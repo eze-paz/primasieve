@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCode Chat</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    height: 100vh;
+    display: flex;
+  }
+  aside {
+    width: 300px;
+    padding: 1rem;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+  }
+  aside input, aside button {
+    padding: 0.5rem 0.625rem;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 5px;
+    color: #e6edf3;
+    font: inherit;
+  }
+  aside button { background: #58a6ff; border-color: #58a6ff; color: #fff; cursor: pointer; }
+  aside button:hover { background: #79b8ff; }
+  aside button.ghost { background: transparent; color: #b4bcd0; border: 1px solid #30363d; }
+  aside button.ghost:hover { background: #21262d; color: #e6edf3; }
+  aside fieldset { border: 1px solid #30363d; border-radius: 5px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; }
+  aside legend { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; padding: 0 0.25rem; }
+  aside .row { display: flex; gap: 0.25rem; }
+  aside .row > * { flex: 1; }
+  aside .hint { font-size: 0.7rem; color: #8b949e; }
+  ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; max-height: 180px; overflow-y: auto; }
+  ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.4rem; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
+  ul.fs-list li.empty { color: #8b949e; justify-content: center; font-style: italic; font-family: inherit; }
+  ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: default; }
+  ul.fs-list .name.folder { color: #58a6ff; cursor: pointer; }
+  ul.fs-list .name.folder:hover { text-decoration: underline; }
+  ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: #8b949e; cursor: pointer; }
+  ul.fs-list button:hover { color: #f85149; background: transparent; }
+  #fileUpload { font-size: 0.75rem; padding: 0.25rem; }
+  .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
+  .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: #8b949e; }
+  .dbx-status.connected { background: rgba(63,185,80,0.1); color: #3fb950; }
+  .dbx-status.error { background: rgba(248,81,73,0.1); color: #f85149; }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+  .msg { max-width: 85%; padding: 0.75rem 1rem; border-radius: 8px; line-height: 1.5; word-wrap: break-word; }
+  .user { align-self: flex-end; background: #58a6ff; color: #fff; white-space: pre-wrap; }
+  .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
+  .err { align-self: center; color: #f85149; font-style: italic; }
+  .info { align-self: center; color: #8b949e; font-style: italic; font-size: 0.85em; }
+  .tool-call, .tool-result { align-self: flex-start; max-width: 85%; padding: 0.5rem 0.75rem; border-radius: 5px; font: 12px/1.4 'JetBrains Mono', Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .tool-call { background: rgba(88,166,255,0.1); border: 1px solid #58a6ff; }
+  .tool-result { background: rgba(63,185,80,0.1); border: 1px solid #3fb950; }
+  .assistant > *:first-child { margin-top: 0; }
+  .assistant > *:last-child { margin-bottom: 0; }
+  .assistant p { margin: 0.5em 0; }
+  .assistant code { background: #0d1117; padding: 0.1em 0.3em; border-radius: 3px; font: 0.9em 'JetBrains Mono', Consolas, monospace; }
+  .assistant pre { background: #0d1117; padding: 0.75rem; border-radius: 5px; overflow-x: auto; margin: 0.5em 0; }
+  .assistant pre code { background: none; padding: 0; font-size: 0.85em; }
+  .assistant ul, .assistant ol { padding-left: 1.5em; margin: 0.5em 0; }
+  .assistant a { color: #58a6ff; }
+  .assistant blockquote { border-left: 3px solid #30363d; padding-left: 0.75em; color: #b4bcd0; margin: 0.5em 0; }
+  .assistant h1, .assistant h2, .assistant h3 { margin: 0.75em 0 0.5em; line-height: 1.3; }
+  .assistant table { border-collapse: collapse; margin: 0.5em 0; }
+  .assistant th, .assistant td { border: 1px solid #30363d; padding: 0.25em 0.5em; }
+  form { display: flex; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid #30363d; }
+  form input { flex: 1; padding: 0.5rem 1rem; background: #161b22; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font: inherit; }
+  form button { padding: 0.5rem 1.25rem; background: #58a6ff; border: none; border-radius: 8px; color: #fff; cursor: pointer; }
+  form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .cursor { display: inline-block; width: 2px; height: 1em; background: #58a6ff; vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<aside>
+  <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+  <input id="model" placeholder="Model (e.g. gpt-4o)">
+  <input id="apiKey" type="password" placeholder="API key">
+  <input id="proxyUrl" placeholder="Proxy URL (optional)">
+  <div class="hint" id="routingHint"></div>
+  <div class="row">
+    <button onclick="saveConfig()">Save</button>
+    <button class="ghost" onclick="clearChat()">Clear chat</button>
+  </div>
+
+  <fieldset>
+    <legend>Dropbox</legend>
+    <input id="dbxAppKey" placeholder="Dropbox app key">
+    <div class="row">
+      <button onclick="dbxConnect()">Connect</button>
+      <button class="ghost" onclick="dbxDisconnect()">Disconnect</button>
+    </div>
+    <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    <input id="dbxPath" placeholder="/" value="/">
+    <div class="row">
+      <button class="ghost" onclick="dbxUp()">↑</button>
+      <button onclick="dbxBrowse()">Browse</button>
+      <button onclick="dbxPull()">Pull → OPFS</button>
+    </div>
+    <ul class="fs-list" id="dbxList"></ul>
+    <button onclick="dbxSync()">Sync OPFS → Dropbox</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Files (OPFS)</legend>
+    <input type="file" id="fileUpload" multiple>
+    <ul class="fs-list" id="fileList"></ul>
+  </fieldset>
+</aside>
+
+<main>
+  <div id="messages"></div>
+  <form onsubmit="event.preventDefault(); send();">
+    <input id="input" placeholder="Type a message..." autocomplete="off">
+    <button id="sendBtn">Send</button>
+  </form>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const messages = [];
+const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
+$('endpoint').value = cfg.endpoint || '';
+$('model').value = cfg.model || '';
+$('apiKey').value = cfg.apiKey || '';
+$('dbxAppKey').value = cfg.dbxAppKey || '';
+$('proxyUrl').value = cfg.proxyUrl || '';
+
+marked.setOptions({ breaks: true, gfm: true });
+const renderMd = text => DOMPurify.sanitize(marked.parse(text));
+
+// ============================================================
+// Routing — picks proxy or direct based on hostname + config
+// ============================================================
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+// Wrap a full URL (https://...) in whichever proxy applies, or return it untouched.
+function api(url) {
+  const stripped = url.replace(/^https?:\/\//, '');
+  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  if (remote) return remote + '/proxy/' + stripped;
+  if (isLocalhost) return '/proxy/' + stripped;
+  return url;
+}
+
+function updateRoutingHint() {
+  const remote = ($('proxyUrl').value || '').trim();
+  const hint = $('routingHint');
+  if (remote) hint.textContent = `Routing via ${remote.replace(/^https?:\/\//, '')}`;
+  else if (isLocalhost) hint.textContent = 'Routing via local /proxy/';
+  else hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
+}
+$('proxyUrl').addEventListener('input', updateRoutingHint);
+updateRoutingHint();
+
+// ============================================================
+// OPFS — flat working filesystem
+// ============================================================
+const opfs = {
+  async dir() { return await navigator.storage.getDirectory(); },
+  async read(path) {
+    const handle = await (await this.dir()).getFileHandle(path);
+    return await (await handle.getFile()).text();
+  },
+  async write(path, content) {
+    const handle = await (await this.dir()).getFileHandle(path, { create: true });
+    const w = await handle.createWritable();
+    await w.write(content);
+    await w.close();
+  },
+  async remove(path) { await (await this.dir()).removeEntry(path); },
+  async list() {
+    const out = [];
+    for await (const [name, h] of (await this.dir()).entries()) {
+      if (h.kind === 'file') out.push(name);
+    }
+    return out.sort();
+  },
+};
+
+// ============================================================
+// Dropbox — OAuth2 PKCE + REST API via /proxy
+// ============================================================
+const DBX_REDIRECT = location.origin + '/';
+
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function pkceChallenge() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return { verifier, challenge: b64url(hash) };
+}
+
+function dbxStatus(text, kind) {
+  const el = $('dbxStatus');
+  el.textContent = text;
+  el.className = 'dbx-status ' + kind;
+}
+
+function dbxTokens() {
+  return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+}
+
+async function dbxAccessToken() {
+  const stored = dbxTokens();
+  if (!stored) throw new Error('Dropbox not connected');
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  // refresh
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: stored.refresh_token,
+    client_id: stored.app_key,
+  });
+  const res = await fetch(api('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
+  const data = await res.json();
+  stored.access_token = data.access_token;
+  stored.expires_at = Date.now() + data.expires_in * 1000;
+  localStorage.setItem('dbx-tokens', JSON.stringify(stored));
+  return data.access_token;
+}
+
+async function dbxConnect() {
+  const appKey = $('dbxAppKey').value.trim();
+  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
+  saveConfig();
+  const { verifier, challenge } = await pkceChallenge();
+  sessionStorage.setItem('dbx-verifier', verifier);
+  sessionStorage.setItem('dbx-app-key', appKey);
+  const params = new URLSearchParams({
+    client_id: appKey,
+    response_type: 'code',
+    redirect_uri: DBX_REDIRECT,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    token_access_type: 'offline',
+  });
+  location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
+}
+
+function dbxDisconnect() {
+  localStorage.removeItem('dbx-tokens');
+  $('dbxList').innerHTML = '';
+  dbxStatus('Not connected', 'disconnected');
+}
+
+async function dbxExchangeCode(code) {
+  const verifier = sessionStorage.getItem('dbx-verifier');
+  const appKey = sessionStorage.getItem('dbx-app-key');
+  if (!verifier || !appKey) throw new Error('Missing PKCE state');
+  const body = new URLSearchParams({
+    code,
+    grant_type: 'authorization_code',
+    client_id: appKey,
+    code_verifier: verifier,
+    redirect_uri: DBX_REDIRECT,
+  });
+  const res = await fetch(api('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Code exchange failed: ' + await res.text());
+  const data = await res.json();
+  localStorage.setItem('dbx-tokens', JSON.stringify({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Date.now() + data.expires_in * 1000,
+    app_key: appKey,
+  }));
+  sessionStorage.removeItem('dbx-verifier');
+  sessionStorage.removeItem('dbx-app-key');
+}
+
+async function dbxApi(path, body) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://api.dropboxapi.com' + path), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+async function dbxList(folderPath) {
+  const data = await dbxApi('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath });
+  return data.entries.map(e => ({ name: e.name, kind: e['.tag'], path: e.path_display }));
+}
+
+async function dbxDownload(path) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://content.dropboxapi.com/2/files/download'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Content-Type': 'text/plain',
+    },
+  });
+  if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
+  return await res.text();
+}
+
+async function dbxUpload(path, content) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://content.dropboxapi.com/2/files/upload'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+}
+
+// ----- Dropbox UI -----
+function joinPath(folder, name) {
+  if (folder === '/' || folder === '') return '/' + name;
+  return folder.replace(/\/$/, '') + '/' + name;
+}
+
+async function dbxBrowse() {
+  if (!dbxTokens()) { dbxStatus('Not connected', 'error'); return; }
+  const path = $('dbxPath').value.trim() || '/';
+  const ul = $('dbxList');
+  ul.innerHTML = '<li class="empty">Loading…</li>';
+  try {
+    const entries = await dbxList(path);
+    ul.innerHTML = '';
+    if (!entries.length) {
+      ul.innerHTML = '<li class="empty">(empty)</li>';
+      return;
+    }
+    entries.sort((a, b) => (a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name)));
+    for (const e of entries) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.className = 'name' + (e.kind === 'folder' ? ' folder' : '');
+      span.textContent = (e.kind === 'folder' ? '📁 ' : '📄 ') + e.name;
+      if (e.kind === 'folder') {
+        span.onclick = () => { $('dbxPath').value = e.path; dbxBrowse(); };
+      }
+      li.appendChild(span);
+      ul.appendChild(li);
+    }
+  } catch (e) {
+    ul.innerHTML = '';
+    dbxStatus(e.message, 'error');
+  }
+}
+
+function dbxUp() {
+  const cur = $('dbxPath').value.trim() || '/';
+  if (cur === '/' || cur === '') return;
+  const parent = cur.replace(/\/[^/]+\/?$/, '') || '/';
+  $('dbxPath').value = parent;
+  dbxBrowse();
+}
+
+async function dbxPull() {
+  if (!dbxTokens()) { dbxStatus('Not connected', 'error'); return; }
+  const path = $('dbxPath').value.trim() || '/';
+  try {
+    dbxStatus('Pulling…', 'connected');
+    const entries = await dbxList(path);
+    let count = 0;
+    for (const e of entries) {
+      if (e.kind !== 'file') continue;
+      const content = await dbxDownload(e.path);
+      await opfs.write(e.name, content);
+      count++;
+    }
+    await refreshFileList();
+    dbxStatus(`Pulled ${count} file${count === 1 ? '' : 's'} from ${path}`, 'connected');
+  } catch (e) {
+    dbxStatus('Pull failed: ' + e.message, 'error');
+  }
+}
+
+async function dbxSync() {
+  if (!dbxTokens()) { dbxStatus('Not connected', 'error'); return; }
+  const path = $('dbxPath').value.trim() || '/';
+  try {
+    dbxStatus('Syncing…', 'connected');
+    const files = await opfs.list();
+    let count = 0;
+    for (const name of files) {
+      const content = await opfs.read(name);
+      await dbxUpload(joinPath(path, name), content);
+      count++;
+    }
+    dbxStatus(`Synced ${count} file${count === 1 ? '' : 's'} → ${path}`, 'connected');
+  } catch (e) {
+    dbxStatus('Sync failed: ' + e.message, 'error');
+  }
+}
+
+// Handle OAuth redirect-back (?code=…) on page load
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (code) {
+    try {
+      await dbxExchangeCode(code);
+      history.replaceState({}, '', location.pathname);
+      dbxStatus('Connected', 'connected');
+    } catch (e) {
+      dbxStatus('Auth failed: ' + e.message, 'error');
+    }
+  } else if (dbxTokens()) {
+    dbxStatus('Connected', 'connected');
+  }
+})();
+
+// ============================================================
+// Pyodide — lazy-loaded Python runtime
+// ============================================================
+let pyPromise = null;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function getPy() {
+  if (pyPromise) return pyPromise;
+  pyPromise = (async () => {
+    await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    try { p.FS.mkdir('/files'); } catch {}
+    return p;
+  })();
+  return pyPromise;
+}
+
+// Wipe Pyodide's /files dir, copy current OPFS files into it.
+async function syncOpfsToPy(p) {
+  for (const name of p.FS.readdir('/files')) {
+    if (name === '.' || name === '..') continue;
+    const full = '/files/' + name;
+    try {
+      const stat = p.FS.stat(full);
+      if (p.FS.isFile(stat.mode)) p.FS.unlink(full);
+    } catch {}
+  }
+  for (const name of await opfs.list()) {
+    p.FS.writeFile('/files/' + name, await opfs.read(name));
+  }
+}
+
+// Mirror Pyodide's /files (top-level files only) back to OPFS.
+async function syncPyToOpfs(p) {
+  const pyFiles = new Set();
+  for (const name of p.FS.readdir('/files')) {
+    if (name === '.' || name === '..') continue;
+    const full = '/files/' + name;
+    let stat;
+    try { stat = p.FS.stat(full); } catch { continue; }
+    if (!p.FS.isFile(stat.mode)) continue;
+    pyFiles.add(name);
+    const content = p.FS.readFile(full, { encoding: 'utf8' });
+    await opfs.write(name, content);
+  }
+  for (const name of await opfs.list()) {
+    if (!pyFiles.has(name)) await opfs.remove(name);
+  }
+}
+
+// ============================================================
+// Tools — backed by OPFS
+// ============================================================
+const tools = {
+  run_python: {
+    description: `Execute Python via Pyodide. Files at /files/ (flat; subdirectories are not persisted). Output via print(). HTTP via pyodide.http.pyfetch (subject to CORS). Pure-Python packages installable with \`await micropip.install('pkg')\`; ~100 are prebuilt (numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess. Examples:
+  read   →  print(open('/files/notes.txt').read())
+  list   →  import os; print(os.listdir('/files'))
+  write  →  open('/files/out.md','w').write(text)
+  edit   →  p='/files/notes.txt'; open(p,'w').write(open(p).read().replace('old','new'))
+  search →  import re, glob
+            for f in glob.glob('/files/*'):
+                hits = re.findall(r'TODO.*', open(f).read())
+                if hits: print(f, hits)
+  fetch  →  from pyodide.http import pyfetch
+            r = await pyfetch('https://httpbin.org/html')      # CORS-friendly site: direct
+            print((await r.string())[:200])
+  noCORS →  r = await pyfetch('/proxy/example.com/')           # site lacks CORS: route via local proxy
+            print((await r.string())[:200])`,
+    parameters: { type: 'object', properties: { code: { type: 'string', description: 'Python source to execute' } }, required: ['code'] },
+    run: async ({ code }) => {
+      let loadingMsg = null;
+      if (!pyPromise) loadingMsg = addMsg('info', '⏳ Loading Pyodide (~10MB, first call only)…');
+      let p;
+      try { p = await getPy(); }
+      catch (e) { loadingMsg?.remove(); return 'Error loading Pyodide: ' + e.message; }
+      loadingMsg?.remove();
+
+      let stdout = '', stderr = '';
+      p.setStdout({ batched: s => stdout += s + '\n' });
+      p.setStderr({ batched: s => stderr += s + '\n' });
+      try {
+        await syncOpfsToPy(p);
+        await p.runPythonAsync(code);
+        await syncPyToOpfs(p);
+        await refreshFileList();
+        let out = stdout.trimEnd();
+        if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+        return out || '(no output)';
+      } catch (e) {
+        const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
+        return `Error: ${e.message}${tail}`;
+      } finally {
+        p.setStdout({});
+        p.setStderr({});
+      }
+    },
+  },
+};
+
+const toolDefs = () => Object.entries(tools).map(([name, t]) => ({
+  type: 'function',
+  function: { name, description: t.description, parameters: t.parameters },
+}));
+
+// ============================================================
+// OPFS file-list UI
+// ============================================================
+async function refreshFileList() {
+  const ul = $('fileList');
+  ul.innerHTML = '';
+  const files = await opfs.list();
+  if (!files.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = '(empty)';
+    ul.appendChild(li);
+    return;
+  }
+  for (const name of files) {
+    const li = document.createElement('li');
+    const span = document.createElement('span');
+    span.className = 'name';
+    span.textContent = name;
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.title = 'Delete';
+    del.onclick = async () => { await opfs.remove(name); await refreshFileList(); };
+    li.append(span, del);
+    ul.appendChild(li);
+  }
+}
+
+$('fileUpload').addEventListener('change', async (e) => {
+  for (const f of e.target.files) await opfs.write(f.name, await f.text());
+  e.target.value = '';
+  await refreshFileList();
+});
+
+refreshFileList();
+
+// ============================================================
+// Config / chat
+// ============================================================
+function saveConfig() {
+  localStorage.setItem('opencode-config', JSON.stringify({
+    endpoint: $('endpoint').value,
+    model: $('model').value,
+    apiKey: $('apiKey').value,
+    dbxAppKey: $('dbxAppKey').value,
+    proxyUrl: $('proxyUrl').value,
+  }));
+}
+
+function clearChat() {
+  messages.length = 0;
+  $('messages').innerHTML = '';
+}
+
+function addMsg(role, text = '') {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+  $('messages').appendChild(div);
+  div.scrollIntoView({ block: 'end' });
+  return div;
+}
+
+async function streamRound() {
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = api(endpoint + '/chat/completions');
+  const body = { model: $('model').value, messages, stream: true, tools: toolDefs() };
+
+  const reply = addMsg('assistant');
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  reply.appendChild(cursor);
+
+  let displayed = '', pending = '', streamDone = false;
+  const drain = new Promise(resolve => {
+    const tick = () => {
+      if (pending.length === 0) {
+        if (streamDone) return resolve();
+        return requestAnimationFrame(tick);
+      }
+      const n = Math.max(1, Math.ceil(pending.length / 30));
+      displayed += pending.slice(0, n);
+      pending = pending.slice(n);
+      reply.innerHTML = renderMd(displayed);
+      reply.appendChild(cursor);
+      $('messages').scrollTop = $('messages').scrollHeight;
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    streamDone = true;
+    reply.remove();
+    throw new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const toolCalls = [];
+  let buffer = '', content = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+      try {
+        const delta = JSON.parse(data).choices?.[0]?.delta;
+        if (!delta) continue;
+        if (delta.content) {
+          content += delta.content;
+          pending += delta.content;
+        }
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const i = tc.index || 0;
+            if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+            if (tc.id) toolCalls[i].id = tc.id;
+            if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
+            if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
+          }
+        }
+      } catch {}
+    }
+  }
+  streamDone = true;
+  await drain;
+  cursor.remove();
+  if (!content && !toolCalls.length) reply.remove();
+  return { content, toolCalls: toolCalls.filter(tc => tc.id) };
+}
+
+async function send() {
+  const text = $('input').value.trim();
+  if (!text) return;
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Fill in endpoint, model, and API key.');
+    return;
+  }
+  messages.push({ role: 'user', content: text });
+  addMsg('user', text);
+  $('input').value = '';
+  $('sendBtn').disabled = true;
+
+  try {
+    while (true) {
+      const { content, toolCalls } = await streamRound();
+      if (!toolCalls.length) {
+        if (content) messages.push({ role: 'assistant', content });
+        break;
+      }
+      messages.push({ role: 'assistant', content, tool_calls: toolCalls });
+      for (const tc of toolCalls) {
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+        addMsg('tool-call', `→ ${tc.function.name}(${JSON.stringify(args)})`);
+        const result = await tools[tc.function.name].run(args);
+        addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      }
+    }
+  } catch (e) {
+    addMsg('err', 'Error: ' + e.message);
+  } finally {
+    $('sendBtn').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
