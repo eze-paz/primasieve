@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script id="serve-py-source" type="text/plain">
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-import http.client, urllib.parse, os, sys, webbrowser, subprocess, json
+import http.client, urllib.parse, os, sys, subprocess, json
 
 PORT = 8080
 SHELL_CWD = os.path.dirname(os.path.abspath(__file__))
@@ -20,8 +20,10 @@ ALLOWED_ORIGINS = {
 }
 # Cloud-mode hardening (set in production via env vars):
 #   SANDPIE_NO_SHELL=1        → /shell endpoint returns 404 (disables RCE on a public host)
+#   SANDPIE_NO_FILE=1         → /file endpoint returns 404 (disables arbitrary FS read/write)
 #   SANDPIE_RESTRICT_PROXY=1  → /proxy/* requires Origin header in ALLOWED_ORIGINS when present
 SHELL_ENABLED = os.environ.get('SANDPIE_NO_SHELL', '') != '1'
+FILE_ENABLED  = os.environ.get('SANDPIE_NO_FILE', '')  != '1'
 RESTRICT_PROXY = os.environ.get('SANDPIE_RESTRICT_PROXY', '') == '1'
 
 class H(SimpleHTTPRequestHandler):
@@ -36,13 +38,17 @@ class H(SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', '*')
         self.end_headers()
 
     def do_GET(self):
         if self.path.startswith('/proxy/'):
             return self._proxy('GET', None)
+        if self.path.startswith('/file'):
+            if not FILE_ENABLED:
+                return self.send_error(404)
+            return self._file_read()
         super().do_GET()
 
     def do_POST(self):
@@ -50,10 +56,21 @@ class H(SimpleHTTPRequestHandler):
             if not SHELL_ENABLED:
                 return self.send_error(404)
             return self._shell()
+        if self.path.startswith('/file'):
+            if not FILE_ENABLED:
+                return self.send_error(404)
+            return self._file_write()
         if not self.path.startswith('/proxy/'):
             return self.send_error(404)
         body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
         self._proxy('POST', body)
+
+    def do_PUT(self):
+        if self.path.startswith('/file'):
+            if not FILE_ENABLED:
+                return self.send_error(404)
+            return self._file_write()
+        self.send_error(404)
 
     def _proxy(self, method, body):
         if RESTRICT_PROXY:
@@ -81,13 +98,77 @@ class H(SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Content-Type', resp.getheader('Content-Type', 'application/octet-stream'))
             self.end_headers()
-            while True:
-                chunk = resp.read1(8192)
-                if not chunk: break
-                self.wfile.write(chunk)
-                self.wfile.flush()
+            try:
+                while True:
+                    chunk = resp.read1(8192)
+                    if not chunk: break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError) as e:
+                # Browser dropped the stream (Stop button, navigate, tab close).
+                # Normal during SSE streaming — log one line, don't propagate.
+                with open('proxy.log', 'a', encoding='utf-8') as _log:
+                    _log.write(f'[proxy] client disconnect: {e.__class__.__name__}\n')
         finally:
             conn.close()
+
+    def _file_read(self):
+        """GET /file?path=/abs/path  → stream file from device to browser.
+        Origin-gated like /shell — without it any cross-origin tab on the same
+        browser could read arbitrary files via the localhost server."""
+        origin = self.headers.get('Origin')
+        if origin and origin not in ALLOWED_ORIGINS:
+            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        path = qs.get('path', [''])[0]
+        if not path:
+            return self._json(400, {'error': 'missing path'})
+        if not os.path.isfile(path):
+            return self._json(404, {'error': 'file not found'})
+        with open('proxy.log', 'a', encoding='utf-8') as _log:
+            _log.write(f'[file] GET {path}\n'); _log.flush()
+        try:
+            size = os.path.getsize(path)
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Length', str(size))
+            self.send_header('X-File-Path', path)
+            self.end_headers()
+            try:
+                with open(path, 'rb') as f:
+                    while True:
+                        chunk = f.read(65536)
+                        if not chunk: break
+                        self.wfile.write(chunk)
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                pass  # client gone — don't traceback
+        except Exception as e:
+            try: self._json(500, {'error': str(e)})
+            except Exception: pass
+
+    def _file_write(self):
+        """POST|PUT /file?path=/abs/path  → upload file from browser to device.
+        Same origin gate as _shell. Creates parent dirs."""
+        origin = self.headers.get('Origin')
+        if origin not in ALLOWED_ORIGINS:
+            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        path = qs.get('path', [''])[0]
+        if not path:
+            return self._json(400, {'error': 'missing path'})
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(length) if length else b''
+            parent = os.path.dirname(path)
+            if parent: os.makedirs(parent, exist_ok=True)
+            with open(path, 'wb') as f:
+                f.write(body)
+            with open('proxy.log', 'a', encoding='utf-8') as _log:
+                _log.write(f'[file] PUT {path} ({len(body)} bytes)\n'); _log.flush()
+            self._json(200, {'bytes': len(body), 'path': path})
+        except Exception as e:
+            self._json(500, {'error': str(e)})
 
     def _shell(self):
         origin = self.headers.get('Origin')
@@ -156,24 +237,8 @@ class H(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-print(f'Serving at http://localhost:{PORT}  (shell cwd: {SHELL_CWD})')
-# Bootstrap: when running as a downloaded standalone script (no sandpie.html
-# alongside us), fetch the latest copy from the public deployment so the page
-# can be served same-origin from localhost:8080 — eliminates CORS entirely.
-# Set SANDPIE_BOOTSTRAP=0 to skip (cloud deploy does this; Apache serves the
-# page from htdocs and doesn't need a local /opt/sandpie/sandpie.html).
-SANDPIE_URL = os.environ.get('SANDPIE_URL', 'https://gasn2cloud.com/sdk/sandpie.html')
-if not os.path.isfile('sandpie.html') and os.environ.get('SANDPIE_BOOTSTRAP', '1') != '0':
-    import urllib.request
-    try:
-        print(f'Bootstrap: fetching {SANDPIE_URL}')
-        with urllib.request.urlopen(SANDPIE_URL, timeout=15) as r:
-            with open('sandpie.html', 'wb') as f: f.write(r.read())
-        print(f'  → saved sandpie.html')
-    except Exception as e:
-        print(f'  bootstrap failed: {e} (page will not be served locally)')
-if os.path.isfile('sandpie.html'):
-    webbrowser.open(f'http://localhost:{PORT}/sandpie.html')
+print(f'Sandpie proxy listening on http://localhost:{PORT}  (shell cwd: {SHELL_CWD})')
+print(f'  shell: {"on" if SHELL_ENABLED else "off"}   file: {"on" if FILE_ENABLED else "off"}   restrict-proxy: {"on" if RESTRICT_PROXY else "off"}')
 HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 </script>
 <style>
@@ -357,6 +422,13 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: #161b22; border-color: #444c56; }
   ul.conv-list li.active { background: #1f2733; border-color: #58a6ff; }
+  ul.conv-list li.archived { opacity: 0.55; }
+  ul.conv-list li.archived-toggle {
+    background: transparent; border: none; color: #8b949e;
+    font: 0.7rem inherit; padding: 0.45rem 0.4rem 0.15rem; justify-content: flex-start;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  ul.conv-list li.archived-toggle:hover { color: #b4bcd0; background: transparent; border: none; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
   /* Empty-conversation welcome — vertically centered greeting + status */
   .welcome {
@@ -1989,9 +2061,19 @@ async function ensureActiveConv() {
 
 async function saveActiveConv() {
   if (!activeConvId || !messages.length) return;
+  // Read existing file to preserve user-set flags (pinned/archived/titleLocked).
+  let prev = {};
+  try { prev = JSON.parse(await opfs.read(convPath(activeConvId))); } catch {}
   const firstUser = messages.find(m => m.role === 'user');
-  const title = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
-  const data = { id: activeConvId, title, updated: new Date().toISOString(), messages };
+  const derived = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
+  const title = (prev.titleLocked && prev.title) ? prev.title : derived;
+  const data = {
+    ...prev,
+    id: activeConvId,
+    title,
+    updated: new Date().toISOString(),
+    messages,
+  };
   await opfs.write(convPath(activeConvId), JSON.stringify(data));
   await refreshConversationList();
 }
@@ -2066,7 +2148,13 @@ async function listConversations() {
     const id = e.name.slice(0, -5);
     try {
       const data = JSON.parse(await opfs.read(convPath(id)));
-      out.push({ id: data.id || id, title: data.title || '(no title)', updated: data.updated || '' });
+      out.push({
+        id: data.id || id,
+        title: data.title || '(no title)',
+        updated: data.updated || '',
+        pinned: !!data.pinned,
+        archived: !!data.archived,
+      });
     } catch {}
   }
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
@@ -2102,12 +2190,89 @@ function refreshWelcome() {
   $('welcomeStatus').textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
 
+// Persists across re-renders (module-level) so toggling expansion doesn't
+// snap shut every time saveActiveConv triggers a refresh.
+let archivedExpanded = false;
+
+async function updateConvFile(id, patch) {
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); }
+  catch { return; }
+  Object.assign(data, patch);
+  await opfs.write(convPath(id), JSON.stringify(data));
+}
+
+async function renameConv(id, current) {
+  const next = prompt('Rename conversation', current);
+  if (next == null) return;
+  const trimmed = next.trim();
+  if (!trimmed || trimmed === current) return;
+  // titleLocked: stops saveActiveConv from clobbering the rename next save.
+  await updateConvFile(id, { title: trimmed, titleLocked: true });
+  await refreshConversationList();
+}
+
+async function togglePinConv(id, currentlyPinned) {
+  await updateConvFile(id, { pinned: !currentlyPinned });
+  await refreshConversationList();
+}
+
+async function toggleArchiveConv(id, currentlyArchived) {
+  await updateConvFile(id, { archived: !currentlyArchived });
+  await refreshConversationList();
+}
+
+async function deleteConv(id, title) {
+  const dbxNote = dbxTokens() ? ' Next sync will also remove the Dropbox copy.' : '';
+  if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
+  // Manifest entry left intact so the next sync propagates the delete to
+  // Dropbox — same semantics as deleting a file from the file list.
+  try { await opfs.remove(convPath(id)); } catch {}
+  if (id === activeConvId) {
+    activeConvId = null;
+    localStorage.removeItem('sandpie-active-conv');
+    messages.length = 0;
+    clearMessagesUI();
+    refreshTokenMeter();
+    refreshWelcome();
+  }
+  await refreshConversationList();
+}
+
+function buildConvLi(c) {
+  const li = document.createElement('li');
+  if (c.id === activeConvId) li.classList.add('active');
+  if (c.archived) li.classList.add('archived');
+  const span = document.createElement('span');
+  span.className = 'name';
+  span.textContent = (c.pinned ? '📌 ' : '') + c.title;
+  span.title = c.updated || '';
+  span.onclick = () => loadConv(c.id);
+  li.appendChild(span);
+  li.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    showContextMenu(ev.clientX, ev.clientY, [
+      { label: 'Rename',                           action: () => renameConv(c.id, c.title) },
+      { label: c.pinned ? 'Unpin' : 'Pin',         action: () => togglePinConv(c.id, c.pinned) },
+      { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
+      { label: 'Delete', danger: true,             action: () => deleteConv(c.id, c.title) },
+    ]);
+  });
+  return li;
+}
+
 async function refreshConversationList() {
   refreshNewChatButton();
   const ul = $('convList');
   if (!ul) return;
   const list = await listConversations();
-  $('convCount').textContent = list.length ? `${list.length}` : '';
+  // listConversations already sorts by updated desc; partition preserves that.
+  const pinned   = list.filter(c => c.pinned && !c.archived);
+  const regular  = list.filter(c => !c.pinned && !c.archived);
+  const archived = list.filter(c => c.archived);
+  // Badge counts visible (non-archived) chats; archived live behind the toggle.
+  const visible = pinned.length + regular.length;
+  $('convCount').textContent = visible ? `${visible}` : '';
   const frag = document.createDocumentFragment();
   if (!list.length) {
     const li = document.createElement('li');
@@ -2117,16 +2282,15 @@ async function refreshConversationList() {
     ul.replaceChildren(frag);
     return;
   }
-  for (const c of list) {
-    const li = document.createElement('li');
-    if (c.id === activeConvId) li.classList.add('active');
-    const span = document.createElement('span');
-    span.className = 'name';
-    span.textContent = c.title;
-    span.title = c.updated || '';
-    span.onclick = () => loadConv(c.id);
-    li.appendChild(span);
-    frag.appendChild(li);
+  for (const c of pinned)  frag.appendChild(buildConvLi(c));
+  for (const c of regular) frag.appendChild(buildConvLi(c));
+  if (archived.length) {
+    const header = document.createElement('li');
+    header.className = 'archived-toggle';
+    header.textContent = `${archivedExpanded ? '▾' : '▸'} Archived (${archived.length})`;
+    header.onclick = () => { archivedExpanded = !archivedExpanded; refreshConversationList(); };
+    frag.appendChild(header);
+    if (archivedExpanded) for (const c of archived) frag.appendChild(buildConvLi(c));
   }
   ul.replaceChildren(frag);
 }
