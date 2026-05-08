@@ -607,6 +607,16 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 // sandboxed iframe inside the last assistant bubble. Scripts run inside the
 // iframe and can't reach the host page.
 (function () {
+  // Sanctioned channel for tools (e.g. Pyodide IPython display) to push
+  // rich output. We append a wrapper div with the HTML; the observer below
+  // catches it and re-homes it into a sandboxed iframe just like any other
+  // body-level mutation.
+  window._sandpieDisplay = function (html) {
+    const div = document.createElement('div');
+    div.innerHTML = String(html || '');
+    document.body.appendChild(div);
+  };
+
   // Listen for size reports from sandboxed artifact iframes.
   window.addEventListener('message', e => {
     if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
@@ -646,8 +656,9 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 
   const obs = new MutationObserver(records => {
     for (const r of records) {
-      if (r.target !== document.body) continue;
       for (const n of r.addedNodes) {
+        // <head>/<body> are legit children of <html>.
+        if (n === document.head || n === document.body) continue;
         // Allow nodes the app explicitly marks as legitimate chrome
         // (context menus, transient download anchors, etc.).
         if (n.nodeType === 1 && n.hasAttribute('data-chrome')) continue;
@@ -656,7 +667,9 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     }
   });
   document.addEventListener('DOMContentLoaded', () => {
+    // Watch both body and html so `documentElement.appendChild` can't dodge.
     obs.observe(document.body, { childList: true });
+    obs.observe(document.documentElement, { childList: true });
   });
 })();
 </script>
@@ -1657,6 +1670,12 @@ HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, rou
 
 No raw sockets, no subprocess.
 
+RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPython.display:
+    from IPython.display import display, HTML, Image, SVG
+    display(HTML('<b>hi</b>'))                  # rendered as a sandboxed iframe artifact
+    display(Image(filename='plot.png'))         # PNG bytes shown inline
+The artifact appears below the assistant message; do NOT inject <script> into document.body, attachShadow, or otherwise touch the host DOM — the page locks down stray DOM mutations.
+
 Examples:
   list    →  import os; print(os.listdir())               # lists /files
   read    →  print(open('notes.txt').read())
@@ -1699,6 +1718,52 @@ Examples:
         // (numpy, pandas, beautifulsoup4, micropip, …). Without this the LLM
         // hits ModuleNotFoundError for ~100 packages that are otherwise free.
         try { await p.loadPackagesFromImports(code); } catch {}
+        // IPython.display.display(HTML(...))/Image/SVG/etc. fall back to repr
+        // in headless Pyodide. Patch display() to route rich reprs through
+        // window._sandpieDisplay; the quarantine observer wraps each emission
+        // in a sandboxed iframe in the last assistant bubble.
+        try {
+          p.runPython(`
+def _sandpie_display(*objs, **kwargs):
+    import base64
+    try:
+        import js
+    except Exception:
+        return
+    for obj in objs:
+        html = None
+        try:
+            if hasattr(obj, '_repr_html_'):
+                html = obj._repr_html_()
+            if html is None and hasattr(obj, '_repr_svg_'):
+                html = obj._repr_svg_()
+            if html is None and hasattr(obj, '_repr_png_'):
+                d = obj._repr_png_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/png;base64,' + d + '">'
+            if html is None and hasattr(obj, '_repr_jpeg_'):
+                d = obj._repr_jpeg_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/jpeg;base64,' + d + '">'
+        except Exception as e:
+            html = '<pre>display error: ' + str(e) + '</pre>'
+        if html is None:
+            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            html = '<pre>' + s + '</pre>'
+        try:
+            js._sandpieDisplay(html)
+        except Exception:
+            pass
+
+try:
+    import IPython.display as _ipd
+    _ipd.display = _sandpie_display
+except Exception:
+    pass
+`);
+        } catch {}
         await p.runPythonAsync(code);
         await syncPyToOpfs(p);
         await refreshFileList();
