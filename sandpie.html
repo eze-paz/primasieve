@@ -2289,6 +2289,13 @@ refreshFileList();
   }
   refreshTokenMeter();
   refreshWelcome();
+  // Scroll to the bottom after layout settles. Use a double rAF so any
+  // late-arriving image loads also trigger a follow-up nudge.
+  const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
+  requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
+  document.querySelectorAll('#messages img').forEach(img => {
+    if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
+  });
 })();
 
 // ============================================================
