@@ -2202,6 +2202,8 @@ async function loadConv(id) {
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
+  const m = $('messages');
+  m.scrollTop = m.scrollHeight;
 }
 
 async function newConversation() {
