@@ -737,15 +737,20 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <input id="apiKey" type="password" placeholder="API key">
       <!-- LOCAL_LLM: BEGIN — in-browser inference via WebLLM (MLC). Delete
            this block + the JS marked LOCAL_LLM + the early-return branch in
-           streamRound to fully revert. Text-only, no tool calls. -->
+           streamRound to fully revert. WebLLM gates tool support to a
+           hardcoded allowlist (the Hermes models below); other models run
+           chat-only. -->
       <div class="or-sep">— OR —</div>
       <select id="localLlmModel">
         <option value="">Run model locally (WebGPU)…</option>
-        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B (~1.9 GB)</option>
-        <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B (~2 GB)</option>
-        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 mini (~2.2 GB)</option>
-        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B (~1 GB)</option>
-        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B (~1.4 GB)</option>
+        <option value="Hermes-3-Llama-3.1-8B-q4f16_1-MLC">Hermes 3 Llama 3.1 8B — tools (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC">Hermes 2 Pro Llama 3 8B — tools (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Mistral-7B-q4f16_1-MLC">Hermes 2 Pro Mistral 7B — tools (~4 GB)</option>
+        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B — chat only (~1.9 GB)</option>
+        <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — chat only (~2 GB)</option>
+        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 mini — chat only (~2.2 GB)</option>
+        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B — chat only (~1 GB)</option>
+        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B — chat only (~1.4 GB)</option>
       </select>
       <button id="localLlmLoad" class="ghost">Load local model</button>
       <div id="localLlmStatus" class="hint"></div>
@@ -2721,22 +2726,52 @@ let currentAbort = null;
 
 // LOCAL_LLM: BEGIN — in-browser WebLLM/MLC inference. Delete this block,
 // the streamRound branch (search LOCAL_LLM there), the HTML block and the
-// CSS lines marked /* LOCAL_LLM */ to fully revert. No tool calls — small
-// local models tool-call unreliably; that's the safety boundary.
+// CSS lines marked /* LOCAL_LLM */ to fully revert. WebLLM gates tool
+// support to a hardcoded allowlist (the Hermes models below); other
+// models load chat-only.
 let localEngine = null;
+let localWorker = null;
+let localEngineModel = '';
+const LOCAL_LLM_TOOLS_OK = new Set([
+  'Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC',
+  'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC',
+  'Hermes-2-Pro-Mistral-7B-q4f16_1-MLC',
+  'Hermes-3-Llama-3.1-8B-q4f32_1-MLC',
+  'Hermes-3-Llama-3.1-8B-q4f16_1-MLC',
+]);
 async function loadLocalLlm() {
   const sel = $('localLlmModel'), btn = $('localLlmLoad'), status = $('localLlmStatus');
   if (!sel.value) { status.textContent = 'pick a model first'; return; }
   if (!('gpu' in navigator)) { status.textContent = 'WebGPU not available — needs Chrome/Edge 113+'; return; }
   btn.disabled = true; status.textContent = 'starting…';
+  // Free any prior model before loading a new one — otherwise GPU memory
+  // accumulates and Chrome eventually evicts the WebGPU context.
+  try { await localEngine?.unload?.(); } catch {}
+  try { localWorker?.terminate(); } catch {}
+  localEngine = null; localWorker = null;
   try {
-    const { CreateMLCEngine } = await import('https://esm.run/@mlc-ai/web-llm');
-    localEngine = await CreateMLCEngine(sel.value, {
+    const { CreateWebWorkerMLCEngine } = await import('https://esm.run/@mlc-ai/web-llm');
+    // Inline worker via Blob URL keeps sandpie a single file. The worker
+    // pulls the same web-llm module from esm.run and exposes the standard
+    // WebWorkerMLCEngineHandler the main thread talks to.
+    const workerCode =
+      'import { WebWorkerMLCEngineHandler } from "https://esm.run/@mlc-ai/web-llm";\n' +
+      'const handler = new WebWorkerMLCEngineHandler();\n' +
+      'self.onmessage = (msg) => handler.onmessage(msg);';
+    localWorker = new Worker(
+      URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' })),
+      { type: 'module' }
+    );
+    localEngine = await CreateWebWorkerMLCEngine(localWorker, sel.value, {
       initProgressCallback: r => { status.textContent = `${Math.round(r.progress * 100)}% — ${(r.text || '').slice(0, 60)}`; },
     });
     status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready (chat uses this; tools may misfire)`;
     btn.textContent = 'Reload local model'; btn.disabled = false;
-  } catch (e) { status.textContent = '✗ ' + e.message; btn.disabled = false; }
+  } catch (e) {
+    try { localWorker?.terminate(); } catch {}
+    localWorker = null; localEngine = null;
+    status.textContent = '✗ ' + e.message; btn.disabled = false;
+  }
 }
 $('localLlmLoad').addEventListener('click', loadLocalLlm);
 // LOCAL_LLM: END
@@ -2853,6 +2888,10 @@ async function streamRound(signal) {
   // is decent, smaller models tend to produce malformed JSON args.
   // Delete this if-block to revert to API-only behavior.
   if (localEngine) {
+    // Hold a screen wake lock during inference so Chrome doesn't throttle
+    // the tab if the user looks away — local generation can run for minutes.
+    let wakeLock = null;
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
     try {
       const stream = await localEngine.chat.completions.create({
         messages: [buildSystemPrompt(), ...messages],
@@ -2865,7 +2904,9 @@ async function streamRound(signal) {
       }
     } catch (e) {
       if (signal?.aborted) aborted = true;
-      else { streamDone = true; reply.remove(); throw e; }
+      else { streamDone = true; reply.remove(); try { await wakeLock?.release(); } catch {} throw e; }
+    } finally {
+      try { await wakeLock?.release(); } catch {}
     }
     streamDone = true;
     await drain;
