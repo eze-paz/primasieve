@@ -375,6 +375,16 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   form button.sending:hover { background: #8b949e; }
   form button:disabled { opacity: 0.5; cursor: not-allowed; }
   .cursor { display: inline-block; width: 2px; height: 1em; background: #58a6ff; vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
+  /* Per-completion duration ticker. Sits under the assistant bubble; updates
+     once a second while the round is in flight, then locks the final value. */
+  .msg-timer {
+    font: 0.7rem 'JetBrains Mono', Consolas, monospace;
+    color: #58a6ff;
+    padding: 0 0.25rem 0.25rem;
+    margin-top: -0.25rem;
+    user-select: none;
+  }
+  .msg-timer.done { color: #6e7681; }
   @keyframes blink { 50% { opacity: 0; } }
   /* Collapsible service sections */
   aside details.service { border: 1px solid #30363d; border-radius: 5px; background: #0d1117; }
@@ -592,6 +602,50 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     .msg { max-width: 95%; }
   }
 </style>
+<script>
+// Stray-DOM guard. Anything appended as a direct child of <body> after the
+// initial parse is treated as model-injected output and re-homed into a
+// sandboxed iframe inside the last assistant bubble. Scripts run inside the
+// iframe and can't reach the host page.
+(function () {
+  function quarantine(node) {
+    if (node.nodeType !== 1) { node.remove(); return; }
+    const messages = document.getElementById('messages');
+    if (!messages) return;
+    const host = messages.querySelector('.msg.assistant:last-of-type') || messages;
+
+    const html = node.outerHTML || node.textContent || '';
+    node.remove();
+
+    const frame = document.createElement('iframe');
+    frame.className = 'artifact-frame';
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.style.cssText = 'width:100%;border:0;background:transparent;display:block;margin-top:0.5rem';
+    host.appendChild(frame);
+
+    frame.onload = () => {
+      const doc = frame.contentDocument;
+      doc.open();
+      doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body>' + html + '</body></html>');
+      doc.close();
+      const resize = () => { frame.style.height = doc.documentElement.scrollHeight + 'px'; };
+      new ResizeObserver(resize).observe(doc.body);
+      resize();
+    };
+    frame.src = 'about:blank';
+  }
+
+  const obs = new MutationObserver(records => {
+    for (const r of records) {
+      if (r.target !== document.body) continue;
+      for (const n of r.addedNodes) quarantine(n);
+    }
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    obs.observe(document.body, { childList: true });
+  });
+})();
+</script>
 </head>
 <body>
 <header class="mobile-header">
@@ -2355,6 +2409,26 @@ async function streamRound(signal) {
   cursor.className = 'cursor';
   reply.appendChild(cursor);
 
+  // Per-completion timer — ticks once per second, locks final value when the
+  // round ends. Sits as a sibling right after the assistant bubble so it
+  // stays visually attached even if more tool-call rows are appended below.
+  const startedAt = Date.now();
+  const timer = document.createElement('div');
+  timer.className = 'msg-timer';
+  timer.textContent = '0s';
+  $('messages').appendChild(timer);
+  const timerInterval = setInterval(() => {
+    timer.textContent = `${Math.floor((Date.now() - startedAt) / 1000)}s`;
+  }, 1000);
+  const finalizeTimer = (label) => {
+    clearInterval(timerInterval);
+    if (label === null) { timer.remove(); return; }
+    const sec = (Date.now() - startedAt) / 1000;
+    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
+    timer.textContent = `${label} · ${fmt}`;
+    timer.classList.add('done');
+  };
+
   const toolCalls = [];
   const toolCallEls = [];
   const toolDisplayed = [];
@@ -2411,6 +2485,7 @@ async function streamRound(signal) {
     if (!res.ok) {
       streamDone = true;
       reply.remove();
+      finalizeTimer(null);
       throw new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
     }
     const reader = res.body.getReader();
@@ -2463,6 +2538,7 @@ async function streamRound(signal) {
     } else {
       streamDone = true;
       reply.remove();
+      finalizeTimer(null);
       throw e;
     }
   }
@@ -2471,7 +2547,12 @@ async function streamRound(signal) {
   await drain;
   cursor.remove();
   for (const el of toolCallEls) if (el) el.textContent += ')';
-  if (!content && !toolCalls.length) reply.remove();
+  if (!content && !toolCalls.length) {
+    reply.remove();
+    finalizeTimer(null);
+  } else {
+    finalizeTimer(aborted ? 'stopped' : 'done');
+  }
   return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
 }
 
