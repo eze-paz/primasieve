@@ -646,10 +646,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     frame.className = 'artifact-frame';
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('scrolling', 'no');
-    frame.style.cssText = 'width:100%;min-height:40px;border:1px solid #30363d;border-radius:6px;background:#fff;display:block;margin-top:0.5rem';
+    frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;margin-top:0.5rem';
     const baseCss =
-      'html,body{margin:0;padding:0;overflow:hidden;}' +
-      'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#0d1117;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
+      'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
+      'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
       'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
       'table{max-width:100%;border-collapse:collapse;}' +
       'pre{white-space:pre-wrap;word-wrap:break-word;}';
