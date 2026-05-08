@@ -743,14 +743,14 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <div class="or-sep">— OR —</div>
       <select id="localLlmModel">
         <option value="">Run model locally (WebGPU)…</option>
-        <option value="Hermes-3-Llama-3.1-8B-q4f16_1-MLC">Hermes 3 Llama 3.1 8B — tools (~4.7 GB)</option>
-        <option value="Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC">Hermes 2 Pro Llama 3 8B — tools (~4.7 GB)</option>
-        <option value="Hermes-2-Pro-Mistral-7B-q4f16_1-MLC">Hermes 2 Pro Mistral 7B — tools (~4 GB)</option>
-        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B — chat only (~1.9 GB)</option>
-        <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — chat only (~2 GB)</option>
-        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 mini — chat only (~2.2 GB)</option>
-        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B — chat only (~1 GB)</option>
-        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B — chat only (~1.4 GB)</option>
+        <option value="Hermes-3-Llama-3.1-8B-q4f16_1-MLC">Hermes 3 Llama 3.1 8B — tools native (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC">Hermes 2 Pro Llama 3 8B — tools native (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Mistral-7B-q4f16_1-MLC">Hermes 2 Pro Mistral 7B — tools native (~4 GB)</option>
+        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B — tools via prompt (~1.9 GB)</option>
+        <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — tools via prompt (~2 GB)</option>
+        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 mini — tools via prompt (~2.2 GB)</option>
+        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B — tools via prompt (~1 GB)</option>
+        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B — tools via prompt (~1.4 GB)</option>
       </select>
       <button id="localLlmLoad" class="ghost">Load local model</button>
       <div id="localLlmStatus" class="hint"></div>
@@ -2766,8 +2766,8 @@ async function loadLocalLlm() {
       initProgressCallback: r => { status.textContent = `${Math.round(r.progress * 100)}% — ${(r.text || '').slice(0, 60)}`; },
     });
     localEngineModel = sel.value;
-    const toolsOn = LOCAL_LLM_TOOLS_OK.has(sel.value);
-    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready — ${toolsOn ? 'tools on' : 'chat only (model not in WebLLM tool allowlist)'}`;
+    const native = LOCAL_LLM_TOOLS_OK.has(sel.value);
+    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready — tools ${native ? 'native' : 'via prompt (best-effort)'}`;
     btn.textContent = 'Reload local model'; btn.disabled = false;
   } catch (e) {
     try { localWorker?.terminate(); } catch {}
@@ -2776,6 +2776,34 @@ async function loadLocalLlm() {
   }
 }
 $('localLlmLoad').addEventListener('click', loadLocalLlm);
+
+// Prompt-injected tool calling for non-Hermes local models. WebLLM only
+// ships a structured tool-call parser for the Hermes family. For every
+// other model we (a) describe the tools in-prompt, (b) tell the model to
+// emit calls as <tool_call>{...}</tool_call>, (c) flatten any prior
+// tool_calls / role:tool messages into the same inline tag format the
+// model expects to see, (d) parse <tool_call> blocks out of the streamed
+// text after generation ends. Best-effort — model compliance varies.
+function buildPromptToolsInstructions(tools) {
+  return `You have access to the following tools. To use one, output exactly:
+<tool_call>{"name": "<tool>", "arguments": {...}}</tool_call>
+Tool results come back as <tool_response>...</tool_response>; continue from there.
+
+Tools:
+${JSON.stringify(tools.map(t => t.function), null, 2)}`;
+}
+function flattenForPromptTools(msgs) {
+  return msgs.map(m => {
+    if (m.role === 'assistant' && m.tool_calls?.length) {
+      const calls = m.tool_calls.map(tc =>
+        `<tool_call>${JSON.stringify({ name: tc.function.name, arguments: (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })() })}</tool_call>`
+      ).join('\n');
+      return { role: 'assistant', content: (m.content || '') + (m.content ? '\n' : '') + calls };
+    }
+    if (m.role === 'tool') return { role: 'user', content: `<tool_response>${m.content}</tool_response>` };
+    return m;
+  });
+}
 // LOCAL_LLM: END
 
 function setSendingState(sending) {
@@ -2895,13 +2923,34 @@ async function streamRound(signal) {
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
     try {
-      // WebLLM rejects `tools:` for any model outside its hardcoded
-      // allowlist (Hermes 2/3 family). Forward tools only when supported;
-      // other models run as plain chat.
+      // Three execution modes:
+      //   useNativeTools  — model is in WebLLM's Hermes allowlist; pass
+      //                     `tools:` and let WebLLM parse delta tool_calls.
+      //                     Hermes also rejects custom system prompts when
+      //                     tools are on, so demote ours to a user message.
+      //   usePromptTools  — non-Hermes model + tools requested. Inject tool
+      //                     descriptions + format spec into the system
+      //                     prompt; flatten any prior tool_calls/role:tool
+      //                     into inline tags; parse <tool_call> blocks out
+      //                     of the response stream once generation ends.
+      //   plain chat      — no tool defs; just stream content.
+      const sys = buildSystemPrompt();
+      const tools = toolDefs();
+      const useNativeTools = LOCAL_LLM_TOOLS_OK.has(localEngineModel) && tools.length > 0;
+      const usePromptTools = !useNativeTools && tools.length > 0;
+      let localMessages;
+      if (useNativeTools) {
+        localMessages = [{ role: 'user', content: '[Context]\n' + sys.content }, ...messages];
+      } else if (usePromptTools) {
+        const sysPlus = { ...sys, content: sys.content + '\n\n' + buildPromptToolsInstructions(tools) };
+        localMessages = [sysPlus, ...flattenForPromptTools(messages)];
+      } else {
+        localMessages = [sys, ...messages];
+      }
       const stream = await localEngine.chat.completions.create({
-        messages: [buildSystemPrompt(), ...messages],
+        messages: localMessages,
         stream: true,
-        ...(LOCAL_LLM_TOOLS_OK.has(localEngineModel) ? { tools: toolDefs() } : {}),
+        ...(useNativeTools ? { tools } : {}),
       });
       for await (const c of stream) {
         if (signal?.aborted) { aborted = true; break; }
@@ -2916,6 +2965,40 @@ async function streamRound(signal) {
     streamDone = true;
     await drain;
     cursor.remove();
+    // Prompt-tools post-process: pull <tool_call>{...}</tool_call> blocks
+    // out of the rendered content, synthesize structured toolCalls so
+    // send()'s tool-runner picks them up, strip the markers from the
+    // visible bubble, re-render. Malformed JSON is left as raw text so
+    // the user can see what the model meant.
+    if (LOCAL_LLM_TOOLS_OK.has(localEngineModel) === false && toolDefs().length > 0 && content) {
+      const re = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        try {
+          const parsed = JSON.parse(m[1]);
+          const i = toolCalls.length;
+          toolCalls[i] = {
+            id: 'call_' + Math.random().toString(36).slice(2, 11),
+            type: 'function',
+            function: {
+              name: parsed.name || '',
+              arguments: JSON.stringify(parsed.arguments || parsed.args || {}),
+            },
+          };
+          addMsg('tool-call', `→ ${toolCalls[i].function.name}(${toolCalls[i].function.arguments})`);
+        } catch { /* leave raw */ }
+      }
+      // Only strip markers we successfully parsed — malformed ones stay visible.
+      const valid = toolCalls.filter(tc => tc?.id).length;
+      if (valid > 0) {
+        let stripped = 0;
+        content = content.replace(re, (full, body) => {
+          if (stripped < valid) { try { JSON.parse(body); stripped++; return ''; } catch {} }
+          return full;
+        }).trim();
+        reply.innerHTML = content ? renderMd(content) : '';
+      }
+    }
     for (const el of toolCallEls) if (el) el.textContent += ')';
     if (!content && !toolCalls.length) reply.remove();
     return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
