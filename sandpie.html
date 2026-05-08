@@ -638,7 +638,12 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   const obs = new MutationObserver(records => {
     for (const r of records) {
       if (r.target !== document.body) continue;
-      for (const n of r.addedNodes) quarantine(n);
+      for (const n of r.addedNodes) {
+        // Allow nodes the app explicitly marks as legitimate chrome
+        // (context menus, transient download anchors, etc.).
+        if (n.nodeType === 1 && n.hasAttribute('data-chrome')) continue;
+        quarantine(n);
+      }
     }
   });
   document.addEventListener('DOMContentLoaded', () => {
@@ -941,6 +946,7 @@ function downloadProxy() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'sandpie-proxy.py';
+  a.setAttribute('data-chrome', '');
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1998,6 +2004,7 @@ function showContextMenu(x, y, items) {
   closeCtxMenu();
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
+  menu.setAttribute('data-chrome', '');
   for (const item of items) {
     const btn = document.createElement('button');
     btn.textContent = item.label;
