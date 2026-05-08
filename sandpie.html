@@ -2486,7 +2486,9 @@ async function streamRound(signal) {
       streamDone = true;
       reply.remove();
       finalizeTimer(null);
-      throw new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
+      const err = new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
+      err.status = res.status;
+      throw err;
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -2556,6 +2558,50 @@ async function streamRound(signal) {
   return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
 }
 
+// Transient upstream errors (load-balancer hiccups, brief overload, rate
+// limits). Auth/bad-request/not-found are intentionally excluded.
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
+
+function isRetryableError(err) {
+  if (!err || err.name === 'AbortError') return false;
+  if (typeof err.status === 'number' && RETRYABLE_STATUS.has(err.status)) return true;
+  // Bare network failures (DNS, dropped, CORS preflight) surface as TypeError.
+  if (err instanceof TypeError) return true;
+  return false;
+}
+
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(resolve, ms);
+    if (signal) signal.addEventListener('abort', () => {
+      clearTimeout(id);
+      reject(new DOMException('aborted', 'AbortError'));
+    }, { once: true });
+  });
+}
+
+async function streamRoundWithRetry(signal) {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [1000, 2500];
+  let notice = null;
+  try {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = await streamRound(signal);
+        return result;
+      } catch (e) {
+        if (signal?.aborted) throw e;
+        if (!isRetryableError(e) || attempt === MAX_ATTEMPTS - 1) throw e;
+        if (!notice) notice = addMsg('info', '');
+        notice.textContent = `AI provider issues detected, retrying (${attempt + 1}/${MAX_ATTEMPTS - 1})…`;
+        await sleep(BACKOFF_MS[attempt], signal);
+      }
+    }
+  } finally {
+    if (notice) notice.remove();
+  }
+}
+
 async function send() {
   const text = $('input').value.trim();
   if (!text) return;
@@ -2572,7 +2618,7 @@ async function send() {
   try {
     while (true) {
       if (currentAbort?.signal.aborted) break;
-      const { content, toolCalls, aborted } = await streamRound(currentAbort?.signal);
+      const { content, toolCalls, aborted } = await streamRoundWithRetry(currentAbort?.signal);
       if (aborted) {
         if (content) messages.push({ role: 'assistant', content });
         addMsg('info', 'Stopped.');
