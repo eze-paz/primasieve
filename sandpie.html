@@ -607,31 +607,41 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 // sandboxed iframe inside the last assistant bubble. Scripts run inside the
 // iframe and can't reach the host page.
 (function () {
+  // Listen for size reports from sandboxed artifact iframes.
+  window.addEventListener('message', e => {
+    if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
+    const frames = document.querySelectorAll('iframe.artifact-frame');
+    for (const f of frames) {
+      if (f.contentWindow === e.source) {
+        f.style.height = Math.max(20, e.data.h | 0) + 'px';
+        return;
+      }
+    }
+  });
+
   function quarantine(node) {
     if (node.nodeType !== 1) { node.remove(); return; }
     const messages = document.getElementById('messages');
     if (!messages) return;
-    const host = messages.querySelector('.msg.assistant:last-of-type') || messages;
+    const assistants = messages.querySelectorAll('.msg.assistant');
+    const host = assistants[assistants.length - 1] || messages;
 
     const html = node.outerHTML || node.textContent || '';
     node.remove();
 
+    // sandbox="allow-scripts" (no allow-same-origin) keeps the iframe
+    // cross-origin, so we use srcdoc — parent cannot touch contentDocument.
+    // A tiny inner script postMessages its height for autosize.
     const frame = document.createElement('iframe');
     frame.className = 'artifact-frame';
     frame.setAttribute('sandbox', 'allow-scripts');
-    frame.style.cssText = 'width:100%;border:0;background:transparent;display:block;margin-top:0.5rem';
+    frame.style.cssText = 'width:100%;min-height:40px;border:1px solid #30363d;border-radius:6px;background:#fff;display:block;margin-top:0.5rem';
+    frame.srcdoc =
+      '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+      html +
+      '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:document.documentElement.scrollHeight},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
+      '</body></html>';
     host.appendChild(frame);
-
-    frame.onload = () => {
-      const doc = frame.contentDocument;
-      doc.open();
-      doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body>' + html + '</body></html>');
-      doc.close();
-      const resize = () => { frame.style.height = doc.documentElement.scrollHeight + 'px'; };
-      new ResizeObserver(resize).observe(doc.body);
-      resize();
-    };
-    frame.src = 'about:blank';
   }
 
   const obs = new MutationObserver(records => {
