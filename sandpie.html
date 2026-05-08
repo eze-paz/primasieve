@@ -2355,32 +2355,51 @@ async function streamRound(signal) {
   cursor.className = 'cursor';
   reply.appendChild(cursor);
 
+  const toolCalls = [];
+  const toolCallEls = [];
+  const toolDisplayed = [];
+  const toolPending = [];
+  let content = '';
+  let aborted = false;
   let displayed = '', pending = '', streamDone = false;
+
   const drain = new Promise(resolve => {
     const tick = () => {
-      if (pending.length === 0) {
-        if (streamDone) return resolve();
-        return requestAnimationFrame(tick);
-      }
       const m = $('messages');
       // Capture intent BEFORE we mutate so the new content doesn't shift the
       // measurement: if user was at bottom, follow; if scrolled up, hold.
       const stick = isAtBottom(m);
-      const n = Math.max(1, Math.ceil(pending.length / 30));
-      displayed += pending.slice(0, n);
-      pending = pending.slice(n);
-      reply.innerHTML = renderMd(displayed);
-      reply.appendChild(cursor);
+      let work = false;
+
+      if (pending.length > 0) {
+        const n = Math.max(1, Math.ceil(pending.length / 30));
+        displayed += pending.slice(0, n);
+        pending = pending.slice(n);
+        reply.innerHTML = renderMd(displayed);
+        reply.appendChild(cursor);
+        work = true;
+      }
+      for (let i = 0; i < toolPending.length; i++) {
+        const buf = toolPending[i];
+        if (!buf || buf.length === 0) continue;
+        const n = Math.max(1, Math.ceil(buf.length / 30));
+        toolDisplayed[i] = (toolDisplayed[i] || '') + buf.slice(0, n);
+        toolPending[i] = buf.slice(n);
+        if (toolCallEls[i]) {
+          toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
+        }
+        work = true;
+      }
+
+      if (!work) {
+        if (streamDone) return resolve();
+        return requestAnimationFrame(tick);
+      }
       if (stick) m.scrollTop = m.scrollHeight;
       requestAnimationFrame(tick);
     };
     tick();
   });
-
-  const toolCalls = [];
-  const toolCallEls = [];
-  let content = '';
-  let aborted = false;
 
   try {
     const res = await fetch(url, {
@@ -2422,10 +2441,16 @@ async function streamRound(signal) {
               if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
               if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
               if (toolCalls[i].function.name) {
-                if (!toolCallEls[i]) toolCallEls[i] = addMsg('tool-call', '');
-                toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolCalls[i].function.arguments}`;
-                const mEl = $('messages');
-                if (isAtBottom(mEl)) mEl.scrollTop = mEl.scrollHeight;
+                if (!toolCallEls[i]) {
+                  toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`);
+                  toolDisplayed[i] = '';
+                  toolPending[i] = '';
+                } else {
+                  toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
+                }
+              }
+              if (tc.function?.arguments) {
+                toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
               }
             }
           }
@@ -2477,13 +2502,25 @@ async function send() {
         break;
       }
       messages.push({ role: 'assistant', content, tool_calls: toolCalls });
-      for (const tc of toolCalls) {
-        if (currentAbort?.signal.aborted) break;
-        let args = {};
-        try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-        const result = await tools[tc.function.name].run(args);
-        addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      const completed = new Set();
+      try {
+        for (const tc of toolCalls) {
+          if (currentAbort?.signal.aborted) break;
+          let args = {};
+          try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+          const result = await tools[tc.function.name].run(args);
+          addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+          completed.add(tc.id);
+        }
+      } finally {
+        // Every tool_call needs a matching tool result or the conversation is
+        // unsendable. Pad any that didn't run (user hit Stop, error, etc.).
+        for (const tc of toolCalls) {
+          if (!completed.has(tc.id)) {
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: '[stopped]' });
+          }
+        }
       }
       if (currentAbort?.signal.aborted) { addMsg('info', 'Stopped.'); break; }
     }
