@@ -3080,8 +3080,19 @@ async function send() {
       if (currentAbort?.signal.aborted) { wasAborted = true; addMsg('info', 'Stopped.'); break; }
     }
   } catch (e) {
-    if (e.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.'); }
-    else addMsg('err', 'Error: ' + e.message);
+    if (e?.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.'); }
+    else {
+      // Some throws (notably from WebLLM via postMessage) come through
+      // without a real Error wrapper — fall back through best-effort
+      // stringification and dump the raw object to DevTools.
+      console.error('sandpie send error:', e);
+      const msg = (e && (e.message || e.error || e.detail))
+        || (typeof e === 'string' ? e : null)
+        || (e && (() => { try { return JSON.stringify(e); } catch { return null; } })())
+        || (e && String(e))
+        || 'unknown error (check DevTools console)';
+      addMsg('err', 'Error: ' + msg);
+    }
   } finally {
     endTotalTimer(wasAborted ? 'stopped' : 'done');
     setSendingState(false);
