@@ -2104,6 +2104,29 @@ function isAtBottom(el, slack = 60) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < slack;
 }
 
+// Hard cap on the tool-result content fed back to the LLM. 30 KB is roomy
+// enough for legitimate long output (recursive `dir`, full pyodide tracebacks,
+// big JSON dumps) but small enough that one runaway print() can't blow past
+// the upstream's body limit and 413 the next request.
+const TOOL_RESULT_MAX = 30000;
+function capToolResult(s) {
+  s = String(s ?? '');
+  if (s.length <= TOOL_RESULT_MAX) {
+    return { content: s, truncated: false, original: s.length, kept: s.length };
+  }
+  const reserve = 120; // leave room for the marker
+  const keep = TOOL_RESULT_MAX - reserve;
+  const head = s.slice(0, keep);
+  const marker = `\n\n[… truncated by sandpie: tool result was ${s.length.toLocaleString()} bytes, kept first ${keep.toLocaleString()}]`;
+  return { content: head + marker, truncated: true, original: s.length, kept: keep };
+}
+
+function humanBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 function addMsg(role, text = '') {
   const m = $('messages');
   const stick = isAtBottom(m);
@@ -2662,7 +2685,17 @@ async function send() {
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
           const result = await tools[tc.function.name].run(args);
           addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+          // Cap what gets fed BACK to the LLM in the next request body. A
+          // single rogue print() or cat-of-large-file used to silently push
+          // multi-MB into messages[] and then nginx would 413 the next round,
+          // wedging the whole conversation. Display path is already capped
+          // at 500 chars for readability — this is a separate, larger cap
+          // for what the model actually sees.
+          const capped = capToolResult(result);
+          if (capped.truncated) {
+            addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`);
+          }
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: capped.content });
           completed.add(tc.id);
         }
       } finally {
