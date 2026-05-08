@@ -1142,6 +1142,15 @@ const opfs = {
     return await (await handle.getFile()).text();
   },
 
+  // Binary-safe read. Use this for any file that might not be UTF-8.
+  async readBytes(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    return new Uint8Array(await file.arrayBuffer());
+  },
+
   async write(path, content) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts, { create: true });
@@ -1649,11 +1658,19 @@ async function syncOpfsToPy(p) {
       cur += '/' + s;
       try { p.FS.mkdir(cur); } catch {}
     }
-    p.FS.writeFile(cur + '/' + fileName, await opfs.read(rel));
+    // Always copy as bytes so binary files (images, PDFs, etc.) survive
+    // the round-trip — text decodes back fine via Pyodide's open().
+    p.FS.writeFile(cur + '/' + fileName, await opfs.readBytes(rel));
   }
 }
 
 // Mirror Pyodide's /files (recursively) back to OPFS.
+function bytesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 async function syncPyToOpfs(p) {
   const pyFiles = new Set();
   const walk = (full, rel) => {
@@ -1669,14 +1686,15 @@ async function syncPyToOpfs(p) {
   walk('/files', '');
 
   for (const rel of pyFiles) {
-    const newContent = p.FS.readFile('/files/' + rel, { encoding: 'utf8' });
-    // Only write when content actually changed — otherwise OPFS bumps
-    // lastModified and refreshFileList flips the dot to 'modified' even
-    // though Pyodide never touched the file.
-    let oldContent = null;
-    try { oldContent = await opfs.read(rel); } catch {}
-    if (oldContent !== newContent) {
-      await opfs.write(rel, newContent);
+    // Read as bytes so binary files (e.g. matplotlib PNG output) aren't
+    // corrupted by UTF-8 decoding. Compare byte-for-byte to skip writes
+    // when nothing changed (otherwise OPFS bumps lastModified and the
+    // file shows as 'modified' even when Pyodide never touched it).
+    const newBytes = p.FS.readFile('/files/' + rel);
+    let oldBytes = null;
+    try { oldBytes = await opfs.readBytes(rel); } catch {}
+    if (!bytesEqual(oldBytes, newBytes)) {
+      await opfs.write(rel, newBytes);
     }
   }
   for (const rel of await opfs.list()) {
