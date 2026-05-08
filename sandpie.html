@@ -2112,10 +2112,49 @@ function addMsg(role, text = '') {
   div.className = 'msg ' + role;
   div.textContent = text;
   m.appendChild(div);
+  // Keep the active total timer pinned to the bottom of the transcript —
+  // tool-call / tool-result / info rows shouldn't shove the live ticker
+  // into the middle of the conversation.
+  if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
   // Only auto-scroll if the user was already near the bottom — otherwise leave
   // them where they are so they can read history without getting yanked back.
-  if (stick) div.scrollIntoView({ block: 'end' });
+  if (stick) (activeTimerEl || div).scrollIntoView({ block: 'end' });
   return div;
+}
+
+// === Total-interaction timer (covers all rounds + tool execution) ============
+// Hoisted (let, not const) — declared up here so addMsg can reference it
+// without TDZ issues during the early DOMContentLoaded path.
+let activeTimerEl = null;
+let activeTimerStart = 0;
+let activeTimerInterval = null;
+
+function startTotalTimer() {
+  if (activeTimerEl) return;
+  activeTimerStart = Date.now();
+  activeTimerEl = document.createElement('div');
+  activeTimerEl.className = 'msg-timer';
+  activeTimerEl.textContent = '0s';
+  $('messages').appendChild(activeTimerEl);
+  activeTimerInterval = setInterval(() => {
+    if (!activeTimerEl) return;
+    activeTimerEl.textContent = `${Math.floor((Date.now() - activeTimerStart) / 1000)}s`;
+  }, 1000);
+}
+
+function endTotalTimer(label) {
+  if (!activeTimerEl) return;
+  clearInterval(activeTimerInterval);
+  activeTimerInterval = null;
+  if (label === null) {
+    activeTimerEl.remove();
+  } else {
+    const sec = (Date.now() - activeTimerStart) / 1000;
+    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
+    activeTimerEl.textContent = `${label} · ${fmt}`;
+    activeTimerEl.classList.add('done');
+  }
+  activeTimerEl = null;
 }
 
 // ============================================================
@@ -2418,26 +2457,6 @@ async function streamRound(signal) {
   cursor.className = 'cursor';
   reply.appendChild(cursor);
 
-  // Per-completion timer — ticks once per second, locks final value when the
-  // round ends. Sits as a sibling right after the assistant bubble so it
-  // stays visually attached even if more tool-call rows are appended below.
-  const startedAt = Date.now();
-  const timer = document.createElement('div');
-  timer.className = 'msg-timer';
-  timer.textContent = '0s';
-  $('messages').appendChild(timer);
-  const timerInterval = setInterval(() => {
-    timer.textContent = `${Math.floor((Date.now() - startedAt) / 1000)}s`;
-  }, 1000);
-  const finalizeTimer = (label) => {
-    clearInterval(timerInterval);
-    if (label === null) { timer.remove(); return; }
-    const sec = (Date.now() - startedAt) / 1000;
-    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
-    timer.textContent = `${label} · ${fmt}`;
-    timer.classList.add('done');
-  };
-
   const toolCalls = [];
   const toolCallEls = [];
   const toolDisplayed = [];
@@ -2494,7 +2513,6 @@ async function streamRound(signal) {
     if (!res.ok) {
       streamDone = true;
       reply.remove();
-      finalizeTimer(null);
       const err = new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
       err.status = res.status;
       throw err;
@@ -2549,7 +2567,6 @@ async function streamRound(signal) {
     } else {
       streamDone = true;
       reply.remove();
-      finalizeTimer(null);
       throw e;
     }
   }
@@ -2558,12 +2575,7 @@ async function streamRound(signal) {
   await drain;
   cursor.remove();
   for (const el of toolCallEls) if (el) el.textContent += ')';
-  if (!content && !toolCalls.length) {
-    reply.remove();
-    finalizeTimer(null);
-  } else {
-    finalizeTimer(aborted ? 'stopped' : 'done');
-  }
+  if (!content && !toolCalls.length) reply.remove();
   return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
 }
 
@@ -2623,12 +2635,17 @@ async function send() {
   addMsg('user', text);
   $('input').value = '';
   setSendingState(true);
+  // One total timer for the whole exchange — covers every streamRound AND
+  // every tool execution between rounds. Settled in the finally block.
+  startTotalTimer();
+  let wasAborted = false;
 
   try {
     while (true) {
       if (currentAbort?.signal.aborted) break;
       const { content, toolCalls, aborted } = await streamRoundWithRetry(currentAbort?.signal);
       if (aborted) {
+        wasAborted = true;
         if (content) messages.push({ role: 'assistant', content });
         addMsg('info', 'Stopped.');
         break;
@@ -2658,12 +2675,13 @@ async function send() {
           }
         }
       }
-      if (currentAbort?.signal.aborted) { addMsg('info', 'Stopped.'); break; }
+      if (currentAbort?.signal.aborted) { wasAborted = true; addMsg('info', 'Stopped.'); break; }
     }
   } catch (e) {
-    if (e.name === 'AbortError') addMsg('info', 'Stopped.');
+    if (e.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.'); }
     else addMsg('err', 'Error: ' + e.message);
   } finally {
+    endTotalTimer(wasAborted ? 'stopped' : 'done');
     setSendingState(false);
     await saveActiveConv();
     refreshTokenMeter();
