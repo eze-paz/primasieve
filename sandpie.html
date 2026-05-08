@@ -2734,7 +2734,7 @@ async function loadLocalLlm() {
     localEngine = await CreateMLCEngine(sel.value, {
       initProgressCallback: r => { status.textContent = `${Math.round(r.progress * 100)}% — ${(r.text || '').slice(0, 60)}`; },
     });
-    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready (chat uses this; tools off)`;
+    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready (chat uses this; tools may misfire)`;
     btn.textContent = 'Reload local model'; btn.disabled = false;
   } catch (e) { status.textContent = '✗ ' + e.message; btn.disabled = false; }
 }
@@ -2817,20 +2817,51 @@ async function streamRound(signal) {
     tick();
   });
 
+  // Shared delta handler — both the SSE path and the WebLLM async-iterator
+  // path emit the same OpenAI-shape `delta` objects, so the merging logic
+  // (content concat + tool-call accumulator with live bubble updates) is
+  // identical and lives in one place.
+  const applyDelta = (delta) => {
+    if (!delta) return;
+    if (delta.content) { content += delta.content; pending += delta.content; }
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        const i = tc.index || 0;
+        if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+        if (tc.id) toolCalls[i].id = tc.id;
+        if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
+        if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
+        if (toolCalls[i].function.name) {
+          if (!toolCallEls[i]) {
+            toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`);
+            toolDisplayed[i] = '';
+            toolPending[i] = '';
+          } else {
+            toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
+          }
+        }
+        if (tc.function?.arguments) {
+          toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
+        }
+      }
+    }
+  };
+
   // LOCAL_LLM: BEGIN — when an in-browser engine is loaded, stream from it
-  // instead of the API. Reuses content/pending/drain/streamDone/aborted, so
-  // markdown rendering and stop-button behavior are identical to the API
-  // path. Tool calls intentionally ignored. Delete this if-block to revert.
+  // instead of the API. Tool defs are forwarded; tool-call deltas flow
+  // through the shared applyDelta. Quality varies by model — Qwen 2.5 3B
+  // is decent, smaller models tend to produce malformed JSON args.
+  // Delete this if-block to revert to API-only behavior.
   if (localEngine) {
     try {
       const stream = await localEngine.chat.completions.create({
         messages: [buildSystemPrompt(), ...messages],
         stream: true,
+        tools: toolDefs(),
       });
       for await (const c of stream) {
         if (signal?.aborted) { aborted = true; break; }
-        const t = c.choices?.[0]?.delta?.content || '';
-        if (t) { content += t; pending += t; }
+        applyDelta(c.choices?.[0]?.delta);
       }
     } catch (e) {
       if (signal?.aborted) aborted = true;
@@ -2839,8 +2870,9 @@ async function streamRound(signal) {
     streamDone = true;
     await drain;
     cursor.remove();
-    if (!content) reply.remove();
-    return { content, toolCalls: [], aborted };
+    for (const el of toolCallEls) if (el) el.textContent += ')';
+    if (!content && !toolCalls.length) reply.remove();
+    return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
   }
   // LOCAL_LLM: END
 
@@ -2871,35 +2903,7 @@ async function streamRound(signal) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6);
         if (data === '[DONE]') continue;
-        try {
-          const delta = JSON.parse(data).choices?.[0]?.delta;
-          if (!delta) continue;
-          if (delta.content) {
-            content += delta.content;
-            pending += delta.content;
-          }
-          if (delta.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              const i = tc.index || 0;
-              if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-              if (tc.id) toolCalls[i].id = tc.id;
-              if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
-              if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
-              if (toolCalls[i].function.name) {
-                if (!toolCallEls[i]) {
-                  toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`);
-                  toolDisplayed[i] = '';
-                  toolPending[i] = '';
-                } else {
-                  toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
-                }
-              }
-              if (tc.function?.arguments) {
-                toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
-              }
-            }
-          }
-        } catch {}
+        try { applyDelta(JSON.parse(data).choices?.[0]?.delta); } catch {}
       }
     }
   } catch (e) {
