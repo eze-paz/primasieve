@@ -1901,15 +1901,30 @@ async function refreshFileList() {
       showContextMenu(ev.clientX, ev.clientY, [
         { label: 'Delete', danger: true, action: async () => {
           const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
-          const dbxNote = dbxTokens()
-            ? ' Next sync will also remove the Dropbox copy.'
-            : '';
+          const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
           if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
-          // Leave the manifest entry alone — that way the next sync sees the
-          // file as "was synced, now missing locally" and propagates the
-          // deletion to Dropbox. Removing from the manifest here would make
-          // the next sync treat it as never-synced and re-pull it.
+          // Local delete first — recursive:true handles folders.
           try { await opfs.remove(it.fullKey); } catch {}
+          // Eagerly propagate to Dropbox so the row vanishes immediately.
+          // Without this, a deleted folder would reappear as a 'cloud' ghost
+          // until the next sync, because the cached dbxIndex still has the
+          // descendant entries that drive folder presence in the UI.
+          if (dbxTokens()) {
+            try { await dbxDelete('/' + it.fullKey); } catch {}
+          }
+          // Strip the deleted path + descendants from the cached index AND
+          // the manifest. Matching is case-insensitive to mirror Dropbox.
+          const lkPrefix = it.fullKey.toLowerCase();
+          const isHit = (k) => {
+            const kl = k.toLowerCase();
+            return kl === lkPrefix || kl.startsWith(lkPrefix + '/');
+          };
+          const idx = dbxIndex(); let idxChanged = false;
+          for (const k of Object.keys(idx)) if (isHit(k)) { delete idx[k]; idxChanged = true; }
+          if (idxChanged) setDbxIndex(idx);
+          const m = manifest(); let mChanged = false;
+          for (const k of Object.keys(m)) if (isHit(k)) { delete m[k]; mChanged = true; }
+          if (mChanged) setManifest(m);
           await refreshFileList();
         }},
       ]);
@@ -2223,11 +2238,22 @@ async function toggleArchiveConv(id, currentlyArchived) {
 }
 
 async function deleteConv(id, title) {
-  const dbxNote = dbxTokens() ? ' Next sync will also remove the Dropbox copy.' : '';
+  const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
-  // Manifest entry left intact so the next sync propagates the delete to
-  // Dropbox — same semantics as deleting a file from the file list.
-  try { await opfs.remove(convPath(id)); } catch {}
+  const path = convPath(id);
+  try { await opfs.remove(path); } catch {}
+  // Propagate to Dropbox + clear cached index/manifest so the row doesn't
+  // resurrect as a 'cloud' ghost (same fix as the file-list delete).
+  if (dbxTokens()) {
+    try { await dbxDelete('/' + path); } catch {}
+  }
+  const lk = path.toLowerCase();
+  const idx = dbxIndex(); let idxChanged = false;
+  for (const k of Object.keys(idx)) if (k.toLowerCase() === lk) { delete idx[k]; idxChanged = true; }
+  if (idxChanged) setDbxIndex(idx);
+  const m = manifest(); let mChanged = false;
+  for (const k of Object.keys(m)) if (k.toLowerCase() === lk) { delete m[k]; mChanged = true; }
+  if (mChanged) setManifest(m);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
