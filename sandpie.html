@@ -2378,6 +2378,7 @@ async function streamRound(signal) {
   });
 
   const toolCalls = [];
+  const toolCallEls = [];
   let content = '';
   let aborted = false;
 
@@ -2420,6 +2421,12 @@ async function streamRound(signal) {
               if (tc.id) toolCalls[i].id = tc.id;
               if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
               if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
+              if (toolCalls[i].function.name) {
+                if (!toolCallEls[i]) toolCallEls[i] = addMsg('tool-call', '');
+                toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolCalls[i].function.arguments}`;
+                const mEl = $('messages');
+                if (isAtBottom(mEl)) mEl.scrollTop = mEl.scrollHeight;
+              }
             }
           }
         } catch {}
@@ -2438,6 +2445,7 @@ async function streamRound(signal) {
   streamDone = true;
   await drain;
   cursor.remove();
+  for (const el of toolCallEls) if (el) el.textContent += ')';
   if (!content && !toolCalls.length) reply.remove();
   return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
 }
@@ -2473,7 +2481,6 @@ async function send() {
         if (currentAbort?.signal.aborted) break;
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-        addMsg('tool-call', `→ ${tc.function.name}(${JSON.stringify(args)})`);
         const result = await tools[tc.function.name].run(args);
         addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
         messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
