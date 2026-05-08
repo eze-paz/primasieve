@@ -307,6 +307,8 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   aside .row { display: flex; gap: 0.25rem; }
   aside .row > * { flex: 1; }
   aside .hint { font-size: 0.7rem; color: #8b949e; }
+  /* LOCAL_LLM */ .or-sep { text-align: center; color: #6e7681; font: 0.65rem 'JetBrains Mono', Consolas, monospace; letter-spacing: 0.2em; padding: 0.25rem 0; }
+  /* LOCAL_LLM */ aside select { padding: 0.5rem 0.625rem; background: #0d1117; border: 1px solid #30363d; border-radius: 5px; color: #e6edf3; font: inherit; }
   aside .navbar { display: flex; gap: 0.25rem; align-items: stretch; }
   aside .navbar input { flex: 1; }
   aside .navbar .back { flex: 0 0 32px; padding: 0; }
@@ -733,6 +735,26 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
       <input id="model" placeholder="Model (e.g. gpt-4o)">
       <input id="apiKey" type="password" placeholder="API key">
+      <!-- LOCAL_LLM: BEGIN — in-browser inference via WebLLM (MLC). Delete
+           this block + the JS marked LOCAL_LLM + the early-return branch in
+           streamRound to fully revert. WebLLM gates tool support to a
+           hardcoded allowlist (the Hermes models below); other models run
+           chat-only. -->
+      <div class="or-sep">— OR —</div>
+      <select id="localLlmModel">
+        <option value="">Run model locally (WebGPU)…</option>
+        <option value="Hermes-3-Llama-3.1-8B-q4f16_1-MLC">Hermes 3 Llama 3.1 8B — tools native (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC">Hermes 2 Pro Llama 3 8B — tools native (~4.7 GB)</option>
+        <option value="Hermes-2-Pro-Mistral-7B-q4f16_1-MLC">Hermes 2 Pro Mistral 7B — tools native (~4 GB)</option>
+        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen 2.5 3B — tools via prompt (~1.9 GB)</option>
+        <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — tools via prompt (~2 GB)</option>
+        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Phi 3.5 mini — tools via prompt (~2.2 GB)</option>
+        <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen 2.5 1.5B — tools via prompt (~1 GB)</option>
+        <option value="gemma-2-2b-it-q4f16_1-MLC">Gemma 2 2B — tools via prompt (~1.4 GB)</option>
+      </select>
+      <button id="localLlmLoad" class="ghost">Load local model</button>
+      <div id="localLlmStatus" class="hint"></div>
+      <!-- LOCAL_LLM: END -->
     </div>
   </details>
 
@@ -2702,6 +2724,100 @@ async function refreshConversationList() {
 // While non-null, the Send button shows "Stop" (red) and submitting aborts.
 let currentAbort = null;
 
+// LOCAL_LLM: BEGIN — in-browser WebLLM/MLC inference. Delete this block,
+// the streamRound branch (search LOCAL_LLM there), the HTML block and the
+// CSS lines marked /* LOCAL_LLM */ to fully revert. WebLLM gates tool
+// support to a hardcoded allowlist (the Hermes models below); other
+// models load chat-only.
+let localEngine = null;
+let localWorker = null;
+let localEngineModel = '';
+const LOCAL_LLM_TOOLS_OK = new Set([
+  'Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC',
+  'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC',
+  'Hermes-2-Pro-Mistral-7B-q4f16_1-MLC',
+  'Hermes-3-Llama-3.1-8B-q4f32_1-MLC',
+  'Hermes-3-Llama-3.1-8B-q4f16_1-MLC',
+]);
+async function loadLocalLlm() {
+  const sel = $('localLlmModel'), btn = $('localLlmLoad'), status = $('localLlmStatus');
+  if (!sel.value) { status.textContent = 'pick a model first'; return; }
+  if (!('gpu' in navigator)) { status.textContent = 'WebGPU not available — needs Chrome/Edge 113+'; return; }
+  btn.disabled = true; status.textContent = 'starting…';
+  // Free any prior model before loading a new one — otherwise GPU memory
+  // accumulates and Chrome eventually evicts the WebGPU context.
+  try { await localEngine?.unload?.(); } catch {}
+  try { localWorker?.terminate(); } catch {}
+  localEngine = null; localWorker = null;
+  try {
+    const { CreateWebWorkerMLCEngine } = await import('https://esm.run/@mlc-ai/web-llm');
+    // Inline worker via Blob URL keeps sandpie a single file. The worker
+    // pulls the same web-llm module from esm.run and exposes the standard
+    // WebWorkerMLCEngineHandler the main thread talks to.
+    const workerCode =
+      'import { WebWorkerMLCEngineHandler } from "https://esm.run/@mlc-ai/web-llm";\n' +
+      'const handler = new WebWorkerMLCEngineHandler();\n' +
+      'self.onmessage = (msg) => handler.onmessage(msg);';
+    localWorker = new Worker(
+      URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' })),
+      { type: 'module' }
+    );
+    localEngine = await CreateWebWorkerMLCEngine(localWorker, sel.value, {
+      initProgressCallback: r => { status.textContent = `${Math.round(r.progress * 100)}% — ${(r.text || '').slice(0, 60)}`; },
+    });
+    localEngineModel = sel.value;
+    const native = LOCAL_LLM_TOOLS_OK.has(sel.value);
+    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready — tools ${native ? 'native' : 'via prompt (best-effort)'}`;
+    btn.textContent = 'Reload local model'; btn.disabled = false;
+  } catch (e) {
+    try { localWorker?.terminate(); } catch {}
+    localWorker = null; localEngine = null; localEngineModel = '';
+    status.textContent = '✗ ' + e.message; btn.disabled = false;
+  }
+}
+$('localLlmLoad').addEventListener('click', loadLocalLlm);
+
+// Prompt-injected tool calling for non-Hermes local models. WebLLM only
+// ships a structured tool-call parser for the Hermes family. For every
+// other model we (a) describe the tools in-prompt, (b) tell the model to
+// emit calls as <tool_call>{...}</tool_call>, (c) flatten any prior
+// tool_calls / role:tool messages into the same inline tag format the
+// model expects to see, (d) parse <tool_call> blocks out of the streamed
+// text after generation ends. Best-effort — model compliance varies.
+function buildPromptToolsInstructions(tools) {
+  // Keep this TIGHT. Stuffing full JSON schemas (with multi-paragraph
+  // descriptions like run_python's ~1.7 KB blurb) into the system prompt
+  // causes small local models to either hang or generate nothing. Compact
+  // signature line per tool is enough to nudge them into the right shape.
+  const lines = tools.map(t => {
+    const f = t.function;
+    const firstSentence = (f.description || '').split(/(?<=[.\n])/)[0].trim().slice(0, 140);
+    const params = Object.entries(f.parameters?.properties || {})
+      .map(([k, v]) => `${k}: ${v.type}`)
+      .join(', ');
+    return `- ${f.name}(${params}) — ${firstSentence}`;
+  }).join('\n');
+  return `You can call tools. To call one, emit EXACTLY this single line and stop:
+<tool_call>{"name":"<tool>","arguments":{...}}</tool_call>
+Then wait for the user's <tool_response>...</tool_response> and continue.
+
+Available tools:
+${lines}`;
+}
+function flattenForPromptTools(msgs) {
+  return msgs.map(m => {
+    if (m.role === 'assistant' && m.tool_calls?.length) {
+      const calls = m.tool_calls.map(tc =>
+        `<tool_call>${JSON.stringify({ name: tc.function.name, arguments: (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })() })}</tool_call>`
+      ).join('\n');
+      return { role: 'assistant', content: (m.content || '') + (m.content ? '\n' : '') + calls };
+    }
+    if (m.role === 'tool') return { role: 'user', content: `<tool_response>${m.content}</tool_response>` };
+    return m;
+  });
+}
+// LOCAL_LLM: END
+
 function setSendingState(sending) {
   const btn = $('sendBtn');
   if (sending) {
@@ -2778,8 +2894,10 @@ async function streamRound(signal) {
     tick();
   });
 
-  // Shared delta handler — content concat + tool-call accumulator with
-  // live bubble updates, applied to each OpenAI-shape SSE delta.
+  // Shared delta handler — both the SSE path and the WebLLM async-iterator
+  // path emit the same OpenAI-shape `delta` objects, so the merging logic
+  // (content concat + tool-call accumulator with live bubble updates) is
+  // identical and lives in one place.
   const applyDelta = (delta) => {
     if (!delta) return;
     if (delta.content) { content += delta.content; pending += delta.content; }
@@ -2805,6 +2923,99 @@ async function streamRound(signal) {
       }
     }
   };
+
+  // LOCAL_LLM: BEGIN — when an in-browser engine is loaded, stream from it
+  // instead of the API. Tool defs are forwarded; tool-call deltas flow
+  // through the shared applyDelta. Quality varies by model — Qwen 2.5 3B
+  // is decent, smaller models tend to produce malformed JSON args.
+  // Delete this if-block to revert to API-only behavior.
+  if (localEngine) {
+    // Hold a screen wake lock during inference so Chrome doesn't throttle
+    // the tab if the user looks away — local generation can run for minutes.
+    let wakeLock = null;
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
+    try {
+      // Three execution modes:
+      //   useNativeTools  — model is in WebLLM's Hermes allowlist; pass
+      //                     `tools:` and let WebLLM parse delta tool_calls.
+      //                     Hermes also rejects custom system prompts when
+      //                     tools are on, so demote ours to a user message.
+      //   usePromptTools  — non-Hermes model + tools requested. Inject tool
+      //                     descriptions + format spec into the system
+      //                     prompt; flatten any prior tool_calls/role:tool
+      //                     into inline tags; parse <tool_call> blocks out
+      //                     of the response stream once generation ends.
+      //   plain chat      — no tool defs; just stream content.
+      const sys = buildSystemPrompt();
+      const tools = toolDefs();
+      const useNativeTools = LOCAL_LLM_TOOLS_OK.has(localEngineModel) && tools.length > 0;
+      const usePromptTools = !useNativeTools && tools.length > 0;
+      let localMessages;
+      if (useNativeTools) {
+        localMessages = [{ role: 'user', content: '[Context]\n' + sys.content }, ...messages];
+      } else if (usePromptTools) {
+        const sysPlus = { ...sys, content: sys.content + '\n\n' + buildPromptToolsInstructions(tools) };
+        localMessages = [sysPlus, ...flattenForPromptTools(messages)];
+      } else {
+        localMessages = [sys, ...messages];
+      }
+      const stream = await localEngine.chat.completions.create({
+        messages: localMessages,
+        stream: true,
+        ...(useNativeTools ? { tools } : {}),
+      });
+      for await (const c of stream) {
+        if (signal?.aborted) { aborted = true; break; }
+        applyDelta(c.choices?.[0]?.delta);
+      }
+    } catch (e) {
+      if (signal?.aborted) aborted = true;
+      else { streamDone = true; reply.remove(); try { await wakeLock?.release(); } catch {} throw e; }
+    } finally {
+      try { await wakeLock?.release(); } catch {}
+    }
+    streamDone = true;
+    await drain;
+    cursor.remove();
+    // Prompt-tools post-process: pull <tool_call>{...}</tool_call> blocks
+    // out of the rendered content, synthesize structured toolCalls so
+    // send()'s tool-runner picks them up, strip the markers from the
+    // visible bubble, re-render. Malformed JSON is left as raw text so
+    // the user can see what the model meant.
+    if (LOCAL_LLM_TOOLS_OK.has(localEngineModel) === false && toolDefs().length > 0 && content) {
+      const re = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        try {
+          const parsed = JSON.parse(m[1]);
+          const i = toolCalls.length;
+          toolCalls[i] = {
+            id: 'call_' + Math.random().toString(36).slice(2, 11),
+            type: 'function',
+            function: {
+              name: parsed.name || '',
+              arguments: JSON.stringify(parsed.arguments || parsed.args || {}),
+            },
+          };
+          addMsg('tool-call', `→ ${toolCalls[i].function.name}(${toolCalls[i].function.arguments})`);
+        } catch { /* leave raw */ }
+      }
+      // Only strip markers we successfully parsed — malformed ones stay visible.
+      const valid = toolCalls.filter(tc => tc?.id).length;
+      if (valid > 0) {
+        let stripped = 0;
+        content = content.replace(re, (full, body) => {
+          if (stripped < valid) { try { JSON.parse(body); stripped++; return ''; } catch {} }
+          return full;
+        }).trim();
+        reply.innerHTML = content ? renderMd(content) : '';
+      }
+    }
+    for (const el of toolCallEls) if (el) el.textContent += ')';
+    if (!content && !toolCalls.length) reply.remove();
+    return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
+  }
+  // LOCAL_LLM: END
 
   try {
     const res = await fetch(url, {
@@ -2901,8 +3112,9 @@ async function streamRoundWithRetry(signal) {
 async function send() {
   const text = $('input').value.trim();
   if (!text) return;
-  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Fill in endpoint, model, and API key.');
+  // LOCAL_LLM: skip API-credential check when an in-browser engine is loaded.
+  if (!localEngine && (!$('endpoint').value || !$('model').value || !$('apiKey').value)) {
+    addMsg('err', 'Fill in endpoint, model, and API key — or load a local model below.');
     return;
   }
   await ensureActiveConv();
@@ -2965,9 +3177,9 @@ async function send() {
   } catch (e) {
     if (e?.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.'); }
     else {
-      // Tool throws don't always come through as proper Error instances
-      // (some libraries throw plain objects/strings). Cascade through
-      // common message shapes and dump the raw object to DevTools.
+      // Some throws (notably from WebLLM via postMessage) come through
+      // without a real Error wrapper — fall back through best-effort
+      // stringification and dump the raw object to DevTools.
       console.error('sandpie send error:', e);
       const msg = (e && (e.message || e.error || e.detail))
         || (typeof e === 'string' ? e : null)
