@@ -2765,11 +2765,13 @@ async function loadLocalLlm() {
     localEngine = await CreateWebWorkerMLCEngine(localWorker, sel.value, {
       initProgressCallback: r => { status.textContent = `${Math.round(r.progress * 100)}% — ${(r.text || '').slice(0, 60)}`; },
     });
-    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready (chat uses this; tools may misfire)`;
+    localEngineModel = sel.value;
+    const toolsOn = LOCAL_LLM_TOOLS_OK.has(sel.value);
+    status.textContent = `✓ ${sel.value.split('-').slice(0, 3).join(' ')} ready — ${toolsOn ? 'tools on' : 'chat only (model not in WebLLM tool allowlist)'}`;
     btn.textContent = 'Reload local model'; btn.disabled = false;
   } catch (e) {
     try { localWorker?.terminate(); } catch {}
-    localWorker = null; localEngine = null;
+    localWorker = null; localEngine = null; localEngineModel = '';
     status.textContent = '✗ ' + e.message; btn.disabled = false;
   }
 }
@@ -2893,10 +2895,13 @@ async function streamRound(signal) {
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {}
     try {
+      // WebLLM rejects `tools:` for any model outside its hardcoded
+      // allowlist (Hermes 2/3 family). Forward tools only when supported;
+      // other models run as plain chat.
       const stream = await localEngine.chat.completions.create({
         messages: [buildSystemPrompt(), ...messages],
         stream: true,
-        tools: toolDefs(),
+        ...(LOCAL_LLM_TOOLS_OK.has(localEngineModel) ? { tools: toolDefs() } : {}),
       });
       for await (const c of stream) {
         if (signal?.aborted) { aborted = true; break; }
