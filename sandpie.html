@@ -645,11 +645,18 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     const frame = document.createElement('iframe');
     frame.className = 'artifact-frame';
     frame.setAttribute('sandbox', 'allow-scripts');
+    frame.setAttribute('scrolling', 'no');
     frame.style.cssText = 'width:100%;min-height:40px;border:1px solid #30363d;border-radius:6px;background:#fff;display:block;margin-top:0.5rem';
+    const baseCss =
+      'html,body{margin:0;padding:0;overflow:hidden;}' +
+      'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#0d1117;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
+      'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
+      'table{max-width:100%;border-collapse:collapse;}' +
+      'pre{white-space:pre-wrap;word-wrap:break-word;}';
     frame.srcdoc =
-      '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+      '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
       html +
-      '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:document.documentElement.scrollHeight},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
+      '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
       '</body></html>';
     host.appendChild(frame);
   }
