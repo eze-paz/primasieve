@@ -2785,12 +2785,24 @@ $('localLlmLoad').addEventListener('click', loadLocalLlm);
 // model expects to see, (d) parse <tool_call> blocks out of the streamed
 // text after generation ends. Best-effort — model compliance varies.
 function buildPromptToolsInstructions(tools) {
-  return `You have access to the following tools. To use one, output exactly:
-<tool_call>{"name": "<tool>", "arguments": {...}}</tool_call>
-Tool results come back as <tool_response>...</tool_response>; continue from there.
+  // Keep this TIGHT. Stuffing full JSON schemas (with multi-paragraph
+  // descriptions like run_python's ~1.7 KB blurb) into the system prompt
+  // causes small local models to either hang or generate nothing. Compact
+  // signature line per tool is enough to nudge them into the right shape.
+  const lines = tools.map(t => {
+    const f = t.function;
+    const firstSentence = (f.description || '').split(/(?<=[.\n])/)[0].trim().slice(0, 140);
+    const params = Object.entries(f.parameters?.properties || {})
+      .map(([k, v]) => `${k}: ${v.type}`)
+      .join(', ');
+    return `- ${f.name}(${params}) — ${firstSentence}`;
+  }).join('\n');
+  return `You can call tools. To call one, emit EXACTLY this single line and stop:
+<tool_call>{"name":"<tool>","arguments":{...}}</tool_call>
+Then wait for the user's <tool_response>...</tool_response> and continue.
 
-Tools:
-${JSON.stringify(tools.map(t => t.function), null, 2)}`;
+Available tools:
+${lines}`;
 }
 function flattenForPromptTools(msgs) {
   return msgs.map(m => {
