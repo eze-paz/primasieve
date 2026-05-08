@@ -2279,7 +2279,9 @@ $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshF
 async function uploadEntry(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
-    await opfs.write(opfsJoin(dirPath, entry.name), await file.text());
+    // Write the File/Blob directly — calling .text() corrupts binary
+    // payloads (images, GIFs, PDFs, etc.) via UTF-8 decoding.
+    await opfs.write(opfsJoin(dirPath, entry.name), file);
   } else if (entry.isDirectory) {
     const sub = opfsJoin(dirPath, entry.name);
     const reader = entry.createReader();
@@ -2307,7 +2309,7 @@ async function uploadEntry(entry, dirPath) {
     // Fallback for browsers without webkitGetAsEntry
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
-        await opfs.write(opfsJoin(path, f.name), await f.text());
+        await opfs.write(opfsJoin(path, f.name), f);
       }
     }
     await refreshFileList();
