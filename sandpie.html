@@ -640,7 +640,9 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     const div = document.createElement('div');
     div.innerHTML = String(html || '');
     document.body.appendChild(div);
+    window._sandpieDisplay.count = (window._sandpieDisplay.count || 0) + 1;
   };
+  window._sandpieDisplay.count = 0;
 
   // Listen for size reports from sandboxed artifact iframes.
   window.addEventListener('message', e => {
@@ -1796,11 +1798,17 @@ except Exception:
     pass
 `);
         } catch {}
+        const beforeArtifacts = window._sandpieDisplay.count || 0;
         await p.runPythonAsync(code);
         await syncPyToOpfs(p);
         await refreshFileList();
         let out = stdout.trimEnd();
         if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+        const newArtifacts = (window._sandpieDisplay.count || 0) - beforeArtifacts;
+        if (newArtifacts > 0) {
+          const note = `(rendered ${newArtifacts} artifact${newArtifacts === 1 ? '' : 's'} via IPython.display — visible to the user)`;
+          out = out ? out + '\n' + note : note;
+        }
         return out || '(no output)';
       } catch (e) {
         const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
