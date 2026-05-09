@@ -1652,9 +1652,13 @@ async function autoPushDirty() {
   }
 }
 
-// Periodic poll while connected: pull cloud-only files in the background so
-// new conversations / files added from another device show up without manual
-// action. Pulls only — never pushes (matches autoSyncOnLoad's policy).
+// Periodic poll while connected: pull cloud-only files AND reconcile
+// cross-device deletes in the background, so changes from another device
+// show up without requiring reload. Never pushes (autoPushDirty handles
+// that at conversation end). Dirty local files — those with edits since
+// the last sync — are exempt from delete propagation so a concurrent edit
+// here doesn't vanish mid-keystroke when the file's been deleted elsewhere;
+// they get re-pushed at conv end via last-write-wins.
 async function cloudPollTick() {
   if (!dbxTokens() || document.hidden) return;
   setDbxBusy(true);
@@ -1662,7 +1666,28 @@ async function cloudPollTick() {
     await refreshDbxIndex('');
     const idx = dbxIndex();
     const m = manifest();
-    let pulled = 0;
+    let pulled = 0, removed = 0;
+
+    // Cross-device delete reconcile (was init-only; now runs every tick so
+    // Dropbox stays the authority during a live session). For each path we
+    // previously synced that's now missing from the fresh cloud listing:
+    // - if the local file is dirty (lastMod > manifest entry), keep it —
+    //   the user edited it since last sync and autoPushDirty will resurrect
+    //   it at conv end.
+    // - otherwise, drop OPFS bytes + manifest entry.
+    for (const path of Object.keys(m)) {
+      if (idx[path]) continue;
+      let dirty = false, present = true;
+      try {
+        const lm = await opfsLastModified(path);
+        if (lm > m[path]) dirty = true;
+      } catch { present = false; }
+      if (dirty) continue;
+      if (present) { try { await opfs.remove(path); } catch {} }
+      delete m[path];
+      removed++;
+    }
+
     for (const [key, val] of Object.entries(idx)) {
       if (val.kind !== 'file') continue;
       let exists = false;
@@ -1683,7 +1708,7 @@ async function cloudPollTick() {
         m[key] = await opfsLastModified(key);
       }
     }
-    if (pulled > 0) {
+    if (pulled || removed) {
       setManifest(m);
       await refreshFileList();
       await refreshConversationList();
