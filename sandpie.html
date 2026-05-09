@@ -438,6 +438,15 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   aside .status-dot.ok   { background: #3fb950; box-shadow: 0 0 4px rgba(63,185,80,0.5); }
   aside .status-dot.warn { background: #f8b251; box-shadow: 0 0 4px rgba(248,178,81,0.5); }
   aside .status-dot.err  { background: #f85149; box-shadow: 0 0 4px rgba(248,81,73,0.5); }
+  /* `.busy` pulses the dot while a sync operation is in flight (auto-pull on
+     init, auto-push on conv end, fetch_file hydration, manifest scan). It
+     overlays whatever colour the dot already has so connection status stays
+     readable underneath. */
+  aside .status-dot.busy { animation: status-dot-pulse 0.9s ease-in-out infinite; }
+  @keyframes status-dot-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1;   }
+    50%      { transform: scale(1.55); opacity: 0.55; }
+  }
   /* Conversations list */
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: #161b22; border-color: #444c56; }
@@ -779,7 +788,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
         <input id="opfsPath" value="/">
       </div>
       <ul class="fs-list" id="fileList"></ul>
-      <button id="syncBtn" onclick="syncCurrent()">Sync</button>
       <div class="hint" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
         <span>drop to upload · right-click for actions</span>
         <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot synced"></span>synced</span>
@@ -1239,6 +1247,18 @@ function dbxStatus(text, kind) {
   if (typeof refreshWelcome === 'function') refreshWelcome();
 }
 
+// Pulse the dropbox dot while sync work is in flight. Reference-counted so
+// concurrent calls (autoSyncOnLoad + a parallel fetch_file, etc.) compose
+// correctly and the dot only stops pulsing when ALL operations finish.
+let dbxBusyCount = 0;
+function setDbxBusy(busy) {
+  dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
+  const dot = $('dbxDot');
+  if (!dot) return;
+  if (dbxBusyCount > 0) dot.classList.add('busy');
+  else dot.classList.remove('busy');
+}
+
 function dbxToggleConnection() {
   if (dbxTokens()) dbxDisconnect();
   else dbxConnect();
@@ -1445,118 +1465,41 @@ function isEagerHydrate(path, size) {
   return false;
 }
 
-// Bidirectional sync of the current folder's subtree:
-//   • upload files that are local-only or modified since last sync
-//   • download files that are cloud-only
-// Refreshes the file list after each file so dots flip from local/cloud → synced
-// progressively rather than at the very end.
-async function syncCurrent() {
-  if (!dbxTokens()) { dbxStatus('Not connected', 'error'); return; }
-  const btn = $('syncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
-  const basePath = opfsCurrentPath();
-  try {
-    dbxStatus('Syncing…', 'connected');
-    await refreshDbxIndex(basePath);
-
-    const idx = dbxIndex();
-    const m = manifest();
-    let pushed = 0, pulled = 0;
-
-    // PUSH
-    const opfsRels = await opfs.list(basePath);
-    for (const rel of opfsRels) {
-      const fullKey = basePath ? basePath + '/' + rel : rel;
-      const lastMod = await opfsLastModified(fullKey);
-      if (m[fullKey] && lastMod <= m[fullKey]) continue;
-      dbxStatus(`↑ ${rel}`, 'connected');
-      const content = await opfs.read(fullKey);
-      const dbxPath = '/' + fullKey;
-      await dbxUpload(dbxPath, content);
-      m[fullKey] = lastMod;
-      idx[fullKey] = { kind: 'file', dbxPath };
-      setManifest(m);
-      setDbxIndex(idx);
-      await refreshFileList();
-      pushed++;
-    }
-
-    // PULL / DELETE
-    // For each cloud file: if missing locally, the manifest tells us why.
-    //   manifest has it → it was synced before, then deleted locally (likely
-    //                     a tool move/delete) → propagate the delete to Dropbox.
-    //   manifest doesn't → never synced → pull it down.
-    let deleted = 0;
-    for (const [key, val] of Object.entries(idx)) {
-      if (val.kind !== 'file') continue;
-      const kl = key.toLowerCase();
-      const bl = basePath.toLowerCase();
-      if (bl && !kl.startsWith(bl + '/') && kl !== bl) continue;
-      let exists = false;
-      try { await opfs.read(key); exists = true; } catch {}
-      if (exists) continue;
-      if (m[key]) {
-        dbxStatus(`× ${key}`, 'connected');
-        await dbxDelete(val.dbxPath || ('/' + key));
-        delete idx[key];
-        delete m[key];
-        setManifest(m);
-        setDbxIndex(idx);
-        await refreshFileList();
-        deleted++;
-      } else {
-        dbxStatus(`↓ ${key}`, 'connected');
-        const content = await dbxDownload(val.dbxPath || ('/' + key));
-        await opfs.write(key, content);
-        m[key] = await opfsLastModified(key);
-        setManifest(m);
-        await refreshFileList();
-        pulled++;
-      }
-    }
-
-    setManifest(m);
-    setDbxIndex(idx);
-    await refreshFileList();
-    const summary = `Sync done: ↑${pushed} ↓${pulled}` + (deleted ? ` ×${deleted}` : '');
-    dbxStatus(summary, 'connected');
-  } catch (e) {
-    dbxStatus('Sync failed: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Sync'; }
-  }
-}
-
 // Phase C: auto-push files that were created or modified during a conversation
 // round. Triggered from send()'s finally block after saveActiveConv. Uploads
-// only — deletes go through the explicit Sync button (or right-click Delete,
-// which propagates immediately). Best-effort: errors are logged but don't
-// block the conversation save. No conflict detection in v1 — last-write-wins.
+// only — deletes propagate immediately via right-click Delete in the file
+// panel. Best-effort: errors are logged but don't block the conversation save.
+// No conflict detection in v1 — last-write-wins.
 async function autoPushDirty() {
   if (!dbxTokens()) return;
-  const m = manifest();
-  const idx = dbxIndex();
-  const opfsRels = await opfs.list();
-  const pushed = [];
-  for (const rel of opfsRels) {
-    const lastMod = await opfsLastModified(rel);
-    if (m[rel] && lastMod <= m[rel]) continue;   // unchanged since last sync
-    try {
-      const content = await opfs.readBytes(rel);   // bytes for binary correctness
-      const dbxPath = '/' + rel;
-      await dbxUpload(dbxPath, content);
-      m[rel] = lastMod;
-      if (!idx[rel] || idx[rel].kind !== 'file') idx[rel] = { kind: 'file', dbxPath };
-      pushed.push(rel);
-    } catch (e) {
-      console.warn('autoPushDirty:', rel, e);
+  setDbxBusy(true);
+  try {
+    const m = manifest();
+    const idx = dbxIndex();
+    const opfsRels = await opfs.list();
+    const pushed = [];
+    for (const rel of opfsRels) {
+      const lastMod = await opfsLastModified(rel);
+      if (m[rel] && lastMod <= m[rel]) continue;   // unchanged since last sync
+      try {
+        const content = await opfs.readBytes(rel);   // bytes for binary correctness
+        const dbxPath = '/' + rel;
+        await dbxUpload(dbxPath, content);
+        m[rel] = lastMod;
+        if (!idx[rel] || idx[rel].kind !== 'file') idx[rel] = { kind: 'file', dbxPath };
+        pushed.push(rel);
+      } catch (e) {
+        console.warn('autoPushDirty:', rel, e);
+      }
     }
-  }
-  if (pushed.length) {
-    setManifest(m);
-    setDbxIndex(idx);
-    dbxStatus(`↑ pushed ${pushed.length}`, 'connected');
-    await refreshFileList();
+    if (pushed.length) {
+      setManifest(m);
+      setDbxIndex(idx);
+      dbxStatus(`↑ pushed ${pushed.length}`, 'connected');
+      await refreshFileList();
+    }
+  } finally {
+    setDbxBusy(false);
   }
 }
 
@@ -1565,6 +1508,7 @@ async function autoPushDirty() {
 // action. Pulls only — never pushes (matches autoSyncOnLoad's policy).
 async function cloudPollTick() {
   if (!dbxTokens() || document.hidden) return;
+  setDbxBusy(true);
   try {
     await refreshDbxIndex('');
     const idx = dbxIndex();
@@ -1576,8 +1520,7 @@ async function cloudPollTick() {
       try { await opfs.read(key); exists = true; } catch {}
       if (!exists) {
         // Skip files we previously synced and have since been deleted locally
-        // — re-pulling would undo a tool move/delete. The next explicit Sync
-        // is what propagates the deletion to Dropbox.
+        // — re-pulling would undo a tool move/delete.
         if (m[key]) continue;
         // Lazy hydration carve-out: only background-pull conversations,
         // sandpie_*.md manifests, and small files. Everything else stays as
@@ -1597,15 +1540,17 @@ async function cloudPollTick() {
       await refreshConversationList();
     }
   } catch { /* silent — don't spam on poll errors */ }
+  finally { setDbxBusy(false); }
 }
 setInterval(cloudPollTick, 60000);
 
-// On page load (when already authenticated), pull anything that exists in the
-// cloud but not in OPFS, and write baseline manifest entries for files that
-// exist on both sides without any baseline yet. Never pushes — local creations
-// and modifications stay under user control via the explicit Sync button.
+// On page load (when already authenticated): reconcile multi-device deletes,
+// pull eager-hydrate carve-outs (conversations, manifest .md, <64KB files),
+// baseline newly-discovered shared files. Never pushes — that happens
+// automatically at the end of each conversation round via autoPushDirty.
 async function autoSyncOnLoad() {
   if (!dbxTokens()) return;
+  setDbxBusy(true);
   try {
     dbxStatus('Auto-pull…', 'connected');
     await refreshDbxIndex('');
@@ -1663,6 +1608,7 @@ async function autoSyncOnLoad() {
     dbxStatus('Auto-pull failed: ' + e.message, 'error');
   } finally {
     initialSyncDone = true;
+    setDbxBusy(false);
     await refreshFileList();
     await refreshConversationList();
   }
@@ -2065,6 +2011,7 @@ Examples:
       try { await opfs.read(norm); exists = true; } catch {}
       if (exists) return `Already local: ${norm}.`;
       if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
+      setDbxBusy(true);
       try {
         const content = await dbxDownload(entry.dbxPath || ('/' + norm), signal);
         await opfs.write(norm, content);
@@ -2077,6 +2024,8 @@ Examples:
       } catch (e) {
         if (e.name === 'AbortError') return `[stopped — fetch_file ${norm} aborted]`;
         return `Failed to fetch ${norm}: ${e.message}`;
+      } finally {
+        setDbxBusy(false);
       }
     },
   },
