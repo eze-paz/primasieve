@@ -1526,6 +1526,39 @@ async function syncCurrent() {
   }
 }
 
+// Phase C: auto-push files that were created or modified during a conversation
+// round. Triggered from send()'s finally block after saveActiveConv. Uploads
+// only — deletes go through the explicit Sync button (or right-click Delete,
+// which propagates immediately). Best-effort: errors are logged but don't
+// block the conversation save. No conflict detection in v1 — last-write-wins.
+async function autoPushDirty() {
+  if (!dbxTokens()) return;
+  const m = manifest();
+  const idx = dbxIndex();
+  const opfsRels = await opfs.list();
+  const pushed = [];
+  for (const rel of opfsRels) {
+    const lastMod = await opfsLastModified(rel);
+    if (m[rel] && lastMod <= m[rel]) continue;   // unchanged since last sync
+    try {
+      const content = await opfs.readBytes(rel);   // bytes for binary correctness
+      const dbxPath = '/' + rel;
+      await dbxUpload(dbxPath, content);
+      m[rel] = lastMod;
+      if (!idx[rel] || idx[rel].kind !== 'file') idx[rel] = { kind: 'file', dbxPath };
+      pushed.push(rel);
+    } catch (e) {
+      console.warn('autoPushDirty:', rel, e);
+    }
+  }
+  if (pushed.length) {
+    setManifest(m);
+    setDbxIndex(idx);
+    dbxStatus(`↑ pushed ${pushed.length}`, 'connected');
+    await refreshFileList();
+  }
+}
+
 // Periodic poll while connected: pull cloud-only files in the background so
 // new conversations / files added from another device show up without manual
 // action. Pulls only — never pushes (matches autoSyncOnLoad's policy).
@@ -3144,6 +3177,9 @@ async function send() {
     setSendingState(false);
     await saveActiveConv();
     refreshTokenMeter();
+    // Phase C: push any files the LLM created/modified during the round to
+    // Dropbox. Errors are logged but don't fail the conversation save.
+    try { await autoPushDirty(); } catch (e) { console.warn('autoPushDirty failed:', e); }
   }
 }
 </script>
