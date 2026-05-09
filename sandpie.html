@@ -1318,6 +1318,18 @@ const opfs = {
     await dir.removeEntry(name, { recursive: true });
   },
 
+  // Cheap existence check — does NOT read file bytes. Important for the
+  // sync engine, which previously called opfs.read() just to test presence
+  // and so loaded multi-GB files into memory for nothing.
+  async exists(path) {
+    try {
+      const { parts, name } = splitPath(path);
+      const dir = await this.resolveDir(parts);
+      await dir.getFileHandle(name);
+      return true;
+    } catch { return false; }
+  },
+
   async mkdir(path) {
     const parts = String(path).split('/').filter(Boolean);
     await this.resolveDir(parts, { create: true });
@@ -1371,10 +1383,14 @@ const opfs = {
 // cloud-side counterpart — that's how phantom "synced" folders accumulate
 // on a device that's been running across many cross-device deletes. Iterates
 // because removing a child dir may newly empty its parent.
-async function pruneOrphanDirs() {
-  const idx = dbxIndex();
+async function pruneOrphanDirs(cloud) {
+  // cloud is the {relPath: entry} listing returned by cloudListAll(); when
+  // omitted, fall back to the keys we know about in syncState. Either way
+  // we build a set of all paths AND their dir prefixes so we know which
+  // OPFS dirs are still referenced from the cloud side.
+  const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
   const cloudPaths = new Set();
-  for (const k of Object.keys(idx)) {
+  for (const k of source) {
     const lower = k.toLowerCase();
     cloudPaths.add(lower);
     const segs = lower.split('/');
@@ -1427,8 +1443,8 @@ function dbxStatus(text, kind) {
 }
 
 // Pulse the dropbox dot while sync work is in flight. Reference-counted so
-// concurrent calls (autoSyncOnLoad + a parallel fetch_file, etc.) compose
-// correctly and the dot only stops pulsing when ALL operations finish.
+// concurrent calls (sync() + a parallel fetch_file, etc.) compose correctly
+// and the dot only stops pulsing when ALL operations finish.
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {
   dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
@@ -1493,7 +1509,11 @@ async function dbxConnect() {
 
 function dbxDisconnect() {
   localStorage.removeItem('dbx-tokens');
+  localStorage.removeItem(SYNC_STATE_KEY);
+  // Legacy keys from the pre-rewrite sync engine — clear so a future
+  // reconnect doesn't pick them up via the migration path.
   localStorage.removeItem('dbx-index');
+  localStorage.removeItem('opfs-sync-manifest');
   dbxStatus('Not connected', 'disconnected');
   refreshFileList();
 }
@@ -1574,7 +1594,9 @@ async function dbxDownload(path, signal) {
     signal,
   });
   if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
-  return await res.text();
+  // Bytes — text() corrupts non-UTF-8 (images, PDFs, anything binary).
+  // opfs.write accepts BufferSource fine.
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 async function dbxUpload(path, content) {
@@ -1589,6 +1611,8 @@ async function dbxUpload(path, content) {
     body: content,
   });
   if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+  // FileMetadata: { name, path_display, content_hash, size, rev, server_modified, ... }
+  return await res.json();
 }
 
 async function dbxDelete(path) {
@@ -1602,11 +1626,43 @@ async function dbxDelete(path) {
   }
 }
 
-// ----- Sync state helpers -----
-function dbxIndex() { return JSON.parse(localStorage.getItem('dbx-index') || '{}'); }
-function setDbxIndex(idx) { localStorage.setItem('dbx-index', JSON.stringify(idx)); }
-function manifest() { return JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}'); }
-function setManifest(m) { localStorage.setItem('opfs-sync-manifest', JSON.stringify(m)); }
+// ============================================================
+// Sync engine — Dropbox is the source of truth.
+// ============================================================
+// Replaces the older dbxIndex + manifest split (three sources of truth,
+// four entry points, drift between them). One state map, one cloud
+// listing, one sync function.
+//
+// Shape: syncState[relPath] = {
+//   rev,           // Dropbox content_hash. Drives "did cloud change?".
+//   size,          // Cloud size in bytes. Drives lazy-hydration decision.
+//   hydrated,      // true = file in OPFS; false = placeholder.
+//   syncedMtime,   // OPFS mtime as of last successful sync (0 if not
+//                  // hydrated). Drives "did local change?".
+// }
+const SYNC_STATE_KEY = 'sandpie-sync-state';
+function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
+function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
+
+// One-shot migration: project the older dbx-index + opfs-sync-manifest pair
+// into the new shape. Old keys are left in localStorage as a safety net but
+// nothing reads them anymore.
+(function migrateLegacyState() {
+  if (localStorage.getItem(SYNC_STATE_KEY)) return;
+  const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
+  const oldIndex = JSON.parse(localStorage.getItem('dbx-index') || '{}');
+  const s = {};
+  for (const [path, info] of Object.entries(oldIndex)) {
+    if (info.kind !== 'file') continue;
+    s[path] = {
+      rev: info.rev,
+      size: info.size,
+      hydrated: oldManifest[path] !== undefined,
+      syncedMtime: oldManifest[path] || 0,
+    };
+  }
+  setSyncState(s);
+})();
 
 async function opfsLastModified(relPath) {
   try {
@@ -1617,32 +1673,11 @@ async function opfsLastModified(relPath) {
   } catch { return 0; }
 }
 
-// Re-list one Dropbox folder (recursively) and merge into the local index.
-// Captures size/rev/cloudMtime so the lazy-hydration layer can decide which
-// files to eagerly pull vs leave as placeholders.
-async function refreshDbxIndex(basePath) {
-  const folder = basePath ? '/' + basePath : '/';
-  const entries = await dbxList(folder, { recursive: true });
-  const idx = dbxIndex();
-  // Drop everything currently indexed under this base, then re-add fresh.
-  const baseLower = basePath.toLowerCase();
-  for (const k of Object.keys(idx)) {
-    const kl = k.toLowerCase();
-    if (!baseLower) delete idx[k];
-    else if (kl === baseLower || kl.startsWith(baseLower + '/')) delete idx[k];
-  }
-  for (const e of entries) {
-    const rel = e.path.replace(/^\/+/, '');
-    if (!rel) continue;
-    idx[rel] = { kind: e.kind, dbxPath: e.path, size: e.size, rev: e.rev, cloudMtime: e.cloudMtime };
-  }
-  setDbxIndex(idx);
-}
-
-// Eager-hydrate carve-outs (Phase B): paths that should always be downloaded
-// on init even under lazy mode. Conversations + manifest .md files are read
-// during init by refreshConversationList / the manifest scanner — they need
-// to be local. Sub-64KB files are cheap and avoid most placeholder gotchas.
+// Carve-outs for files that should be downloaded eagerly even under lazy
+// mode. Conversations + sandpie_*.md manifests are read at init by code
+// that needs them local; small files are cheap and sidestep most
+// placeholder gotchas. Everything else stays a placeholder until the user
+// clicks it or fetch_file pulls it.
 function isEagerHydrate(path, size) {
   if (path === '_conversations' || path.startsWith('_conversations/')) return true;
   if (/(?:^|\/)sandpie_[^/]*\.md$/.test(path)) return true;
@@ -1650,190 +1685,176 @@ function isEagerHydrate(path, size) {
   return false;
 }
 
-// Phase C: auto-push files that were created or modified during a conversation
-// round. Triggered from send()'s finally block after saveActiveConv. Uploads
-// only — deletes propagate immediately via right-click Delete in the file
-// panel. Best-effort: errors are logged but don't block the conversation save.
-// No conflict detection in v1 — last-write-wins.
-async function autoPushDirty() {
-  if (!dbxTokens()) return;
-  setDbxBusy(true);
-  try {
-    const m = manifest();
-    const idx = dbxIndex();
-    const opfsRels = await opfs.list();
-    const pushed = [];
-    for (const rel of opfsRels) {
-      const lastMod = await opfsLastModified(rel);
-      if (m[rel] && lastMod <= m[rel]) continue;   // unchanged since last sync
-      try {
-        const content = await opfs.readBytes(rel);   // bytes for binary correctness
-        const dbxPath = '/' + rel;
-        await dbxUpload(dbxPath, content);
-        m[rel] = lastMod;
-        if (!idx[rel] || idx[rel].kind !== 'file') idx[rel] = { kind: 'file', dbxPath };
-        pushed.push(rel);
-      } catch (e) {
-        console.warn('autoPushDirty:', rel, e);
-      }
-    }
-    if (pushed.length) {
-      setManifest(m);
-      setDbxIndex(idx);
-      dbxStatus(`↑ pushed ${pushed.length}`, 'connected');
-      await refreshFileList();
-    }
-  } finally {
-    setDbxBusy(false);
+// Recursive list of /. Returns { relPath: { kind, path, size, rev, cloudMtime } },
+// keyed by Dropbox-relative path. Treats Dropbox listing as truth.
+async function cloudListAll() {
+  const entries = await dbxList('/', { recursive: true });
+  const out = {};
+  for (const e of entries) {
+    const rel = e.path.replace(/^\/+/, '');
+    if (!rel) continue;
+    out[rel] = e;
   }
+  return out;
 }
 
-// Periodic poll while connected: pull cloud-only files AND reconcile
-// cross-device deletes in the background, so changes from another device
-// show up without requiring reload. Never pushes (autoPushDirty handles
-// that at conversation end). Dirty local files — those with edits since
-// the last sync — are exempt from delete propagation so a concurrent edit
-// here doesn't vanish mid-keystroke when the file's been deleted elsewhere;
-// they get re-pushed at conv end via last-write-wins.
-async function cloudPollTick() {
-  if (!dbxTokens() || document.hidden) return;
-  setDbxBusy(true);
-  try {
-    await refreshDbxIndex('');
-    const idx = dbxIndex();
-    const m = manifest();
-    let pulled = 0, removed = 0;
+let _syncing = false;
 
-    // Cross-device delete reconcile (was init-only; now runs every tick so
-    // Dropbox stays the authority during a live session). For each path we
-    // previously synced that's now missing from the fresh cloud listing:
-    // - if the local file is dirty (lastMod > manifest entry), keep it —
-    //   the user edited it since last sync and autoPushDirty will resurrect
-    //   it at conv end.
-    // - otherwise, drop OPFS bytes + manifest entry.
-    for (const path of Object.keys(m)) {
-      if (idx[path]) continue;
-      let dirty = false, present = true;
-      try {
-        const lm = await opfsLastModified(path);
-        if (lm > m[path]) dirty = true;
-      } catch { present = false; }
-      if (dirty) continue;
-      if (present) { try { await opfs.remove(path); } catch {} }
-      delete m[path];
-      removed++;
-    }
-
-    for (const [key, val] of Object.entries(idx)) {
-      if (val.kind !== 'file') continue;
-      let exists = false;
-      try { await opfs.read(key); exists = true; } catch {}
-      if (!exists) {
-        // Skip files we previously synced and have since been deleted locally
-        // — re-pulling would undo a tool move/delete.
-        if (m[key]) continue;
-        // Lazy hydration carve-out: only background-pull conversations,
-        // sandpie_*.md manifests, and small files. Everything else stays as
-        // a placeholder until the LLM calls fetch_file or the user clicks it.
-        if (!isEagerHydrate(key, val.size)) continue;
-        const content = await dbxDownload(val.dbxPath || ('/' + key));
-        await opfs.write(key, content);
-        m[key] = await opfsLastModified(key);
-        pulled++;
-      } else if (!m[key]) {
-        m[key] = await opfsLastModified(key);
-      }
-    }
-    if (removed) await pruneOrphanDirs();
-    if (pulled || removed) {
-      setManifest(m);
-      await refreshFileList();
-      await refreshConversationList();
-    }
-  } catch { /* silent — don't spam on poll errors */ }
-  finally { setDbxBusy(false); }
-}
-setInterval(cloudPollTick, 60000);
-
-// On page load (when already authenticated): reconcile multi-device deletes,
-// pull eager-hydrate carve-outs (conversations, manifest .md, <64KB files),
-// baseline newly-discovered shared files. Never pushes — that happens
-// automatically at the end of each conversation round via autoPushDirty.
-async function autoSyncOnLoad() {
+// Single sync entry point. Called on connect, on the Resync button, on a
+// 60s background tick (when foregrounded), and at conversation end.
+//
+// Pull phase:
+//   * Drops local copies of paths that vanished from cloud, except when
+//     the local file is dirty (lastMod > syncedMtime) — those are kept and
+//     re-pushed in the push phase (last-write-wins).
+//   * For each cloud entry: if first sighting and local has it too, baseline
+//     as synced (TOFU). If first sighting + cloud-only, eager-download or
+//     leave as placeholder. If state already had it and cloud rev changed,
+//     re-download (eager) or demote to placeholder (lazy).
+//   * If cloud unchanged but local copy disappeared, demote to placeholder
+//     (cloud is authority — accidental local removals don't propagate).
+//
+// Push phase: any OPFS file with no state entry, or with mtime newer than
+// syncedMtime, gets uploaded and the state row refreshed.
+//
+// Empty-dir prune: directories with no children and no cloud counterpart
+// get removed (cascades up).
+async function sync() {
   if (!dbxTokens()) return;
+  if (_syncing) return;
+  _syncing = true;
   setDbxBusy(true);
   try {
-    dbxStatus('Auto-pull…', 'connected');
-    await refreshDbxIndex('');
-    const idx = dbxIndex();
-    const m = manifest();
+    dbxStatus('Syncing…', 'connected');
+    const cloud = await cloudListAll();
+    const state = syncState();
+    let pulled = 0, pushed = 0, removed = 0, baselined = 0;
 
-    // Multi-device delete reconcile (Phase A of the lazy-hydration plan):
-    // any path we previously synced that's now ABSENT from the fresh cloud
-    // listing was deleted on another device. Propagate to local — drop OPFS
-    // bytes + manifest entry. Without this, device 1 deleting a file leaves
-    // it stale on device 2 forever (manifest acts as a TOFU baseline). Only
-    // runs at init, never from cloudPollTick — background deletes during an
-    // active session would be surprising mid-edit.
-    let removed = 0;
-    for (const path of Object.keys(m)) {
-      if (idx[path]) continue;            // still in cloud → no action
-      try { await opfs.remove(path); } catch {}
-      delete m[path];
+    // --- Pull: cross-device delete reconcile ---
+    for (const path of Object.keys(state)) {
+      if (cloud[path]) continue;
+      const s = state[path];
+      if (s.hydrated) {
+        const lm = await opfsLastModified(path);
+        if (lm > 0 && lm > s.syncedMtime) continue;  // dirty — defer to push
+        try { await opfs.remove(path); } catch {}
+      }
+      delete state[path];
       removed++;
     }
-    if (removed) {
-      setManifest(m);
-      await pruneOrphanDirs();
-      dbxStatus(`Reconciling… (-${removed} from another device)`, 'connected');
+
+    // --- Pull: cloud → local ---
+    for (const [path, e] of Object.entries(cloud)) {
+      if (e.kind !== 'file') continue;
+      const s = state[path];
+      const eager = isEagerHydrate(path, e.size);
+      const localExists = await opfs.exists(path);
+
+      if (!s) {
+        if (localExists) {
+          state[path] = {
+            rev: e.rev, size: e.size, hydrated: true,
+            syncedMtime: await opfsLastModified(path),
+          };
+          baselined++;
+        } else if (eager) {
+          dbxStatus(`↓ ${path}`, 'connected');
+          const content = await dbxDownload(e.path);
+          await opfs.write(path, content);
+          state[path] = {
+            rev: e.rev, size: e.size, hydrated: true,
+            syncedMtime: await opfsLastModified(path),
+          };
+          pulled++;
+        } else {
+          state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
+        }
+        continue;
+      }
+
+      const cloudChanged = s.rev !== e.rev;
+      const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
+
+      if (cloudChanged && localDirty) continue;  // last-write-wins → push phase
+
+      if (cloudChanged) {
+        if (eager && (s.hydrated || !localExists)) {
+          dbxStatus(`↓ ${path}`, 'connected');
+          const content = await dbxDownload(e.path);
+          await opfs.write(path, content);
+          state[path] = {
+            rev: e.rev, size: e.size, hydrated: true,
+            syncedMtime: await opfsLastModified(path),
+          };
+          pulled++;
+        } else {
+          if (localExists) { try { await opfs.remove(path); } catch {} }
+          state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
+        }
+        continue;
+      }
+
+      // Cloud unchanged. Demote to placeholder if local copy went missing.
+      if (s.hydrated && !localExists) {
+        state[path].hydrated = false;
+        state[path].syncedMtime = 0;
+      }
+      state[path].size = e.size;
     }
 
-    let pulled = 0, baselined = 0;
-    for (const [key, val] of Object.entries(idx)) {
-      if (val.kind !== 'file') continue;
-      let exists = false;
-      try { await opfs.read(key); exists = true; } catch {}
-      if (!exists) {
-        // Don't re-pull files we previously synced and have since deleted
-        // locally — explicit Sync propagates that delete to cloud.
-        if (m[key]) continue;
-        // Lazy hydration: only eager-download carve-outs (conversations,
-        // sandpie_*.md manifests, files <64KB). Everything else stays as a
-        // placeholder — listed in dbxIndex, missing from OPFS — and gets
-        // hydrated on demand via the fetch_file tool when the LLM needs it.
-        if (!isEagerHydrate(key, val.size)) continue;
-        dbxStatus(`↓ ${key}`, 'connected');
-        const content = await dbxDownload(val.dbxPath || ('/' + key));
-        await opfs.write(key, content);
-        m[key] = await opfsLastModified(key);
-        setManifest(m);
-        await refreshFileList();
-        pulled++;
-      } else if (!m[key]) {
-        m[key] = await opfsLastModified(key);
-        baselined++;
+    // --- Push: local → cloud (dirty + local-only) ---
+    let opfsRels = [];
+    try { opfsRels = await opfs.list(); } catch {}
+    for (const rel of opfsRels) {
+      const lm = await opfsLastModified(rel);
+      const s = state[rel];
+      if (s && s.hydrated && lm <= s.syncedMtime) continue;
+      try {
+        const content = await opfs.readBytes(rel);
+        dbxStatus(`↑ ${rel}`, 'connected');
+        const meta = await dbxUpload('/' + rel, content);
+        state[rel] = {
+          rev: (meta && meta.content_hash) || (s && s.rev) || '',
+          size: (meta && meta.size != null) ? meta.size : (s && s.size != null ? s.size : content.byteLength),
+          hydrated: true,
+          syncedMtime: lm,
+        };
+        pushed++;
+      } catch (err) {
+        console.warn('sync push:', rel, err);
       }
     }
-    setManifest(m);
-    dbxStatus(pulled ? `Connected · pulled ${pulled}` : 'Connected', 'connected');
+
+    setSyncState(state);
+    if (removed) await pruneOrphanDirs(cloud);
+
+    const parts = [];
+    if (pulled) parts.push(`↓${pulled}`);
+    if (pushed) parts.push(`↑${pushed}`);
+    if (removed) parts.push(`-${removed}`);
+    dbxStatus(parts.length ? `Connected · ${parts.join(' ')}` : 'Connected', 'connected');
+    await refreshFileList();
+    await refreshConversationList();
   } catch (e) {
-    dbxStatus('Auto-pull failed: ' + e.message, 'error');
+    dbxStatus('Sync failed: ' + e.message, 'error');
+    console.warn('sync:', e);
   } finally {
     initialSyncDone = true;
     setDbxBusy(false);
-    await refreshFileList();
-    await refreshConversationList();
+    _syncing = false;
   }
 }
+
+// Background sync every 60s while foregrounded.
+setInterval(() => { if (!document.hidden) sync(); }, 60000);
 
 function joinPath(folder, name) {
   if (folder === '/' || folder === '') return '/' + name;
   return folder.replace(/\/$/, '') + '/' + name;
 }
 
-// User-triggered resync: same logic as autoSyncOnLoad, but invoked from the
-// Resync button so users don't have to wait for the 60s poll or reload the
-// page to see cross-device deletes propagate.
+// User-triggered resync: same logic as the background tick, but invoked
+// from the Resync button so users don't have to wait for it.
 async function manualResync() {
   if (!dbxTokens()) {
     dbxStatus('Not connected', 'disconnected');
@@ -1842,7 +1863,7 @@ async function manualResync() {
   const btn = $('dbxResyncBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
   try {
-    await autoSyncOnLoad();
+    await sync();
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
   }
@@ -1857,13 +1878,13 @@ async function manualResync() {
       await dbxExchangeCode(code);
       history.replaceState({}, '', location.pathname);
       dbxStatus('Connected', 'connected');
-      await autoSyncOnLoad();
+      await sync();
     } catch (e) {
       dbxStatus('Auth failed: ' + e.message, 'error');
     }
   } else if (dbxTokens()) {
     dbxStatus('Connected', 'connected');
-    await autoSyncOnLoad();
+    await sync();
   }
 })();
 
@@ -1928,17 +1949,17 @@ async function syncOpfsToPy(p) {
     // the round-trip — text decodes back fine via Pyodide's open().
     p.FS.writeFile(dir + '/' + fileName, await opfs.readBytes(rel));
   }
-  // Phase B lazy hydration: materialize zero-byte placeholders in pyodide's
-  // FS for every cloud-only path. This makes os.listdir / glob.glob / os.walk
-  // / pathlib.iterdir enumerate all paths the LLM might want, even though we
-  // never downloaded the bytes. open() on a placeholder reads zero bytes —
-  // the FNF rewrite below the runPythonAsync call notices unsuccessful reads
-  // and tells the LLM to call fetch_file first. Returns the placeholders set
-  // so syncPyToOpfs can avoid mistaking them for real local files later.
+  // Lazy hydration: materialize zero-byte placeholders in pyodide's FS for
+  // every cloud path that isn't currently hydrated locally. Lets os.listdir
+  // / glob.glob / os.walk / pathlib.iterdir enumerate everything the LLM
+  // might ask for. open() on a placeholder reads zero bytes — the FNF
+  // rewrite below the runPythonAsync call notices unsuccessful reads and
+  // tells the LLM to call fetch_file first. Returns the placeholders set so
+  // syncPyToOpfs doesn't mistake them for real local files later.
   const placeholders = new Set();
-  const idx = dbxIndex();
-  for (const [rel, val] of Object.entries(idx)) {
-    if (val.kind !== 'file') continue;
+  const state = syncState();
+  for (const [rel, val] of Object.entries(state)) {
+    if (val.hydrated) continue;
     if (hydrated.has(rel)) continue;
     const segs = rel.split('/');
     const fileName = segs.pop();
@@ -2232,21 +2253,22 @@ Examples:
       if (!dbxTokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
       if (!path) return 'Missing path.';
       const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
-      const idx = dbxIndex();
-      const entry = idx[norm];
+      const state = syncState();
+      const entry = state[norm];
       if (!entry) return `No such file in Dropbox listing: ${norm}. Check the path or refresh the file list.`;
-      if (entry.kind !== 'file') return `Not a file: ${norm} (kind=${entry.kind}).`;
-      let exists = false;
-      try { await opfs.read(norm); exists = true; } catch {}
-      if (exists) return `Already local: ${norm}.`;
+      if (await opfs.exists(norm)) return `Already local: ${norm}.`;
       if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
       setDbxBusy(true);
       try {
-        const content = await dbxDownload(entry.dbxPath || ('/' + norm), signal);
+        const content = await dbxDownload('/' + norm, signal);
         await opfs.write(norm, content);
-        const m = manifest();
-        m[norm] = await opfsLastModified(norm);
-        setManifest(m);
+        const s = syncState();
+        s[norm] = {
+          rev: entry.rev, size: entry.size,
+          hydrated: true,
+          syncedMtime: await opfsLastModified(norm),
+        };
+        setSyncState(s);
         await refreshFileList();
         const sizeStr = entry.size != null ? ` (${entry.size} bytes)` : '';
         return `Hydrated ${norm}${sizeStr}. You can now read it.`;
@@ -2388,14 +2410,14 @@ async function refreshFileList() {
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
-  // Direct children at this level from the cached Dropbox index. We also
-  // derive folder presence from any deeper entry — Dropbox doesn't have a
-  // "create empty folder" primitive, so a freshly-pushed file at /a/b/c.txt
-  // implies /a/ exists remotely even if no explicit folder entry was added.
-  const idx = dbxIndex();
+  // Direct children at this level derived from the sync state. Dropbox has
+  // no "create empty folder" primitive, so a known-cloud file at /a/b/c.txt
+  // implies /a/ exists remotely — we synthesize folder rows from path
+  // prefixes the same way the cloud listing does.
+  const state = syncState();
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
-  for (const [k, v] of Object.entries(idx)) {
+  for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (!kl.startsWith(prefix.toLowerCase())) continue;
     const rest = k.slice(prefix.length);
@@ -2404,7 +2426,7 @@ async function refreshFileList() {
       const firstSeg = rest.split('/')[0];
       if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
     } else {
-      remoteMap.set(rest, v.kind === 'folder' ? 'folder' : 'file');
+      remoteMap.set(rest, 'file');
     }
   }
 
@@ -2421,7 +2443,6 @@ async function refreshFileList() {
     return;
   }
 
-  const m = manifest();
   const items = [];
   for (const name of names) {
     const local = localMap.get(name);
@@ -2436,14 +2457,16 @@ async function refreshFileList() {
       status = 'cloud';
     } else if (!remote) {
       status = 'local';
-    } else if (!m[fullKey]) {
-      // No baseline yet — first time we've seen this file on both sides.
-      // Trust-on-first-use: assume synced. autoSyncOnLoad / autoPushDirty will
-      // write a baseline so future edits flip to 'modified' correctly.
-      status = 'synced';
     } else {
-      const lastMod = await opfsLastModified(fullKey);
-      status = lastMod <= m[fullKey] ? 'synced' : 'modified';
+      const s = state[fullKey];
+      if (!s || !s.hydrated) {
+        // Cloud has it, local has it, no synced state — TOFU until next sync
+        // baselines it.
+        status = 'synced';
+      } else {
+        const lastMod = await opfsLastModified(fullKey);
+        status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
+      }
     }
     items.push({ name, kind, status, fullKey });
   }
@@ -2504,19 +2527,16 @@ async function refreshFileList() {
           if (dbxTokens()) {
             try { await dbxDelete('/' + it.fullKey); } catch {}
           }
-          // Strip the deleted path + descendants from the cached index AND
-          // the manifest. Matching is case-insensitive to mirror Dropbox.
+          // Strip the deleted path + descendants from sync state. Matching
+          // is case-insensitive to mirror Dropbox semantics.
           const lkPrefix = it.fullKey.toLowerCase();
           const isHit = (k) => {
             const kl = k.toLowerCase();
             return kl === lkPrefix || kl.startsWith(lkPrefix + '/');
           };
-          const idx = dbxIndex(); let idxChanged = false;
-          for (const k of Object.keys(idx)) if (isHit(k)) { delete idx[k]; idxChanged = true; }
-          if (idxChanged) setDbxIndex(idx);
-          const m = manifest(); let mChanged = false;
-          for (const k of Object.keys(m)) if (isHit(k)) { delete m[k]; mChanged = true; }
-          if (mChanged) setManifest(m);
+          const s = syncState(); let sChanged = false;
+          for (const k of Object.keys(s)) if (isHit(k)) { delete s[k]; sChanged = true; }
+          if (sChanged) setSyncState(s);
           await refreshFileList();
         }},
       ]);
@@ -3023,12 +3043,9 @@ async function deleteConv(id, title) {
     try { await dbxDelete('/' + path); } catch {}
   }
   const lk = path.toLowerCase();
-  const idx = dbxIndex(); let idxChanged = false;
-  for (const k of Object.keys(idx)) if (k.toLowerCase() === lk) { delete idx[k]; idxChanged = true; }
-  if (idxChanged) setDbxIndex(idx);
-  const m = manifest(); let mChanged = false;
-  for (const k of Object.keys(m)) if (k.toLowerCase() === lk) { delete m[k]; mChanged = true; }
-  if (mChanged) setManifest(m);
+  const s = syncState(); let sChanged = false;
+  for (const k of Object.keys(s)) if (k.toLowerCase() === lk) { delete s[k]; sChanged = true; }
+  if (sChanged) setSyncState(s);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
@@ -3385,7 +3402,7 @@ async function send() {
     refreshTokenMeter();
     // Phase C: push any files the LLM created/modified during the round to
     // Dropbox. Errors are logged but don't fail the conversation save.
-    try { await autoPushDirty(); } catch (e) { console.warn('autoPushDirty failed:', e); }
+    try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 </script>
