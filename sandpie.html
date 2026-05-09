@@ -1551,6 +1551,26 @@ async function autoSyncOnLoad() {
     await refreshDbxIndex('');
     const idx = dbxIndex();
     const m = manifest();
+
+    // Multi-device delete reconcile (Phase A of the lazy-hydration plan):
+    // any path we previously synced that's now ABSENT from the fresh cloud
+    // listing was deleted on another device. Propagate to local — drop OPFS
+    // bytes + manifest entry. Without this, device 1 deleting a file leaves
+    // it stale on device 2 forever (manifest acts as a TOFU baseline). Only
+    // runs at init, never from cloudPollTick — background deletes during an
+    // active session would be surprising mid-edit.
+    let removed = 0;
+    for (const path of Object.keys(m)) {
+      if (idx[path]) continue;            // still in cloud → no action
+      try { await opfs.remove(path); } catch {}
+      delete m[path];
+      removed++;
+    }
+    if (removed) {
+      setManifest(m);
+      dbxStatus(`Reconciling… (-${removed} from another device)`, 'connected');
+    }
+
     let pulled = 0, baselined = 0;
     for (const [key, val] of Object.entries(idx)) {
       if (val.kind !== 'file') continue;
