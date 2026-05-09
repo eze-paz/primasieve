@@ -2277,11 +2277,31 @@ async function refreshFileList() {
     dot.title = it.status;
     const span = document.createElement('span');
     span.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    const kindIcon = it.kind === 'folder' ? '📁 ' : '📄 ';
+    // Phase D: distinct icon for cloud-only placeholders. Click hydrates
+    // them via the same fetch_file tool the LLM uses; once local, the row
+    // re-renders with 📄 + the file viewer click handler.
+    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
+    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     span.textContent = kindIcon + it.name;
-    span.title = `${it.kind} · ${it.status}`;
+    span.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
     if (it.kind === 'folder') {
       span.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
+    } else if (isPlaceholder) {
+      span.onclick = async () => {
+        const orig = span.textContent;
+        span.textContent = '⏳ ' + it.name;
+        span.style.pointerEvents = 'none';
+        try {
+          const result = await tools.fetch_file.run({ path: it.fullKey });
+          if (!result.startsWith('Hydrated')) addMsg('info', result);
+          // refreshFileList() runs inside fetch_file's run() so this row
+          // gets re-rendered with the hydrated state automatically.
+        } catch (e) {
+          span.textContent = orig;
+          span.style.pointerEvents = '';
+          addMsg('err', 'Hydrate failed: ' + e.message);
+        }
+      };
     } else {
       span.onclick = () => openFileViewer(it.fullKey, it.name);
     }
