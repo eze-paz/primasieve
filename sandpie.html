@@ -568,8 +568,11 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
-  /* Tablet/phone: stack layout, sidebar becomes a drawer */
-  @media (max-width: 768px) {
+  /* Tablet/phone: stack layout, sidebar becomes a drawer.
+     Also matches any touch device (hover: none + pointer: coarse) so iOS
+     Safari's "Request Desktop Site" or post-OAuth handoff that fakes a
+     desktop viewport still gets the mobile layout. */
+  @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     body {
       flex-direction: column;
       /* dvh handles iOS Safari url-bar; vh fallback for older browsers */
@@ -1146,8 +1149,11 @@ function downloadProxy() {
 // (localProxyMode and localProxyTimer are declared near the top so refreshProxyDot
 //  can read them safely at module init.)
 async function probeLocalProxy() {
+  // 2s gives the OS a real chance to fail/succeed the connect; 800ms was
+  // racing with TCP handshake on slower machines and made the test feel like
+  // it didn't happen at all.
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 800);
+  const t = setTimeout(() => ctrl.abort(), 2000);
   try {
     const r = await fetch('http://localhost:8080/', { method: 'OPTIONS', signal: ctrl.signal });
     return !!r.headers.get('access-control-allow-origin');
@@ -1208,9 +1214,47 @@ function startLocalProxyTimer(intervalMs, onAlive, onDead) {
 }
 
 async function toggleLocalProxy() {
-  if (localProxyMode === 'inactive') {
-    setLocalProxyUI('searching');
-    if (await probeLocalProxy()) {
+  if (localProxyMode !== 'inactive') {
+    if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+    setLocalProxyUI('inactive');
+    return;
+  }
+
+  // Populate the proxy field BEFORE testing so the user can see exactly what
+  // URL we're probing. Previously the field stayed empty until a probe
+  // succeeded, which meant a failed probe looked like "no proxy" without any
+  // indication of what was tried. setLocalProxyUI('inactive') already clears
+  // this back to '' if the value still equals our default.
+  $('proxyUrl').value = 'http://localhost:8080';
+  updateRoutingHint();
+
+  setLocalProxyUI('searching');
+  const alive = await probeLocalProxy();
+
+  if (alive) {
+    setLocalProxyUI('connected');
+    startLocalProxyTimer(15000, () => {}, () => {
+      if (localProxyMode === 'connected') {
+        addMsg('info', 'Local proxy disconnected.');
+        if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+        setLocalProxyUI('inactive');
+      }
+    });
+    return;
+  }
+
+  showDownloadPrompt();
+  // Browsers block fetch() from HTTPS pages to http://localhost as mixed
+  // content, so the probe will always fail in that context — say so instead
+  // of letting the user think the proxy isn't running.
+  if (location.protocol === 'https:') {
+    $('proxyDownloadHint').textContent =
+      'Browsers block http://localhost from HTTPS pages (mixed content). Open sandpie via http://localhost:8080 to use the local proxy, or set a public proxy URL above.';
+  }
+  // Keep probing — user is presumably about to start the proxy.
+  startLocalProxyTimer(3000, () => {
+    if (localProxyMode === 'searching') {
+      if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
       setLocalProxyUI('connected');
       startLocalProxyTimer(15000, () => {}, () => {
         if (localProxyMode === 'connected') {
@@ -1219,27 +1263,8 @@ async function toggleLocalProxy() {
           setLocalProxyUI('inactive');
         }
       });
-    } else {
-      showDownloadPrompt();
-      // keep probing — user is presumably about to start it
-      startLocalProxyTimer(3000, () => {
-        if (localProxyMode === 'searching') {
-          if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-          setLocalProxyUI('connected');
-          startLocalProxyTimer(15000, () => {}, () => {
-            if (localProxyMode === 'connected') {
-              addMsg('info', 'Local proxy disconnected.');
-              if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-              setLocalProxyUI('inactive');
-            }
-          });
-        }
-      });
     }
-  } else {
-    if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-    setLocalProxyUI('inactive');
-  }
+  });
 }
 
 // ============================================================
