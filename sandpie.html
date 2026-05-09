@@ -447,6 +447,18 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.55); opacity: 0.55; }
   }
+  /* Beta error/console log panel */
+  ul.err-list { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; max-height: 240px; overflow-y: auto; padding: 0; margin: 0 0 0.4rem 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.7rem; }
+  ul.err-list li { padding: 0.3rem 0.4rem; border-radius: 3px; border-left: 2px solid #30363d; background: #161b22; word-break: break-word; white-space: pre-wrap; line-height: 1.35; color: #c9d1d9; }
+  ul.err-list li.lvl-log   { border-left-color: #58a6ff; }
+  ul.err-list li.lvl-warn  { border-left-color: #f8b251; }
+  ul.err-list li.lvl-error { border-left-color: #f85149; }
+  ul.err-list li .ts  { color: #6e7681; margin-right: 0.4em; }
+  ul.err-list li .lvl { font-weight: 600; margin-right: 0.4em; }
+  ul.err-list li.lvl-log   .lvl { color: #58a6ff; }
+  ul.err-list li.lvl-warn  .lvl { color: #f8b251; }
+  ul.err-list li.lvl-error .lvl { color: #f85149; }
+  .err-empty { color: #6e7681; font-size: 0.72rem; font-style: italic; padding: 0.3rem 0.1rem; }
   /* Conversations list */
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: #161b22; border-color: #444c56; }
@@ -636,6 +648,50 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
 </style>
 <script>
+// Beta error log: capture console.{log,info,warn,error} + uncaught errors so
+// users can see what went wrong without opening DevTools. Installed as the
+// very first script so it covers everything that follows.
+(function () {
+  const MAX_ENTRIES = 200;
+  const buf = [];
+  function fmt(args) {
+    return Array.from(args).map(a => {
+      if (a instanceof Error) return a.stack || (a.name + ': ' + a.message);
+      if (typeof a === 'string') return a;
+      try { return JSON.stringify(a); } catch (_) { return String(a); }
+    }).join(' ');
+  }
+  function add(level, msg) {
+    buf.push({ ts: new Date(), level, msg });
+    if (buf.length > MAX_ENTRIES) buf.splice(0, buf.length - MAX_ENTRIES);
+    if (typeof window.renderErrorLog === 'function') {
+      try { window.renderErrorLog(); } catch (_) {}
+    }
+  }
+  window._errorLog = {
+    entries: buf,
+    clear() { buf.length = 0; if (typeof window.renderErrorLog === 'function') window.renderErrorLog(); },
+    push: add,
+  };
+  for (const level of ['log', 'info', 'warn', 'error']) {
+    const orig = console[level].bind(console);
+    console[level] = function (...args) {
+      try { add(level === 'info' ? 'log' : level, fmt(args)); } catch (_) {}
+      orig(...args);
+    };
+  }
+  window.addEventListener('error', (ev) => {
+    const where = ev.filename ? ' @ ' + ev.filename + ':' + ev.lineno + ':' + ev.colno : '';
+    const stack = ev.error && ev.error.stack;
+    add('error', stack || ((ev.message || 'Error') + where));
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    const r = ev.reason;
+    const msg = r && r.stack ? r.stack : (r && r.message) || String(r);
+    add('error', 'Unhandled promise rejection: ' + msg);
+  });
+})();
+
 // Stray-DOM guard. Anything appended as a direct child of <body> after the
 // initial parse is treated as model-injected output and re-homed into a
 // sandboxed iframe inside the last assistant bubble. Scripts run inside the
@@ -780,6 +836,17 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   </details>
 
 
+  <details class="service" id="errorsSection">
+    <summary>Errors <span id="errCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
+    <div class="service-body">
+      <ul class="err-list" id="errList" aria-live="polite"></ul>
+      <div id="errEmpty" class="err-empty">no events captured</div>
+      <div class="row">
+        <button class="ghost" onclick="clearErrorLog()">Clear</button>
+      </div>
+    </div>
+  </details>
+
   <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -816,6 +883,40 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 
 <script>
 const $ = id => document.getElementById(id);
+
+// Renderer for the beta error log captured by the IIFE in the earlier script.
+// Defined first so add() can call it as soon as DOM nodes exist.
+window.renderErrorLog = function renderErrorLog() {
+  const ul = document.getElementById('errList');
+  if (!ul) return;
+  const empty = document.getElementById('errEmpty');
+  const count = document.getElementById('errCount');
+  const entries = window._errorLog.entries;
+  const errCount = entries.reduce((n, e) => e.level === 'error' ? n + 1 : n, 0);
+  if (count) count.textContent = entries.length ? (errCount ? errCount + '!' : String(entries.length)) : '';
+  if (empty) empty.style.display = entries.length ? 'none' : '';
+  ul.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const e of entries) {
+    const li = document.createElement('li');
+    li.className = 'lvl-' + e.level;
+    const tsSpan = document.createElement('span');
+    tsSpan.className = 'ts';
+    tsSpan.textContent = e.ts.toLocaleTimeString();
+    const lvlSpan = document.createElement('span');
+    lvlSpan.className = 'lvl';
+    lvlSpan.textContent = e.level.toUpperCase();
+    li.appendChild(tsSpan);
+    li.appendChild(lvlSpan);
+    li.appendChild(document.createTextNode(e.msg));
+    frag.appendChild(li);
+  }
+  ul.appendChild(frag);
+  ul.scrollTop = ul.scrollHeight;
+};
+function clearErrorLog() { window._errorLog.clear(); }
+document.addEventListener('DOMContentLoaded', () => window.renderErrorLog());
+
 const messages = [];
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
 $('endpoint').value = cfg.endpoint || '';
@@ -1296,8 +1397,11 @@ async function dbxConnect() {
   if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
   saveConfig();
   const { verifier, challenge } = await pkceChallenge();
-  sessionStorage.setItem('dbx-verifier', verifier);
-  sessionStorage.setItem('dbx-app-key', appKey);
+  localStorage.setItem('dbx-pkce', JSON.stringify({
+    verifier,
+    app_key: appKey,
+    ts: Date.now(),
+  }));
   const params = new URLSearchParams({
     client_id: appKey,
     response_type: 'code',
@@ -1317,9 +1421,13 @@ function dbxDisconnect() {
 }
 
 async function dbxExchangeCode(code) {
-  const verifier = sessionStorage.getItem('dbx-verifier');
-  const appKey = sessionStorage.getItem('dbx-app-key');
-  if (!verifier || !appKey) throw new Error('Missing PKCE state');
+  const stashed = JSON.parse(localStorage.getItem('dbx-pkce') || 'null');
+  if (!stashed) throw new Error('Missing PKCE state');
+  if (Date.now() - stashed.ts > 10 * 60 * 1000) {
+    localStorage.removeItem('dbx-pkce');
+    throw new Error('PKCE state expired — please reconnect');
+  }
+  const { verifier, app_key: appKey } = stashed;
   const body = new URLSearchParams({
     code,
     grant_type: 'authorization_code',
@@ -1340,8 +1448,7 @@ async function dbxExchangeCode(code) {
     expires_at: Date.now() + data.expires_in * 1000,
     app_key: appKey,
   }));
-  sessionStorage.removeItem('dbx-verifier');
-  sessionStorage.removeItem('dbx-app-key');
+  localStorage.removeItem('dbx-pkce');
 }
 
 async function dbxApi(path, body) {
