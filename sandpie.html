@@ -1345,7 +1345,16 @@ async function dbxList(folderPath, { recursive = false } = {}) {
     data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
     entries = entries.concat(data.entries);
   }
-  return entries.map(e => ({ name: e.name, kind: e['.tag'], path: e.path_display }));
+  // size / rev / cloudMtime captured for the lazy-hydration layer (Phase B).
+  // Folders don't carry size; leave undefined.
+  return entries.map(e => ({
+    name: e.name,
+    kind: e['.tag'],
+    path: e.path_display,
+    size: e.size,
+    rev: e.content_hash,
+    cloudMtime: e.server_modified,
+  }));
 }
 
 async function dbxDownload(path) {
@@ -1403,6 +1412,8 @@ async function opfsLastModified(relPath) {
 }
 
 // Re-list one Dropbox folder (recursively) and merge into the local index.
+// Captures size/rev/cloudMtime so the lazy-hydration layer can decide which
+// files to eagerly pull vs leave as placeholders.
 async function refreshDbxIndex(basePath) {
   const folder = basePath ? '/' + basePath : '/';
   const entries = await dbxList(folder, { recursive: true });
@@ -1417,9 +1428,20 @@ async function refreshDbxIndex(basePath) {
   for (const e of entries) {
     const rel = e.path.replace(/^\/+/, '');
     if (!rel) continue;
-    idx[rel] = { kind: e.kind, dbxPath: e.path };
+    idx[rel] = { kind: e.kind, dbxPath: e.path, size: e.size, rev: e.rev, cloudMtime: e.cloudMtime };
   }
   setDbxIndex(idx);
+}
+
+// Eager-hydrate carve-outs (Phase B): paths that should always be downloaded
+// on init even under lazy mode. Conversations + manifest .md files are read
+// during init by refreshConversationList / the manifest scanner — they need
+// to be local. Sub-64KB files are cheap and avoid most placeholder gotchas.
+function isEagerHydrate(path, size) {
+  if (path === '_conversations' || path.startsWith('_conversations/')) return true;
+  if (/(?:^|\/)sandpie_[^/]*\.md$/.test(path)) return true;
+  if (typeof size === 'number' && size < 64 * 1024) return true;
+  return false;
 }
 
 // Bidirectional sync of the current folder's subtree:
@@ -1523,6 +1545,10 @@ async function cloudPollTick() {
         // — re-pulling would undo a tool move/delete. The next explicit Sync
         // is what propagates the deletion to Dropbox.
         if (m[key]) continue;
+        // Lazy hydration carve-out: only background-pull conversations,
+        // sandpie_*.md manifests, and small files. Everything else stays as
+        // a placeholder until the LLM calls fetch_file or the user clicks it.
+        if (!isEagerHydrate(key, val.size)) continue;
         const content = await dbxDownload(val.dbxPath || ('/' + key));
         await opfs.write(key, content);
         m[key] = await opfsLastModified(key);
@@ -1577,9 +1603,14 @@ async function autoSyncOnLoad() {
       let exists = false;
       try { await opfs.read(key); exists = true; } catch {}
       if (!exists) {
-        // Same rule as cloudPollTick: don't re-pull files we previously synced
-        // and have since deleted locally. Explicit Sync propagates the delete.
+        // Don't re-pull files we previously synced and have since deleted
+        // locally — explicit Sync propagates that delete to cloud.
         if (m[key]) continue;
+        // Lazy hydration: only eager-download carve-outs (conversations,
+        // sandpie_*.md manifests, files <64KB). Everything else stays as a
+        // placeholder — listed in dbxIndex, missing from OPFS — and gets
+        // hydrated on demand via the fetch_file tool when the LLM needs it.
+        if (!isEagerHydrate(key, val.size)) continue;
         dbxStatus(`↓ ${key}`, 'connected');
         const content = await dbxDownload(val.dbxPath || ('/' + key));
         await opfs.write(key, content);
@@ -1670,18 +1701,45 @@ async function syncOpfsToPy(p) {
   rmTree('/files');
   try { p.FS.mkdir('/files'); } catch {}
 
-  for (const rel of await opfs.list()) {
-    const segs = rel.split('/');
-    const fileName = segs.pop();
+  const opfsRels = await opfs.list();
+  const hydrated = new Set(opfsRels);
+  const ensureDirs = (segs) => {
     let cur = '/files';
     for (const s of segs) {
       cur += '/' + s;
       try { p.FS.mkdir(cur); } catch {}
     }
+    return cur;
+  };
+  for (const rel of opfsRels) {
+    const segs = rel.split('/');
+    const fileName = segs.pop();
+    const dir = ensureDirs(segs);
     // Always copy as bytes so binary files (images, PDFs, etc.) survive
     // the round-trip — text decodes back fine via Pyodide's open().
-    p.FS.writeFile(cur + '/' + fileName, await opfs.readBytes(rel));
+    p.FS.writeFile(dir + '/' + fileName, await opfs.readBytes(rel));
   }
+  // Phase B lazy hydration: materialize zero-byte placeholders in pyodide's
+  // FS for every cloud-only path. This makes os.listdir / glob.glob / os.walk
+  // / pathlib.iterdir enumerate all paths the LLM might want, even though we
+  // never downloaded the bytes. open() on a placeholder reads zero bytes —
+  // the FNF rewrite below the runPythonAsync call notices unsuccessful reads
+  // and tells the LLM to call fetch_file first. Returns the placeholders set
+  // so syncPyToOpfs can avoid mistaking them for real local files later.
+  const placeholders = new Set();
+  const idx = dbxIndex();
+  for (const [rel, val] of Object.entries(idx)) {
+    if (val.kind !== 'file') continue;
+    if (hydrated.has(rel)) continue;
+    const segs = rel.split('/');
+    const fileName = segs.pop();
+    const dir = ensureDirs(segs);
+    try {
+      p.FS.writeFile(dir + '/' + fileName, new Uint8Array(0));
+      placeholders.add(rel);
+    } catch {}
+  }
+  return placeholders;
 }
 
 // Mirror Pyodide's /files (recursively) back to OPFS.
@@ -1691,7 +1749,7 @@ function bytesEqual(a, b) {
   return true;
 }
 
-async function syncPyToOpfs(p) {
+async function syncPyToOpfs(p, placeholders = new Set()) {
   const pyFiles = new Set();
   const walk = (full, rel) => {
     for (const name of p.FS.readdir(full)) {
@@ -1711,6 +1769,11 @@ async function syncPyToOpfs(p) {
     // when nothing changed (otherwise OPFS bumps lastModified and the
     // file shows as 'modified' even when Pyodide never touched it).
     const newBytes = p.FS.readFile('/files/' + rel);
+    // Phase B: if this path went into pyodide as a zero-byte placeholder
+    // and came out still zero-byte, the LLM didn't fill it in — don't write
+    // empty bytes back to OPFS. (Real local zero-byte files aren't placeholders
+    // — the placeholders set is exactly the paths we materialized in syncOpfsToPy.)
+    if (placeholders.has(rel) && newBytes.length === 0) continue;
     let oldBytes = null;
     try { oldBytes = await opfs.readBytes(rel); } catch {}
     if (!bytesEqual(oldBytes, newBytes)) {
@@ -1718,7 +1781,10 @@ async function syncPyToOpfs(p) {
     }
   }
   for (const rel of await opfs.list()) {
-    if (!pyFiles.has(rel)) await opfs.remove(rel);
+    // Don't delete OPFS files corresponding to pyodide-side placeholders —
+    // we never had them locally; pyFiles contains them only because we
+    // materialized zero-byte stand-ins for listing purposes.
+    if (!pyFiles.has(rel) && !placeholders.has(rel)) await opfs.remove(rel);
   }
 }
 
@@ -1741,6 +1807,8 @@ PACKAGES — IMPORTANT, READ THIS FIRST:
 HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, route through \`/proxy/<host>/<path>\`.
 
 No raw sockets, no subprocess.
+
+CLOUD-ONLY FILES — IMPORTANT: when Dropbox is connected, files larger than 64 KB are NOT downloaded on init. They appear in os.listdir / glob / pathlib as zero-byte placeholders. Calling open() on a placeholder raises FileNotFoundError with a "sandpie cloud placeholder" message — when you see that, call the fetch_file tool with that path FIRST to download it, then re-run your code. Conversations and sandpie_*.md manifests are always local, so this only matters for the user's data files.
 
 RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPython.display:
     from IPython.display import display, HTML, Image, SVG
@@ -1782,10 +1850,46 @@ Examples:
       p.setStdout({ batched: s => stdout += s + '\n' });
       p.setStderr({ batched: s => stderr += s + '\n' });
       try {
-        await syncOpfsToPy(p);
+        const placeholders = await syncOpfsToPy(p);
         // Pin working directory to /files so bare relative paths land in OPFS,
         // and so os.getcwd() reports the user's filesystem, not /home/pyodide.
         p.runPython('import os; os.chdir("/files")');
+        // Phase B: install a Python open() wrapper that raises FileNotFoundError
+        // with a fetch_file directive embedded in the message whenever the LLM
+        // tries to read a cloud-only placeholder. Most file-reading libraries
+        // (pandas.read_csv, np.load, json.load, PIL.Image.open, …) ultimately
+        // route through builtins.open, so wrapping it covers the common cases.
+        // C-extension reads (sqlite3.connect on a missing DB, etc.) bypass this
+        // — document those edge cases in the tool description.
+        try {
+          window._sandpie_cloud_paths = [...placeholders];
+          p.runPython(`
+import builtins, os
+_real_open = builtins.open
+try:
+    from js import _sandpie_cloud_paths
+    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
+except Exception:
+    _sandpie_cloud_set = set()
+
+def _sandpie_normalize(path):
+    s = str(path)
+    if s.startswith('/files/'): s = s[len('/files/'):]
+    while s.startswith('./'): s = s[2:]
+    return s.lstrip('/')
+
+def _sandpie_open(path, *args, **kwargs):
+    n = _sandpie_normalize(path)
+    if n in _sandpie_cloud_set:
+        raise FileNotFoundError(
+            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
+            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run."
+        )
+    return _real_open(path, *args, **kwargs)
+
+builtins.open = _sandpie_open
+`);
+        } catch {}
         // Auto-load any prebuilt Pyodide packages referenced by `import` lines
         // (numpy, pandas, beautifulsoup4, micropip, …). Without this the LLM
         // hits ModuleNotFoundError for ~100 packages that are otherwise free.
@@ -1838,7 +1942,7 @@ except Exception:
         } catch {}
         const beforeArtifacts = window._sandpieDisplay.count || 0;
         await p.runPythonAsync(code);
-        await syncPyToOpfs(p);
+        await syncPyToOpfs(p, placeholders);
         await refreshFileList();
         let out = stdout.trimEnd();
         if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
@@ -1904,6 +2008,41 @@ Examples:
       }
     },
   },
+  fetch_file: {
+    description: `Download a single cloud-only file from Dropbox into local storage so run_python can read it. Use when run_python returns "sandpie cloud placeholder" for a path. Path is relative to /files/ (e.g. "notes.txt", "subdir/data.csv"). One file per call. Returns "Hydrated <path>" on success, or an explanatory error.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Cloud-only file path relative to /files/' },
+      },
+      required: ['path'],
+    },
+    run: async ({ path }) => {
+      if (!dbxTokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
+      if (!path) return 'Missing path.';
+      const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
+      const idx = dbxIndex();
+      const entry = idx[norm];
+      if (!entry) return `No such file in Dropbox listing: ${norm}. Check the path or refresh the file list.`;
+      if (entry.kind !== 'file') return `Not a file: ${norm} (kind=${entry.kind}).`;
+      let exists = false;
+      try { await opfs.read(norm); exists = true; } catch {}
+      if (exists) return `Already local: ${norm}.`;
+      if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
+      try {
+        const content = await dbxDownload(entry.dbxPath || ('/' + norm));
+        await opfs.write(norm, content);
+        const m = manifest();
+        m[norm] = await opfsLastModified(norm);
+        setManifest(m);
+        await refreshFileList();
+        const sizeStr = entry.size != null ? ` (${entry.size} bytes)` : '';
+        return `Hydrated ${norm}${sizeStr}. You can now read it.`;
+      } catch (e) {
+        return `Failed to fetch ${norm}: ${e.message}`;
+      }
+    },
+  },
 };
 
 function isShellAvailable() {
@@ -1915,7 +2054,11 @@ function isShellAvailable() {
 }
 
 const toolDefs = () => Object.entries(tools)
-  .filter(([name]) => name !== 'shell' || isShellAvailable())
+  .filter(([name]) => {
+    if (name === 'shell') return isShellAvailable();
+    if (name === 'fetch_file') return !!dbxTokens();   // only useful when Dropbox is connected
+    return true;
+  })
   .map(([name, t]) => ({
     type: 'function',
     function: { name, description: t.description, parameters: t.parameters },
