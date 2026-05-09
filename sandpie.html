@@ -817,6 +817,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <input id="dbxAppKey" placeholder="Dropbox app key">
       <div class="row">
         <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
       </div>
       <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
     </div>
@@ -1364,6 +1365,41 @@ const opfs = {
   },
 };
 
+// Removes empty OPFS directories that have no presence in the cached cloud
+// index. After a reconcile sweep deletes the last file under a folder, the
+// folder itself lingers in OPFS even though it has no children and no
+// cloud-side counterpart — that's how phantom "synced" folders accumulate
+// on a device that's been running across many cross-device deletes. Iterates
+// because removing a child dir may newly empty its parent.
+async function pruneOrphanDirs() {
+  const idx = dbxIndex();
+  const cloudPaths = new Set();
+  for (const k of Object.keys(idx)) {
+    const lower = k.toLowerCase();
+    cloudPaths.add(lower);
+    const segs = lower.split('/');
+    for (let i = 1; i < segs.length; i++) cloudPaths.add(segs.slice(0, i).join('/'));
+  }
+  let pruned = 0;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let all;
+    try { all = await opfs.listAll(''); } catch { return pruned; }
+    // Deepest first so children are removed before parents are checked.
+    all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
+    for (const e of all) {
+      if (e.kind !== 'directory') continue;
+      if (cloudPaths.has(e.path.toLowerCase())) continue;
+      let children;
+      try { children = await opfs.listDir(e.path); } catch { continue; }
+      if (children.length) continue;
+      try { await opfs.remove(e.path); pruned++; changed = true; } catch {}
+    }
+  }
+  return pruned;
+}
+
 // ============================================================
 // Dropbox — OAuth2 PKCE + REST API via /proxy
 // ============================================================
@@ -1708,6 +1744,7 @@ async function cloudPollTick() {
         m[key] = await opfsLastModified(key);
       }
     }
+    if (removed) await pruneOrphanDirs();
     if (pulled || removed) {
       setManifest(m);
       await refreshFileList();
@@ -1747,6 +1784,7 @@ async function autoSyncOnLoad() {
     }
     if (removed) {
       setManifest(m);
+      await pruneOrphanDirs();
       dbxStatus(`Reconciling… (-${removed} from another device)`, 'connected');
     }
 
@@ -1791,6 +1829,23 @@ async function autoSyncOnLoad() {
 function joinPath(folder, name) {
   if (folder === '/' || folder === '') return '/' + name;
   return folder.replace(/\/$/, '') + '/' + name;
+}
+
+// User-triggered resync: same logic as autoSyncOnLoad, but invoked from the
+// Resync button so users don't have to wait for the 60s poll or reload the
+// page to see cross-device deletes propagate.
+async function manualResync() {
+  if (!dbxTokens()) {
+    dbxStatus('Not connected', 'disconnected');
+    return;
+  }
+  const btn = $('dbxResyncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
+  try {
+    await autoSyncOnLoad();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
+  }
 }
 
 // Handle OAuth redirect-back (?code=…) on page load
