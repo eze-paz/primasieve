@@ -1357,7 +1357,7 @@ async function dbxList(folderPath, { recursive = false } = {}) {
   }));
 }
 
-async function dbxDownload(path) {
+async function dbxDownload(path, signal) {
   const token = await dbxAccessToken();
   const res = await fetch(api('https://content.dropboxapi.com/2/files/download'), {
     method: 'POST',
@@ -1366,6 +1366,7 @@ async function dbxDownload(path) {
       'Dropbox-API-Arg': JSON.stringify({ path }),
       'Content-Type': 'text/plain',
     },
+    signal,
   });
   if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
   return await res.text();
@@ -2015,7 +2016,7 @@ Examples:
       },
       required: ['cmd'],
     },
-    run: async ({ cmd, cwd, timeout }) => {
+    run: async ({ cmd, cwd, timeout }, signal) => {
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       const base = remote || (isLocal ? '' : null);
@@ -2028,6 +2029,7 @@ Examples:
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal,                    // wires the Stop button into the fetch
         });
         const data = await res.json();
         if (!res.ok) return `Error ${res.status}: ${data.error || 'unknown'}`;
@@ -2037,6 +2039,7 @@ Examples:
         out += `\n--- exit ${data.code} (cwd: ${data.cwd}) ---`;
         return out;
       } catch (e) {
+        if (e.name === 'AbortError') return '[stopped — shell fetch aborted; server-side process may still finish]';
         return `Error: ${e.message}`;
       }
     },
@@ -2050,7 +2053,7 @@ Examples:
       },
       required: ['path'],
     },
-    run: async ({ path }) => {
+    run: async ({ path }, signal) => {
       if (!dbxTokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
       if (!path) return 'Missing path.';
       const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
@@ -2063,7 +2066,7 @@ Examples:
       if (exists) return `Already local: ${norm}.`;
       if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
       try {
-        const content = await dbxDownload(entry.dbxPath || ('/' + norm));
+        const content = await dbxDownload(entry.dbxPath || ('/' + norm), signal);
         await opfs.write(norm, content);
         const m = manifest();
         m[norm] = await opfsLastModified(norm);
@@ -2072,6 +2075,7 @@ Examples:
         const sizeStr = entry.size != null ? ` (${entry.size} bytes)` : '';
         return `Hydrated ${norm}${sizeStr}. You can now read it.`;
       } catch (e) {
+        if (e.name === 'AbortError') return `[stopped — fetch_file ${norm} aborted]`;
         return `Failed to fetch ${norm}: ${e.message}`;
       }
     },
@@ -3152,7 +3156,11 @@ async function send() {
           if (currentAbort?.signal.aborted) break;
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-          const result = await tools[tc.function.name].run(args);
+          // Pass the abort signal so Stop is responsive even when a tool is
+          // mid-flight (shell fetch, fetch_file dbxDownload, etc.). pyodide's
+          // run_python doesn't accept an external abort and will run to
+          // completion — that's a separate, harder fix needing setInterruptBuffer.
+          const result = await tools[tc.function.name].run(args, currentAbort?.signal);
           addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
           // Cap what gets fed BACK to the LLM in the next request body. A
           // single rogue print() or cat-of-large-file used to silently push
