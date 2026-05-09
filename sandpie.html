@@ -2209,7 +2209,7 @@ async function refreshFileList() {
       status = 'local';
     } else if (!m[fullKey]) {
       // No baseline yet — first time we've seen this file on both sides.
-      // Trust-on-first-use: assume synced. autoSyncOnLoad / syncCurrent will
+      // Trust-on-first-use: assume synced. autoSyncOnLoad / autoPushDirty will
       // write a baseline so future edits flip to 'modified' correctly.
       status = 'synced';
     } else {
