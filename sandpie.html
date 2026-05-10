@@ -996,8 +996,11 @@ refreshTokenMeter();
   const ta = $('input');
   if (!ta) return;
   function autosize() {
+    const m = $('messages');
+    const stick = isAtBottom(m);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
+    if (stick) m.scrollTop = m.scrollHeight;
   }
   ta.addEventListener('input', autosize);
   ta.addEventListener('keydown', e => {
@@ -3057,6 +3060,8 @@ function handleSubmit() {
   if (!text) return;
   messageQueue.push(text);
   $('input').value = '';
+  const m = $('messages');
+  m.scrollTop = m.scrollHeight;
   processQueue();
 }
 
@@ -3150,6 +3155,7 @@ async function streamRound(signal) {
         if (streamDone) return resolve();
         return requestAnimationFrame(tick);
       }
+      if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
       if (stick) m.scrollTop = m.scrollHeight;
       requestAnimationFrame(tick);
     };
