@@ -3034,11 +3034,15 @@ function setSendingState(sending) {
 }
 
 function handleSend() {
-  if (currentAbort) {
-    currentAbort.abort();
+  const btn = $('sendBtn');
+  const text = $('input').value.trim();
+
+  // If button shows "Stop", abort current round
+  if (btn.classList.contains('sending')) {
+    if (currentAbort) currentAbort.abort();
     return;
   }
-  const text = $('input').value.trim();
+
   if (!text) return;
   messageQueue.push(text);
   $('input').value = '';
