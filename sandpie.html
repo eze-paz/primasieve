@@ -491,6 +491,13 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     letter-spacing: 0.06em;
     animation: cta-breathe 3s ease-in-out infinite;
   }
+  .queue-count {
+    font-size: 0.7rem;
+    color: #8b949e;
+    margin-left: 0.5rem;
+    min-width: 1.5rem;
+    display: inline-block;
+  }
   @keyframes cta-breathe {
     0%, 100% { opacity: 0.6; }
     50%      { opacity: 1; }
@@ -807,6 +814,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <form onsubmit="event.preventDefault(); handleSend();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
     <button id="sendBtn">Send</button>
+    <span id="queueCount" class="queue-count"></span>
   </form>
 </main>
 
@@ -3001,6 +3009,8 @@ async function refreshConversationList() {
 // Tracks the in-flight LLM round so the user can interrupt mid-stream.
 // While non-null, the Send button shows "Stop" (red) and submitting aborts.
 let currentAbort = null;
+const messageQueue = [];
+let isProcessingQueue = false;
 
 function setSendingState(sending) {
   const btn = $('sendBtn');
@@ -3011,15 +3021,61 @@ function setSendingState(sending) {
     btn.disabled = false;
   } else {
     currentAbort = null;
-    btn.textContent = 'Send';
     btn.classList.remove('sending');
+    if (messageQueue.length > 0) {
+      btn.textContent = `${messageQueue.length} queued`;
+      btn.classList.add('queued');
+    } else {
+      btn.textContent = 'Send';
+      btn.classList.remove('queued');
+    }
     btn.disabled = false;
   }
 }
 
 function handleSend() {
-  if (currentAbort) currentAbort.abort();
-  else send();
+  if (currentAbort) {
+    currentAbort.abort();
+    return;
+  }
+  const text = $('input').value.trim();
+  if (!text) return;
+  messageQueue.push(text);
+  $('input').value = '';
+  processQueue();
+}
+
+function updateQueueCount() {
+  const el = $('queueCount');
+  if (!el) return;
+  el.textContent = messageQueue.length > 0 ? `${messageQueue.length} queued` : '';
+  // Also update button if not currently sending
+  if (!currentAbort) {
+    const btn = $('sendBtn');
+    if (messageQueue.length > 0) {
+      btn.textContent = `${messageQueue.length} queued`;
+      btn.classList.add('queued');
+    } else {
+      btn.textContent = 'Send';
+      btn.classList.remove('queued');
+    }
+  }
+}
+
+async function processQueue() {
+  if (isProcessingQueue || messageQueue.length === 0) return;
+  isProcessingQueue = true;
+  updateQueueCount();
+
+  while (messageQueue.length > 0) {
+    const text = messageQueue.shift();
+    updateQueueCount();
+    await sendSingle(text);
+    if (currentAbort?.signal.aborted) break;
+  }
+
+  isProcessingQueue = false;
+  updateQueueCount();
 }
 
 async function streamRound(signal) {
@@ -3201,6 +3257,12 @@ async function streamRoundWithRetry(signal) {
 async function send() {
   const text = $('input').value.trim();
   if (!text) return;
+  messageQueue.push(text);
+  $('input').value = '';
+  processQueue();
+}
+
+async function sendSingle(text) {
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.');
     return;
@@ -3208,7 +3270,6 @@ async function send() {
   await ensureActiveConv();
   messages.push({ role: 'user', content: text });
   addMsg('user', text);
-  $('input').value = '';
   setSendingState(true);
   // One total timer for the whole exchange — covers every streamRound AND
   // every tool execution between rounds. Settled in the finally block.
@@ -3290,6 +3351,9 @@ async function send() {
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
+
+// send() is now a thin wrapper around the queue system.
+// sendSingle(text) handles one message round.
 </script>
 </body>
 </html>
