@@ -486,37 +486,22 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
   .welcome-cta {
     font-size: 0.75rem;
+    color: #58a6ff;
     margin-top: 0.5rem;
     letter-spacing: 0.06em;
-    display: inline-block;
-    /* Muted gray base with a brighter band that sweeps across every few
-       seconds. Reads as "alive and idle" without looking like a link. */
-    background: linear-gradient(90deg,
-      #6e7681 0%, #6e7681 42%,
-      #e6edf3 50%,
-      #6e7681 58%, #6e7681 100%);
-    background-size: 220% 100%;
-    background-position: 110% 0;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-    animation: cta-shimmer 4.5s ease-in-out infinite;
+    animation: cta-breathe 3s ease-in-out infinite;
   }
-  @keyframes cta-shimmer {
-    0%   { background-position: 110% 0; }
-    55%  { background-position: -110% 0; }
-    100% { background-position: -110% 0; }
+  @keyframes cta-breathe {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
     .welcome-cta {
       animation: none;
-      background: none;
-      -webkit-text-fill-color: currentColor;
-      color: #8b949e;
+      opacity: 0.85;
     }
   }
-  /* Token meter — shows current context size vs configured limit. Click to edit. */
+/* Token meter — shows current context size vs configured limit. Click to edit. */
   .token-meter {
     position: relative;
     height: 22px;
