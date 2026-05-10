@@ -2003,7 +2003,23 @@ Examples:
           window._sandpie_cloud_paths = [...placeholders];
           p.runPython(`
 import builtins, os
-_real_open = builtins.open
+
+# ROBUST GUARD: Prevent double-patch recursion.
+# Store _original_open on builtins so it survives across runPython calls.
+if getattr(builtins.open, '__name__', None) == '_sandpie_open':
+    # Already patched — restore original first if we have it
+    if hasattr(builtins, '_original_open'):
+        builtins.open = builtins._original_open
+
+# Save the TRUE original open (before any patching).
+# Use builtins._original_open if available (from previous run),
+# otherwise capture current builtins.open.
+if hasattr(builtins, '_original_open'):
+    _real_open = builtins._original_open
+else:
+    _real_open = builtins.open
+    builtins._original_open = _real_open
+
 try:
     from js import _sandpie_cloud_paths
     _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
