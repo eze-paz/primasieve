@@ -726,9 +726,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
 <aside>
-  <div style="font-size:0.65rem; color:#8b949e; padding:0.25rem 0.5rem; border-bottom:1px solid #30363d; margin-bottom:0.5rem;">
-    sandpie <span id="versionDisplay">v0.0.0</span>
-  </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -803,6 +800,9 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       </div>
     </div>
   </details>
+  <div style="font-size:0.65rem; color:#8b949e; padding:0.5rem; border-top:1px solid #30363d; margin-top:auto; text-align:center;">
+    sandpie <span id="versionDisplay">v0.0.0</span>
+  </div>
 </aside>
 
 <main>
@@ -814,7 +814,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <div class="welcome-cta">ready when you are</div>
     </div>
   </div>
-  <form onsubmit="event.preventDefault(); handleSend();">
+  <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
     <button id="sendBtn">Send</button>
     <span id="queueCount" class="queue-count"></span>
@@ -998,7 +998,7 @@ refreshTokenMeter();
   ta.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
-      ta.form?.requestSubmit();
+      handleSubmit();
     }
   });
   // After send() clears the value, also reset the height
@@ -3036,6 +3036,7 @@ function setSendingState(sending) {
     queueAborted = false;
     btn.textContent = 'Stop';
     btn.classList.add('sending');
+    btn.onclick = handleStop;
     btn.disabled = false;
   } else {
     currentAbort = null;
@@ -3047,27 +3048,24 @@ function setSendingState(sending) {
       btn.textContent = 'Send';
       btn.classList.remove('queued');
     }
+    btn.onclick = handleSubmit;
     btn.disabled = false;
   }
 }
 
-function handleSend() {
-  const btn = $('sendBtn');
+function handleSubmit() {
   const text = $('input').value.trim();
-
-  // If button shows "Stop", abort current round and clear queue
-  if (btn.classList.contains('sending')) {
-    queueAborted = true;
-    if (currentAbort) currentAbort.abort();
-    messageQueue.length = 0;  // Clear queue
-    updateQueueCount();
-    return;
-  }
-
   if (!text) return;
   messageQueue.push(text);
   $('input').value = '';
   processQueue();
+}
+
+function handleStop() {
+  queueAborted = true;
+  if (currentAbort) currentAbort.abort();
+  messageQueue.length = 0;  // Clear queue
+  updateQueueCount();
 }
 
 function updateQueueCount() {
