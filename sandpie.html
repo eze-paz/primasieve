@@ -2701,6 +2701,23 @@ function isAtBottom(el, slack = 60) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < slack;
 }
 
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) { /* wakeLock may be denied, ignore */ }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    try { wakeLock.release(); } catch (e) {}
+    wakeLock = null;
+  }
+}
+
+
 // Hard cap on the tool-result content fed back to the LLM. 30 KB is roomy
 // enough for legitimate long output (recursive `dir`, full pyodide tracebacks,
 // big JSON dumps) but small enough that one runaway print() can't blow past
@@ -3051,6 +3068,7 @@ async function refreshConversationList() {
 // Tracks the in-flight LLM round so the user can interrupt mid-stream.
 // While non-null, the Send button shows "Stop" (red) and submitting aborts.
 let currentAbort = null;
+let wakeLock = null;
 const messageQueue = [];
 let isProcessingQueue = false;
 let queueAborted = false;
@@ -3169,11 +3187,11 @@ async function streamRound(signal) {
 
       if (!work) {
         if (streamDone) return resolve();
-        return requestAnimationFrame(tick);
+        return setTimeout(tick, 16);
       }
       if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
       if (stick) m.scrollTop = m.scrollHeight;
-      requestAnimationFrame(tick);
+      setTimeout(tick, 16);
     };
     tick();
   });
@@ -3314,6 +3332,7 @@ async function sendSingle(text) {
   await ensureActiveConv();
   messages.push({ role: 'user', content: text });
   addMsg('user', text);
+  requestWakeLock();
   setSendingState(true);
   // One total timer for the whole exchange — covers every streamRound AND
   // every tool execution between rounds. Settled in the finally block.
@@ -3386,6 +3405,7 @@ async function sendSingle(text) {
       addMsg('err', 'Error: ' + msg);
     }
   } finally {
+    releaseWakeLock();
     endTotalTimer(wasAborted ? 'stopped' : 'done');
     setSendingState(false);
     await saveActiveConv();
