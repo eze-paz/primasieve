@@ -816,7 +816,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
-    <button id="sendBtn">Send</button>
+    <button id="sendBtn" onclick="handleButtonClick()">Send</button>
     <span id="queueCount" class="queue-count"></span>
   </form>
 </main>
@@ -2713,7 +2713,7 @@ function addMsg(role, text = '') {
   if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
   // Only auto-scroll if the user was already near the bottom — otherwise leave
   // them where they are so they can read history without getting yanked back.
-  if (stick) (activeTimerEl || div).scrollIntoView({ block: 'end' });
+  if (stick) m.scrollTop = m.scrollHeight;
   return div;
 }
 
@@ -3036,19 +3036,11 @@ function setSendingState(sending) {
     queueAborted = false;
     btn.textContent = 'Stop';
     btn.classList.add('sending');
-    btn.onclick = handleStop;
     btn.disabled = false;
   } else {
     currentAbort = null;
     btn.classList.remove('sending');
-    if (messageQueue.length > 0) {
-      btn.textContent = `${messageQueue.length} queued`;
-      btn.classList.add('queued');
-    } else {
-      btn.textContent = 'Send';
-      btn.classList.remove('queued');
-    }
-    btn.onclick = handleSubmit;
+    btn.textContent = 'Send';
     btn.disabled = false;
   }
 }
@@ -3061,28 +3053,24 @@ function handleSubmit() {
   processQueue();
 }
 
-function handleStop() {
-  queueAborted = true;
-  if (currentAbort) currentAbort.abort();
-  messageQueue.length = 0;  // Clear queue
-  updateQueueCount();
+function handleButtonClick() {
+  const btn = $('sendBtn');
+  if (btn.classList.contains('sending')) {
+    // Stop
+    queueAborted = true;
+    if (currentAbort) currentAbort.abort();
+    messageQueue.length = 0;
+    updateQueueCount();
+  } else {
+    // Send
+    handleSubmit();
+  }
 }
 
 function updateQueueCount() {
   const el = $('queueCount');
   if (!el) return;
   el.textContent = messageQueue.length > 0 ? `${messageQueue.length} queued` : '';
-  // Also update button if not currently sending
-  if (!currentAbort) {
-    const btn = $('sendBtn');
-    if (messageQueue.length > 0) {
-      btn.textContent = `${messageQueue.length} queued`;
-      btn.classList.add('queued');
-    } else {
-      btn.textContent = 'Send';
-      btn.classList.remove('queued');
-    }
-  }
 }
 
 async function processQueue() {
