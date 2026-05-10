@@ -491,17 +491,17 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     letter-spacing: 0.06em;
     animation: cta-breathe 3s ease-in-out infinite;
   }
-  .queue-count {
-    font-size: 0.7rem;
+  .queue-pill {
+    font-size: 0.65rem;
     color: #fff;
     background: #58a6ff;
-    padding: 0.15rem 0.5rem;
+    padding: 0.1rem 0.4rem;
     border-radius: 1rem;
-    margin-left: 0.5rem;
-    min-width: 1.5rem;
+    margin-left: 0.4rem;
     display: inline-block;
     text-align: center;
     font-weight: 600;
+    vertical-align: middle;
   }
   @keyframes cta-breathe {
     0%, 100% { opacity: 0.6; }
@@ -822,7 +822,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
     <button id="sendBtn" onclick="handleButtonClick()">Send</button>
-    <span id="queueCount" class="queue-count"></span>
   </form>
 </main>
 
@@ -2734,11 +2733,13 @@ function startTotalTimer() {
   activeTimerStart = Date.now();
   activeTimerEl = document.createElement('div');
   activeTimerEl.className = 'msg-timer';
-  activeTimerEl.textContent = '0s';
+  activeTimerEl.innerHTML = '0s' + (messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '');
   $('messages').appendChild(activeTimerEl);
   activeTimerInterval = setInterval(() => {
     if (!activeTimerEl) return;
-    activeTimerEl.textContent = `${Math.floor((Date.now() - activeTimerStart) / 1000)}s`;
+    const sec = Math.floor((Date.now() - activeTimerStart) / 1000);
+    const queueBadge = messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '';
+    activeTimerEl.innerHTML = `${sec}s${queueBadge}`;
   }, 1000);
 }
 
@@ -3073,9 +3074,12 @@ function handleButtonClick() {
 }
 
 function updateQueueCount() {
-  const el = $('queueCount');
-  if (!el) return;
-  el.textContent = messageQueue.length > 0 ? `${messageQueue.length} queued` : '';
+  // Update timer badge if timer is active
+  if (activeTimerEl) {
+    const sec = Math.floor((Date.now() - activeTimerStart) / 1000);
+    const queueBadge = messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '';
+    activeTimerEl.innerHTML = `${sec}s${queueBadge}`;
+  }
 }
 
 async function processQueue() {
