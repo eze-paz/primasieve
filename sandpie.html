@@ -726,6 +726,9 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
 <aside>
+  <div style="font-size:0.65rem; color:#8b949e; padding:0.25rem 0.5rem; border-bottom:1px solid #30363d; margin-bottom:0.5rem;">
+    sandpie <span id="versionDisplay">v0.0.0</span>
+  </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -805,7 +808,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 <main>
   <div id="messages">
     <div id="welcome" class="welcome">
-      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
+      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span> <span id="welcomeVersion" style="font-size:0.6rem; color:#8b949e; font-weight:normal;"></span></div>
       <div class="welcome-tag">a sandboxed python AI workspace in one HTML file</div>
       <div class="welcome-status" id="welcomeStatus"></div>
       <div class="welcome-cta">ready when you are</div>
@@ -820,6 +823,8 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
 
 <script>
 const $ = id => document.getElementById(id);
+
+const VERSION = '1.0.0';
 
 const messages = [];
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
@@ -975,7 +980,8 @@ function editTokenLimit() {
   tokenLimit = n;
   localStorage.setItem(TOKEN_LIMIT_KEY, String(n));
   refreshTokenMeter();
-  refreshWelcome();
+  updateVersionDisplay();
+refreshWelcome();
 }
 refreshTokenMeter();
 
@@ -1332,7 +1338,8 @@ function dbxStatus(text, kind) {
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
   const btn = $('dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-  if (typeof refreshWelcome === 'function') refreshWelcome();
+  if (typeof refreshWelcome === 'function') updateVersionDisplay();
+refreshWelcome();
 }
 
 // Pulse the dropbox dot while sync work is in flight. Reference-counted so
@@ -2235,7 +2242,8 @@ async function gatherSandpieManifests() {
 async function refreshManifests() {
   cachedManifests = await gatherSandpieManifests();
   refreshTokenMeter();
-  refreshWelcome();
+  updateVersionDisplay();
+refreshWelcome();
 }
 
 // Built fresh on every request so it reflects the current state of Dropbox/proxy/shell.
@@ -2641,7 +2649,8 @@ refreshFileList();
     } catch { /* file may not exist yet — that's fine */ }
   }
   refreshTokenMeter();
-  refreshWelcome();
+  updateVersionDisplay();
+refreshWelcome();
   // Scroll to the bottom after layout settles. Use a double rAF so any
   // late-arriving image loads also trigger a follow-up nudge.
   const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
@@ -2839,7 +2848,8 @@ async function newConversation() {
   clearMessagesUI();
   await refreshConversationList();
   refreshTokenMeter();
-  refreshWelcome();
+  updateVersionDisplay();
+refreshWelcome();
 }
 
 async function listConversations() {
@@ -2873,6 +2883,11 @@ function refreshNewChatButton() {
 
 // Show a welcome card in the messages area when the chat is empty — disappears
 // the moment the user sends a message (or loads a conversation with history).
+function updateVersionDisplay() {
+  const els = document.querySelectorAll('#versionDisplay, #welcomeVersion');
+  els.forEach(el => { if (el) el.textContent = VERSION; });
+}
+
 function refreshWelcome() {
   const w = $('welcome');
   if (!w) return;
@@ -2945,7 +2960,8 @@ async function deleteConv(id, title) {
     messages.length = 0;
     clearMessagesUI();
     refreshTokenMeter();
-    refreshWelcome();
+    updateVersionDisplay();
+refreshWelcome();
   }
   await refreshConversationList();
 }
