@@ -3011,11 +3011,13 @@ async function refreshConversationList() {
 let currentAbort = null;
 const messageQueue = [];
 let isProcessingQueue = false;
+let queueAborted = false;
 
 function setSendingState(sending) {
   const btn = $('sendBtn');
   if (sending) {
     currentAbort = new AbortController();
+    queueAborted = false;
     btn.textContent = 'Stop';
     btn.classList.add('sending');
     btn.disabled = false;
@@ -3037,9 +3039,12 @@ function handleSend() {
   const btn = $('sendBtn');
   const text = $('input').value.trim();
 
-  // If button shows "Stop", abort current round
+  // If button shows "Stop", abort current round and clear queue
   if (btn.classList.contains('sending')) {
+    queueAborted = true;
     if (currentAbort) currentAbort.abort();
+    messageQueue.length = 0;  // Clear queue
+    updateQueueCount();
     return;
   }
 
@@ -3069,13 +3074,14 @@ function updateQueueCount() {
 async function processQueue() {
   if (isProcessingQueue || messageQueue.length === 0) return;
   isProcessingQueue = true;
+  queueAborted = false;
   updateQueueCount();
 
   while (messageQueue.length > 0) {
     const text = messageQueue.shift();
     updateQueueCount();
     await sendSingle(text);
-    if (currentAbort?.signal.aborted) break;
+    if (queueAborted) break;
   }
 
   isProcessingQueue = false;
