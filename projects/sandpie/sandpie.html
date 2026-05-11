@@ -967,7 +967,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
-      <input type="text" id="convSearch" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:0.85rem;">
+      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:0.85rem;">
       <div id="tokenMeter" class="token-meter" onclick="editTokenLimit()" title="Estimated context size · click to change limit">
         <div class="token-fill" id="tokenFill"></div>
         <span class="token-label" id="tokenLabel">0 / 200k</span>
@@ -994,10 +994,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     <div class="modal-backdrop" onclick="closeProviderModal()"></div>
     <div class="modal-content">
       <h3>Edit provider</h3>
-      <input id="modalEndpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-      <input id="modalModel" placeholder="Model (e.g. gpt-4o)">
-      <input id="modalApiKey" type="password" placeholder="API key">
-      <input id="modalProxyUrl" placeholder="Proxy URL (optional)">
+      <input id="modalEndpoint" autocomplete="off" readonly onfocus="this.removeAttribute("readonly")" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="modalModel" autocomplete="off" readonly onfocus="this.removeAttribute("readonly")" placeholder="Model (e.g. gpt-4o)">
+      <input id="modalApiKey" type="password" autocomplete="new-password" placeholder="API key">
+      <input id="modalProxyUrl" autocomplete="off" readonly onfocus="this.removeAttribute("readonly")" placeholder="Proxy URL (optional)">
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
         <button class="ghost" onclick="closeProviderModal()">Cancel</button>
