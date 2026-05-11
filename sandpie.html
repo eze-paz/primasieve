@@ -2717,6 +2717,13 @@ function releaseWakeLock() {
   }
 }
 
+// Re-acquire wake lock when user returns to tab during generation
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentAbort) {
+    requestWakeLock();
+  }
+});
+
 
 // Hard cap on the tool-result content fed back to the LLM. 30 KB is roomy
 // enough for legitimate long output (recursive `dir`, full pyodide tracebacks,
@@ -3097,6 +3104,11 @@ function handleSubmit() {
   const m = $('messages');
   m.scrollTop = m.scrollHeight;
   processQueue();
+  // Reset textarea height after clearing value
+  const ta = $('input');
+  if (ta) {
+    ta.style.height = 'auto';
+  }
 }
 
 function handleButtonClick() {
