@@ -746,28 +746,17 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   </details>
 
   <details class="service" id="aiSection">
-    <summary>AI provider <span class="status-dot" id="aiDot"></span><span class="status-dot" id="proxyDot"></span></summary>
+    <summary>AI provider <span class="status-dot" id="aiDot"></span></summary>
     <div class="service-body">
       <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
       <input id="model" placeholder="Model (e.g. gpt-4o)">
       <input id="apiKey" type="password" placeholder="API key">
       <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)">
-      <div class="hint" style="line-height:1.4em; margin-top:0.5rem;">
-        Optional proxy. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
-      </div>
-      <div class="hint" id="routingHint"></div>
+      <div class="hint" id="routingHint" style="margin-top:0.5rem;"></div>
       <div class="row">
-        <button class="ghost" id="localProxyToggle" onclick="toggleLocalProxy()">Activate local proxy</button>
+        <button class="ghost" onclick="downloadProxy()">Download proxy</button>
       </div>
-      <div class="hint" id="proxyStatus" style="display:none;"></div>
-      <div id="proxyDownloadPrompt" style="display:none; padding:0.5rem; background:rgba(248,81,73,0.06); border:1px solid #f8514955; border-radius:5px; font-size:0.72rem; line-height:1.4em;">
-        No proxy on <code style="font-size:0.85em;">localhost:8080</code>.
-        <strong style="color:#f8b251;">⚠ Heads up:</strong> the local proxy gives the AI a <code style="font-size:0.85em;">shell</code> tool — it can run any command in the directory where you start the script. Use only on a machine you trust the AI to operate in.
-        <div class="row" style="margin-top:0.5rem;">
-          <button onclick="downloadProxy()">Download &amp; install</button>
-        </div>
-        <div id="proxyDownloadHint" style="margin-top:0.4rem; color:#8b949e;"></div>
-      </div>
+      <div id="proxyDownloadHint" style="margin-top:0.4rem; color:#8b949e; font-size:0.72rem;"></div>
     </div>
   </details>
 
