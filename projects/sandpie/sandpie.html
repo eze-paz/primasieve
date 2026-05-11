@@ -341,7 +341,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .file-viewer .meta { color: #8b949e; font-size: 0.78rem; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: #8b949e; cursor: pointer; }
   ul.fs-list button:hover { color: #f85149; background: transparent; }
-  .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
+  .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
   .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: #8b949e; }
   .dbx-status.connected { background: rgba(63,185,80,0.1); color: #3fb950; }
   .dbx-status.error { background: rgba(248,81,73,0.1); color: #f85149; }
@@ -746,33 +746,15 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   </details>
 
   <details class="service" id="aiSection">
-    <summary>AI provider <span class="status-dot" id="aiDot"></span></summary>
+    <summary>AI provider <span class="status-dot" id="aiDot"></span><span class="status-dot" id="proxyDot"></span></summary>
     <div class="service-body">
-      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
-      <input id="model" placeholder="Model (e.g. gpt-4o)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
-      <input id="apiKey" type="password" placeholder="API key" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
-    </div>
-  </details>
-
-  <details class="service" id="cloudSection">
-    <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
-    <div class="service-body">
-      <input id="dbxAppKey" placeholder="Dropbox app key" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
-      <div class="row">
-        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
-        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
+      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="model" placeholder="Model (e.g. gpt-4o)">
+      <input id="apiKey" type="password" placeholder="API key">
+      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)">
+      <div class="hint" style="line-height:1.4em; margin-top:0.5rem;">
+        Optional proxy. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
       </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
-    </div>
-  </details>
-
-  <details class="service" id="proxySection">
-    <summary>Proxy <span class="status-dot" id="proxyDot"></span></summary>
-    <div class="service-body">
-      <div class="hint" style="line-height:1.4em;">
-        Optional. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
-      </div>
-      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
       <div class="hint" id="routingHint"></div>
       <div class="row">
         <button class="ghost" id="localProxyToggle" onclick="toggleLocalProxy()">Activate local proxy</button>
@@ -789,8 +771,19 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     </div>
   </details>
 
+  <details class="service" id="cloudSection">
+    <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
+    <div class="service-body">
+      <input id="dbxAppKey" placeholder="Dropbox app key">
+      <div class="row">
+        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
+      </div>
+      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    </div>
+  </details>
 
-  <details class="service" id="filesSection" open>
+    <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
       <div class="navbar">
@@ -1615,71 +1608,6 @@ async function cloudListAll() {
 
 let _syncing = false;
 
-
-// ============================================================
-// Upload Queue — Concurrent upload batching
-// ============================================================
-class UploadQueue {
-  constructor(concurrency = 3) {
-    this.concurrency = concurrency;
-    this.queue = [];
-    this.active = 0;
-    this.results = { pushed: 0, errors: [] };
-  }
-
-  add(item) {
-    this.queue.push(item);
-  }
-
-  async process(state, dbxStatus) {
-    const processNext = async () => {
-      while (this.queue.length > 0 && this.active < this.concurrency) {
-        this.active++;
-        const item = this.queue.shift();
-
-        try {
-          const content = await opfs.readBytes(item.rel);
-          const progress = this.queue.length + this.active > 1 ? 
-            ` (${this.results.pushed + 1}/${this.queue.length + this.active + this.results.pushed})` : '';
-          const displayName = item.rel.length > 30 ? 
-            item.rel.slice(0, 15) + '...' + item.rel.slice(-12) : item.rel;
-          dbxStatus(`↑ ${displayName}${progress}`, 'connected');
-
-          const meta = await dbxUpload('/' + item.rel, content);
-          state[item.rel] = {
-            rev: (meta && meta.content_hash) || (item.s && item.s.rev) || '',
-            size: (meta && meta.size != null) ? meta.size : 
-              (item.s && item.s.size != null ? item.s.size : content.byteLength),
-            hydrated: true,
-            syncedMtime: item.lm,
-          };
-          this.results.pushed++;
-        } catch (err) {
-          console.warn('sync push:', item.rel, err);
-          this.results.errors.push({ path: item.rel, error: err });
-        } finally {
-          this.active--;
-          await processNext();
-        }
-      }
-    };
-
-    // Start initial batch
-    const initialBatch = Math.min(this.concurrency, this.queue.length);
-    for (let i = 0; i < initialBatch; i++) {
-      processNext();
-    }
-
-    // Wait for all to complete
-    while (this.active > 0 || this.queue.length > 0) {
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
-
-    return this.results;
-  }
-}
-
-
 // Single sync entry point. Called on connect, on the Resync button, on a
 // 60s background tick (when foregrounded), and at conversation end.
 //
@@ -1724,22 +1652,10 @@ async function sync() {
     }
 
     // --- Pull: cloud → local ---
-    // Separate eager files (conversations, manifests, small files) for priority processing
-    const eagerFiles = [];
-    const lazyFiles = [];
     for (const [path, e] of Object.entries(cloud)) {
       if (e.kind !== 'file') continue;
-      const eager = isEagerHydrate(path, e.size);
-      if (eager) {
-        eagerFiles.push([path, e]);
-      } else {
-        lazyFiles.push([path, e]);
-      }
-    }
-
-    // Process eager files first (conversations, manifests, small files)
-    for (const [path, e] of eagerFiles) {
       const s = state[path];
+      const eager = isEagerHydrate(path, e.size);
       const localExists = await opfs.exists(path);
 
       if (!s) {
@@ -1794,34 +1710,26 @@ async function sync() {
       state[path].size = e.size;
     }
 
-    // Process lazy files (large files, non-critical)
-    for (const [path, e] of lazyFiles) {
-      const s = state[path];
-      const localExists = await opfs.exists(path);
-
     // --- Push: local → cloud (dirty + local-only) ---
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
-
-    // Filter files that need pushing
-    const toPush = [];
     for (const rel of opfsRels) {
       const lm = await opfsLastModified(rel);
       const s = state[rel];
       if (s && s.hydrated && lm <= s.syncedMtime) continue;
-      toPush.push({ rel, lm, s: state[rel] });
-    }
-
-    // Use parallel upload queue (concurrency = 3)
-    if (toPush.length > 0) {
-      const uploadQueue = new UploadQueue(3);
-      for (const item of toPush) {
-        uploadQueue.add(item);
-      }
-      const uploadResults = await uploadQueue.process(state, dbxStatus);
-      pushed = uploadResults.pushed;
-      if (uploadResults.errors.length > 0) {
-        console.warn('Upload errors:', uploadResults.errors);
+      try {
+        const content = await opfs.readBytes(rel);
+        dbxStatus(`↑ ${rel}`, 'connected');
+        const meta = await dbxUpload('/' + rel, content);
+        state[rel] = {
+          rev: (meta && meta.content_hash) || (s && s.rev) || '',
+          size: (meta && meta.size != null) ? meta.size : (s && s.size != null ? s.size : content.byteLength),
+          hydrated: true,
+          syncedMtime: lm,
+        };
+        pushed++;
+      } catch (err) {
+        console.warn('sync push:', rel, err);
       }
     }
 
