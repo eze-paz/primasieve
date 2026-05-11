@@ -748,16 +748,16 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <details class="service" id="aiSection">
     <summary>AI provider <span class="status-dot" id="aiDot"></span></summary>
     <div class="service-body">
-      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-      <input id="model" placeholder="Model (e.g. gpt-4o)">
-      <input id="apiKey" type="password" placeholder="API key">
+      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
+      <input id="model" placeholder="Model (e.g. gpt-4o)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
+      <input id="apiKey" type="password" placeholder="API key" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
     </div>
   </details>
 
   <details class="service" id="cloudSection">
     <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
     <div class="service-body">
-      <input id="dbxAppKey" placeholder="Dropbox app key">
+      <input id="dbxAppKey" placeholder="Dropbox app key" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
       <div class="row">
         <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
         <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
@@ -772,7 +772,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
       <div class="hint" style="line-height:1.4em;">
         Optional. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
       </div>
-      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)">
+      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
       <div class="hint" id="routingHint"></div>
       <div class="row">
         <button class="ghost" id="localProxyToggle" onclick="toggleLocalProxy()">Activate local proxy</button>
