@@ -993,6 +993,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     <div class="modal-backdrop" onclick="closeProviderModal()"></div>
     <div class="modal-content">
       <h3>Edit provider</h3>
+      <input id="modalName" autocomplete="off" placeholder="Name (e.g. Main, Backup, Local proxy)">
       <input id="modalEndpoint" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Base URL (e.g. https://api.openai.com/v1)">
       <input id="modalModel" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Model (e.g. gpt-4o)">
       <input id="modalApiKey" type="password" autocomplete="new-password" placeholder="API key">
@@ -1161,6 +1162,7 @@ function activateProvider(id) {
 function openProviderModal(providerId = null) {
   _editingProviderId = providerId;
   const p = providerId ? _providers.find(x => x.id === providerId) : null;
+  $('modalName').value = p ? (p.name || p.model || '') : '';
   $('modalEndpoint').value = p ? p.endpoint : '';
   $('modalModel').value = p ? p.model : '';
   $('modalApiKey').value = p ? p.apiKey : '';
@@ -1174,6 +1176,7 @@ function closeProviderModal() {
 }
 
 function saveProviderModal() {
+  const name = $('modalName').value.trim();
   const endpoint = $('modalEndpoint').value.trim();
   const model = $('modalModel').value.trim();
   const apiKey = $('modalApiKey').value.trim();
@@ -1187,7 +1190,7 @@ function saveProviderModal() {
   if (_editingProviderId) {
     const p = _providers.find(x => x.id === _editingProviderId);
     if (p) {
-      p.name = model;
+      p.name = name || model;
       p.endpoint = endpoint;
       p.model = model;
       p.apiKey = apiKey;
@@ -1196,7 +1199,7 @@ function saveProviderModal() {
   } else {
     const newP = {
       id: 'provider_' + Date.now(),
-      name: model,
+      name: name || model,
       endpoint,
       model,
       apiKey,
