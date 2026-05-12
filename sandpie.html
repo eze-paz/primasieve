@@ -2895,7 +2895,31 @@ async function refreshFileList() {
     li.append(dot, span);
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
-      showContextMenu(ev.clientX, ev.clientY, [
+      const menuItems = [];
+      if (it.kind === 'file') {
+        menuItems.push({ label: 'Download', action: async () => {
+          try {
+            let bytes;
+            if (it.status === 'cloud') {
+              if (!dbxTokens()) { addMsg('err', 'Dropbox not connected — cannot download placeholder.'); return; }
+              bytes = await dbxDownload('/' + it.fullKey);
+            } else {
+              bytes = await opfs.readBytes(it.fullKey);
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([bytes]));
+            a.download = it.name;
+            a.setAttribute('data-chrome', '');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          } catch (e) {
+            addMsg('err', 'Download failed: ' + e.message);
+          }
+        }});
+      }
+      menuItems.push(
         { label: 'Delete', danger: true, action: async () => {
           const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
           const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
@@ -2920,8 +2944,9 @@ async function refreshFileList() {
           for (const k of Object.keys(s)) if (isHit(k)) { delete s[k]; sChanged = true; }
           if (sChanged) setSyncState(s);
           await refreshFileList();
-        }},
-      ]);
+        }}
+      );
+      showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
   }
