@@ -642,6 +642,237 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     #messages { padding: 1rem; }
     .msg { max-width: 95%; }
   }
+
+  .proxy-link {
+    font-size: 0.6rem;
+    color: #484f58;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .proxy-link:hover {
+    color: #8b949e;
+    text-decoration: underline;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chip:hover {
+    border-color: #8b949e;
+    color: #c9d1d9;
+  }
+  .chip.active {
+    background: rgba(47, 129, 83, 0.25);
+    border-color: #3fb950;
+    color: #3fb950;
+  }
+  .chip.add {
+    border-style: dashed;
+  }
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+  }
+  .modal-content {
+    position: relative;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 1.2rem;
+    width: 90%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .modal-content h3 {
+    margin: 0 0 0.3rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .modal-content input {
+    width: 100%;
+    padding: 0.5rem;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    font-size: 0.85rem;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.4rem;
+  }
+  .context-menu {
+    position: fixed;
+    z-index: 300;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 0.3rem 0;
+    min-width: 120px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .context-item {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #c9d1d9;
+  }
+  .context-item:hover {
+    background: #21262d;
+  }
+  .context-delete {
+    color: #f85149;
+  }
+  .context-delete:hover {
+    background: rgba(248,81,73,0.1);
+  }
+  .proxy-link {
+    font-size: 0.6rem;
+    color: #484f58;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .proxy-link:hover {
+    color: #8b949e;
+    text-decoration: underline;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .chip:hover {
+    border-color: #8b949e;
+    color: #c9d1d9;
+  }
+  .chip.active {
+    background: rgba(47, 129, 83, 0.25);
+    border-color: #3fb950;
+    color: #3fb950;
+  }
+  .chip.add {
+    border-style: dashed;
+  }
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+  }
+  .modal-content {
+    position: relative;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 1.2rem;
+    width: 90%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .modal-content h3 {
+    margin: 0 0 0.3rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .modal-content input {
+    width: 100%;
+    padding: 0.5rem;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    font-size: 0.85rem;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.4rem;
+  }
+  .context-menu {
+    position: fixed;
+    z-index: 300;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 0.3rem 0;
+    min-width: 120px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .context-item {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: #c9d1d9;
+  }
+  .context-item:hover {
+    background: #21262d;
+  }
+  .context-delete {
+    color: #f85149;
+  }
+  .context-delete:hover {
+    background: rgba(248,81,73,0.1);
+  }
 </style>
 <script>
 // Stray-DOM guard. Anything appended as a direct child of <body> after the
@@ -735,7 +966,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
-      <input type="text" id="convSearch" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:0.85rem;">
+      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:0.85rem;">
       <div id="tokenMeter" class="token-meter" onclick="editTokenLimit()" title="Estimated context size · click to change limit">
         <div class="token-fill" id="tokenFill"></div>
         <span class="token-label" id="tokenLabel">0 / 200k</span>
@@ -748,11 +979,36 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <details class="service" id="aiSection">
     <summary>AI provider <span class="status-dot" id="aiDot"></span></summary>
     <div class="service-body">
-      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-      <input id="model" placeholder="Model (e.g. gpt-4o)">
-      <input id="apiKey" type="password" placeholder="API key">
+      <div class="chip-row" id="providerChips"></div>
+      <div class="hint" id="routingHint" style="margin-top:0.5rem;"></div>
+      <input id="endpoint" type="hidden">
+      <input id="model" type="hidden">
+      <input id="apiKey" type="hidden">
+      <input id="proxyUrl" type="hidden">
     </div>
   </details>
+
+  <!-- Provider Modal -->
+  <div id="providerModal" class="modal" style="display:none;">
+    <div class="modal-backdrop" onclick="closeProviderModal()"></div>
+    <div class="modal-content">
+      <h3>Edit provider</h3>
+      <input id="modalEndpoint" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="modalModel" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Model (e.g. gpt-4o)">
+      <input id="modalApiKey" type="password" autocomplete="new-password" placeholder="API key">
+      <input id="modalProxyUrl" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Proxy URL (optional)">
+      <div class="modal-actions">
+        <button onclick="saveProviderModal()">Save</button>
+        <button class="ghost" onclick="closeProviderModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chip Context Menu -->
+  <div id="chipContextMenu" class="context-menu" style="display:none;">
+    <div class="context-item" onclick="editProviderFromMenu()">Edit</div>
+    <div class="context-item context-delete" onclick="deleteProviderFromMenu()">Delete</div>
+  </div>
 
   <details class="service" id="cloudSection">
     <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
@@ -766,31 +1022,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     </div>
   </details>
 
-  <details class="service" id="proxySection">
-    <summary>Proxy <span class="status-dot" id="proxyDot"></span></summary>
-    <div class="service-body">
-      <div class="hint" style="line-height:1.4em;">
-        Optional. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
-      </div>
-      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)">
-      <div class="hint" id="routingHint"></div>
-      <div class="row">
-        <button class="ghost" id="localProxyToggle" onclick="toggleLocalProxy()">Activate local proxy</button>
-      </div>
-      <div class="hint" id="proxyStatus" style="display:none;"></div>
-      <div id="proxyDownloadPrompt" style="display:none; padding:0.5rem; background:rgba(248,81,73,0.06); border:1px solid #f8514955; border-radius:5px; font-size:0.72rem; line-height:1.4em;">
-        No proxy on <code style="font-size:0.85em;">localhost:8080</code>.
-        <strong style="color:#f8b251;">⚠ Heads up:</strong> the local proxy gives the AI a <code style="font-size:0.85em;">shell</code> tool — it can run any command in the directory where you start the script. Use only on a machine you trust the AI to operate in.
-        <div class="row" style="margin-top:0.5rem;">
-          <button onclick="downloadProxy()">Download &amp; install</button>
-        </div>
-        <div id="proxyDownloadHint" style="margin-top:0.4rem; color:#8b949e;"></div>
-      </div>
-    </div>
-  </details>
-
-
-  <details class="service" id="filesSection" open>
+    <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
       <div class="navbar">
@@ -808,7 +1040,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     </div>
   </details>
   <div style="font-size:0.65rem; color:#8b949e; padding:0.5rem; border-top:1px solid #30363d; margin-top:auto; text-align:center;">
-    sandpie <span id="versionDisplay">v0.0.0</span>
+    <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
+    <div class="proxy-link-wrap" style="margin-top:0.3rem;">
+      <a class="proxy-link" onclick="downloadProxy()" title="Gives the AI shell access on your machine. Only use on trusted machines.">Download local proxy</a>
+    </div>
   </div>
 </aside>
 
@@ -833,12 +1068,192 @@ const $ = id => document.getElementById(id);
 const VERSION = '1.0.0';
 
 const messages = [];
+// Provider system with backward compat migration
+const PROVIDERS_KEY = 'sandpie-providers';
+const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
+let _providers = [];
+let _activeProviderId = null;
+let _editingProviderId = null;
+let _chipMenuTarget = null;
+
+function loadProviders() {
+  const raw = localStorage.getItem(PROVIDERS_KEY);
+  _providers = raw ? JSON.parse(raw) : [];
+  _activeProviderId = localStorage.getItem(ACTIVE_PROVIDER_KEY);
+
+  // Migrate old single-provider config
+  if (_providers.length === 0) {
+    const old = JSON.parse(localStorage.getItem('opencode-config') || '{}');
+    if (old.endpoint || old.model || old.apiKey) {
+      const migrated = {
+        id: 'provider_' + Date.now(),
+        name: old.model || 'Provider',
+        endpoint: old.endpoint || '',
+        model: old.model || '',
+        apiKey: old.apiKey || '',
+        proxyUrl: old.proxyUrl || ''
+      };
+      _providers = [migrated];
+      _activeProviderId = migrated.id;
+      saveProviders();
+    }
+  }
+
+  // Ensure active provider exists
+  if (_activeProviderId && !_providers.find(p => p.id === _activeProviderId)) {
+    _activeProviderId = _providers.length ? _providers[0].id : null;
+  }
+  if (!_activeProviderId && _providers.length) {
+    _activeProviderId = _providers[0].id;
+  }
+
+  applyActiveProvider();
+  renderChips();
+}
+
+function saveProviders() {
+  localStorage.setItem(PROVIDERS_KEY, JSON.stringify(_providers));
+  localStorage.setItem(ACTIVE_PROVIDER_KEY, _activeProviderId || '');
+}
+
+function getActiveProvider() {
+  return _providers.find(p => p.id === _activeProviderId) || null;
+}
+
+function applyActiveProvider() {
+  const p = getActiveProvider();
+  $('endpoint').value = p ? p.endpoint : '';
+  $('model').value = p ? p.model : '';
+  $('apiKey').value = p ? p.apiKey : '';
+  $('proxyUrl').value = p ? p.proxyUrl : '';
+  updateRoutingHint();
+  refreshAiDot();
+}
+
+function renderChips() {
+  const row = $('providerChips');
+  row.innerHTML = '';
+
+  _providers.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '');
+    chip.textContent = p.name || p.model || 'Unnamed';
+    chip.dataset.id = p.id;
+    chip.onclick = () => activateProvider(p.id);
+    chip.oncontextmenu = (e) => showChipMenu(e, p.id);
+    row.appendChild(chip);
+  });
+
+  const addChip = document.createElement('div');
+  addChip.className = 'chip add';
+  addChip.textContent = '+ Add';
+  addChip.onclick = () => openProviderModal();
+  row.appendChild(addChip);
+}
+
+function activateProvider(id) {
+  _activeProviderId = id;
+  saveProviders();
+  applyActiveProvider();
+  renderChips();
+}
+
+function openProviderModal(providerId = null) {
+  _editingProviderId = providerId;
+  const p = providerId ? _providers.find(x => x.id === providerId) : null;
+  $('modalEndpoint').value = p ? p.endpoint : '';
+  $('modalModel').value = p ? p.model : '';
+  $('modalApiKey').value = p ? p.apiKey : '';
+  $('modalProxyUrl').value = p ? p.proxyUrl : '';
+  $('providerModal').style.display = '';
+}
+
+function closeProviderModal() {
+  $('providerModal').style.display = 'none';
+  _editingProviderId = null;
+}
+
+function saveProviderModal() {
+  const endpoint = $('modalEndpoint').value.trim();
+  const model = $('modalModel').value.trim();
+  const apiKey = $('modalApiKey').value.trim();
+  const proxyUrl = $('modalProxyUrl').value.trim();
+
+  if (!endpoint || !model || !apiKey) {
+    alert('Endpoint, model, and API key are required.');
+    return;
+  }
+
+  if (_editingProviderId) {
+    const p = _providers.find(x => x.id === _editingProviderId);
+    if (p) {
+      p.name = model;
+      p.endpoint = endpoint;
+      p.model = model;
+      p.apiKey = apiKey;
+      p.proxyUrl = proxyUrl;
+    }
+  } else {
+    const newP = {
+      id: 'provider_' + Date.now(),
+      name: model,
+      endpoint,
+      model,
+      apiKey,
+      proxyUrl
+    };
+    _providers.push(newP);
+    _activeProviderId = newP.id;
+  }
+
+  saveProviders();
+  applyActiveProvider();
+  renderChips();
+  closeProviderModal();
+}
+
+function showChipMenu(e, providerId) {
+  e.preventDefault();
+  _chipMenuTarget = providerId;
+  const menu = $('chipContextMenu');
+  menu.style.display = '';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+}
+
+function hideChipMenu() {
+  $('chipContextMenu').style.display = 'none';
+  _chipMenuTarget = null;
+}
+
+function editProviderFromMenu() {
+  if (_chipMenuTarget) openProviderModal(_chipMenuTarget);
+  hideChipMenu();
+}
+
+function deleteProviderFromMenu() {
+  if (!_chipMenuTarget) return;
+  const p = _providers.find(x => x.id === _chipMenuTarget);
+  if (p && confirm('Delete "' + (p.name || p.model) + '"?')) {
+    _providers = _providers.filter(x => x.id !== _chipMenuTarget);
+    if (_activeProviderId === _chipMenuTarget) {
+      _activeProviderId = _providers.length ? _providers[0].id : null;
+    }
+    saveProviders();
+    applyActiveProvider();
+    renderChips();
+  }
+  hideChipMenu();
+}
+
+document.addEventListener('click', hideChipMenu);
+
+// Load on init
+loadProviders();
+
+// Dropbox config (separate from providers)
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
-$('endpoint').value = cfg.endpoint || '';
-$('model').value = cfg.model || '';
-$('apiKey').value = cfg.apiKey || '';
 $('dbxAppKey').value = cfg.dbxAppKey || '';
-$('proxyUrl').value = cfg.proxyUrl || '';
 
 marked.setOptions({ breaks: true, gfm: true });
 const renderMd = text => DOMPurify.sanitize(marked.parse(text));
@@ -2695,12 +3110,19 @@ refreshWelcome();
 // Config / chat
 // ============================================================
 function saveConfig() {
+  // Save active provider changes back to the provider object
+  const p = getActiveProvider();
+  if (p) {
+    p.endpoint = $('endpoint').value;
+    p.model = $('model').value;
+    p.apiKey = $('apiKey').value;
+    p.proxyUrl = $('proxyUrl').value;
+    saveProviders();
+    renderChips();
+  }
+  // Keep old config for backward compat (Dropbox key only)
   localStorage.setItem('opencode-config', JSON.stringify({
-    endpoint: $('endpoint').value,
-    model: $('model').value,
-    apiKey: $('apiKey').value,
     dbxAppKey: $('dbxAppKey').value,
-    proxyUrl: $('proxyUrl').value,
   }));
 }
 
