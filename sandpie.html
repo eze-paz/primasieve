@@ -994,10 +994,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     <div class="modal-content">
       <h3>Edit provider</h3>
       <input id="modalName" autocomplete="off" placeholder="Name (e.g. Main, Backup, Local proxy)">
-      <input id="modalEndpoint" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-      <input id="modalModel" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Model (e.g. gpt-4o)">
-      <input id="modalApiKey" type="password" autocomplete="new-password" placeholder="API key">
-      <input id="modalProxyUrl" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Proxy URL (optional)">
+      <input id="modalEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
+      <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
+      <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
         <button class="ghost" onclick="closeProviderModal()">Cancel</button>
@@ -1014,7 +1014,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   <details class="service" id="cloudSection">
     <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
     <div class="service-body">
-      <input id="dbxAppKey" placeholder="Dropbox app key">
+      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
       <div class="row">
         <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
         <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
