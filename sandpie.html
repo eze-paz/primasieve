@@ -2347,6 +2347,8 @@ const tools = {
   run_python: {
     description: `Execute Python via Pyodide. The working directory is /files/ — this IS the user's persistent filesystem. Use bare relative paths (e.g. open('foo.txt')); they resolve under /files/. Anything written outside /files/ (including os.getcwd() defaults like /home/pyodide) is ephemeral and discarded after this call. Nested directories supported. Output via print(). Top-level await is supported.
 
+PREFERRED WORKFLOW (IMPORTANT): Save reusable scripts to /files/scripts/<name>.py once, then invoke them via {path:"scripts/<name>.py", args:[...]} on every later call instead of re-pasting the same source. This is the right way to operate in sandpie — it's faster (lower token cost per call), persists across sessions, and gives you proper CLI-style sys.argv handling. Use inline {code:...} only for one-shot snippets (a list, a quick computation, file inspection) or while you're actively iterating on a script that you're about to save. If you find yourself pasting >20 lines, you should be saving it instead. Within a single session the Pyodide globals also persist between calls, so a function defined once can be called by name on later turns — but path/args is the cleanest pattern for anything you might want again next session.
+
 SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — switch to the read_file tool (host paths) or fetch_file (Dropbox cloud-only paths).
 
 PACKAGES — IMPORTANT, READ THIS FIRST:
@@ -2390,9 +2392,37 @@ Examples:
              r = await pyfetch('https://httpbin.org/html')
              print((await r.string())[:200])
   noCORS  →  r = await pyfetch('/proxy/example.com/')     # site lacks CORS: route via local proxy
-             print((await r.string())[:200])`,
-    parameters: { type: 'object', properties: { code: { type: 'string', description: 'Python source to execute' } }, required: ['code'] },
-    run: async ({ code }) => {
+             print((await r.string())[:200])
+  saved   →  # FIRST call (one time) — save the script:
+             #   {code: "import os; os.makedirs('scripts', exist_ok=True); open('scripts/score.py','w').write('import sys; print(sys.argv)')"}
+             # LATER calls — invoke it without re-pasting:
+             #   {path: "scripts/score.py", args: ["--day", "2026-05-08"]}
+             # The script sees sys.argv = ["scripts/score.py", "--day", "2026-05-08"].`,
+    parameters: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Inline Python source. Mutually exclusive with path. Use for one-shot snippets or while iterating on a script you are about to save.' },
+        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args]. PREFERRED for anything you want to run more than once — save once to /files/scripts/<name>.py, then invoke by path on every later call.' },
+        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
+      },
+    },
+    run: async ({ code, path: scriptPath, args }) => {
+      // Exactly one of code/path must be provided.
+      if (!code && !scriptPath) return 'Error: provide either "code" (inline source) or "path" (saved script under /files/).';
+      if (code && scriptPath) return 'Error: provide either "code" or "path", not both.';
+      // If path was given, load the script from OPFS up-front so the rest of
+      // the pipeline (loadPackagesFromImports, runPythonAsync) can treat it
+      // exactly like inline code.
+      const scriptArgs = Array.isArray(args) ? args.map(String) : [];
+      let normPath = '';
+      if (scriptPath) {
+        normPath = String(scriptPath).replace(/^\/+/, '').replace(/^files\//, '');
+        try {
+          code = await opfs.read(normPath);
+        } catch (e) {
+          return `Error: could not read /files/${normPath}: ${e.message}. Did you save it yet? Use a code: call first to write the script — e.g. open('${normPath}','w').write(...).`;
+        }
+      }
       let loadingMsg = null;
       if (!pyPromise) loadingMsg = addMsg('info', '⏳ Loading Pyodide (~10MB, first call only)…');
       let p;
@@ -2461,6 +2491,18 @@ def _sandpie_open(path, *args, **kwargs):
 builtins.open = _sandpie_open
 `);
         } catch {}
+        // When invoked via {path,args}, expose argv to the script just like a
+        // shell would (sys.argv[0] = script path, then the user's args).
+        if (normPath) {
+          try {
+            window._sandpie_argv = [normPath, ...scriptArgs];
+            p.runPython(`
+import sys
+from js import _sandpie_argv
+sys.argv = list(_sandpie_argv.to_py())
+`);
+          } catch {}
+        }
         // Auto-load any prebuilt Pyodide packages referenced by `import` lines
         // (numpy, pandas, beautifulsoup4, micropip, …). Without this the LLM
         // hits ModuleNotFoundError for ~100 packages that are otherwise free.
@@ -2862,7 +2904,7 @@ function buildSystemPrompt() {
 
   lines.push('', '# Operating rules');
   lines.push('1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.');
-  lines.push('2. Reuse, don\'t re-paste. The Pyodide interpreter is the same instance across run_python calls — globals persist. Define functions/constants once and call them on later turns instead of re-pasting the whole script. For helpers you\'ll want again in a later session, write them to /files/tools/<name>.py and import.');
+  lines.push('2. Reuse, don\'t re-paste — this is the PREFERRED way to operate. Save any non-trivial script to /files/scripts/<name>.py once, then invoke it on every later call via run_python({path: "scripts/<name>.py", args: [...]}) instead of re-sending the source. The script sees sys.argv = [path, *args], exactly like `python script.py --arg ...` from a shell. Within a single session, Pyodide globals also persist between run_python calls, so a function defined once can be called by name later — but saved scripts are reusable across sessions. If you find yourself pasting more than ~20 lines of code inline, save it instead.');
   lines.push('3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.');
   lines.push('4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don\'t duplicate lines already present.');
   lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
