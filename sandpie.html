@@ -2524,15 +2524,35 @@ except Exception:
         }
         return out || '(no output)';
       } catch (e) {
-        const msg = (e && (e.message || (typeof e.toString === 'function' ? e.toString() : ''))) || '';
+        // Try hard to extract something useful. pyodide can throw a PythonError
+        // (has .message with the traceback), a plain Error, a string, or
+        // sometimes an opaque object whose default toString is "[object Object]".
+        let msg = '';
+        if (e != null) {
+          if (typeof e === 'string') msg = e;
+          else if (e.message) msg = e.message;
+          else {
+            let s = '';
+            try { s = e.toString(); } catch {}
+            if (s && s !== '[object Object]') msg = s;
+            else {
+              try {
+                const j = JSON.stringify(e, Object.getOwnPropertyNames(Object(e)));
+                if (j && j !== '{}') msg = j;
+              } catch {}
+            }
+          }
+        }
         const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-        // No message + nothing on stderr = runtime-level death (pyodide asyncio
-        // loop corrupted, promise rejected with a non-Error object, etc.).
-        // Subsequent runPythonAsync calls will keep failing the same way until
-        // the interpreter is rebuilt — reset pyPromise so the next call loads
-        // a clean instance, and tell the model what happened so it doesn't
-        // spam identical retries.
+        // Opaque or empty error + nothing on stderr = runtime-level death
+        // (pyodide asyncio loop corrupted, promise rejected with a non-Error
+        // object, etc.). Subsequent runPythonAsync calls will keep failing
+        // the same way until the interpreter is rebuilt — reset pyPromise so
+        // the next call loads a clean instance, and tell the model what
+        // happened so it doesn't spam identical retries.
         if (!msg && !stderr.trim()) {
+          // Keep the raw object in the JS console for the user to inspect.
+          try { console.error('[sandpie] opaque run_python error:', e); } catch {}
           pyPromise = null;
           return 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first. If this fires twice in a row, ask the user to reload the page.';
         }
