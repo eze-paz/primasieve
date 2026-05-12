@@ -2366,7 +2366,20 @@ async function syncPyToOpfs(p, placeholders = new Set()) {
     // Don't delete OPFS files corresponding to pyodide-side placeholders —
     // we never had them locally; pyFiles contains them only because we
     // materialized zero-byte stand-ins for listing purposes.
-    if (!pyFiles.has(rel) && !placeholders.has(rel)) await opfs.remove(rel);
+    if (pyFiles.has(rel) || placeholders.has(rel)) continue;
+    // The file existed in OPFS but pyodide no longer has it — the LLM
+    // deleted it. Propagate to Dropbox and clear the state row so sync()
+    // doesn't see "hydrated, no local, cloud unchanged" and silently demote
+    // it back to a placeholder (which would let the LLM re-hydrate the
+    // file we just deleted). dbxDelete tolerates not_found, so files that
+    // were never pushed are safe to attempt.
+    await opfs.remove(rel);
+    if (dbxTokens()) {
+      try { await dbxDelete('/' + rel); }
+      catch (e) { console.warn('dbxDelete failed for LLM-deleted file:', rel, e); }
+    }
+    const s = syncState();
+    if (s[rel]) { delete s[rel]; setSyncState(s); }
   }
 }
 
