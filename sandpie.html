@@ -770,109 +770,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     text-decoration: underline;
   }
 
-  .chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.3rem;
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: 12px;
-    font-size: 0.78rem;
-    background: #21262d;
-    border: 1px solid #30363d;
-    color: #8b949e;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .chip:hover {
-    border-color: #8b949e;
-    color: #c9d1d9;
-  }
-  .chip.active {
-    background: rgba(47, 129, 83, 0.25);
-    border-color: #3fb950;
-    color: #3fb950;
-  }
-  .chip.add {
-    border-style: dashed;
-  }
-  .modal {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-  }
-  .modal-content {
-    position: relative;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 10px;
-    padding: 1.2rem;
-    width: 90%;
-    max-width: 380px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-  .modal-content h3 {
-    margin: 0 0 0.3rem 0;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-  .modal-content input {
-    width: 100%;
-    padding: 0.5rem;
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e6edf3;
-    font-size: 0.85rem;
-  }
-  .modal-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-    margin-top: 0.4rem;
-  }
-  .context-menu {
-    position: fixed;
-    z-index: 300;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 0.3rem 0;
-    min-width: 120px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  }
-  .context-item {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-    color: #c9d1d9;
-  }
-  .context-item:hover {
-    background: #21262d;
-  }
-  .context-delete {
-    color: #f85149;
-  }
-  .context-delete:hover {
-    background: rgba(248,81,73,0.1);
-  }
 </style>
 <script>
 // Stray-DOM guard. Anything appended as a direct child of <body> after the
@@ -1080,7 +977,15 @@ let _chipMenuTarget = null;
 
 function loadProviders() {
   const raw = localStorage.getItem(PROVIDERS_KEY);
-  _providers = raw ? JSON.parse(raw) : [];
+  // Defensive: a corrupted entry must not crash the whole boot, or the
+  // chip row stays empty and even the + Add button never renders.
+  try {
+    const parsed = raw ? JSON.parse(raw) : [];
+    _providers = Array.isArray(parsed) ? parsed.filter(p => p && typeof p === 'object' && p.id) : [];
+  } catch (e) {
+    console.warn('loadProviders: corrupt provider list in localStorage, resetting:', e);
+    _providers = [];
+  }
   _activeProviderId = localStorage.getItem(ACTIVE_PROVIDER_KEY);
 
   // Migrate old single-provider config
@@ -1134,17 +1039,26 @@ function applyActiveProvider() {
 
 function renderChips() {
   const row = $('providerChips');
+  if (!row) return;
   row.innerHTML = '';
 
-  _providers.forEach(p => {
-    const chip = document.createElement('div');
-    chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '');
-    chip.textContent = p.name || p.model || 'Unnamed';
-    chip.dataset.id = p.id;
-    chip.onclick = () => activateProvider(p.id);
-    chip.oncontextmenu = (e) => showChipMenu(e, p.id);
-    row.appendChild(chip);
-  });
+  // Render provider chips defensively — one malformed entry must not
+  // prevent the + Add chip from showing (otherwise the user can't even
+  // create a new provider to recover from a bad state).
+  for (const p of _providers) {
+    try {
+      if (!p || !p.id) continue;
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '');
+      chip.textContent = p.name || p.model || 'Unnamed';
+      chip.dataset.id = p.id;
+      chip.onclick = () => activateProvider(p.id);
+      chip.oncontextmenu = (e) => showChipMenu(e, p.id);
+      row.appendChild(chip);
+    } catch (e) {
+      console.warn('renderChips: skipping malformed provider:', p, e);
+    }
+  }
 
   const addChip = document.createElement('div');
   addChip.className = 'chip add';
