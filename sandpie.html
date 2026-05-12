@@ -364,6 +364,19 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .file-viewer pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font: 0.8rem/1.45 'JetBrains Mono', Consolas, monospace; color: #e6edf3; }
   .file-viewer img, .file-viewer video, .file-viewer audio { max-width: 100%; display: block; margin: 0 auto; }
   .file-viewer .meta { color: #8b949e; font-size: 0.78rem; }
+  .file-viewer .panel header button.mode { font-size: 0.78rem; padding: 0.1rem 0.4rem; border: 1px solid #30363d; border-radius: 3px; }
+  .file-viewer .panel header button.mode:hover { color: #e6edf3; border-color: #58a6ff; }
+  .file-viewer textarea.editor { width: 100%; min-height: 60vh; background: #010409; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 0.5rem; font: 0.8rem/1.45 'JetBrains Mono', Consolas, monospace; resize: vertical; box-sizing: border-box; outline: none; }
+  .file-viewer textarea.editor:focus { border-color: #58a6ff; }
+  .file-viewer .md-preview { color: #e6edf3; font: 0.9rem/1.55 system-ui, -apple-system, sans-serif; }
+  .file-viewer .md-preview h1, .file-viewer .md-preview h2, .file-viewer .md-preview h3 { color: #e6edf3; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; margin-top: 1.2rem; }
+  .file-viewer .md-preview code { background: #161b22; padding: 0.15em 0.35em; border-radius: 3px; font: 0.85em 'JetBrains Mono', Consolas, monospace; }
+  .file-viewer .md-preview pre { background: #161b22; padding: 0.6rem; border-radius: 4px; overflow: auto; }
+  .file-viewer .md-preview pre code { background: transparent; padding: 0; }
+  .file-viewer .md-preview blockquote { border-left: 3px solid #30363d; margin: 0; padding-left: 0.8rem; color: #8b949e; }
+  .file-viewer .md-preview a { color: #58a6ff; }
+  .file-viewer .md-preview table { border-collapse: collapse; }
+  .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid #30363d; padding: 0.3rem 0.6rem; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: #8b949e; cursor: pointer; }
   ul.fs-list button:hover { color: #f85149; background: transparent; }
   .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
@@ -2511,8 +2524,19 @@ except Exception:
         }
         return out || '(no output)';
       } catch (e) {
+        const msg = (e && (e.message || (typeof e.toString === 'function' ? e.toString() : ''))) || '';
         const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-        return `Error: ${e.message}${tail}`;
+        // No message + nothing on stderr = runtime-level death (pyodide asyncio
+        // loop corrupted, promise rejected with a non-Error object, etc.).
+        // Subsequent runPythonAsync calls will keep failing the same way until
+        // the interpreter is rebuilt — reset pyPromise so the next call loads
+        // a clean instance, and tell the model what happened so it doesn't
+        // spam identical retries.
+        if (!msg && !stderr.trim()) {
+          pyPromise = null;
+          return 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first. If this fires twice in a row, ask the user to reload the page.';
+        }
+        return `Error: ${msg || 'unknown (no message)'}${tail}`;
       } finally {
         p.setStdout({});
         p.setStderr({});
@@ -2816,6 +2840,11 @@ function buildSystemPrompt() {
     lines.push('', 'No sandpie_*.md files exist yet.');
   }
 
+  lines.push('', '# Operating rules');
+  lines.push('1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.');
+  lines.push('2. Reuse, don\'t re-paste. The Pyodide interpreter is the same instance across run_python calls — globals persist. Define functions/constants once and call them on later turns instead of re-pasting the whole script. For helpers you\'ll want again in a later session, write them to /files/tools/<name>.py and import.');
+  lines.push('3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.');
+  lines.push('4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don\'t duplicate lines already present.');
   lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
   return { role: 'system', content: lines.join('\n') };
 }
@@ -3047,6 +3076,21 @@ function closeFileViewer() {
   });
 }
 
+// Lazy-loaded markdown renderer (only fetched when the first .md preview opens).
+let markedPromise = null;
+function getMarked() {
+  if (!markedPromise) {
+    markedPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/marked@13/marked.min.js';
+      s.onload = () => resolve(window.marked);
+      s.onerror = () => reject(new Error('failed to load marked'));
+      document.head.appendChild(s);
+    });
+  }
+  return markedPromise;
+}
+
 async function openFileViewer(fullKey, name) {
   // Fetch the underlying File object so we get a Blob (works for binary too).
   let file;
@@ -3075,68 +3119,169 @@ async function openFileViewer(fullKey, name) {
   const meta = document.createElement('span');
   meta.className = 'meta';
   meta.textContent = `${file.size.toLocaleString()} bytes`;
+
+  // Buttons created up-front; visibility is driven by the current mode.
+  const mdBtn = document.createElement('button');
+  mdBtn.className = 'mode';
+  mdBtn.style.display = 'none';
+  const pencilBtn = document.createElement('button');
+  pencilBtn.className = 'mode';
+  pencilBtn.textContent = '✎';
+  pencilBtn.title = 'Edit';
+  pencilBtn.style.display = 'none';
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'mode';
+  saveBtn.textContent = '💾';
+  saveBtn.title = 'Save (Ctrl+S)';
+  saveBtn.style.display = 'none';
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close (Esc)';
-  closeBtn.onclick = closeFileViewer;
-  header.append(title, meta, closeBtn);
+
+  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
 
   const body = document.createElement('div');
   body.className = 'body';
+  panel.append(header, body);
+  overlay.appendChild(panel);
+
+  // ---- Non-editable paths (binary media). Unchanged. ----
+  const finalize = (closeFn) => {
+    closeBtn.onclick = closeFn;
+    overlay._close = closeFn;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
+    document.body.appendChild(overlay);
+  };
 
   if (IMAGE_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file);
-    overlay.dataset.blobUrl = url;
-    const img = document.createElement('img');
-    img.src = url;
-    body.appendChild(img);
-  } else if (VIDEO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file);
-    overlay.dataset.blobUrl = url;
-    const v = document.createElement('video');
-    v.src = url; v.controls = true;
-    body.appendChild(v);
-  } else if (AUDIO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file);
-    overlay.dataset.blobUrl = url;
-    const a = document.createElement('audio');
-    a.src = url; a.controls = true;
-    body.appendChild(a);
-  } else if (ext === 'pdf') {
-    const url = URL.createObjectURL(file);
-    overlay.dataset.blobUrl = url;
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const img = document.createElement('img'); img.src = url; body.appendChild(img);
+    finalize(closeFileViewer); return;
+  }
+  if (VIDEO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const v = document.createElement('video'); v.src = url; v.controls = true; body.appendChild(v);
+    finalize(closeFileViewer); return;
+  }
+  if (AUDIO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const a = document.createElement('audio'); a.src = url; a.controls = true; body.appendChild(a);
+    finalize(closeFileViewer); return;
+  }
+  if (ext === 'pdf') {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
     const f = document.createElement('iframe');
     f.setAttribute('data-chrome', '');
     f.src = url;
     f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
     body.appendChild(f);
-  } else {
-    // Text-y fallback. Read up to the cap; if the result has too many U+FFFD
-    // replacement chars, treat as binary.
-    const text = await file.text();
-    const sample = text.slice(0, TEXT_PREVIEW_CAP);
-    const repl = (sample.match(/�/g) || []).length;
-    const looksBinary = repl > 50 && repl / sample.length > 0.01;
-    const pre = document.createElement('pre');
-    if (looksBinary) {
-      pre.textContent = '(binary file — preview unavailable)';
-    } else {
-      pre.textContent = sample + (text.length > TEXT_PREVIEW_CAP
-        ? `\n…[truncated, full size ${text.length.toLocaleString()} chars]` : '');
-    }
-    body.appendChild(pre);
+    finalize(closeFileViewer); return;
   }
 
-  panel.append(header, body);
-  overlay.appendChild(panel);
+  // ---- Text-y path: read full content, detect binary by replacement-char density. ----
+  const text = await file.text();
+  const sample = text.slice(0, 4000);
+  const repl = (sample.match(/�/g) || []).length;
+  const looksBinary = repl > 50 && repl / Math.max(sample.length, 1) > 0.01;
+  if (looksBinary) {
+    const pre = document.createElement('pre');
+    pre.textContent = '(binary file — preview unavailable)';
+    body.appendChild(pre);
+    finalize(closeFileViewer); return;
+  }
 
-  // Click backdrop (not panel) to close.
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeFileViewer(); });
+  const isMd = ext === 'md' || ext === 'markdown';
+  const editable = text.length <= TEXT_PREVIEW_CAP;
+  // mode: 'rendered' (md preview), 'raw' (read-only <pre>), 'edit' (textarea)
+  let mode = isMd ? 'rendered' : 'raw';
+  let current = text;      // last-saved version
+  let textareaEl = null;   // populated while editing
+
+  const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
+  const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
+
+  function refreshButtons() {
+    mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
+    mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
+    mdBtn.title = mode === 'rendered' ? 'Show raw markdown' : 'Render markdown';
+    pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
+    saveBtn.style.display = mode === 'edit' ? '' : 'none';
+  }
+
+  async function render() {
+    body.innerHTML = '';
+    textareaEl = null;
+    if (mode === 'edit') {
+      const ta = document.createElement('textarea');
+      ta.className = 'editor';
+      ta.spellcheck = false;
+      ta.value = current;
+      ta.addEventListener('input', refreshTitle);
+      ta.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault(); doSave();
+        }
+      });
+      body.appendChild(ta);
+      textareaEl = ta;
+      ta.focus();
+    } else if (mode === 'rendered') {
+      const div = document.createElement('div');
+      div.className = 'md-preview';
+      div.textContent = 'Loading preview…';
+      body.appendChild(div);
+      try {
+        const marked = await getMarked();
+        div.innerHTML = marked.parse(current);
+      } catch (e) {
+        div.textContent = '(failed to load markdown renderer — showing raw)\n\n' + current;
+      }
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = current.length > TEXT_PREVIEW_CAP
+        ? current.slice(0, TEXT_PREVIEW_CAP) + `\n…[truncated, full size ${current.length.toLocaleString()} chars]`
+        : current;
+      body.appendChild(pre);
+    }
+    refreshButtons();
+    refreshTitle();
+  }
+
+  mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
+  pencilBtn.onclick = () => { mode = 'edit'; render(); };
+
+  async function doSave() {
+    if (!textareaEl) return;
+    const newContent = textareaEl.value;
+    try {
+      await opfs.write(fullKey, newContent);
+      current = newContent;
+      meta.textContent = `${new Blob([newContent]).size.toLocaleString()} bytes`;
+      refreshTitle();
+      await refreshFileList();
+    } catch (e) {
+      addMsg('err', `Could not save ${fullKey}: ${e.message}`);
+    }
+  }
+  saveBtn.onclick = doSave;
+
+  function attemptClose() {
+    if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
+    closeFileViewer();
+  }
+
+  closeBtn.onclick = attemptClose;
+  overlay._close = attemptClose;
+  overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
   document.body.appendChild(overlay);
+  await render();
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.querySelector('.file-viewer')) closeFileViewer();
+  if (e.key === 'Escape') {
+    const v = document.querySelector('.file-viewer');
+    if (v) (v._close || closeFileViewer)();
+  }
 });
 
 function opfsUp() {
@@ -3273,11 +3418,18 @@ function capToolResult(s) {
   if (s.length <= TOOL_RESULT_MAX) {
     return { content: s, truncated: false, original: s.length, kept: s.length };
   }
-  const reserve = 120; // leave room for the marker
-  const keep = TOOL_RESULT_MAX - reserve;
-  const head = s.slice(0, keep);
-  const marker = `\n\n[… truncated by sandpie: tool result was ${s.length.toLocaleString()} bytes, kept first ${keep.toLocaleString()}]`;
-  return { content: head + marker, truncated: true, original: s.length, kept: keep };
+  // Head+tail: a single big print() often has its useful summary at the end
+  // (the final traceback line, the "Done." after a long log). Keeping both
+  // ends costs nothing over head-only and saves the model a re-run.
+  const reserve = 180;
+  const budget = TOOL_RESULT_MAX - reserve;
+  const headLen = Math.floor(budget * 0.7);
+  const tailLen = budget - headLen;
+  const head = s.slice(0, headLen);
+  const tail = s.slice(-tailLen);
+  const dropped = s.length - headLen - tailLen;
+  const marker = `\n\n[… truncated by sandpie: dropped ${dropped.toLocaleString()} bytes from the middle; kept first ${headLen.toLocaleString()} + last ${tailLen.toLocaleString()} of ${s.length.toLocaleString()}]\n\n`;
+  return { content: head + marker + tail, truncated: true, original: s.length, kept: headLen + tailLen };
 }
 
 function humanBytes(n) {
