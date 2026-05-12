@@ -1184,6 +1184,11 @@ function deleteProviderFromMenu() {
 
 document.addEventListener('click', hideChipMenu);
 
+// Hoisted: loadProviders() → applyActiveProvider() → updateRoutingHint()
+// references isLocalhost during this top-level call, before the const
+// would otherwise reach its initializer (TDZ).
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
 // Load on init
 loadProviders();
 
@@ -1212,8 +1217,8 @@ let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 
 // ============================================================
 // Routing — picks proxy or direct based on hostname + config
+// (isLocalhost is hoisted above loadProviders() to avoid a TDZ during init.)
 // ============================================================
-const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
 // Wrap a full URL (https://...) in whichever proxy applies, or return it untouched.
 function api(url) {
