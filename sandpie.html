@@ -893,85 +893,49 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
 </style>
 <script>
-// Stray-DOM guard. Anything appended as a direct child of <body> after the
-// initial parse is treated as model-injected output and re-homed into a
-// sandboxed iframe inside the last assistant bubble. Scripts run inside the
-// iframe and can't reach the host page.
-(function () {
-  // Sanctioned channel for tools (e.g. Pyodide IPython display) to push
-  // rich output. We append a wrapper div with the HTML; the observer below
-  // catches it and re-homes it into a sandboxed iframe just like any other
-  // body-level mutation.
-  window._sandpieDisplay = function (html) {
-    const div = document.createElement('div');
-    div.innerHTML = String(html || '');
-    document.body.appendChild(div);
-    window._sandpieDisplay.count = (window._sandpieDisplay.count || 0) + 1;
-  };
-  window._sandpieDisplay.count = 0;
+// Render an HTML string as a sandboxed (allow-scripts, no same-origin) iframe
+// appended to `host`. Used for Pyodide IPython.display output (live) and for
+// replaying persisted artifacts when a conversation is reloaded from OPFS.
+window._renderArtifact = function (host, html) {
+  if (!host) return;
+  const frame = document.createElement('iframe');
+  frame.className = 'artifact-frame';
+  frame.setAttribute('sandbox', 'allow-scripts');
+  frame.setAttribute('scrolling', 'no');
+  frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;margin-top:0.5rem';
+  const baseCss =
+    'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
+    'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
+    'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
+    'table{max-width:100%;border-collapse:collapse;}' +
+    'pre{white-space:pre-wrap;word-wrap:break-word;}';
+  frame.srcdoc =
+    '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
+    String(html || '') +
+    '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
+    '</body></html>';
+  host.appendChild(frame);
+};
 
-  // Listen for size reports from sandboxed artifact iframes.
-  window.addEventListener('message', e => {
-    if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
-    const frames = document.querySelectorAll('iframe.artifact-frame');
-    for (const f of frames) {
-      if (f.contentWindow === e.source) {
-        f.style.height = Math.max(20, e.data.h | 0) + 'px';
-        return;
-      }
+// Sandboxed iframes postMessage their content height so we can autosize them.
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
+  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+    if (f.contentWindow === e.source) {
+      f.style.height = Math.max(20, e.data.h | 0) + 'px';
+      return;
     }
-  });
-
-  function quarantine(node) {
-    if (node.nodeType !== 1) { node.remove(); return; }
-    const messages = document.getElementById('messages');
-    if (!messages) return;
-    const assistants = messages.querySelectorAll('.msg.assistant');
-    const host = assistants[assistants.length - 1] || messages;
-
-    const html = node.outerHTML || node.textContent || '';
-    node.remove();
-
-    // sandbox="allow-scripts" (no allow-same-origin) keeps the iframe
-    // cross-origin, so we use srcdoc — parent cannot touch contentDocument.
-    // A tiny inner script postMessages its height for autosize.
-    const frame = document.createElement('iframe');
-    frame.className = 'artifact-frame';
-    frame.setAttribute('sandbox', 'allow-scripts');
-    frame.setAttribute('scrolling', 'no');
-    frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;margin-top:0.5rem';
-    const baseCss =
-      'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
-      'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
-      'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
-      'table{max-width:100%;border-collapse:collapse;}' +
-      'pre{white-space:pre-wrap;word-wrap:break-word;}';
-    frame.srcdoc =
-      '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
-      html +
-      '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
-      '</body></html>';
-    host.appendChild(frame);
   }
+});
 
-  const obs = new MutationObserver(records => {
-    for (const r of records) {
-      for (const n of r.addedNodes) {
-        // <head>/<body> are legit children of <html>.
-        if (n === document.head || n === document.body) continue;
-        // Allow nodes the app explicitly marks as legitimate chrome
-        // (context menus, transient download anchors, etc.).
-        if (n.nodeType === 1 && n.hasAttribute('data-chrome')) continue;
-        quarantine(n);
-      }
-    }
-  });
-  document.addEventListener('DOMContentLoaded', () => {
-    // Watch both body and html so `documentElement.appendChild` can't dodge.
-    obs.observe(document.body, { childList: true });
-    obs.observe(document.documentElement, { childList: true });
-  });
-})();
+// Buffer for artifacts emitted during the currently-running tool call. The
+// tool exec loop drains this immediately after the tool returns, so it
+// attaches the HTML to the matching tool message (persisted with the conv)
+// and renders into the originating stream's host.
+window._pendingArtifacts = [];
+window._sandpieDisplay = function (html) {
+  window._pendingArtifacts.push(String(html || ''));
+};
 </script>
 </head>
 <body>
@@ -2495,7 +2459,7 @@ RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPytho
     from IPython.display import display, HTML, Image, SVG
     display(HTML('<b>hi</b>'))                  # rendered as a sandboxed iframe artifact
     display(Image(filename='plot.png'))         # PNG bytes shown inline
-The artifact appears below the assistant message; do NOT inject <script> into document.body, attachShadow, or otherwise touch the host DOM — the page locks down stray DOM mutations.
+The artifact appears below the assistant message. IPython.display is the only sanctioned channel for rich output: artifacts emitted this way are persisted with the conversation and reappear on page reload. Anything else you try (writing to document.body, attachShadow, fetching the host page, etc.) is not reachable from inside Pyodide and will not render — use display().
 
 Examples:
   list    →  import os; print(os.listdir())               # lists /files
@@ -2634,8 +2598,10 @@ sys.argv = list(_sandpie_argv.to_py())
         try { await p.loadPackagesFromImports(code); } catch {}
         // IPython.display.display(HTML(...))/Image/SVG/etc. fall back to repr
         // in headless Pyodide. Patch display() to route rich reprs through
-        // window._sandpieDisplay; the quarantine observer wraps each emission
-        // in a sandboxed iframe in the last assistant bubble.
+        // window._sandpieDisplay, which buffers the HTML. The tool exec loop
+        // drains the buffer after runPythonAsync resolves: it persists each
+        // artifact on the tool message (so it survives reload) and renders it
+        // as a sandboxed iframe under the originating conv's host.
         try {
           p.runPython(`
 def _sandpie_display(*objs, **kwargs):
@@ -2678,13 +2644,13 @@ except Exception:
     pass
 `);
         } catch {}
-        const beforeArtifacts = window._sandpieDisplay.count || 0;
+        const beforeArtifacts = window._pendingArtifacts.length;
         await p.runPythonAsync(code);
         await syncPyToOpfs(p, placeholders);
         await refreshFileList();
         let out = stdout.trimEnd();
         if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-        const newArtifacts = (window._sandpieDisplay.count || 0) - beforeArtifacts;
+        const newArtifacts = window._pendingArtifacts.length - beforeArtifacts;
         if (newArtifacts > 0) {
           const note = `(rendered ${newArtifacts} artifact${newArtifacts === 1 ? '' : 's'} via IPython.display — visible to the user)`;
           out = out ? out + '\n' + note : note;
@@ -3946,6 +3912,12 @@ function renderHistoricalMessage(m) {
     const t = String(m.content || '');
     const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
     bindBubble(div, m);
+    // Replay any artifacts captured when this tool originally ran. They land
+    // under the same host addMsg picked (active conv's host by default).
+    if (Array.isArray(m.artifacts) && m.artifacts.length) {
+      const host = div.parentNode;
+      for (const html of m.artifacts) window._renderArtifact(host, html);
+    }
   }
 }
 
@@ -4294,6 +4266,10 @@ function handleSubmit() {
 async function enqueueForActive(text) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
+  // If the stream's host hasn't been mounted yet (fresh conv started by
+  // typing rather than via the conv list), mount it now so bubbles are
+  // visible as they stream in.
+  if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
   s.queue.push(text);
   updateQueueCount(s);
   processQueueFor(s);
@@ -4558,6 +4534,10 @@ async function sendSingle(text, stream) {
   const host = stream.host;
   convMessages.push({ role: 'user', content: text });
   bindBubble(addMsg('user', text, host), convMessages[convMessages.length - 1]);
+  // Early save so a brand-new conv lands on disk before the long-running
+  // round — that way the conv list shows it (with the generating-dot
+  // indicator) the moment streaming starts, not only after it finishes.
+  saveConv(convId).catch(() => {});
   requestWakeLock();
   setStreamSending(stream, true);
   // One total timer for the whole exchange — covers every streamRound AND
@@ -4608,6 +4588,9 @@ async function sendSingle(text, stream) {
           // mid-flight (shell fetch, fetch_file dbxDownload, etc.). pyodide's
           // run_python doesn't accept an external abort and will run to
           // completion — that's a separate, harder fix needing setInterruptBuffer.
+          // Clear any stale artifacts from a previous tool run so what we
+          // drain afterwards is strictly produced by THIS call.
+          window._pendingArtifacts.length = 0;
           let result;
           try {
             result = await tools[tc.function.name].run(args, stream.abort?.signal);
@@ -4629,8 +4612,16 @@ async function sendSingle(text, stream) {
           if (capped.truncated) {
             addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`, host);
           }
-          convMessages.push({ role: 'tool', tool_call_id: tc.id, content: capped.content });
+          // Drain artifacts produced by this tool call. Persist on the tool
+          // message so saveConv keeps them, and render now into the captured
+          // host so they appear under the right conv even if the user
+          // switches tabs mid-stream.
+          const artifacts = window._pendingArtifacts.splice(0);
+          const toolMsg = { role: 'tool', tool_call_id: tc.id, content: capped.content };
+          if (artifacts.length) toolMsg.artifacts = artifacts;
+          convMessages.push(toolMsg);
           bindBubble(resultDiv, convMessages[convMessages.length - 1]);
+          for (const html of artifacts) window._renderArtifact(host, html);
           completed.add(tc.id);
         }
       } finally {
