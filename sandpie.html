@@ -1331,7 +1331,57 @@ const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
 $('dbxAppKey').value = cfg.dbxAppKey || '';
 
 marked.setOptions({ breaks: true, gfm: true });
-const renderMd = text => DOMPurify.sanitize(marked.parse(text));
+
+// Strip common leading whitespace from every <pre> block's content.
+// Some models emit fenced thinking blocks whose body starts indented, and
+// once that lands in the conversation history the model mimics with a bit
+// more indent each round — consecutive thinking boxes drift visibly right.
+// Dedent preserves intra-block relative structure (code that's intentionally
+// indented stays indented) and only removes the common offset.
+function dedentPreBlocks(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  for (const pre of wrap.querySelectorAll('pre')) {
+    const root = pre.querySelector('code') || pre;
+    const original = root.textContent;
+    if (!original) continue;
+    const lines = original.split('\n');
+    let minIndent = Infinity;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^[ \t]*/);
+      if (m && m[0].length < minIndent) minIndent = m[0].length;
+    }
+    if (!isFinite(minIndent) || minIndent === 0) continue;
+    root.textContent = lines.map(
+      l => l.length >= minIndent ? l.slice(minIndent) : l,
+    ).join('\n');
+  }
+  return wrap.innerHTML;
+}
+
+const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
+
+// Source-level dedent: strip the common leading whitespace from the body of
+// every fenced code block in raw markdown. Used before persisting assistant
+// content so the model doesn't see (and amplify) drifted indent next round.
+function dedentMarkdownFences(text) {
+  if (!text) return text;
+  return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
+    const lines = body.split('\n');
+    let minIndent = Infinity;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^[ \t]*/);
+      if (m && m[0].length < minIndent) minIndent = m[0].length;
+    }
+    if (!isFinite(minIndent) || minIndent === 0) return lead + open + body + close;
+    const dedented = lines.map(
+      l => l.length >= minIndent ? l.slice(minIndent) : l,
+    ).join('\n');
+    return lead + open + dedented + close;
+  });
+}
 
 // Declared up here so refreshProxyDot() can read them at module init time
 // (let bindings are TDZ-bound until their declaration line runs, so they must
@@ -4744,7 +4794,10 @@ async function sendSingle(text, stream) {
   try {
     while (true) {
       if (stream.abort?.signal.aborted) break;
-      const { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(stream.abort?.signal, stream);
+      let { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(stream.abort?.signal, stream);
+      // Dedent fenced code blocks before persisting so the next round's
+      // history doesn't carry drifted indent the model would amplify.
+      if (content) content = dedentMarkdownFences(content);
       if (aborted) {
         wasAborted = true;
         if (content && content.trim()) {
