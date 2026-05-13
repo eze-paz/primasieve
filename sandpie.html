@@ -4080,20 +4080,23 @@ function sleep(ms, signal) {
 }
 
 async function streamRoundWithRetry(signal) {
-  const MAX_ATTEMPTS = 3;
-  const BACKOFF_MS = [1000, 2500];
+  // Retry indefinitely on transient errors — the user's stop button (which
+  // aborts `signal`) is the exit path. Backoff ramps up then caps at 10s.
+  const BACKOFF_MS = [1000, 2500, 5000, 10000];
   let notice = null;
+  let attempt = 0;
   try {
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    while (true) {
       try {
         const result = await streamRound(signal);
         return result;
       } catch (e) {
         if (signal?.aborted) throw e;
-        if (!isRetryableError(e) || attempt === MAX_ATTEMPTS - 1) throw e;
+        if (!isRetryableError(e)) throw e;
         if (!notice) notice = addMsg('info', '');
-        notice.textContent = `AI provider issues detected, retrying (${attempt + 1}/${MAX_ATTEMPTS - 1})…`;
-        await sleep(BACKOFF_MS[attempt], signal);
+        notice.textContent = `AI provider issues detected, retrying (attempt ${attempt + 1})…`;
+        await sleep(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)], signal);
+        attempt++;
       }
     }
   } finally {
