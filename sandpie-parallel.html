@@ -512,7 +512,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
      keep their host detached so their stream can keep mutating bubbles
      without contaminating whichever conv the user is currently looking at. */
   .conv-host { display: flex; flex-direction: column; gap: 1rem; flex: 0 0 auto; }
-  /* Empty-conversation welcome — vertically centered greeting + status */
+  /* Empty-conversation welcome — vertically centered greeting + status.
+     Held invisible for 1s after load, then faded in over 0.5s so the page
+     finishes settling (fonts, JS-built shield mesh, layout shifts) before
+     anything in the hero is painted. Eliminates the load flash. */
   .welcome {
     margin: auto 0;
     padding: 2rem 1rem;
@@ -523,6 +526,12 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     align-items: center;
     gap: 0.5rem;
     user-select: none;
+    opacity: 0;
+    animation: welcome-fadein 0.5s ease-out 1s forwards;
+  }
+  @keyframes welcome-fadein {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
   .welcome-title {
     font-size: 1.8rem;
@@ -3801,9 +3810,12 @@ function addMsg(role, text = '', host = null) {
     div.textContent = text;
   }
   target.appendChild(div);
-  // Keep the host's own total timer (if any) pinned to the bottom of its
-  // bubbles — works whether the host is mounted or parked off-DOM.
-  const timer = target.querySelector(':scope > .msg-timer');
+  // Keep the host's *active* total timer pinned to the bottom of its bubbles.
+  // The `:not(.done)` guard is load-bearing: finished rounds leave their
+  // "done · 12s" bubble in the host (chronologically first, with .done),
+  // and a bare `:scope > .msg-timer` selector would re-anchor THAT to the
+  // bottom on every new addMsg — burying the actually-ticking timer mid-history.
+  const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && stick) m.scrollTop = m.scrollHeight;
   return div;
@@ -4469,9 +4481,13 @@ function setStreamSending(stream, sending) {
   } else {
     stream.abort = null;
     stream.generating = false;
-    // Clear any lingering in-flight tool spinners scoped to this stream's
-    // bubble host (so a tool aborted mid-run doesn't keep ticking invisibly).
-    for (const el of stream.host.querySelectorAll('.tool-call.in-flight')) {
+    // Clear any lingering tool spinners scoped to this stream's bubble host.
+    // Covers both phases: `.in-flight` (mid-execution, ticker running) AND
+    // preparing (LLM was still streaming args when the user hit Stop — no
+    // .in-flight class yet, but the chip already shows a spinner via
+    // renderTcPreparing). Anything with the done check is skipped.
+    for (const el of stream.host.querySelectorAll('.tool-call')) {
+      if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
       stopToolTicker(el);
       renderTcDone(el, el.dataset.fname);
@@ -4571,6 +4587,23 @@ self.addEventListener('message', (e) => {
 async function run({ requestId, url, headers, body }) {
   const controller = new AbortController();
   active.set(requestId, { controller });
+  // Idle-bytes watchdog: if reader.read() doesn't resolve with new bytes for
+  // ~60s we assume the underlying connection is wedged. This handles the
+  // post-freeze case where the tab was suspended by Chrome, the upstream's
+  // idle timeout fired mid-stream, and on resume the read() promise never
+  // settles because no FIN was successfully propagated through the chain.
+  // We tag the abort with a distinguished reason so the catch branch below
+  // reports it as a retryable network glitch (vs. a user-initiated stop).
+  const IDLE_MS = 60_000;
+  let lastByteTime = Date.now();
+  let idleAborted = false;
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastByteTime > IDLE_MS) {
+      idleAborted = true;
+      try { controller.abort('idle-timeout'); } catch (_) {}
+      clearInterval(watchdog);
+    }
+  }, 5000);
   try {
     const res = await fetch(url, {
       method: 'POST', headers,
@@ -4582,11 +4615,19 @@ async function run({ requestId, url, headers, body }) {
       self.postMessage({ type: 'error', requestId, status: res.status, message: res.status + ': ' + text });
       return;
     }
+    lastByteTime = Date.now();
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    while (true) {
+    // sawDone short-circuits the outer loop the instant we see [DONE], even if
+    // the upstream lingers on the TCP side before sending FIN. The Python
+    // proxy used to coincidentally close fast; Node + Apache + Anthropic's
+    // SSE pipeline can hold the socket open for a beat after the terminator,
+    // and "indefinitely waits to execute the tool call" was the symptom.
+    let sawDone = false;
+    while (!sawDone) {
       const { done, value } = await reader.read();
+      lastByteTime = Date.now();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\\n');
@@ -4594,21 +4635,35 @@ async function run({ requestId, url, headers, body }) {
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6);
-        if (data === '[DONE]') continue;
+        if (data === '[DONE]') { sawDone = true; break; }
         try {
-          const delta = JSON.parse(data).choices && JSON.parse(data).choices[0] && JSON.parse(data).choices[0].delta;
+          const parsed = JSON.parse(data);
+          const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
           if (delta) self.postMessage({ type: 'delta', requestId, delta });
         } catch (_) {}
       }
     }
+    // Best-effort: cancel any further reads so the worker doesn't hold the
+    // connection open after we already know the stream is finished.
+    try { reader.cancel(); } catch (_) {}
     self.postMessage({ type: 'done', requestId });
   } catch (e) {
-    if (e && (e.name === 'AbortError' || controller.signal.aborted)) {
+    // Distinguish a watchdog-triggered abort (treat as retryable network
+    // failure) from a user-initiated abort (treat as cancellation).
+    if (idleAborted) {
+      self.postMessage({
+        type: 'error',
+        requestId,
+        name: 'TypeError',
+        message: 'stream stalled (no bytes for ' + (IDLE_MS / 1000) + 's; likely tab freeze)',
+      });
+    } else if (e && (e.name === 'AbortError' || controller.signal.aborted)) {
       self.postMessage({ type: 'aborted', requestId });
     } else {
       self.postMessage({ type: 'error', requestId, message: (e && e.message) || String(e) });
     }
   } finally {
+    clearInterval(watchdog);
     active.delete(requestId);
   }
 }
@@ -4642,7 +4697,12 @@ async function streamRound(signal, stream) {
   const host = stream.host;
   const convMessages = stream.messages;
   const endpoint = $('endpoint').value.replace(/\/$/, '');
-  const url = api(endpoint + '/chat/completions');
+  // Absolutize against the page origin BEFORE handing to the worker. The
+  // worker lives at a blob: URL, so a relative URL (e.g. "/proxy/..." that
+  // api() returns on localhost or with a relative proxyUrl) would resolve
+  // to blob:/proxy/... and fetch with "Failed to fetch". `new URL(x, base)`
+  // is a no-op on already-absolute URLs.
+  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   const body = { model: $('model').value, messages: [buildSystemPrompt(), ...convMessages], stream: true, tools: toolDefs() };
 
   const reply = addMsg('assistant', '', host);
@@ -4757,9 +4817,14 @@ async function streamRound(signal, stream) {
     onDelta:   applyDelta,
     onDone:    () => resolveStream(),
     onAborted: () => { aborted = true; resolveStream(); },
-    onError:   ({ status, message }) => {
+    onError:   ({ status, message, name }) => {
       const err = new Error(message);
       if (typeof status === 'number') err.status = status;
+      // Preserve the worker's reported error category so isRetryableError's
+      // "bare network failure" branch picks up watchdog timeouts and other
+      // worker-side TypeError-equivalents (which can't actually be a
+      // TypeError instance across postMessage, only by name).
+      if (typeof name === 'string') err.name = name;
       streamError = err;
       resolveStream();
     },
@@ -4819,8 +4884,11 @@ const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 5
 function isRetryableError(err) {
   if (!err || err.name === 'AbortError') return false;
   if (typeof err.status === 'number' && RETRYABLE_STATUS.has(err.status)) return true;
-  // Bare network failures (DNS, dropped, CORS preflight) surface as TypeError.
-  if (err instanceof TypeError) return true;
+  // Bare network failures (DNS, dropped, CORS preflight) surface as
+  // TypeError. The worker reports its watchdog/idle-timeout failure with
+  // name: 'TypeError' for the same reason — the prototype chain doesn't
+  // survive postMessage, so check by name too.
+  if (err instanceof TypeError || err.name === 'TypeError') return true;
   return false;
 }
 
