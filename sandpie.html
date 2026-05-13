@@ -3798,28 +3798,29 @@ function tcEscape(s) {
   }[c]));
 }
 
-function renderTcPreparing(div, fname) {
+function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
+  // Token count is meaningful here because the LLM is actively streaming the
+  // arguments — each character is a real token coming in. During the tool's
+  // execution phase (running) nothing new is generated, so we hide it there.
+  const tok = Math.ceil((args ? String(args).length : 0) / 4);
   el.innerHTML =
     '<span class="tc-spinner tc-dim"></span>' +
-    `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>`;
+    `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
+    (tok > 0 ? `<span class="tc-meta">~${tok} tok</span>` : '');
 }
 
-function renderTcRunning(div, fname, args, elapsedMs, flavor) {
+function renderTcRunning(div, fname, flavor) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  // Real arg tokens (live during arg streaming) + simulated drip during the
-  // tool's execution phase, so the counter keeps moving while the tool runs.
-  const argTok = Math.ceil((args ? String(args).length : 0) / 4);
-  const drip = Math.floor(elapsedMs / 55); // ~18 tok/s
-  const tok = argTok + drip;
-  const secs = (elapsedMs / 1000).toFixed(1);
+  // No timer / token count — the global interaction timer at the bottom of
+  // the transcript already shows elapsed time, and nothing new is being
+  // generated during local tool execution.
   el.innerHTML =
     '<span class="tc-spinner"></span>' +
     `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
-    `<span class="tc-flavor">${tcEscape(flavor)}</span>` +
-    `<span class="tc-meta">${secs}s · ~${tok} tok</span>`;
+    `<span class="tc-flavor">${tcEscape(flavor)}</span>`;
 }
 
 function renderTcDone(div, fname) {
@@ -3832,7 +3833,6 @@ function renderTcDone(div, fname) {
 
 function startToolTicker(div, tc) {
   if (!div || div._ticker) return;
-  const startMs = Date.now();
   const flavors = tcFlavorsFor(tc.function.name);
   let idx = 0;
   div.dataset.fname = tc.function.name;
@@ -3841,13 +3841,7 @@ function startToolTicker(div, tc) {
       div._ticker = null;
       return;
     }
-    renderTcRunning(
-      div,
-      tc.function.name,
-      tc.function.arguments,
-      Date.now() - startMs,
-      flavors[idx % flavors.length],
-    );
+    renderTcRunning(div, tc.function.name, flavors[idx % flavors.length]);
     idx++;
     div._ticker = setTimeout(tick, 1400);
   };
@@ -4447,7 +4441,6 @@ async function streamRound(signal, stream) {
           if (!toolCallEls[i]) {
             toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`, host);
             toolCallEls[i].dataset.fname = toolCalls[i].function.name;
-            renderTcPreparing(toolCallEls[i], toolCalls[i].function.name);
             toolDisplayed[i] = '';
             toolPending[i] = '';
           } else {
@@ -4456,6 +4449,16 @@ async function streamRound(signal, stream) {
         }
         if (tc.function?.arguments) {
           toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
+        }
+        // Keep the preparing card in sync with the live token estimate so the
+        // count rises as args stream in. Skipped once the bubble is in-flight
+        // (the ticker owns the rendering then).
+        if (toolCallEls[i] && !toolCallEls[i].classList.contains('in-flight')) {
+          renderTcPreparing(
+            toolCallEls[i],
+            toolCalls[i].function.name,
+            toolCalls[i].function.arguments,
+          );
         }
       }
     }
