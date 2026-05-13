@@ -512,7 +512,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
      keep their host detached so their stream can keep mutating bubbles
      without contaminating whichever conv the user is currently looking at. */
   .conv-host { display: flex; flex-direction: column; gap: 1rem; flex: 0 0 auto; }
-  /* Empty-conversation welcome — vertically centered greeting + status */
+  /* Empty-conversation welcome — vertically centered greeting + status.
+     Held invisible for 1s after load, then faded in over 0.5s so the page
+     finishes settling (fonts, JS-built shield mesh, layout shifts) before
+     anything in the hero is painted. Eliminates the load flash. */
   .welcome {
     margin: auto 0;
     padding: 2rem 1rem;
@@ -523,7 +526,8 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     align-items: center;
     gap: 0.5rem;
     user-select: none;
-    animation: welcome-fadein 0.4s ease-out;
+    opacity: 0;
+    animation: welcome-fadein 0.5s ease-out 1s forwards;
   }
   @keyframes welcome-fadein {
     from { opacity: 0; }
@@ -3783,9 +3787,11 @@ function addMsg(role, text = '', host = null) {
     div.textContent = text;
   }
   target.appendChild(div);
-  // Keep the host's own total timer (if any) pinned to the bottom of its
-  // bubbles — works whether the host is mounted or parked off-DOM.
-  const timer = target.querySelector(':scope > .msg-timer');
+  // Keep the host's own LIVE total timer pinned to the bottom of its bubbles.
+  // Settled timers (.done — "stopped · 10s" / "done · 4.2s") stay anchored to
+  // the round they belong to; otherwise a stop-then-send-again would drag the
+  // old "stopped" indicator under each new message.
+  const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && stick) m.scrollTop = m.scrollHeight;
   return div;
@@ -4445,9 +4451,13 @@ function setStreamSending(stream, sending) {
   } else {
     stream.abort = null;
     stream.generating = false;
-    // Clear any lingering in-flight tool spinners scoped to this stream's
-    // bubble host (so a tool aborted mid-run doesn't keep ticking invisibly).
-    for (const el of stream.host.querySelectorAll('.tool-call.in-flight')) {
+    // Clear any lingering tool spinners scoped to this stream's bubble host.
+    // Covers both phases: `.in-flight` (mid-execution, ticker running) AND
+    // preparing (LLM was still streaming args when the user hit Stop — no
+    // .in-flight class yet, but the chip already shows a spinner via
+    // renderTcPreparing). Anything with the done check is skipped.
+    for (const el of stream.host.querySelectorAll('.tool-call')) {
+      if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
       stopToolTicker(el);
       renderTcDone(el, el.dataset.fname);
