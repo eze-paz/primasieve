@@ -825,6 +825,19 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
      .tc-collapsed (rich spinner/flavor card). CSS swaps which is visible based
      on the global minimize state. Tool-result bubbles are hidden when minimized. */
+  .tool-call {
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .tool-call:hover {
+    background: rgba(88,166,255,0.18);
+    border-color: rgba(88,166,255,0.7);
+  }
+  #messages.tools-minimized .tool-call:hover {
+    background: linear-gradient(135deg, rgba(88,166,255,0.14), rgba(88,166,255,0.24));
+    border-color: rgba(88,166,255,0.65);
+    box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
+  }
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
   #messages.tools-minimized .tool-call {
@@ -996,6 +1009,7 @@ window._sandpieDisplay = function (html) {
 
   <!-- Message Bubble Context Menu -->
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
+    <div class="context-item" onclick="copyFromMenu()">Copy</div>
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
   </div>
@@ -3644,6 +3658,13 @@ function bindBubble(div, msgRef) {
   if (!div || !msgRef) return div;
   div._msg = msgRef;
   div.addEventListener('contextmenu', onBubbleContextMenu);
+  // Tool-call chips also open the menu on left-click — the chip is itself
+  // the affordance for "interact with this step". For text bubbles (user /
+  // assistant) we keep left-click as text-selection, so this is scoped to
+  // .tool-call only.
+  if (div.classList.contains('tool-call')) {
+    div.addEventListener('click', onBubbleContextMenu);
+  }
   return div;
 }
 
@@ -3697,6 +3718,36 @@ function toggleToolsMinimizedFromMenu() {
   localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
   applyToolsMinimized();
   hideBubbleMenu();
+}
+
+async function copyFromMenu() {
+  const target = _bubbleMenuTarget;
+  hideBubbleMenu();
+  if (!target) return;
+  let text;
+  // For tool-call chips, prefer the full `→ funcname(args)` line — that's
+  // what the user sees in the expanded view and what they'd want to grab.
+  const expanded = target.querySelector && target.querySelector('.tc-expanded');
+  if (expanded && expanded.textContent) {
+    text = expanded.textContent;
+  } else if (target._msg && typeof target._msg.content === 'string') {
+    text = target._msg.content;
+  } else {
+    text = target.innerText || target.textContent || '';
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    // Fallback for non-secure-context / older browsers.
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
 }
 
 // === Tool-call collapsed view — spinner, rotating flavor text, token tick ===
