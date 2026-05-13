@@ -808,32 +808,73 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     text-decoration: underline;
   }
 
-  /* When tool calls/results are minimized, collapse them to a compact chip and
-     hide results entirely. In-flight tool-calls keep a small spinner so the
-     user can tell work is happening in the background. */
+  /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
+     .tc-collapsed (rich spinner/flavor card). CSS swaps which is visible based
+     on the global minimize state. Tool-result bubbles are hidden when minimized. */
+  .tool-call .tc-expanded { display: inline; }
+  .tool-call .tc-collapsed { display: none; }
   #messages.tools-minimized .tool-call {
-    padding: 0.2rem 0.55rem;
-    font-size: 11px;
-    max-width: 70%;
-    opacity: 0.6;
-    white-space: nowrap;
+    padding: 0.45rem 0.75rem;
+    font-size: 12px;
+    max-width: 88%;
+    background: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0.14));
+    border: 1px solid rgba(88,166,255,0.35);
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
+  }
+  #messages.tools-minimized .tool-call .tc-expanded { display: none; }
+  #messages.tools-minimized .tool-call .tc-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    min-width: 0;
   }
   #messages.tools-minimized .tool-result { display: none; }
-  #messages.tools-minimized .tool-call.in-flight { opacity: 1; }
-  #messages.tools-minimized .tool-call.in-flight::after {
-    content: '';
-    display: inline-block;
-    width: 8px; height: 8px;
-    margin-left: 6px;
+
+  .tc-spinner {
+    flex-shrink: 0;
+    width: 11px; height: 11px;
     border: 2px solid #58a6ff;
     border-top-color: transparent;
     border-radius: 50%;
-    vertical-align: middle;
-    animation: sp-spin 0.8s linear infinite;
+    animation: sp-spin 0.85s linear infinite;
   }
+  .tc-title { color: #c9d1d9; white-space: nowrap; }
+  .tc-title b { color: #58a6ff; font-weight: 600; }
+  .tc-flavor {
+    color: #8b949e;
+    font-style: italic;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    animation: tc-fade 1.4s ease-in-out;
+  }
+  .tc-meta {
+    margin-left: auto;
+    font-size: 10px;
+    color: #6e7681;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .tc-check {
+    flex-shrink: 0;
+    color: #56d364;
+    font-weight: bold;
+    font-size: 12px;
+  }
+  .tc-dim { opacity: 0.65; }
   @keyframes sp-spin { to { transform: rotate(360deg); } }
+  @keyframes tc-fade {
+    0% { opacity: 0; transform: translateY(2px); }
+    20% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0.6; transform: translateY(0); }
+  }
 </style>
 <script>
 // Stray-DOM guard. Anything appended as a direct child of <body> after the
@@ -3546,7 +3587,19 @@ function addMsg(role, text = '') {
   const stick = isAtBottom(m);
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-  div.textContent = text;
+  if (role === 'tool-call') {
+    // Dual view: .tc-expanded carries the full text (visible when tools are
+    // shown); .tc-collapsed carries the minimized spinner/flavor/token card.
+    const expanded = document.createElement('span');
+    expanded.className = 'tc-expanded';
+    expanded.textContent = text;
+    const collapsed = document.createElement('span');
+    collapsed.className = 'tc-collapsed';
+    div.appendChild(expanded);
+    div.appendChild(collapsed);
+  } else {
+    div.textContent = text;
+  }
   m.appendChild(div);
   // Keep the active total timer pinned to the bottom of the transcript —
   // tool-call / tool-result / info rows shouldn't shove the live ticker
@@ -3623,6 +3676,117 @@ function toggleToolsMinimizedFromMenu() {
   localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
   applyToolsMinimized();
   hideBubbleMenu();
+}
+
+// === Tool-call collapsed view — spinner, rotating flavor text, token tick ===
+// Token estimate uses the same 4-chars-per-token approximation as the meter
+// (estimateTokens / fmtTokens) — sized to feel alive without being precise.
+const TOOL_FLAVOR = {
+  run_python: [
+    'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
+    'tracing call frames', 'marshaling output buffer', 'flushing stdout',
+    'checking traceback', 'resolving imports', 'walking the heap',
+  ],
+  shell: [
+    'spawning subprocess', 'piping stdout', 'draining stderr',
+    'awaiting exit code', 'parsing shell output', 'flushing pipe buffers',
+    'reading exit status', 'streaming bytes from child',
+  ],
+  read_file: [
+    'opening file descriptor', 'decoding utf-8', 'buffering chunks',
+    'normalizing line endings', 'measuring byte length', 'sniffing encoding',
+  ],
+  write_file: [
+    'allocating storage', 'encoding payload', 'flushing to disk',
+    'updating mtime', 'syncing inode', 'committing bytes',
+  ],
+  fetch_file: [
+    'resolving hostname', 'negotiating TLS handshake', 'streaming bytes over the wire',
+    'verifying content length', 'decoding response body', 'unpacking from Dropbox',
+  ],
+};
+const GENERIC_FLAVOR = [
+  'thinking', 'computing', 'processing', 'crunching numbers',
+  'consulting the oracle', 'reticulating splines', 'staring into the abyss',
+];
+function tcFlavorsFor(name) { return TOOL_FLAVOR[name] || GENERIC_FLAVOR; }
+
+function tcSetExpanded(div, text) {
+  const el = div && div.querySelector && div.querySelector('.tc-expanded');
+  if (el) el.textContent = text;
+}
+function tcAppendExpanded(div, text) {
+  const el = div && div.querySelector && div.querySelector('.tc-expanded');
+  if (el) el.textContent += text;
+}
+
+function tcEscape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function renderTcPreparing(div, fname) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+  el.innerHTML =
+    '<span class="tc-spinner tc-dim"></span>' +
+    `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>`;
+}
+
+function renderTcRunning(div, fname, args, elapsedMs, flavor) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+  // Real arg tokens (live during arg streaming) + simulated drip during the
+  // tool's execution phase, so the counter keeps moving while the tool runs.
+  const argTok = Math.ceil((args ? String(args).length : 0) / 4);
+  const drip = Math.floor(elapsedMs / 55); // ~18 tok/s
+  const tok = argTok + drip;
+  const secs = (elapsedMs / 1000).toFixed(1);
+  el.innerHTML =
+    '<span class="tc-spinner"></span>' +
+    `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
+    `<span class="tc-flavor">${tcEscape(flavor)}</span>` +
+    `<span class="tc-meta">${secs}s · ~${tok} tok</span>`;
+}
+
+function renderTcDone(div, fname) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+  el.innerHTML =
+    '<span class="tc-check">✓</span>' +
+    `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>`;
+}
+
+function startToolTicker(div, tc) {
+  if (!div || div._ticker) return;
+  const startMs = Date.now();
+  const flavors = tcFlavorsFor(tc.function.name);
+  let idx = 0;
+  div.dataset.fname = tc.function.name;
+  const tick = () => {
+    if (!div.isConnected || !div.classList.contains('in-flight')) {
+      div._ticker = null;
+      return;
+    }
+    renderTcRunning(
+      div,
+      tc.function.name,
+      tc.function.arguments,
+      Date.now() - startMs,
+      flavors[idx % flavors.length],
+    );
+    idx++;
+    div._ticker = setTimeout(tick, 1400);
+  };
+  tick();
+}
+
+function stopToolTicker(div) {
+  if (div && div._ticker) {
+    clearTimeout(div._ticker);
+    div._ticker = null;
+  }
 }
 
 // === Total-interaction timer (covers all rounds + tool execution) ============
@@ -3712,6 +3876,8 @@ function renderHistoricalMessage(m) {
         let args = tc.function.arguments;
         try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
         const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+        tcDiv.dataset.fname = tc.function.name;
+        renderTcDone(tcDiv, tc.function.name);
         bindBubble(tcDiv, m);
       }
     }
@@ -3971,9 +4137,13 @@ function setSendingState(sending) {
     btn.classList.remove('sending');
     btn.textContent = 'Send';
     btn.disabled = false;
-    // Clear any lingering in-flight spinners (e.g. tool aborted mid-run).
+    // Clear any lingering in-flight spinners (e.g. tool aborted mid-run) and
+    // stop their tickers so the rotating flavor + token counter doesn't keep
+    // running invisibly in the background.
     for (const el of document.querySelectorAll('#messages .tool-call.in-flight')) {
       el.classList.remove('in-flight');
+      stopToolTicker(el);
+      renderTcDone(el, el.dataset.fname);
     }
   }
 }
@@ -4074,7 +4244,7 @@ async function streamRound(signal) {
         toolDisplayed[i] = (toolDisplayed[i] || '') + buf.slice(0, n);
         toolPending[i] = buf.slice(n);
         if (toolCallEls[i]) {
-          toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
+          tcSetExpanded(toolCallEls[i], `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`);
         }
         work = true;
       }
@@ -4105,10 +4275,12 @@ async function streamRound(signal) {
         if (toolCalls[i].function.name) {
           if (!toolCallEls[i]) {
             toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`);
+            toolCallEls[i].dataset.fname = toolCalls[i].function.name;
+            renderTcPreparing(toolCallEls[i], toolCalls[i].function.name);
             toolDisplayed[i] = '';
             toolPending[i] = '';
           } else {
-            toolCallEls[i].textContent = `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`;
+            tcSetExpanded(toolCallEls[i], `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`);
           }
         }
         if (tc.function?.arguments) {
@@ -4161,7 +4333,7 @@ async function streamRound(signal) {
   streamDone = true;
   await drain;
   cursor.remove();
-  for (const el of toolCallEls) if (el) el.textContent += ')';
+  for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
   if (!content && !toolCalls.length) reply.remove();
   // Expose live bubble refs so the caller can bind them to the assistant
   // message object after it's pushed into `messages[]`. Filtering toolCalls
@@ -4280,9 +4452,13 @@ async function sendSingle(text) {
           if (currentAbort?.signal.aborted) break;
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-          // Mark this tool-call bubble as in-flight so the minimized-view
-          // spinner shows while the tool is running.
-          if (toolBubble) toolBubble.classList.add('in-flight');
+          // Mark this tool-call bubble as in-flight and start the ticker so
+          // the minimized-view shows spinner + rotating flavor + live token
+          // count while the tool runs.
+          if (toolBubble) {
+            toolBubble.classList.add('in-flight');
+            startToolTicker(toolBubble, tc);
+          }
           // Pass the abort signal so Stop is responsive even when a tool is
           // mid-flight (shell fetch, fetch_file dbxDownload, etc.). pyodide's
           // run_python doesn't accept an external abort and will run to
@@ -4291,7 +4467,11 @@ async function sendSingle(text) {
           try {
             result = await tools[tc.function.name].run(args, currentAbort?.signal);
           } finally {
-            if (toolBubble) toolBubble.classList.remove('in-flight');
+            if (toolBubble) {
+              toolBubble.classList.remove('in-flight');
+              stopToolTicker(toolBubble);
+              renderTcDone(toolBubble, tc.function.name);
+            }
           }
           const resultDiv = addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
           // Cap what gets fed BACK to the LLM in the next request body. A
