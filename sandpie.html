@@ -808,6 +808,32 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     text-decoration: underline;
   }
 
+  /* When tool calls/results are minimized, collapse them to a compact chip and
+     hide results entirely. In-flight tool-calls keep a small spinner so the
+     user can tell work is happening in the background. */
+  #messages.tools-minimized .tool-call {
+    padding: 0.2rem 0.55rem;
+    font-size: 11px;
+    max-width: 70%;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #messages.tools-minimized .tool-result { display: none; }
+  #messages.tools-minimized .tool-call.in-flight { opacity: 1; }
+  #messages.tools-minimized .tool-call.in-flight::after {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin-left: 6px;
+    border: 2px solid #58a6ff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    vertical-align: middle;
+    animation: sp-spin 0.8s linear infinite;
+  }
+  @keyframes sp-spin { to { transform: rotate(360deg); } }
 </style>
 <script>
 // Stray-DOM guard. Anything appended as a direct child of <body> after the
@@ -945,6 +971,12 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     <div class="context-item" onclick="editProviderFromMenu()">Edit</div>
     <div class="context-item" onclick="duplicateProviderFromMenu()">Duplicate</div>
     <div class="context-item context-delete" onclick="deleteProviderFromMenu()">Delete</div>
+  </div>
+
+  <!-- Message Bubble Context Menu -->
+  <div id="bubbleContextMenu" class="context-menu" style="display:none;">
+    <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
+    <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
   </div>
 
   <details class="service" id="cloudSection">
@@ -1252,6 +1284,9 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 let pyPromise = null;
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+// Tool-call/result bubbles minimized by default. Persisted across reloads.
+let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
+applyToolsMinimized();
 
 // ============================================================
 // Routing — picks proxy or direct based on hostname + config
@@ -3523,6 +3558,73 @@ function addMsg(role, text = '') {
   return div;
 }
 
+// === Bubble context menu (rewind + minimize tool calls) =====================
+// Bubbles are bound to their backing message via object reference (div._msg),
+// not array index — so rewind survives slices and re-renders cleanly.
+function applyToolsMinimized() {
+  const host = document.getElementById('messages');
+  if (host) host.classList.toggle('tools-minimized', toolsMinimized);
+}
+
+function bindBubble(div, msgRef) {
+  if (!div || !msgRef) return div;
+  div._msg = msgRef;
+  div.addEventListener('contextmenu', onBubbleContextMenu);
+  return div;
+}
+
+let _bubbleMenuTarget = null;
+
+function onBubbleContextMenu(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  _bubbleMenuTarget = e.currentTarget;
+  $('bubbleToggleToolsItem').textContent = toolsMinimized ? 'Show tool calls' : 'Hide tool calls';
+  const menu = $('bubbleContextMenu');
+  menu.style.display = '';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+}
+
+function hideBubbleMenu() {
+  $('bubbleContextMenu').style.display = 'none';
+  _bubbleMenuTarget = null;
+}
+
+document.addEventListener('click', hideBubbleMenu);
+
+async function rewindFromMenu() {
+  const target = _bubbleMenuTarget;
+  hideBubbleMenu();
+  if (!target || !target._msg) return;
+  const idx = messages.indexOf(target._msg);
+  if (idx < 0) return;
+  const after = messages.length - idx - 1;
+  const msg = after === 0
+    ? 'Remove this message?'
+    : `Remove this message and ${after} message(s) after it?`;
+  if (!confirm(msg)) return;
+  // Abort any in-flight stream before truncating, so the in-flight round
+  // doesn't push messages into the slot we just freed.
+  if (currentAbort) {
+    queueAborted = true;
+    currentAbort.abort();
+    messageQueue.length = 0;
+    updateQueueCount();
+  }
+  messages.length = idx;
+  clearMessagesUI();
+  for (const m of messages) renderHistoricalMessage(m);
+  await saveActiveConv();
+}
+
+function toggleToolsMinimizedFromMenu() {
+  toolsMinimized = !toolsMinimized;
+  localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
+  applyToolsMinimized();
+  hideBubbleMenu();
+}
+
 // === Total-interaction timer (covers all rounds + tool execution) ============
 // Hoisted (let, not const) — declared up here so addMsg can reference it
 // without TDZ issues during the early DOMContentLoaded path.
@@ -3598,22 +3700,25 @@ async function saveActiveConv() {
 
 function renderHistoricalMessage(m) {
   if (m.role === 'user') {
-    addMsg('user', m.content);
+    bindBubble(addMsg('user', m.content), m);
   } else if (m.role === 'assistant') {
     if (m.content) {
       const div = addMsg('assistant');
       div.innerHTML = renderMd(m.content);
+      bindBubble(div, m);
     }
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
         let args = tc.function.arguments;
         try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
-        addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+        bindBubble(tcDiv, m);
       }
     }
   } else if (m.role === 'tool') {
     const t = String(m.content || '');
-    addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
+    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
+    bindBubble(div, m);
   }
 }
 
@@ -3866,6 +3971,10 @@ function setSendingState(sending) {
     btn.classList.remove('sending');
     btn.textContent = 'Send';
     btn.disabled = false;
+    // Clear any lingering in-flight spinners (e.g. tool aborted mid-run).
+    for (const el of document.querySelectorAll('#messages .tool-call.in-flight')) {
+      el.classList.remove('in-flight');
+    }
   }
 }
 
@@ -4054,7 +4163,19 @@ async function streamRound(signal) {
   cursor.remove();
   for (const el of toolCallEls) if (el) el.textContent += ')';
   if (!content && !toolCalls.length) reply.remove();
-  return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
+  // Expose live bubble refs so the caller can bind them to the assistant
+  // message object after it's pushed into `messages[]`. Filtering toolCalls
+  // by id used to drop entries without preserving the parallel toolCallEls
+  // alignment — re-pair them here so binding is index-safe.
+  const keptToolCalls = [];
+  const keptToolCallEls = [];
+  for (let i = 0; i < toolCalls.length; i++) {
+    if (toolCalls[i] && toolCalls[i].id) {
+      keptToolCalls.push(toolCalls[i]);
+      keptToolCallEls.push(toolCallEls[i] || null);
+    }
+  }
+  return { content, toolCalls: keptToolCalls, toolCallEls: keptToolCallEls, reply, aborted };
 }
 
 // Transient upstream errors (load-balancer hiccups, brief overload, rate
@@ -4119,7 +4240,7 @@ async function sendSingle(text) {
   }
   await ensureActiveConv();
   messages.push({ role: 'user', content: text });
-  addMsg('user', text);
+  bindBubble(addMsg('user', text), messages[messages.length - 1]);
   requestWakeLock();
   setSendingState(true);
   // One total timer for the whole exchange — covers every streamRound AND
@@ -4130,30 +4251,49 @@ async function sendSingle(text) {
   try {
     while (true) {
       if (currentAbort?.signal.aborted) break;
-      const { content, toolCalls, aborted } = await streamRoundWithRetry(currentAbort?.signal);
+      const { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(currentAbort?.signal);
       if (aborted) {
         wasAborted = true;
-        if (content) messages.push({ role: 'assistant', content });
+        if (content) {
+          messages.push({ role: 'assistant', content });
+          bindBubble(reply, messages[messages.length - 1]);
+        }
         addMsg('info', 'Stopped.');
         break;
       }
       if (!toolCalls.length) {
-        if (content) messages.push({ role: 'assistant', content });
+        if (content) {
+          messages.push({ role: 'assistant', content });
+          bindBubble(reply, messages[messages.length - 1]);
+        }
         break;
       }
       messages.push({ role: 'assistant', content, tool_calls: toolCalls });
+      const asstMsg = messages[messages.length - 1];
+      bindBubble(reply, asstMsg);
+      for (const el of toolCallEls) if (el) bindBubble(el, asstMsg);
       const completed = new Set();
       try {
-        for (const tc of toolCalls) {
+        for (let i = 0; i < toolCalls.length; i++) {
+          const tc = toolCalls[i];
+          const toolBubble = toolCallEls[i];
           if (currentAbort?.signal.aborted) break;
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+          // Mark this tool-call bubble as in-flight so the minimized-view
+          // spinner shows while the tool is running.
+          if (toolBubble) toolBubble.classList.add('in-flight');
           // Pass the abort signal so Stop is responsive even when a tool is
           // mid-flight (shell fetch, fetch_file dbxDownload, etc.). pyodide's
           // run_python doesn't accept an external abort and will run to
           // completion — that's a separate, harder fix needing setInterruptBuffer.
-          const result = await tools[tc.function.name].run(args, currentAbort?.signal);
-          addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
+          let result;
+          try {
+            result = await tools[tc.function.name].run(args, currentAbort?.signal);
+          } finally {
+            if (toolBubble) toolBubble.classList.remove('in-flight');
+          }
+          const resultDiv = addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
           // Cap what gets fed BACK to the LLM in the next request body. A
           // single rogue print() or cat-of-large-file used to silently push
           // multi-MB into messages[] and then nginx would 413 the next round,
@@ -4165,6 +4305,7 @@ async function sendSingle(text) {
             addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`);
           }
           messages.push({ role: 'tool', tool_call_id: tc.id, content: capped.content });
+          bindBubble(resultDiv, messages[messages.length - 1]);
           completed.add(tc.id);
         }
       } finally {
