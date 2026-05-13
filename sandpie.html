@@ -2426,301 +2426,34 @@ function loadScript(src) {
   });
 }
 
-// One Pyodide worker per conversation = full Python isolation (separate
-// globals, imports, sys.argv, /files mount, stdout/stderr target). Heavy
-// Python runs in its own thread, so a tight CPU loop in one conv no longer
-// freezes the tab or trips Chrome's "page unresponsive" killer. Workers
-// are lazy-created on first run_python call and terminated when the conv
-// is deleted (see deleteConv).
-//
-// The worker source contains:
-//   * worker-side OPFS helpers (same async API as main; OPFS is per-origin)
-//   * pyodide bootstrap (importScripts the CDN)
-//   * syncOpfsToPy / syncPyToOpfs (port of the main-thread versions)
-//   * a `run` message handler that does setup + exec + sync + returns
-//     stdout/stderr/artifacts/filled-placeholders in a single result message
-//   * the open()/argv/IPython.display Python monkey-patches inline
-const PYODIDE_WORKER_SOURCE = `
-let py = null;
-let initPromise = null;
-
-// ---- worker-side OPFS helpers ----
-async function opfsRoot() { return navigator.storage.getDirectory(); }
-function splitPath(path) {
-  const parts = String(path).split('/').filter(Boolean);
-  const name = parts.pop();
-  return { parts, name };
-}
-async function opfsResolveDir(parts, create) {
-  let dir = await opfsRoot();
-  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
-  return dir;
-}
-async function opfsList(prefix) {
-  prefix = prefix || '';
-  const out = [];
-  const walk = async (dir, p) => {
-    for await (const [n, h] of dir.entries()) {
-      const full = p ? p + '/' + n : n;
-      // Skip the chats-store directory — same skip the main-thread sync uses.
-      if (full === '_conversations' || full.startsWith('_conversations/')) continue;
-      if (h.kind === 'file') out.push(full);
-      else await walk(h, full);
-    }
-  };
-  const start = prefix ? await opfsResolveDir(prefix.split('/').filter(Boolean)) : await opfsRoot();
-  await walk(start, prefix.replace(/^\\/+|\\/+$/g, ''));
-  return out.sort();
-}
-async function opfsReadBytes(path) {
-  const { parts, name } = splitPath(path);
-  const dir = await opfsResolveDir(parts);
-  const handle = await dir.getFileHandle(name);
-  return new Uint8Array(await (await handle.getFile()).arrayBuffer());
-}
-async function opfsWriteBytes(path, bytes) {
-  const { parts, name } = splitPath(path);
-  const dir = await opfsResolveDir(parts, true);
-  const handle = await dir.getFileHandle(name, { create: true });
-  const w = await handle.createWritable();
-  await w.write(bytes);
-  await w.close();
-}
-
-async function init() {
-  if (py) return py;
-  if (initPromise) return initPromise;
-  initPromise = (async () => {
-    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
-    try { py.FS.mkdir('/files'); } catch (_) {}
-    return py;
+async function getPy() {
+  if (pyPromise) return pyPromise;
+  pyPromise = (async () => {
+    await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    try { p.FS.mkdir('/files'); } catch {}
+    return p;
   })();
-  return initPromise;
+  return pyPromise;
 }
 
-async function syncOpfsToPy(p, placeholdersList) {
-  const rmTree = (full) => {
-    let stat;
-    try { stat = p.FS.stat(full); } catch (_) { return; }
-    if (p.FS.isDir(stat.mode)) {
-      for (const name of p.FS.readdir(full)) {
-        if (name === '.' || name === '..') continue;
-        rmTree(full + '/' + name);
-      }
-      if (full !== '/files') p.FS.rmdir(full);
-    } else {
-      p.FS.unlink(full);
-    }
-  };
-  rmTree('/files');
-  try { p.FS.mkdir('/files'); } catch (_) {}
-  const files = await opfsList();
-  const hydrated = new Set(files);
-  const ensureDirs = (segs) => {
-    let cur = '/files';
-    for (const s of segs) {
-      cur += '/' + s;
-      try { p.FS.mkdir(cur); } catch (_) {}
-    }
-    return cur;
-  };
-  for (const rel of files) {
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    p.FS.writeFile(dir + '/' + fn, await opfsReadBytes(rel));
-  }
-  const placeholders = new Set();
-  for (const rel of (placeholdersList || [])) {
-    if (hydrated.has(rel)) continue;
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    try {
-      p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
-      placeholders.add(rel);
-    } catch (_) {}
-  }
-  return placeholders;
+// Pyodide is one shared interpreter (single set of Python globals, single
+// sys.stdout/stderr redirection target). Without serialization, two convs
+// that both kick off run_python concurrently would race: stdout buffers
+// would cross-contaminate, the open()/argv monkey-patches would step on
+// each other, and any in-flight async Python could observe globals from
+// the other conv's setup. The mutex serializes the *entire* per-call
+// setup + execution + sync block, so each run_python looks atomic from
+// the LLM's perspective. LLM completions still run in parallel via the
+// worker — only the Python execution itself queues.
+let _pyMutex = Promise.resolve();
+function pyRunAtomic(taskFn) {
+  const next = _pyMutex.then(taskFn, taskFn);
+  // Don't let a thrown task poison the chain — downstream waiters should
+  // still get a turn; we only care that they wait their turn.
+  _pyMutex = next.then(() => {}, () => {});
+  return next;
 }
-
-function bytesEqual(a, b) {
-  if (!a || !b || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-async function syncPyToOpfs(p, placeholders) {
-  const pyFiles = new Set();
-  const walk = (full, rel) => {
-    for (const name of p.FS.readdir(full)) {
-      if (name === '.' || name === '..') continue;
-      const childFull = full + '/' + name;
-      const childRel = rel ? rel + '/' + name : name;
-      const stat = p.FS.stat(childFull);
-      if (p.FS.isFile(stat.mode)) pyFiles.add(childRel);
-      else walk(childFull, childRel);
-    }
-  };
-  walk('/files', '');
-  const filled = [];
-  const written = [];
-  for (const rel of pyFiles) {
-    const newBytes = p.FS.readFile('/files/' + rel);
-    if (placeholders.has(rel) && newBytes.length === 0) continue;
-    let oldBytes = null;
-    try { oldBytes = await opfsReadBytes(rel); } catch (_) {}
-    if (oldBytes && bytesEqual(oldBytes, newBytes)) continue;
-    await opfsWriteBytes(rel, newBytes);
-    written.push(rel);
-    if (placeholders.has(rel)) filled.push(rel);
-  }
-  return { filled, written };
-}
-
-const OPEN_PATCH = \`
-import builtins, os
-if getattr(builtins.open, '__name__', None) == '_sandpie_open':
-    if hasattr(builtins, '_original_open'):
-        builtins.open = builtins._original_open
-if hasattr(builtins, '_original_open'):
-    _real_open = builtins._original_open
-else:
-    _real_open = builtins.open
-    builtins._original_open = _real_open
-try:
-    from js import _sandpie_cloud_paths
-    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
-except Exception:
-    _sandpie_cloud_set = set()
-def _sandpie_normalize(path):
-    s = str(path)
-    if s.startswith('/files/'): s = s[len('/files/'):]
-    while s.startswith('./'): s = s[2:]
-    return s.lstrip('/')
-def _sandpie_open(path, *args, **kwargs):
-    n = _sandpie_normalize(path)
-    if n in _sandpie_cloud_set:
-        raise FileNotFoundError(
-            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
-            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
-            f"If you meant a host path (outside /files/), use the read_file tool instead."
-        )
-    return _real_open(path, *args, **kwargs)
-builtins.open = _sandpie_open
-\`;
-
-const DISPLAY_PATCH = \`
-def _sandpie_display(*objs, **kwargs):
-    import base64
-    try:
-        import js
-    except Exception:
-        return
-    for obj in objs:
-        html = None
-        try:
-            if hasattr(obj, '_repr_html_'):
-                html = obj._repr_html_()
-            if html is None and hasattr(obj, '_repr_svg_'):
-                html = obj._repr_svg_()
-            if html is None and hasattr(obj, '_repr_png_'):
-                d = obj._repr_png_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/png;base64,' + d + '">'
-            if html is None and hasattr(obj, '_repr_jpeg_'):
-                d = obj._repr_jpeg_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/jpeg;base64,' + d + '">'
-        except Exception as e:
-            html = '<pre>display error: ' + str(e) + '</pre>'
-        if html is None:
-            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html = '<pre>' + s + '</pre>'
-        try:
-            js._sandpieDisplay(html)
-        except Exception:
-            pass
-try:
-    import IPython.display as _ipd
-    _ipd.display = _sandpie_display
-except Exception:
-    pass
-\`;
-
-self.addEventListener('message', async (e) => {
-  const m = e.data;
-  if (m.type !== 'run') return;
-  let stdout = '', stderr = '';
-  const artifacts = [];
-  let p = null;
-  try {
-    p = await init();
-    p.setStdout({ batched: s => stdout += s + '\\n' });
-    p.setStderr({ batched: s => stderr += s + '\\n' });
-    const placeholders = await syncOpfsToPy(p, m.placeholdersList);
-    p.runPython('import os; os.chdir(\"/files\")');
-    self._sandpie_cloud_paths = [...placeholders];
-    try { p.runPython(OPEN_PATCH); } catch (_) {}
-    if (m.argv) {
-      self._sandpie_argv = m.argv;
-      try { p.runPython('import sys\\nfrom js import _sandpie_argv\\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
-    }
-    self._sandpieDisplay = (html) => artifacts.push(html);
-    try { p.runPython(DISPLAY_PATCH); } catch (_) {}
-    try { await p.loadPackagesFromImports(m.code); } catch (_) {}
-    await p.runPythonAsync(m.code);
-    const sync = await syncPyToOpfs(p, placeholders);
-    let out = stdout.trimEnd();
-    if (stderr.trim()) out += (out ? '\\n' : '') + '--- stderr ---\\n' + stderr.trimEnd();
-    if (artifacts.length) {
-      const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
-      out = out ? out + '\\n' + note : note;
-    }
-    self.postMessage({ type: 'result', requestId: m.requestId, result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written });
-  } catch (e) {
-    let msg = '';
-    if (e != null) {
-      if (typeof e === 'string') msg = e;
-      else if (e.message) msg = e.message;
-      else {
-        try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
-        if (!msg) { try { msg = JSON.stringify(e, Object.getOwnPropertyNames(Object(e))); if (msg === '{}') msg = ''; } catch (_) {} }
-      }
-    }
-    const tail = stderr.trim() ? '\\n--- stderr ---\\n' + stderr.trimEnd() : '';
-    if (!msg && !stderr.trim()) {
-      self.postMessage({ type: 'fatal', requestId: m.requestId, artifacts });
-      return;
-    }
-    self.postMessage({ type: 'error', requestId: m.requestId, message: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts });
-  } finally {
-    if (p) { try { p.setStdout({}); } catch (_) {} try { p.setStderr({}); } catch (_) {} }
-  }
-});
-`;
-
-// Lazy per-conv worker handle. Created the first time a conv's run_python is
-// invoked; terminated when the conv is deleted (deleteConv handles that).
-function getPyWorker(stream) {
-  if (stream.pyWorker) return stream.pyWorker;
-  const blob = new Blob([PYODIDE_WORKER_SOURCE], { type: 'application/javascript' });
-  const w = new Worker(URL.createObjectURL(blob));
-  w._pending = new Map(); // requestId -> { resolve }
-  w.addEventListener('message', (e) => {
-    const m = e.data;
-    const pending = w._pending.get(m.requestId);
-    if (!pending) return;
-    w._pending.delete(m.requestId);
-    pending.resolve(m);
-  });
-  stream.pyWorker = w;
-  return w;
-}
-let _pyReqId = 0;
 
 // Wipe Pyodide's /files dir, copy the entire OPFS tree into it (with subdirs).
 async function syncOpfsToPy(p) {
@@ -5345,7 +5078,6 @@ async function sendSingle(text, stream) {
   }
 
   if (reduceMotion) {
-    // Single static mesh, no shimmer, no rebuild loop.
     const host = document.createElementNS(NS, 'g');
     host.setAttribute('clip-path', 'url(#welcome-clip)');
     svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
