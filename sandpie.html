@@ -2008,6 +2008,7 @@ async function cloudListAll() {
 }
 
 let _syncing = false;
+let _openFilePath = null;  // file currently open in viewer — skip sync for this path
 
 // Single sync entry point. Called on connect, on the Resync button, on a
 // 60s background tick (when foregrounded), and at conversation end.
@@ -2084,6 +2085,8 @@ async function sync() {
       const cloudChanged = s.rev !== e.rev;
       const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
 
+      if (path === _openFilePath) continue;  // skip pull for file open in viewer
+
       if (cloudChanged && localDirty) continue;  // last-write-wins → push phase
 
       if (cloudChanged) {
@@ -2115,6 +2118,7 @@ async function sync() {
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
     for (const rel of opfsRels) {
+      if (rel === _openFilePath) continue;  // skip push for file open in viewer
       const lm = await opfsLastModified(rel);
       const s = state[rel];
       if (s && s.hydrated && lm <= s.syncedMtime) continue;
@@ -3131,6 +3135,7 @@ const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
 const TEXT_PREVIEW_CAP = 200_000; // chars
 
 function closeFileViewer() {
+  _openFilePath = null;
   document.querySelectorAll('.file-viewer').forEach(el => {
     const url = el.dataset.blobUrl;
     if (url) URL.revokeObjectURL(url);
@@ -3166,6 +3171,7 @@ async function openFileViewer(fullKey, name) {
     return;
   }
 
+  _openFilePath = fullKey;
   const ext = (name.split('.').pop() || '').toLowerCase();
   const overlay = document.createElement('div');
   overlay.className = 'file-viewer';
