@@ -828,10 +828,12 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
   #messages.tools-minimized .tool-call {
+    display: flex;
+    align-items: center;
     padding: 0.5rem 0.8rem;
     font-size: 12px;
     line-height: 1.5;
-    min-height: 28px;
+    min-height: 30px;
     max-width: 88%;
     background: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0.14));
     border: 1px solid rgba(88,166,255,0.35);
@@ -1091,7 +1093,36 @@ const $ = id => document.getElementById(id);
 
 const VERSION = '1.0.0';
 
-const messages = [];
+// Active-conversation message array. Reassigned (not mutated in place) when
+// the user switches conversations — so any in-flight stream that captured the
+// previous reference keeps pushing to its own conversation's array instead of
+// contaminating whichever conv is now visible. See convStreams below.
+let messages = [];
+// Per-conversation stream state. Each conv the user has touched in this
+// session gets an entry. Holds the conv's messages array, its bubble host
+// (DOM div mounted under #messages only while the conv is active), and the
+// per-stream queue/abort/timer so a background stream can finish writing
+// into its own conv without leaking into another one.
+const convStreams = new Map();
+function ensureStream(id) {
+  let s = convStreams.get(id);
+  if (!s) {
+    const host = document.createElement('div');
+    host.className = 'conv-host';
+    host.dataset.convId = id;
+    s = {
+      id, host,
+      messages: [],
+      queue: [], isProcessing: false, queueAborted: false,
+      abort: null,
+      timerEl: null, timerStart: 0, timerInterval: null,
+      generating: false,
+    };
+    convStreams.set(id, s);
+  }
+  return s;
+}
+function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
 // Provider system with backward compat migration
 const PROVIDERS_KEY = 'sandpie-providers';
 const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
@@ -3498,13 +3529,17 @@ refreshFileList();
 (async () => {
   await refreshConversationList();
   if (activeConvId) {
+    // Bootstrap the active conv as a stream record so all the conv-switching
+    // / parking machinery has a consistent in-memory state to swap against.
+    const restoreId = activeConvId;
+    activeConvId = null; // mountConv expects no parked active during init
+    const s = ensureStream(restoreId);
     try {
-      const data = JSON.parse(await opfs.read(convPath(activeConvId)));
-      for (const m of data.messages || []) {
-        messages.push(m);
-        renderHistoricalMessage(m);
-      }
+      const data = JSON.parse(await opfs.read(convPath(restoreId)));
+      s.messages = (data.messages || []).slice();
     } catch { /* file may not exist yet — that's fine */ }
+    mountConv(restoreId);
+    for (const m of s.messages) renderHistoricalMessage(m);
   }
   refreshTokenMeter();
   updateVersionDisplay();
@@ -3558,10 +3593,12 @@ function releaseWakeLock() {
   }
 }
 
-// Re-acquire wake lock when user returns to tab during generation
+// Re-acquire wake lock when user returns to tab and any conversation is
+// still generating in the background.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && currentAbort) {
-    requestWakeLock();
+  if (document.hidden) return;
+  for (const s of convStreams.values()) {
+    if (s.generating) { requestWakeLock(); break; }
   }
 });
 
@@ -3596,9 +3633,15 @@ function humanBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function addMsg(role, text = '') {
+function addMsg(role, text = '', host = null) {
+  // Default target = active conv's host so bubbles created from arbitrary
+  // callsites land in the conversation the user is currently viewing.
+  // Stream code passes its captured host explicitly so background streams
+  // route into their own (possibly parked / off-DOM) conversation host.
+  const target = host || (activeStream() && activeStream().host) || $('messages');
   const m = $('messages');
-  const stick = isAtBottom(m);
+  const visible = target === m || target.parentNode === m;
+  const stick = visible ? isAtBottom(m) : false;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
@@ -3614,14 +3657,12 @@ function addMsg(role, text = '') {
   } else {
     div.textContent = text;
   }
-  m.appendChild(div);
-  // Keep the active total timer pinned to the bottom of the transcript —
-  // tool-call / tool-result / info rows shouldn't shove the live ticker
-  // into the middle of the conversation.
-  if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
-  // Only auto-scroll if the user was already near the bottom — otherwise leave
-  // them where they are so they can read history without getting yanked back.
-  if (stick) m.scrollTop = m.scrollHeight;
+  target.appendChild(div);
+  // Keep the host's own total timer (if any) pinned to the bottom of its
+  // bubbles — works whether the host is mounted or parked off-DOM.
+  const timer = target.querySelector(':scope > .msg-timer');
+  if (timer) target.appendChild(timer);
+  if (visible && stick) m.scrollTop = m.scrollHeight;
   return div;
 }
 
@@ -3671,16 +3712,16 @@ async function rewindFromMenu() {
     ? 'Remove this message?'
     : `Remove this message and ${after} message(s) after it?`;
   if (!confirm(msg)) return;
-  // Abort any in-flight stream before truncating, so the in-flight round
-  // doesn't push messages into the slot we just freed.
-  if (currentAbort) {
-    queueAborted = true;
-    currentAbort.abort();
-    messageQueue.length = 0;
-    updateQueueCount();
+  // Abort any in-flight stream for the active conv before truncating, so the
+  // in-flight round doesn't push messages into the slot we just freed.
+  const s = activeStream();
+  if (s) {
+    if (s.abort) { s.queueAborted = true; s.abort.abort(); }
+    s.queue.length = 0;
+    updateQueueCount(s);
   }
   messages.length = idx;
-  clearMessagesUI();
+  clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
   await saveActiveConv();
 }
@@ -3804,40 +3845,38 @@ function stopToolTicker(div) {
 }
 
 // === Total-interaction timer (covers all rounds + tool execution) ============
-// Hoisted (let, not const) — declared up here so addMsg can reference it
-// without TDZ issues during the early DOMContentLoaded path.
-let activeTimerEl = null;
-let activeTimerStart = 0;
-let activeTimerInterval = null;
-
-function startTotalTimer() {
-  if (activeTimerEl) return;
-  activeTimerStart = Date.now();
-  activeTimerEl = document.createElement('div');
-  activeTimerEl.className = 'msg-timer';
-  activeTimerEl.innerHTML = '0s' + (messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '');
-  $('messages').appendChild(activeTimerEl);
-  activeTimerInterval = setInterval(() => {
-    if (!activeTimerEl) return;
-    const sec = Math.floor((Date.now() - activeTimerStart) / 1000);
-    const queueBadge = messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '';
-    activeTimerEl.innerHTML = `${sec}s${queueBadge}`;
+// Per-stream: each conversation's timer lives on its stream record so a
+// background conv keeps ticking against its own bubble host without colliding
+// with whichever conv is currently visible.
+function startTotalTimer(stream) {
+  if (!stream || stream.timerEl) return;
+  stream.timerStart = Date.now();
+  const el = document.createElement('div');
+  el.className = 'msg-timer';
+  el.innerHTML = '0s' + (stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '');
+  stream.host.appendChild(el);
+  stream.timerEl = el;
+  stream.timerInterval = setInterval(() => {
+    if (!stream.timerEl) return;
+    const sec = Math.floor((Date.now() - stream.timerStart) / 1000);
+    const queueBadge = stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '';
+    stream.timerEl.innerHTML = `${sec}s${queueBadge}`;
   }, 1000);
 }
 
-function endTotalTimer(label) {
-  if (!activeTimerEl) return;
-  clearInterval(activeTimerInterval);
-  activeTimerInterval = null;
+function endTotalTimer(stream, label) {
+  if (!stream || !stream.timerEl) return;
+  clearInterval(stream.timerInterval);
+  stream.timerInterval = null;
   if (label === null) {
-    activeTimerEl.remove();
+    stream.timerEl.remove();
   } else {
-    const sec = (Date.now() - activeTimerStart) / 1000;
+    const sec = (Date.now() - stream.timerStart) / 1000;
     const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
-    activeTimerEl.textContent = `${label} · ${fmt}`;
-    activeTimerEl.classList.add('done');
+    stream.timerEl.textContent = `${label} · ${fmt}`;
+    stream.timerEl.classList.add('done');
   }
-  activeTimerEl = null;
+  stream.timerEl = null;
 }
 
 // ============================================================
@@ -3857,22 +3896,30 @@ async function ensureActiveConv() {
   localStorage.setItem('sandpie-active-conv', activeConvId);
 }
 
-async function saveActiveConv() {
-  if (!activeConvId || !messages.length) return;
+async function saveActiveConv() { return saveConv(activeConvId); }
+
+// Save a specific conversation's stream state to disk. Used by background
+// streams so a save reaches the conv that actually generated the messages,
+// even if the user has since switched to a different conv.
+async function saveConv(convId) {
+  if (!convId) return;
+  const s = convStreams.get(convId);
+  const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
+  if (!msgs || !msgs.length) return;
   // Read existing file to preserve user-set flags (pinned/archived/titleLocked).
   let prev = {};
-  try { prev = JSON.parse(await opfs.read(convPath(activeConvId))); } catch {}
-  const firstUser = messages.find(m => m.role === 'user');
+  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
+  const firstUser = msgs.find(m => m.role === 'user');
   const derived = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
   const title = (prev.titleLocked && prev.title) ? prev.title : derived;
   const data = {
     ...prev,
-    id: activeConvId,
+    id: convId,
     title,
     updated: new Date().toISOString(),
-    messages,
+    messages: msgs,
   };
-  await opfs.write(convPath(activeConvId), JSON.stringify(data));
+  await opfs.write(convPath(convId), JSON.stringify(data));
   await refreshConversationList();
 }
 
@@ -3880,7 +3927,7 @@ function renderHistoricalMessage(m) {
   if (m.role === 'user') {
     bindBubble(addMsg('user', m.content), m);
   } else if (m.role === 'assistant') {
-    if (m.content) {
+    if (m.content && m.content.trim()) {
       const div = addMsg('assistant');
       div.innerHTML = renderMd(m.content);
       bindBubble(div, m);
@@ -3902,47 +3949,83 @@ function renderHistoricalMessage(m) {
   }
 }
 
-function clearMessagesUI() {
-  // Remove message bubbles, tool calls, info/err messages — but preserve the
-  // #welcome card so it can be re-shown for fresh conversations.
-  const host = $('messages');
-  for (const child of [...host.children]) {
-    if (child.id !== 'welcome') child.remove();
+function clearActiveConvUI() {
+  // Wipe the active conv's bubble host children. The host itself stays
+  // mounted under #messages; #welcome (a sibling of the host) is untouched.
+  const s = activeStream();
+  if (s && s.host) s.host.innerHTML = '';
+}
+
+// Park the currently active conv: detach its host from #messages. Module
+// `messages` keeps pointing at the parked conv's array until mountConv runs.
+function parkActiveConv() {
+  const s = activeStream();
+  if (!s) return;
+  s.messages = messages;
+  if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
+}
+
+// Mount a conv as the active one: rebind module-level `messages`, attach its
+// host to #messages, update the send button to reflect this conv's state.
+function mountConv(convId) {
+  activeConvId = convId;
+  if (convId) {
+    localStorage.setItem('sandpie-active-conv', convId);
+    const s = ensureStream(convId);
+    messages = s.messages;
+    const m = $('messages');
+    if (s.host.parentNode !== m) m.appendChild(s.host);
+  } else {
+    localStorage.removeItem('sandpie-active-conv');
+    messages = [];
   }
+  refreshSendButtonForActive();
 }
 
 async function loadConv(id) {
-  if (id === activeConvId && messages.length) return;
-  let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); }
-  catch (e) { addMsg('err', 'Failed to load conversation: ' + e.message); return; }
-  messages.length = 0;
-  clearMessagesUI();
-  for (const m of data.messages || []) {
-    messages.push(m);
-    renderHistoricalMessage(m);
+  if (id === activeConvId) return;
+  // Snapshot whichever conv we're leaving — its bubbles + state persist
+  // unmounted so any in-flight stream keeps writing into them safely.
+  parkActiveConv();
+  if (convStreams.has(id)) {
+    // Already in-memory (currently generating, or previously loaded this
+    // session). Re-mount its host: no disk read, no re-render.
+    mountConv(id);
+  } else {
+    // First time looking at this conv this session — pull from disk into a
+    // fresh stream record and render bubbles into its host.
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) {
+      if (activeConvId) mountConv(activeConvId);
+      addMsg('err', 'Failed to load conversation: ' + e.message);
+      return;
+    }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    mountConv(id);
+    for (const m of s.messages) renderHistoricalMessage(m);
   }
-  activeConvId = id;
-  localStorage.setItem('sandpie-active-conv', id);
   await refreshConversationList();
   refreshTokenMeter();
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
-  const m = $('messages');
-  m.scrollTop = m.scrollHeight;
+  const mEl = $('messages');
+  mEl.scrollTop = mEl.scrollHeight;
+  refreshWelcome();
 }
 
 async function newConversation() {
   await saveActiveConv();
-  activeConvId = newConvId();
-  localStorage.setItem('sandpie-active-conv', activeConvId);
-  messages.length = 0;
-  clearMessagesUI();
+  parkActiveConv();
+  const id = newConvId();
+  ensureStream(id);
+  mountConv(id);
   await refreshConversationList();
   refreshTokenMeter();
   updateVersionDisplay();
-refreshWelcome();
+  refreshWelcome();
 }
 
 async function listConversations() {
@@ -4048,17 +4131,25 @@ async function deleteConv(id, title) {
     try { await dbxDelete('/' + path); } catch {}
   }
   const lk = path.toLowerCase();
-  const s = syncState(); let sChanged = false;
-  for (const k of Object.keys(s)) if (k.toLowerCase() === lk) { delete s[k]; sChanged = true; }
-  if (sChanged) setSyncState(s);
+  const sync = syncState(); let sChanged = false;
+  for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
+  if (sChanged) setSyncState(sync);
+  // Tear down any in-memory stream record + parked bubbles for the deleted conv.
+  const stream = convStreams.get(id);
+  if (stream) {
+    if (stream.abort) stream.abort.abort();
+    if (stream.timerInterval) clearInterval(stream.timerInterval);
+    if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
+    convStreams.delete(id);
+  }
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
-    messages.length = 0;
-    clearMessagesUI();
+    messages = [];
+    refreshSendButtonForActive();
     refreshTokenMeter();
     updateVersionDisplay();
-refreshWelcome();
+    refreshWelcome();
   }
   await refreshConversationList();
 }
@@ -4073,6 +4164,16 @@ function buildConvLi(c) {
   span.title = c.updated || '';
   span.onclick = () => loadConv(c.id);
   li.appendChild(span);
+  // Background-generating indicator: pulsing blue dot to the right of the
+  // title while this conv has an in-flight LLM round (even if the user has
+  // navigated to a different conv). Disappears the moment the stream ends.
+  const stream = convStreams.get(c.id);
+  if (stream && stream.generating) {
+    const dot = document.createElement('span');
+    dot.className = 'gen-dot';
+    dot.title = 'Still generating…';
+    li.appendChild(dot);
+  }
   li.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
     showContextMenu(ev.clientX, ev.clientY, [
@@ -4130,46 +4231,58 @@ async function refreshConversationList() {
   ul.replaceChildren(frag);
 }
 
-// Tracks the in-flight LLM round so the user can interrupt mid-stream.
-// While non-null, the Send button shows "Stop" (red) and submitting aborts.
-let currentAbort = null;
+// Per-stream abort/queue state. The Send button reflects whichever
+// conversation is currently visible (active stream). A background stream
+// for a parked conv keeps running and writes only to its own state.
 let wakeLock = null;
-const messageQueue = [];
-let isProcessingQueue = false;
-let queueAborted = false;
 
-function setSendingState(sending) {
+// Sync the visible Send button to the active conv's stream.
+function refreshSendButtonForActive() {
   const btn = $('sendBtn');
-  if (sending) {
-    currentAbort = new AbortController();
-    queueAborted = false;
+  if (!btn) return;
+  const s = activeStream();
+  if (s && s.generating) {
     btn.textContent = 'Stop';
     btn.classList.add('sending');
     btn.disabled = false;
   } else {
-    currentAbort = null;
-    btn.classList.remove('sending');
     btn.textContent = 'Send';
+    btn.classList.remove('sending');
     btn.disabled = false;
-    // Clear any lingering in-flight spinners (e.g. tool aborted mid-run) and
-    // stop their tickers so the rotating flavor + token counter doesn't keep
-    // running invisibly in the background.
-    for (const el of document.querySelectorAll('#messages .tool-call.in-flight')) {
+  }
+}
+
+// Toggle generating flag and visuals for a specific stream. Updates the
+// send button only if this stream belongs to the currently active conv.
+function setStreamSending(stream, sending) {
+  if (!stream) return;
+  if (sending) {
+    stream.abort = new AbortController();
+    stream.queueAborted = false;
+    stream.generating = true;
+  } else {
+    stream.abort = null;
+    stream.generating = false;
+    // Clear any lingering in-flight tool spinners scoped to this stream's
+    // bubble host (so a tool aborted mid-run doesn't keep ticking invisibly).
+    for (const el of stream.host.querySelectorAll('.tool-call.in-flight')) {
       el.classList.remove('in-flight');
       stopToolTicker(el);
       renderTcDone(el, el.dataset.fname);
     }
   }
+  if (stream === activeStream()) refreshSendButtonForActive();
+  // Conv-list spinner indicator follows the generating flag.
+  refreshConversationList();
 }
 
 function handleSubmit() {
   const text = $('input').value.trim();
   if (!text) return;
-  messageQueue.push(text);
   $('input').value = '';
   const m = $('messages');
   m.scrollTop = m.scrollHeight;
-  processQueue();
+  enqueueForActive(text);
   // Reset textarea height after clearing value
   const ta = $('input');
   if (ta) {
@@ -4177,52 +4290,68 @@ function handleSubmit() {
   }
 }
 
+// Push a message into the currently visible conv's queue and start processing.
+async function enqueueForActive(text) {
+  await ensureActiveConv();
+  const s = ensureStream(activeConvId);
+  s.queue.push(text);
+  updateQueueCount(s);
+  processQueueFor(s);
+}
+
 function handleButtonClick() {
   const btn = $('sendBtn');
-  if (btn.classList.contains('sending')) {
-    // Stop
-    queueAborted = true;
-    if (currentAbort) currentAbort.abort();
-    messageQueue.length = 0;
-    updateQueueCount();
+  const s = activeStream();
+  if (btn.classList.contains('sending') && s) {
+    // Stop the active stream. Other conv streams keep running.
+    s.queueAborted = true;
+    if (s.abort) s.abort.abort();
+    s.queue.length = 0;
+    updateQueueCount(s);
   } else {
-    // Send
     handleSubmit();
   }
 }
 
-function updateQueueCount() {
-  // Update timer badge if timer is active
-  if (activeTimerEl) {
-    const sec = Math.floor((Date.now() - activeTimerStart) / 1000);
-    const queueBadge = messageQueue.length > 0 ? ` <span class="queue-pill">${messageQueue.length} queued</span>` : '';
-    activeTimerEl.innerHTML = `${sec}s${queueBadge}`;
-  }
+function updateQueueCount(stream) {
+  // Update the timer badge for the given stream (default = active).
+  const s = stream || activeStream();
+  if (!s || !s.timerEl) return;
+  const sec = Math.floor((Date.now() - s.timerStart) / 1000);
+  const queueBadge = s.queue.length > 0 ? ` <span class="queue-pill">${s.queue.length} queued</span>` : '';
+  s.timerEl.innerHTML = `${sec}s${queueBadge}`;
 }
 
-async function processQueue() {
-  if (isProcessingQueue || messageQueue.length === 0) return;
-  isProcessingQueue = true;
-  queueAborted = false;
-  updateQueueCount();
+async function processQueueFor(stream) {
+  if (!stream || stream.isProcessing || stream.queue.length === 0) return;
+  stream.isProcessing = true;
+  stream.queueAborted = false;
+  updateQueueCount(stream);
 
-  while (messageQueue.length > 0) {
-    const text = messageQueue.shift();
-    updateQueueCount();
-    await sendSingle(text);
-    if (queueAborted) break;
+  while (stream.queue.length > 0) {
+    const text = stream.queue.shift();
+    updateQueueCount(stream);
+    await sendSingle(text, stream);
+    if (stream.queueAborted) break;
   }
 
-  isProcessingQueue = false;
-  updateQueueCount();
+  stream.isProcessing = false;
+  updateQueueCount(stream);
 }
 
-async function streamRound(signal) {
+async function streamRound(signal, stream) {
+  // Capture the stream's host + messages array up-front so we keep writing
+  // into THIS conversation even if the user navigates to a different one
+  // mid-stream. The captured `host` may be detached from #messages (parked),
+  // but DOM mutations on a detached subtree are perfectly valid — they just
+  // aren't visible until the host is re-mounted.
+  const host = stream.host;
+  const convMessages = stream.messages;
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = api(endpoint + '/chat/completions');
-  const body = { model: $('model').value, messages: [buildSystemPrompt(), ...messages], stream: true, tools: toolDefs() };
+  const body = { model: $('model').value, messages: [buildSystemPrompt(), ...convMessages], stream: true, tools: toolDefs() };
 
-  const reply = addMsg('assistant');
+  const reply = addMsg('assistant', '', host);
   const cursor = document.createElement('span');
   cursor.className = 'cursor';
   reply.appendChild(cursor);
@@ -4238,9 +4367,10 @@ async function streamRound(signal) {
   const drain = new Promise(resolve => {
     const tick = () => {
       const m = $('messages');
-      // Capture intent BEFORE we mutate so the new content doesn't shift the
-      // measurement: if user was at bottom, follow; if scrolled up, hold.
-      const stick = isAtBottom(m);
+      // Only manipulate scroll if this stream's host is currently mounted
+      // (i.e. the user is viewing the conv this stream belongs to).
+      const visible = host.parentNode === m;
+      const stick = visible ? isAtBottom(m) : false;
       let work = false;
 
       if (pending.length > 0) {
@@ -4267,8 +4397,8 @@ async function streamRound(signal) {
         if (streamDone) return resolve();
         return setTimeout(tick, 16);
       }
-      if (activeTimerEl && activeTimerEl.parentNode === m) m.appendChild(activeTimerEl);
-      if (stick) m.scrollTop = m.scrollHeight;
+      if (stream.timerEl && stream.timerEl.parentNode === host) host.appendChild(stream.timerEl);
+      if (visible && stick) m.scrollTop = m.scrollHeight;
       setTimeout(tick, 16);
     };
     tick();
@@ -4288,7 +4418,7 @@ async function streamRound(signal) {
         if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
         if (toolCalls[i].function.name) {
           if (!toolCallEls[i]) {
-            toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`);
+            toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`, host);
             toolCallEls[i].dataset.fname = toolCalls[i].function.name;
             renderTcPreparing(toolCallEls[i], toolCalls[i].function.name);
             toolDisplayed[i] = '';
@@ -4349,9 +4479,10 @@ async function streamRound(signal) {
   cursor.remove();
   for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
   // Remove the assistant bubble whenever no visible text streamed — even if
-  // tool_calls came through. A bubble with only a (now-removed) cursor is
-  // visual noise and the tool-call chips already mark the assistant's turn.
-  if (!content) reply.remove();
+  // tool_calls came through, and even if only whitespace arrived. A bubble
+  // with no real text is visual noise; the tool-call chips already mark
+  // the assistant's turn.
+  if (!content || !content.trim()) reply.remove();
   // Expose live bubble refs so the caller can bind them to the assistant
   // message object after it's pushed into `messages[]`. Filtering toolCalls
   // by id used to drop entries without preserving the parallel toolCallEls
@@ -4389,7 +4520,7 @@ function sleep(ms, signal) {
   });
 }
 
-async function streamRoundWithRetry(signal) {
+async function streamRoundWithRetry(signal, stream) {
   // Retry indefinitely on transient errors — the user's stop button (which
   // aborts `signal`) is the exit path. Backoff ramps up then caps at 10s.
   const BACKOFF_MS = [1000, 2500, 5000, 10000];
@@ -4398,12 +4529,12 @@ async function streamRoundWithRetry(signal) {
   try {
     while (true) {
       try {
-        const result = await streamRound(signal);
+        const result = await streamRound(signal, stream);
         return result;
       } catch (e) {
         if (signal?.aborted) throw e;
         if (!isRetryableError(e)) throw e;
-        if (!notice) notice = addMsg('info', '');
+        if (!notice) notice = addMsg('info', '', stream.host);
         notice.textContent = `AI provider issues detected, retrying (attempt ${attempt + 1})…`;
         await sleep(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)], signal);
         attempt++;
@@ -4414,51 +4545,48 @@ async function streamRoundWithRetry(signal) {
   }
 }
 
-async function send() {
-  const text = $('input').value.trim();
-  if (!text) return;
-  messageQueue.push(text);
-  $('input').value = '';
-  processQueue();
-}
-
-async function sendSingle(text) {
+async function sendSingle(text, stream) {
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Fill in endpoint, model, and API key.');
+    addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  await ensureActiveConv();
-  messages.push({ role: 'user', content: text });
-  bindBubble(addMsg('user', text), messages[messages.length - 1]);
+  // Capture per-stream state up-front. All bubble inserts, message pushes,
+  // and abort/timer reads use these locals so a conv-switch mid-stream
+  // doesn't redirect writes into the now-visible conversation.
+  const convId = stream.id;
+  const convMessages = stream.messages;
+  const host = stream.host;
+  convMessages.push({ role: 'user', content: text });
+  bindBubble(addMsg('user', text, host), convMessages[convMessages.length - 1]);
   requestWakeLock();
-  setSendingState(true);
+  setStreamSending(stream, true);
   // One total timer for the whole exchange — covers every streamRound AND
   // every tool execution between rounds. Settled in the finally block.
-  startTotalTimer();
+  startTotalTimer(stream);
   let wasAborted = false;
 
   try {
     while (true) {
-      if (currentAbort?.signal.aborted) break;
-      const { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(currentAbort?.signal);
+      if (stream.abort?.signal.aborted) break;
+      const { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(stream.abort?.signal, stream);
       if (aborted) {
         wasAborted = true;
-        if (content) {
-          messages.push({ role: 'assistant', content });
-          bindBubble(reply, messages[messages.length - 1]);
+        if (content && content.trim()) {
+          convMessages.push({ role: 'assistant', content });
+          bindBubble(reply, convMessages[convMessages.length - 1]);
         }
-        addMsg('info', 'Stopped.');
+        addMsg('info', 'Stopped.', host);
         break;
       }
       if (!toolCalls.length) {
-        if (content) {
-          messages.push({ role: 'assistant', content });
-          bindBubble(reply, messages[messages.length - 1]);
+        if (content && content.trim()) {
+          convMessages.push({ role: 'assistant', content });
+          bindBubble(reply, convMessages[convMessages.length - 1]);
         }
         break;
       }
-      messages.push({ role: 'assistant', content, tool_calls: toolCalls });
-      const asstMsg = messages[messages.length - 1];
+      convMessages.push({ role: 'assistant', content, tool_calls: toolCalls });
+      const asstMsg = convMessages[convMessages.length - 1];
       bindBubble(reply, asstMsg);
       for (const el of toolCallEls) if (el) bindBubble(el, asstMsg);
       const completed = new Set();
@@ -4466,7 +4594,7 @@ async function sendSingle(text) {
         for (let i = 0; i < toolCalls.length; i++) {
           const tc = toolCalls[i];
           const toolBubble = toolCallEls[i];
-          if (currentAbort?.signal.aborted) break;
+          if (stream.abort?.signal.aborted) break;
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
           // Mark this tool-call bubble as in-flight and start the ticker so
@@ -4482,7 +4610,7 @@ async function sendSingle(text) {
           // completion — that's a separate, harder fix needing setInterruptBuffer.
           let result;
           try {
-            result = await tools[tc.function.name].run(args, currentAbort?.signal);
+            result = await tools[tc.function.name].run(args, stream.abort?.signal);
           } finally {
             if (toolBubble) {
               toolBubble.classList.remove('in-flight');
@@ -4490,7 +4618,7 @@ async function sendSingle(text) {
               renderTcDone(toolBubble, tc.function.name);
             }
           }
-          const resultDiv = addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
+          const resultDiv = addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`, host);
           // Cap what gets fed BACK to the LLM in the next request body. A
           // single rogue print() or cat-of-large-file used to silently push
           // multi-MB into messages[] and then nginx would 413 the next round,
@@ -4499,10 +4627,10 @@ async function sendSingle(text) {
           // for what the model actually sees.
           const capped = capToolResult(result);
           if (capped.truncated) {
-            addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`);
+            addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`, host);
           }
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: capped.content });
-          bindBubble(resultDiv, messages[messages.length - 1]);
+          convMessages.push({ role: 'tool', tool_call_id: tc.id, content: capped.content });
+          bindBubble(resultDiv, convMessages[convMessages.length - 1]);
           completed.add(tc.id);
         }
       } finally {
@@ -4510,14 +4638,14 @@ async function sendSingle(text) {
         // unsendable. Pad any that didn't run (user hit Stop, error, etc.).
         for (const tc of toolCalls) {
           if (!completed.has(tc.id)) {
-            messages.push({ role: 'tool', tool_call_id: tc.id, content: '[stopped]' });
+            convMessages.push({ role: 'tool', tool_call_id: tc.id, content: '[stopped]' });
           }
         }
       }
-      if (currentAbort?.signal.aborted) { wasAborted = true; addMsg('info', 'Stopped.'); break; }
+      if (stream.abort?.signal.aborted) { wasAborted = true; addMsg('info', 'Stopped.', host); break; }
     }
   } catch (e) {
-    if (e?.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.'); }
+    if (e?.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.', host); }
     else {
       // Tool throws don't always come through as proper Error instances
       // (some libraries throw plain objects/strings). Cascade through
@@ -4528,22 +4656,23 @@ async function sendSingle(text) {
         || (e && (() => { try { return JSON.stringify(e); } catch { return null; } })())
         || (e && String(e))
         || 'unknown error (check DevTools console)';
-      addMsg('err', 'Error: ' + msg);
+      addMsg('err', 'Error: ' + msg, host);
     }
   } finally {
     releaseWakeLock();
-    endTotalTimer(wasAborted ? 'stopped' : 'done');
-    setSendingState(false);
-    await saveActiveConv();
-    refreshTokenMeter();
+    endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
+    setStreamSending(stream, false);
+    await saveConv(convId);
+    // Token meter reflects the visible conv only.
+    if (convId === activeConvId) refreshTokenMeter();
     // Phase C: push any files the LLM created/modified during the round to
     // Dropbox. Errors are logged but don't fail the conversation save.
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 
-// send() is now a thin wrapper around the queue system.
-// sendSingle(text) handles one message round.
+// handleSubmit() enqueues into the active conv's stream; processQueueFor(s)
+// drains that queue by repeatedly calling sendSingle(text, s).
 </script>
 </body>
 </html>
