@@ -2325,6 +2325,24 @@ async function getPy() {
   return pyPromise;
 }
 
+// Pyodide is one shared interpreter (single set of Python globals, single
+// sys.stdout/stderr redirection target). Without serialization, two convs
+// that both kick off run_python concurrently would race: stdout buffers
+// would cross-contaminate, the open()/argv monkey-patches would step on
+// each other, and any in-flight async Python could observe globals from
+// the other conv's setup. The mutex serializes the *entire* per-call
+// setup + execution + sync block, so each run_python looks atomic from
+// the LLM's perspective. LLM completions still run in parallel via the
+// worker — only the Python execution itself queues.
+let _pyMutex = Promise.resolve();
+function pyRunAtomic(taskFn) {
+  const next = _pyMutex.then(taskFn, taskFn);
+  // Don't let a thrown task poison the chain — downstream waiters should
+  // still get a turn; we only care that they wait their turn.
+  _pyMutex = next.then(() => {}, () => {});
+  return next;
+}
+
 // Wipe Pyodide's /files dir, copy the entire OPFS tree into it (with subdirs).
 async function syncOpfsToPy(p) {
   const rmTree = (full) => {
@@ -2509,10 +2527,18 @@ Examples:
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
       },
     },
-    run: async ({ code, path: scriptPath, args }) => {
-      // Exactly one of code/path must be provided.
+    run: async ({ code, path: scriptPath, args }, signal) => {
+      // Validate up-front so we don't pointlessly queue behind another call.
       if (!code && !scriptPath) return 'Error: provide either "code" (inline source) or "path" (saved script under /files/).';
       if (code && scriptPath) return 'Error: provide either "code" or "path", not both.';
+      // Serialize across convs — one Python interpreter, one stdout target,
+      // shared globals + monkey-patched builtins.open / sys.argv. Any
+      // already-running run_python finishes (and resets stdout/stderr in its
+      // finally) before the next one starts its setup.
+      return pyRunAtomic(async () => {
+        // If the caller already aborted while we were waiting in the mutex
+        // queue, bail without touching the interpreter.
+        if (signal && signal.aborted) return '[stopped]';
       // If path was given, load the script from OPFS up-front so the rest of
       // the pipeline (loadPackagesFromImports, runPythonAsync) can treat it
       // exactly like inline code.
@@ -2708,6 +2734,7 @@ except Exception:
         p.setStdout({});
         p.setStderr({});
       }
+      }); // end pyRunAtomic
     },
   },
   shell: {
@@ -3655,16 +3682,23 @@ function applyToolsMinimized() {
 }
 
 function bindBubble(div, msgRef) {
-  if (!div || !msgRef) return div;
-  div._msg = msgRef;
-  div.addEventListener('contextmenu', onBubbleContextMenu);
-  // Tool-call chips also open the menu on left-click — the chip is itself
-  // the affordance for "interact with this step". For text bubbles (user /
-  // assistant) we keep left-click as text-selection, so this is scoped to
-  // .tool-call only.
-  if (div.classList.contains('tool-call')) {
-    div.addEventListener('click', onBubbleContextMenu);
+  if (!div) return div;
+  // Idempotent: attach the contextmenu/click listeners exactly once per
+  // bubble so we can call bindBubble at creation time (no msg yet) AND
+  // again once the message is pushed, without ending up with duplicate
+  // handlers that fire the menu twice.
+  if (!div._listenersAttached) {
+    div._listenersAttached = true;
+    div.addEventListener('contextmenu', onBubbleContextMenu);
+    // Tool-call chips also open the menu on left-click — the chip is itself
+    // the affordance for "interact with this step". For text bubbles (user /
+    // assistant) we keep left-click as text-selection, so this is scoped to
+    // .tool-call only.
+    if (div.classList.contains('tool-call')) {
+      div.addEventListener('click', onBubbleContextMenu);
+    }
   }
+  if (msgRef) div._msg = msgRef;
   return div;
 }
 
@@ -3691,7 +3725,15 @@ document.addEventListener('click', hideBubbleMenu);
 async function rewindFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
-  if (!target || !target._msg) return;
+  if (!target) return;
+  // _msg is only set once the assistant message is pushed (after the LLM
+  // finishes streaming this round). During the preparing phase the chip is
+  // clickable but there's no message to rewind to yet.
+  if (!target._msg) {
+    const s = activeStream();
+    addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
+    return;
+  }
   const idx = messages.indexOf(target._msg);
   if (idx < 0) return;
   const after = messages.length - idx - 1;
@@ -4360,6 +4402,90 @@ async function processQueueFor(stream) {
   updateQueueCount(stream);
 }
 
+// ============================================================
+// LLM streaming worker — owns fetch + SSE parse + delta accumulation
+// on a dedicated thread. Lets a long completion keep finishing even
+// when the tab is minimized (Chrome throttles main-thread timers and
+// task scheduling aggressively for hidden tabs; worker threads are
+// throttled far less). One shared worker handles every conv; the
+// requestId on each message demuxes which stream it belongs to.
+// ============================================================
+const LLM_WORKER_SOURCE = `
+const active = new Map();
+self.addEventListener('message', (e) => {
+  const m = e.data;
+  if (m.type === 'abort') {
+    const a = active.get(m.requestId);
+    if (a) a.controller.abort();
+    return;
+  }
+  if (m.type === 'start') run(m);
+});
+async function run({ requestId, url, headers, body }) {
+  const controller = new AbortController();
+  active.set(requestId, { controller });
+  try {
+    const res = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, 300);
+      self.postMessage({ type: 'error', requestId, status: res.status, message: res.status + ': ' + text });
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const delta = JSON.parse(data).choices && JSON.parse(data).choices[0] && JSON.parse(data).choices[0].delta;
+          if (delta) self.postMessage({ type: 'delta', requestId, delta });
+        } catch (_) {}
+      }
+    }
+    self.postMessage({ type: 'done', requestId });
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || controller.signal.aborted)) {
+      self.postMessage({ type: 'aborted', requestId });
+    } else {
+      self.postMessage({ type: 'error', requestId, message: (e && e.message) || String(e) });
+    }
+  } finally {
+    active.delete(requestId);
+  }
+}
+`;
+
+let _llmWorker = null;
+function getLLMWorker() {
+  if (_llmWorker) return _llmWorker;
+  const blob = new Blob([LLM_WORKER_SOURCE], { type: 'application/javascript' });
+  _llmWorker = new Worker(URL.createObjectURL(blob));
+  _llmWorker._pending = new Map(); // requestId -> { onDelta, onDone, onAborted, onError }
+  _llmWorker.addEventListener('message', (e) => {
+    const m = e.data;
+    const p = _llmWorker._pending.get(m.requestId);
+    if (!p) return;
+    if (m.type === 'delta') p.onDelta(m.delta);
+    else if (m.type === 'done') p.onDone();
+    else if (m.type === 'aborted') p.onAborted();
+    else if (m.type === 'error') p.onError(m);
+  });
+  return _llmWorker;
+}
+let _reqIdCounter = 0;
+
 async function streamRound(signal, stream) {
   // Capture the stream's host + messages array up-front so we keep writing
   // into THIS conversation even if the user navigates to a different one
@@ -4441,6 +4567,11 @@ async function streamRound(signal, stream) {
           if (!toolCallEls[i]) {
             toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`, host);
             toolCallEls[i].dataset.fname = toolCalls[i].function.name;
+            // Attach context-menu / click handlers immediately so the chip is
+            // clickable during the preparing phase (LLM still streaming args).
+            // The _msg reference is filled in later once the assistant message
+            // is pushed; the menu actions handle a missing _msg gracefully.
+            bindBubble(toolCallEls[i]);
             toolDisplayed[i] = '';
             toolPending[i] = '';
           } else {
@@ -4464,44 +4595,50 @@ async function streamRound(signal, stream) {
     }
   };
 
+  // Hand the fetch+SSE-parse loop off to the LLM worker. The worker thread
+  // keeps draining the response stream at network speed even if Chrome
+  // throttles or pauses this tab's main thread (background / minimized).
+  // Per-delta postMessage calls feed `applyDelta` exactly as the inline
+  // reader used to — the only thing that moved is where the bytes are read.
+  const worker = getLLMWorker();
+  const requestId = ++_reqIdCounter;
+  stream.requestId = requestId;
+  let streamError = null;
+  let resolveStream;
+  const streamComplete = new Promise(r => { resolveStream = r; });
+  worker._pending.set(requestId, {
+    onDelta:   applyDelta,
+    onDone:    () => resolveStream(),
+    onAborted: () => { aborted = true; resolveStream(); },
+    onError:   ({ status, message }) => {
+      const err = new Error(message);
+      if (typeof status === 'number') err.status = status;
+      streamError = err;
+      resolveStream();
+    },
+  });
+  const onAbort = () => worker.postMessage({ type: 'abort', requestId });
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
+  worker.postMessage({
+    type: 'start', requestId,
+    url,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    body,
+  });
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
-      body: JSON.stringify(body),
-      signal,
-    });
-    if (!res.ok) {
-      streamDone = true;
-      reply.remove();
-      const err = new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
-      err.status = res.status;
-      throw err;
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6);
-        if (data === '[DONE]') continue;
-        try { applyDelta(JSON.parse(data).choices?.[0]?.delta); } catch {}
-      }
-    }
-  } catch (e) {
-    if (e.name === 'AbortError' || (signal && signal.aborted)) {
-      aborted = true;
-    } else {
-      streamDone = true;
-      reply.remove();
-      throw e;
-    }
+    await streamComplete;
+  } finally {
+    worker._pending.delete(requestId);
+    if (signal) signal.removeEventListener('abort', onAbort);
+    stream.requestId = null;
+  }
+  if (streamError) {
+    streamDone = true;
+    reply.remove();
+    throw streamError;
   }
 
   streamDone = true;
