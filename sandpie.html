@@ -537,12 +537,71 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     color: #6e7681;
     margin-top: 0.6rem;
   }
-  .welcome-cta {
-    font-size: 0.75rem;
-    color: #58a6ff;
-    margin-top: 0.5rem;
-    letter-spacing: 0.06em;
-    animation: cta-breathe 3s ease-in-out infinite;
+  /* Welcome shield — layered echo: 3 generations of an asymmetric jittered mesh
+     coexist at different lifecycle phases, rebuilt with a new random seed every 2s.
+     Communicates the pyodide/OPFS containment story without text. */
+  .welcome-shield {
+    width: 96px;
+    height: 115px;
+    color: #c9d1d9;
+    display: block;
+    margin: 0.6rem auto 0;
+  }
+  .welcome-shield-outline {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+  }
+  .welcome-shield .dtri-layered {
+    fill: currentColor;
+    fill-opacity: 0;
+    stroke: currentColor;
+    stroke-width: 0.4;
+    stroke-opacity: 0;
+    animation:
+      welcome-layered-life 6s ease-in-out 1 forwards,
+      welcome-layered-shim 3s linear infinite var(--shim-delay, 0s);
+  }
+  @keyframes welcome-layered-life {
+    0%   { opacity: 0; }
+    18%  { opacity: 0.55; }
+    82%  { opacity: 0.55; }
+    100% { opacity: 0; }
+  }
+  @keyframes welcome-layered-shim {
+    0%, 100% { fill-opacity: 0;   stroke-opacity: 0.18; }
+    4%       { fill-opacity: 0.3; stroke-opacity: 1; }
+    11%      { fill-opacity: 0;   stroke-opacity: 0.18; }
+  }
+  /* Rotating tagline carousel that replaces the old "ready when you are" CTA */
+  .welcome-rotating {
+    position: relative;
+    height: 1.4em;
+    font-size: 0.78rem;
+    color: #8b949e;
+    margin-top: 0.6rem;
+    letter-spacing: 0.04em;
+    min-width: 18ch;
+  }
+  .welcome-rotating span {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%) translateY(6px);
+    opacity: 0;
+    white-space: nowrap;
+    animation: welcome-tag-cycle 20s ease-in-out infinite;
+  }
+  .welcome-rotating span:nth-child(1) { animation-delay: 0s; }
+  .welcome-rotating span:nth-child(2) { animation-delay: 5s; }
+  .welcome-rotating span:nth-child(3) { animation-delay: 10s; }
+  .welcome-rotating span:nth-child(4) { animation-delay: 15s; }
+  @keyframes welcome-tag-cycle {
+    0%    { opacity: 0; transform: translateX(-50%) translateY(6px); }
+    2.5%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    22.5% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    25%   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    100%  { opacity: 0; transform: translateX(-50%) translateY(6px); }
   }
   .queue-pill {
     font-size: 0.65rem;
@@ -556,15 +615,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     font-weight: 600;
     vertical-align: middle;
   }
-  @keyframes cta-breathe {
-    0%, 100% { opacity: 0.6; }
-    50%      { opacity: 1; }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .welcome-cta {
-      animation: none;
-      opacity: 0.85;
-    }
+    .welcome-shield .dtri-layered { animation: none; opacity: 0.3; stroke-opacity: 0.3; }
+    .welcome-rotating span { animation: none; }
+    .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
 /* Token meter — shows current context size vs configured limit. Click to edit. */
   .token-meter {
@@ -1054,10 +1108,18 @@ window._sandpieDisplay = function (html) {
 <main>
   <div id="messages">
     <div id="welcome" class="welcome">
-      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span> <span id="welcomeVersion" style="font-size:0.6rem; color:#8b949e; font-weight:normal;"></span></div>
-      <div class="welcome-tag">a sandboxed python AI workspace in one HTML file</div>
+      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
       <div class="welcome-status" id="welcomeStatus"></div>
-      <div class="welcome-cta">ready when you are</div>
+      <svg id="welcomeShield" class="welcome-shield" viewBox="0 0 100 120" aria-hidden="true">
+        <defs><clipPath id="welcome-clip"><path d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" /></clipPath></defs>
+        <path class="welcome-shield-outline" d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" />
+      </svg>
+      <div class="welcome-rotating" aria-label="security taglines">
+        <span>nothing escapes the tab</span>
+        <span>zero install</span>
+        <span>designed for security</span>
+        <span>contained AI</span>
+      </div>
     </div>
   </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
@@ -2364,34 +2426,301 @@ function loadScript(src) {
   });
 }
 
-async function getPy() {
-  if (pyPromise) return pyPromise;
-  pyPromise = (async () => {
-    await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
-    try { p.FS.mkdir('/files'); } catch {}
-    return p;
-  })();
-  return pyPromise;
+// One Pyodide worker per conversation = full Python isolation (separate
+// globals, imports, sys.argv, /files mount, stdout/stderr target). Heavy
+// Python runs in its own thread, so a tight CPU loop in one conv no longer
+// freezes the tab or trips Chrome's "page unresponsive" killer. Workers
+// are lazy-created on first run_python call and terminated when the conv
+// is deleted (see deleteConv).
+//
+// The worker source contains:
+//   * worker-side OPFS helpers (same async API as main; OPFS is per-origin)
+//   * pyodide bootstrap (importScripts the CDN)
+//   * syncOpfsToPy / syncPyToOpfs (port of the main-thread versions)
+//   * a `run` message handler that does setup + exec + sync + returns
+//     stdout/stderr/artifacts/filled-placeholders in a single result message
+//   * the open()/argv/IPython.display Python monkey-patches inline
+const PYODIDE_WORKER_SOURCE = `
+let py = null;
+let initPromise = null;
+
+// ---- worker-side OPFS helpers ----
+async function opfsRoot() { return navigator.storage.getDirectory(); }
+function splitPath(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  const name = parts.pop();
+  return { parts, name };
+}
+async function opfsResolveDir(parts, create) {
+  let dir = await opfsRoot();
+  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
+  return dir;
+}
+async function opfsList(prefix) {
+  prefix = prefix || '';
+  const out = [];
+  const walk = async (dir, p) => {
+    for await (const [n, h] of dir.entries()) {
+      const full = p ? p + '/' + n : n;
+      // Skip the chats-store directory — same skip the main-thread sync uses.
+      if (full === '_conversations' || full.startsWith('_conversations/')) continue;
+      if (h.kind === 'file') out.push(full);
+      else await walk(h, full);
+    }
+  };
+  const start = prefix ? await opfsResolveDir(prefix.split('/').filter(Boolean)) : await opfsRoot();
+  await walk(start, prefix.replace(/^\\/+|\\/+$/g, ''));
+  return out.sort();
+}
+async function opfsReadBytes(path) {
+  const { parts, name } = splitPath(path);
+  const dir = await opfsResolveDir(parts);
+  const handle = await dir.getFileHandle(name);
+  return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+}
+async function opfsWriteBytes(path, bytes) {
+  const { parts, name } = splitPath(path);
+  const dir = await opfsResolveDir(parts, true);
+  const handle = await dir.getFileHandle(name, { create: true });
+  const w = await handle.createWritable();
+  await w.write(bytes);
+  await w.close();
 }
 
-// Pyodide is one shared interpreter (single set of Python globals, single
-// sys.stdout/stderr redirection target). Without serialization, two convs
-// that both kick off run_python concurrently would race: stdout buffers
-// would cross-contaminate, the open()/argv monkey-patches would step on
-// each other, and any in-flight async Python could observe globals from
-// the other conv's setup. The mutex serializes the *entire* per-call
-// setup + execution + sync block, so each run_python looks atomic from
-// the LLM's perspective. LLM completions still run in parallel via the
-// worker — only the Python execution itself queues.
-let _pyMutex = Promise.resolve();
-function pyRunAtomic(taskFn) {
-  const next = _pyMutex.then(taskFn, taskFn);
-  // Don't let a thrown task poison the chain — downstream waiters should
-  // still get a turn; we only care that they wait their turn.
-  _pyMutex = next.then(() => {}, () => {});
-  return next;
+async function init() {
+  if (py) return py;
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    try { py.FS.mkdir('/files'); } catch (_) {}
+    return py;
+  })();
+  return initPromise;
 }
+
+async function syncOpfsToPy(p, placeholdersList) {
+  const rmTree = (full) => {
+    let stat;
+    try { stat = p.FS.stat(full); } catch (_) { return; }
+    if (p.FS.isDir(stat.mode)) {
+      for (const name of p.FS.readdir(full)) {
+        if (name === '.' || name === '..') continue;
+        rmTree(full + '/' + name);
+      }
+      if (full !== '/files') p.FS.rmdir(full);
+    } else {
+      p.FS.unlink(full);
+    }
+  };
+  rmTree('/files');
+  try { p.FS.mkdir('/files'); } catch (_) {}
+  const files = await opfsList();
+  const hydrated = new Set(files);
+  const ensureDirs = (segs) => {
+    let cur = '/files';
+    for (const s of segs) {
+      cur += '/' + s;
+      try { p.FS.mkdir(cur); } catch (_) {}
+    }
+    return cur;
+  };
+  for (const rel of files) {
+    const segs = rel.split('/');
+    const fn = segs.pop();
+    const dir = ensureDirs(segs);
+    p.FS.writeFile(dir + '/' + fn, await opfsReadBytes(rel));
+  }
+  const placeholders = new Set();
+  for (const rel of (placeholdersList || [])) {
+    if (hydrated.has(rel)) continue;
+    const segs = rel.split('/');
+    const fn = segs.pop();
+    const dir = ensureDirs(segs);
+    try {
+      p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
+      placeholders.add(rel);
+    } catch (_) {}
+  }
+  return placeholders;
+}
+
+function bytesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+async function syncPyToOpfs(p, placeholders) {
+  const pyFiles = new Set();
+  const walk = (full, rel) => {
+    for (const name of p.FS.readdir(full)) {
+      if (name === '.' || name === '..') continue;
+      const childFull = full + '/' + name;
+      const childRel = rel ? rel + '/' + name : name;
+      const stat = p.FS.stat(childFull);
+      if (p.FS.isFile(stat.mode)) pyFiles.add(childRel);
+      else walk(childFull, childRel);
+    }
+  };
+  walk('/files', '');
+  const filled = [];
+  const written = [];
+  for (const rel of pyFiles) {
+    const newBytes = p.FS.readFile('/files/' + rel);
+    if (placeholders.has(rel) && newBytes.length === 0) continue;
+    let oldBytes = null;
+    try { oldBytes = await opfsReadBytes(rel); } catch (_) {}
+    if (oldBytes && bytesEqual(oldBytes, newBytes)) continue;
+    await opfsWriteBytes(rel, newBytes);
+    written.push(rel);
+    if (placeholders.has(rel)) filled.push(rel);
+  }
+  return { filled, written };
+}
+
+const OPEN_PATCH = \`
+import builtins, os
+if getattr(builtins.open, '__name__', None) == '_sandpie_open':
+    if hasattr(builtins, '_original_open'):
+        builtins.open = builtins._original_open
+if hasattr(builtins, '_original_open'):
+    _real_open = builtins._original_open
+else:
+    _real_open = builtins.open
+    builtins._original_open = _real_open
+try:
+    from js import _sandpie_cloud_paths
+    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
+except Exception:
+    _sandpie_cloud_set = set()
+def _sandpie_normalize(path):
+    s = str(path)
+    if s.startswith('/files/'): s = s[len('/files/'):]
+    while s.startswith('./'): s = s[2:]
+    return s.lstrip('/')
+def _sandpie_open(path, *args, **kwargs):
+    n = _sandpie_normalize(path)
+    if n in _sandpie_cloud_set:
+        raise FileNotFoundError(
+            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
+            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
+            f"If you meant a host path (outside /files/), use the read_file tool instead."
+        )
+    return _real_open(path, *args, **kwargs)
+builtins.open = _sandpie_open
+\`;
+
+const DISPLAY_PATCH = \`
+def _sandpie_display(*objs, **kwargs):
+    import base64
+    try:
+        import js
+    except Exception:
+        return
+    for obj in objs:
+        html = None
+        try:
+            if hasattr(obj, '_repr_html_'):
+                html = obj._repr_html_()
+            if html is None and hasattr(obj, '_repr_svg_'):
+                html = obj._repr_svg_()
+            if html is None and hasattr(obj, '_repr_png_'):
+                d = obj._repr_png_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/png;base64,' + d + '">'
+            if html is None and hasattr(obj, '_repr_jpeg_'):
+                d = obj._repr_jpeg_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/jpeg;base64,' + d + '">'
+        except Exception as e:
+            html = '<pre>display error: ' + str(e) + '</pre>'
+        if html is None:
+            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            html = '<pre>' + s + '</pre>'
+        try:
+            js._sandpieDisplay(html)
+        except Exception:
+            pass
+try:
+    import IPython.display as _ipd
+    _ipd.display = _sandpie_display
+except Exception:
+    pass
+\`;
+
+self.addEventListener('message', async (e) => {
+  const m = e.data;
+  if (m.type !== 'run') return;
+  let stdout = '', stderr = '';
+  const artifacts = [];
+  let p = null;
+  try {
+    p = await init();
+    p.setStdout({ batched: s => stdout += s + '\\n' });
+    p.setStderr({ batched: s => stderr += s + '\\n' });
+    const placeholders = await syncOpfsToPy(p, m.placeholdersList);
+    p.runPython('import os; os.chdir(\"/files\")');
+    self._sandpie_cloud_paths = [...placeholders];
+    try { p.runPython(OPEN_PATCH); } catch (_) {}
+    if (m.argv) {
+      self._sandpie_argv = m.argv;
+      try { p.runPython('import sys\\nfrom js import _sandpie_argv\\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
+    }
+    self._sandpieDisplay = (html) => artifacts.push(html);
+    try { p.runPython(DISPLAY_PATCH); } catch (_) {}
+    try { await p.loadPackagesFromImports(m.code); } catch (_) {}
+    await p.runPythonAsync(m.code);
+    const sync = await syncPyToOpfs(p, placeholders);
+    let out = stdout.trimEnd();
+    if (stderr.trim()) out += (out ? '\\n' : '') + '--- stderr ---\\n' + stderr.trimEnd();
+    if (artifacts.length) {
+      const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
+      out = out ? out + '\\n' + note : note;
+    }
+    self.postMessage({ type: 'result', requestId: m.requestId, result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written });
+  } catch (e) {
+    let msg = '';
+    if (e != null) {
+      if (typeof e === 'string') msg = e;
+      else if (e.message) msg = e.message;
+      else {
+        try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
+        if (!msg) { try { msg = JSON.stringify(e, Object.getOwnPropertyNames(Object(e))); if (msg === '{}') msg = ''; } catch (_) {} }
+      }
+    }
+    const tail = stderr.trim() ? '\\n--- stderr ---\\n' + stderr.trimEnd() : '';
+    if (!msg && !stderr.trim()) {
+      self.postMessage({ type: 'fatal', requestId: m.requestId, artifacts });
+      return;
+    }
+    self.postMessage({ type: 'error', requestId: m.requestId, message: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts });
+  } finally {
+    if (p) { try { p.setStdout({}); } catch (_) {} try { p.setStderr({}); } catch (_) {} }
+  }
+});
+`;
+
+// Lazy per-conv worker handle. Created the first time a conv's run_python is
+// invoked; terminated when the conv is deleted (deleteConv handles that).
+function getPyWorker(stream) {
+  if (stream.pyWorker) return stream.pyWorker;
+  const blob = new Blob([PYODIDE_WORKER_SOURCE], { type: 'application/javascript' });
+  const w = new Worker(URL.createObjectURL(blob));
+  w._pending = new Map(); // requestId -> { resolve }
+  w.addEventListener('message', (e) => {
+    const m = e.data;
+    const pending = w._pending.get(m.requestId);
+    if (!pending) return;
+    w._pending.delete(m.requestId);
+    pending.resolve(m);
+  });
+  stream.pyWorker = w;
+  return w;
+}
+let _pyReqId = 0;
 
 // Wipe Pyodide's /files dir, copy the entire OPFS tree into it (with subdirs).
 async function syncOpfsToPy(p) {
@@ -4913,6 +5242,129 @@ async function sendSingle(text, stream) {
 
 // handleSubmit() enqueues into the active conv's stream; processQueueFor(s)
 // drains that queue by repeatedly calling sendSingle(text, s).
+
+// === Welcome shield · v14 layered echo ===
+// Asymmetric jittered ring mesh, rebuilt with a new random seed every 2s.
+// At most three generations of the mesh coexist in the DOM at any time, each
+// running its own 6s lifecycle (fade in → shimmer → fade out). Rebuild is
+// skipped while #welcome is hidden so it costs nothing during normal chatting.
+(function () {
+  const svg = document.getElementById('welcomeShield');
+  if (!svg) return;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = 'http://www.w3.org/2000/svg';
+  const cx = 50, cy = 55;
+  const HEATER_SEGS = [
+    ['L', [50, 8],   [90, 22]],
+    ['L', [90, 22],  [90, 58]],
+    ['Q', [90, 58],  [50, 114], [90, 100]],
+    ['Q', [50, 114], [10, 58],  [10, 100]],
+    ['L', [10, 58],  [10, 22]],
+    ['L', [10, 22],  [50, 8]],
+  ];
+  function segLength(s) {
+    if (s[0] === 'L') return Math.hypot(s[2][0]-s[1][0], s[2][1]-s[1][1]);
+    let L = 0, prev = s[1];
+    for (let i = 1; i <= 32; i++) {
+      const t = i/32, u = 1-t;
+      const x = u*u*s[1][0] + 2*u*t*s[3][0] + t*t*s[2][0];
+      const y = u*u*s[1][1] + 2*u*t*s[3][1] + t*t*s[2][1];
+      L += Math.hypot(x-prev[0], y-prev[1]); prev = [x, y];
+    }
+    return L;
+  }
+  const SEG_LENS = HEATER_SEGS.map(segLength);
+  const TOTAL_LEN = SEG_LENS.reduce((a,b)=>a+b, 0);
+  function perimAt(target) {
+    let acc = 0;
+    for (let i = 0; i < HEATER_SEGS.length; i++) {
+      if (acc + SEG_LENS[i] >= target || i === HEATER_SEGS.length - 1) {
+        const t = (target - acc) / SEG_LENS[i], u = 1 - t, s = HEATER_SEGS[i];
+        if (s[0] === 'L') return [s[1][0] + (s[2][0]-s[1][0])*t, s[1][1] + (s[2][1]-s[1][1])*t];
+        return [u*u*s[1][0] + 2*u*t*s[3][0] + t*t*s[2][0],
+                u*u*s[1][1] + 2*u*t*s[3][1] + t*t*s[2][1]];
+      }
+      acc += SEG_LENS[i];
+    }
+  }
+  function samplePerim(N) { const p=[]; for (let k=0;k<N;k++) p.push(perimAt((k/N)*TOTAL_LEN)); return p; }
+  function buildJitteredRings(N, scales, seed, jitter) {
+    let s = seed || 1;
+    const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const outer = samplePerim(N);
+    return scales.map((scale, ri) => outer.map(([x, y]) => {
+      let nx = cx + (x - cx) * scale, ny = cy + (y - cy) * scale;
+      if (ri > 0) { nx += (rng() - 0.5) * jitter; ny += (rng() - 0.5) * jitter; }
+      return [nx, ny];
+    }));
+  }
+  function ringsToTris(rings, N) {
+    const tris = [];
+    for (let r = 0; r < rings.length - 1; r++) {
+      for (let i = 0; i < N; i++) {
+        const j = (i+1) % N;
+        tris.push([rings[r][i], rings[r][j], rings[r+1][j]]);
+        tris.push([rings[r][i], rings[r+1][j], rings[r+1][i]]);
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      const j = (i+1) % N;
+      tris.push([rings[rings.length-1][i], rings[rings.length-1][j], [cx, cy]]);
+    }
+    return tris;
+  }
+  function triCentroid(t) { return [(t[0][0]+t[1][0]+t[2][0])/3, (t[0][1]+t[1][1]+t[2][1])/3]; }
+  function triPath(t) {
+    return 'M ' + t[0][0].toFixed(2) + ' ' + t[0][1].toFixed(2) +
+           ' L ' + t[1][0].toFixed(2) + ' ' + t[1][1].toFixed(2) +
+           ' L ' + t[2][0].toFixed(2) + ' ' + t[2][1].toFixed(2) + ' Z';
+  }
+
+  function rebuildShield() {
+    // Cheap skip while the welcome card is hidden (during an active chat).
+    const welcome = document.getElementById('welcome');
+    if (!welcome || welcome.style.display === 'none' || welcome.offsetParent === null) return;
+    const hosts = svg.querySelectorAll('.mesh-host');
+    if (hosts.length >= 3) hosts[0].remove();
+    const host = document.createElementNS(NS, 'g');
+    host.setAttribute('class', 'mesh-host');
+    host.setAttribute('clip-path', 'url(#welcome-clip)');
+    svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
+    const N = 14;
+    const seed = Math.floor(Math.random() * 1e6) + 1;
+    const tris = ringsToTris(buildJitteredRings(N, [1.0, 0.62, 0.28], seed, 6), N);
+    tris.sort((a, b) => Math.atan2(triCentroid(a)[1]-cy, triCentroid(a)[0]-cx) -
+                         Math.atan2(triCentroid(b)[1]-cy, triCentroid(b)[0]-cx));
+    tris.forEach((tri, i) => {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', triPath(tri));
+      p.setAttribute('class', 'dtri-layered');
+      p.style.setProperty('--shim-delay', (i / tris.length * 3).toFixed(2) + 's');
+      host.appendChild(p);
+    });
+  }
+
+  if (reduceMotion) {
+    // Single static mesh, no shimmer, no rebuild loop.
+    const host = document.createElementNS(NS, 'g');
+    host.setAttribute('clip-path', 'url(#welcome-clip)');
+    svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
+    const N = 14;
+    const tris = ringsToTris(buildJitteredRings(N, [1.0, 0.62, 0.28], 1337, 4), N);
+    tris.forEach(tri => {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', triPath(tri));
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', 'currentColor');
+      p.setAttribute('stroke-width', '0.4');
+      p.setAttribute('stroke-opacity', '0.3');
+      host.appendChild(p);
+    });
+  } else {
+    rebuildShield();
+    setInterval(rebuildShield, 2000);
+  }
+})();
 </script>
 </body>
 </html>
