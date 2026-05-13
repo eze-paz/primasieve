@@ -498,6 +498,20 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
   ul.conv-list li.archived-toggle:hover { color: #b4bcd0; background: transparent; border: none; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
+  /* Pulsing dot shown on a conversation row while an LLM stream for that
+     conversation is still in flight — so the user can navigate away and
+     know which chats are still generating in the background. */
+  ul.conv-list li .gen-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #58a6ff; box-shadow: 0 0 6px rgba(88,166,255,0.7);
+    flex-shrink: 0; margin-left: 0.35rem;
+    animation: status-dot-pulse 0.9s ease-in-out infinite;
+  }
+  /* Each conversation's bubbles live in a .conv-host. Only the active
+     conv's host is mounted under #messages; in-flight non-visible convs
+     keep their host detached so their stream can keep mutating bubbles
+     without contaminating whichever conv the user is currently looking at. */
+  .conv-host { display: flex; flex-direction: column; gap: 1rem; flex: 0 0 auto; }
   /* Empty-conversation welcome — vertically centered greeting + status */
   .welcome {
     margin: auto 0;
@@ -814,8 +828,10 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
   #messages.tools-minimized .tool-call {
-    padding: 0.45rem 0.75rem;
+    padding: 0.5rem 0.8rem;
     font-size: 12px;
+    line-height: 1.5;
+    min-height: 28px;
     max-width: 88%;
     background: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0.14));
     border: 1px solid rgba(88,166,255,0.35);
@@ -851,7 +867,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     white-space: nowrap;
     min-width: 0;
     flex: 1;
-    animation: tc-fade 1.4s ease-in-out;
+    animation: tc-fade 0.35s ease-out;
   }
   .tc-meta {
     margin-left: auto;
@@ -870,10 +886,8 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .tc-dim { opacity: 0.65; }
   @keyframes sp-spin { to { transform: rotate(360deg); } }
   @keyframes tc-fade {
-    0% { opacity: 0; transform: translateY(2px); }
-    20% { opacity: 1; transform: translateY(0); }
-    80% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0.6; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(3px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 </style>
 <script>
@@ -4334,7 +4348,10 @@ async function streamRound(signal) {
   await drain;
   cursor.remove();
   for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
-  if (!content && !toolCalls.length) reply.remove();
+  // Remove the assistant bubble whenever no visible text streamed — even if
+  // tool_calls came through. A bubble with only a (now-removed) cursor is
+  // visual noise and the tool-call chips already mark the assistant's turn.
+  if (!content) reply.remove();
   // Expose live bubble refs so the caller can bind them to the assistant
   // message object after it's pushed into `messages[]`. Filtering toolCalls
   // by id used to drop entries without preserving the parallel toolCallEls
