@@ -3752,6 +3752,11 @@ async function rewindFromMenu() {
   messages.length = idx;
   clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
+  // After a wholesale re-render the per-bubble isAtBottom check inside
+  // addMsg can return false (host briefly empty/short, scroll snaps to 0),
+  // so leave the user where the conversation now ends.
+  const messagesEl = $('messages');
+  if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
 }
 
