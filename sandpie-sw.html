@@ -4609,7 +4609,27 @@ let _swReady = (async () => {
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 
-async function streamRound(signal, stream) {
+// ============================================================
+// sendSingle now just dispatches to the SW agent loop and renders the
+// NDJSON event stream that comes back. The entire round-iteration logic
+// (stream LLM → see tool_calls → run tools → next round) lives in
+// sandpie-sw.js, so it keeps progressing while this tab is frozen.
+//
+// Events the SW emits (1 per NDJSON line on the response body):
+//   round_start              — new LLM round begins; create assistant bubble
+//   delta                    — OpenAI-shape delta chunk
+//   round_end                — round finished; clean up bubble (cursor etc.)
+//   message_added            — SW appended a message to its array; mirror it
+//   tool_started             — about to run this tool call
+//   tool_result              — tool finished; render result bubble + artifacts
+//   agent_done               — agent loop exited (no more tool_calls)
+//   error                    — fatal; surface to user
+// ============================================================
+
+// ---- legacy helpers kept for reference; not used in the SW-agent path ----
+// (streamRound + streamRoundWithRetry + retry plumbing used to live here,
+// but the SW now owns the round loop end-to-end.)
+async function _streamRound_legacy_removed(signal, stream) {
   // Capture the stream's host + messages array up-front so we keep writing
   // into THIS conversation even if the user navigates to a different one
   // mid-stream. The captured `host` may be detached from #messages (parked),
@@ -4865,7 +4885,7 @@ async function streamRoundWithRetry(signal, stream) {
   }
 }
 
-async function sendSingle(text, stream) {
+async function _sendSingle_legacy_removed(text, stream) {
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
@@ -5008,6 +5028,212 @@ async function sendSingle(text, stream) {
     if (convId === activeConvId) refreshTokenMeter();
     // Phase C: push any files the LLM created/modified during the round to
     // Dropbox. Errors are logged but don't fail the conversation save.
+    try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+  }
+}
+
+// =================================================================
+// NEW sendSingle: dispatch the agent loop to the SW, render its events.
+// All round/tool orchestration runs in sandpie-sw.js so the loop keeps
+// progressing while this tab is frozen.
+// =================================================================
+async function sendSingle(text, stream) {
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
+    return;
+  }
+  const convId = stream.id;
+  const convMessages = stream.messages;
+  const host = stream.host;
+
+  const userMsg = { role: 'user', content: text };
+  convMessages.push(userMsg);
+  bindBubble(addMsg('user', text, host), userMsg);
+  // Early save so a fresh conv hits the list immediately.
+  saveConv(convId).catch(() => {});
+  requestWakeLock();
+  setStreamSending(stream, true);
+  startTotalTimer(stream);
+  let wasAborted = false;
+
+  // Build the agent config the SW needs.
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
+  const remoteProxy = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
+  // Empty string means same-origin (which the SW resolves against its own URL).
+  const proxyBase = remoteProxy || '';
+  const placeholdersList = [];
+  try {
+    const st = syncState();
+    for (const [rel, val] of Object.entries(st)) if (!val.hydrated) placeholdersList.push(rel);
+  } catch (_) {}
+  let dbxTokensSnap = null;
+  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
+
+  const config = {
+    url,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    model: $('model').value,
+    systemPrompt: buildSystemPrompt(),
+    messages: convMessages.slice(),
+    tools: toolDefs(),
+    proxyBase,
+    origin: location.origin,
+    dbxTokens: dbxTokensSnap,
+    placeholdersList,
+  };
+
+  await _swReady;
+  const ctrl = new AbortController();
+  stream.requestId = ctrl;
+  const onAbort = () => ctrl.abort();
+  if (stream.abort?.signal) {
+    if (stream.abort.signal.aborted) onAbort();
+    else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  // Per-round render state. Reset on round_start.
+  let reply = null;
+  let cursor = null;
+  let content = '';
+  const toolCalls = [];
+  const toolCallEls = [];
+  let pendingToolResultDiv = null;
+
+  function applyDelta(delta) {
+    if (!delta) return;
+    if (delta.content) {
+      content += delta.content;
+      if (reply) {
+        reply.innerHTML = renderMd(content);
+        if (cursor) reply.appendChild(cursor);
+      }
+    }
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        const i = tc.index || 0;
+        if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+        if (tc.id) toolCalls[i].id = tc.id;
+        if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
+        if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
+        if (toolCalls[i].function.name) {
+          if (!toolCallEls[i]) {
+            toolCallEls[i] = addMsg('tool-call', '→ ' + toolCalls[i].function.name + '(', host);
+            toolCallEls[i].dataset.fname = toolCalls[i].function.name;
+          } else {
+            tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolCalls[i].function.arguments);
+          }
+          if (!toolCallEls[i].classList.contains('in-flight')) {
+            renderTcPreparing(toolCallEls[i], toolCalls[i].function.name, toolCalls[i].function.arguments);
+          }
+        }
+      }
+    }
+  }
+
+  function handleEvent(ev) {
+    switch (ev.type) {
+      case 'round_start': {
+        reply = addMsg('assistant', '', host);
+        cursor = document.createElement('span');
+        cursor.className = 'cursor';
+        reply.appendChild(cursor);
+        content = '';
+        toolCalls.length = 0;
+        toolCallEls.length = 0;
+        break;
+      }
+      case 'delta': applyDelta(ev.delta); break;
+      case 'round_end': {
+        if (cursor) { cursor.remove(); cursor = null; }
+        for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
+        if (reply && (!content || !content.trim())) reply.remove();
+        break;
+      }
+      case 'message_added': {
+        convMessages.push(ev.message);
+        const msg = convMessages[convMessages.length - 1];
+        if (msg.role === 'assistant') {
+          if (reply) bindBubble(reply, msg);
+          for (const el of toolCallEls) if (el) bindBubble(el, msg);
+        } else if (msg.role === 'tool' && pendingToolResultDiv) {
+          bindBubble(pendingToolResultDiv, msg);
+          pendingToolResultDiv = null;
+        }
+        break;
+      }
+      case 'tool_started': {
+        const idx = toolCalls.findIndex(t => t && t.id === ev.tc.id);
+        if (idx >= 0 && toolCallEls[idx]) {
+          toolCallEls[idx].classList.add('in-flight');
+          startToolTicker(toolCallEls[idx], ev.tc);
+        }
+        break;
+      }
+      case 'tool_result': {
+        const idx = toolCalls.findIndex(t => t && t.id === ev.id);
+        if (idx >= 0 && toolCallEls[idx]) {
+          toolCallEls[idx].classList.remove('in-flight');
+          stopToolTicker(toolCallEls[idx]);
+          renderTcDone(toolCallEls[idx], toolCalls[idx].function.name);
+        }
+        const result = String(ev.result || '');
+        const display = result.length > 500 ? result.slice(0, 500) + '…' : result;
+        pendingToolResultDiv = addMsg('tool-result', '← ' + display, host);
+        if (ev.artifacts && ev.artifacts.length) {
+          for (const html of ev.artifacts) window._renderArtifact(host, html);
+        }
+        break;
+      }
+      case 'agent_done': break;
+      case 'error': addMsg('err', 'Error: ' + (ev.message || 'unknown'), host); break;
+    }
+  }
+
+  try {
+    const res = await fetch('./sandpie-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let lineBuf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      lineBuf += decoder.decode(value, { stream: true });
+      const lines = lineBuf.split('\n');
+      lineBuf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { handleEvent(JSON.parse(line)); }
+        catch (e) { console.warn('[sandpie] bad event line:', line, e); }
+      }
+    }
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
+      wasAborted = true;
+      addMsg('info', 'Stopped.', host);
+    } else {
+      console.error('[sandpie] agent fetch error:', e);
+      addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
+    }
+  } finally {
+    if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
+    stream.requestId = null;
+    releaseWakeLock();
+    endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
+    setStreamSending(stream, false);
+    await saveConv(convId);
+    if (convId === activeConvId) refreshTokenMeter();
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
