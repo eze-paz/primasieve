@@ -4983,7 +4983,23 @@ async function _streamRound_legacy_removed(signal, stream) {
   // to blob:/proxy/... and fetch with "Failed to fetch". `new URL(x, base)`
   // is a no-op on already-absolute URLs.
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  const body = { model: $('model').value, messages: [buildSystemPrompt(), ...convMessages], stream: true, tools: toolDefs() };
+  // Ollama defaults are too small for tool-using agents: num_ctx=2048 silently
+  // truncates the system prompt + tool descriptions, and num_predict=128 cuts
+  // off tool-call JSON mid-string. Force a usable window and low-temp sampling
+  // for tool determinism. Ollama honors `options` on the OpenAI-compat endpoint.
+  const body = {
+    model: $('model').value,
+    messages: [buildSystemPrompt(), ...convMessages],
+    stream: true,
+    tools: toolDefs(),
+    options: {
+      num_ctx: 16384,
+      num_predict: 2048,
+      temperature: 0.2,
+      top_p: 0.9,
+      repeat_penalty: 1.1,
+    },
+  };
 
   const reply = addMsg('assistant', '', host);
   const cursor = document.createElement('span');
