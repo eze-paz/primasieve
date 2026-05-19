@@ -4920,36 +4920,56 @@ async function processQueueFor(stream) {
 // the SW's scope (the directory containing sandpie.js).
 const SW_STREAM_PATH = './sandpie-stream';
 
-// Register the SW and guarantee it's actually CONTROLLING this page before
-// anything that fetches /sandpie-agent runs. Previously this was a hand-rolled
-// `controllerchange` wait — fragile because:
-//   * If the SW is already active+claimed from a prior load, controllerchange
-//     never fires (it already happened) — we have to check `controller` first.
-//   * If the page came from a hard refresh (Ctrl+Shift+R), the browser
-//     bypasses the SW for THAT navigation: the SW is registered, active, but
-//     not controlling. controllerchange won't fire either, so we'd hang
-//     forever, and every sendSingle hangs at `await _swReady`.
-//   * If SW install fails mid-flight (CDN flake, Pyodide bootstrap throws
-//     outside the try), `.ready` never resolves — without a timeout we just
-//     hang silently.
+// Register the SW and guarantee it's CONTROLLING this page before any
+// /sandpie-agent fetch runs. Three failure modes to defend against:
 //
-// Standard-primitive fix:
-//   1. register() — idempotent. updateViaCache:'none' so HTTP cache can't pin
-//      a stale SW script.
-//   2. navigator.serviceWorker.ready — promise that resolves once an active
-//      SW exists in our scope. Handles install/activate timing internally.
-//      Race against a 10s timeout so a broken install surfaces clearly.
-//   3. After ready, check `controller`. If still null (hard-refresh case),
-//      reload ONCE — the next navigation goes through the SW and we're
-//      controlled. A sessionStorage guard breaks any reload loop the
-//      moment two reloads fail to attach (SW install is genuinely broken).
+//   (a) STALE SW from rename. Renaming sandpie-sw.js → sandpie.js left
+//       browsers with an old `sandpie-sw.js` registration in the same scope
+//       (/sdk/). Some browsers happily run both side-by-side or keep the
+//       stale one controlling. Unregister anything that isn't sandpie.js
+//       up front so there's exactly one SW in our scope.
+//
+//   (b) HARD-REFRESH or already-activated SW. The page can load without
+//       a controller (Ctrl+Shift+R bypasses the SW; a previously-activated
+//       SW's `activate` handler — the only other clients.claim() callsite
+//       — won't fire again for this lifetime). The previous reload-to-attach
+//       hack didn't work because the *next* reload often came up
+//       uncontrolled for exactly the same reason. Instead, send the active
+//       SW a `sandpie-claim` message; its handler calls clients.claim()
+//       which assigns this SW as our controller and fires controllerchange.
+//
+//   (c) BROKEN INSTALL. If the SW script throws during install (CDN flake,
+//       Pyodide bootstrap), navigator.serviceWorker.ready never resolves.
+//       Race against a 10s timeout so a real error surfaces with an
+//       actionable message instead of hanging the boot.
 let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
+
+  // (a) Unregister stale SWs from old file names. Only ours — we don't touch
+  // anything else on the origin. Two registrations in the same scope can
+  // race; the old script URL is now a 404 since we deleted it from the
+  // server, so its SW is effectively orphaned anyway.
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) {
+      const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
+      // Only unregister known-stale sandpie file names (the SW.js rename) —
+      // never unregister an unknown SW that might belong to another app on
+      // the origin.
+      if (/\/sandpie-sw\.js$/.test(url)) {
+        await r.unregister();
+        console.log('[sandpie] unregistered stale SW:', url);
+      }
+    }
+  } catch (e) {
+    console.warn('[sandpie] stale-SW cleanup failed:', e);
+  }
+
   await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
 
-  // Wait for active state with a timeout — never hang on a broken install.
+  // (c) Wait for an active SW with a timeout — never hang on a broken install.
   const reg = await Promise.race([
     navigator.serviceWorker.ready,
     new Promise((_, reject) => setTimeout(
@@ -4957,27 +4977,33 @@ let _swReady = (async () => {
       10000,
     )),
   ]);
-  // Best-effort update check; never blocks boot.
   reg.update().catch(e => console.warn('[sandpie] SW update check failed:', e));
 
-  // Hard-refresh path: SW is active but the current navigation wasn't
-  // intercepted by it. /sandpie-agent fetches would 404 against the network.
-  // Reload once to attach the SW to this page.
+  // (b) If we're uncontrolled, ask the active SW to claim us. The SW's
+  // message handler responds by calling clients.claim(), which fires
+  // controllerchange here and assigns us a controller.
   if (!navigator.serviceWorker.controller) {
-    const RELOAD_KEY = 'sandpie-sw-reload-once';
-    if (sessionStorage.getItem(RELOAD_KEY)) {
-      sessionStorage.removeItem(RELOAD_KEY);
-      throw new Error('Service worker registered but is not controlling this page after a reload. Open DevTools → Application → Service Workers and check the SW status / errors.');
+    const target = reg.active || navigator.serviceWorker.controller;
+    if (!target) {
+      throw new Error('Service worker registered but has no active worker to claim from. Check DevTools → Application → Service Workers.');
     }
-    sessionStorage.setItem(RELOAD_KEY, '1');
-    console.log('[sandpie] SW active but not controlling — reloading once to attach.');
-    location.reload();
-    // Block the rest of init while the reload replaces this context.
-    return new Promise(() => {});
+    console.log('[sandpie] no controller — asking SW to claim this client.');
+    await new Promise((resolve, reject) => {
+      const onChange = () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+        clearTimeout(timer);
+        resolve();
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', onChange);
+      const timer = setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+        reject(new Error('Service worker did not claim this client within 5s. Try a hard reload.'));
+      }, 5000);
+      target.postMessage({ type: 'sandpie-claim' });
+    });
   }
 
-  sessionStorage.removeItem('sandpie-sw-reload-once');
-  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller.scriptURL);
+  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
   return reg;
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
