@@ -928,7 +928,7 @@ window._sandpieDisplay = function (html) {
 // ─────────────────────────────────────────────────────────────────────────────
 //   R1  sendSingle builds config: { url, headers, model,
 //       systemPrompt: buildSystemPrompt(), messages, tools: toolDefs(),
-//       proxyBase, origin, dbxTokens, placeholdersList }.
+//       proxyBase, origin, dbxTokens, convId }.
 //   R2  await _swReady; POST ./sandpie-agent with the config as body.
 //   R3  Read response body line-by-line, JSON.parse each NDJSON line, dispatch
 //       to handleEvent(ev).
@@ -5210,11 +5210,6 @@ function buildAgentConfig(convMessages) {
   // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
   // Empty string means same-origin (the SW resolves it against its own URL).
   const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
-  const placeholdersList = [];
-  try {
-    const st = syncState();
-    for (const [rel, val] of Object.entries(st)) if (!val.hydrated) placeholdersList.push(rel);
-  } catch (_) {}
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
   return {
@@ -5227,7 +5222,6 @@ function buildAgentConfig(convMessages) {
     proxyBase,
     origin: location.origin,
     dbxTokens: dbxTokensSnap,
-    placeholdersList,
   };
 }
 

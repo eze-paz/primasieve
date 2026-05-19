@@ -28,7 +28,7 @@
 //                                                 (used when caller wants
 //                                                 only one round, no agent
 //                                                 loop)
-//   POST /sandpie-py { code, argv, placeholdersList } → run python once
+//   POST /sandpie-py { code, argv } → run python once
 //
 // =============================================================================
 // SW-side flow (mirrors the page-side flow chart in sandpie.html)
@@ -67,9 +67,10 @@
 //         next iteration
 //       emit agent_done
 //
-//   T1  tool_run_python: lazy initPyodide (single shared interp), [line ~264]
-//       syncOpfsToPy (mount OPFS into /files/), exec user code,
-//       syncPyToOpfs (write back changes), return stdout + artifacts.
+//   T1  tool_run_python: lazy initPyodide (single shared interp),
+//       exec user code, return stdout + artifacts. NO automatic
+//       OPFS sync — Python operates in plain Pyodide MEMFS. The LLM
+//       uses read_file / write_file / fetch_file for actual file I/O.
 //   T2  tool_shell:      POST proxyBase/shell                     [line ~330]
 //   T3  tool_read_file:  GET  proxyBase/file?path=                [line ~344]
 //   T4  tool_write_file: POST proxyBase/file?path=                [line ~347]
@@ -215,7 +216,6 @@ async function initPyodide() {
   pyInitPromise = (async () => {
     try {
       const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
-      try { p.FS.mkdir('/files'); } catch (_) {}
       py = p;
       return p;
     } catch (e) {
@@ -259,27 +259,14 @@ function isPyodideFatal(e, msg, stderr) {
 // withPy — single-flight serializer for tool_run_python calls.
 // =============================================================================
 // The SW holds ONE Pyodide interpreter shared across all convs. tool_run_python
-// mutates interpreter-global state in three places that two concurrent callers
-// would trample on:
+// mutates interpreter-global state (setStdout/setStderr batched callbacks
+// closed over caller-local accumulators, self._sandpieDisplay, self._sandpie_argv,
+// the DISPLAY_PATCH IPython redirect). Two concurrent callers would trample
+// these and one would return garbage — withPy serializes the critical section.
 //
-//   1. p.setStdout / p.setStderr install callbacks closed over the CALLER'S
-//      local stdout/stderr accumulators. A second call replaces them; the
-//      first conv's prints then land in the second's accumulator (or vanish).
-//   2. syncOpfsToPy starts with rmTree('/files') and rewrites the entire FS.
-//      A second call entering this while the first is mid-runPythonAsync
-//      yanks the filesystem out from under the running script.
-//   3. self._sandpie_cloud_paths, self._sandpie_argv, self._sandpieDisplay,
-//      os.chdir, OPEN_PATCH and DISPLAY_PATCH are all globals/side-effects
-//      that the second call silently rebinds.
-//
-// Net: in the unguarded path, one of two concurrent run_python calls would
-// fail or return garbage (the "1 of 2 fails" race the user reported).
-//
-// withPy serializes: the second caller awaits the first to finish before its
-// critical section runs. No parallelism across convs for Python, but every
-// call completes cleanly. The trade-off is explicit and lives in this single
-// place — true parallelism would require per-conv interpreters, which we
-// explicitly chose NOT to add (SW-spawned workers were reverted).
+// Trade-off: no parallelism across convs for Python. Acceptable; the only way
+// to get true parallelism would be per-conv interpreters (workers), which
+// were explicitly reverted.
 //
 // Implementation note: chain via .then(fn, fn) so a rejection from the
 // previous call doesn't skip subsequent waiters — every queued fn runs in
@@ -305,21 +292,6 @@ async function opfsResolveDir(parts, create) {
   for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
   return dir;
 }
-async function opfsList(prefix) {
-  prefix = prefix || '';
-  const out = [];
-  const walk = async (dir, p) => {
-    for await (const [n, h] of dir.entries()) {
-      const full = p ? p + '/' + n : n;
-      if (full === '_conversations' || full.startsWith('_conversations/')) continue;
-      if (h.kind === 'file') out.push(full);
-      else await walk(h, full);
-    }
-  };
-  const start = prefix ? await opfsResolveDir(prefix.split('/').filter(Boolean)) : await opfsRoot();
-  await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
-  return out.sort();
-}
 async function opfsReadBytes(path) {
   const { parts, name } = splitPath(path);
   const dir = await opfsResolveDir(parts);
@@ -334,119 +306,6 @@ async function opfsWriteBytes(path, bytes) {
   await w.write(bytes);
   await w.close();
 }
-
-// ---- Pyodide /files ↔ OPFS sync ----
-async function syncOpfsToPy(p, placeholdersList) {
-  const rmTree = (full) => {
-    let stat;
-    try { stat = p.FS.stat(full); } catch (_) { return; }
-    if (p.FS.isDir(stat.mode)) {
-      for (const name of p.FS.readdir(full)) {
-        if (name === '.' || name === '..') continue;
-        rmTree(full + '/' + name);
-      }
-      if (full !== '/files') p.FS.rmdir(full);
-    } else {
-      p.FS.unlink(full);
-    }
-  };
-  rmTree('/files');
-  try { p.FS.mkdir('/files'); } catch (_) {}
-  const files = await opfsList();
-  const hydrated = new Set(files);
-  const ensureDirs = (segs) => {
-    let cur = '/files';
-    for (const s of segs) {
-      cur += '/' + s;
-      try { p.FS.mkdir(cur); } catch (_) {}
-    }
-    return cur;
-  };
-  for (const rel of files) {
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    p.FS.writeFile(dir + '/' + fn, await opfsReadBytes(rel));
-  }
-  const placeholders = new Set();
-  for (const rel of (placeholdersList || [])) {
-    if (hydrated.has(rel)) continue;
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    try {
-      p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
-      placeholders.add(rel);
-    } catch (_) {}
-  }
-  return placeholders;
-}
-
-function bytesEqual(a, b) {
-  if (!a || !b || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-async function syncPyToOpfs(p, placeholders) {
-  const pyFiles = new Set();
-  const walk = (full, rel) => {
-    for (const name of p.FS.readdir(full)) {
-      if (name === '.' || name === '..') continue;
-      const childFull = full + '/' + name;
-      const childRel = rel ? rel + '/' + name : name;
-      const stat = p.FS.stat(childFull);
-      if (p.FS.isFile(stat.mode)) pyFiles.add(childRel);
-      else walk(childFull, childRel);
-    }
-  };
-  walk('/files', '');
-  const filled = [];
-  const written = [];
-  for (const rel of pyFiles) {
-    const newBytes = p.FS.readFile('/files/' + rel);
-    if (placeholders.has(rel) && newBytes.length === 0) continue;
-    let oldBytes = null;
-    try { oldBytes = await opfsReadBytes(rel); } catch (_) {}
-    if (oldBytes && bytesEqual(oldBytes, newBytes)) continue;
-    await opfsWriteBytes(rel, newBytes);
-    written.push(rel);
-    if (placeholders.has(rel)) filled.push(rel);
-  }
-  return { filled, written };
-}
-
-const OPEN_PATCH = `
-import builtins, os
-if getattr(builtins.open, '__name__', None) == '_sandpie_open':
-    if hasattr(builtins, '_original_open'):
-        builtins.open = builtins._original_open
-if hasattr(builtins, '_original_open'):
-    _real_open = builtins._original_open
-else:
-    _real_open = builtins.open
-    builtins._original_open = _real_open
-try:
-    from js import _sandpie_cloud_paths
-    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
-except Exception:
-    _sandpie_cloud_set = set()
-def _sandpie_normalize(path):
-    s = str(path)
-    if s.startswith('/files/'): s = s[len('/files/'):]
-    while s.startswith('./'): s = s[2:]
-    return s.lstrip('/')
-def _sandpie_open(path, *args, **kwargs):
-    n = _sandpie_normalize(path)
-    if n in _sandpie_cloud_set:
-        raise FileNotFoundError(
-            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
-            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
-            f"If you meant a host path (outside /files/), use the read_file tool instead."
-        )
-    return _real_open(path, *args, **kwargs)
-builtins.open = _sandpie_open
-`;
 
 const DISPLAY_PATCH = `
 def _sandpie_display(*objs, **kwargs):
@@ -505,11 +364,9 @@ async function tool_run_python({ code, path, args }, ctx) {
       return { result: `Error: could not read /files/${normPath}: ${e.message}.` };
     }
   }
-  // Serialize the interpreter-touching critical section. Validation + the
-  // OPFS read above don't touch Pyodide, so we let them run outside the
-  // lock (no point queuing on path-read errors). Everything from initPyodide
-  // through the result return mutates global interpreter state — must hold
-  // the lock for the whole stretch.
+  // Serialize the interpreter-touching critical section so concurrent
+  // run_python calls don't race on the shared interpreter's globals
+  // (setStdout closures, IPython.display redirect, etc).
   return withPy(async () => {
     let p;
     try { p = await initPyodide(); }
@@ -519,10 +376,12 @@ async function tool_run_python({ code, path, args }, ctx) {
     try {
       p.setStdout({ batched: s => { stdout += s + '\n'; } });
       p.setStderr({ batched: s => { stderr += s + '\n'; } });
-      const placeholders = await syncOpfsToPy(p, ctx.placeholdersList || []);
-      p.runPython('import os; os.chdir("/files")');
-      self._sandpie_cloud_paths = [...placeholders];
-      try { p.runPython(OPEN_PATCH); } catch (_) {}
+      // Minimal Python environment: stdout/stderr capture + IPython.display
+      // → artifacts redirect + optional argv for `path:` mode. NO OPFS sync.
+      // If the user's code tries to open() a sandpie file, it'll get a
+      // normal Python FileNotFoundError — the LLM has read_file /
+      // write_file / fetch_file tools for actual file access, and it can
+      // discover the failure mode from the error itself.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
@@ -531,14 +390,13 @@ async function tool_run_python({ code, path, args }, ctx) {
       try { p.runPython(DISPLAY_PATCH); } catch (_) {}
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       await p.runPythonAsync(code);
-      const sync = await syncPyToOpfs(p, placeholders);
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
       if (artifacts.length) {
         const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
         out = out ? out + '\n' + note : note;
       }
-      return { result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written };
+      return { result: out || '(no output)', artifacts };
     } catch (e) {
       let msg = '';
       if (e != null) {
@@ -747,7 +605,6 @@ async function handleAgent(req) {
         proxyBase: config.proxyBase || '',
         origin: config.origin || '',
         dbxTokens: config.dbxTokens || null,
-        placeholdersList: config.placeholdersList || [],
       };
       try {
         await runAgent(config, ctx);
@@ -821,7 +678,7 @@ async function handlePy(req) {
   let args;
   try { args = await req.json(); }
   catch (e) { return jsonErr(400, 'bad request body: ' + e.message); }
-  const ctx = { placeholdersList: args.placeholdersList || [] };
+  const ctx = {};
   const out = await tool_run_python(args, ctx);
   return new Response(JSON.stringify(out), {
     status: 200,
