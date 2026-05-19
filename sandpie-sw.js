@@ -83,7 +83,7 @@
 // Version stamp logged on every SW boot — confirms a fresh build is running.
 // If you don't see this after a hard reload, the browser is still serving a
 // stale SW (DevTools → Application → Service Workers → Update or Unregister).
-const SW_VERSION = '1.3.0';
+const SW_VERSION = '1.4.0';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -94,23 +94,29 @@ console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 // initPyodide() — fails with "failed to load" regardless of network state,
 // which is why run_python never worked.
 //
-// Fix: pre-import pyodide.js at top-level. Wrapped in try so a CDN outage
-// at SW-install time can't block message sending — non-python tools and
-// completions keep working; run_python returns a clear error.
+// Pre-import BOTH pyodide.js (the loader, ~500KB) and pyodide.asm.js (the
+// emscripten glue, ~1MB) at top-level so they're in scope before loadPyodide
+// runs. loadPyodide() internally calls importScripts(asm.js) again — when
+// asm.js is already loaded, Pyodide detects that and skips the redundant
+// call. Without the asm.js pre-import, loadPyodide tries the lazy
+// importScripts (illegal past top-level) and throws.
 //
-// NOTE: We deliberately do NOT pre-import pyodide.asm.js here. A previous
-// attempt to pre-import both blocked SW activation on slow networks (the
-// SW install can't complete until every top-level importScripts has parsed,
-// and asm.js is ~1MB of generated JS). loadPyodide() in v0.26.4 fetches
-// pyodide.asm.js itself via its own mechanism — pyodide.js alone is enough
-// to make loadPyodide() reachable.
+// Both wrapped in try so a CDN outage at SW-install time can't break message
+// sending — non-python tools and completions keep working; run_python
+// returns a clear error if Pyodide didn't load. console.log lines confirm
+// which step reached us (visible in DevTools → Application → Service workers
+// → click the SW link to open its console).
 const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
 let _pyodideJsLoaded = false;
 try {
+  console.log('[sandpie-sw] importing pyodide.js…');
   importScripts(PYODIDE_INDEX + 'pyodide.js');
+  console.log('[sandpie-sw] importing pyodide.asm.js…');
+  importScripts(PYODIDE_INDEX + 'pyodide.asm.js');
   _pyodideJsLoaded = true;
+  console.log('[sandpie-sw] pyodide bootstrap scripts loaded');
 } catch (e) {
-  console.warn('[sandpie-sw] pyodide.js failed to load at SW init:', e);
+  console.warn('[sandpie-sw] pyodide bootstrap failed:', e);
 }
 
 self.addEventListener('install', () => self.skipWaiting());

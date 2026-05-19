@@ -4635,21 +4635,30 @@ async function processQueueFor(stream) {
 // the SW's scope (the directory containing sandpie-sw.js).
 const SW_STREAM_PATH = './sandpie-stream';
 
-// Register the SW as soon as the page boots; idempotent so a hard-refresh
-// just re-registers the same script. `skipWaiting + clients.claim` in the
-// SW make updates take effect on next reload without a two-tab dance.
+// Register the SW as soon as the page boots and FORCE an update check.
+// Three guarantees, in order:
+//   1. updateViaCache:'none' tells the browser to bypass its HTTP cache when
+//      fetching sandpie-sw.js itself, so a redeploy is never masked by stale
+//      cache headers (Apache loves to send max-age on .js files).
+//   2. reg.update() proactively asks the browser to re-fetch the SW script
+//      every page load. Combined with skipWaiting + clients.claim in the SW,
+//      the new version takes over on this same page load, no manual unregister.
+//   3. controllerchange wait: don't resolve _swReady until a SW is actually
+//      controlling this page, otherwise the first /sandpie-agent fetch falls
+//      through to the network as a real 404.
 let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie-sw.html needs them. Try sandpie-parallel.html instead.');
   }
-  const reg = await navigator.serviceWorker.register('./sandpie-sw.js');
-  // Wait until the SW is actually controlling this page; otherwise the
-  // first fetch could fall through to the network as a real 404.
+  const reg = await navigator.serviceWorker.register('./sandpie-sw.js', { updateViaCache: 'none' });
+  // Best-effort update check — never blocks the boot if the network is slow.
+  reg.update().catch(e => console.warn('[sandpie] SW update check failed:', e));
   if (!navigator.serviceWorker.controller) {
     await new Promise(resolve => {
       navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
     });
   }
+  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
   return reg;
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
