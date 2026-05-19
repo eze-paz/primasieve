@@ -199,6 +199,12 @@ self.addEventListener('fetch', (event) => {
 
 let py = null;
 let pyInitPromise = null;
+// Pyodide's NativeFS mount handle for /files. Held at module scope so
+// tool_run_python can call nativefs.syncfs() after each user run to push
+// Python-side writes back into OPFS. Null if the mount failed at init
+// (browser without OPFS, permission error, etc.) — Python still runs in
+// MEMFS, just without /files.
+let _nativefs = null;
 async function initPyodide() {
   if (py) return py;
   if (pyInitPromise) return pyInitPromise;
@@ -216,6 +222,22 @@ async function initPyodide() {
   pyInitPromise = (async () => {
     try {
       const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
+      // Lazy OPFS mount at /files. mountNativeFS gives Python a view onto
+      // the user's OPFS via Pyodide's NATIVEFS — reads and writes translate
+      // through to OPFS on demand. No upfront walk, no rmTree, no per-call
+      // sync. tool_run_python calls nativefs.syncfs() after each run to
+      // push pending writes back. If OPFS is unreachable (privacy mode,
+      // permissions, older browser) we log and continue — Python runs
+      // without /files; user code that touches it gets a normal Python
+      // FileNotFoundError.
+      try {
+        const opfsRoot = await navigator.storage.getDirectory();
+        _nativefs = await p.mountNativeFS('/files', opfsRoot);
+        console.log('[sandpie-sw] OPFS mounted at /files');
+      } catch (e) {
+        _nativefs = null;
+        console.warn('[sandpie-sw] OPFS mount failed (Python /files unavailable):', e);
+      }
       py = p;
       return p;
     } catch (e) {
@@ -235,6 +257,7 @@ function resetPyodide(reason) {
   console.warn('[sandpie-sw] resetting Pyodide:', reason);
   py = null;
   pyInitPromise = null;
+  _nativefs = null;  // dies with the interpreter; new init re-mounts
 }
 
 // Heuristic: should we treat this catch as Pyodide being dead?
@@ -376,12 +399,12 @@ async function tool_run_python({ code, path, args }, ctx) {
     try {
       p.setStdout({ batched: s => { stdout += s + '\n'; } });
       p.setStderr({ batched: s => { stderr += s + '\n'; } });
-      // Minimal Python environment: stdout/stderr capture + IPython.display
-      // → artifacts redirect + optional argv for `path:` mode. NO OPFS sync.
-      // If the user's code tries to open() a sandpie file, it'll get a
-      // normal Python FileNotFoundError — the LLM has read_file /
-      // write_file / fetch_file tools for actual file access, and it can
-      // discover the failure mode from the error itself.
+      // Python environment: stdout/stderr capture + IPython.display →
+      // artifacts redirect + optional argv for `path:` mode. /files is
+      // mounted lazily via mountNativeFS at init — Python can use plain
+      // open()/os.listdir/glob and it reads OPFS on demand. Files not
+      // hydrated from Dropbox simply aren't present in /files (no
+      // placeholder shim needed); LLM uses fetch_file to bring them in.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
@@ -390,6 +413,13 @@ async function tool_run_python({ code, path, args }, ctx) {
       try { p.runPython(DISPLAY_PATCH); } catch (_) {}
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       await p.runPythonAsync(code);
+      // Flush any writes Python made into /files back to OPFS. No-op when
+      // Python didn't touch the FS. Skipped (with a warning) if the mount
+      // failed at init — Python had no /files to write to, nothing to flush.
+      if (_nativefs) {
+        try { await _nativefs.syncfs(); }
+        catch (e) { console.warn('[sandpie-sw] syncfs after run_python failed:', e); }
+      }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
       if (artifacts.length) {
