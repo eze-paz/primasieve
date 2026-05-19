@@ -124,7 +124,28 @@
   .dbx-status.connected { background: rgba(63,185,80,0.1); color: #3fb950; }
   .dbx-status.error { background: rgba(248,81,73,0.1); color: #f85149; }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; }
+  /* SidePanel: #messagesWrap is a row container; #messages is always
+     present, #messagesSide is hidden until body.side-open. body.active-right
+     dims #messages and vice-versa — convs stay in their pane and only the
+     "active" label flips. drop-target = a draggable conv is hovering. */
+  #messagesWrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; min-width: 0; }
+  #messagesSide {
+    flex: 1; overflow-y: auto; padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+    scrollbar-gutter: stable; min-width: 0;
+    border-left: 1px solid #30363d;
+  }
+  body:not(.side-open) #messagesSide { display: none; }
+  body.side-open #messages,
+  body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
+  body.side-open.active-left  #messagesSide,
+  body.side-open.active-right #messages {
+    opacity: 0.55; filter: grayscale(0.25); cursor: pointer;
+  }
+  body.side-open.active-left  #messagesSide:hover,
+  body.side-open.active-right #messages:hover { opacity: 0.75; }
+  #messagesWrap.drop-target { outline: 2px dashed #58a6ff; outline-offset: -8px; }
   .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; border-radius: 8px; line-height: 1.5; overflow-wrap: anywhere; }
   .user { align-self: flex-end; background: #58a6ff; color: #fff; white-space: pre-wrap; }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
@@ -482,6 +503,13 @@
     /* Backdrop also sits above the header? No — header z-index 101 stays clickable
        above the backdrop's z-index 99, so the hamburger ends up the close button. */
     main { flex: 1 1 auto; min-height: 0; }
+    /* Mobile: side panel splits the screen too narrow. Hide it entirely
+       (the side conv stays in memory; resizing to desktop brings it back).
+       JS drop handlers also early-return on mobile, so the only way in is
+       the "View in side panel" context menu — and that's a desktop-only
+       option in buildConvLi too. */
+    body.side-open #messagesSide { display: none; }
+    body.side-open #messages { flex: 1; }
     /* Touch-friendly: bigger inputs and bottom-row chat */
     aside input, aside button {
       padding: 0.65rem 0.75rem;
@@ -613,14 +641,14 @@
     background: rgba(88,166,255,0.18);
     border-color: rgba(88,166,255,0.7);
   }
-  #messages.tools-minimized .tool-call:hover {
+  body.tools-minimized .tool-call:hover {
     background: linear-gradient(135deg, rgba(88,166,255,0.14), rgba(88,166,255,0.24));
     border-color: rgba(88,166,255,0.65);
     box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
   }
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
-  #messages.tools-minimized .tool-call {
+  body.tools-minimized .tool-call {
     display: flex;
     align-items: center;
     padding: 0.5rem 0.8rem;
@@ -633,15 +661,15 @@
     white-space: normal;
     overflow: hidden;
   }
-  #messages.tools-minimized .tool-call .tc-expanded { display: none; }
-  #messages.tools-minimized .tool-call .tc-collapsed {
+  body.tools-minimized .tool-call .tc-expanded { display: none; }
+  body.tools-minimized .tool-call .tc-collapsed {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     width: 100%;
     min-width: 0;
   }
-  #messages.tools-minimized .tool-result { display: none; }
+  body.tools-minimized .tool-result { display: none; }
 
   .tc-spinner {
     flex-shrink: 0;
@@ -829,21 +857,28 @@ window._sandpieDisplay = function (html) {
 </aside>
 
 <main>
-  <div id="messages">
-    <div id="welcome" class="welcome">
-      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
-      <div class="welcome-status" id="welcomeStatus"></div>
-      <svg id="welcomeShield" class="welcome-shield" viewBox="0 0 100 120" aria-hidden="true">
-        <defs><clipPath id="welcome-clip"><path d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" /></clipPath></defs>
-        <path class="welcome-shield-outline" d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" />
-      </svg>
-      <div class="welcome-rotating" aria-label="security taglines">
-        <span>nothing escapes the tab</span>
-        <span>zero install</span>
-        <span>designed for security</span>
-        <span>contained AI</span>
+  <!-- #messagesWrap is the dual-pane container. By default only #messages is
+       visible; when the SidePanel controller opens a second conv, the
+       <body> gets `side-open` and #messagesSide becomes the right half.
+       See the SidePanel class for state model. -->
+  <div id="messagesWrap">
+    <div id="messages">
+      <div id="welcome" class="welcome">
+        <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
+        <div class="welcome-status" id="welcomeStatus"></div>
+        <svg id="welcomeShield" class="welcome-shield" viewBox="0 0 100 120" aria-hidden="true">
+          <defs><clipPath id="welcome-clip"><path d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" /></clipPath></defs>
+          <path class="welcome-shield-outline" d="M 50 8 L 90 22 L 90 58 Q 90 100 50 114 Q 10 100 10 58 L 10 22 Z" />
+        </svg>
+        <div class="welcome-rotating" aria-label="security taglines">
+          <span>nothing escapes the tab</span>
+          <span>zero install</span>
+          <span>designed for security</span>
+          <span>contained AI</span>
+        </div>
       </div>
     </div>
+    <div id="messagesSide"></div>
   </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
@@ -3462,6 +3497,10 @@ async function uploadEntry(entry, dirPath) {
 })();
 
 refreshFileList();
+// Instantiate the SidePanel controller before any mountConv call — mountConv
+// reads sidePanel.activeMountTarget() to know which physical panel owns the
+// active conv. Construction wires up the click/drag handlers on #messagesWrap.
+sidePanel = new SidePanel();
 // Restore the last active conversation (if any) and render its history.
 (async () => {
   await refreshConversationList();
@@ -3576,9 +3615,15 @@ function addMsg(role, text = '', host = null) {
   // Stream code passes its captured host explicitly so background streams
   // route into their own (possibly parked / off-DOM) conversation host.
   const target = host || (activeStream() && activeStream().host) || $('messages');
-  const m = $('messages');
-  const visible = target === m || target.parentNode === m;
-  const stick = visible ? isAtBottom(m) : false;
+  // Auto-scroll the container the target lives in — could be #messages
+  // (single-pane or active-left) or #messagesSide (active-right side
+  // panel). Walk up so we don't have to know which.
+  let scrollHost = target;
+  while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
+    scrollHost = scrollHost.parentNode;
+  }
+  const visible = !!scrollHost;
+  const stick = visible ? isAtBottom(scrollHost) : false;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
@@ -3602,7 +3647,7 @@ function addMsg(role, text = '', host = null) {
   // bottom on every new addMsg — burying the actually-ticking timer mid-history.
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
-  if (visible && stick) m.scrollTop = m.scrollHeight;
+  if (visible && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 
@@ -3610,8 +3655,10 @@ function addMsg(role, text = '', host = null) {
 // Bubbles are bound to their backing message via object reference (div._msg),
 // not array index — so rewind survives slices and re-renders cleanly.
 function applyToolsMinimized() {
-  const host = document.getElementById('messages');
-  if (host) host.classList.toggle('tools-minimized', toolsMinimized);
+  // Class lives on <body> so the rule reaches both #messages and
+  // #messagesSide. Previously it was on #messages only, which meant the
+  // side panel kept showing expanded tool calls regardless of the setting.
+  document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
 function bindBubble(div, msgRef) {
@@ -4095,6 +4142,197 @@ class RoundRenderer {
   }
 }
 
+// =============================================================================
+// SidePanel — controller for the dual-conversation view.
+// =============================================================================
+// State model (single source of truth lives in this object):
+//
+//   left      = $('messages')      — primary DOM panel, ALWAYS the host for
+//                                    activeConvId's conv when activeIsRight is
+//                                    false, swaps with right on flip()
+//   right     = $('messagesSide')  — secondary DOM panel, shown iff isOpen
+//   _sideId   = string | null      — conv mounted in the inactive panel
+//   _activeIsRight = bool          — which physical panel currently owns
+//                                    activeConvId. Flips on flip().
+//
+// Public API (everything else in the file goes through THESE four methods —
+// no caller touches body classes or DOM panels directly):
+//   open(id)            — mount conv `id` into the right panel (lazy-loads
+//                         from OPFS if needed). No-op if id is the active
+//                         conv or already in the side panel.
+//   close()             — unmount the side conv; collapse the right panel.
+//   flip()              — swap which side is active. Conv hosts STAY in
+//                         their pane; only the activeConvId↔sideId labels
+//                         and the active-left/active-right body class swap.
+//   notifyDeleted(id)   — called by deleteConv to clear references if the
+//                         deleted conv was on the side.
+//
+// Read-only accessors:
+//   isOpen, sideId, activeIsRight, activeMountTarget()
+//
+// Invariant: every public method ends by calling _render(), which derives
+// body.side-open / body.active-left / body.active-right from current state.
+// That's the single place DOM/CSS sync happens — no scattered classList
+// toggles elsewhere.
+//
+// Mobile (<=768px): CSS hides the right panel; buildConvLi suppresses the
+// "View in side panel" menu item; the drop handler early-returns. The
+// controller itself is viewport-agnostic — it'll happily track state for
+// a panel that's CSS-hidden, and the user gets it back on resize.
+// =============================================================================
+class SidePanel {
+  constructor() {
+    this.left = $('messages');
+    this.right = $('messagesSide');
+    this.wrap = $('messagesWrap');
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    this._wireEvents();
+  }
+
+  // ─── Read-only ───────────────────────────────────────────────────────────
+  get isOpen() { return this._sideId !== null; }
+  get sideId() { return this._sideId; }
+  get activeIsRight() { return this._activeIsRight; }
+  // Where mountConv should put the active conv's host. Returns the panel
+  // currently owning activeConvId. (Conv hosts are explicit DOM children
+  // and are never moved by anything except SidePanel methods + mountConv.)
+  activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
+
+  // ─── State operations ───────────────────────────────────────────────────
+
+  async open(id) {
+    if (!id) return;
+    if (id === activeConvId) return;      // already showing
+    if (id === this._sideId) return;      // already in side
+    if (this._activeIsRight) return;      // would clobber the active conv
+
+    // Park the previous side conv (if any) so its host detaches cleanly.
+    if (this._sideId) {
+      const prev = convStreams.get(this._sideId);
+      prev?.host?.parentNode?.removeChild(prev.host);
+    }
+    await this._lazyLoad(id);
+    this._sideId = id;
+    const s = convStreams.get(id);
+    if (s?.host) this.right.appendChild(s.host);
+    this._render();
+    // Land on the latest messages, not the top of history. rAF so the
+    // browser has measured the just-mounted host before we scroll.
+    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
+    refreshConversationList();
+  }
+
+  close() {
+    if (!this.isOpen) return;
+    if (this._activeIsRight) this.flip();  // bring user back to left first
+    const s = convStreams.get(this._sideId);
+    s?.host?.parentNode?.removeChild(s.host);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshConversationList();
+  }
+
+  flip() {
+    if (!this.isOpen) return;
+    // Swap the activeConvId ↔ sideId labels. Hosts stay where they are
+    // — _render flips active-left/active-right and the dimming follows.
+    [activeConvId, this._sideId] = [this._sideId, activeConvId];
+    this._activeIsRight = !this._activeIsRight;
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    const s = convStreams.get(activeConvId);
+    messages = s?.messages || [];
+    this._render();
+    refreshSendButtonForActive();
+    refreshTokenMeter();
+    refreshWelcome();
+    refreshConversationList();
+  }
+
+  // Called from deleteConv to clean up references to the deleted conv.
+  // If the deleted conv was the active one AND a side conv exists, we
+  // promote the side to active so the user isn't stranded.
+  notifyDeleted(id) {
+    if (id === this._sideId) {
+      this._sideId = null;
+      this._activeIsRight = false;
+      this._render();
+    }
+  }
+
+  // ─── Private ─────────────────────────────────────────────────────────────
+
+  // Hydrate a conv from OPFS into convStreams. Same logic as loadConv but
+  // local to here so opening into the side doesn't disturb activeConvId.
+  async _lazyLoad(id) {
+    if (convStreams.has(id)) return;
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    for (const m of s.messages) renderHistoricalMessage(m, s.host);
+  }
+
+  // The ONLY place that mutates body classes for panel state. Every public
+  // method calls this last so derived DOM/CSS is always in sync with state.
+  _render() {
+    const b = document.body.classList;
+    b.toggle('side-open',     this.isOpen);
+    b.toggle('active-left',   this.isOpen && !this._activeIsRight);
+    b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
+  }
+
+  // Click-to-swap + drag-drop wiring. Attached once at construction.
+  _wireEvents() {
+    if (!this.wrap || !this.left || !this.right) return;
+
+    // Click on the dim panel → flip. Skips clicks on interactive children
+    // and text selections so it doesn't fight normal interactions.
+    const onPanelClick = (targetIsRight) => (ev) => {
+      if (!this.isOpen) return;
+      if (targetIsRight === this._activeIsRight) return;  // already active
+      const sel = window.getSelection?.().toString();
+      if (sel && sel.length > 0) return;
+      if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
+      this.flip();
+    };
+    this.left.addEventListener('click',  onPanelClick(false));
+    this.right.addEventListener('click', onPanelClick(true));
+
+    // HTML5 drag-drop: a conv LI carries text/sandpie-conv-id; dropping it
+    // anywhere in the wrap opens it in the side panel. Touch devices don't
+    // fire these events, so they fall back to the right-click menu.
+    this.wrap.addEventListener('dragover', (ev) => {
+      if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+      this.wrap.classList.add('drop-target');
+    });
+    this.wrap.addEventListener('dragleave', (ev) => {
+      if (ev.target === this.wrap) this.wrap.classList.remove('drop-target');
+    });
+    this.wrap.addEventListener('drop', (ev) => {
+      this.wrap.classList.remove('drop-target');
+      if (isMobileViewport()) return;
+      const id = ev.dataTransfer?.getData('text/sandpie-conv-id');
+      if (!id) return;
+      ev.preventDefault();
+      this.open(id);
+    });
+  }
+}
+
+function isMobileViewport() {
+  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+}
+
+// Instantiated below after all dependencies (convStreams, ensureStream, opfs,
+// renderHistoricalMessage, addMsg, refresh* functions) are defined.
+let sidePanel = null;
+
 // === Total-interaction timer (covers all rounds + tool execution) ============
 // Per-stream: each conversation's timer lives on its stream record so a
 // background conv keeps ticking against its own bubble host without colliding
@@ -4223,15 +4461,19 @@ function parkActiveConv() {
 }
 
 // Mount a conv as the active one: rebind module-level `messages`, attach its
-// host to #messages, update the send button to reflect this conv's state.
+// host to whichever DOM panel currently owns "active" (left by default; right
+// after the user has clicked into a side-panel conv), update the send button.
 function mountConv(convId) {
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
-    const m = $('messages');
-    if (s.host.parentNode !== m) m.appendChild(s.host);
+    // The active mount target is owned by SidePanel — when the side panel
+    // is closed, this is always #messages; when open, it's whichever
+    // panel SidePanel currently considers active.
+    const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
+    if (s.host.parentNode !== target) target.appendChild(s.host);
   } else {
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
@@ -4241,6 +4483,9 @@ function mountConv(convId) {
 
 async function loadConv(id) {
   if (id === activeConvId) return;
+  // If the requested conv is already shown in the side panel, clicking it
+  // in the sidebar just flips which side is active — the host doesn't move.
+  if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
   // Snapshot whichever conv we're leaving — its bubbles + state persist
   // unmounted so any in-flight stream keeps writing into them safely.
   parkActiveConv();
@@ -4405,10 +4650,15 @@ async function deleteConv(id, title) {
     if (stream.pyWorker) { try { stream.pyWorker.terminate(); } catch {} stream.pyWorker = null; }
     convStreams.delete(id);
   }
+  // Tell SidePanel first so it can drop its reference + collapse the right
+  // panel if this conv was the side one. If the active conv was deleted AND
+  // a side conv exists, flip it to active so the user isn't stranded.
+  if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
+    if (sidePanel?.isOpen) sidePanel.flip();
     refreshSendButtonForActive();
     refreshTokenMeter();
     updateVersionDisplay();
@@ -4439,12 +4689,33 @@ function buildConvLi(c) {
   }
   li.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
-    showContextMenu(ev.clientX, ev.clientY, [
-      { label: 'Rename',                           action: () => renameConv(c.id, c.title) },
-      { label: c.pinned ? 'Unpin' : 'Pin',         action: () => togglePinConv(c.id, c.pinned) },
+    const items = [
+      { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
+      { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
       { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
-      { label: 'Delete', danger: true,             action: () => deleteConv(c.id, c.title) },
-    ]);
+    ];
+    // Side-panel entry: only offer if (a) viewport can fit two panels and
+    // (b) this conv isn't already showing in either panel.
+    const sideOpen = sidePanel?.isOpen;
+    const inActive = c.id === activeConvId;
+    const inSide   = sideOpen && c.id === sidePanel.sideId;
+    if (!isMobileViewport() && !inActive && !inSide) {
+      items.push({ label: 'View in side panel', action: () => sidePanel.open(c.id) });
+    }
+    if (inSide) {
+      items.push({ label: 'Close side panel', action: () => sidePanel.close() });
+    }
+    items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
+    showContextMenu(ev.clientX, ev.clientY, items);
+  });
+  // HTML5 drag — dropping the LI onto #messagesWrap opens it in the side
+  // panel (the wrap's dragover/drop handlers, wired in SidePanel._wireEvents,
+  // read the carried `text/sandpie-conv-id`). Touch devices don't fire HTML5
+  // drag events; they get the same affordance via the context menu above.
+  li.draggable = true;
+  li.addEventListener('dragstart', (ev) => {
+    ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
+    ev.dataTransfer.effectAllowed = 'copy';
   });
   return li;
 }
