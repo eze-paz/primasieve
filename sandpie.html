@@ -3646,6 +3646,37 @@ class SidePanel {
     }
   }
 
+  // Side conv becomes active; side panel collapses back to single-pane.
+  // Used by deleteConv when the active conv is the one being deleted but a
+  // side conv exists. flip() is the wrong primitive there — it only swaps
+  // the `activeConvId ↔ sideId` labels, leaving the surviving conv's HOST
+  // mounted in the (now-hidden) side panel and the new mount target wrong.
+  // This explicitly moves the host, clears the side state, and returns
+  // `_activeIsRight` to false so future mountConv calls land in #messages.
+  // Caller is responsible for clearing the deleted conv's activeConvId
+  // BEFORE calling this — we only promote, we don't validate.
+  promoteSideToActive() {
+    if (!this.isOpen) return false;
+    const sId = this._sideId;
+    const s = convStreams.get(sId);
+    if (s && s.host) {
+      // Move from right pane → left pane. The host's bubbles stay attached
+      // to it through the move, so no re-render is needed.
+      if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
+      this.left.appendChild(s.host);
+    }
+    activeConvId = sId;
+    messages = (s && s.messages) || [];
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshSendButtonForActive();
+    refreshTokenMeter();
+    refreshWelcome();
+    return true;
+  }
+
   // ─── Private ─────────────────────────────────────────────────────────────
 
   // Hydrate a conv from OPFS into convStreams. Same logic as loadConv but
@@ -4719,18 +4750,29 @@ async function deleteConv(id, title) {
     convStreams.delete(id);
   }
   // Tell SidePanel first so it can drop its reference + collapse the right
-  // panel if this conv was the side one. If the active conv was deleted AND
-  // a side conv exists, flip it to active so the user isn't stranded.
+  // panel if this conv was the side one. (No-op if id is the active conv.)
   if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
-    if (sidePanel?.isOpen) sidePanel.flip();
-    refreshSendButtonForActive();
-    refreshTokenMeter();
-    updateVersionDisplay();
-    refreshWelcome();
+    // If a side conv exists, promote it to active — moves its host from
+    // #messagesSide → #messages and collapses the side layout. We DO NOT
+    // use sidePanel.flip() here: flip only swaps the activeConvId/sideId
+    // labels, leaving the surviving conv's host in the (now-hidden) side
+    // panel and mountConv targeting the wrong pane on subsequent loads.
+    // promoteSideToActive sets messages + activeConvId itself, so we only
+    // run the post-state UI refreshers below if it didn't fire.
+    const promoted = sidePanel?.promoteSideToActive();
+    if (!promoted) {
+      refreshSendButtonForActive();
+      refreshTokenMeter();
+      updateVersionDisplay();
+      refreshWelcome();
+    } else {
+      // promoteSideToActive already ran send/token/welcome; just version.
+      updateVersionDisplay();
+    }
   }
   await refreshConversationList();
 }
