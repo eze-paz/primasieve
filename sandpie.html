@@ -4874,15 +4874,25 @@ async function processQueueFor(stream) {
   stream.queueAborted = false;
   updateQueueCount(stream);
 
-  while (stream.queue.length > 0) {
-    const text = stream.queue.shift();
+  try {
+    while (stream.queue.length > 0) {
+      const text = stream.queue.shift();
+      updateQueueCount(stream);
+      await sendSingle(text, stream);
+      if (stream.queueAborted) break;
+    }
+  } finally {
+    stream.isProcessing = false;
     updateQueueCount(stream);
-    await sendSingle(text, stream);
-    if (stream.queueAborted) break;
   }
 
-  stream.isProcessing = false;
-  updateQueueCount(stream);
+  // Messages enqueued *while* we were running this pass (especially during
+  // an abort/teardown window — rewind, Stop, etc.) would have bounced off
+  // the `isProcessing` early-return in the entry. Now that we're idle, give
+  // them a fresh pass. Recursive but non-overlapping: the re-entry sees
+  // isProcessing=false, queue non-empty, and starts a new loop. Stops when
+  // the queue drains.
+  if (stream.queue.length > 0) processQueueFor(stream);
 }
 
 // ============================================================
