@@ -3497,6 +3497,197 @@ async function uploadEntry(entry, dirPath) {
 })();
 
 refreshFileList();
+// =============================================================================
+// SidePanel — controller for the dual-conversation view.
+// =============================================================================
+// State model (single source of truth lives in this object):
+//
+//   left      = $('messages')      — primary DOM panel, ALWAYS the host for
+//                                    activeConvId's conv when activeIsRight is
+//                                    false, swaps with right on flip()
+//   right     = $('messagesSide')  — secondary DOM panel, shown iff isOpen
+//   _sideId   = string | null      — conv mounted in the inactive panel
+//   _activeIsRight = bool          — which physical panel currently owns
+//                                    activeConvId. Flips on flip().
+//
+// Public API (everything else in the file goes through THESE four methods —
+// no caller touches body classes or DOM panels directly):
+//   open(id)            — mount conv `id` into the right panel (lazy-loads
+//                         from OPFS if needed). No-op if id is the active
+//                         conv or already in the side panel.
+//   close()             — unmount the side conv; collapse the right panel.
+//   flip()              — swap which side is active. Conv hosts STAY in
+//                         their pane; only the activeConvId↔sideId labels
+//                         and the active-left/active-right body class swap.
+//   notifyDeleted(id)   — called by deleteConv to clear references if the
+//                         deleted conv was on the side.
+//
+// Read-only accessors:
+//   isOpen, sideId, activeIsRight, activeMountTarget()
+//
+// Invariant: every public method ends by calling _render(), which derives
+// body.side-open / body.active-left / body.active-right from current state.
+// That's the single place DOM/CSS sync happens — no scattered classList
+// toggles elsewhere.
+//
+// Mobile (<=768px): CSS hides the right panel; buildConvLi suppresses the
+// "View in side panel" menu item; the drop handler early-returns. The
+// controller itself is viewport-agnostic — it'll happily track state for
+// a panel that's CSS-hidden, and the user gets it back on resize.
+// =============================================================================
+class SidePanel {
+  constructor() {
+    this.left = $('messages');
+    this.right = $('messagesSide');
+    this.wrap = $('messagesWrap');
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    this._wireEvents();
+  }
+
+  // ─── Read-only ───────────────────────────────────────────────────────────
+  get isOpen() { return this._sideId !== null; }
+  get sideId() { return this._sideId; }
+  get activeIsRight() { return this._activeIsRight; }
+  // Where mountConv should put the active conv's host. Returns the panel
+  // currently owning activeConvId. (Conv hosts are explicit DOM children
+  // and are never moved by anything except SidePanel methods + mountConv.)
+  activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
+
+  // ─── State operations ───────────────────────────────────────────────────
+
+  async open(id) {
+    if (!id) return;
+    if (id === activeConvId) return;      // already showing
+    if (id === this._sideId) return;      // already in side
+    if (this._activeIsRight) return;      // would clobber the active conv
+
+    // Park the previous side conv (if any) so its host detaches cleanly.
+    if (this._sideId) {
+      const prev = convStreams.get(this._sideId);
+      prev?.host?.parentNode?.removeChild(prev.host);
+    }
+    await this._lazyLoad(id);
+    this._sideId = id;
+    const s = convStreams.get(id);
+    if (s?.host) this.right.appendChild(s.host);
+    this._render();
+    // Land on the latest messages, not the top of history. rAF so the
+    // browser has measured the just-mounted host before we scroll.
+    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
+    refreshConversationList();
+  }
+
+  close() {
+    if (!this.isOpen) return;
+    if (this._activeIsRight) this.flip();  // bring user back to left first
+    const s = convStreams.get(this._sideId);
+    s?.host?.parentNode?.removeChild(s.host);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshConversationList();
+  }
+
+  flip() {
+    if (!this.isOpen) return;
+    // Swap the activeConvId ↔ sideId labels. Hosts stay where they are
+    // — _render flips active-left/active-right and the dimming follows.
+    [activeConvId, this._sideId] = [this._sideId, activeConvId];
+    this._activeIsRight = !this._activeIsRight;
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    const s = convStreams.get(activeConvId);
+    messages = s?.messages || [];
+    this._render();
+    refreshSendButtonForActive();
+    refreshTokenMeter();
+    refreshWelcome();
+    refreshConversationList();
+  }
+
+  // Called from deleteConv to clean up references to the deleted conv.
+  // If the deleted conv was the active one AND a side conv exists, we
+  // promote the side to active so the user isn't stranded.
+  notifyDeleted(id) {
+    if (id === this._sideId) {
+      this._sideId = null;
+      this._activeIsRight = false;
+      this._render();
+    }
+  }
+
+  // ─── Private ─────────────────────────────────────────────────────────────
+
+  // Hydrate a conv from OPFS into convStreams. Same logic as loadConv but
+  // local to here so opening into the side doesn't disturb activeConvId.
+  async _lazyLoad(id) {
+    if (convStreams.has(id)) return;
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    for (const m of s.messages) renderHistoricalMessage(m, s.host);
+  }
+
+  // The ONLY place that mutates body classes for panel state. Every public
+  // method calls this last so derived DOM/CSS is always in sync with state.
+  _render() {
+    const b = document.body.classList;
+    b.toggle('side-open',     this.isOpen);
+    b.toggle('active-left',   this.isOpen && !this._activeIsRight);
+    b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
+  }
+
+  // Click-to-swap + drag-drop wiring. Attached once at construction.
+  _wireEvents() {
+    if (!this.wrap || !this.left || !this.right) return;
+
+    // Click on the dim panel → flip. Skips clicks on interactive children
+    // and text selections so it doesn't fight normal interactions.
+    const onPanelClick = (targetIsRight) => (ev) => {
+      if (!this.isOpen) return;
+      if (targetIsRight === this._activeIsRight) return;  // already active
+      const sel = window.getSelection?.().toString();
+      if (sel && sel.length > 0) return;
+      if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
+      this.flip();
+    };
+    this.left.addEventListener('click',  onPanelClick(false));
+    this.right.addEventListener('click', onPanelClick(true));
+
+    // HTML5 drag-drop: a conv LI carries text/sandpie-conv-id; dropping it
+    // anywhere in the wrap opens it in the side panel. Touch devices don't
+    // fire these events, so they fall back to the right-click menu.
+    this.wrap.addEventListener('dragover', (ev) => {
+      if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+      this.wrap.classList.add('drop-target');
+    });
+    this.wrap.addEventListener('dragleave', (ev) => {
+      if (ev.target === this.wrap) this.wrap.classList.remove('drop-target');
+    });
+    this.wrap.addEventListener('drop', (ev) => {
+      this.wrap.classList.remove('drop-target');
+      if (isMobileViewport()) return;
+      const id = ev.dataTransfer?.getData('text/sandpie-conv-id');
+      if (!id) return;
+      ev.preventDefault();
+      this.open(id);
+    });
+  }
+}
+
+function isMobileViewport() {
+  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+}
+
+// Instantiated below after all dependencies (convStreams, ensureStream, opfs,
+// renderHistoricalMessage, addMsg, refresh* functions) are defined.
+let sidePanel = null;
+
 // Instantiate the SidePanel controller before any mountConv call — mountConv
 // reads sidePanel.activeMountTarget() to know which physical panel owns the
 // active conv. Construction wires up the click/drag handlers on #messagesWrap.
@@ -4141,197 +4332,6 @@ class RoundRenderer {
     }
   }
 }
-
-// =============================================================================
-// SidePanel — controller for the dual-conversation view.
-// =============================================================================
-// State model (single source of truth lives in this object):
-//
-//   left      = $('messages')      — primary DOM panel, ALWAYS the host for
-//                                    activeConvId's conv when activeIsRight is
-//                                    false, swaps with right on flip()
-//   right     = $('messagesSide')  — secondary DOM panel, shown iff isOpen
-//   _sideId   = string | null      — conv mounted in the inactive panel
-//   _activeIsRight = bool          — which physical panel currently owns
-//                                    activeConvId. Flips on flip().
-//
-// Public API (everything else in the file goes through THESE four methods —
-// no caller touches body classes or DOM panels directly):
-//   open(id)            — mount conv `id` into the right panel (lazy-loads
-//                         from OPFS if needed). No-op if id is the active
-//                         conv or already in the side panel.
-//   close()             — unmount the side conv; collapse the right panel.
-//   flip()              — swap which side is active. Conv hosts STAY in
-//                         their pane; only the activeConvId↔sideId labels
-//                         and the active-left/active-right body class swap.
-//   notifyDeleted(id)   — called by deleteConv to clear references if the
-//                         deleted conv was on the side.
-//
-// Read-only accessors:
-//   isOpen, sideId, activeIsRight, activeMountTarget()
-//
-// Invariant: every public method ends by calling _render(), which derives
-// body.side-open / body.active-left / body.active-right from current state.
-// That's the single place DOM/CSS sync happens — no scattered classList
-// toggles elsewhere.
-//
-// Mobile (<=768px): CSS hides the right panel; buildConvLi suppresses the
-// "View in side panel" menu item; the drop handler early-returns. The
-// controller itself is viewport-agnostic — it'll happily track state for
-// a panel that's CSS-hidden, and the user gets it back on resize.
-// =============================================================================
-class SidePanel {
-  constructor() {
-    this.left = $('messages');
-    this.right = $('messagesSide');
-    this.wrap = $('messagesWrap');
-    this._sideId = null;
-    this._activeIsRight = false;
-    this._render();
-    this._wireEvents();
-  }
-
-  // ─── Read-only ───────────────────────────────────────────────────────────
-  get isOpen() { return this._sideId !== null; }
-  get sideId() { return this._sideId; }
-  get activeIsRight() { return this._activeIsRight; }
-  // Where mountConv should put the active conv's host. Returns the panel
-  // currently owning activeConvId. (Conv hosts are explicit DOM children
-  // and are never moved by anything except SidePanel methods + mountConv.)
-  activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
-
-  // ─── State operations ───────────────────────────────────────────────────
-
-  async open(id) {
-    if (!id) return;
-    if (id === activeConvId) return;      // already showing
-    if (id === this._sideId) return;      // already in side
-    if (this._activeIsRight) return;      // would clobber the active conv
-
-    // Park the previous side conv (if any) so its host detaches cleanly.
-    if (this._sideId) {
-      const prev = convStreams.get(this._sideId);
-      prev?.host?.parentNode?.removeChild(prev.host);
-    }
-    await this._lazyLoad(id);
-    this._sideId = id;
-    const s = convStreams.get(id);
-    if (s?.host) this.right.appendChild(s.host);
-    this._render();
-    // Land on the latest messages, not the top of history. rAF so the
-    // browser has measured the just-mounted host before we scroll.
-    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
-    refreshConversationList();
-  }
-
-  close() {
-    if (!this.isOpen) return;
-    if (this._activeIsRight) this.flip();  // bring user back to left first
-    const s = convStreams.get(this._sideId);
-    s?.host?.parentNode?.removeChild(s.host);
-    this._sideId = null;
-    this._activeIsRight = false;
-    this._render();
-    refreshConversationList();
-  }
-
-  flip() {
-    if (!this.isOpen) return;
-    // Swap the activeConvId ↔ sideId labels. Hosts stay where they are
-    // — _render flips active-left/active-right and the dimming follows.
-    [activeConvId, this._sideId] = [this._sideId, activeConvId];
-    this._activeIsRight = !this._activeIsRight;
-    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
-    const s = convStreams.get(activeConvId);
-    messages = s?.messages || [];
-    this._render();
-    refreshSendButtonForActive();
-    refreshTokenMeter();
-    refreshWelcome();
-    refreshConversationList();
-  }
-
-  // Called from deleteConv to clean up references to the deleted conv.
-  // If the deleted conv was the active one AND a side conv exists, we
-  // promote the side to active so the user isn't stranded.
-  notifyDeleted(id) {
-    if (id === this._sideId) {
-      this._sideId = null;
-      this._activeIsRight = false;
-      this._render();
-    }
-  }
-
-  // ─── Private ─────────────────────────────────────────────────────────────
-
-  // Hydrate a conv from OPFS into convStreams. Same logic as loadConv but
-  // local to here so opening into the side doesn't disturb activeConvId.
-  async _lazyLoad(id) {
-    if (convStreams.has(id)) return;
-    let data;
-    try { data = JSON.parse(await opfs.read(convPath(id))); }
-    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
-    const s = ensureStream(id);
-    s.messages = (data.messages || []).slice();
-    for (const m of s.messages) renderHistoricalMessage(m, s.host);
-  }
-
-  // The ONLY place that mutates body classes for panel state. Every public
-  // method calls this last so derived DOM/CSS is always in sync with state.
-  _render() {
-    const b = document.body.classList;
-    b.toggle('side-open',     this.isOpen);
-    b.toggle('active-left',   this.isOpen && !this._activeIsRight);
-    b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
-  }
-
-  // Click-to-swap + drag-drop wiring. Attached once at construction.
-  _wireEvents() {
-    if (!this.wrap || !this.left || !this.right) return;
-
-    // Click on the dim panel → flip. Skips clicks on interactive children
-    // and text selections so it doesn't fight normal interactions.
-    const onPanelClick = (targetIsRight) => (ev) => {
-      if (!this.isOpen) return;
-      if (targetIsRight === this._activeIsRight) return;  // already active
-      const sel = window.getSelection?.().toString();
-      if (sel && sel.length > 0) return;
-      if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
-      this.flip();
-    };
-    this.left.addEventListener('click',  onPanelClick(false));
-    this.right.addEventListener('click', onPanelClick(true));
-
-    // HTML5 drag-drop: a conv LI carries text/sandpie-conv-id; dropping it
-    // anywhere in the wrap opens it in the side panel. Touch devices don't
-    // fire these events, so they fall back to the right-click menu.
-    this.wrap.addEventListener('dragover', (ev) => {
-      if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect = 'copy';
-      this.wrap.classList.add('drop-target');
-    });
-    this.wrap.addEventListener('dragleave', (ev) => {
-      if (ev.target === this.wrap) this.wrap.classList.remove('drop-target');
-    });
-    this.wrap.addEventListener('drop', (ev) => {
-      this.wrap.classList.remove('drop-target');
-      if (isMobileViewport()) return;
-      const id = ev.dataTransfer?.getData('text/sandpie-conv-id');
-      if (!id) return;
-      ev.preventDefault();
-      this.open(id);
-    });
-  }
-}
-
-function isMobileViewport() {
-  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-}
-
-// Instantiated below after all dependencies (convStreams, ensureStream, opfs,
-// renderHistoricalMessage, addMsg, refresh* functions) are defined.
-let sidePanel = null;
 
 // === Total-interaction timer (covers all rounds + tool execution) ============
 // Per-stream: each conversation's timer lives on its stream record so a
