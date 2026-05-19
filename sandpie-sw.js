@@ -30,6 +30,82 @@
 //                                                 loop)
 //   POST /sandpie-py { code, argv, placeholdersList } → run python once
 
+// Version stamp so you can tell at a glance whether a fresh SW build
+// is actually running. Logged on every SW boot (install, activate, and
+// any cold-start after idle termination). If you don't see this in the
+// console after a hard refresh, the browser is still serving a stale
+// SW — Application → Service Workers → Update will force a refresh.
+const SW_VERSION = '1.2.4';
+console.log('[sandpie-sw] boot — version=' + SW_VERSION);
+
+// Silence one specific Pyodide-emitted warning that spams the console
+// on every SW boot. Pyodide calls self.addEventListener('message', ...)
+// from inside loadPyodide(), which is past the SW's initial-evaluation
+// window — Chrome warns "Event handler of 'message' event must be added
+// on the initial evaluation of worker script." once per addEventListener
+// call. The handler still works while the SW is alive (the only thing
+// Chrome's note actually disables is "wake the terminated SW via a
+// 'message' postMessage", which we don't use — the page wakes us via
+// fetch to /sandpie-agent). So the warning is informational noise.
+// Filter ONLY this exact string so unrelated warnings still surface.
+const _origWarn = console.warn;
+console.warn = function (...args) {
+  if (typeof args[0] === 'string' && args[0].indexOf("Event handler of 'message' event must be added on the initial evaluation") !== -1) {
+    return;
+  }
+  _origWarn.apply(console, args);
+};
+// Pyodide's package-loading logger sometimes uses console.log directly
+// (in addition to the messageCallback option). Filter those exact patterns
+// so the SW console isn't flooded with "Loading micropip…" / "Loaded X" /
+// "already loaded" / "No new packages to load" / "Attempted install" lines
+// on every run_python call. Other console.log usage passes through.
+const _origLog = console.log;
+const _PYO_NOISE = [
+  /^Loading [\w\-., ]+$/,
+  /^Loaded [\w\-., ]+$/,
+  /already loaded from default channel$/,
+  /^No new packages to load$/,
+  /^Attempted install$/,
+];
+console.log = function (...args) {
+  const s = args[0];
+  if (typeof s === 'string') {
+    for (const re of _PYO_NOISE) if (re.test(s)) return;
+  }
+  _origLog.apply(console, args);
+};
+
+// importScripts() in a Service Worker is only legal during the initial
+// synchronous evaluation of the SW script (i.e. right here at the top),
+// or synchronously inside the install event handler. Calling it lazily
+// from inside a fetch handler / async function throws "failed to load"
+// regardless of network state.
+//
+// Pyodide's loadPyodide() internally calls importScripts() a SECOND time
+// to fetch pyodide.asm.js. That second call is past the legal window and
+// fails with the same "failed to load" error. So we pre-load BOTH scripts
+// here at the top — Pyodide detects pyodide.asm.js is already in scope
+// and skips its own importScripts call.
+//
+// Cost: ~500KB pyodide.js + ~1MB pyodide.asm.js on SW boot (HTTP-cached
+// after first time, so usually instant). The heavy ~10MB WASM payload
+// is still loaded lazily by loadPyodide() via fetch (not importScripts),
+// so we don't pay that until run_python is actually called.
+//
+// Wrapped in try so the SW still installs successfully on offline /
+// blocked-CDN networks — non-python tools keep working; run_python
+// then reports Pyodide unavailable.
+const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+let _pyodideJsLoaded = false;
+try {
+  importScripts(PYODIDE_INDEX + 'pyodide.js');
+  importScripts(PYODIDE_INDEX + 'pyodide.asm.js');
+  _pyodideJsLoaded = true;
+} catch (e) {
+  console.warn('[sandpie-sw] Pyodide bootstrap scripts failed to load:', e);
+}
+
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
@@ -53,9 +129,22 @@ let pyInitPromise = null;
 async function initPyodide() {
   if (py) return py;
   if (pyInitPromise) return pyInitPromise;
+  if (!_pyodideJsLoaded) {
+    throw new Error('Pyodide bootstrap script unavailable (CDN unreachable when SW installed). Reload the page after going online to retry.');
+  }
   pyInitPromise = (async () => {
-    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    // pyodide.js was imported at the top of this file (must happen at SW
+    // script parse time — SWs forbid importScripts past that point). Now
+    // just instantiate the runtime; loadPyodide is in the global scope.
+    // Do NOT pass stdout/stderr to loadPyodide here. Earlier we did, to
+    // silence the loader chatter, but that no-op stuck around even after
+    // per-call setStdout() and made print() output silently disappear
+    // ("(no output)" returned even when the script had clearly printed).
+    // Loader noise is handled at the right layer instead:
+    //   * `messageCallback: () => {}` on loadPackagesFromImports (below)
+    //   * console.log filter at SW top-level (catches anything that leaks
+    //     through to console.log directly).
+    py = await loadPyodide({ indexURL: PYODIDE_INDEX });
     try { py.FS.mkdir('/files'); } catch (_) {}
     return py;
   })();
@@ -261,6 +350,38 @@ except Exception:
 // Tool implementations (run inside the SW).
 // ============================================================
 
+// Append corrective guidance for common Pyodide foot-guns so the model's next
+// retry has actionable info instead of just a raw traceback. Small models
+// (Gemma e2b etc.) re-emit the same broken pattern when given only Python's
+// error text — a HINT block with a worked example breaks the loop.
+function pythonErrorHint(errText) {
+  const hints = [];
+  // asyncio.run() inside an already-running loop — common because models default
+  // to wrapping coroutines in asyncio.run() instead of using top-level await.
+  if (/asyncio\.run\(\) cannot be called from a running event loop/i.test(errText)
+      || /coroutine .* was never awaited/i.test(errText)) {
+    hints.push(
+      'HINT: Pyodide already runs inside an event loop, so asyncio.run() is forbidden here. ' +
+      'Use top-level await directly. Also note pyfetch() returns a FetchResponse object, not the body — you must call .string() or .bytes() on it. ' +
+      'Correct pattern for fetching a URL and saving to OPFS:\n' +
+      '    from pyodide.http import pyfetch\n' +
+      '    r = await pyfetch("https://example.com")\n' +
+      '    body = await r.string()           # or: await r.bytes() for binary\n' +
+      '    open("example.html", "w").write(body)\n' +
+      '    print("saved", len(body), "bytes")\n' +
+      'No asyncio.run, no async def wrapper needed — just await at the top of the snippet.'
+    );
+  }
+  // open() on something that isn't a path (e.g. open(FetchResponse, "w")).
+  if (/expected str, bytes or os\.PathLike/i.test(errText)) {
+    hints.push(
+      'HINT: open() needs a filename string. You probably passed a FetchResponse or other object. ' +
+      'For URLs use: r = await pyfetch(url); body = await r.string(); open("file","w").write(body).'
+    );
+  }
+  return hints.length ? '\n--- hint ---\n' + hints.join('\n') : '';
+}
+
 async function tool_run_python({ code, path, args }, ctx) {
   if (!code && !path) return { result: 'Error: provide either "code" or "path".' };
   if (code && path) return { result: 'Error: provide either "code" or "path", not both.' };
@@ -292,11 +413,16 @@ async function tool_run_python({ code, path, args }, ctx) {
     }
     self._sandpieDisplay = (html) => artifacts.push(html);
     try { p.runPython(DISPLAY_PATCH); } catch (_) {}
-    try { await p.loadPackagesFromImports(code); } catch (_) {}
+    // messageCallback: () => {} silences the per-call "Loading X…" /
+    // "Loaded X" logger spam that pyodide emits on every package-check.
+    try { await p.loadPackagesFromImports(code, { messageCallback: () => {}, errorCallback: () => {} }); } catch (_) {}
     await p.runPythonAsync(code);
     const sync = await syncPyToOpfs(p, placeholders);
     let out = stdout.trimEnd();
-    if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+    if (stderr.trim()) {
+      out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+      out += pythonErrorHint(stderr + ' ' + stdout);
+    }
     if (artifacts.length) {
       const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
       out = out ? out + '\n' + note : note;
@@ -317,7 +443,8 @@ async function tool_run_python({ code, path, args }, ctx) {
       py = null; pyInitPromise = null;
       return { result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.', artifacts };
     }
-    return { result: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts };
+    const hint = pythonErrorHint((msg || '') + ' ' + stderr);
+    return { result: 'Error: ' + (msg || 'unknown (no message)') + tail + hint, artifacts };
   } finally {
     try { p && p.setStdout({}); } catch (_) {}
     try { p && p.setStderr({}); } catch (_) {}
@@ -372,6 +499,40 @@ async function tool_fetch_file(args, ctx) {
   } catch (e) {
     return { result: 'Error: ' + (e && e.message || e) };
   }
+}
+
+// Extract the first balanced JSON object from a string, ignoring any
+// trailing garbage. Some models emit non-JSON control tokens after the
+// closing brace of tool_call arguments (e.g. `<|tool_calls_section_end|>`,
+// partial reasoning text, raw `<think>` blocks). The leak corrupts BOTH
+// our local JSON.parse AND the next round's request body — the upstream
+// LLM API re-parses arguments internally and rejects the whole request
+// with a 400 if it's malformed. So we sanitize here at the source.
+function extractFirstJsonObject(s) {
+  s = String(s == null ? '' : s);
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (start === -1) {
+      if (c === '{') { start = i; depth = 1; }
+      continue;
+    }
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === '"') { inStr = false; }
+    } else {
+      if (c === '"') { inStr = true; }
+      else if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) {
+          try { return JSON.parse(s.slice(start, i + 1)); } catch (_) { return {}; }
+        }
+      }
+    }
+  }
+  return {};
 }
 
 async function runTool(name, args, ctx) {
@@ -454,6 +615,7 @@ async function runAgent(config, ctx) {
       stream: true,
       tools: config.tools,
     };
+    if (config.think) reqBody.think = true;
     const round = await streamOneRound(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (!round.tool_calls.length) {
@@ -469,8 +631,13 @@ async function runAgent(config, ctx) {
     ctx.emit({ type: 'message_added', message: asstMsg });
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
-      let parsedArgs = {};
-      try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
+      // Sanitize args: strip trailing control tokens / reasoning leaks so
+      // both this local execution AND the next round's request body have
+      // a valid JSON `arguments` field. We OVERWRITE tc.function.arguments
+      // (which already went into messages[] via push) so the message
+      // record stays consistent with what we executed.
+      const parsedArgs = extractFirstJsonObject(tc.function.arguments);
+      tc.function.arguments = JSON.stringify(parsedArgs);
       ctx.emit({ type: 'tool_started', tc });
       let toolOut;
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
