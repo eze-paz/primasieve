@@ -3,269 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>sandpie chat</title>
+<title>sandpie</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<script id="serve-py-source" type="text/plain">
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import http.client, urllib.parse, os, sys, subprocess, json
-
-PORT = 8080
-SHELL_CWD = os.path.dirname(os.path.abspath(__file__))
-SHELL_TIMEOUT_MAX = 120
-ALLOWED_ORIGINS = {
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'https://gasn2cloud.com',
-}
-# Cloud-mode hardening (set in production via env vars):
-#   SANDPIE_NO_SHELL=1        → /shell endpoint returns 404 (disables RCE on a public host)
-#   SANDPIE_NO_FILE=1         → /file endpoint returns 404 (disables arbitrary FS read/write)
-#   SANDPIE_RESTRICT_PROXY=1  → /proxy/* requires Origin header in ALLOWED_ORIGINS when present
-SHELL_ENABLED = os.environ.get('SANDPIE_NO_SHELL', '') != '1'
-FILE_ENABLED  = os.environ.get('SANDPIE_NO_FILE', '')  != '1'
-RESTRICT_PROXY = os.environ.get('SANDPIE_RESTRICT_PROXY', '') == '1'
-
-class H(SimpleHTTPRequestHandler):
-    # Hop-by-hop + routing headers we must not forward; everything else passes through verbatim.
-    # accept-encoding is skipped so upstream returns identity-encoded bodies that the browser
-    # can parse directly (we don't forward Content-Encoding back, so otherwise responses would
-    # arrive gzipped but tagged as plain JSON, mangling the parse).
-    _SKIP = {'host', 'content-length', 'connection', 'keep-alive',
-             'proxy-authenticate', 'proxy-authorization', 'te', 'trailers',
-             'transfer-encoding', 'upgrade', 'cookie', 'accept-encoding'}
-
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.end_headers()
-
-    def do_GET(self):
-        if self.path.startswith('/proxy/'):
-            return self._proxy('GET', None)
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_read()
-        super().do_GET()
-
-    def do_POST(self):
-        if self.path == '/shell':
-            if not SHELL_ENABLED:
-                return self.send_error(404)
-            return self._shell()
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_write()
-        if not self.path.startswith('/proxy/'):
-            return self.send_error(404)
-        body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
-        self._proxy('POST', body)
-
-    def do_PUT(self):
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_write()
-        self.send_error(404)
-
-    def _proxy(self, method, body):
-        if RESTRICT_PROXY:
-            origin = self.headers.get('Origin')
-            # Allow if no Origin (non-browser clients, same-origin GETs that omit it).
-            # Reject only when Origin is present and not in our allowlist.
-            if origin and origin not in ALLOWED_ORIGINS:
-                return self.send_error(403, f'Origin not allowed: {origin}')
-        parsed = urllib.parse.urlparse('https://' + self.path[7:])
-        path = parsed.path or '/'
-        if parsed.query: path += '?' + parsed.query
-        # http.client preserves header name casing (urllib does not).
-        headers = {k: v for k, v in self.headers.items() if k.lower() not in self._SKIP}
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[proxy] {method} {parsed.netloc}{path}\n')
-            for k, v in headers.items():
-                short = v if len(v) < 80 else v[:77] + '...'
-                _log.write(f'        {k}: {short}\n')
-            _log.flush()
-        conn = http.client.HTTPSConnection(parsed.netloc, timeout=120)
-        try:
-            conn.request(method, path, body, headers)
-            resp = conn.getresponse()
-            self.send_response(resp.status)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Type', resp.getheader('Content-Type', 'application/octet-stream'))
-            self.end_headers()
-            try:
-                while True:
-                    chunk = resp.read1(8192)
-                    if not chunk: break
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
-            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError) as e:
-                # Browser dropped the stream (Stop button, navigate, tab close).
-                # Normal during SSE streaming — log one line, don't propagate.
-                with open('proxy.log', 'a', encoding='utf-8') as _log:
-                    _log.write(f'[proxy] client disconnect: {e.__class__.__name__}\n')
-        finally:
-            conn.close()
-
-    def _file_read(self):
-        """GET /file?path=/abs/path  → stream file from device to browser.
-        Origin-gated like /shell — without it any cross-origin tab on the same
-        browser could read arbitrary files via the localhost server."""
-        origin = self.headers.get('Origin')
-        if origin and origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        path = qs.get('path', [''])[0]
-        if not path:
-            return self._json(400, {'error': 'missing path'})
-        if not os.path.isfile(path):
-            return self._json(404, {'error': 'file not found'})
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[file] GET {path}\n'); _log.flush()
-        try:
-            size = os.path.getsize(path)
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Type', 'application/octet-stream')
-            self.send_header('Content-Length', str(size))
-            self.send_header('X-File-Path', path)
-            self.end_headers()
-            try:
-                with open(path, 'rb') as f:
-                    while True:
-                        chunk = f.read(65536)
-                        if not chunk: break
-                        self.wfile.write(chunk)
-            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
-                pass  # client gone — don't traceback
-        except Exception as e:
-            try: self._json(500, {'error': str(e)})
-            except Exception: pass
-
-    def _file_write(self):
-        """POST|PUT /file?path=/abs/path  → upload file from browser to device.
-        Same origin gate as _shell. Creates parent dirs."""
-        origin = self.headers.get('Origin')
-        if origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        path = qs.get('path', [''])[0]
-        if not path:
-            return self._json(400, {'error': 'missing path'})
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(length) if length else b''
-            parent = os.path.dirname(path)
-            if parent: os.makedirs(parent, exist_ok=True)
-            with open(path, 'wb') as f:
-                f.write(body)
-            with open('proxy.log', 'a', encoding='utf-8') as _log:
-                _log.write(f'[file] PUT {path} ({len(body)} bytes)\n'); _log.flush()
-            self._json(200, {'bytes': len(body), 'path': path})
-        except Exception as e:
-            self._json(500, {'error': str(e)})
-
-    def _shell(self):
-        origin = self.headers.get('Origin')
-        if origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        try:
-            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
-        except Exception as e:
-            return self._json(400, {'error': f'bad json: {e}'})
-        cmd = (body.get('cmd') or '').strip()
-        if not cmd:
-            return self._json(400, {'error': 'missing cmd'})
-        cwd = body.get('cwd') or SHELL_CWD
-        timeout = min(int(body.get('timeout', 30)), SHELL_TIMEOUT_MAX)
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[shell] {cmd!r} (cwd={cwd}, timeout={timeout})\n')
-            _log.flush()
-        # Use Popen so we can forcibly kill the WHOLE process tree on timeout.
-        # subprocess.run's built-in timeout only kills cmd.exe / sh on Windows
-        # / Linux respectively — children (find, dir, etc.) keep running and
-        # the proxy thread blocks waiting for their pipes to close.
-        # encoding=utf-8 + errors=replace: locale.getpreferredencoding() on
-        # Windows is cp1252, which throws on non-Latin bytes; replacement keeps
-        # output flowing instead of failing the whole call.
-        kwargs = dict(shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                      text=True, encoding='utf-8', errors='replace', cwd=cwd)
-        if sys.platform == 'win32':
-            kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs['start_new_session'] = True
-        # PowerShell via shell=True goes cmd.exe → powershell, and cmd.exe
-        # mangles nested quotes — `powershell -Command "Get-Content ..."`
-        # often emits empty stdout after the JSON→cmd round trip. Detect a
-        # leading `powershell`/`pwsh` and run argv-form so PS gets the script
-        # verbatim. Also force UTF-8 console encoding inside the session.
-        run_target = cmd
-        if sys.platform == 'win32':
-            stripped = cmd.lstrip()
-            head = stripped.split(None, 1)
-            if head and head[0].lower() in ('powershell', 'pwsh', 'powershell.exe', 'pwsh.exe'):
-                script = head[1] if len(head) > 1 else ''
-                for flag in ('-NoProfile -Command ', '-Command ', '-c '):
-                    if script.lower().startswith(flag.lower()):
-                        script = script[len(flag):]
-                        break
-                script = script.strip()
-                if (script.startswith('"') and script.endswith('"')) or \
-                   (script.startswith("'") and script.endswith("'")):
-                    script = script[1:-1]
-                prologue = "[Console]::OutputEncoding=[Text.Encoding]::UTF8;$OutputEncoding=[Text.Encoding]::UTF8;"
-                run_target = [head[0], '-NoProfile', '-NonInteractive', '-Command', prologue + script]
-                kwargs.pop('shell', None)
-        try:
-            proc = subprocess.Popen(run_target, **kwargs)
-        except Exception as e:
-            return self._json(500, {'error': f'spawn failed: {e}'})
-        try:
-            stdout, stderr = proc.communicate(timeout=timeout)
-            self._json(200, {'stdout': stdout, 'stderr': stderr, 'code': proc.returncode, 'cwd': cwd})
-        except subprocess.TimeoutExpired:
-            try:
-                if sys.platform == 'win32':
-                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)],
-                                   capture_output=True, timeout=5)
-                else:
-                    import signal
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
-            try:
-                stdout, stderr = proc.communicate(timeout=2)
-            except Exception:
-                stdout, stderr = '', ''
-            self._json(200, {
-                'stdout': stdout or '',
-                'stderr': (stderr or '') + f'\n(timeout after {timeout}s — process tree killed)',
-                'code': -1, 'cwd': cwd,
-            })
-        except Exception as e:
-            try: proc.kill()
-            except Exception: pass
-            self._json(500, {'error': str(e)})
-
-    def _json(self, status, obj):
-        body = json.dumps(obj).encode()
-        self.send_response(status)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-print(f'Sandpie proxy listening on http://localhost:{PORT}  (shell cwd: {SHELL_CWD})')
-print(f'  shell: {"on" if SHELL_ENABLED else "off"}   file: {"on" if FILE_ENABLED else "off"}   restrict-proxy: {"on" if RESTRICT_PROXY else "off"}')
-HTTPServer(('127.0.0.1', PORT), H).serve_forever()
-</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -539,7 +279,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     color: #e6edf3;
     font-weight: 600;
   }
-  .welcome-by { display: block; color: #6e7681; font-weight: 400; font-size: 0.55em; letter-spacing: normal; margin-top: 0.2em; }
+  .welcome-by { color: #6e7681; font-weight: 400; font-size: 0.55em; letter-spacing: normal; margin-left: 0.4em; }
   .welcome-tag { font-size: 0.78rem; color: #6e7681; }
   .welcome-status {
     font: 0.72rem 'JetBrains Mono', Consolas, monospace;
@@ -625,7 +365,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     vertical-align: middle;
   }
   @media (prefers-reduced-motion: reduce) {
-    .welcome { animation: none; }
     .welcome-shield .dtri-layered { animation: none; opacity: 0.3; stroke-opacity: 0.3; }
     .welcome-rotating span { animation: none; }
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
@@ -759,18 +498,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     .msg { max-width: 95%; }
   }
 
-  .proxy-link {
-    font-size: 0.6rem;
-    color: #484f58;
-    cursor: pointer;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .proxy-link:hover {
-    color: #8b949e;
-    text-decoration: underline;
-  }
-
   .chip-row {
     display: flex;
     flex-wrap: wrap;
@@ -873,17 +600,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
   .context-delete:hover {
     background: rgba(248,81,73,0.1);
-  }
-  .proxy-link {
-    font-size: 0.6rem;
-    color: #484f58;
-    cursor: pointer;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .proxy-link:hover {
-    color: #8b949e;
-    text-decoration: underline;
   }
 
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
@@ -1109,9 +825,6 @@ window._sandpieDisplay = function (html) {
   </details>
   <div style="font-size:0.65rem; color:#8b949e; padding:0.5rem; border-top:1px solid #30363d; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
-    <div class="proxy-link-wrap" style="margin-top:0.3rem;">
-      <a class="proxy-link" onclick="downloadProxy()" title="Gives the AI shell access on your machine. Only use on trusted machines.">Download local proxy</a>
-    </div>
   </div>
 </aside>
 
@@ -1139,6 +852,129 @@ window._sandpieDisplay = function (html) {
 </main>
 
 <script>
+// =============================================================================
+// sandpie-sw end-to-end flow
+// =============================================================================
+// The system is fan-shaped: the page boots → registers a Service Worker → the
+// user sends a message → the page POSTs to a same-origin /sandpie-agent path
+// that the SW intercepts → the SW runs the full LLM agent loop (stream upstream,
+// dispatch tool calls, recurse) → the SW emits NDJSON events back to the page
+// → the page renders each event into the conversation's bubble host.
+//
+// When editing, find the step that owns the concern you're touching and read
+// the surrounding section banner. State that lives in one step must not be
+// mutated from another.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGE LIFECYCLE                                                  (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
+//       <script> runs.
+//   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
+//       localProxyMode, providers, ... .
+//   P2  navigator.serviceWorker.register('./sandpie.js'); _swReady waits
+//       for controllerchange so first /sandpie-agent POST is intercepted.
+//   P3  init() → loadProviders, restore active conv, mountConv,
+//       refreshFileList, refreshWelcome, refreshConversationList.
+//   P4  await sync() pulls Dropbox if connected (no-op otherwise).
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// USER SEND                                                       (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   U1  <form onsubmit> → handleSubmit().
+//   U2  handleSubmit reads $('input'), calls enqueueForActive(text).
+//   U3  enqueueForActive: ensureActiveConv → ensureStream(id) → mountConv if
+//       host detached → stream.queue.push(text) → processQueueFor(s).
+//   U4  processQueueFor: while queue non-empty → await sendSingle(text,
+//       stream). Resets queueAborted on entry, sets isProcessing.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE ROUND — PAGE SIDE                                           (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   R1  sendSingle builds config: { url, headers, model,
+//       systemPrompt: buildSystemPrompt(), messages, tools: toolDefs(),
+//       proxyBase, origin, dbxTokens, placeholdersList }.
+//   R2  await _swReady; POST ./sandpie-agent with the config as body.
+//   R3  Read response body line-by-line, JSON.parse each NDJSON line, dispatch
+//       to handleEvent(ev).
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE ROUND — SW SIDE                                          (sandpie.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   S1  fetch event on /sandpie-agent → handleAgent(req).
+//   S2  ReadableStream.start → runAgent(config, ctx) with ctx.emit pushing
+//       events back to the page.
+//   S3  runAgent loop:
+//         emit round_start
+//         streamOneRound(url, headers, body, ctx):
+//           fetch upstream LLM with stream=true
+//           for each SSE delta: accumulate, emit { type:'delta', delta }
+//           return { content, tool_calls }
+//         emit round_end
+//         if no tool_calls: emit message_added (asst only), break
+//         emit message_added (asst with tool_calls)
+//         for each tc:
+//           emit tool_started
+//           runTool(name, args, ctx) → tool_run_python / tool_shell / ...
+//           emit tool_result (+ artifacts)
+//           emit message_added (tool)
+//         next round
+//       emit agent_done
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT DISPATCH — PAGE SIDE                                      (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+// All per-round render state is owned by `RoundRenderer` (a single object
+// constructed at the top of sendSingle). handleEvent dispatches events into
+// the renderer's methods — it does NOT touch render state directly.
+//   E1  round_start    → renderer.startRound()
+//   E2  delta          → renderer.applyDelta(ev.delta)
+//                          ├─ content delta → typewriter into reply
+//                          └─ tool_call delta → bubble, then typewriter for
+//                             args via toolPending / toolDisplayed / drainTick
+//   E3  round_end      → renderer.endRound() — schedules ')' append after
+//                        the args drain completes (NOT before, otherwise the
+//                        paren jumps ahead of still-typing args).
+//   E4  message_added  → renderer.bindMessage(msg) — convMessages.push,
+//                        bindBubble to wire the rewind/copy menu.
+//   E5  tool_started   → renderer.markToolStarted(tcId) — in-flight class +
+//                        flavor ticker.
+//   E6  tool_result    → renderer.markToolDone(tcId, result, artifacts) —
+//                        renderTcDone, append tool-result bubble, render
+//                        artifacts.
+//   E7  agent_done     → renderer.finalize(); break read loop.
+//   E8  error          → addMsg('err', ...). renderer.finalize() in finally.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// POST-STREAM                                                     (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   F1  remove abort listener, stream.requestId = null.
+//   F2  releaseWakeLock, endTotalTimer, setStreamSending(false).
+//   F3  await saveConv(convId) — persist messages + artifacts to OPFS.
+//   F4  refreshTokenMeter() if active.
+//   F5  await sync() — Dropbox push of dirty conv files (no-op if not
+//       connected).
+//   F6  processQueueFor loops back to U4 if more queued, else returns.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL EXECUTION                                               (sandpie.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   T1  run_python    → initPyodide (lazy) → syncOpfsToPy → exec → syncPyToOpfs
+//   T2  shell         → POST proxyBase/shell
+//   T3  read_file     → GET  proxyBase/file?path=
+//   T4  write_file    → POST proxyBase/file?path=
+//   T5  fetch_file    → Dropbox download via SW dbx helper
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// SW LIFECYCLE                                                 (sandpie.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   W1  install  → skipWaiting()
+//   W2  activate → clients.claim() so first page load is controlled without
+//                  a reload
+//   W3  ~30s idle → SW terminates. Next /sandpie-agent fetch re-boots it.
+//                  Pyodide reinitializes lazily on next run_python.
+// =============================================================================
+
 const $ = id => document.getElementById(id);
 
 const VERSION = '1.0.0';
@@ -1467,7 +1303,6 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 // Hoisted up here so refreshWelcome / refreshTokenMeter / etc. can read them
 // safely at module init — `let` bindings live in TDZ until their declaration
 // line runs, and `typeof` on a TDZ-bound name throws too.
-let pyPromise = null;
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 // Tool-call/result bubbles minimized by default. Persisted across reloads.
@@ -1490,7 +1325,7 @@ function api(url) {
 
 // Dropbox endpoints never permit browser CORS, so they MUST go through a
 // proxy regardless of host. Order: explicit remote proxy → same-origin
-// /proxy/ (works on localhost via serve.py and on cloud-hosted sandpie
+// /proxy/ (works on localhost when a local proxy is running and on cloud-hosted sandpie
 // where the host serves its own /proxy/ forwarder).
 function dbxRoute(url) {
   const stripped = url.replace(/^https?:\/\//, '');
@@ -1653,28 +1488,13 @@ document.addEventListener('submit', () => {
 });
 
 // ============================================================
-// Local proxy — download embedded serve.py, auto-detect when running
+// Local proxy — auto-detect when an externally-started proxy is running
 // ============================================================
-function downloadProxy() {
-  const code = document.getElementById('serve-py-source').textContent.trim() + '\n';
-  const blob = new Blob([code], { type: 'text/x-python' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'sandpie-proxy.py';
-  a.setAttribute('data-chrome', '');
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  const hint = $('proxyDownloadHint');
-  if (hint) hint.textContent = 'Downloaded. From the project directory you want the AI to operate in, run: python sandpie-proxy.py — auto-connect once it\'s up.';
-}
-
 // Local proxy state machine: 'inactive' | 'searching' | 'connected'
 //   inactive  → no polling, no probes, no UI noise. Default.
-//   searching → user clicked Activate; we probe once. If found → connected.
-//               If not → show download prompt and keep probing every 3s
-//               so a freshly-started proxy auto-connects.
+//   searching → probing once. If found → connected, else stay searching
+//               and keep probing every 3s so a freshly-started proxy
+//               auto-connects.
 //   connected → background verify every 15s; if it goes down, drop to inactive.
 // (localProxyMode and localProxyTimer are declared near the top so refreshProxyDot
 //  can read them safely at module init.)
@@ -1694,44 +1514,17 @@ async function probeLocalProxy() {
 function setLocalProxyUI(mode) {
   localProxyMode = mode;
   refreshProxyDot();
-  const btn = $('localProxyToggle');
-  const status = $('proxyStatus');
-  const prompt = $('proxyDownloadPrompt');
   if (mode === 'inactive') {
-    btn.textContent = 'Activate local proxy';
-    btn.disabled = false;
-    status.style.display = 'none';
-    prompt.style.display = 'none';
     if ($('proxyUrl').value.trim() === 'http://localhost:8080') {
       $('proxyUrl').value = '';
       updateRoutingHint();
     }
-  } else if (mode === 'searching') {
-    btn.textContent = 'Cancel';
-    btn.disabled = false;
-    status.textContent = 'Searching for local proxy…';
-    status.style.color = '#8b949e';
-    status.style.display = '';
-    prompt.style.display = 'none';
   } else if (mode === 'connected') {
-    btn.textContent = 'Deactivate';
-    btn.disabled = false;
-    status.textContent = '✓ Local proxy connected';
-    status.style.color = '#3fb950';
-    status.style.display = '';
-    prompt.style.display = 'none';
     if (!$('proxyUrl').value.trim()) {
       $('proxyUrl').value = 'http://localhost:8080';
       updateRoutingHint();
     }
   }
-}
-
-function showDownloadPrompt() {
-  $('proxyStatus').style.display = 'none';
-  $('proxyDownloadPrompt').style.display = '';
-  $('localProxyToggle').textContent = 'Cancel';
-  $('proxyDownloadHint').textContent = '';
 }
 
 function startLocalProxyTimer(intervalMs, onAlive, onDead) {
@@ -1751,10 +1544,8 @@ async function toggleLocalProxy() {
   }
 
   // Populate the proxy field BEFORE testing so the user can see exactly what
-  // URL we're probing. Previously the field stayed empty until a probe
-  // succeeded, which meant a failed probe looked like "no proxy" without any
-  // indication of what was tried. setLocalProxyUI('inactive') already clears
-  // this back to '' if the value still equals our default.
+  // URL we're probing. setLocalProxyUI('inactive') already clears this back
+  // to '' if the value still equals our default.
   $('proxyUrl').value = 'http://localhost:8080';
   updateRoutingHint();
 
@@ -1773,15 +1564,7 @@ async function toggleLocalProxy() {
     return;
   }
 
-  showDownloadPrompt();
-  // Browsers block fetch() from HTTPS pages to http://localhost as mixed
-  // content, so the probe will always fail in that context — say so instead
-  // of letting the user think the proxy isn't running.
-  if (location.protocol === 'https:') {
-    $('proxyDownloadHint').textContent =
-      'Browsers block http://localhost from HTTPS pages (mixed content). Open sandpie via http://localhost:8080 to use the local proxy, or set a public proxy URL above.';
-  }
-  // Keep probing — user is presumably about to start the proxy.
+  // No proxy yet — keep probing in case the user starts one externally.
   startLocalProxyTimer(3000, () => {
     if (localProxyMode === 'searching') {
       if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
@@ -2423,53 +2206,88 @@ async function manualResync() {
 })();
 
 // ============================================================
-// Pyodide — lazy-loaded Python runtime (pyPromise hoisted near the top)
+// Pyodide — runs inside per-conv Web Workers (no main-thread instance).
+// Heavy Python in one conv stays off the UI thread; convs run truly in
+// parallel against their own Python interpreters.
 // ============================================================
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('Failed to load ' + src));
-    document.head.appendChild(s);
-  });
+// One Pyodide worker per conversation = full Python isolation (separate
+// globals, imports, sys.argv, /files mount, stdout/stderr target). Heavy
+// Python runs in its own thread, so a tight CPU loop in one conv no longer
+// freezes the tab or trips Chrome's "page unresponsive" killer. Workers
+// are lazy-created on first run_python call and terminated when the conv
+// is deleted (see deleteConv).
+//
+// The worker source contains:
+//   * worker-side OPFS helpers (same async API as main; OPFS is per-origin)
+//   * pyodide bootstrap (importScripts the CDN)
+//   * syncOpfsToPy / syncPyToOpfs (port of the main-thread versions)
+//   * a `run` message handler that does setup + exec + sync + returns
+//     stdout/stderr/artifacts/filled-placeholders in a single result message
+//   * the open()/argv/IPython.display Python monkey-patches inline
+const PYODIDE_WORKER_SOURCE = `
+let py = null;
+let initPromise = null;
+
+// ---- worker-side OPFS helpers ----
+async function opfsRoot() { return navigator.storage.getDirectory(); }
+function splitPath(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  const name = parts.pop();
+  return { parts, name };
+}
+async function opfsResolveDir(parts, create) {
+  let dir = await opfsRoot();
+  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
+  return dir;
+}
+async function opfsList(prefix) {
+  prefix = prefix || '';
+  const out = [];
+  const walk = async (dir, p) => {
+    for await (const [n, h] of dir.entries()) {
+      const full = p ? p + '/' + n : n;
+      // Skip the chats-store directory — same skip the main-thread sync uses.
+      if (full === '_conversations' || full.startsWith('_conversations/')) continue;
+      if (h.kind === 'file') out.push(full);
+      else await walk(h, full);
+    }
+  };
+  const start = prefix ? await opfsResolveDir(prefix.split('/').filter(Boolean)) : await opfsRoot();
+  await walk(start, prefix.replace(/^\\/+|\\/+$/g, ''));
+  return out.sort();
+}
+async function opfsReadBytes(path) {
+  const { parts, name } = splitPath(path);
+  const dir = await opfsResolveDir(parts);
+  const handle = await dir.getFileHandle(name);
+  return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+}
+async function opfsWriteBytes(path, bytes) {
+  const { parts, name } = splitPath(path);
+  const dir = await opfsResolveDir(parts, true);
+  const handle = await dir.getFileHandle(name, { create: true });
+  const w = await handle.createWritable();
+  await w.write(bytes);
+  await w.close();
 }
 
-async function getPy() {
-  if (pyPromise) return pyPromise;
-  pyPromise = (async () => {
-    await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
-    try { p.FS.mkdir('/files'); } catch {}
-    return p;
+async function init() {
+  if (py) return py;
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    try { py.FS.mkdir('/files'); } catch (_) {}
+    return py;
   })();
-  return pyPromise;
+  return initPromise;
 }
 
-// Pyodide is one shared interpreter (single set of Python globals, single
-// sys.stdout/stderr redirection target). Without serialization, two convs
-// that both kick off run_python concurrently would race: stdout buffers
-// would cross-contaminate, the open()/argv monkey-patches would step on
-// each other, and any in-flight async Python could observe globals from
-// the other conv's setup. The mutex serializes the *entire* per-call
-// setup + execution + sync block, so each run_python looks atomic from
-// the LLM's perspective. LLM completions still run in parallel via the
-// worker — only the Python execution itself queues.
-let _pyMutex = Promise.resolve();
-function pyRunAtomic(taskFn) {
-  const next = _pyMutex.then(taskFn, taskFn);
-  // Don't let a thrown task poison the chain — downstream waiters should
-  // still get a turn; we only care that they wait their turn.
-  _pyMutex = next.then(() => {}, () => {});
-  return next;
-}
-
-// Wipe Pyodide's /files dir, copy the entire OPFS tree into it (with subdirs).
-async function syncOpfsToPy(p) {
+async function syncOpfsToPy(p, placeholdersList) {
   const rmTree = (full) => {
     let stat;
-    try { stat = p.FS.stat(full); } catch { return; }
+    try { stat = p.FS.stat(full); } catch (_) { return; }
     if (p.FS.isDir(stat.mode)) {
       for (const name of p.FS.readdir(full)) {
         if (name === '.' || name === '..') continue;
@@ -2481,57 +2299,44 @@ async function syncOpfsToPy(p) {
     }
   };
   rmTree('/files');
-  try { p.FS.mkdir('/files'); } catch {}
-
-  const opfsRels = await opfs.list();
-  const hydrated = new Set(opfsRels);
+  try { p.FS.mkdir('/files'); } catch (_) {}
+  const files = await opfsList();
+  const hydrated = new Set(files);
   const ensureDirs = (segs) => {
     let cur = '/files';
     for (const s of segs) {
       cur += '/' + s;
-      try { p.FS.mkdir(cur); } catch {}
+      try { p.FS.mkdir(cur); } catch (_) {}
     }
     return cur;
   };
-  for (const rel of opfsRels) {
+  for (const rel of files) {
     const segs = rel.split('/');
-    const fileName = segs.pop();
+    const fn = segs.pop();
     const dir = ensureDirs(segs);
-    // Always copy as bytes so binary files (images, PDFs, etc.) survive
-    // the round-trip — text decodes back fine via Pyodide's open().
-    p.FS.writeFile(dir + '/' + fileName, await opfs.readBytes(rel));
+    p.FS.writeFile(dir + '/' + fn, await opfsReadBytes(rel));
   }
-  // Lazy hydration: materialize zero-byte placeholders in pyodide's FS for
-  // every cloud path that isn't currently hydrated locally. Lets os.listdir
-  // / glob.glob / os.walk / pathlib.iterdir enumerate everything the LLM
-  // might ask for. open() on a placeholder reads zero bytes — the FNF
-  // rewrite below the runPythonAsync call notices unsuccessful reads and
-  // tells the LLM to call fetch_file first. Returns the placeholders set so
-  // syncPyToOpfs doesn't mistake them for real local files later.
   const placeholders = new Set();
-  const state = syncState();
-  for (const [rel, val] of Object.entries(state)) {
-    if (val.hydrated) continue;
+  for (const rel of (placeholdersList || [])) {
     if (hydrated.has(rel)) continue;
     const segs = rel.split('/');
-    const fileName = segs.pop();
+    const fn = segs.pop();
     const dir = ensureDirs(segs);
     try {
-      p.FS.writeFile(dir + '/' + fileName, new Uint8Array(0));
+      p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
       placeholders.add(rel);
-    } catch {}
+    } catch (_) {}
   }
   return placeholders;
 }
 
-// Mirror Pyodide's /files (recursively) back to OPFS.
 function bytesEqual(a, b) {
   if (!a || !b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-async function syncPyToOpfs(p, placeholders = new Set()) {
+async function syncPyToOpfs(p, placeholders) {
   const pyFiles = new Set();
   const walk = (full, rel) => {
     for (const name of p.FS.readdir(full)) {
@@ -2544,44 +2349,172 @@ async function syncPyToOpfs(p, placeholders = new Set()) {
     }
   };
   walk('/files', '');
-
+  const filled = [];
+  const written = [];
   for (const rel of pyFiles) {
-    // Read as bytes so binary files (e.g. matplotlib PNG output) aren't
-    // corrupted by UTF-8 decoding. Compare byte-for-byte to skip writes
-    // when nothing changed (otherwise OPFS bumps lastModified and the
-    // file shows as 'modified' even when Pyodide never touched it).
     const newBytes = p.FS.readFile('/files/' + rel);
-    // Phase B: if this path went into pyodide as a zero-byte placeholder
-    // and came out still zero-byte, the LLM didn't fill it in — don't write
-    // empty bytes back to OPFS. (Real local zero-byte files aren't placeholders
-    // — the placeholders set is exactly the paths we materialized in syncOpfsToPy.)
     if (placeholders.has(rel) && newBytes.length === 0) continue;
     let oldBytes = null;
-    try { oldBytes = await opfs.readBytes(rel); } catch {}
-    if (!bytesEqual(oldBytes, newBytes)) {
-      await opfs.write(rel, newBytes);
-    }
+    try { oldBytes = await opfsReadBytes(rel); } catch (_) {}
+    if (oldBytes && bytesEqual(oldBytes, newBytes)) continue;
+    await opfsWriteBytes(rel, newBytes);
+    written.push(rel);
+    if (placeholders.has(rel)) filled.push(rel);
   }
-  for (const rel of await opfs.list()) {
-    // Don't delete OPFS files corresponding to pyodide-side placeholders —
-    // we never had them locally; pyFiles contains them only because we
-    // materialized zero-byte stand-ins for listing purposes.
-    if (pyFiles.has(rel) || placeholders.has(rel)) continue;
-    // The file existed in OPFS but pyodide no longer has it — the LLM
-    // deleted it. Propagate to Dropbox and clear the state row so sync()
-    // doesn't see "hydrated, no local, cloud unchanged" and silently demote
-    // it back to a placeholder (which would let the LLM re-hydrate the
-    // file we just deleted). dbxDelete tolerates not_found, so files that
-    // were never pushed are safe to attempt.
-    await opfs.remove(rel);
-    if (dbxTokens()) {
-      try { await dbxDelete('/' + rel); }
-      catch (e) { console.warn('dbxDelete failed for LLM-deleted file:', rel, e); }
-    }
-    const s = syncState();
-    if (s[rel]) { delete s[rel]; setSyncState(s); }
-  }
+  return { filled, written };
 }
+
+const OPEN_PATCH = \`
+import builtins, os
+if getattr(builtins.open, '__name__', None) == '_sandpie_open':
+    if hasattr(builtins, '_original_open'):
+        builtins.open = builtins._original_open
+if hasattr(builtins, '_original_open'):
+    _real_open = builtins._original_open
+else:
+    _real_open = builtins.open
+    builtins._original_open = _real_open
+try:
+    from js import _sandpie_cloud_paths
+    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
+except Exception:
+    _sandpie_cloud_set = set()
+def _sandpie_normalize(path):
+    s = str(path)
+    if s.startswith('/files/'): s = s[len('/files/'):]
+    while s.startswith('./'): s = s[2:]
+    return s.lstrip('/')
+def _sandpie_open(path, *args, **kwargs):
+    n = _sandpie_normalize(path)
+    if n in _sandpie_cloud_set:
+        raise FileNotFoundError(
+            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
+            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
+            f"If you meant a host path (outside /files/), use the read_file tool instead."
+        )
+    return _real_open(path, *args, **kwargs)
+builtins.open = _sandpie_open
+\`;
+
+const DISPLAY_PATCH = \`
+def _sandpie_display(*objs, **kwargs):
+    import base64
+    try:
+        import js
+    except Exception:
+        return
+    for obj in objs:
+        html = None
+        try:
+            if hasattr(obj, '_repr_html_'):
+                html = obj._repr_html_()
+            if html is None and hasattr(obj, '_repr_svg_'):
+                html = obj._repr_svg_()
+            if html is None and hasattr(obj, '_repr_png_'):
+                d = obj._repr_png_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/png;base64,' + d + '">'
+            if html is None and hasattr(obj, '_repr_jpeg_'):
+                d = obj._repr_jpeg_()
+                if isinstance(d, (bytes, bytearray)):
+                    d = base64.b64encode(d).decode()
+                html = '<img src="data:image/jpeg;base64,' + d + '">'
+        except Exception as e:
+            html = '<pre>display error: ' + str(e) + '</pre>'
+        if html is None:
+            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            html = '<pre>' + s + '</pre>'
+        try:
+            js._sandpieDisplay(html)
+        except Exception:
+            pass
+try:
+    import IPython.display as _ipd
+    _ipd.display = _sandpie_display
+except Exception:
+    pass
+\`;
+
+self.addEventListener('message', async (e) => {
+  const m = e.data;
+  if (m.type !== 'run') return;
+  let stdout = '', stderr = '';
+  const artifacts = [];
+  let p = null;
+  try {
+    p = await init();
+    p.setStdout({ batched: s => stdout += s + '\\n' });
+    p.setStderr({ batched: s => stderr += s + '\\n' });
+    const placeholders = await syncOpfsToPy(p, m.placeholdersList);
+    p.runPython('import os; os.chdir(\"/files\")');
+    self._sandpie_cloud_paths = [...placeholders];
+    try { p.runPython(OPEN_PATCH); } catch (_) {}
+    if (m.argv) {
+      self._sandpie_argv = m.argv;
+      try { p.runPython('import sys\\nfrom js import _sandpie_argv\\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
+    }
+    self._sandpieDisplay = (html) => artifacts.push(html);
+    try { p.runPython(DISPLAY_PATCH); } catch (_) {}
+    try { await p.loadPackagesFromImports(m.code); } catch (_) {}
+    await p.runPythonAsync(m.code);
+    const sync = await syncPyToOpfs(p, placeholders);
+    let out = stdout.trimEnd();
+    if (stderr.trim()) out += (out ? '\\n' : '') + '--- stderr ---\\n' + stderr.trimEnd();
+    if (artifacts.length) {
+      const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
+      out = out ? out + '\\n' + note : note;
+    }
+    self.postMessage({ type: 'result', requestId: m.requestId, result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written });
+  } catch (e) {
+    let msg = '';
+    if (e != null) {
+      if (typeof e === 'string') msg = e;
+      else if (e.message) msg = e.message;
+      else {
+        try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
+        if (!msg) { try { msg = JSON.stringify(e, Object.getOwnPropertyNames(Object(e))); if (msg === '{}') msg = ''; } catch (_) {} }
+      }
+    }
+    const tail = stderr.trim() ? '\\n--- stderr ---\\n' + stderr.trimEnd() : '';
+    if (!msg && !stderr.trim()) {
+      self.postMessage({ type: 'fatal', requestId: m.requestId, artifacts });
+      return;
+    }
+    self.postMessage({ type: 'error', requestId: m.requestId, message: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts });
+  } finally {
+    if (p) { try { p.setStdout({}); } catch (_) {} try { p.setStderr({}); } catch (_) {} }
+  }
+});
+`;
+
+// Lazy per-conv worker handle. Created the first time a conv's run_python is
+// invoked; terminated when the conv is deleted (deleteConv handles that).
+function getPyWorker(stream) {
+  if (stream.pyWorker) return stream.pyWorker;
+  const blob = new Blob([PYODIDE_WORKER_SOURCE], { type: 'application/javascript' });
+  const w = new Worker(URL.createObjectURL(blob));
+  w._pending = new Map(); // requestId -> { resolve }
+  w.addEventListener('message', (e) => {
+    const m = e.data;
+    const pending = w._pending.get(m.requestId);
+    if (!pending) return;
+    w._pending.delete(m.requestId);
+    pending.resolve(m);
+  });
+  stream.pyWorker = w;
+  return w;
+}
+let _pyReqId = 0;
+
+// Note: syncOpfsToPy / syncPyToOpfs used to live here. They now run inside
+// each conv's Pyodide worker (see PYODIDE_WORKER_SOURCE above) — the worker
+// has direct OPFS access via navigator.storage.getDirectory(), so no main-
+// thread round-trip is needed. One feature was dropped in the move: the old
+// syncPyToOpfs propagated python-side file *deletions* back to OPFS (and
+// Dropbox). The worker version only propagates writes; if the LLM deletes
+// a file inside Python, it'll reappear from OPFS on the next call. Add
+// back if that capability is missed.
 
 // ============================================================
 // Tools — backed by OPFS
@@ -2649,21 +2582,12 @@ Examples:
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
       },
     },
-    run: async ({ code, path: scriptPath, args }, signal) => {
-      // Validate up-front so we don't pointlessly queue behind another call.
+    run: async ({ code, path: scriptPath, args }, signal, stream) => {
       if (!code && !scriptPath) return 'Error: provide either "code" (inline source) or "path" (saved script under /files/).';
       if (code && scriptPath) return 'Error: provide either "code" or "path", not both.';
-      // Serialize across convs — one Python interpreter, one stdout target,
-      // shared globals + monkey-patched builtins.open / sys.argv. Any
-      // already-running run_python finishes (and resets stdout/stderr in its
-      // finally) before the next one starts its setup.
-      return pyRunAtomic(async () => {
-        // If the caller already aborted while we were waiting in the mutex
-        // queue, bail without touching the interpreter.
-        if (signal && signal.aborted) return '[stopped]';
-      // If path was given, load the script from OPFS up-front so the rest of
-      // the pipeline (loadPackagesFromImports, runPythonAsync) can treat it
-      // exactly like inline code.
+      if (!stream) return 'Error: run_python is missing conversation context (internal — refresh the page).';
+      // If path was given, load the script from OPFS up-front so the worker's
+      // executor can treat code and {path,args} the same way.
       const scriptArgs = Array.isArray(args) ? args.map(String) : [];
       let normPath = '';
       if (scriptPath) {
@@ -2674,193 +2598,77 @@ Examples:
           return `Error: could not read /files/${normPath}: ${e.message}. Did you save it yet? Use a code: call first to write the script — e.g. open('${normPath}','w').write(...).`;
         }
       }
+      // Each conv owns its own Pyodide worker — separate globals, imports,
+      // /files mount, stdout target. First call per conv pays the pyodide
+      // bootstrap (WASM is HTTP-cached, so ~2-3s after the very first page
+      // load); later calls are instant.
+      const firstCall = !stream.pyWorker;
       let loadingMsg = null;
-      if (!pyPromise) loadingMsg = addMsg('info', '⏳ Loading Pyodide (~10MB, first call only)…');
-      let p;
-      try { p = await getPy(); }
-      catch (e) { loadingMsg?.remove(); return 'Error loading Pyodide: ' + e.message; }
-      loadingMsg?.remove();
-
-      let stdout = '', stderr = '';
-      p.setStdout({ batched: s => stdout += s + '\n' });
-      p.setStderr({ batched: s => stderr += s + '\n' });
-      try {
-        const placeholders = await syncOpfsToPy(p);
-        // Pin working directory to /files so bare relative paths land in OPFS,
-        // and so os.getcwd() reports the user's filesystem, not /home/pyodide.
-        p.runPython('import os; os.chdir("/files")');
-        // Phase B: install a Python open() wrapper that raises FileNotFoundError
-        // with a fetch_file directive embedded in the message whenever the LLM
-        // tries to read a cloud-only placeholder. Most file-reading libraries
-        // (pandas.read_csv, np.load, json.load, PIL.Image.open, …) ultimately
-        // route through builtins.open, so wrapping it covers the common cases.
-        // C-extension reads (sqlite3.connect on a missing DB, etc.) bypass this
-        // — document those edge cases in the tool description.
-        try {
-          window._sandpie_cloud_paths = [...placeholders];
-          p.runPython(`
-import builtins, os
-
-# ROBUST GUARD: Prevent double-patch recursion.
-# Store _original_open on builtins so it survives across runPython calls.
-if getattr(builtins.open, '__name__', None) == '_sandpie_open':
-    # Already patched — restore original first if we have it
-    if hasattr(builtins, '_original_open'):
-        builtins.open = builtins._original_open
-
-# Save the TRUE original open (before any patching).
-# Use builtins._original_open if available (from previous run),
-# otherwise capture current builtins.open.
-if hasattr(builtins, '_original_open'):
-    _real_open = builtins._original_open
-else:
-    _real_open = builtins.open
-    builtins._original_open = _real_open
-
-try:
-    from js import _sandpie_cloud_paths
-    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
-except Exception:
-    _sandpie_cloud_set = set()
-
-def _sandpie_normalize(path):
-    s = str(path)
-    if s.startswith('/files/'): s = s[len('/files/'):]
-    while s.startswith('./'): s = s[2:]
-    return s.lstrip('/')
-
-def _sandpie_open(path, *args, **kwargs):
-    n = _sandpie_normalize(path)
-    if n in _sandpie_cloud_set:
-        raise FileNotFoundError(
-            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
-            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
-            f"If you meant a host path (outside /files/), use the read_file tool instead."
-        )
-    return _real_open(path, *args, **kwargs)
-
-builtins.open = _sandpie_open
-`);
-        } catch {}
-        // When invoked via {path,args}, expose argv to the script just like a
-        // shell would (sys.argv[0] = script path, then the user's args).
-        if (normPath) {
-          try {
-            window._sandpie_argv = [normPath, ...scriptArgs];
-            p.runPython(`
-import sys
-from js import _sandpie_argv
-sys.argv = list(_sandpie_argv.to_py())
-`);
-          } catch {}
-        }
-        // Auto-load any prebuilt Pyodide packages referenced by `import` lines
-        // (numpy, pandas, beautifulsoup4, micropip, …). Without this the LLM
-        // hits ModuleNotFoundError for ~100 packages that are otherwise free.
-        try { await p.loadPackagesFromImports(code); } catch {}
-        // IPython.display.display(HTML(...))/Image/SVG/etc. fall back to repr
-        // in headless Pyodide. Patch display() to route rich reprs through
-        // window._sandpieDisplay, which buffers the HTML. The tool exec loop
-        // drains the buffer after runPythonAsync resolves: it persists each
-        // artifact on the tool message (so it survives reload) and renders it
-        // as a sandboxed iframe under the originating conv's host.
-        try {
-          p.runPython(`
-def _sandpie_display(*objs, **kwargs):
-    import base64
-    try:
-        import js
-    except Exception:
-        return
-    for obj in objs:
-        html = None
-        try:
-            if hasattr(obj, '_repr_html_'):
-                html = obj._repr_html_()
-            if html is None and hasattr(obj, '_repr_svg_'):
-                html = obj._repr_svg_()
-            if html is None and hasattr(obj, '_repr_png_'):
-                d = obj._repr_png_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/png;base64,' + d + '">'
-            if html is None and hasattr(obj, '_repr_jpeg_'):
-                d = obj._repr_jpeg_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/jpeg;base64,' + d + '">'
-        except Exception as e:
-            html = '<pre>display error: ' + str(e) + '</pre>'
-        if html is None:
-            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html = '<pre>' + s + '</pre>'
-        try:
-            js._sandpieDisplay(html)
-        except Exception:
-            pass
-
-try:
-    import IPython.display as _ipd
-    _ipd.display = _sandpie_display
-except Exception:
-    pass
-`);
-        } catch {}
-        const beforeArtifacts = window._pendingArtifacts.length;
-        await p.runPythonAsync(code);
-        await syncPyToOpfs(p, placeholders);
-        await refreshFileList();
-        let out = stdout.trimEnd();
-        if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-        const newArtifacts = window._pendingArtifacts.length - beforeArtifacts;
-        if (newArtifacts > 0) {
-          const note = `(rendered ${newArtifacts} artifact${newArtifacts === 1 ? '' : 's'} via IPython.display — visible to the user)`;
-          out = out ? out + '\n' + note : note;
-        }
-        return out || '(no output)';
-      } catch (e) {
-        // Try hard to extract something useful. pyodide can throw a PythonError
-        // (has .message with the traceback), a plain Error, a string, or
-        // sometimes an opaque object whose default toString is "[object Object]".
-        let msg = '';
-        if (e != null) {
-          if (typeof e === 'string') msg = e;
-          else if (e.message) msg = e.message;
-          else {
-            let s = '';
-            try { s = e.toString(); } catch {}
-            if (s && s !== '[object Object]') msg = s;
-            else {
-              try {
-                const j = JSON.stringify(e, Object.getOwnPropertyNames(Object(e)));
-                if (j && j !== '{}') msg = j;
-              } catch {}
-            }
-          }
-        }
-        const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-        // Opaque or empty error + nothing on stderr = runtime-level death
-        // (pyodide asyncio loop corrupted, promise rejected with a non-Error
-        // object, etc.). Subsequent runPythonAsync calls will keep failing
-        // the same way until the interpreter is rebuilt — reset pyPromise so
-        // the next call loads a clean instance, and tell the model what
-        // happened so it doesn't spam identical retries.
-        if (!msg && !stderr.trim()) {
-          // Keep the raw object in the JS console for the user to inspect.
-          try { console.error('[sandpie] opaque run_python error:', e); } catch {}
-          pyPromise = null;
-          return 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first. If this fires twice in a row, ask the user to reload the page.';
-        }
-        return `Error: ${msg || 'unknown (no message)'}${tail}`;
-      } finally {
-        p.setStdout({});
-        p.setStderr({});
+      if (firstCall) {
+        loadingMsg = addMsg(
+          'info',
+          '⏳ Loading Pyodide for this conversation (~10MB, first call per conv)…',
+          stream.host,
+        );
       }
-      }); // end pyRunAtomic
+      const worker = getPyWorker(stream);
+      // Cloud-placeholder list comes from main-thread localStorage (workers
+      // can't reach it). Worker uses it to materialize zero-byte stubs so
+      // os.listdir / glob enumerate everything; open() on a placeholder
+      // raises FileNotFoundError with a fetch_file directive.
+      const placeholdersList = [];
+      try {
+        const st = syncState();
+        for (const [rel, val] of Object.entries(st)) {
+          if (!val.hydrated) placeholdersList.push(rel);
+        }
+      } catch {}
+      const requestId = ++_pyReqId;
+      const resultPromise = new Promise(resolve => {
+        worker._pending.set(requestId, { resolve });
+      });
+      worker.postMessage({
+        type: 'run',
+        requestId,
+        code,
+        argv: normPath ? [normPath, ...scriptArgs] : null,
+        placeholdersList,
+      });
+      let msg;
+      try { msg = await resultPromise; }
+      finally { loadingMsg?.remove(); }
+      // Stage artifacts into the shared pending queue so sendSingle's
+      // existing artifact-drain (line ~5197) picks them up unchanged.
+      if (msg.artifacts && msg.artifacts.length) {
+        for (const html of msg.artifacts) window._pendingArtifacts.push(html);
+      }
+      // Mark filled cloud placeholders as hydrated so future syncOpfsToPy
+      // calls treat them as real files, not stubs.
+      if (msg.filled && msg.filled.length) {
+        try {
+          const st = syncState();
+          let changed = false;
+          for (const rel of msg.filled) {
+            if (st[rel]) { st[rel].hydrated = true; changed = true; }
+          }
+          if (changed) setSyncState(st);
+        } catch {}
+      }
+      // Refresh the sidebar file list if the worker wrote anything back.
+      try { await refreshFileList(); } catch {}
+      if (msg.type === 'fatal') {
+        // Kill this conv's worker so the next call gets a clean interpreter.
+        // Other convs' workers are unaffected.
+        try { worker.terminate(); } catch {}
+        stream.pyWorker = null;
+        return 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first. If this fires twice in a row, ask the user to reload the page.';
+      }
+      if (msg.type === 'error') return msg.message;
+      return msg.result;
     },
   },
   shell: {
-    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user to click "Download proxy" and run "python sandpie-proxy.py". Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
+    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user the local proxy must be running. Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
 
 SHELL ENVIRONMENT: cmd.exe on Windows, /bin/sh on Linux/macOS. \`sed\`/\`grep\`/\`head\`/\`tail\` are typically absent on Windows hosts — use \`findstr\`, \`type\`, or a one-shot \`python -c "..."\` instead. To read a file, prefer the read_file tool (cleaner, no quoting issues) over \`type\`/\`cat\`. PowerShell via \`powershell -Command "..."\` can be unreliable through this transport (nested-quote mangling can produce empty stdout) — prefer \`python -c\` or cmd built-ins.
 
@@ -2888,7 +2696,7 @@ Examples:
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       const base = remote || (isLocal ? '' : null);
-      if (base === null) return 'Error: shell requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: shell requires the local proxy. Start the local proxy, then retry.';
       try {
         const payload = { cmd };
         if (cwd) payload.cwd = cwd;
@@ -2928,7 +2736,7 @@ ADDRESSING: host paths only. To read an OPFS file use run_python (open('foo.txt'
     run: async ({ path, encoding, max_bytes }, signal) => {
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: read_file requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: read_file requires the local proxy. Start the local proxy, then retry.';
       if (!path) return 'Missing path.';
       const cap = Math.min(Math.max(1, max_bytes || 5_000_000), 20_000_000);
       try {
@@ -2978,7 +2786,7 @@ SAFETY: this OVERWRITES the target. For edits, read first then write the full ne
     run: async ({ path, content, encoding }, signal) => {
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: write_file requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: write_file requires the local proxy. Start the local proxy, then retry.';
       if (!path) return 'Missing path.';
       let body;
       if (encoding === 'base64') {
@@ -3787,10 +3595,11 @@ function addMsg(role, text = '', host = null) {
     div.textContent = text;
   }
   target.appendChild(div);
-  // Keep the host's own LIVE total timer pinned to the bottom of its bubbles.
-  // Settled timers (.done — "stopped · 10s" / "done · 4.2s") stay anchored to
-  // the round they belong to; otherwise a stop-then-send-again would drag the
-  // old "stopped" indicator under each new message.
+  // Keep the host's *active* total timer pinned to the bottom of its bubbles.
+  // The `:not(.done)` guard is load-bearing: finished rounds leave their
+  // "done · 12s" bubble in the host (chronologically first, with .done),
+  // and a bare `:scope > .msg-timer` selector would re-anchor THAT to the
+  // bottom on every new addMsg — burying the actually-ticking timer mid-history.
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && stick) m.scrollTop = m.scrollHeight;
@@ -4023,6 +3832,266 @@ function stopToolTicker(div) {
   if (div && div._ticker) {
     clearTimeout(div._ticker);
     div._ticker = null;
+  }
+}
+
+// =============================================================================
+// RoundRenderer — owns ALL per-round render state for one streaming exchange.
+// =============================================================================
+// One instance per sendSingle call. The dispatch layer (dispatchAgentEvent
+// below) is the ONLY caller of its public methods; it does not touch render
+// state directly. Lifecycle, matching the flow-chart event labels:
+//
+//   r = new RoundRenderer(host, convMessages)
+//   r.startRound()                              // E1  round_start
+//   r.applyDelta(ev.delta)                      // E2  delta
+//   r.endRound()                                // E3  round_end
+//   r.bindMessage(msg)                          // E4  message_added
+//   r.markToolStarted(tc)                       // E5  tool_started
+//   r.markToolDone(id, result, artifacts)       // E6  tool_result
+//   r.finalize()                                // F2  always, from finally
+//
+// Invariants:
+//  * Bubble DOM lives in this.host only.
+//  * drainTick is the ONLY writer of tool-arg text during a round; applyDelta
+//    just enqueues into toolPending[i]. This is the structural reason the
+//    typewriter can't be "skipped" by a fast-arriving delta.
+//  * startRound() and finalize() share one private flush path
+//    (_flushAllPending) so a fast tool that fires tool_result → next
+//    round_start before the typewriter has finished cannot strand the prior
+//    bubble mid-arg.
+//  * finalize() is idempotent and safe to call from any finally regardless
+//    of where the round/tool cycle left off.
+// =============================================================================
+class RoundRenderer {
+  constructor(host, convMessages) {
+    this.host = host;
+    this.convMessages = convMessages;
+    // Per-round state. startRound() resets these AFTER flushing the prior
+    // round's pending bytes — see _flushAllPending.
+    this.reply = null;
+    this.cursor = null;
+    // Assistant text: `content` is the LLM-truthful accumulation; `displayed`
+    // is what's actually painted into the bubble; `pending` is queued chars
+    // waiting for the next typewriter tick.
+    this.content = '';
+    this.displayed = '';
+    this.pending = '';
+    this.toolCalls = [];
+    this.toolCallEls = [];
+    this.toolDisplayed = [];
+    this.toolPending = [];
+    this.toolsShouldClose = false;
+    this.drainTimer = null;
+    this.pendingToolResultDiv = null;
+  }
+
+  // ─── public API ──────────────────────────────────────────────────────────
+
+  startRound() {
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this._flushAllPending();
+    this.reply = addMsg('assistant', '', this.host);
+    this.cursor = document.createElement('span');
+    this.cursor.className = 'cursor';
+    this.reply.appendChild(this.cursor);
+    this.content = '';
+    this.displayed = '';
+    this.pending = '';
+    this.toolCalls.length = 0;
+    this.toolCallEls.length = 0;
+    this.toolDisplayed.length = 0;
+    this.toolPending.length = 0;
+    this.toolsShouldClose = false;
+  }
+
+  applyDelta(delta) {
+    if (!delta) return;
+    if (delta.content) this._appendContent(delta.content);
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
+    }
+  }
+
+  endRound() {
+    // Don't remove the cursor here — the typewriter may still be revealing
+    // text, and yanking the cursor mid-stream looks jumpy. drainTick
+    // (and finalize on hard exit) handle cursor removal once pending hits 0.
+    this.toolsShouldClose = true;
+    this._scheduleDrain();
+    // Remove the assistant bubble entirely if no text was ever streamed
+    // (round contained only tool calls). Checked against `content` not
+    // `displayed` because the SW has finished emitting deltas by now —
+    // any text that's going to arrive has already arrived.
+    if (this.reply && (!this.content || !this.content.trim())) {
+      this.reply.remove();
+      this.reply = null;
+      this.cursor = null;
+    }
+  }
+
+  bindMessage(msg) {
+    this.convMessages.push(msg);
+    if (msg.role === 'assistant') {
+      if (this.reply) bindBubble(this.reply, msg);
+      for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
+    } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
+      bindBubble(this.pendingToolResultDiv, msg);
+      this.pendingToolResultDiv = null;
+    }
+  }
+
+  markToolStarted(tc) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
+    if (idx < 0 || !this.toolCallEls[idx]) return;
+    this.toolCallEls[idx].classList.add('in-flight');
+    startToolTicker(this.toolCallEls[idx], tc);
+  }
+
+  markToolDone(tcId, result, artifacts) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
+    if (idx >= 0 && this.toolCallEls[idx]) {
+      this.toolCallEls[idx].classList.remove('in-flight');
+      stopToolTicker(this.toolCallEls[idx]);
+      renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
+    }
+    const text = String(result || '');
+    const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
+    this.pendingToolResultDiv = addMsg('tool-result', '← ' + display, this.host);
+    if (artifacts && artifacts.length) {
+      for (const html of artifacts) window._renderArtifact(this.host, html);
+    }
+  }
+
+  finalize() {
+    // Idempotent — safe to call from finally regardless of where the
+    // round/tool cycle left off. Force-closes any open '(' so the user
+    // sees a complete tool call even on abrupt stream end.
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this.toolsShouldClose = true;
+    this._flushAllPending();
+    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
+  }
+
+  // ─── private ─────────────────────────────────────────────────────────────
+
+  _appendContent(chunk) {
+    // `content` is the LLM-truthful accumulation (used at save time).
+    // `pending` queues chars for the typewriter; drainTick reveals them
+    // into `displayed`, which is what's actually painted.
+    this.content += chunk;
+    this.pending += chunk;
+    this._scheduleDrain();
+  }
+
+  _paintContent() {
+    if (!this.reply) return;
+    this.reply.innerHTML = renderMd(this.displayed);
+    if (this.cursor) this.reply.appendChild(this.cursor);
+  }
+
+  _applyToolCallDelta(tc) {
+    const i = tc.index || 0;
+    if (!this.toolCalls[i]) {
+      this.toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+    }
+    if (tc.id) this.toolCalls[i].id = tc.id;
+    if (tc.function?.name) this.toolCalls[i].function.name += tc.function.name;
+    if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
+    if (!this.toolCalls[i].function.name) return;
+    if (!this.toolCallEls[i]) {
+      // Bubble starts with `→ name(` only — args stream in via toolPending
+      // / drainTick so they type out smoothly whether the upstream sent
+      // them char-by-char or in one chunk.
+      this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
+      this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
+      this.toolDisplayed[i] = '';
+      this.toolPending[i] = '';
+    }
+    if (tc.function?.arguments) {
+      this.toolPending[i] = (this.toolPending[i] || '') + tc.function.arguments;
+      this._scheduleDrain();
+    }
+    if (!this.toolCallEls[i].classList.contains('in-flight')) {
+      renderTcPreparing(this.toolCallEls[i], this.toolCalls[i].function.name, this.toolCalls[i].function.arguments);
+    }
+  }
+
+  _scheduleDrain() {
+    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
+  }
+
+  _drainTick() {
+    this.drainTimer = null;
+    let anyPending = false;
+    // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
+    // so a big batch reveals fast and a trickle reveals smoothly.
+    if (this.pending.length > 0) {
+      const n = Math.max(1, Math.ceil(this.pending.length / 30));
+      this.displayed += this.pending.slice(0, n);
+      this.pending = this.pending.slice(n);
+      this._paintContent();
+      if (this.pending.length > 0) anyPending = true;
+    }
+    // Tool-call args typewriter.
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i];
+      if (!buf || buf.length === 0) continue;
+      const n = Math.max(1, Math.ceil(buf.length / 30));
+      this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf.slice(0, n);
+      this.toolPending[i] = buf.slice(n);
+      this._paintTool(i);
+      if (this.toolPending[i].length > 0) anyPending = true;
+    }
+    this._appendCloseParensIfReady();
+    // Once round_end has fired AND the assistant-text typewriter has fully
+    // caught up, the cursor's purpose is done — drop it. (Tool-call drains
+    // can still be running; the cursor only blinks for the text bubble.)
+    if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
+      this.cursor.remove();
+      this.cursor = null;
+    }
+    if (anyPending) this._scheduleDrain();
+  }
+
+  // Synchronously reveal everything still queued and append the closing ')'
+  // to any bubble whose round has ended. Called from startRound (prior-round
+  // cleanup) and finalize (stream-exit cleanup) — single place where the
+  // "args got stranded mid-stream" bug class is structurally prevented.
+  _flushAllPending() {
+    // Assistant text first.
+    if (this.pending.length > 0) {
+      this.displayed += this.pending;
+      this.pending = '';
+      this._paintContent();
+    }
+    // Then tool args + close-paren.
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i] || '';
+      if (buf.length > 0) {
+        this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf;
+        this.toolPending[i] = '';
+        this._paintTool(i);
+      }
+    }
+    this._appendCloseParensIfReady();
+  }
+
+  _paintTool(i) {
+    if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
+    tcSetExpanded(this.toolCallEls[i], '→ ' + this.toolCalls[i].function.name + '(' + this.toolDisplayed[i]);
+  }
+
+  _appendCloseParensIfReady() {
+    if (!this.toolsShouldClose) return;
+    for (let i = 0; i < this.toolCallEls.length; i++) {
+      const el = this.toolCallEls[i];
+      if (!el || el._tcClosed) continue;
+      if ((this.toolPending[i] || '').length === 0) {
+        tcAppendExpanded(el, ')');
+        el._tcClosed = true;
+      }
+    }
   }
 }
 
@@ -4267,7 +4336,10 @@ function refreshWelcome() {
   let convCount = 0;
   try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
   if (convCount > 0) parts.push(`${convCount} chat${convCount === 1 ? '' : 's'} restored`);
-  if (pyPromise) parts.push('pyodide loaded');
+  // Count convs with a live pyodide worker (worker per conv now).
+  let pyConvs = 0;
+  for (const s of convStreams.values()) if (s.pyWorker) pyConvs++;
+  if (pyConvs > 0) parts.push(`pyodide × ${pyConvs}`);
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
@@ -4328,6 +4400,9 @@ async function deleteConv(id, title) {
     if (stream.abort) stream.abort.abort();
     if (stream.timerInterval) clearInterval(stream.timerInterval);
     if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
+    // Tear down this conv's Pyodide worker too — otherwise it keeps holding
+    // ~10MB of WASM heap forever even though no one can talk to it.
+    if (stream.pyWorker) { try { stream.pyWorker.terminate(); } catch {} stream.pyWorker = null; }
     convStreams.delete(id);
   }
   if (id === activeConvId) {
@@ -4536,456 +4611,209 @@ async function processQueueFor(stream) {
 }
 
 // ============================================================
-// LLM streaming worker — owns fetch + SSE parse + delta accumulation
-// on a dedicated thread. Lets a long completion keep finishing even
-// when the tab is minimized (Chrome throttles main-thread timers and
-// task scheduling aggressively for hidden tabs; worker threads are
-// throttled far less). One shared worker handles every conv; the
-// requestId on each message demuxes which stream it belongs to.
+// LLM streaming via Service Worker — sibling sandpie.js owns the
+// upstream fetch + buffered SSE drain. The page just issues a normal
+// fetch to a sentinel path the SW intercepts. Why a SW instead of a
+// dedicated Web Worker:
+//   * Dedicated workers freeze WITH the page (Chrome's energy-saver
+//     freezing suspends task execution including network event handlers).
+//     When the tab unfreezes the in-flight stream is often dead — no
+//     bytes were read, the upstream's idle timer fired, FIN never
+//     propagated cleanly. The Web Worker version had a watchdog to
+//     retry past this, but at the cost of restarting the completion.
+//   * Service workers have a separate lifecycle — they're explicitly
+//     exempt from freezing while a fetch handler is in flight, so a
+//     mid-stream tab freeze of 1-2 minutes is survivable: the SW keeps
+//     draining bytes into an in-memory buffer, and the page picks up
+//     where it left off when it unfreezes.
+//   * Bonus: page-side code is simpler. No postMessage protocol, no
+//     requestId multiplex — just `fetch(SW_STREAM_PATH, { body })`
+//     and read the response body like any other SSE stream.
 // ============================================================
-const LLM_WORKER_SOURCE = `
-const active = new Map();
-self.addEventListener('message', (e) => {
-  const m = e.data;
-  if (m.type === 'abort') {
-    const a = active.get(m.requestId);
-    if (a) a.controller.abort();
-    return;
+
+// Same-origin path the SW intercepts. Relative resolution puts it under
+// the SW's scope (the directory containing sandpie.js).
+const SW_STREAM_PATH = './sandpie-stream';
+
+// Register the SW as soon as the page boots and FORCE an update check.
+// Three guarantees, in order:
+//   1. updateViaCache:'none' tells the browser to bypass its HTTP cache when
+//      fetching sandpie.js itself, so a redeploy is never masked by stale
+//      cache headers (Apache loves to send max-age on .js files).
+//   2. reg.update() proactively asks the browser to re-fetch the SW script
+//      every page load. Combined with skipWaiting + clients.claim in the SW,
+//      the new version takes over on this same page load, no manual unregister.
+//   3. controllerchange wait: don't resolve _swReady until a SW is actually
+//      controlling this page, otherwise the first /sandpie-agent fetch falls
+//      through to the network as a real 404.
+let _swReady = (async () => {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
-  if (m.type === 'start') run(m);
-});
-async function run({ requestId, url, headers, body }) {
-  const controller = new AbortController();
-  active.set(requestId, { controller });
-  try {
-    const res = await fetch(url, {
-      method: 'POST', headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
+  const reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
+  // Best-effort update check — never blocks the boot if the network is slow.
+  reg.update().catch(e => console.warn('[sandpie] SW update check failed:', e));
+  if (!navigator.serviceWorker.controller) {
+    await new Promise(resolve => {
+      navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
     });
-    if (!res.ok) {
-      const text = (await res.text()).slice(0, 300);
-      self.postMessage({ type: 'error', requestId, status: res.status, message: res.status + ': ' + text });
-      return;
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6);
-        if (data === '[DONE]') continue;
-        try {
-          const delta = JSON.parse(data).choices && JSON.parse(data).choices[0] && JSON.parse(data).choices[0].delta;
-          if (delta) self.postMessage({ type: 'delta', requestId, delta });
-        } catch (_) {}
-      }
-    }
-    self.postMessage({ type: 'done', requestId });
-  } catch (e) {
-    if (e && (e.name === 'AbortError' || controller.signal.aborted)) {
-      self.postMessage({ type: 'aborted', requestId });
-    } else {
-      self.postMessage({ type: 'error', requestId, message: (e && e.message) || String(e) });
-    }
-  } finally {
-    active.delete(requestId);
   }
-}
-`;
+  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
+  return reg;
+})();
+_swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 
-let _llmWorker = null;
-function getLLMWorker() {
-  if (_llmWorker) return _llmWorker;
-  const blob = new Blob([LLM_WORKER_SOURCE], { type: 'application/javascript' });
-  _llmWorker = new Worker(URL.createObjectURL(blob));
-  _llmWorker._pending = new Map(); // requestId -> { onDelta, onDone, onAborted, onError }
-  _llmWorker.addEventListener('message', (e) => {
-    const m = e.data;
-    const p = _llmWorker._pending.get(m.requestId);
-    if (!p) return;
-    if (m.type === 'delta') p.onDelta(m.delta);
-    else if (m.type === 'done') p.onDone();
-    else if (m.type === 'aborted') p.onAborted();
-    else if (m.type === 'error') p.onError(m);
-  });
-  return _llmWorker;
-}
-let _reqIdCounter = 0;
-
-async function streamRound(signal, stream) {
-  // Capture the stream's host + messages array up-front so we keep writing
-  // into THIS conversation even if the user navigates to a different one
-  // mid-stream. The captured `host` may be detached from #messages (parked),
-  // but DOM mutations on a detached subtree are perfectly valid — they just
-  // aren't visible until the host is re-mounted.
-  const host = stream.host;
-  const convMessages = stream.messages;
-  const endpoint = $('endpoint').value.replace(/\/$/, '');
-  const url = api(endpoint + '/chat/completions');
-  const body = { model: $('model').value, messages: [buildSystemPrompt(), ...convMessages], stream: true, tools: toolDefs() };
-
-  const reply = addMsg('assistant', '', host);
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  reply.appendChild(cursor);
-
-  const toolCalls = [];
-  const toolCallEls = [];
-  const toolDisplayed = [];
-  const toolPending = [];
-  let content = '';
-  let aborted = false;
-  let displayed = '', pending = '', streamDone = false;
-
-  const drain = new Promise(resolve => {
-    const tick = () => {
-      const m = $('messages');
-      // Only manipulate scroll if this stream's host is currently mounted
-      // (i.e. the user is viewing the conv this stream belongs to).
-      const visible = host.parentNode === m;
-      const stick = visible ? isAtBottom(m) : false;
-      let work = false;
-
-      if (pending.length > 0) {
-        const n = Math.max(1, Math.ceil(pending.length / 30));
-        displayed += pending.slice(0, n);
-        pending = pending.slice(n);
-        reply.innerHTML = renderMd(displayed);
-        reply.appendChild(cursor);
-        work = true;
-      }
-      for (let i = 0; i < toolPending.length; i++) {
-        const buf = toolPending[i];
-        if (!buf || buf.length === 0) continue;
-        const n = Math.max(1, Math.ceil(buf.length / 30));
-        toolDisplayed[i] = (toolDisplayed[i] || '') + buf.slice(0, n);
-        toolPending[i] = buf.slice(n);
-        if (toolCallEls[i]) {
-          tcSetExpanded(toolCallEls[i], `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`);
-        }
-        work = true;
-      }
-
-      if (!work) {
-        if (streamDone) return resolve();
-        return setTimeout(tick, 16);
-      }
-      if (stream.timerEl && stream.timerEl.parentNode === host) host.appendChild(stream.timerEl);
-      if (visible && stick) m.scrollTop = m.scrollHeight;
-      setTimeout(tick, 16);
-    };
-    tick();
-  });
-
-  // Shared delta handler — content concat + tool-call accumulator with
-  // live bubble updates, applied to each OpenAI-shape SSE delta.
-  const applyDelta = (delta) => {
-    if (!delta) return;
-    if (delta.content) { content += delta.content; pending += delta.content; }
-    if (delta.tool_calls) {
-      for (const tc of delta.tool_calls) {
-        const i = tc.index || 0;
-        if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-        if (tc.id) toolCalls[i].id = tc.id;
-        if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
-        if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
-        if (toolCalls[i].function.name) {
-          if (!toolCallEls[i]) {
-            toolCallEls[i] = addMsg('tool-call', `→ ${toolCalls[i].function.name}(`, host);
-            toolCallEls[i].dataset.fname = toolCalls[i].function.name;
-            // Attach context-menu / click handlers immediately so the chip is
-            // clickable during the preparing phase (LLM still streaming args).
-            // The _msg reference is filled in later once the assistant message
-            // is pushed; the menu actions handle a missing _msg gracefully.
-            bindBubble(toolCallEls[i]);
-            toolDisplayed[i] = '';
-            toolPending[i] = '';
-          } else {
-            tcSetExpanded(toolCallEls[i], `→ ${toolCalls[i].function.name}(${toolDisplayed[i]}`);
-          }
-        }
-        if (tc.function?.arguments) {
-          toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
-        }
-        // Keep the preparing card in sync with the live token estimate so the
-        // count rises as args stream in. Skipped once the bubble is in-flight
-        // (the ticker owns the rendering then).
-        if (toolCallEls[i] && !toolCallEls[i].classList.contains('in-flight')) {
-          renderTcPreparing(
-            toolCallEls[i],
-            toolCalls[i].function.name,
-            toolCalls[i].function.arguments,
-          );
-        }
-      }
-    }
-  };
-
-  // Hand the fetch+SSE-parse loop off to the LLM worker. The worker thread
-  // keeps draining the response stream at network speed even if Chrome
-  // throttles or pauses this tab's main thread (background / minimized).
-  // Per-delta postMessage calls feed `applyDelta` exactly as the inline
-  // reader used to — the only thing that moved is where the bytes are read.
-  const worker = getLLMWorker();
-  const requestId = ++_reqIdCounter;
-  stream.requestId = requestId;
-  let streamError = null;
-  let resolveStream;
-  const streamComplete = new Promise(r => { resolveStream = r; });
-  worker._pending.set(requestId, {
-    onDelta:   applyDelta,
-    onDone:    () => resolveStream(),
-    onAborted: () => { aborted = true; resolveStream(); },
-    onError:   ({ status, message }) => {
-      const err = new Error(message);
-      if (typeof status === 'number') err.status = status;
-      streamError = err;
-      resolveStream();
-    },
-  });
-  const onAbort = () => worker.postMessage({ type: 'abort', requestId });
-  if (signal) {
-    if (signal.aborted) onAbort();
-    else signal.addEventListener('abort', onAbort, { once: true });
-  }
-  worker.postMessage({
-    type: 'start', requestId,
-    url,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
-    body,
-  });
-  try {
-    await streamComplete;
-  } finally {
-    worker._pending.delete(requestId);
-    if (signal) signal.removeEventListener('abort', onAbort);
-    stream.requestId = null;
-  }
-  if (streamError) {
-    streamDone = true;
-    reply.remove();
-    throw streamError;
-  }
-
-  streamDone = true;
-  await drain;
-  cursor.remove();
-  for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
-  // Remove the assistant bubble whenever no visible text streamed — even if
-  // tool_calls came through, and even if only whitespace arrived. A bubble
-  // with no real text is visual noise; the tool-call chips already mark
-  // the assistant's turn.
-  if (!content || !content.trim()) reply.remove();
-  // Expose live bubble refs so the caller can bind them to the assistant
-  // message object after it's pushed into `messages[]`. Filtering toolCalls
-  // by id used to drop entries without preserving the parallel toolCallEls
-  // alignment — re-pair them here so binding is index-safe.
-  const keptToolCalls = [];
-  const keptToolCallEls = [];
-  for (let i = 0; i < toolCalls.length; i++) {
-    if (toolCalls[i] && toolCalls[i].id) {
-      keptToolCalls.push(toolCalls[i]);
-      keptToolCallEls.push(toolCallEls[i] || null);
-    }
-  }
-  return { content, toolCalls: keptToolCalls, toolCallEls: keptToolCallEls, reply, aborted };
-}
-
-// Transient upstream errors (load-balancer hiccups, brief overload, rate
-// limits). Auth/bad-request/not-found are intentionally excluded.
-const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
-
-function isRetryableError(err) {
-  if (!err || err.name === 'AbortError') return false;
-  if (typeof err.status === 'number' && RETRYABLE_STATUS.has(err.status)) return true;
-  // Bare network failures (DNS, dropped, CORS preflight) surface as TypeError.
-  if (err instanceof TypeError) return true;
-  return false;
-}
-
-function sleep(ms, signal) {
-  return new Promise((resolve, reject) => {
-    const id = setTimeout(resolve, ms);
-    if (signal) signal.addEventListener('abort', () => {
-      clearTimeout(id);
-      reject(new DOMException('aborted', 'AbortError'));
-    }, { once: true });
-  });
-}
-
-async function streamRoundWithRetry(signal, stream) {
-  // Retry indefinitely on transient errors — the user's stop button (which
-  // aborts `signal`) is the exit path. Backoff ramps up then caps at 10s.
-  const BACKOFF_MS = [1000, 2500, 5000, 10000];
-  let notice = null;
-  let attempt = 0;
-  try {
-    while (true) {
-      try {
-        const result = await streamRound(signal, stream);
-        return result;
-      } catch (e) {
-        if (signal?.aborted) throw e;
-        if (!isRetryableError(e)) throw e;
-        if (!notice) notice = addMsg('info', '', stream.host);
-        notice.textContent = `AI provider issues detected, retrying (attempt ${attempt + 1})…`;
-        await sleep(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)], signal);
-        attempt++;
-      }
-    }
-  } finally {
-    if (notice) notice.remove();
-  }
-}
-
+// =============================================================================
+// sendSingle — orchestrates ONE round-trip with the agent loop.
+// =============================================================================
+// Reads as a near-1:1 mapping of the flow-chart steps. Each step's concern
+// lives in its own helper so this function stays a thin coordinator:
+//
+//   [R1] buildAgentConfig  — package the SW request payload from the UI state
+//   [R2] await _swReady    — make sure the SW is controlling this page
+//   [R2] fetch /sandpie-agent — POST the config, SW intercepts
+//   [R3] readAgentEvents   — NDJSON line reader, calls dispatch for each line
+//   [E*] dispatchAgentEvent — map ev.type to the renderer's method
+//   [F1..F5] finally       — abort cleanup, persistence, Dropbox sync
+//
+// All per-round render state is in the RoundRenderer constructed at the top.
 async function sendSingle(text, stream) {
+  // [R1] Pre-flight
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  // Capture per-stream state up-front. All bubble inserts, message pushes,
-  // and abort/timer reads use these locals so a conv-switch mid-stream
-  // doesn't redirect writes into the now-visible conversation.
-  const convId = stream.id;
-  const convMessages = stream.messages;
-  const host = stream.host;
-  convMessages.push({ role: 'user', content: text });
-  bindBubble(addMsg('user', text, host), convMessages[convMessages.length - 1]);
-  // Early save so a brand-new conv lands on disk before the long-running
-  // round — that way the conv list shows it (with the generating-dot
-  // indicator) the moment streaming starts, not only after it finishes.
-  saveConv(convId).catch(() => {});
+  const { id: convId, messages: convMessages, host } = stream;
+
+  // [U-tail] Persist + render the user message before kicking off the round.
+  const userMsg = { role: 'user', content: text };
+  convMessages.push(userMsg);
+  bindBubble(addMsg('user', text, host), userMsg);
+  saveConv(convId).catch(() => {});  // best-effort: fresh conv hits the list immediately
   requestWakeLock();
   setStreamSending(stream, true);
-  // One total timer for the whole exchange — covers every streamRound AND
-  // every tool execution between rounds. Settled in the finally block.
   startTotalTimer(stream);
   let wasAborted = false;
 
+  // [R1] Build the SW request payload from current UI state.
+  const config = buildAgentConfig(convMessages);
+
+  // [R2] Wait for the SW to be controlling the page, then wire abort.
+  await _swReady;
+  const ctrl = new AbortController();
+  stream.requestId = ctrl;
+  const onAbort = () => ctrl.abort();
+  if (stream.abort?.signal) {
+    if (stream.abort.signal.aborted) onAbort();
+    else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  // [E*] Renderer owns ALL per-round render state. Dispatch is the only caller.
+  const renderer = new RoundRenderer(host, convMessages);
+
   try {
-    while (true) {
-      if (stream.abort?.signal.aborted) break;
-      let { content, toolCalls, toolCallEls, reply, aborted } = await streamRoundWithRetry(stream.abort?.signal, stream);
-      // Dedent fenced code blocks before persisting so the next round's
-      // history doesn't carry drifted indent the model would amplify.
-      if (content) content = dedentMarkdownFences(content);
-      if (aborted) {
-        wasAborted = true;
-        if (content && content.trim()) {
-          convMessages.push({ role: 'assistant', content });
-          bindBubble(reply, convMessages[convMessages.length - 1]);
-        }
-        addMsg('info', 'Stopped.', host);
-        break;
-      }
-      if (!toolCalls.length) {
-        if (content && content.trim()) {
-          convMessages.push({ role: 'assistant', content });
-          bindBubble(reply, convMessages[convMessages.length - 1]);
-        }
-        break;
-      }
-      convMessages.push({ role: 'assistant', content, tool_calls: toolCalls });
-      const asstMsg = convMessages[convMessages.length - 1];
-      bindBubble(reply, asstMsg);
-      for (const el of toolCallEls) if (el) bindBubble(el, asstMsg);
-      const completed = new Set();
-      try {
-        for (let i = 0; i < toolCalls.length; i++) {
-          const tc = toolCalls[i];
-          const toolBubble = toolCallEls[i];
-          if (stream.abort?.signal.aborted) break;
-          let args = {};
-          try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-          // Mark this tool-call bubble as in-flight and start the ticker so
-          // the minimized-view shows spinner + rotating flavor + live token
-          // count while the tool runs.
-          if (toolBubble) {
-            toolBubble.classList.add('in-flight');
-            startToolTicker(toolBubble, tc);
-          }
-          // Pass the abort signal so Stop is responsive even when a tool is
-          // mid-flight (shell fetch, fetch_file dbxDownload, etc.). pyodide's
-          // run_python doesn't accept an external abort and will run to
-          // completion — that's a separate, harder fix needing setInterruptBuffer.
-          // Clear any stale artifacts from a previous tool run so what we
-          // drain afterwards is strictly produced by THIS call.
-          window._pendingArtifacts.length = 0;
-          let result;
-          try {
-            result = await tools[tc.function.name].run(args, stream.abort?.signal);
-          } finally {
-            if (toolBubble) {
-              toolBubble.classList.remove('in-flight');
-              stopToolTicker(toolBubble);
-              renderTcDone(toolBubble, tc.function.name);
-            }
-          }
-          const resultDiv = addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`, host);
-          // Cap what gets fed BACK to the LLM in the next request body. A
-          // single rogue print() or cat-of-large-file used to silently push
-          // multi-MB into messages[] and then nginx would 413 the next round,
-          // wedging the whole conversation. Display path is already capped
-          // at 500 chars for readability — this is a separate, larger cap
-          // for what the model actually sees.
-          const capped = capToolResult(result);
-          if (capped.truncated) {
-            addMsg('info', `tool result truncated: ${humanBytes(capped.original)} → ${humanBytes(capped.kept)} (LLM sees the head)`, host);
-          }
-          // Drain artifacts produced by this tool call. Persist on the tool
-          // message so saveConv keeps them, and render now into the captured
-          // host so they appear under the right conv even if the user
-          // switches tabs mid-stream.
-          const artifacts = window._pendingArtifacts.splice(0);
-          const toolMsg = { role: 'tool', tool_call_id: tc.id, content: capped.content };
-          if (artifacts.length) toolMsg.artifacts = artifacts;
-          convMessages.push(toolMsg);
-          bindBubble(resultDiv, convMessages[convMessages.length - 1]);
-          for (const html of artifacts) window._renderArtifact(host, html);
-          completed.add(tc.id);
-        }
-      } finally {
-        // Every tool_call needs a matching tool result or the conversation is
-        // unsendable. Pad any that didn't run (user hit Stop, error, etc.).
-        for (const tc of toolCalls) {
-          if (!completed.has(tc.id)) {
-            convMessages.push({ role: 'tool', tool_call_id: tc.id, content: '[stopped]' });
-          }
-        }
-      }
-      if (stream.abort?.signal.aborted) { wasAborted = true; addMsg('info', 'Stopped.', host); break; }
+    // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
+    const res = await fetch('./sandpie-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
+      return;
     }
+    // [R3 → E*] Drain the NDJSON stream into the renderer.
+    await readAgentEvents(res.body, ev => dispatchAgentEvent(ev, renderer, host));
   } catch (e) {
-    if (e?.name === 'AbortError') { wasAborted = true; addMsg('info', 'Stopped.', host); }
-    else {
-      // Tool throws don't always come through as proper Error instances
-      // (some libraries throw plain objects/strings). Cascade through
-      // common message shapes and dump the raw object to DevTools.
-      console.error('sandpie send error:', e);
-      const msg = (e && (e.message || e.error || e.detail))
-        || (typeof e === 'string' ? e : null)
-        || (e && (() => { try { return JSON.stringify(e); } catch { return null; } })())
-        || (e && String(e))
-        || 'unknown error (check DevTools console)';
-      addMsg('err', 'Error: ' + msg, host);
+    if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
+      wasAborted = true;
+      addMsg('info', 'Stopped.', host);
+    } else {
+      console.error('[sandpie] agent fetch error:', e);
+      addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
+    // [F1] Tear down abort wiring.
+    if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
+    stream.requestId = null;
+    // [F2] Flush any in-flight typewriter so no bubble outlives the stream
+    // half-rendered. Idempotent: safe regardless of where we exited.
+    renderer.finalize();
+    // [F3..F5] Post-stream housekeeping.
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Token meter reflects the visible conv only.
     if (convId === activeConvId) refreshTokenMeter();
-    // Phase C: push any files the LLM created/modified during the round to
-    // Dropbox. Errors are logged but don't fail the conversation save.
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+  }
+}
+
+// [R1] Package the SW request body from the live UI state. Pure read of
+// $('endpoint') / $('apiKey') / $('model') / $('proxyUrl') + module-level
+// helpers; no DOM writes, no side effects.
+function buildAgentConfig(convMessages) {
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
+  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
+  // Empty string means same-origin (the SW resolves it against its own URL).
+  const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  const placeholdersList = [];
+  try {
+    const st = syncState();
+    for (const [rel, val] of Object.entries(st)) if (!val.hydrated) placeholdersList.push(rel);
+  } catch (_) {}
+  let dbxTokensSnap = null;
+  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
+  return {
+    url,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    model: $('model').value,
+    systemPrompt: buildSystemPrompt(),
+    messages: convMessages.slice(),
+    tools: toolDefs(),
+    proxyBase,
+    origin: location.origin,
+    dbxTokens: dbxTokensSnap,
+    placeholdersList,
+  };
+}
+
+// [R3] Drain an NDJSON response body line-by-line, calling onEvent(parsed)
+// for each successfully-parsed line. Bad lines are logged and skipped so a
+// single malformed event can't kill the whole stream.
+async function readAgentEvents(body, onEvent) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let lineBuf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    lineBuf += decoder.decode(value, { stream: true });
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop() || '';  // last fragment may be incomplete; carry it forward
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try { onEvent(JSON.parse(line)); }
+      catch (e) { console.warn('[sandpie] bad event line:', line, e); }
+    }
+  }
+}
+
+// [E1..E8] Map an SW event to the renderer's method. Errors are surfaced as
+// info-bubbles in the host; everything else routes to RoundRenderer.
+function dispatchAgentEvent(ev, renderer, host) {
+  switch (ev.type) {
+    case 'round_start':   return renderer.startRound();
+    case 'delta':         return renderer.applyDelta(ev.delta);
+    case 'round_end':     return renderer.endRound();
+    case 'message_added': return renderer.bindMessage(ev.message);
+    case 'tool_started':  return renderer.markToolStarted(ev.tc);
+    case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
+    case 'agent_done':    return;
+    case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
   }
 }
 
@@ -5094,6 +4922,7 @@ async function sendSingle(text, stream) {
   }
 
   if (reduceMotion) {
+    // Single static mesh, no shimmer, no rebuild loop.
     const host = document.createElementNS(NS, 'g');
     host.setAttribute('clip-path', 'url(#welcome-clip)');
     svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));

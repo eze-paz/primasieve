@@ -1,4 +1,4 @@
-// sandpie-sw.js — Service Worker that runs the LLM agent loop end-to-end.
+// sandpie.js — Service Worker that runs the LLM agent loop end-to-end.
 //
 // Why: when the page tab is frozen by Chrome's energy-saver freezing, all
 // page-side work stops — including the loop in sendSingle that decides
@@ -31,7 +31,7 @@
 //   POST /sandpie-py { code, argv, placeholdersList } → run python once
 //
 // =============================================================================
-// SW-side flow (mirrors the page-side flow chart in sandpie-sw.html)
+// SW-side flow (mirrors the page-side flow chart in sandpie.html)
 // =============================================================================
 //
 //   W1  install  → skipWaiting()                                  [line ~33]
@@ -76,7 +76,7 @@
 //   T5  tool_fetch_file: Dropbox download via SW dbx helper       [line ~355]
 //
 // Adding a new tool: register it in runTool's switch AND export its
-// schema to the page via tools[] in sandpie-sw.html (the SW receives
+// schema to the page via tools[] in sandpie.html (the SW receives
 // the schema array verbatim and forwards it to upstream).
 // =============================================================================
 
@@ -619,7 +619,7 @@ async function handleAgent(req) {
 }
 
 // Backward-compat: a one-shot SSE proxy (just opens upstream, pipes back).
-// Same shape as the prior sandpie-sw.js implementation.
+// Same shape as the prior implementation.
 async function handleStream(req) {
   let payload;
   try { payload = await req.json(); }
