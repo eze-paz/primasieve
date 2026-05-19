@@ -2604,7 +2604,7 @@ HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, rou
 
 No raw sockets, no subprocess.
 
-CLOUD-ONLY FILES — IMPORTANT: when Dropbox is connected, files larger than 64 KB are NOT downloaded on init. They are simply absent from /files (not listed by os.listdir, not visible to glob, open() raises a plain FileNotFoundError with no special message). If the user mentions a file you don't see, it may live on Dropbox un-hydrated — call the fetch_file tool with the relative path to pull it into /files, then re-run. Conversations and sandpie_*.md manifests are always local, so this only matters for the user's data files.
+CLOUD FILES — files in /files/ are the user's working set (mounted from OPFS; changes persist across runs). If you open() a file that's in the user's Dropbox but not yet in /files/, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
 
 RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPython.display:
     from IPython.display import display, HTML, Image, SVG

@@ -278,6 +278,23 @@ function isPyodideFatal(e, msg, stderr) {
   return false;
 }
 
+// Extract the missing file path from a Pyodide PythonError whose underlying
+// Python exception is FileNotFoundError. Standard repr in the JS-side error
+// message is:
+//   FileNotFoundError: [Errno 2] No such file or directory: 'path'
+// Returns the OPFS-relative path (no leading '/', no '/files/' prefix) so
+// it can be passed straight to tool_fetch_file. Returns null if the error
+// is anything other than that shape — caller treats null as "don't retry".
+function _extractMissingPath(e) {
+  const msg = (e && (e.message || String(e))) || '';
+  if (!/FileNotFoundError/.test(msg)) return null;
+  const m = msg.match(/No such file or directory:\s*['"]([^'"]+)['"]/);
+  if (!m) return null;
+  let p = m[1];
+  p = p.replace(/^\/+/, '').replace(/^files\//, '');
+  return p || null;
+}
+
 // =============================================================================
 // withPy — single-flight serializer for tool_run_python calls.
 // =============================================================================
@@ -412,7 +429,34 @@ async function tool_run_python({ code, path, args }, ctx) {
       self._sandpieDisplay = (html) => artifacts.push(html);
       try { p.runPython(DISPLAY_PATCH); } catch (_) {}
       try { await p.loadPackagesFromImports(code); } catch (_) {}
-      await p.runPythonAsync(code);
+      // Single-retry: if user code dies with FileNotFoundError on a path
+      // that turns out to live in Dropbox, fetch_file it and re-run the
+      // whole snippet once. The LLM never sees the failure-then-retry —
+      // it just gets the successful result. Budget is 1 to avoid fetch
+      // storms inside one call; subsequent missing files in the same
+      // snippet surface to the LLM (it can run again, where they'd
+      // already be local or trigger another single retry).
+      let _retried = false;
+      while (true) {
+        try {
+          await p.runPythonAsync(code);
+          break;
+        } catch (runErr) {
+          if (_retried) throw runErr;
+          const missing = _extractMissingPath(runErr);
+          if (!missing || !ctx.dbxTokens) throw runErr;
+          const fr = await tool_fetch_file({ path: missing }, ctx);
+          if (typeof fr.result !== 'string' || fr.result.startsWith('Error')) throw runErr;
+          // Re-sync OPFS into Pyodide's /files view so the just-fetched
+          // file is now visible to open() / os.listdir on the retry.
+          if (_nativefs) { try { await _nativefs.syncfs(); } catch (_) {} }
+          // Discard partial output captured before the failing line so
+          // the user sees a clean run, not an interleaving of attempts.
+          stdout = '';
+          stderr = '';
+          _retried = true;
+        }
+      }
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
       // failed at init — Python had no /files to write to, nothing to flush.
