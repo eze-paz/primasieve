@@ -4589,25 +4589,37 @@ async function newConversation() {
 async function listConversations() {
   let entries = [];
   try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
-  const out = [];
-  for (const e of entries) {
-    if (e.kind !== 'file' || !e.name.endsWith('.json')) continue;
-    const id = e.name.slice(0, -5);
-    try {
-      const data = JSON.parse(await opfs.read(convPath(id)));
-      // Build searchable content from messages
-      const messages = data.messages || [];
-      const messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
-      out.push({
-        id: data.id || id,
-        title: data.title || '(no title)',
-        updated: data.updated || '',
-        pinned: !!data.pinned,
-        archived: !!data.archived,
-        messageContent: messageContent,
-      });
-    } catch {}
-  }
+  // Only build the searchable full-text body when the search box actually
+  // has content. It's used solely by the filter step in refreshConversationList,
+  // so for the common case (no active search) we skip iterating + joining
+  // every message in every conv. Was a per-call O(total_message_bytes) cost
+  // that ran after every send / save / rename / sync — easily 10+s with a
+  // populated Dropbox account.
+  const searchActive = !!($('convSearch')?.value.trim());
+  // Read all conv files in parallel. The previous serial `for ... await` made
+  // boot O(N × disk_latency); Promise.all collapses that to roughly one disk
+  // round-trip's worth (OPFS handles concurrent reads fine).
+  const reads = entries
+    .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
+    .map(async (e) => {
+      const id = e.name.slice(0, -5);
+      try {
+        const data = JSON.parse(await opfs.read(convPath(id)));
+        const row = {
+          id: data.id || id,
+          title: data.title || '(no title)',
+          updated: data.updated || '',
+          pinned: !!data.pinned,
+          archived: !!data.archived,
+        };
+        if (searchActive) {
+          const messages = data.messages || [];
+          row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
+        }
+        return row;
+      } catch { return null; }
+    });
+  const out = (await Promise.all(reads)).filter(Boolean);
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
 
