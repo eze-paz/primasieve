@@ -3871,7 +3871,12 @@ class RoundRenderer {
     // round's pending bytes — see _flushAllPending.
     this.reply = null;
     this.cursor = null;
+    // Assistant text: `content` is the LLM-truthful accumulation; `displayed`
+    // is what's actually painted into the bubble; `pending` is queued chars
+    // waiting for the next typewriter tick.
     this.content = '';
+    this.displayed = '';
+    this.pending = '';
     this.toolCalls = [];
     this.toolCallEls = [];
     this.toolDisplayed = [];
@@ -3891,6 +3896,8 @@ class RoundRenderer {
     this.cursor.className = 'cursor';
     this.reply.appendChild(this.cursor);
     this.content = '';
+    this.displayed = '';
+    this.pending = '';
     this.toolCalls.length = 0;
     this.toolCallEls.length = 0;
     this.toolDisplayed.length = 0;
@@ -3907,12 +3914,20 @@ class RoundRenderer {
   }
 
   endRound() {
-    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
-    // Defer the ')' to drainTick so it lands AFTER the paced args finish
-    // typing out, not before them.
+    // Don't remove the cursor here — the typewriter may still be revealing
+    // text, and yanking the cursor mid-stream looks jumpy. drainTick
+    // (and finalize on hard exit) handle cursor removal once pending hits 0.
     this.toolsShouldClose = true;
     this._scheduleDrain();
-    if (this.reply && (!this.content || !this.content.trim())) this.reply.remove();
+    // Remove the assistant bubble entirely if no text was ever streamed
+    // (round contained only tool calls). Checked against `content` not
+    // `displayed` because the SW has finished emitting deltas by now —
+    // any text that's going to arrive has already arrived.
+    if (this.reply && (!this.content || !this.content.trim())) {
+      this.reply.remove();
+      this.reply = null;
+      this.cursor = null;
+    }
   }
 
   bindMessage(msg) {
@@ -3961,11 +3976,18 @@ class RoundRenderer {
   // ─── private ─────────────────────────────────────────────────────────────
 
   _appendContent(chunk) {
+    // `content` is the LLM-truthful accumulation (used at save time).
+    // `pending` queues chars for the typewriter; drainTick reveals them
+    // into `displayed`, which is what's actually painted.
     this.content += chunk;
-    if (this.reply) {
-      this.reply.innerHTML = renderMd(this.content);
-      if (this.cursor) this.reply.appendChild(this.cursor);
-    }
+    this.pending += chunk;
+    this._scheduleDrain();
+  }
+
+  _paintContent() {
+    if (!this.reply) return;
+    this.reply.innerHTML = renderMd(this.displayed);
+    if (this.cursor) this.reply.appendChild(this.cursor);
   }
 
   _applyToolCallDelta(tc) {
@@ -4002,6 +4024,16 @@ class RoundRenderer {
   _drainTick() {
     this.drainTimer = null;
     let anyPending = false;
+    // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
+    // so a big batch reveals fast and a trickle reveals smoothly.
+    if (this.pending.length > 0) {
+      const n = Math.max(1, Math.ceil(this.pending.length / 30));
+      this.displayed += this.pending.slice(0, n);
+      this.pending = this.pending.slice(n);
+      this._paintContent();
+      if (this.pending.length > 0) anyPending = true;
+    }
+    // Tool-call args typewriter.
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i];
       if (!buf || buf.length === 0) continue;
@@ -4012,6 +4044,13 @@ class RoundRenderer {
       if (this.toolPending[i].length > 0) anyPending = true;
     }
     this._appendCloseParensIfReady();
+    // Once round_end has fired AND the assistant-text typewriter has fully
+    // caught up, the cursor's purpose is done — drop it. (Tool-call drains
+    // can still be running; the cursor only blinks for the text bubble.)
+    if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
+      this.cursor.remove();
+      this.cursor = null;
+    }
     if (anyPending) this._scheduleDrain();
   }
 
@@ -4020,6 +4059,13 @@ class RoundRenderer {
   // cleanup) and finalize (stream-exit cleanup) — single place where the
   // "args got stranded mid-stream" bug class is structurally prevented.
   _flushAllPending() {
+    // Assistant text first.
+    if (this.pending.length > 0) {
+      this.displayed += this.pending;
+      this.pending = '';
+      this._paintContent();
+    }
+    // Then tool args + close-paren.
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i] || '';
       if (buf.length > 0) {
