@@ -122,19 +122,6 @@ try {
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
-// On-demand claim. The page posts { type: 'sandpie-claim' } when it boots
-// without a controller (typical after hard refresh or a SW filename change
-// where the old SW had already activated and our activate handler — the only
-// other place we call clients.claim — won't re-fire for this lifetime).
-// Calling clients.claim here forces the browser to assign this SW as the
-// controller for all in-scope uncontrolled clients, including the page that
-// just messaged us; the page sees a `controllerchange` event and proceeds.
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'sandpie-claim') {
-    event.waitUntil(self.clients.claim());
-  }
-});
-
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const path = url.pathname;
