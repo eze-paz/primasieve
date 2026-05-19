@@ -1014,6 +1014,35 @@ const $ = id => document.getElementById(id);
 
 const VERSION = '1.0.0';
 
+// =============================================================================
+// SW console relay — surfaces sandpie.js's console output here.
+// =============================================================================
+// SW logs normally live in a separate DevTools window (Application → Service
+// Workers → click the SW link → its own Console tab). That makes Pyodide
+// aborts, init failures, fatal-reset reasons invisible unless you go hunting.
+// This receiver listens for the SW's `sandpie-sw-log` postMessages and
+// re-emits them in the page's regular console with a `[sw]` prefix, plus a
+// one-shot ping that asks the SW to flush its boot-time log buffer so even
+// pre-page-load lines (version stamp, importScripts results) appear here.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d || d.type !== 'sandpie-sw-log') return;
+    // Map level → console method. Default to log for unknown.
+    const fn = console[d.level] || console.log;
+    fn.call(console, '[sw]', d.text);
+  });
+  // Once a controller exists, ask it to replay the boot buffer so we don't
+  // miss SW logs that fired before this listener was wired up. Try now and
+  // also on controllerchange (covers cold + warm boots).
+  const flush = () => {
+    const c = navigator.serviceWorker.controller;
+    if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
+  };
+  flush();
+  navigator.serviceWorker.addEventListener('controllerchange', flush);
+}
+
 // Active-conversation message array. Reassigned (not mutated in place) when
 // the user switches conversations — so any in-flight stream that captured the
 // previous reference keeps pushing to its own conversation's array instead of

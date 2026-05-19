@@ -80,10 +80,69 @@
 // the schema array verbatim and forwards it to upstream).
 // =============================================================================
 
+// =============================================================================
+// Console relay — every console.log/warn/error in the SW is also posted
+// to all clients so it shows up in the PAGE'S regular DevTools console
+// with a `[sw]` prefix. Without this the most actionable signals
+// (Pyodide aborts, init failures, fatal resets) get buried in a separate
+// DevTools window that you'd have to dig into Application → Service
+// Workers → click the SW link to find.
+// =============================================================================
+// Buffer logs emitted during install/activate when there are no clients
+// yet. First time a client connects (via the page-side message handler
+// pinging us with `sandpie-sw-flush-logs`), we drain the buffer.
+const _swLogBuffer = [];
+const _MAX_BUFFER = 200;
+function _relayLog(level, args) {
+  // Best-effort stringification — most log args are strings or simple objects.
+  const text = args.map(a => {
+    if (a == null) return String(a);
+    if (typeof a === 'string') return a;
+    if (a instanceof Error) return (a.stack || a.message || String(a));
+    try { return JSON.stringify(a); } catch (_) { return String(a); }
+  }).join(' ');
+  const msg = { type: 'sandpie-sw-log', level, text, ts: Date.now() };
+  // Buffer ALL logs so the page-side relay can fetch the recent history
+  // when it connects (e.g. SW boot logs that fired before the page was
+  // listening). Cap so a noisy SW doesn't grow unbounded.
+  _swLogBuffer.push(msg);
+  if (_swLogBuffer.length > _MAX_BUFFER) _swLogBuffer.shift();
+  // Fan out to current clients. includeUncontrolled:true so we still
+  // reach a page that's mid-boot and not yet under SW control.
+  self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+    .then(clients => { for (const c of clients) c.postMessage(msg); })
+    .catch(() => {});
+}
+const _origConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+console.log   = (...args) => { try { _relayLog('log',   args); } catch (_) {} _origConsole.log.apply(console, args); };
+console.warn  = (...args) => { try { _relayLog('warn',  args); } catch (_) {} _origConsole.warn.apply(console, args); };
+console.error = (...args) => { try { _relayLog('error', args); } catch (_) {} _origConsole.error.apply(console, args); };
+console.info  = (...args) => { try { _relayLog('info',  args); } catch (_) {} _origConsole.info.apply(console, args); };
+
+// Catch silent SW failures: uncaught errors + unhandled promise rejections.
+// Pyodide WASM aborts that terminate the SW thread won't reach this (the
+// event loop is gone by then), but any JS-level error will, and seeing it
+// in the page console is the first time we'll actually know it happened.
+self.addEventListener('error', (ev) => {
+  console.error('uncaught error:', ev.message, 'at', (ev.filename || '?') + ':' + (ev.lineno || '?'), ev.error && ev.error.stack ? '\n' + ev.error.stack : '');
+});
+self.addEventListener('unhandledrejection', (ev) => {
+  const r = ev.reason;
+  console.error('unhandled rejection:', r && (r.stack || r.message) || String(r));
+});
+
+// Drain the boot buffer when a client connects + asks for it. The page
+// pings us with `sandpie-sw-flush-logs` on its message-handler init.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'sandpie-sw-flush-logs') {
+    for (const msg of _swLogBuffer) {
+      try { event.source.postMessage(msg); } catch (_) {}
+    }
+  }
+});
+
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-// If you don't see this after a hard reload, the browser is still serving a
-// stale SW (DevTools → Application → Service Workers → Update or Unregister).
-const SW_VERSION = '1.5.0';
+const SW_VERSION = '1.6.0';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
