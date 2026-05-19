@@ -4848,6 +4848,25 @@ async function sendSingle(text, stream) {
     switch (ev.type) {
       case 'round_start': {
         if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
+        // Flush any args still pending from the prior round so the bubble
+        // shows the complete tool call before we wipe the per-round state.
+        // Without this, a fast-running tool (e.g. read_file) can fire
+        // tool_result → next round_start before the typewriter has finished
+        // revealing the args, leaving the bubble frozen at `(... mid-arg`.
+        for (let i = 0; i < toolPending.length; i++) {
+          const buf = toolPending[i] || '';
+          if (buf.length > 0) {
+            toolDisplayed[i] = (toolDisplayed[i] || '') + buf;
+            toolPending[i] = '';
+            if (toolCallEls[i] && toolCalls[i]) {
+              tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
+            }
+          }
+          if (toolsShouldClose && toolCallEls[i] && !toolCallEls[i]._tcClosed) {
+            tcAppendExpanded(toolCallEls[i], ')');
+            toolCallEls[i]._tcClosed = true;
+          }
+        }
         reply = addMsg('assistant', '', host);
         cursor = document.createElement('span');
         cursor.className = 'cursor';
