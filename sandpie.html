@@ -2604,7 +2604,7 @@ HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, rou
 
 No raw sockets, no subprocess.
 
-CLOUD FILES — files in /files/ are the user's working set (mounted from OPFS; changes persist across runs). If you open() a file that's in the user's Dropbox but not yet in /files/, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
+CLOUD FILES — your working directory is /files/ (the user's persistent storage, mounted from OPFS; changes persist across runs and sync to Dropbox). Use plain relative paths: open('notes.txt'), os.listdir('.'), pathlib.Path('data.csv') — they all resolve under /files/. If you open() a file that's in the user's Dropbox but not yet locally hydrated, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
 
 RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPython.display:
     from IPython.display import display, HTML, Image, SVG

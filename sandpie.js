@@ -233,7 +233,8 @@ async function initPyodide() {
       try {
         const opfsRoot = await navigator.storage.getDirectory();
         _nativefs = await p.mountNativeFS('/files', opfsRoot);
-        console.log('[sandpie-sw] OPFS mounted at /files');
+        p.runPython('import os; os.chdir("/files")');
+        console.log('[sandpie-sw] OPFS mounted at /files (cwd)');
       } catch (e) {
         _nativefs = null;
         console.warn('[sandpie-sw] OPFS mount failed (Python /files unavailable):', e);
