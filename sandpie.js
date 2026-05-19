@@ -83,7 +83,7 @@
 // Version stamp logged on every SW boot — confirms a fresh build is running.
 // If you don't see this after a hard reload, the browser is still serving a
 // stale SW (DevTools → Application → Service Workers → Update or Unregister).
-const SW_VERSION = '1.4.0';
+const SW_VERSION = '1.5.0';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -147,15 +147,53 @@ async function initPyodide() {
     // Surface a usable error instead of hanging the agent loop forever.
     throw new Error('Pyodide unavailable: pyodide.js failed to load when the service worker installed. Reload the page after going online to retry.');
   }
+  // Wrap loadPyodide so a failure CLEARS pyInitPromise. Without this clear,
+  // a rejected pyInitPromise sticks around forever and every subsequent call
+  // resolves to the same failure — the next user retry returns the identical
+  // error with no way to recover short of a page reload. The typical cause
+  // is a CDN flake during the asm.js/wasm fetch; the second attempt usually
+  // succeeds.
   pyInitPromise = (async () => {
-    // loadPyodide is in scope because pyodide.js was importScripts'd at the
-    // top of this file. It will fetch pyodide.asm.js + the wasm payload via
-    // its own internal mechanism (not importScripts), which is legal here.
-    py = await loadPyodide({ indexURL: PYODIDE_INDEX });
-    try { py.FS.mkdir('/files'); } catch (_) {}
-    return py;
+    try {
+      const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
+      try { p.FS.mkdir('/files'); } catch (_) {}
+      py = p;
+      return p;
+    } catch (e) {
+      pyInitPromise = null;  // allow retry on next initPyodide() call
+      throw e;
+    }
   })();
   return pyInitPromise;
+}
+
+// Hard reset Pyodide state. Call when the interpreter is wedged (Emscripten
+// abort, WASM runtime error, memory corruption) so the next run_python call
+// re-bootstraps from scratch instead of repeatedly hitting the corrupted
+// instance. NOT to be called on Python-side exceptions (PythonError) —
+// those are user-code errors and Pyodide is still healthy.
+function resetPyodide(reason) {
+  console.warn('[sandpie-sw] resetting Pyodide:', reason);
+  py = null;
+  pyInitPromise = null;
+}
+
+// Heuristic: should we treat this catch as Pyodide being dead?
+// Conservative — false-positive resets only waste a reinit, false-negative
+// resets leave the user stuck. So we require strong signals.
+function isPyodideFatal(e, msg, stderr) {
+  // Completely empty exception (no message, no stderr) — classic Emscripten
+  // Abort signature.
+  if (!msg && !stderr.trim()) return true;
+  // WebAssembly runtime panics — instance is unrecoverable.
+  if (typeof WebAssembly !== 'undefined' && e instanceof WebAssembly.RuntimeError) return true;
+  const sig = ((msg || '') + ' ' + (stderr || '')).toLowerCase();
+  // Emscripten / wasm death signatures.
+  if (sig.includes('aborted(')) return true;
+  if (sig.includes('runtimeerror: abort(')) return true;
+  if (sig.includes('memory access out of bounds')) return true;
+  if (sig.includes('out of memory') && sig.includes('wasm')) return true;
+  return false;
 }
 
 // ---- OPFS helpers (same async API as the page, works in SW too) ----
@@ -408,10 +446,17 @@ async function tool_run_python({ code, path, args }, ctx) {
       }
     }
     const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-    if (!msg && !stderr.trim()) {
-      // Fatal interpreter death — reset for next call.
-      py = null; pyInitPromise = null;
-      return { result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.', artifacts };
+    // Fatal interpreter death: empty exception, WASM runtime error, or
+    // Emscripten abort. Reset so the next call rebootstraps a fresh
+    // interpreter instead of repeatedly failing in the wedged one.
+    if (isPyodideFatal(e, msg, stderr)) {
+      resetPyodide(msg || stderr.trim() || 'empty exception');
+      return {
+        result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.'
+          + (msg ? '\n--- crash signal ---\n' + msg : '')
+          + tail,
+        artifacts,
+      };
     }
     return { result: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts };
   } finally {

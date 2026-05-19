@@ -5050,6 +5050,20 @@ async function sendSingle(text, stream) {
   // [E*] Renderer owns ALL per-round render state. Dispatch is the only caller.
   const renderer = new RoundRenderer(host, convMessages);
 
+  // Track stream completeness so we can detect a silent SW death — when a
+  // Pyodide WASM abort terminates the whole SW thread mid-stream, the NDJSON
+  // stream ends cleanly (no fetch error, no `error` event) but no
+  // `agent_done` was emitted. Without this guard the user sees nothing
+  // happen and assumes "completions stopped working" again.
+  let agentDoneSeen = false;
+  let lastInFlightTool = null;
+  const dispatch = (ev) => {
+    if (ev.type === 'agent_done')  agentDoneSeen = true;
+    if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
+    if (ev.type === 'tool_result')  lastInFlightTool = null;
+    dispatchAgentEvent(ev, renderer, host);
+  };
+
   try {
     // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
     const res = await fetch('./sandpie-agent', {
@@ -5064,7 +5078,21 @@ async function sendSingle(text, stream) {
       return;
     }
     // [R3 → E*] Drain the NDJSON stream into the renderer.
-    await readAgentEvents(res.body, ev => dispatchAgentEvent(ev, renderer, host));
+    await readAgentEvents(res.body, dispatch);
+    // [R3.5] Stream ended without `agent_done`. SW likely died — Pyodide
+    // WASM aborts (memory access, out-of-bounds, abort()) terminate the
+    // whole SW thread, so our SW-side try/catch never runs. Surface a
+    // clear bubble so the user knows what happened and that retry will
+    // recover (browsers spawn a fresh SW for the next fetch event).
+    if (!agentDoneSeen && !wasAborted) {
+      const trigger = lastInFlightTool
+        ? ` while running \`${lastInFlightTool}\``
+        : '';
+      addMsg('err',
+        `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
+        host,
+      );
+    }
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
       wasAborted = true;
