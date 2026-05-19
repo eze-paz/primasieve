@@ -4262,6 +4262,15 @@ class RoundRenderer {
   _drainTick() {
     this.drainTimer = null;
     let anyPending = false;
+    // Stick-to-bottom auto-scroll: snapshot whether the scroll container is
+    // already at the bottom BEFORE we paint, then re-pin it after. Without
+    // this, content grows inside the bubble but scrollTop stays put, so the
+    // user has to manually chase the cursor. The scroll host is whichever
+    // ancestor of `reply` is #messages or #messagesSide — the side panel
+    // case is the one the user noticed.
+    const scrollHost = this._scrollHost();
+    const wasAtBottom = scrollHost ? isAtBottom(scrollHost) : false;
+
     // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
     // so a big batch reveals fast and a trickle reveals smoothly.
     if (this.pending.length > 0) {
@@ -4289,7 +4298,21 @@ class RoundRenderer {
       this.cursor.remove();
       this.cursor = null;
     }
+    // Re-pin to bottom if we were there before painting. Done last so the
+    // scrollHeight measurement reflects everything we just appended.
+    if (scrollHost && wasAtBottom) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
+  }
+
+  // Walks up from `this.reply` (or any tool-call bubble fallback) to find the
+  // #messages / #messagesSide container that scrolls. Both panels need this
+  // — the side panel was the regression case the user reported.
+  _scrollHost() {
+    let el = this.reply || this.host;
+    while (el && el.id !== 'messages' && el.id !== 'messagesSide') {
+      el = el.parentNode;
+    }
+    return el;
   }
 
   // Synchronously reveal everything still queued and append the closing ')'
