@@ -4412,12 +4412,16 @@ async function saveConv(convId) {
   await refreshConversationList();
 }
 
-function renderHistoricalMessage(m) {
+// host: where to mount these bubbles. Defaults to addMsg's own default
+// (active conv's host), but MUST be passed when replaying history for a
+// non-active conv — e.g. opening a conv into the side panel — otherwise
+// the bubbles append into the active conv and the side panel renders empty.
+function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
-    bindBubble(addMsg('user', m.content), m);
+    bindBubble(addMsg('user', m.content, host), m);
   } else if (m.role === 'assistant') {
     if (m.content && m.content.trim()) {
-      const div = addMsg('assistant');
+      const div = addMsg('assistant', '', host);
       div.innerHTML = renderMd(m.content);
       bindBubble(div, m);
     }
@@ -4425,7 +4429,7 @@ function renderHistoricalMessage(m) {
       for (const tc of m.tool_calls) {
         let args = tc.function.arguments;
         try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
-        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`, host);
         tcDiv.dataset.fname = tc.function.name;
         renderTcDone(tcDiv, tc.function.name);
         bindBubble(tcDiv, m);
@@ -4433,13 +4437,13 @@ function renderHistoricalMessage(m) {
     }
   } else if (m.role === 'tool') {
     const t = String(m.content || '');
-    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
+    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`, host);
     bindBubble(div, m);
     // Replay any artifacts captured when this tool originally ran. They land
-    // under the same host addMsg picked (active conv's host by default).
+    // in the same host as the tool-result bubble we just created.
     if (Array.isArray(m.artifacts) && m.artifacts.length) {
-      const host = div.parentNode;
-      for (const html of m.artifacts) window._renderArtifact(host, html);
+      const artifactHost = div.parentNode;
+      for (const html of m.artifacts) window._renderArtifact(artifactHost, html);
     }
   }
 }
