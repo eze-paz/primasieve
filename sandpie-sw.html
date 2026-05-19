@@ -5,267 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie (sw) chat</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<script id="serve-py-source" type="text/plain">
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import http.client, urllib.parse, os, sys, subprocess, json
-
-PORT = 8080
-SHELL_CWD = os.path.dirname(os.path.abspath(__file__))
-SHELL_TIMEOUT_MAX = 120
-ALLOWED_ORIGINS = {
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'https://gasn2cloud.com',
-}
-# Cloud-mode hardening (set in production via env vars):
-#   SANDPIE_NO_SHELL=1        → /shell endpoint returns 404 (disables RCE on a public host)
-#   SANDPIE_NO_FILE=1         → /file endpoint returns 404 (disables arbitrary FS read/write)
-#   SANDPIE_RESTRICT_PROXY=1  → /proxy/* requires Origin header in ALLOWED_ORIGINS when present
-SHELL_ENABLED = os.environ.get('SANDPIE_NO_SHELL', '') != '1'
-FILE_ENABLED  = os.environ.get('SANDPIE_NO_FILE', '')  != '1'
-RESTRICT_PROXY = os.environ.get('SANDPIE_RESTRICT_PROXY', '') == '1'
-
-class H(SimpleHTTPRequestHandler):
-    # Hop-by-hop + routing headers we must not forward; everything else passes through verbatim.
-    # accept-encoding is skipped so upstream returns identity-encoded bodies that the browser
-    # can parse directly (we don't forward Content-Encoding back, so otherwise responses would
-    # arrive gzipped but tagged as plain JSON, mangling the parse).
-    _SKIP = {'host', 'content-length', 'connection', 'keep-alive',
-             'proxy-authenticate', 'proxy-authorization', 'te', 'trailers',
-             'transfer-encoding', 'upgrade', 'cookie', 'accept-encoding'}
-
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
-        self.end_headers()
-
-    def do_GET(self):
-        if self.path.startswith('/proxy/'):
-            return self._proxy('GET', None)
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_read()
-        super().do_GET()
-
-    def do_POST(self):
-        if self.path == '/shell':
-            if not SHELL_ENABLED:
-                return self.send_error(404)
-            return self._shell()
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_write()
-        if not self.path.startswith('/proxy/'):
-            return self.send_error(404)
-        body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
-        self._proxy('POST', body)
-
-    def do_PUT(self):
-        if self.path.startswith('/file'):
-            if not FILE_ENABLED:
-                return self.send_error(404)
-            return self._file_write()
-        self.send_error(404)
-
-    def _proxy(self, method, body):
-        if RESTRICT_PROXY:
-            origin = self.headers.get('Origin')
-            # Allow if no Origin (non-browser clients, same-origin GETs that omit it).
-            # Reject only when Origin is present and not in our allowlist.
-            if origin and origin not in ALLOWED_ORIGINS:
-                return self.send_error(403, f'Origin not allowed: {origin}')
-        parsed = urllib.parse.urlparse('https://' + self.path[7:])
-        path = parsed.path or '/'
-        if parsed.query: path += '?' + parsed.query
-        # http.client preserves header name casing (urllib does not).
-        headers = {k: v for k, v in self.headers.items() if k.lower() not in self._SKIP}
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[proxy] {method} {parsed.netloc}{path}\n')
-            for k, v in headers.items():
-                short = v if len(v) < 80 else v[:77] + '...'
-                _log.write(f'        {k}: {short}\n')
-            _log.flush()
-        conn = http.client.HTTPSConnection(parsed.netloc, timeout=120)
-        try:
-            conn.request(method, path, body, headers)
-            resp = conn.getresponse()
-            self.send_response(resp.status)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Type', resp.getheader('Content-Type', 'application/octet-stream'))
-            self.end_headers()
-            try:
-                while True:
-                    chunk = resp.read1(8192)
-                    if not chunk: break
-                    self.wfile.write(chunk)
-                    self.wfile.flush()
-            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError) as e:
-                # Browser dropped the stream (Stop button, navigate, tab close).
-                # Normal during SSE streaming — log one line, don't propagate.
-                with open('proxy.log', 'a', encoding='utf-8') as _log:
-                    _log.write(f'[proxy] client disconnect: {e.__class__.__name__}\n')
-        finally:
-            conn.close()
-
-    def _file_read(self):
-        """GET /file?path=/abs/path  → stream file from device to browser.
-        Origin-gated like /shell — without it any cross-origin tab on the same
-        browser could read arbitrary files via the localhost server."""
-        origin = self.headers.get('Origin')
-        if origin and origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        path = qs.get('path', [''])[0]
-        if not path:
-            return self._json(400, {'error': 'missing path'})
-        if not os.path.isfile(path):
-            return self._json(404, {'error': 'file not found'})
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[file] GET {path}\n'); _log.flush()
-        try:
-            size = os.path.getsize(path)
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Type', 'application/octet-stream')
-            self.send_header('Content-Length', str(size))
-            self.send_header('X-File-Path', path)
-            self.end_headers()
-            try:
-                with open(path, 'rb') as f:
-                    while True:
-                        chunk = f.read(65536)
-                        if not chunk: break
-                        self.wfile.write(chunk)
-            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
-                pass  # client gone — don't traceback
-        except Exception as e:
-            try: self._json(500, {'error': str(e)})
-            except Exception: pass
-
-    def _file_write(self):
-        """POST|PUT /file?path=/abs/path  → upload file from browser to device.
-        Same origin gate as _shell. Creates parent dirs."""
-        origin = self.headers.get('Origin')
-        if origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        path = qs.get('path', [''])[0]
-        if not path:
-            return self._json(400, {'error': 'missing path'})
-        try:
-            length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(length) if length else b''
-            parent = os.path.dirname(path)
-            if parent: os.makedirs(parent, exist_ok=True)
-            with open(path, 'wb') as f:
-                f.write(body)
-            with open('proxy.log', 'a', encoding='utf-8') as _log:
-                _log.write(f'[file] PUT {path} ({len(body)} bytes)\n'); _log.flush()
-            self._json(200, {'bytes': len(body), 'path': path})
-        except Exception as e:
-            self._json(500, {'error': str(e)})
-
-    def _shell(self):
-        origin = self.headers.get('Origin')
-        if origin not in ALLOWED_ORIGINS:
-            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
-        try:
-            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
-        except Exception as e:
-            return self._json(400, {'error': f'bad json: {e}'})
-        cmd = (body.get('cmd') or '').strip()
-        if not cmd:
-            return self._json(400, {'error': 'missing cmd'})
-        cwd = body.get('cwd') or SHELL_CWD
-        timeout = min(int(body.get('timeout', 30)), SHELL_TIMEOUT_MAX)
-        with open('proxy.log', 'a', encoding='utf-8') as _log:
-            _log.write(f'[shell] {cmd!r} (cwd={cwd}, timeout={timeout})\n')
-            _log.flush()
-        # Use Popen so we can forcibly kill the WHOLE process tree on timeout.
-        # subprocess.run's built-in timeout only kills cmd.exe / sh on Windows
-        # / Linux respectively — children (find, dir, etc.) keep running and
-        # the proxy thread blocks waiting for their pipes to close.
-        # encoding=utf-8 + errors=replace: locale.getpreferredencoding() on
-        # Windows is cp1252, which throws on non-Latin bytes; replacement keeps
-        # output flowing instead of failing the whole call.
-        kwargs = dict(shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                      text=True, encoding='utf-8', errors='replace', cwd=cwd)
-        if sys.platform == 'win32':
-            kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs['start_new_session'] = True
-        # PowerShell via shell=True goes cmd.exe → powershell, and cmd.exe
-        # mangles nested quotes — `powershell -Command "Get-Content ..."`
-        # often emits empty stdout after the JSON→cmd round trip. Detect a
-        # leading `powershell`/`pwsh` and run argv-form so PS gets the script
-        # verbatim. Also force UTF-8 console encoding inside the session.
-        run_target = cmd
-        if sys.platform == 'win32':
-            stripped = cmd.lstrip()
-            head = stripped.split(None, 1)
-            if head and head[0].lower() in ('powershell', 'pwsh', 'powershell.exe', 'pwsh.exe'):
-                script = head[1] if len(head) > 1 else ''
-                for flag in ('-NoProfile -Command ', '-Command ', '-c '):
-                    if script.lower().startswith(flag.lower()):
-                        script = script[len(flag):]
-                        break
-                script = script.strip()
-                if (script.startswith('"') and script.endswith('"')) or \
-                   (script.startswith("'") and script.endswith("'")):
-                    script = script[1:-1]
-                prologue = "[Console]::OutputEncoding=[Text.Encoding]::UTF8;$OutputEncoding=[Text.Encoding]::UTF8;"
-                run_target = [head[0], '-NoProfile', '-NonInteractive', '-Command', prologue + script]
-                kwargs.pop('shell', None)
-        try:
-            proc = subprocess.Popen(run_target, **kwargs)
-        except Exception as e:
-            return self._json(500, {'error': f'spawn failed: {e}'})
-        try:
-            stdout, stderr = proc.communicate(timeout=timeout)
-            self._json(200, {'stdout': stdout, 'stderr': stderr, 'code': proc.returncode, 'cwd': cwd})
-        except subprocess.TimeoutExpired:
-            try:
-                if sys.platform == 'win32':
-                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)],
-                                   capture_output=True, timeout=5)
-                else:
-                    import signal
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except Exception:
-                pass
-            try:
-                stdout, stderr = proc.communicate(timeout=2)
-            except Exception:
-                stdout, stderr = '', ''
-            self._json(200, {
-                'stdout': stdout or '',
-                'stderr': (stderr or '') + f'\n(timeout after {timeout}s — process tree killed)',
-                'code': -1, 'cwd': cwd,
-            })
-        except Exception as e:
-            try: proc.kill()
-            except Exception: pass
-            self._json(500, {'error': str(e)})
-
-    def _json(self, status, obj):
-        body = json.dumps(obj).encode()
-        self.send_response(status)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-print(f'Sandpie proxy listening on http://localhost:{PORT}  (shell cwd: {SHELL_CWD})')
-print(f'  shell: {"on" if SHELL_ENABLED else "off"}   file: {"on" if FILE_ENABLED else "off"}   restrict-proxy: {"on" if RESTRICT_PROXY else "off"}')
-HTTPServer(('127.0.0.1', PORT), H).serve_forever()
-</script>
+<!-- SECURITY TODO: DOMPurify temporarily disabled to let model-emitted HTML (e.g. <think> blocks from Gemma 4 / DeepSeek-R1 / Qwen3 thinking mode) render. Re-enable after auditing: known risk is that injected HTML from LLM output can read localStorage (Dropbox tokens, provider API keys) and reach the Service Worker. Plan when re-enabling: preprocess <think>...</think> → <details><summary>...</summary>...</details> BEFORE sanitization so reasoning blocks survive. -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script> -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -384,7 +125,37 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .dbx-status.connected { background: rgba(63,185,80,0.1); color: #3fb950; }
   .dbx-status.error { background: rgba(248,81,73,0.1); color: #f85149; }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; }
+  /* messages-wrap holds the main panel + optional side panel side-by-side.
+     When `body.side-open` is set, side panel becomes visible and both
+     panels split 50/50. On mobile (<=768px) the wrap stacks vertically. */
+  #messagesWrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; min-width: 0; }
+  #messagesSide {
+    flex: 1; overflow-y: auto; padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+    scrollbar-gutter: stable; min-width: 0;
+    border-left: 1px solid #30363d;
+  }
+  body:not(.side-open) #messagesSide { display: none; }
+  /* Either panel can be the active one; the other dims. Convs stay
+     physically in their assigned panel — clicking a dim panel only
+     flips which side is active, it doesn't move conv-hosts around.
+     CSS keys off body.active-main / body.active-side to know which
+     side to dim. */
+  body.side-open #messages,
+  body.side-open #messagesSide {
+    transition: opacity 0.15s, filter 0.15s;
+  }
+  body.side-open.active-main #messagesSide,
+  body.side-open.active-side #messages {
+    opacity: 0.55;
+    filter: grayscale(0.25);
+    cursor: pointer;
+  }
+  body.side-open.active-main #messagesSide:hover,
+  body.side-open.active-side #messages:hover { opacity: 0.75; }
+  /* Drop indicator when dragging a conv onto the messages area. */
+  #messagesWrap.drop-target { outline: 2px dashed #58a6ff; outline-offset: -8px; }
   .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; border-radius: 8px; line-height: 1.5; overflow-wrap: anywhere; }
   .user { align-self: flex-end; background: #58a6ff; color: #fff; white-space: pre-wrap; }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
@@ -435,6 +206,37 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   }
   .msg-timer.done { color: #6e7681; }
   @keyframes blink { 50% { opacity: 0; } }
+  /* Reasoning blocks from thinking-mode models (Gemma 4, DeepSeek-R1, Qwen3) */
+  details.reasoning {
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: rgba(110, 118, 129, 0.08);
+    margin: 0.5rem 0;
+    font-size: 0.85em;
+    color: #8b949e;
+  }
+  details.reasoning > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6e7681;
+    user-select: none;
+  }
+  details.reasoning > summary::-webkit-details-marker { display: none; }
+  details.reasoning > summary::before {
+    content: '▸ ';
+    font-size: 0.7em;
+    color: #6e7681;
+  }
+  details.reasoning[open] > summary::before { content: '▾ '; }
+  details.reasoning > *:not(summary) {
+    padding: 0 0.85rem;
+  }
+  details.reasoning > *:not(summary):first-of-type { padding-top: 0.2rem; }
+  details.reasoning > *:not(summary):last-child { padding-bottom: 0.6rem; }
   /* Collapsible service sections */
   aside details.service { border: 1px solid #30363d; border-radius: 5px; background: #0d1117; }
   aside details.service[open] { background: #0d1117; }
@@ -539,7 +341,7 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     color: #e6edf3;
     font-weight: 600;
   }
-  .welcome-by { color: #6e7681; font-weight: 400; font-size: 0.55em; letter-spacing: normal; margin-left: 0.4em; }
+  .welcome-by { display: block; color: #6e7681; font-weight: 400; font-size: 0.55em; letter-spacing: normal; margin-top: 0.2em; }
   .welcome-tag { font-size: 0.78rem; color: #6e7681; }
   .welcome-status {
     font: 0.72rem 'JetBrains Mono', Consolas, monospace;
@@ -742,6 +544,13 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     /* Backdrop also sits above the header? No — header z-index 101 stays clickable
        above the backdrop's z-index 99, so the hamburger ends up the close button. */
     main { flex: 1 1 auto; min-height: 0; }
+    /* On mobile, side-panel splits the limited screen too thin to be
+       useful. Just collapse it: side conv stays in memory but isn't
+       displayed; "View in side panel" still works as a no-op-ish
+       placeholder until you go back to desktop. */
+    body.side-open #messagesSide { display: none; }
+    body.side-open #messages { flex: 1; }
+    .panel-inactive { opacity: 1; filter: none; }
     /* Touch-friendly: bigger inputs and bottom-row chat */
     aside input, aside button {
       padding: 0.65rem 0.75rem;
@@ -756,18 +565,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     form input, form textarea { font-size: 16px; /* prevents iOS auto-zoom on focus */ }
     #messages { padding: 1rem; }
     .msg { max-width: 95%; }
-  }
-
-  .proxy-link {
-    font-size: 0.6rem;
-    color: #484f58;
-    cursor: pointer;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .proxy-link:hover {
-    color: #8b949e;
-    text-decoration: underline;
   }
 
   .chip-row {
@@ -842,6 +639,26 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     color: #e6edf3;
     font-size: 0.85rem;
   }
+  .modal-content input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+    margin: 0;
+    accent-color: #2f81f7;
+  }
+  .modal-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    margin: 0.1rem 0;
+  }
+  .modal-checkbox .hint {
+    color: #6e7681;
+    font-size: 0.72rem;
+  }
   .modal-actions {
     display: flex;
     gap: 0.5rem;
@@ -873,17 +690,6 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
   .context-delete:hover {
     background: rgba(248,81,73,0.1);
   }
-  .proxy-link {
-    font-size: 0.6rem;
-    color: #484f58;
-    cursor: pointer;
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-  .proxy-link:hover {
-    color: #8b949e;
-    text-decoration: underline;
-  }
 
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
      .tc-collapsed (rich spinner/flavor card). CSS swaps which is visible based
@@ -896,14 +702,17 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     background: rgba(88,166,255,0.18);
     border-color: rgba(88,166,255,0.7);
   }
-  #messages.tools-minimized .tool-call:hover {
+  /* tools-minimized lives on <body> (not on #messages) so the setting
+     covers BOTH panels at once — the side panel's #messagesSide picks
+     it up via descendant matching the same way. */
+  body.tools-minimized .tool-call:hover {
     background: linear-gradient(135deg, rgba(88,166,255,0.14), rgba(88,166,255,0.24));
     border-color: rgba(88,166,255,0.65);
     box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
   }
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
-  #messages.tools-minimized .tool-call {
+  body.tools-minimized .tool-call {
     display: flex;
     align-items: center;
     padding: 0.5rem 0.8rem;
@@ -916,15 +725,15 @@ HTTPServer(('127.0.0.1', PORT), H).serve_forever()
     white-space: normal;
     overflow: hidden;
   }
-  #messages.tools-minimized .tool-call .tc-expanded { display: none; }
-  #messages.tools-minimized .tool-call .tc-collapsed {
+  body.tools-minimized .tool-call .tc-expanded { display: none; }
+  body.tools-minimized .tool-call .tc-collapsed {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     width: 100%;
     min-width: 0;
   }
-  #messages.tools-minimized .tool-result { display: none; }
+  body.tools-minimized .tool-result { display: none; }
 
   .tc-spinner {
     flex-shrink: 0;
@@ -1056,6 +865,10 @@ window._sandpieDisplay = function (html) {
       <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
       <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
       <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
+      <label class="modal-checkbox">
+        <input type="checkbox" id="modalThink">
+        <span>Thinking mode <span class="hint">— sends <code>think: true</code> (Ollama r1/qwen3/gpt-oss/gemma4)</span></span>
+      </label>
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
         <button class="ghost" onclick="closeProviderModal()">Cancel</button>
@@ -1108,13 +921,17 @@ window._sandpieDisplay = function (html) {
   </details>
   <div style="font-size:0.65rem; color:#8b949e; padding:0.5rem; border-top:1px solid #30363d; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
-    <div class="proxy-link-wrap" style="margin-top:0.3rem;">
-      <a class="proxy-link" onclick="downloadProxy()" title="Gives the AI shell access on your machine. Only use on trusted machines.">Download local proxy</a>
-    </div>
   </div>
 </aside>
 
 <main>
+  <!-- messagesWrap holds the main panel and (when open) a side panel
+       side-by-side so the user can view two conversations at once.
+       Toggled via right-click "View in side panel" or by dragging a
+       conv entry from the sidebar list onto the right half. Click on
+       either panel to make it "active" (the one that receives sends);
+       the other dims. -->
+  <div id="messagesWrap">
   <div id="messages">
     <div id="welcome" class="welcome">
       <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
@@ -1131,6 +948,8 @@ window._sandpieDisplay = function (html) {
       </div>
     </div>
   </div>
+  <div id="messagesSide"></div>
+  </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
     <button id="sendBtn" onclick="handleButtonClick()">Send</button>
@@ -1140,7 +959,8 @@ window._sandpieDisplay = function (html) {
 <script>
 const $ = id => document.getElementById(id);
 
-const VERSION = '1.0.0';
+const VERSION = '1.4.7';
+console.log('[sandpie] page boot — variant=sw version=' + VERSION);
 
 // Active-conversation message array. Reassigned (not mutated in place) when
 // the user switches conversations — so any in-flight stream that captured the
@@ -1287,6 +1107,7 @@ function openProviderModal(providerId = null) {
   $('modalModel').value = p ? p.model : '';
   $('modalApiKey').value = p ? p.apiKey : '';
   $('modalProxyUrl').value = p ? p.proxyUrl : '';
+  $('modalThink').checked = p ? !!p.think : false;
   $('providerModal').style.display = '';
 }
 
@@ -1301,6 +1122,7 @@ function saveProviderModal() {
   const model = $('modalModel').value.trim();
   const apiKey = $('modalApiKey').value.trim();
   const proxyUrl = $('modalProxyUrl').value.trim();
+  const think = !!$('modalThink').checked;
 
   if (!endpoint || !model || !apiKey) {
     alert('Endpoint, model, and API key are required.');
@@ -1315,6 +1137,7 @@ function saveProviderModal() {
       p.model = model;
       p.apiKey = apiKey;
       p.proxyUrl = proxyUrl;
+      p.think = think;
     }
   } else {
     const newP = {
@@ -1323,7 +1146,8 @@ function saveProviderModal() {
       endpoint,
       model,
       apiKey,
-      proxyUrl
+      proxyUrl,
+      think
     };
     _providers.push(newP);
     _activeProviderId = newP.id;
@@ -1364,7 +1188,8 @@ function duplicateProviderFromMenu() {
     endpoint: p.endpoint,
     model: p.model,
     apiKey: p.apiKey,
-    proxyUrl: p.proxyUrl
+    proxyUrl: p.proxyUrl,
+    think: !!p.think
   };
   _providers.push(copy);
   saveProviders();
@@ -1431,7 +1256,23 @@ function dedentPreBlocks(html) {
   return wrap.innerHTML;
 }
 
-const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
+// Transform `<think>...</think>` blocks (Gemma 4, DeepSeek-R1, Qwen3-thinking)
+// into <details> collapsibles BEFORE markdown parsing. Browsers don't style
+// <think>, and marked treats unknown block tags inconsistently — <details>
+// is on both the browser default-element list and marked's known-block list,
+// so this survives sanitization (when DOMPurify is re-enabled) and renders
+// as a click-to-expand "Reasoning" panel. The blank lines around the inner
+// content tell marked to re-enter markdown parsing inside the <details>.
+function liftThinkBlocks(text) {
+  return text.replace(/<think>([\s\S]*?)<\/think>/gi, (_, inner) => {
+    return `\n<details class="reasoning"><summary>🧠 Reasoning</summary>\n\n${inner.trim()}\n\n</details>\n`;
+  });
+}
+
+// SECURITY TODO: DOMPurify call disabled — see comment on the script tag in <head>.
+// Re-enable after audit. Original line preserved below for the restore.
+// const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(liftThinkBlocks(text))));
+const renderMd = text => dedentPreBlocks(marked.parse(liftThinkBlocks(text)));
 
 // Source-level dedent: strip the common leading whitespace from the body of
 // every fenced code block in raw markdown. Used before persisting assistant
@@ -1468,6 +1309,13 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 // line runs, and `typeof` on a TDZ-bound name throws too.
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+// activeIsSide tracks whether the active conv currently lives in the
+// side panel (#messagesSide) rather than the main panel (#messages).
+// Conv hosts never move just because the user clicked between panels —
+// only this flag flips, and `activeConvId` ↔ `sideConvId` swap their
+// semantic roles. The CSS body classes active-main/active-side handle
+// which physical container gets dimmed.
+let activeIsSide = false;
 // Tool-call/result bubbles minimized by default. Persisted across reloads.
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -1488,8 +1336,8 @@ function api(url) {
 
 // Dropbox endpoints never permit browser CORS, so they MUST go through a
 // proxy regardless of host. Order: explicit remote proxy → same-origin
-// /proxy/ (works on localhost via serve.py and on cloud-hosted sandpie
-// where the host serves its own /proxy/ forwarder).
+// /proxy/ (works on localhost when a local proxy is running and on
+// cloud-hosted sandpie where the host serves its own /proxy/ forwarder).
 function dbxRoute(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
@@ -1651,28 +1499,13 @@ document.addEventListener('submit', () => {
 });
 
 // ============================================================
-// Local proxy — download embedded serve.py, auto-detect when running
+// Local proxy — auto-detect when an externally-started proxy is running
 // ============================================================
-function downloadProxy() {
-  const code = document.getElementById('serve-py-source').textContent.trim() + '\n';
-  const blob = new Blob([code], { type: 'text/x-python' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'sandpie-proxy.py';
-  a.setAttribute('data-chrome', '');
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  const hint = $('proxyDownloadHint');
-  if (hint) hint.textContent = 'Downloaded. From the project directory you want the AI to operate in, run: python sandpie-proxy.py — auto-connect once it\'s up.';
-}
-
 // Local proxy state machine: 'inactive' | 'searching' | 'connected'
 //   inactive  → no polling, no probes, no UI noise. Default.
-//   searching → user clicked Activate; we probe once. If found → connected.
-//               If not → show download prompt and keep probing every 3s
-//               so a freshly-started proxy auto-connects.
+//   searching → probing once. If found → connected, else stay searching
+//               and keep probing every 3s so a freshly-started proxy
+//               auto-connects.
 //   connected → background verify every 15s; if it goes down, drop to inactive.
 // (localProxyMode and localProxyTimer are declared near the top so refreshProxyDot
 //  can read them safely at module init.)
@@ -1692,44 +1525,17 @@ async function probeLocalProxy() {
 function setLocalProxyUI(mode) {
   localProxyMode = mode;
   refreshProxyDot();
-  const btn = $('localProxyToggle');
-  const status = $('proxyStatus');
-  const prompt = $('proxyDownloadPrompt');
   if (mode === 'inactive') {
-    btn.textContent = 'Activate local proxy';
-    btn.disabled = false;
-    status.style.display = 'none';
-    prompt.style.display = 'none';
     if ($('proxyUrl').value.trim() === 'http://localhost:8080') {
       $('proxyUrl').value = '';
       updateRoutingHint();
     }
-  } else if (mode === 'searching') {
-    btn.textContent = 'Cancel';
-    btn.disabled = false;
-    status.textContent = 'Searching for local proxy…';
-    status.style.color = '#8b949e';
-    status.style.display = '';
-    prompt.style.display = 'none';
   } else if (mode === 'connected') {
-    btn.textContent = 'Deactivate';
-    btn.disabled = false;
-    status.textContent = '✓ Local proxy connected';
-    status.style.color = '#3fb950';
-    status.style.display = '';
-    prompt.style.display = 'none';
     if (!$('proxyUrl').value.trim()) {
       $('proxyUrl').value = 'http://localhost:8080';
       updateRoutingHint();
     }
   }
-}
-
-function showDownloadPrompt() {
-  $('proxyStatus').style.display = 'none';
-  $('proxyDownloadPrompt').style.display = '';
-  $('localProxyToggle').textContent = 'Cancel';
-  $('proxyDownloadHint').textContent = '';
 }
 
 function startLocalProxyTimer(intervalMs, onAlive, onDead) {
@@ -1749,10 +1555,8 @@ async function toggleLocalProxy() {
   }
 
   // Populate the proxy field BEFORE testing so the user can see exactly what
-  // URL we're probing. Previously the field stayed empty until a probe
-  // succeeded, which meant a failed probe looked like "no proxy" without any
-  // indication of what was tried. setLocalProxyUI('inactive') already clears
-  // this back to '' if the value still equals our default.
+  // URL we're probing. setLocalProxyUI('inactive') already clears this back
+  // to '' if the value still equals our default.
   $('proxyUrl').value = 'http://localhost:8080';
   updateRoutingHint();
 
@@ -1771,15 +1575,7 @@ async function toggleLocalProxy() {
     return;
   }
 
-  showDownloadPrompt();
-  // Browsers block fetch() from HTTPS pages to http://localhost as mixed
-  // content, so the probe will always fail in that context — say so instead
-  // of letting the user think the proxy isn't running.
-  if (location.protocol === 'https:') {
-    $('proxyDownloadHint').textContent =
-      'Browsers block http://localhost from HTTPS pages (mixed content). Open sandpie via http://localhost:8080 to use the local proxy, or set a public proxy URL above.';
-  }
-  // Keep probing — user is presumably about to start the proxy.
+  // No proxy yet — keep probing in case the user starts one externally.
   startLocalProxyTimer(3000, () => {
     if (localProxyMode === 'searching') {
       if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
@@ -2883,7 +2679,7 @@ Examples:
     },
   },
   shell: {
-    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user to click "Download proxy" and run "python sandpie-proxy.py". Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
+    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user the local proxy must be running. Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
 
 SHELL ENVIRONMENT: cmd.exe on Windows, /bin/sh on Linux/macOS. \`sed\`/\`grep\`/\`head\`/\`tail\` are typically absent on Windows hosts — use \`findstr\`, \`type\`, or a one-shot \`python -c "..."\` instead. To read a file, prefer the read_file tool (cleaner, no quoting issues) over \`type\`/\`cat\`. PowerShell via \`powershell -Command "..."\` can be unreliable through this transport (nested-quote mangling can produce empty stdout) — prefer \`python -c\` or cmd built-ins.
 
@@ -2911,7 +2707,7 @@ Examples:
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       const base = remote || (isLocal ? '' : null);
-      if (base === null) return 'Error: shell requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: shell requires the local proxy. Start the local proxy, then retry.';
       try {
         const payload = { cmd };
         if (cwd) payload.cwd = cwd;
@@ -2951,7 +2747,7 @@ ADDRESSING: host paths only. To read an OPFS file use run_python (open('foo.txt'
     run: async ({ path, encoding, max_bytes }, signal) => {
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: read_file requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: read_file requires the local proxy. Start the local proxy, then retry.';
       if (!path) return 'Missing path.';
       const cap = Math.min(Math.max(1, max_bytes || 5_000_000), 20_000_000);
       try {
@@ -3001,7 +2797,7 @@ SAFETY: this OVERWRITES the target. For edits, read first then write the full ne
     run: async ({ path, content, encoding }, signal) => {
       const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
       const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: write_file requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      if (base === null) return 'Error: write_file requires the local proxy. Start the local proxy, then retry.';
       if (!path) return 'Missing path.';
       let body;
       if (encoding === 'base64') {
@@ -3100,9 +2896,59 @@ const toolDefs = () => Object.entries(tools)
 // describing what's in its folder and pointing at other key docs (skills,
 // prompts, project READMEs). LLM gets oriented without searching.
 // ============================================================
-const MANIFEST_PATTERN = /^sandpie_.*\.md$/i;
-const MANIFEST_CONTENT_CAP = 2048; // chars per manifest, post-truncation
+// Only sandpie_memory.md is auto-loaded into the system prompt — it's
+// the index, and every other `sandpie_*.md` (lessons, plans, skill
+// indexes, project notes) is discoverable from it but loaded by the
+// LLM on demand via run_python. Keeps the system prompt small enough
+// for tiny models (Gemma e2b etc.) to actually pay attention to it.
+const MANIFEST_PATTERN = /^sandpie_memory\.md$/i;
+const MANIFEST_CONTENT_CAP = 16384; // chars; memory is now the load-bearing prompt, so give it room
 // cachedManifests hoisted near the top
+
+// Default sandpie_memory.md content — seeded into OPFS on first boot if the
+// user doesn't already have one. Everything in here is user-editable: rules,
+// tool prose, style. Dynamic environment state (Dropbox/proxy/shell status)
+// stays in JS — see buildSystemPrompt().
+const DEFAULT_SANDPIE_MEMORY = `# About this file
+
+This is your personal context file for sandpie. The AI loads it into every system prompt. Edit freely — rewrite rules, add project conventions, point at other files in /files/. Delete this section once you've made it your own.
+
+# Identity
+
+You are an AI assistant running inside sandpie, a single-page browser-based workspace.
+
+# Tools
+
+- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user's persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.
+- shell: Run shell commands on the user's machine via the local proxy. Default cwd is the directory where the proxy was started. Be careful with destructive commands; ask before running anything that could lose data. (Only available when the user has activated the local proxy from the sidebar.)
+
+# Operating rules
+
+1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.
+2. Reuse, don't re-paste — this is the PREFERRED way to operate. Save any non-trivial script to /files/scripts/<name>.py once, then invoke it on every later call via run_python({path: "scripts/<name>.py", args: [...]}) instead of re-sending the source. The script sees sys.argv = [path, *args], exactly like \`python script.py --arg ...\` from a shell. Within a single session, Pyodide globals also persist between run_python calls, so a function defined once can be called by name later — but saved scripts are reusable across sessions. If you find yourself pasting more than ~20 lines of code inline, save it instead.
+3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.
+4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don't duplicate lines already present.
+
+# Style
+
+Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.
+
+# Workspace notes
+
+(Add notes about what lives in /files/, links to other sandpie_*.md files, project-specific conventions, etc.)
+`;
+
+async function seedDefaultMemoryIfMissing() {
+  try {
+    if (await opfs.exists('sandpie_memory.md')) return false;
+    await opfs.write('sandpie_memory.md', new Blob([DEFAULT_SANDPIE_MEMORY], { type: 'text/markdown' }));
+    console.log('[sandpie] seeded default sandpie_memory.md');
+    return true;
+  } catch (e) {
+    console.warn('[sandpie] could not seed sandpie_memory.md:', e);
+    return false;
+  }
+}
 
 async function gatherSandpieManifests() {
   const out = [];
@@ -3133,6 +2979,7 @@ async function gatherSandpieManifests() {
 }
 
 async function refreshManifests() {
+  await seedDefaultMemoryIfMissing();
   cachedManifests = await gatherSandpieManifests();
   refreshTokenMeter();
   updateVersionDisplay();
@@ -3141,51 +2988,12 @@ refreshWelcome();
 
 // Built fresh on every request so it reflects the current state of Dropbox/proxy/shell.
 function buildSystemPrompt() {
-  const dbxConnected = !!dbxTokens();
-  const proxyUrl = ($('proxyUrl').value || '').trim();
-  const shellOk = isShellAvailable();
-
-  const lines = [
-    'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
-    '',
-    '# Tools',
-    '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
-  ];
-  if (shellOk) {
-    lines.push(`- shell: Run shell commands on the user's machine via the local proxy. Default cwd is the directory where the proxy was started. Be careful with destructive commands; ask before running anything that could lose data.`);
-  }
-
-  lines.push('', '# Environment');
-  lines.push(`- Cloud sync (Dropbox): ${dbxConnected ? 'connected. The user can sync /files/ ↔ Dropbox via UI buttons. You don\'t call Dropbox directly — read/write OPFS via run_python and the user controls the sync.' : 'not connected. The user can connect from the sidebar Cloud sync panel if they want offsite backup.'}`);
-  if (proxyUrl) {
-    lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
-  }
-  if (!shellOk) {
-    lines.push('- Shell: not available. Don\'t suggest running shell commands. If the user wants you to run commands on their machine, point them to "Activate local proxy" in the sidebar.');
-  }
-
-  lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
-
-  // Context manifests
-  lines.push('', '# Context manifests (sandpie_*.md)');
-  lines.push('Convention: any file matching `sandpie_*.md` anywhere under /files/ is auto-loaded below as orientation context. A manifest should be a short markdown note that describes what\'s in its folder and *points at* other important docs (skills, prompts, project READMEs) by relative path — read those with run_python when relevant. If the user starts a project without one, suggest creating /files/sandpie_overview.md as an entry point.');
-  if (cachedManifests.length) {
-    lines.push('', `Loaded manifests (${cachedManifests.length}):`);
-    for (const m of cachedManifests) {
-      lines.push('', `## /files/${m.path}`);
-      lines.push(m.content);
-    }
-  } else {
-    lines.push('', 'No sandpie_*.md files exist yet.');
-  }
-
-  lines.push('', '# Operating rules');
-  lines.push('1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.');
-  lines.push('2. Reuse, don\'t re-paste — this is the PREFERRED way to operate. Save any non-trivial script to /files/scripts/<name>.py once, then invoke it on every later call via run_python({path: "scripts/<name>.py", args: [...]}) instead of re-sending the source. The script sees sys.argv = [path, *args], exactly like `python script.py --arg ...` from a shell. Within a single session, Pyodide globals also persist between run_python calls, so a function defined once can be called by name later — but saved scripts are reusable across sessions. If you find yourself pasting more than ~20 lines of code inline, save it instead.');
-  lines.push('3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.');
-  lines.push('4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don\'t duplicate lines already present.');
-  lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
-  return { role: 'system', content: lines.join('\n') };
+  // Full passthrough: the system prompt is whatever the user's
+  // sandpie_memory.md contains — verbatim, no JS-injected wrapping.
+  // Returns null when the memory file is missing so the SW omits the
+  // system message entirely (filter(Boolean) in runAgent).
+  const memory = cachedManifests.length ? cachedManifests[0].content : '';
+  return memory ? { role: 'system', content: memory } : null;
 }
 
 // ============================================================
@@ -3754,6 +3562,53 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ----- Side panel wiring (click-to-swap + drag-drop to open) -----
+(function setupSidePanelHandlers() {
+  const wrap  = $('messagesWrap');
+  const main  = $('messages');
+  const side  = $('messagesSide');
+  if (!wrap || !main || !side) return;
+
+  // Click on the dim panel flips it to active. Convs DON'T move
+  // physically — only the active-side flag flips. Both panels get a
+  // listener so the user can flip in either direction.
+  function panelClick(targetIsSide) {
+    return (ev) => {
+      if (!sideConvId) return;
+      // No-op if this side is already active.
+      if (targetIsSide === activeIsSide) return;
+      const sel = window.getSelection && window.getSelection().toString();
+      if (sel && sel.length > 0) return;
+      if (ev.target.closest('.ctx-menu, button, a, input, textarea')) return;
+      flipActivePanel();
+    };
+  }
+  main.addEventListener('click', panelClick(false));
+  side.addEventListener('click', panelClick(true));
+
+  // Drag-drop: a conv LI dropped anywhere in the messages wrap opens
+  // it in the side panel. Mobile (no HTML5 drag events on touch) just
+  // doesn't trigger this path — right-click menu remains primary.
+  wrap.addEventListener('dragover', (ev) => {
+    if (!ev.dataTransfer || !ev.dataTransfer.types.includes('text/sandpie-conv-id')) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'copy';
+    wrap.classList.add('drop-target');
+  });
+  wrap.addEventListener('dragleave', (ev) => {
+    // Only clear when we leave the wrap entirely, not just hop between children.
+    if (ev.target === wrap) wrap.classList.remove('drop-target');
+  });
+  wrap.addEventListener('drop', (ev) => {
+    wrap.classList.remove('drop-target');
+    const id = ev.dataTransfer && ev.dataTransfer.getData('text/sandpie-conv-id');
+    if (!id) return;
+    if (isMobileViewport()) return;
+    ev.preventDefault();
+    openInSidePanel(id);
+  });
+})();
+
 
 // Hard cap on the tool-result content fed back to the LLM. 30 KB is roomy
 // enough for legitimate long output (recursive `dir`, full pyodide tracebacks,
@@ -3791,9 +3646,16 @@ function addMsg(role, text = '', host = null) {
   // Stream code passes its captured host explicitly so background streams
   // route into their own (possibly parked / off-DOM) conversation host.
   const target = host || (activeStream() && activeStream().host) || $('messages');
-  const m = $('messages');
-  const visible = target === m || target.parentNode === m;
-  const stick = visible ? isAtBottom(m) : false;
+  // Find which scroll container this bubble lives in. With the side
+  // panel the host can be in either #messages or #messagesSide; pre-side
+  // code only ever checked #messages, which is why the inactive panel
+  // stopped auto-scrolling. Walk up to find whichever applies.
+  let scrollHost = target;
+  while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
+    scrollHost = scrollHost.parentNode;
+  }
+  const visible = !!scrollHost;
+  const stick = visible ? isAtBottom(scrollHost) : false;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
@@ -3817,7 +3679,7 @@ function addMsg(role, text = '', host = null) {
   // bottom on every new addMsg — burying the actually-ticking timer mid-history.
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
-  if (visible && stick) m.scrollTop = m.scrollHeight;
+  if (visible && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 
@@ -3825,8 +3687,11 @@ function addMsg(role, text = '', host = null) {
 // Bubbles are bound to their backing message via object reference (div._msg),
 // not array index — so rewind survives slices and re-renders cleanly.
 function applyToolsMinimized() {
-  const host = document.getElementById('messages');
-  if (host) host.classList.toggle('tools-minimized', toolsMinimized);
+  // Class lives on <body> so both #messages and #messagesSide pick up
+  // the rule via descendant selectors. Previously this only toggled the
+  // class on #messages, which meant the side panel kept showing all
+  // tool calls regardless of the setting.
+  document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
 function bindBubble(div, msgRef) {
@@ -4129,12 +3994,12 @@ async function saveConv(convId) {
   await refreshConversationList();
 }
 
-function renderHistoricalMessage(m) {
+function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
-    bindBubble(addMsg('user', m.content), m);
+    bindBubble(addMsg('user', m.content, host), m);
   } else if (m.role === 'assistant') {
     if (m.content && m.content.trim()) {
-      const div = addMsg('assistant');
+      const div = addMsg('assistant', '', host);
       div.innerHTML = renderMd(m.content);
       bindBubble(div, m);
     }
@@ -4142,7 +4007,7 @@ function renderHistoricalMessage(m) {
       for (const tc of m.tool_calls) {
         let args = tc.function.arguments;
         try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
-        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`, host);
         tcDiv.dataset.fname = tc.function.name;
         renderTcDone(tcDiv, tc.function.name);
         bindBubble(tcDiv, m);
@@ -4150,13 +4015,11 @@ function renderHistoricalMessage(m) {
     }
   } else if (m.role === 'tool') {
     const t = String(m.content || '');
-    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
+    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`, host);
     bindBubble(div, m);
-    // Replay any artifacts captured when this tool originally ran. They land
-    // under the same host addMsg picked (active conv's host by default).
     if (Array.isArray(m.artifacts) && m.artifacts.length) {
-      const host = div.parentNode;
-      for (const html of m.artifacts) window._renderArtifact(host, html);
+      const dest = div.parentNode;
+      for (const html of m.artifacts) window._renderArtifact(dest, html);
     }
   }
 }
@@ -4177,16 +4040,18 @@ function parkActiveConv() {
   if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
 }
 
-// Mount a conv as the active one: rebind module-level `messages`, attach its
-// host to #messages, update the send button to reflect this conv's state.
+// Mount a conv as the active one: rebind module-level `messages`,
+// attach its host to whichever physical panel is currently the active
+// side (#messages by default, #messagesSide when the user has flipped
+// into the side panel), update the send button.
 function mountConv(convId) {
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
-    const m = $('messages');
-    if (s.host.parentNode !== m) m.appendChild(s.host);
+    const mountTarget = activeIsSide ? $('messagesSide') : $('messages');
+    if (s.host.parentNode !== mountTarget) mountTarget.appendChild(s.host);
   } else {
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
@@ -4194,8 +4059,107 @@ function mountConv(convId) {
   refreshSendButtonForActive();
 }
 
+// ============================================================
+// Side panel — second conv mounted in #messagesSide, visible alongside
+// the active conv in #messages. Conventions:
+//   * activeConvId  is ALWAYS the conv in the left panel (#messages).
+//     It receives sends; its stream's "generating" indicator + token
+//     meter reflect this panel.
+//   * sideConvId    is the conv in the right panel (#messagesSide), or
+//     null when the side panel is closed.
+//   * Clicking the side panel swaps the two convs so the side becomes
+//     active (always-on-the-left rule preserved). No `activeIsSide`
+//     flag — physical position == role.
+//
+// Mobile (<=768px): side panel is hidden via CSS, "View in side panel"
+// menu option is skipped, and drag-drop from the conv list silently
+// no-ops. The side conv stays in memory; resizing to desktop brings
+// it back. Right-click → "View in side panel" is the primary trigger;
+// drag a conv from the sidebar list onto the messages area is an
+// alternative.
+// ============================================================
+let sideConvId = null;
+function isMobileViewport() {
+  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+}
+
+// Open or replace the conv in the side panel. The side panel is the
+// physical #messagesSide container — when activeIsSide=false (default),
+// it's the dim/auxiliary panel on the right. Conv hosts never move on
+// their own once placed; they only move when explicitly opened here.
+async function openInSidePanel(id) {
+  if (!id || id === activeConvId || id === sideConvId) return;
+  // When activeIsSide is true, #messagesSide is the active panel and
+  // "View in side panel" would overwrite the active conv. The context
+  // menu suppresses the option in that case; this is a defensive guard.
+  if (activeIsSide) return;
+  // Park whatever was in #messagesSide before (the previous side conv).
+  if (sideConvId) {
+    const oldSide = convStreams.get(sideConvId);
+    if (oldSide?.host?.parentNode) oldSide.host.parentNode.removeChild(oldSide.host);
+  }
+  // Lazy load from OPFS if this conv hasn't been touched this session.
+  if (!convStreams.has(id)) {
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); return; }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    for (const m of s.messages) renderHistoricalMessage(m, s.host);
+  }
+  sideConvId = id;
+  const s = convStreams.get(id);
+  const sideEl = $('messagesSide');
+  sideEl.appendChild(s.host);
+  document.body.classList.add('side-open', 'active-main');
+  document.body.classList.remove('active-side');
+  // Pull the side panel to the bottom so the user lands on the most
+  // recent messages, not the top of history. Use rAF so the browser
+  // has measured the just-mounted host before we scroll.
+  requestAnimationFrame(() => { sideEl.scrollTop = sideEl.scrollHeight; });
+  refreshConversationList();
+}
+
+// Close the side panel. Whichever conv was in #messagesSide gets parked.
+// If the active panel was the side one, first flip back to main so we
+// don't leave the user staring at a hidden panel.
+function closeSidePanel() {
+  if (!sideConvId && !activeIsSide) return;
+  if (activeIsSide) flipActivePanel();
+  if (sideConvId) {
+    const s = convStreams.get(sideConvId);
+    if (s?.host?.parentNode) s.host.parentNode.removeChild(s.host);
+  }
+  sideConvId = null;
+  document.body.classList.remove('side-open', 'active-main', 'active-side');
+  refreshConversationList();
+}
+
+// Flip which physical panel is active. Conv hosts STAY in their assigned
+// container — only `activeConvId` ↔ `sideConvId` swap semantically, and
+// the `active-main`/`active-side` body class swap so CSS dims the right
+// one. This is the "convs stay in their lane" behaviour.
+function flipActivePanel() {
+  if (!sideConvId) return;
+  [activeConvId, sideConvId] = [sideConvId, activeConvId];
+  activeIsSide = !activeIsSide;
+  if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+  const newActiveStream = convStreams.get(activeConvId);
+  messages = newActiveStream?.messages || [];
+  document.body.classList.toggle('active-main', !activeIsSide);
+  document.body.classList.toggle('active-side',  activeIsSide);
+  refreshSendButtonForActive();
+  refreshConversationList();
+  refreshTokenMeter();
+  refreshWelcome();
+}
+
 async function loadConv(id) {
   if (id === activeConvId) return;
+  // If the requested conv is already visible in the other (non-active)
+  // panel, clicking it in the sidebar just flips which side is active.
+  // The conv host doesn't move; it stays where it was placed.
+  if (id === sideConvId) { flipActivePanel(); return; }
   // Snapshot whichever conv we're leaving — its bubbles + state persist
   // unmounted so any in-flight stream keeps writing into them safely.
   parkActiveConv();
@@ -4360,10 +4324,19 @@ async function deleteConv(id, title) {
     if (stream.pyWorker) { try { stream.pyWorker.terminate(); } catch {} stream.pyWorker = null; }
     convStreams.delete(id);
   }
+  if (id === sideConvId) {
+    // Just delete the stream record; the host is already gone above.
+    // Reset the side flag + hide the panel.
+    sideConvId = null;
+    document.body.classList.remove('side-open');
+  }
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
+    // If a conv is in the other panel, promote it to active so the page
+    // isn't stranded without a conversation to send into.
+    if (sideConvId) flipActivePanel();
     refreshSendButtonForActive();
     refreshTokenMeter();
     updateVersionDisplay();
@@ -4394,12 +4367,29 @@ function buildConvLi(c) {
   }
   li.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
-    showContextMenu(ev.clientX, ev.clientY, [
+    const items = [
       { label: 'Rename',                           action: () => renameConv(c.id, c.title) },
       { label: c.pinned ? 'Unpin' : 'Pin',         action: () => togglePinConv(c.id, c.pinned) },
       { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
-      { label: 'Delete', danger: true,             action: () => deleteConv(c.id, c.title) },
-    ]);
+    ];
+    // Side panel option — only when this conv isn't already visible and
+    // the viewport is wide enough to actually show a second panel.
+    if (!isMobileViewport() && c.id !== activeConvId && c.id !== sideConvId) {
+      items.push({ label: 'View in side panel', action: () => openInSidePanel(c.id) });
+    }
+    if (c.id === sideConvId) {
+      items.push({ label: 'Close side panel', action: () => closeSidePanel() });
+    }
+    items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
+    showContextMenu(ev.clientX, ev.clientY, items);
+  });
+  // Drag support — dragging a conv onto the messages area opens it
+  // in the side panel. Touch devices don't fire HTML5 drag events,
+  // so this naturally degrades to the right-click menu on mobile.
+  li.draggable = true;
+  li.addEventListener('dragstart', (ev) => {
+    ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
+    ev.dataTransfer.effectAllowed = 'copy';
   });
   return li;
 }
@@ -4553,16 +4543,27 @@ async function processQueueFor(stream) {
   stream.isProcessing = true;
   stream.queueAborted = false;
   updateQueueCount(stream);
-
-  while (stream.queue.length > 0) {
-    const text = stream.queue.shift();
+  // try/finally: if sendSingle throws (e.g. anything in its pre-try
+  // setup like buildSystemPrompt, _swReady, addMsg), we still reset
+  // isProcessing — otherwise subsequent sends silently no-op forever
+  // because the early-return at the top of this function fires.
+  try {
+    while (stream.queue.length > 0) {
+      const text = stream.queue.shift();
+      updateQueueCount(stream);
+      try { await sendSingle(text, stream); }
+      catch (e) {
+        console.error('[sandpie] sendSingle threw — recovering:', e);
+        try { addMsg('err', 'Send failed: ' + (e && e.message || String(e)), stream.host); } catch (_) {}
+        // Don't keep grinding the queue on a recurring fault.
+        break;
+      }
+      if (stream.queueAborted) break;
+    }
+  } finally {
+    stream.isProcessing = false;
     updateQueueCount(stream);
-    await sendSingle(text, stream);
-    if (stream.queueAborted) break;
   }
-
-  stream.isProcessing = false;
-  updateQueueCount(stream);
 }
 
 // ============================================================
@@ -5033,6 +5034,94 @@ async function _sendSingle_legacy_removed(text, stream) {
 }
 
 // =================================================================
+// "Worked while you were away" debug telemetry.
+// Tracks SW-driven activity that arrived at the page while the tab was
+// hidden, and dumps a summary to the console as soon as the user comes
+// back. Lets you eyeball whether the agent loop actually progressed
+// during a minimize / tab-switch, vs the page just being throttled.
+// =================================================================
+let _hiddenStats = null;
+function _resetHiddenStats() {
+  _hiddenStats = { hiddenAt: Date.now(), chars: 0, deltas: 0, rounds: 0, tools: 0, toolResults: 0, errors: 0 };
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    _resetHiddenStats();
+  } else if (_hiddenStats && _hiddenStats.hiddenAt) {
+    const ms = Date.now() - _hiddenStats.hiddenAt;
+    const dur = ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+    const tok = Math.round(_hiddenStats.chars / 4);
+    const parts = [
+      `+${_hiddenStats.chars} chars (~${tok} tok)`,
+      `${_hiddenStats.deltas} deltas`,
+      `${_hiddenStats.rounds} rounds`,
+      `${_hiddenStats.tools}/${_hiddenStats.toolResults} tools started/finished`,
+    ];
+    if (_hiddenStats.errors) parts.push(`${_hiddenStats.errors} errors`);
+    console.log(`[sandpie] welcome back — hidden ${dur} · ${parts.join(' · ')}`);
+    _hiddenStats = null;
+  }
+});
+
+// Extract the first balanced JSON object from a string, ignoring any
+// trailing garbage. Mirrors the SW-side helper — used to scrub stray
+// control tokens (e.g. `<|tool_calls_section_end|>`) that some models
+// leak after the closing brace of tool_call arguments. Without this,
+// the broken message poisons the conv: the upstream API rejects every
+// subsequent request with a 400 because it re-parses arguments and
+// finds it malformed.
+function extractFirstJsonObject(s) {
+  s = String(s == null ? '' : s);
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (start === -1) {
+      if (c === '{') { start = i; depth = 1; }
+      continue;
+    }
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === '"') { inStr = false; }
+    } else {
+      if (c === '"') { inStr = true; }
+      else if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) {
+          try { return JSON.parse(s.slice(start, i + 1)); } catch (_) { return {}; }
+        }
+      }
+    }
+  }
+  return {};
+}
+
+// Walk the message array and repair any tool_call.function.arguments
+// that aren't strict JSON. Mutates in place so saveConv persists the
+// cleaned version — recovers conversations that were poisoned by a
+// previous bad LLM emission before this fix existed.
+function sanitizeToolCallArgs(messages) {
+  let cleaned = 0;
+  for (const m of messages) {
+    if (m.role !== 'assistant' || !Array.isArray(m.tool_calls)) continue;
+    for (const tc of m.tool_calls) {
+      if (!tc.function || typeof tc.function.arguments !== 'string') continue;
+      try {
+        JSON.parse(tc.function.arguments);
+        continue; // already valid, leave it alone
+      } catch (_) {
+        const obj = extractFirstJsonObject(tc.function.arguments);
+        tc.function.arguments = JSON.stringify(obj);
+        cleaned++;
+      }
+    }
+  }
+  if (cleaned) console.log(`[sandpie] sanitized ${cleaned} broken tool_call args`);
+  return cleaned;
+}
+
+// =================================================================
 // NEW sendSingle: dispatch the agent loop to the SW, render its events.
 // All round/tool orchestration runs in sandpie-sw.js so the loop keeps
 // progressing while this tab is frozen.
@@ -5046,14 +5135,23 @@ async function sendSingle(text, stream) {
   const convMessages = stream.messages;
   const host = stream.host;
 
+  // Scrub any malformed tool_call arguments that may have been left in
+  // the conv history by a previous LLM emission (e.g. trailing
+  // `<|tool_calls_section_end|>` tokens). Once cleaned in convMessages,
+  // saveConv below persists the fix so the conv stops 400-ing on
+  // subsequent sends.
+  sanitizeToolCallArgs(convMessages);
+
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
   bindBubble(addMsg('user', text, host), userMsg);
   // Early save so a fresh conv hits the list immediately.
   saveConv(convId).catch(() => {});
   requestWakeLock();
-  setStreamSending(stream, true);
-  startTotalTimer(stream);
+  // setStreamSending + startTotalTimer moved INSIDE the try block below
+  // so a throw in any pre-fetch step (config build, _swReady, etc.)
+  // doesn't leave the stream stuck in "generating" with the Stop button
+  // shown forever. The inner finally clears them no matter how we exit.
   let wasAborted = false;
 
   // Build the agent config the SW needs.
@@ -5082,6 +5180,7 @@ async function sendSingle(text, stream) {
     origin: location.origin,
     dbxTokens: dbxTokensSnap,
     placeholdersList,
+    think: !!(getActiveProvider() && getActiveProvider().think),
   };
 
   await _swReady;
@@ -5096,18 +5195,140 @@ async function sendSingle(text, stream) {
   // Per-round render state. Reset on round_start.
   let reply = null;
   let cursor = null;
-  let content = '';
+  let content = '';        // full assembled assistant text (LLM-truthful)
+  let displayed = '';      // portion of content actually painted into the bubble
+  let pending = '';        // queued chars waiting for the drain tick to reveal
+  let roundOngoing = false;
+  let drainTimer = null;
   const toolCalls = [];
   const toolCallEls = [];
+  // Paced reveal for tool-call argument streams — mirrors `pending`/`displayed`
+  // for the assistant text so args type out instead of slamming in whole.
+  const toolDisplayed = [];
+  const toolPending = [];
+  let toolsShouldClose = false;
   let pendingToolResultDiv = null;
+
+  // Typewriter drain: reveal `pending` at ~16ms steps so output streams
+  // visibly even when the SW delivers a big batch of parsed deltas at
+  // once. When the round is over AND pending is empty, finalize the
+  // bubble (cursor removal, empty-bubble cleanup).
+  //
+  // Hidden-tab handling: setTimeout is throttled to 1Hz in background
+  // tabs (and stops entirely under freeze), so a strict typewriter
+  // would slowly "catch up" for seconds after the user returns to a
+  // tab whose stream completed long ago. To avoid that, applyDelta
+  // and drainTick both check `document.visibilityState === 'hidden'`
+  // and short-circuit to a direct flush: pending merges into
+  // displayed in one shot, the bubble stays fully in sync with what
+  // the SW has actually delivered, and there's no typewriter
+  // animation to play catch-up when the tab returns. The SW is
+  // unaffected by any of this — it's the page-side rendering that
+  // adapts to visibility, not the agent loop.
+  function flushAll() {
+    if (pending.length > 0) {
+      displayed += pending;
+      pending = '';
+      if (reply) {
+        reply.innerHTML = renderMd(displayed);
+        if (cursor) reply.appendChild(cursor);
+      }
+    }
+    for (let i = 0; i < toolPending.length; i++) {
+      const buf = toolPending[i];
+      if (!buf) continue;
+      toolDisplayed[i] = (toolDisplayed[i] || '') + buf;
+      toolPending[i] = '';
+      if (toolCallEls[i]) {
+        tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
+      }
+    }
+  }
+  function drainTick() {
+    drainTimer = null;
+    // Find the scroll container the active reply lives in (either
+    // #messages or #messagesSide). The previous code only ever scrolled
+    // #messages, so when a stream ran in the side panel its content
+    // wouldn't auto-follow the cursor as new tokens arrived.
+    let scrollHost = reply;
+    while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
+      scrollHost = scrollHost.parentNode;
+    }
+    const wasAtBottom = scrollHost ? isAtBottom(scrollHost) : false;
+    if (pending.length > 0) {
+      if (document.visibilityState === 'hidden') {
+        flushAll();
+      } else {
+        const n = Math.max(1, Math.ceil(pending.length / 30));
+        displayed += pending.slice(0, n);
+        pending = pending.slice(n);
+        if (reply) {
+          reply.innerHTML = renderMd(displayed);
+          if (cursor) reply.appendChild(cursor);
+        }
+      }
+    }
+    // Paced reveal of tool-call argument streams (matches the assistant-text
+    // typewriter above so args don't slam into the bubble in one shot).
+    let anyToolPending = false;
+    for (let i = 0; i < toolPending.length; i++) {
+      const buf = toolPending[i];
+      if (!buf || buf.length === 0) continue;
+      if (document.visibilityState === 'hidden') {
+        toolDisplayed[i] = (toolDisplayed[i] || '') + buf;
+        toolPending[i] = '';
+      } else {
+        const n = Math.max(1, Math.ceil(buf.length / 30));
+        toolDisplayed[i] = (toolDisplayed[i] || '') + buf.slice(0, n);
+        toolPending[i] = buf.slice(n);
+      }
+      if (toolCallEls[i]) {
+        tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
+      }
+      if (toolPending[i].length > 0) anyToolPending = true;
+    }
+    // Close the args paren only after a tool's pending buffer has fully drained
+    // — round_end sets the flag, but we wait so the ')' lands at the end of
+    // the typed-out args, not before them.
+    if (toolsShouldClose) {
+      for (let i = 0; i < toolCallEls.length; i++) {
+        const el = toolCallEls[i];
+        if (!el || el._tcClosed) continue;
+        if ((toolPending[i] || '').length === 0) {
+          tcAppendExpanded(el, ')');
+          el._tcClosed = true;
+        }
+      }
+    }
+    if (scrollHost && wasAtBottom) scrollHost.scrollTop = scrollHost.scrollHeight;
+    if (pending.length > 0 || anyToolPending || roundOngoing) {
+      drainTimer = setTimeout(drainTick, 16);
+    } else {
+      // Round done + nothing left to type — finalize the bubble.
+      if (cursor) { cursor.remove(); cursor = null; }
+      if (reply && (!displayed || !displayed.trim())) reply.remove();
+    }
+  }
+  function ensureDrain() {
+    if (drainTimer == null) drainTimer = setTimeout(drainTick, 16);
+  }
 
   function applyDelta(delta) {
     if (!delta) return;
     if (delta.content) {
       content += delta.content;
-      if (reply) {
-        reply.innerHTML = renderMd(content);
-        if (cursor) reply.appendChild(cursor);
+      if (document.visibilityState === 'hidden') {
+        // Skip the typewriter: throttled setTimeout would lag the
+        // bubble behind reality, then "catch up" on tab return.
+        // Render now so state is always in sync.
+        displayed += delta.content;
+        if (reply) {
+          reply.innerHTML = renderMd(displayed);
+          if (cursor) reply.appendChild(cursor);
+        }
+      } else {
+        pending += delta.content;
+        ensureDrain();
       }
     }
     if (delta.tool_calls) {
@@ -5119,10 +5340,25 @@ async function sendSingle(text, stream) {
         if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
         if (toolCalls[i].function.name) {
           if (!toolCallEls[i]) {
+            // Bubble starts with `→ name(` only — args are routed through
+            // toolPending and revealed by drainTick so they type out smoothly
+            // whether they arrive char-by-char (Kimi-style) or all-at-once
+            // (Gemma / most Ollama models).
             toolCallEls[i] = addMsg('tool-call', '→ ' + toolCalls[i].function.name + '(', host);
             toolCallEls[i].dataset.fname = toolCalls[i].function.name;
-          } else {
-            tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolCalls[i].function.arguments);
+            toolDisplayed[i] = '';
+            toolPending[i] = '';
+          }
+          if (tc.function?.arguments) {
+            if (document.visibilityState === 'hidden') {
+              // Hidden tab: setTimeout is throttled, so flush directly to
+              // keep the bubble in sync with reality on tab return.
+              toolDisplayed[i] = (toolDisplayed[i] || '') + tc.function.arguments;
+              tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
+            } else {
+              toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
+              ensureDrain();
+            }
           }
           if (!toolCallEls[i].classList.contains('in-flight')) {
             renderTcPreparing(toolCallEls[i], toolCalls[i].function.name, toolCalls[i].function.arguments);
@@ -5133,22 +5369,45 @@ async function sendSingle(text, stream) {
   }
 
   function handleEvent(ev) {
+    // Background-activity telemetry: when the tab is hidden, _hiddenStats
+    // is non-null and accumulates per-event counters. The visibilitychange
+    // listener logs a summary the moment the user returns.
+    if (_hiddenStats) {
+      if (ev.type === 'delta' && ev.delta && ev.delta.content) {
+        _hiddenStats.chars += ev.delta.content.length;
+        _hiddenStats.deltas++;
+      } else if (ev.type === 'round_start')   _hiddenStats.rounds++;
+      else if (ev.type === 'tool_started')    _hiddenStats.tools++;
+      else if (ev.type === 'tool_result')     _hiddenStats.toolResults++;
+      else if (ev.type === 'error')           _hiddenStats.errors++;
+    }
     switch (ev.type) {
       case 'round_start': {
+        // Flush any in-flight drain from the prior round before opening
+        // a new bubble. (Belt-and-suspenders — round_end should already
+        // have settled it.)
+        if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
         reply = addMsg('assistant', '', host);
         cursor = document.createElement('span');
         cursor.className = 'cursor';
         reply.appendChild(cursor);
-        content = '';
+        content = ''; displayed = ''; pending = '';
+        roundOngoing = true;
         toolCalls.length = 0;
         toolCallEls.length = 0;
+        toolDisplayed.length = 0;
+        toolPending.length = 0;
+        toolsShouldClose = false;
         break;
       }
       case 'delta': applyDelta(ev.delta); break;
       case 'round_end': {
-        if (cursor) { cursor.remove(); cursor = null; }
-        for (const el of toolCallEls) if (el) tcAppendExpanded(el, ')');
-        if (reply && (!content || !content.trim())) reply.remove();
+        // Defer the closing ')' to drainTick — it appends per-tool once each
+        // bubble's toolPending buffer has fully drained, so the paren lands
+        // at the end of the typed-out args instead of jumping ahead of them.
+        toolsShouldClose = true;
+        roundOngoing = false;
+        ensureDrain();
         break;
       }
       case 'message_added': {
@@ -5192,6 +5451,11 @@ async function sendSingle(text, stream) {
   }
 
   try {
+    // State mutations that *must* be undone in finally — kept inside
+    // the try so a throw above (config build, _swReady) doesn't leave
+    // the user stuck with a "Stop" button on a non-existent stream.
+    setStreamSending(stream, true);
+    startTotalTimer(stream);
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
