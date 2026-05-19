@@ -80,6 +80,39 @@
 // the schema array verbatim and forwards it to upstream).
 // =============================================================================
 
+// Version stamp logged on every SW boot — confirms a fresh build is running.
+// If you don't see this after a hard reload, the browser is still serving a
+// stale SW (DevTools → Application → Service Workers → Update or Unregister).
+const SW_VERSION = '1.3.0';
+console.log('[sandpie-sw] boot — version=' + SW_VERSION);
+
+// --- Pyodide bootstrap ------------------------------------------------------
+// importScripts() in a service worker is only legal during the INITIAL
+// SYNCHRONOUS evaluation of the SW script (i.e. right here, before any
+// addEventListener runs) or synchronously inside an install handler.
+// Pyodide's old call site — `importScripts(...)` from inside an async
+// initPyodide() — fails with "failed to load" regardless of network state,
+// which is why run_python never worked.
+//
+// Fix: pre-import pyodide.js at top-level. Wrapped in try so a CDN outage
+// at SW-install time can't block message sending — non-python tools and
+// completions keep working; run_python returns a clear error.
+//
+// NOTE: We deliberately do NOT pre-import pyodide.asm.js here. A previous
+// attempt to pre-import both blocked SW activation on slow networks (the
+// SW install can't complete until every top-level importScripts has parsed,
+// and asm.js is ~1MB of generated JS). loadPyodide() in v0.26.4 fetches
+// pyodide.asm.js itself via its own mechanism — pyodide.js alone is enough
+// to make loadPyodide() reachable.
+const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+let _pyodideJsLoaded = false;
+try {
+  importScripts(PYODIDE_INDEX + 'pyodide.js');
+  _pyodideJsLoaded = true;
+} catch (e) {
+  console.warn('[sandpie-sw] pyodide.js failed to load at SW init:', e);
+}
+
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
@@ -103,9 +136,16 @@ let pyInitPromise = null;
 async function initPyodide() {
   if (py) return py;
   if (pyInitPromise) return pyInitPromise;
+  if (!_pyodideJsLoaded) {
+    // pyodide.js wasn't loaded at SW init (CDN unreachable or blocked).
+    // Surface a usable error instead of hanging the agent loop forever.
+    throw new Error('Pyodide unavailable: pyodide.js failed to load when the service worker installed. Reload the page after going online to retry.');
+  }
   pyInitPromise = (async () => {
-    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    // loadPyodide is in scope because pyodide.js was importScripts'd at the
+    // top of this file. It will fetch pyodide.asm.js + the wasm payload via
+    // its own internal mechanism (not importScripts), which is legal here.
+    py = await loadPyodide({ indexURL: PYODIDE_INDEX });
     try { py.FS.mkdir('/files'); } catch (_) {}
     return py;
   })();
