@@ -3835,6 +3835,220 @@ function stopToolTicker(div) {
   }
 }
 
+// =============================================================================
+// RoundRenderer — owns ALL per-round render state for one streaming exchange.
+// =============================================================================
+// One instance per sendSingle call. The dispatch layer (dispatchAgentEvent
+// below) is the ONLY caller of its public methods; it does not touch render
+// state directly. Lifecycle, matching the flow-chart event labels:
+//
+//   r = new RoundRenderer(host, convMessages)
+//   r.startRound()                              // E1  round_start
+//   r.applyDelta(ev.delta)                      // E2  delta
+//   r.endRound()                                // E3  round_end
+//   r.bindMessage(msg)                          // E4  message_added
+//   r.markToolStarted(tc)                       // E5  tool_started
+//   r.markToolDone(id, result, artifacts)       // E6  tool_result
+//   r.finalize()                                // F2  always, from finally
+//
+// Invariants:
+//  * Bubble DOM lives in this.host only.
+//  * drainTick is the ONLY writer of tool-arg text during a round; applyDelta
+//    just enqueues into toolPending[i]. This is the structural reason the
+//    typewriter can't be "skipped" by a fast-arriving delta.
+//  * startRound() and finalize() share one private flush path
+//    (_flushAllPending) so a fast tool that fires tool_result → next
+//    round_start before the typewriter has finished cannot strand the prior
+//    bubble mid-arg.
+//  * finalize() is idempotent and safe to call from any finally regardless
+//    of where the round/tool cycle left off.
+// =============================================================================
+class RoundRenderer {
+  constructor(host, convMessages) {
+    this.host = host;
+    this.convMessages = convMessages;
+    // Per-round state. startRound() resets these AFTER flushing the prior
+    // round's pending bytes — see _flushAllPending.
+    this.reply = null;
+    this.cursor = null;
+    this.content = '';
+    this.toolCalls = [];
+    this.toolCallEls = [];
+    this.toolDisplayed = [];
+    this.toolPending = [];
+    this.toolsShouldClose = false;
+    this.drainTimer = null;
+    this.pendingToolResultDiv = null;
+  }
+
+  // ─── public API ──────────────────────────────────────────────────────────
+
+  startRound() {
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this._flushAllPending();
+    this.reply = addMsg('assistant', '', this.host);
+    this.cursor = document.createElement('span');
+    this.cursor.className = 'cursor';
+    this.reply.appendChild(this.cursor);
+    this.content = '';
+    this.toolCalls.length = 0;
+    this.toolCallEls.length = 0;
+    this.toolDisplayed.length = 0;
+    this.toolPending.length = 0;
+    this.toolsShouldClose = false;
+  }
+
+  applyDelta(delta) {
+    if (!delta) return;
+    if (delta.content) this._appendContent(delta.content);
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
+    }
+  }
+
+  endRound() {
+    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
+    // Defer the ')' to drainTick so it lands AFTER the paced args finish
+    // typing out, not before them.
+    this.toolsShouldClose = true;
+    this._scheduleDrain();
+    if (this.reply && (!this.content || !this.content.trim())) this.reply.remove();
+  }
+
+  bindMessage(msg) {
+    this.convMessages.push(msg);
+    if (msg.role === 'assistant') {
+      if (this.reply) bindBubble(this.reply, msg);
+      for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
+    } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
+      bindBubble(this.pendingToolResultDiv, msg);
+      this.pendingToolResultDiv = null;
+    }
+  }
+
+  markToolStarted(tc) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
+    if (idx < 0 || !this.toolCallEls[idx]) return;
+    this.toolCallEls[idx].classList.add('in-flight');
+    startToolTicker(this.toolCallEls[idx], tc);
+  }
+
+  markToolDone(tcId, result, artifacts) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
+    if (idx >= 0 && this.toolCallEls[idx]) {
+      this.toolCallEls[idx].classList.remove('in-flight');
+      stopToolTicker(this.toolCallEls[idx]);
+      renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
+    }
+    const text = String(result || '');
+    const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
+    this.pendingToolResultDiv = addMsg('tool-result', '← ' + display, this.host);
+    if (artifacts && artifacts.length) {
+      for (const html of artifacts) window._renderArtifact(this.host, html);
+    }
+  }
+
+  finalize() {
+    // Idempotent — safe to call from finally regardless of where the
+    // round/tool cycle left off. Force-closes any open '(' so the user
+    // sees a complete tool call even on abrupt stream end.
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this.toolsShouldClose = true;
+    this._flushAllPending();
+    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
+  }
+
+  // ─── private ─────────────────────────────────────────────────────────────
+
+  _appendContent(chunk) {
+    this.content += chunk;
+    if (this.reply) {
+      this.reply.innerHTML = renderMd(this.content);
+      if (this.cursor) this.reply.appendChild(this.cursor);
+    }
+  }
+
+  _applyToolCallDelta(tc) {
+    const i = tc.index || 0;
+    if (!this.toolCalls[i]) {
+      this.toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+    }
+    if (tc.id) this.toolCalls[i].id = tc.id;
+    if (tc.function?.name) this.toolCalls[i].function.name += tc.function.name;
+    if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
+    if (!this.toolCalls[i].function.name) return;
+    if (!this.toolCallEls[i]) {
+      // Bubble starts with `→ name(` only — args stream in via toolPending
+      // / drainTick so they type out smoothly whether the upstream sent
+      // them char-by-char or in one chunk.
+      this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
+      this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
+      this.toolDisplayed[i] = '';
+      this.toolPending[i] = '';
+    }
+    if (tc.function?.arguments) {
+      this.toolPending[i] = (this.toolPending[i] || '') + tc.function.arguments;
+      this._scheduleDrain();
+    }
+    if (!this.toolCallEls[i].classList.contains('in-flight')) {
+      renderTcPreparing(this.toolCallEls[i], this.toolCalls[i].function.name, this.toolCalls[i].function.arguments);
+    }
+  }
+
+  _scheduleDrain() {
+    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
+  }
+
+  _drainTick() {
+    this.drainTimer = null;
+    let anyPending = false;
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i];
+      if (!buf || buf.length === 0) continue;
+      const n = Math.max(1, Math.ceil(buf.length / 30));
+      this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf.slice(0, n);
+      this.toolPending[i] = buf.slice(n);
+      this._paintTool(i);
+      if (this.toolPending[i].length > 0) anyPending = true;
+    }
+    this._appendCloseParensIfReady();
+    if (anyPending) this._scheduleDrain();
+  }
+
+  // Synchronously reveal everything still queued and append the closing ')'
+  // to any bubble whose round has ended. Called from startRound (prior-round
+  // cleanup) and finalize (stream-exit cleanup) — single place where the
+  // "args got stranded mid-stream" bug class is structurally prevented.
+  _flushAllPending() {
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i] || '';
+      if (buf.length > 0) {
+        this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf;
+        this.toolPending[i] = '';
+        this._paintTool(i);
+      }
+    }
+    this._appendCloseParensIfReady();
+  }
+
+  _paintTool(i) {
+    if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
+    tcSetExpanded(this.toolCallEls[i], '→ ' + this.toolCalls[i].function.name + '(' + this.toolDisplayed[i]);
+  }
+
+  _appendCloseParensIfReady() {
+    if (!this.toolsShouldClose) return;
+    for (let i = 0; i < this.toolCallEls.length; i++) {
+      const el = this.toolCallEls[i];
+      if (!el || el._tcClosed) continue;
+      if ((this.toolPending[i] || '').length === 0) {
+        tcAppendExpanded(el, ')');
+        el._tcClosed = true;
+      }
+    }
+  }
+}
+
 // === Total-interaction timer (covers all rounds + tool execution) ============
 // Per-stream: each conversation's timer lives on its stream record so a
 // background conv keeps ticking against its own bubble host without colliding
@@ -4822,53 +5036,42 @@ async function _sendSingle_legacy_removed(text, stream) {
 // All round/tool orchestration runs in sandpie-sw.js so the loop keeps
 // progressing while this tab is frozen.
 // =================================================================
+// =============================================================================
+// sendSingle — orchestrates ONE round-trip with the agent loop.
+// =============================================================================
+// Reads as a near-1:1 mapping of the flow-chart steps. Each step's concern
+// lives in its own helper so this function stays a thin coordinator:
+//
+//   [R1] buildAgentConfig  — package the SW request payload from the UI state
+//   [R2] await _swReady    — make sure the SW is controlling this page
+//   [R2] fetch /sandpie-agent — POST the config, SW intercepts
+//   [R3] readAgentEvents   — NDJSON line reader, calls dispatch for each line
+//   [E*] dispatchAgentEvent — map ev.type to the renderer's method
+//   [F1..F5] finally       — abort cleanup, persistence, Dropbox sync
+//
+// All per-round render state is in the RoundRenderer constructed at the top.
 async function sendSingle(text, stream) {
+  // [R1] Pre-flight
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  const convId = stream.id;
-  const convMessages = stream.messages;
-  const host = stream.host;
+  const { id: convId, messages: convMessages, host } = stream;
 
+  // [U-tail] Persist + render the user message before kicking off the round.
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
   bindBubble(addMsg('user', text, host), userMsg);
-  // Early save so a fresh conv hits the list immediately.
-  saveConv(convId).catch(() => {});
+  saveConv(convId).catch(() => {});  // best-effort: fresh conv hits the list immediately
   requestWakeLock();
   setStreamSending(stream, true);
   startTotalTimer(stream);
   let wasAborted = false;
 
-  // Build the agent config the SW needs.
-  const endpoint = $('endpoint').value.replace(/\/$/, '');
-  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  const remoteProxy = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
-  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
-  // Empty string means same-origin (which the SW resolves against its own URL).
-  const proxyBase = remoteProxy || '';
-  const placeholdersList = [];
-  try {
-    const st = syncState();
-    for (const [rel, val] of Object.entries(st)) if (!val.hydrated) placeholdersList.push(rel);
-  } catch (_) {}
-  let dbxTokensSnap = null;
-  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
+  // [R1] Build the SW request payload from current UI state.
+  const config = buildAgentConfig(convMessages);
 
-  const config = {
-    url,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
-    model: $('model').value,
-    systemPrompt: buildSystemPrompt(),
-    messages: convMessages.slice(),
-    tools: toolDefs(),
-    proxyBase,
-    origin: location.origin,
-    dbxTokens: dbxTokensSnap,
-    placeholdersList,
-  };
-
+  // [R2] Wait for the SW to be controlling the page, then wire abort.
   await _swReady;
   const ctrl = new AbortController();
   stream.requestId = ctrl;
@@ -4878,181 +5081,11 @@ async function sendSingle(text, stream) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  // Per-round render state. Reset on round_start.
-  let reply = null;
-  let cursor = null;
-  let content = '';
-  const toolCalls = [];
-  const toolCallEls = [];
-  // Paced reveal for tool-call argument streams. Without this, models that
-  // deliver the entire tool call in one SSE delta (Gemma / most Ollama)
-  // dump the full args into the bubble in one shot — no streaming feel.
-  // toolPending[i] queues bytes to reveal; drainTick reveals a slice per
-  // 16ms tick into toolDisplayed[i].
-  const toolDisplayed = [];
-  const toolPending = [];
-  let toolsShouldClose = false;
-  let drainTimer = null;
-  let pendingToolResultDiv = null;
-
-  function drainTick() {
-    drainTimer = null;
-    let anyPending = false;
-    for (let i = 0; i < toolPending.length; i++) {
-      const buf = toolPending[i];
-      if (!buf || buf.length === 0) continue;
-      const n = Math.max(1, Math.ceil(buf.length / 30));
-      toolDisplayed[i] = (toolDisplayed[i] || '') + buf.slice(0, n);
-      toolPending[i] = buf.slice(n);
-      if (toolCallEls[i]) {
-        tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
-      }
-      if (toolPending[i].length > 0) anyPending = true;
-    }
-    // Once round_end has fired and a tool's pending buffer has fully
-    // drained, append the closing paren. Doing it here (instead of
-    // immediately on round_end) keeps the ')' from jumping ahead of
-    // args still being typed out.
-    if (toolsShouldClose) {
-      for (let i = 0; i < toolCallEls.length; i++) {
-        const el = toolCallEls[i];
-        if (!el || el._tcClosed) continue;
-        if ((toolPending[i] || '').length === 0) {
-          tcAppendExpanded(el, ')');
-          el._tcClosed = true;
-        }
-      }
-    }
-    if (anyPending) drainTimer = setTimeout(drainTick, 16);
-  }
-  function ensureDrain() {
-    if (drainTimer == null) drainTimer = setTimeout(drainTick, 16);
-  }
-
-  function applyDelta(delta) {
-    if (!delta) return;
-    if (delta.content) {
-      content += delta.content;
-      if (reply) {
-        reply.innerHTML = renderMd(content);
-        if (cursor) reply.appendChild(cursor);
-      }
-    }
-    if (delta.tool_calls) {
-      for (const tc of delta.tool_calls) {
-        const i = tc.index || 0;
-        if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-        if (tc.id) toolCalls[i].id = tc.id;
-        if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
-        if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
-        if (toolCalls[i].function.name) {
-          if (!toolCallEls[i]) {
-            // Bubble starts with `→ name(` only — args stream in via
-            // toolPending/drainTick so they type out smoothly whether the
-            // upstream sent them char-by-char or in one chunk.
-            toolCallEls[i] = addMsg('tool-call', '→ ' + toolCalls[i].function.name + '(', host);
-            toolCallEls[i].dataset.fname = toolCalls[i].function.name;
-            toolDisplayed[i] = '';
-            toolPending[i] = '';
-          }
-          if (tc.function?.arguments) {
-            toolPending[i] = (toolPending[i] || '') + tc.function.arguments;
-            ensureDrain();
-          }
-          if (!toolCallEls[i].classList.contains('in-flight')) {
-            renderTcPreparing(toolCallEls[i], toolCalls[i].function.name, toolCalls[i].function.arguments);
-          }
-        }
-      }
-    }
-  }
-
-  function handleEvent(ev) {
-    switch (ev.type) {
-      case 'round_start': {
-        if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
-        // Flush any args still pending from the prior round so the bubble
-        // shows the complete tool call before we wipe the per-round state.
-        // Without this, a fast-running tool (e.g. read_file) can fire
-        // tool_result → next round_start before the typewriter has finished
-        // revealing the args, leaving the bubble frozen at `(... mid-arg`.
-        for (let i = 0; i < toolPending.length; i++) {
-          const buf = toolPending[i] || '';
-          if (buf.length > 0) {
-            toolDisplayed[i] = (toolDisplayed[i] || '') + buf;
-            toolPending[i] = '';
-            if (toolCallEls[i] && toolCalls[i]) {
-              tcSetExpanded(toolCallEls[i], '→ ' + toolCalls[i].function.name + '(' + toolDisplayed[i]);
-            }
-          }
-          if (toolsShouldClose && toolCallEls[i] && !toolCallEls[i]._tcClosed) {
-            tcAppendExpanded(toolCallEls[i], ')');
-            toolCallEls[i]._tcClosed = true;
-          }
-        }
-        reply = addMsg('assistant', '', host);
-        cursor = document.createElement('span');
-        cursor.className = 'cursor';
-        reply.appendChild(cursor);
-        content = '';
-        toolCalls.length = 0;
-        toolCallEls.length = 0;
-        toolDisplayed.length = 0;
-        toolPending.length = 0;
-        toolsShouldClose = false;
-        break;
-      }
-      case 'delta': applyDelta(ev.delta); break;
-      case 'round_end': {
-        if (cursor) { cursor.remove(); cursor = null; }
-        // Defer ')' to drainTick so it lands AFTER the paced args finish
-        // typing out — not before them.
-        toolsShouldClose = true;
-        ensureDrain();
-        if (reply && (!content || !content.trim())) reply.remove();
-        break;
-      }
-      case 'message_added': {
-        convMessages.push(ev.message);
-        const msg = convMessages[convMessages.length - 1];
-        if (msg.role === 'assistant') {
-          if (reply) bindBubble(reply, msg);
-          for (const el of toolCallEls) if (el) bindBubble(el, msg);
-        } else if (msg.role === 'tool' && pendingToolResultDiv) {
-          bindBubble(pendingToolResultDiv, msg);
-          pendingToolResultDiv = null;
-        }
-        break;
-      }
-      case 'tool_started': {
-        const idx = toolCalls.findIndex(t => t && t.id === ev.tc.id);
-        if (idx >= 0 && toolCallEls[idx]) {
-          toolCallEls[idx].classList.add('in-flight');
-          startToolTicker(toolCallEls[idx], ev.tc);
-        }
-        break;
-      }
-      case 'tool_result': {
-        const idx = toolCalls.findIndex(t => t && t.id === ev.id);
-        if (idx >= 0 && toolCallEls[idx]) {
-          toolCallEls[idx].classList.remove('in-flight');
-          stopToolTicker(toolCallEls[idx]);
-          renderTcDone(toolCallEls[idx], toolCalls[idx].function.name);
-        }
-        const result = String(ev.result || '');
-        const display = result.length > 500 ? result.slice(0, 500) + '…' : result;
-        pendingToolResultDiv = addMsg('tool-result', '← ' + display, host);
-        if (ev.artifacts && ev.artifacts.length) {
-          for (const html of ev.artifacts) window._renderArtifact(host, html);
-        }
-        break;
-      }
-      case 'agent_done': break;
-      case 'error': addMsg('err', 'Error: ' + (ev.message || 'unknown'), host); break;
-    }
-  }
+  // [E*] Renderer owns ALL per-round render state. Dispatch is the only caller.
+  const renderer = new RoundRenderer(host, convMessages);
 
   try {
+    // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5064,21 +5097,8 @@ async function sendSingle(text, stream) {
       addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
       return;
     }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let lineBuf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      lineBuf += decoder.decode(value, { stream: true });
-      const lines = lineBuf.split('\n');
-      lineBuf = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try { handleEvent(JSON.parse(line)); }
-        catch (e) { console.warn('[sandpie] bad event line:', line, e); }
-      }
-    }
+    // [R3 → E*] Drain the NDJSON stream into the renderer.
+    await readAgentEvents(res.body, ev => dispatchAgentEvent(ev, renderer, host));
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
       wasAborted = true;
@@ -5088,14 +5108,85 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
+    // [F1] Tear down abort wiring.
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
+    // [F2] Flush any in-flight typewriter so no bubble outlives the stream
+    // half-rendered. Idempotent: safe regardless of where we exited.
+    renderer.finalize();
+    // [F3..F5] Post-stream housekeeping.
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
     if (convId === activeConvId) refreshTokenMeter();
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+  }
+}
+
+// [R1] Package the SW request body from the live UI state. Pure read of
+// $('endpoint') / $('apiKey') / $('model') / $('proxyUrl') + module-level
+// helpers; no DOM writes, no side effects.
+function buildAgentConfig(convMessages) {
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
+  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
+  // Empty string means same-origin (the SW resolves it against its own URL).
+  const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  const placeholdersList = [];
+  try {
+    const st = syncState();
+    for (const [rel, val] of Object.entries(st)) if (!val.hydrated) placeholdersList.push(rel);
+  } catch (_) {}
+  let dbxTokensSnap = null;
+  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
+  return {
+    url,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    model: $('model').value,
+    systemPrompt: buildSystemPrompt(),
+    messages: convMessages.slice(),
+    tools: toolDefs(),
+    proxyBase,
+    origin: location.origin,
+    dbxTokens: dbxTokensSnap,
+    placeholdersList,
+  };
+}
+
+// [R3] Drain an NDJSON response body line-by-line, calling onEvent(parsed)
+// for each successfully-parsed line. Bad lines are logged and skipped so a
+// single malformed event can't kill the whole stream.
+async function readAgentEvents(body, onEvent) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let lineBuf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    lineBuf += decoder.decode(value, { stream: true });
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop() || '';  // last fragment may be incomplete; carry it forward
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try { onEvent(JSON.parse(line)); }
+      catch (e) { console.warn('[sandpie] bad event line:', line, e); }
+    }
+  }
+}
+
+// [E1..E8] Map an SW event to the renderer's method. Errors are surfaced as
+// info-bubbles in the host; everything else routes to RoundRenderer.
+function dispatchAgentEvent(ev, renderer, host) {
+  switch (ev.type) {
+    case 'round_start':   return renderer.startRound();
+    case 'delta':         return renderer.applyDelta(ev.delta);
+    case 'round_end':     return renderer.endRound();
+    case 'message_added': return renderer.bindMessage(ev.message);
+    case 'tool_started':  return renderer.markToolStarted(ev.tc);
+    case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
+    case 'agent_done':    return;
+    case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
   }
 }
 
