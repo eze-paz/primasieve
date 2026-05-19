@@ -255,6 +255,44 @@ function isPyodideFatal(e, msg, stderr) {
   return false;
 }
 
+// =============================================================================
+// withPy — single-flight serializer for tool_run_python calls.
+// =============================================================================
+// The SW holds ONE Pyodide interpreter shared across all convs. tool_run_python
+// mutates interpreter-global state in three places that two concurrent callers
+// would trample on:
+//
+//   1. p.setStdout / p.setStderr install callbacks closed over the CALLER'S
+//      local stdout/stderr accumulators. A second call replaces them; the
+//      first conv's prints then land in the second's accumulator (or vanish).
+//   2. syncOpfsToPy starts with rmTree('/files') and rewrites the entire FS.
+//      A second call entering this while the first is mid-runPythonAsync
+//      yanks the filesystem out from under the running script.
+//   3. self._sandpie_cloud_paths, self._sandpie_argv, self._sandpieDisplay,
+//      os.chdir, OPEN_PATCH and DISPLAY_PATCH are all globals/side-effects
+//      that the second call silently rebinds.
+//
+// Net: in the unguarded path, one of two concurrent run_python calls would
+// fail or return garbage (the "1 of 2 fails" race the user reported).
+//
+// withPy serializes: the second caller awaits the first to finish before its
+// critical section runs. No parallelism across convs for Python, but every
+// call completes cleanly. The trade-off is explicit and lives in this single
+// place — true parallelism would require per-conv interpreters, which we
+// explicitly chose NOT to add (SW-spawned workers were reverted).
+//
+// Implementation note: chain via .then(fn, fn) so a rejection from the
+// previous call doesn't skip subsequent waiters — every queued fn runs in
+// turn regardless of how the previous one settled. _pyMutex is then reset
+// to a resolved promise (`.catch(() => {})`) so the chain length stays O(1)
+// in the rejection case (no infinite chain of rejected promises).
+let _pyMutex = Promise.resolve();
+function withPy(fn) {
+  const next = _pyMutex.then(fn, fn);
+  _pyMutex = next.catch(() => {});
+  return next;
+}
+
 // ---- OPFS helpers (same async API as the page, works in SW too) ----
 async function opfsRoot() { return navigator.storage.getDirectory(); }
 function splitPath(p) {
@@ -467,61 +505,68 @@ async function tool_run_python({ code, path, args }, ctx) {
       return { result: `Error: could not read /files/${normPath}: ${e.message}.` };
     }
   }
-  let p;
-  try { p = await initPyodide(); }
-  catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
-  let stdout = '', stderr = '';
-  const artifacts = [];
-  try {
-    p.setStdout({ batched: s => { stdout += s + '\n'; } });
-    p.setStderr({ batched: s => { stderr += s + '\n'; } });
-    const placeholders = await syncOpfsToPy(p, ctx.placeholdersList || []);
-    p.runPython('import os; os.chdir("/files")');
-    self._sandpie_cloud_paths = [...placeholders];
-    try { p.runPython(OPEN_PATCH); } catch (_) {}
-    if (normPath) {
-      self._sandpie_argv = [normPath, ...scriptArgs];
-      try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
-    }
-    self._sandpieDisplay = (html) => artifacts.push(html);
-    try { p.runPython(DISPLAY_PATCH); } catch (_) {}
-    try { await p.loadPackagesFromImports(code); } catch (_) {}
-    await p.runPythonAsync(code);
-    const sync = await syncPyToOpfs(p, placeholders);
-    let out = stdout.trimEnd();
-    if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-    if (artifacts.length) {
-      const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
-      out = out ? out + '\n' + note : note;
-    }
-    return { result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written };
-  } catch (e) {
-    let msg = '';
-    if (e != null) {
-      if (typeof e === 'string') msg = e;
-      else if (e.message) msg = e.message;
-      else {
-        try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
+  // Serialize the interpreter-touching critical section. Validation + the
+  // OPFS read above don't touch Pyodide, so we let them run outside the
+  // lock (no point queuing on path-read errors). Everything from initPyodide
+  // through the result return mutates global interpreter state — must hold
+  // the lock for the whole stretch.
+  return withPy(async () => {
+    let p;
+    try { p = await initPyodide(); }
+    catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
+    let stdout = '', stderr = '';
+    const artifacts = [];
+    try {
+      p.setStdout({ batched: s => { stdout += s + '\n'; } });
+      p.setStderr({ batched: s => { stderr += s + '\n'; } });
+      const placeholders = await syncOpfsToPy(p, ctx.placeholdersList || []);
+      p.runPython('import os; os.chdir("/files")');
+      self._sandpie_cloud_paths = [...placeholders];
+      try { p.runPython(OPEN_PATCH); } catch (_) {}
+      if (normPath) {
+        self._sandpie_argv = [normPath, ...scriptArgs];
+        try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
+      self._sandpieDisplay = (html) => artifacts.push(html);
+      try { p.runPython(DISPLAY_PATCH); } catch (_) {}
+      try { await p.loadPackagesFromImports(code); } catch (_) {}
+      await p.runPythonAsync(code);
+      const sync = await syncPyToOpfs(p, placeholders);
+      let out = stdout.trimEnd();
+      if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+      if (artifacts.length) {
+        const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
+        out = out ? out + '\n' + note : note;
+      }
+      return { result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written };
+    } catch (e) {
+      let msg = '';
+      if (e != null) {
+        if (typeof e === 'string') msg = e;
+        else if (e.message) msg = e.message;
+        else {
+          try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
+        }
+      }
+      const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
+      // Fatal interpreter death: empty exception, WASM runtime error, or
+      // Emscripten abort. Reset so the next call rebootstraps a fresh
+      // interpreter instead of repeatedly failing in the wedged one.
+      if (isPyodideFatal(e, msg, stderr)) {
+        resetPyodide(msg || stderr.trim() || 'empty exception');
+        return {
+          result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.'
+            + (msg ? '\n--- crash signal ---\n' + msg : '')
+            + tail,
+          artifacts,
+        };
+      }
+      return { result: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts };
+    } finally {
+      try { p && p.setStdout({}); } catch (_) {}
+      try { p && p.setStderr({}); } catch (_) {}
     }
-    const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-    // Fatal interpreter death: empty exception, WASM runtime error, or
-    // Emscripten abort. Reset so the next call rebootstraps a fresh
-    // interpreter instead of repeatedly failing in the wedged one.
-    if (isPyodideFatal(e, msg, stderr)) {
-      resetPyodide(msg || stderr.trim() || 'empty exception');
-      return {
-        result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.'
-          + (msg ? '\n--- crash signal ---\n' + msg : '')
-          + tail,
-        artifacts,
-      };
-    }
-    return { result: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts };
-  } finally {
-    try { p && p.setStdout({}); } catch (_) {}
-    try { p && p.setStderr({}); } catch (_) {}
-  }
+  });
 }
 
 // shell / read_file / write_file all go through the cloud proxy at /shell.
