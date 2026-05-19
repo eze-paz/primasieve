@@ -852,6 +852,129 @@ window._sandpieDisplay = function (html) {
 </main>
 
 <script>
+// =============================================================================
+// sandpie-sw end-to-end flow
+// =============================================================================
+// The system is fan-shaped: the page boots → registers a Service Worker → the
+// user sends a message → the page POSTs to a same-origin /sandpie-agent path
+// that the SW intercepts → the SW runs the full LLM agent loop (stream upstream,
+// dispatch tool calls, recurse) → the SW emits NDJSON events back to the page
+// → the page renders each event into the conversation's bubble host.
+//
+// When editing, find the step that owns the concern you're touching and read
+// the surrounding section banner. State that lives in one step must not be
+// mutated from another.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGE LIFECYCLE                                                  (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
+//       <script> runs.
+//   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
+//       localProxyMode, providers, ... .
+//   P2  navigator.serviceWorker.register('./sandpie-sw.js'); _swReady waits
+//       for controllerchange so first /sandpie-agent POST is intercepted.
+//   P3  init() → loadProviders, restore active conv, mountConv,
+//       refreshFileList, refreshWelcome, refreshConversationList.
+//   P4  await sync() pulls Dropbox if connected (no-op otherwise).
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// USER SEND                                                       (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   U1  <form onsubmit> → handleSubmit().
+//   U2  handleSubmit reads $('input'), calls enqueueForActive(text).
+//   U3  enqueueForActive: ensureActiveConv → ensureStream(id) → mountConv if
+//       host detached → stream.queue.push(text) → processQueueFor(s).
+//   U4  processQueueFor: while queue non-empty → await sendSingle(text,
+//       stream). Resets queueAborted on entry, sets isProcessing.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE ROUND — PAGE SIDE                                           (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   R1  sendSingle builds config: { url, headers, model,
+//       systemPrompt: buildSystemPrompt(), messages, tools: toolDefs(),
+//       proxyBase, origin, dbxTokens, placeholdersList }.
+//   R2  await _swReady; POST ./sandpie-agent with the config as body.
+//   R3  Read response body line-by-line, JSON.parse each NDJSON line, dispatch
+//       to handleEvent(ev).
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE ROUND — SW SIDE                                       (sandpie-sw.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   S1  fetch event on /sandpie-agent → handleAgent(req).
+//   S2  ReadableStream.start → runAgent(config, ctx) with ctx.emit pushing
+//       events back to the page.
+//   S3  runAgent loop:
+//         emit round_start
+//         streamOneRound(url, headers, body, ctx):
+//           fetch upstream LLM with stream=true
+//           for each SSE delta: accumulate, emit { type:'delta', delta }
+//           return { content, tool_calls }
+//         emit round_end
+//         if no tool_calls: emit message_added (asst only), break
+//         emit message_added (asst with tool_calls)
+//         for each tc:
+//           emit tool_started
+//           runTool(name, args, ctx) → tool_run_python / tool_shell / ...
+//           emit tool_result (+ artifacts)
+//           emit message_added (tool)
+//         next round
+//       emit agent_done
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT DISPATCH — PAGE SIDE                                      (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+// All per-round render state is owned by `RoundRenderer` (a single object
+// constructed at the top of sendSingle). handleEvent dispatches events into
+// the renderer's methods — it does NOT touch render state directly.
+//   E1  round_start    → renderer.startRound()
+//   E2  delta          → renderer.applyDelta(ev.delta)
+//                          ├─ content delta → typewriter into reply
+//                          └─ tool_call delta → bubble, then typewriter for
+//                             args via toolPending / toolDisplayed / drainTick
+//   E3  round_end      → renderer.endRound() — schedules ')' append after
+//                        the args drain completes (NOT before, otherwise the
+//                        paren jumps ahead of still-typing args).
+//   E4  message_added  → renderer.bindMessage(msg) — convMessages.push,
+//                        bindBubble to wire the rewind/copy menu.
+//   E5  tool_started   → renderer.markToolStarted(tcId) — in-flight class +
+//                        flavor ticker.
+//   E6  tool_result    → renderer.markToolDone(tcId, result, artifacts) —
+//                        renderTcDone, append tool-result bubble, render
+//                        artifacts.
+//   E7  agent_done     → renderer.finalize(); break read loop.
+//   E8  error          → addMsg('err', ...). renderer.finalize() in finally.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// POST-STREAM                                                     (this file)
+// ─────────────────────────────────────────────────────────────────────────────
+//   F1  remove abort listener, stream.requestId = null.
+//   F2  releaseWakeLock, endTotalTimer, setStreamSending(false).
+//   F3  await saveConv(convId) — persist messages + artifacts to OPFS.
+//   F4  refreshTokenMeter() if active.
+//   F5  await sync() — Dropbox push of dirty conv files (no-op if not
+//       connected).
+//   F6  processQueueFor loops back to U4 if more queued, else returns.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL EXECUTION                                            (sandpie-sw.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   T1  run_python    → initPyodide (lazy) → syncOpfsToPy → exec → syncPyToOpfs
+//   T2  shell         → POST proxyBase/shell
+//   T3  read_file     → GET  proxyBase/file?path=
+//   T4  write_file    → POST proxyBase/file?path=
+//   T5  fetch_file    → Dropbox download via SW dbx helper
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// SW LIFECYCLE                                              (sandpie-sw.js)
+// ─────────────────────────────────────────────────────────────────────────────
+//   W1  install  → skipWaiting()
+//   W2  activate → clients.claim() so first page load is controlled without
+//                  a reload
+//   W3  ~30s idle → SW terminates. Next /sandpie-agent fetch re-boots it.
+//                  Pyodide reinitializes lazily on next run_python.
+// =============================================================================
+
 const $ = id => document.getElementById(id);
 
 const VERSION = '1.0.0';

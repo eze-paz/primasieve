@@ -29,6 +29,56 @@
 //                                                 only one round, no agent
 //                                                 loop)
 //   POST /sandpie-py { code, argv, placeholdersList } → run python once
+//
+// =============================================================================
+// SW-side flow (mirrors the page-side flow chart in sandpie-sw.html)
+// =============================================================================
+//
+//   W1  install  → skipWaiting()                                  [line ~33]
+//   W2  activate → clients.claim()                                [line ~34]
+//   W3  fetch event router — three intercepted paths:             [line ~36]
+//         /sandpie-agent  → handleAgent
+//         /sandpie-stream → handleStream  (legacy single-round SSE proxy)
+//         /sandpie-py     → handlePy      (one-shot run_python)
+//
+//   S1  handleAgent(req): parse config, open ReadableStream.      [line ~491]
+//   S2  ReadableStream.start → runAgent(config, ctx) with         [line ~446]
+//       ctx.emit(ev) pushing NDJSON lines back to the page.
+//   S3  runAgent loop (one iteration = one LLM round):
+//         emit round_start
+//         streamOneRound:                                         [line ~392]
+//           fetch upstream LLM with stream=true
+//           for each SSE delta:
+//             accumulate content + toolCalls[i] from delta
+//             emit { type:'delta', delta } VERBATIM (raw upstream
+//             shape — the page reconstructs its own view)
+//           return { content, tool_calls }
+//         emit round_end
+//         if no tool_calls: emit message_added (asst), break
+//         emit message_added (asst with tool_calls)
+//         for each tc in tool_calls:
+//           sanitize tc.function.arguments via JSON.parse fallback
+//           emit tool_started
+//           toolOut = await runTool(name, args, ctx)              [line ~377]
+//             → dispatches to tool_run_python / tool_shell /
+//               tool_read_file / tool_write_file / tool_fetch_file
+//           emit tool_result (with optional artifacts)
+//           emit message_added (tool)
+//         next iteration
+//       emit agent_done
+//
+//   T1  tool_run_python: lazy initPyodide (single shared interp), [line ~264]
+//       syncOpfsToPy (mount OPFS into /files/), exec user code,
+//       syncPyToOpfs (write back changes), return stdout + artifacts.
+//   T2  tool_shell:      POST proxyBase/shell                     [line ~330]
+//   T3  tool_read_file:  GET  proxyBase/file?path=                [line ~344]
+//   T4  tool_write_file: POST proxyBase/file?path=                [line ~347]
+//   T5  tool_fetch_file: Dropbox download via SW dbx helper       [line ~355]
+//
+// Adding a new tool: register it in runTool's switch AND export its
+// schema to the page via tools[] in sandpie-sw.html (the SW receives
+// the schema array verbatim and forwards it to upstream).
+// =============================================================================
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
