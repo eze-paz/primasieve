@@ -361,6 +361,7 @@
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: var(--sp-surface); border-color: #444c56; }
   ul.conv-list li.active { background: #1f2733; border-color: var(--sp-accent); }
+  ul.conv-list li.lp-active { background: rgba(88, 166, 255, 0.15); border-color: var(--sp-accent); }
   ul.conv-list li.archived { opacity: 0.55; }
   ul.conv-list li.archived-toggle {
     background: transparent; border: none; color: var(--sp-muted);
@@ -4116,9 +4117,11 @@ function _onTouchStart(e, handler) {
   _lp.target = e.currentTarget;
   _lp.startX = t.clientX;
   _lp.startY = t.clientY;
+  _lp.target.classList.add('lp-active');
   _lp.timer = setTimeout(() => {
     _lp.timer = null;
     _lp.target._lpFired = true;
+    _lp.target.classList.remove('lp-active');
     handler({ currentTarget: _lp.target, target: _lp.target, clientX: _lp.startX, clientY: _lp.startY, preventDefault() {}, stopPropagation() {} });
   }, _lp.delay);
 }
@@ -4126,15 +4129,19 @@ function _onTouchMove(e) {
   if (!_lp.timer) return;
   const t = e.touches[0];
   if (Math.abs(t.clientX - _lp.startX) > _lp.slop || Math.abs(t.clientY - _lp.startY) > _lp.slop) {
-    clearTimeout(_lp.timer); _lp.timer = null; _lp.target = null;
+    clearTimeout(_lp.timer); _lp.timer = null;
+    if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
   }
 }
 function _onTouchEnd(e) {
   if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
-  _lp.target = null;
+  if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
   if (e.currentTarget._lpFired) { e.currentTarget._lpFired = false; e.preventDefault(); e.stopPropagation(); }
 }
-function _onTouchCancel() { if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; } _lp.target = null; }
+function _onTouchCancel() {
+  if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
+  if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
+}
 /**
  * Attach long-press handlers to an element.
  * On touch devices this prevents the browser's default drag/scroll so the
