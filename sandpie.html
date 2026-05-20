@@ -4355,13 +4355,17 @@ function renderTcPreparing(div, fname, args) {
 function renderTcRunning(div, fname, flavor) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  // No timer / token count — the global interaction timer at the bottom of
-  // the transcript already shows elapsed time, and nothing new is being
-  // generated during local tool execution.
-  el.innerHTML =
-    '<span class="tc-spinner"></span>' +
-    `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
-    `<span class="tc-flavor">${tcEscape(flavor)}</span>`;
+  // Build the structure once, then only update the flavor text so the CSS
+  // spinner animation never resets.  The spinner is a border+animation element
+  // — destroying it via innerHTML every 1.4s causes a visible jank.
+  if (!el.querySelector('.tc-spinner')) {
+    el.innerHTML =
+      '<span class="tc-spinner"></span>' +
+      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
+      '<span class="tc-flavor"></span>';
+  }
+  const flavorEl = el.querySelector('.tc-flavor');
+  if (flavorEl) flavorEl.textContent = flavor;
 }
 
 function renderTcDone(div, fname) {
