@@ -4936,6 +4936,11 @@ async function listConversations() {
       } catch { return null; }
     });
   const out = (await Promise.all(reads)).filter(Boolean);
+  // Seed last-viewed from each conv's own updated time so on reload
+  // nothing looks "unseen" — only new messages during this session turn blue.
+  for (const c of out) {
+    if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
+  }
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
 
