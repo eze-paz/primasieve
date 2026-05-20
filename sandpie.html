@@ -185,12 +185,70 @@
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
     transform: translate(5px, calc(5px + var(--py) * -4px));
   }
-  .assistant { align-self: flex-start; background: var(--sp-surface); border: 1px solid var(--sp-border); }
+  .assistant {
+    align-self: flex-start;
+    position: relative;
+    padding: 0;
+    background: transparent;
+    --py: 0;
+  }
+  .assistant .bubble {
+    display: block;
+    padding: 0.75rem 1rem;
+    background: var(--sp-surface);
+    color: var(--sp-text);
+    border: 1px solid var(--sp-border);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transform: translateY(calc(var(--py) * 2px));
+  }
+  .assistant::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transform: translate(4px, calc(4px + var(--py) * -3px));
+  }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
   .info { align-self: center; color: var(--sp-muted); font-style: italic; font-size: 0.85em; }
-  .tool-call, .tool-result { align-self: flex-start; max-width: 85%; min-width: 0; padding: 0.5rem 0.75rem; border-radius: 5px; font: 12px/1.4 'JetBrains Mono', Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .tool-call { background: rgba(88,166,255,0.1); border: 1px solid var(--sp-accent); }
-  .tool-result { background: rgba(63,185,80,0.1); border: 1px solid var(--sp-success); }
+  .tool-call, .tool-result {
+    align-self: flex-start;
+    max-width: 85%;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    font: 12px/1.4 'JetBrains Mono', Consolas, monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  .tool-call {
+    background: rgba(88,166,255,0.1);
+    border: 1px solid var(--sp-accent);
+    position: relative;
+  }
+  .tool-call::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(88,166,255,0.15);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    transform: translate(2px, 2px);
+    z-index: -1;
+  }
+  .tool-result {
+    background: rgba(63,185,80,0.1);
+    border: 1px solid var(--sp-success);
+    position: relative;
+  }
+  .tool-result::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(63,185,80,0.15);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    transform: translate(2px, 2px);
+    z-index: -1;
+  }
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
   .assistant p { margin: 0.5em 0; }
@@ -203,7 +261,23 @@
   .assistant h1, .assistant h2, .assistant h3 { margin: 0.75em 0 0.5em; line-height: 1.3; }
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
-  form { display: flex; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); align-items: stretch; }
+  form {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--sp-border);
+    align-items: stretch;
+    position: relative;
+  }
+  form::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(88,166,255,0.06);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    transform: translate(3px, 3px);
+    z-index: -1;
+  }
   form textarea {
     flex: 1;
     padding: 0.5rem 1rem;
@@ -5504,11 +5578,11 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 
   function updateTargets() {
-    const users = messages.querySelectorAll('.msg.user');
+    const parallaxMsgs = messages.querySelectorAll('.msg.user, .msg.assistant');
     const vh = window.innerHeight;
     const center = vh / 2;
 
-    for (const msg of users) {
+    for (const msg of parallaxMsgs) {
       const rect = msg.getBoundingClientRect();
       const msgCenter = rect.top + rect.height / 2;
       const ny = (msgCenter - center) / (vh / 2);
