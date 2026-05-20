@@ -546,40 +546,7 @@
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
 /* Token meter — shows current context size vs configured limit. Click to edit. */
-  .token-meter {
-    position: relative;
-    height: 22px;
-    background: var(--sp-bg);
-    border: 1px solid var(--sp-border);
-    border-radius: 4px;
-    cursor: pointer;
-    overflow: hidden;
-    transition: border-color 0.15s;
-    /* Flex centering — keeps label vertically centered regardless of font metrics */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .token-meter:hover { border-color: var(--sp-accent); }
-  .token-fill {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 0%;
-    background-color: var(--sp-success);
-    transition: width 0.2s ease-out, background-color 0.2s;
-  }
-  .token-fill.warn { background-color: var(--sp-warn); }
-  .token-fill.err  { background-color: var(--sp-danger); }
-  .token-label {
-    position: relative;
-    z-index: 1;
-    font: 0.7rem 'JetBrains Mono', Consolas, monospace;
-    color: #fff;
-    user-select: none;
-    text-shadow: 0 0 3px rgba(0,0,0,0.8), 0 0 1px rgba(0,0,0,0.8);
-  }
+
 
   /* Mobile header (only shown < 768px) */
   .mobile-header { display: none; }
@@ -925,12 +892,8 @@ window._sandpieDisplay = function (html) {
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
       <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-      <div id="tokenMeter" class="token-meter" onclick="editTokenLimit()" title="Estimated context size · click to change limit">
-        <div class="token-fill" id="tokenFill"></div>
-        <span class="token-label" id="tokenLabel">0 / 200k</span>
-      </div>
-      <button class="ghost" id="newChatBtn" onclick="newConversation()">+ New chat</button>
       <ul class="fs-list conv-list" id="convList"></ul>
+      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-top:0.5rem;">+ New chat</button>
     </div>
   </details>
 
