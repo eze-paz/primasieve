@@ -4704,6 +4704,9 @@ async function loadConv(id) {
   // If the requested conv is already shown in the side panel, clicking it
   // in the sidebar just flips which side is active — the host doesn't move.
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
+  // Persist the conv we're leaving before switching — otherwise it vanishes
+  // from disk and refreshConversationList() won't show it.
+  await saveActiveConv();
   // Snapshot whichever conv we're leaving — its bubbles + state persist
   // unmounted so any in-flight stream keeps writing into them safely.
   parkActiveConv();
