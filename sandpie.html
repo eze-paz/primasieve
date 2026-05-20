@@ -146,13 +146,12 @@
   body.side-open.active-left  #messagesSide:hover,
   body.side-open.active-right #messages:hover { opacity: 0.75; }
   #messagesWrap.drop-target { outline: 2px dashed #58a6ff; outline-offset: -8px; }
-  .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; border-radius: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+  .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
   .user { 
     align-self: flex-end; 
     background: #58a6ff; 
     color: #fff; 
     white-space: pre-wrap;
-    position: relative;
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -160,10 +159,10 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(88, 166, 255, 0.45);
-    filter: blur(3px);
+    background: rgba(88, 166, 255, 0.5);
+    filter: blur(4px);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(5px, 5px);
+    transform: translate(6px, 6px);
     z-index: -1;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
   }
@@ -171,10 +170,32 @@
     transform: translate(-2px, -2px);
   }
   .user:hover::before {
-    transform: translate(10px, 10px);
-    filter: blur(6px);
+    transform: translate(12px, 12px);
+    filter: blur(8px);
   }
-  .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
+  .assistant { 
+    align-self: flex-start; 
+    background: #161b22; 
+    border: 1px solid #30363d;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .assistant::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transform: translate(5px, 5px);
+    z-index: -1;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .assistant:hover {
+    transform: translate(-1px, -1px);
+  }
+  .assistant:hover::before {
+    transform: translate(10px, 10px);
+  }
   .err { align-self: center; color: #f85149; font-style: italic; }
   .info { align-self: center; color: #8b949e; font-style: italic; font-size: 0.85em; }
   .tool-call, .tool-result { align-self: flex-start; max-width: 85%; min-width: 0; padding: 0.5rem 0.75rem; border-radius: 5px; font: 12px/1.4 'JetBrains Mono', Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
