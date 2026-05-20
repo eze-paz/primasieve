@@ -108,19 +108,19 @@
   }
   aside .navbar .back {
     flex: 0 0 32px;
+    height: 32px;
     padding: 0;
     border: none;
     background: #000;
-    color: var(--sp-accent);
+    color: var(--sp-text);
     cursor: pointer;
     border-radius: 4px;
     clip-path: none;
     font-size: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    line-height: 32px;
+    text-align: center;
   }
-  aside .navbar .back:hover { color: var(--sp-text); background: #111; }
+  aside .navbar .back:hover { background: #111; }
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; padding: 2px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: rgba(88,166,255,0.08); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
