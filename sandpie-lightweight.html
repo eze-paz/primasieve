@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sandpie chat</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script id="serve-py-source" type="text/plain">
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import http.client, urllib.parse, os, sys, webbrowser, subprocess, json
+
+PORT = 8080
+SHELL_CWD = os.path.dirname(os.path.abspath(__file__))
+SHELL_TIMEOUT_MAX = 120
+ALLOWED_ORIGINS = {
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'https://gasn2cloud.com',
+}
+# Cloud-mode hardening (set in production via env vars):
+#   SANDPIE_NO_SHELL=1        → /shell endpoint returns 404 (disables RCE on a public host)
+#   SANDPIE_RESTRICT_PROXY=1  → /proxy/* requires Origin header in ALLOWED_ORIGINS when present
+SHELL_ENABLED = os.environ.get('SANDPIE_NO_SHELL', '') != '1'
+RESTRICT_PROXY = os.environ.get('SANDPIE_RESTRICT_PROXY', '') == '1'
+
+class H(SimpleHTTPRequestHandler):
+    # Hop-by-hop + routing headers we must not forward; everything else passes through verbatim.
+    # accept-encoding is skipped so upstream returns identity-encoded bodies that the browser
+    # can parse directly (we don't forward Content-Encoding back, so otherwise responses would
+    # arrive gzipped but tagged as plain JSON, mangling the parse).
+    _SKIP = {'host', 'content-length', 'connection', 'keep-alive',
+             'proxy-authenticate', 'proxy-authorization', 'te', 'trailers',
+             'transfer-encoding', 'upgrade', 'cookie', 'accept-encoding'}
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()
+
+    def do_GET(self):
+        if self.path.startswith('/proxy/'):
+            return self._proxy('GET', None)
+        super().do_GET()
+
+    def do_POST(self):
+        if self.path == '/shell':
+            if not SHELL_ENABLED:
+                return self.send_error(404)
+            return self._shell()
+        if not self.path.startswith('/proxy/'):
+            return self.send_error(404)
+        body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+        self._proxy('POST', body)
+
+    def _proxy(self, method, body):
+        if RESTRICT_PROXY:
+            origin = self.headers.get('Origin')
+            # Allow if no Origin (non-browser clients, same-origin GETs that omit it).
+            # Reject only when Origin is present and not in our allowlist.
+            if origin and origin not in ALLOWED_ORIGINS:
+                return self.send_error(403, f'Origin not allowed: {origin}')
+        parsed = urllib.parse.urlparse('https://' + self.path[7:])
+        path = parsed.path or '/'
+        if parsed.query: path += '?' + parsed.query
+        # http.client preserves header name casing (urllib does not).
+        headers = {k: v for k, v in self.headers.items() if k.lower() not in self._SKIP}
+        with open('proxy.log', 'a', encoding='utf-8') as _log:
+            _log.write(f'[proxy] {method} {parsed.netloc}{path}\n')
+            for k, v in headers.items():
+                short = v if len(v) < 80 else v[:77] + '...'
+                _log.write(f'        {k}: {short}\n')
+            _log.flush()
+        conn = http.client.HTTPSConnection(parsed.netloc, timeout=120)
+        try:
+            conn.request(method, path, body, headers)
+            resp = conn.getresponse()
+            self.send_response(resp.status)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', resp.getheader('Content-Type', 'application/octet-stream'))
+            self.end_headers()
+            while True:
+                chunk = resp.read1(8192)
+                if not chunk: break
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        finally:
+            conn.close()
+
+    def _shell(self):
+        origin = self.headers.get('Origin')
+        if origin not in ALLOWED_ORIGINS:
+            return self._json(403, {'error': f'Origin not allowed: {origin!r}'})
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
+        except Exception as e:
+            return self._json(400, {'error': f'bad json: {e}'})
+        cmd = (body.get('cmd') or '').strip()
+        if not cmd:
+            return self._json(400, {'error': 'missing cmd'})
+        cwd = body.get('cwd') or SHELL_CWD
+        timeout = min(int(body.get('timeout', 30)), SHELL_TIMEOUT_MAX)
+        with open('proxy.log', 'a', encoding='utf-8') as _log:
+            _log.write(f'[shell] {cmd!r} (cwd={cwd}, timeout={timeout})\n')
+            _log.flush()
+        # Use Popen so we can forcibly kill the WHOLE process tree on timeout.
+        # subprocess.run's built-in timeout only kills cmd.exe / sh on Windows
+        # / Linux respectively — children (find, dir, etc.) keep running and
+        # the proxy thread blocks waiting for their pipes to close.
+        kwargs = dict(shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                      text=True, cwd=cwd)
+        if sys.platform == 'win32':
+            kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            kwargs['start_new_session'] = True
+        try:
+            proc = subprocess.Popen(cmd, **kwargs)
+        except Exception as e:
+            return self._json(500, {'error': f'spawn failed: {e}'})
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+            self._json(200, {'stdout': stdout, 'stderr': stderr, 'code': proc.returncode, 'cwd': cwd})
+        except subprocess.TimeoutExpired:
+            try:
+                if sys.platform == 'win32':
+                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)],
+                                   capture_output=True, timeout=5)
+                else:
+                    import signal
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+            try:
+                stdout, stderr = proc.communicate(timeout=2)
+            except Exception:
+                stdout, stderr = '', ''
+            self._json(200, {
+                'stdout': stdout or '',
+                'stderr': (stderr or '') + f'\n(timeout after {timeout}s — process tree killed)',
+                'code': -1, 'cwd': cwd,
+            })
+        except Exception as e:
+            try: proc.kill()
+            except Exception: pass
+            self._json(500, {'error': str(e)})
+
+    def _json(self, status, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(status)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+print(f'Serving at http://localhost:{PORT}  (shell cwd: {SHELL_CWD})')
+# Bootstrap: when running as a downloaded standalone script (no sandpie.html
+# alongside us), fetch the latest copy from the public deployment so the page
+# can be served same-origin from localhost:8080 — eliminates CORS entirely.
+# Set SANDPIE_BOOTSTRAP=0 to skip (cloud deploy does this; Apache serves the
+# page from htdocs and doesn't need a local /opt/sandpie/sandpie.html).
+SANDPIE_URL = os.environ.get('SANDPIE_URL', 'https://gasn2cloud.com/sdk/sandpie.html')
+if not os.path.isfile('sandpie.html') and os.environ.get('SANDPIE_BOOTSTRAP', '1') != '0':
+    import urllib.request
+    try:
+        print(f'Bootstrap: fetching {SANDPIE_URL}')
+        with urllib.request.urlopen(SANDPIE_URL, timeout=15) as r:
+            with open('sandpie.html', 'wb') as f: f.write(r.read())
+        print(f'  → saved sandpie.html')
+    except Exception as e:
+        print(f'  bootstrap failed: {e} (page will not be served locally)')
+if os.path.isfile('sandpie.html'):
+    webbrowser.open(f'http://localhost:{PORT}/sandpie.html')
+HTTPServer(('127.0.0.1', PORT), H).serve_forever()
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    height: 100vh;
+    display: flex;
+  }
+  aside {
+    width: 300px;
+    padding: 1rem;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    /* Reserve scrollbar gutter so layout doesn't reflow when content
+       grows past the viewport and the scrollbar appears. */
+    scrollbar-gutter: stable;
+  }
+  /* Themed scrollbars everywhere — Firefox + WebKit/Chromium/Edge/Safari */
+  html { scrollbar-width: thin; scrollbar-color: #30363d transparent; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  *::-webkit-scrollbar-thumb:hover { background: #444c56; }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  aside input, aside button {
+    padding: 0.5rem 0.625rem;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 5px;
+    color: #e6edf3;
+    font: inherit;
+  }
+  aside button { background: #58a6ff; border-color: #58a6ff; color: #fff; cursor: pointer; }
+  aside button:hover { background: #79b8ff; }
+  aside button:disabled,
+  aside button:disabled:hover {
+    background: #d29922;
+    border-color: #d29922;
+    color: #0d1117;
+    cursor: not-allowed;
+    animation: sync-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+  /* Ghost buttons in disabled state should look quietly inactive — no amber pulse,
+     just a muted style that says "you don't need to click this right now." */
+  aside button.ghost:disabled,
+  aside button.ghost:disabled:hover {
+    background: transparent;
+    border-color: #21262d;
+    color: #6e7681;
+    cursor: default;
+    animation: none;
+    opacity: 0.6;
+  }
+  aside button.ghost { background: transparent; color: #b4bcd0; border: 1px solid #30363d; }
+  aside button.ghost:hover { background: #21262d; color: #e6edf3; }
+  aside fieldset { border: 1px solid #30363d; border-radius: 5px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; }
+  aside legend { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; padding: 0 0.25rem; }
+  aside .row { display: flex; gap: 0.25rem; }
+  aside .row > * { flex: 1; }
+  aside .hint { font-size: 0.7rem; color: #8b949e; }
+  aside .navbar { display: flex; gap: 0.25rem; align-items: stretch; }
+  aside .navbar input { flex: 1; }
+  aside .navbar .back { flex: 0 0 32px; padding: 0; }
+  ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; padding: 2px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
+  ul.fs-list.drag-over { border-color: #58a6ff; background: rgba(88,166,255,0.08); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.synced   { background: #3fb950; }
+  .dot.modified { background: #d29922; }
+  .dot.local    { background: #58a6ff; }
+  .dot.cloud    { background: #6e7681; }
+  .dot.none     { background: transparent; }
+  .ctx-menu { position: fixed; background: #161b22; border: 1px solid #30363d; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
+  .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: #e6edf3; text-align: left; cursor: pointer; font: inherit; }
+  .ctx-menu button:hover { background: #21262d; }
+  .ctx-menu button.danger { color: #f85149; }
+  ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.4rem; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
+  ul.fs-list li.empty { color: #8b949e; justify-content: center; font-style: italic; font-family: inherit; }
+  ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: default; }
+  ul.fs-list .name.folder { color: #58a6ff; cursor: pointer; }
+  ul.fs-list .name.folder:hover { text-decoration: underline; }
+  ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: #8b949e; cursor: pointer; }
+  ul.fs-list button:hover { color: #f85149; background: transparent; }
+  .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
+  .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: #8b949e; }
+  .dbx-status.connected { background: rgba(63,185,80,0.1); color: #3fb950; }
+  .dbx-status.error { background: rgba(248,81,73,0.1); color: #f85149; }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; }
+  .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; border-radius: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+  .user { align-self: flex-end; background: #58a6ff; color: #fff; white-space: pre-wrap; }
+  .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
+  .err { align-self: center; color: #f85149; font-style: italic; }
+  .info { align-self: center; color: #8b949e; font-style: italic; font-size: 0.85em; }
+  .tool-call, .tool-result { align-self: flex-start; max-width: 85%; min-width: 0; padding: 0.5rem 0.75rem; border-radius: 5px; font: 12px/1.4 'JetBrains Mono', Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .tool-call { background: rgba(88,166,255,0.1); border: 1px solid #58a6ff; }
+  .tool-result { background: rgba(63,185,80,0.1); border: 1px solid #3fb950; }
+  .assistant > *:first-child { margin-top: 0; }
+  .assistant > *:last-child { margin-bottom: 0; }
+  .assistant p { margin: 0.5em 0; }
+  .assistant code { background: #0d1117; padding: 0.1em 0.3em; border-radius: 3px; font: 0.9em 'JetBrains Mono', Consolas, monospace; }
+  .assistant pre { background: #0d1117; padding: 0.75rem; border-radius: 5px; margin: 0.5em 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .assistant pre code { background: none; padding: 0; font-size: 0.85em; }
+  .assistant ul, .assistant ol { padding-left: 1.5em; margin: 0.5em 0; }
+  .assistant a { color: #58a6ff; }
+  .assistant blockquote { border-left: 3px solid #30363d; padding-left: 0.75em; color: #b4bcd0; margin: 0.5em 0; }
+  .assistant h1, .assistant h2, .assistant h3 { margin: 0.75em 0 0.5em; line-height: 1.3; }
+  .assistant table { border-collapse: collapse; margin: 0.5em 0; }
+  .assistant th, .assistant td { border: 1px solid #30363d; padding: 0.25em 0.5em; }
+  form { display: flex; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid #30363d; align-items: center; }
+  form textarea {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    color: #e6edf3;
+    font: inherit;
+    resize: none;
+    overflow-y: auto;
+    line-height: 1.4;
+    min-height: calc(1.4em + 1rem + 2px); /* one line + padding + border */
+    max-height: 40vh;
+  }
+  form button { padding: 0.5rem 1.25rem; background: #58a6ff; border: none; border-radius: 8px; color: #fff; cursor: pointer; }
+  form button.sending { background: #6e7681; }
+  form button.sending:hover { background: #8b949e; }
+  form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .cursor { display: inline-block; width: 2px; height: 1em; background: #58a6ff; vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  /* Collapsible service sections */
+  aside details.service { border: 1px solid #30363d; border-radius: 5px; background: #0d1117; }
+  aside details.service[open] { background: #0d1117; }
+  aside details.service summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #b4bcd0;
+    user-select: none;
+  }
+  aside details.service summary::-webkit-details-marker { display: none; }
+  aside details.service summary::before {
+    content: '▸';
+    font-size: 0.65em;
+    color: #8b949e;
+    transition: transform 0.15s;
+    width: 0.6em;
+  }
+  aside details.service[open] summary::before { transform: rotate(90deg); }
+  aside details.service summary:hover { color: #e6edf3; }
+  aside details.service .service-body {
+    padding: 0 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  aside .status-dot {
+    margin-left: auto;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #30363d;
+    flex-shrink: 0;
+  }
+  aside .status-dot.ok   { background: #3fb950; box-shadow: 0 0 4px rgba(63,185,80,0.5); }
+  aside .status-dot.warn { background: #f8b251; box-shadow: 0 0 4px rgba(248,178,81,0.5); }
+  aside .status-dot.err  { background: #f85149; box-shadow: 0 0 4px rgba(248,81,73,0.5); }
+  /* Conversations list */
+  ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+  ul.conv-list li:hover { background: #161b22; border-color: #444c56; }
+  ul.conv-list li.active { background: #1f2733; border-color: #58a6ff; }
+  ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
+  /* Empty-conversation welcome — vertically centered greeting + status */
+  .welcome {
+    margin: auto 0;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #8b949e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+  }
+  .welcome-title {
+    font-size: 1.8rem;
+    letter-spacing: 0.04em;
+    color: #e6edf3;
+    font-weight: 600;
+  }
+  .welcome-by { color: #6e7681; font-weight: 400; font-size: 0.55em; letter-spacing: normal; margin-left: 0.4em; }
+  .welcome-tag { font-size: 0.78rem; color: #6e7681; }
+  .welcome-status {
+    font: 0.72rem 'JetBrains Mono', Consolas, monospace;
+    color: #6e7681;
+    margin-top: 0.6rem;
+  }
+  .welcome-cta {
+    font-size: 0.75rem;
+    color: #58a6ff;
+    margin-top: 0.5rem;
+    letter-spacing: 0.06em;
+  }
+  .welcome-cta::after {
+    content: '▊';
+    margin-left: 0.2em;
+    animation: blink 1s step-end infinite;
+  }
+  /* Token meter — shows current context size vs configured limit. Click to edit. */
+  .token-meter {
+    position: relative;
+    height: 22px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.15s;
+    /* Flex centering — keeps label vertically centered regardless of font metrics */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .token-meter:hover { border-color: #58a6ff; }
+  .token-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0%;
+    background-color: #3fb950;
+    transition: width 0.2s ease-out, background-color 0.2s;
+  }
+  .token-fill.warn { background-color: #d29922; }
+  .token-fill.err  { background-color: #f85149; }
+  .token-label {
+    position: relative;
+    z-index: 1;
+    font: 0.7rem 'JetBrains Mono', Consolas, monospace;
+    color: #fff;
+    user-select: none;
+    text-shadow: 0 0 3px rgba(0,0,0,0.8), 0 0 1px rgba(0,0,0,0.8);
+  }
+
+  /* Mobile header (only shown < 768px) */
+  .mobile-header { display: none; }
+  .backdrop { display: none; }
+
+  /* Tablet/phone: stack layout, sidebar becomes a drawer */
+  @media (max-width: 768px) {
+    body {
+      flex-direction: column;
+      /* dvh handles iOS Safari url-bar; vh fallback for older browsers */
+      height: 100vh;
+      height: 100dvh;
+    }
+    .mobile-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      padding-top: max(0.5rem, env(safe-area-inset-top));
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      flex: 0 0 auto;
+      /* Sits above the drawer so the hamburger stays tappable when open */
+      position: relative;
+      z-index: 101;
+    }
+    .mobile-header .hamburger {
+      width: 44px; height: 44px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mobile-header .hamburger:active { background: #21262d; }
+    .mobile-header .brand {
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #e6edf3;
+    }
+    aside {
+      position: fixed;
+      /* Drawer slides in below the mobile header — ~52px of header content
+         + safe-area-inset-top on notched iOS, with a 60px floor on Android. */
+      top: max(60px, calc(env(safe-area-inset-top, 0px) + 52px));
+      bottom: 0;
+      left: -100%;
+      width: min(85vw, 320px);
+      z-index: 100;
+      transition: left 0.22s ease-out;
+      padding-top: 1rem;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      box-shadow: 0 0 24px rgba(0,0,0,0.4);
+    }
+    body.sidebar-open aside { left: 0; }
+    .backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 99;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s;
+    }
+    body.sidebar-open .backdrop {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Backdrop also sits above the header? No — header z-index 101 stays clickable
+       above the backdrop's z-index 99, so the hamburger ends up the close button. */
+    main { flex: 1 1 auto; min-height: 0; }
+    /* Touch-friendly: bigger inputs and bottom-row chat */
+    aside input, aside button {
+      padding: 0.65rem 0.75rem;
+      font-size: 0.95rem;
+    }
+    aside details.service summary { padding: 0.75rem 0.85rem; font-size: 0.85rem; }
+    ul.fs-list button { width: 28px; height: 28px; font-size: 1.1rem; }
+    form {
+      padding: 0.75rem 1rem;
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+    form input, form textarea { font-size: 16px; /* prevents iOS auto-zoom on focus */ }
+    #messages { padding: 1rem; }
+    .msg { max-width: 95%; }
+  }
+</style>
+</head>
+<body>
+<header class="mobile-header">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
+  <span class="brand">sandpie</span>
+</header>
+<div class="backdrop" onclick="toggleSidebar()"></div>
+<aside>
+  <details class="service" id="convSection" open>
+    <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
+    <div class="service-body">
+      <div id="tokenMeter" class="token-meter" onclick="editTokenLimit()" title="Estimated context size · click to change limit">
+        <div class="token-fill" id="tokenFill"></div>
+        <span class="token-label" id="tokenLabel">0 / 200k</span>
+      </div>
+      <button class="ghost" id="newChatBtn" onclick="newConversation()">+ New chat</button>
+      <ul class="fs-list conv-list" id="convList"></ul>
+    </div>
+  </details>
+
+  <details class="service" id="aiSection">
+    <summary>AI provider <span class="status-dot" id="aiDot"></span></summary>
+    <div class="service-body">
+      <input id="endpoint" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="model" placeholder="Model (e.g. gpt-4o)">
+      <input id="apiKey" type="password" placeholder="API key">
+    </div>
+  </details>
+
+  <details class="service" id="cloudSection">
+    <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
+    <div class="service-body">
+      <input id="dbxAppKey" placeholder="Dropbox app key">
+      <div class="row">
+        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+      </div>
+      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    </div>
+  </details>
+
+  <details class="service" id="proxySection">
+    <summary>Proxy <span class="status-dot" id="proxyDot"></span></summary>
+    <div class="service-body">
+      <div class="hint" style="line-height:1.4em;">
+        Optional. Only needed if your LLM provider blocks browser CORS, or if you want the AI to have <code style="font-size:0.85em;">shell</code> access on this machine.
+      </div>
+      <input id="proxyUrl" placeholder="Proxy URL (e.g. https://gasn2cloud.com)">
+      <div class="hint" id="routingHint"></div>
+      <div class="row">
+        <button class="ghost" id="localProxyToggle" onclick="toggleLocalProxy()">Activate local proxy</button>
+      </div>
+      <div class="hint" id="proxyStatus" style="display:none;"></div>
+      <div id="proxyDownloadPrompt" style="display:none; padding:0.5rem; background:rgba(248,81,73,0.06); border:1px solid #f8514955; border-radius:5px; font-size:0.72rem; line-height:1.4em;">
+        No proxy on <code style="font-size:0.85em;">localhost:8080</code>.
+        <strong style="color:#f8b251;">⚠ Heads up:</strong> the local proxy gives the AI a <code style="font-size:0.85em;">shell</code> tool — it can run any command in the directory where you start the script. Use only on a machine you trust the AI to operate in.
+        <div class="row" style="margin-top:0.5rem;">
+          <button onclick="downloadProxy()">Download &amp; install</button>
+        </div>
+        <div id="proxyDownloadHint" style="margin-top:0.4rem; color:#8b949e;"></div>
+      </div>
+    </div>
+  </details>
+
+
+  <details class="service" id="filesSection" open>
+    <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
+    <div class="service-body">
+      <div class="navbar">
+        <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
+        <input id="opfsPath" value="/">
+      </div>
+      <ul class="fs-list" id="fileList"></ul>
+      <button id="syncBtn" onclick="syncCurrent()">Sync</button>
+      <div class="hint" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+        <span>drop to upload · right-click for actions</span>
+        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot synced"></span>synced</span>
+        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot modified"></span>modified</span>
+        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot local"></span>local</span>
+        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot cloud"></span>cloud</span>
+      </div>
+    </div>
+  </details>
+</aside>
+
+<main>
+  <div id="messages">
+    <div id="welcome" class="welcome">
+      <div class="welcome-title">sandpie<span class="welcome-by">by GasN2</span></div>
+      <div class="welcome-tag">a sandboxed python AI workspace in one HTML file</div>
+      <div class="welcome-status" id="welcomeStatus"></div>
+      <div class="welcome-cta">ready when you are</div>
+    </div>
+  </div>
+  <form onsubmit="event.preventDefault(); handleSend();">
+    <textarea id="input" placeholder="Type a message…  (Enter sends, Shift+Enter for newline)" rows="1" autocomplete="off"></textarea>
+    <button id="sendBtn">Send</button>
+  </form>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const messages = [];
+const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
+$('endpoint').value = cfg.endpoint || '';
+$('model').value = cfg.model || '';
+$('apiKey').value = cfg.apiKey || '';
+$('dbxAppKey').value = cfg.dbxAppKey || '';
+$('proxyUrl').value = cfg.proxyUrl || '';
+
+marked.setOptions({ breaks: true, gfm: true });
+const renderMd = text => DOMPurify.sanitize(marked.parse(text));
+
+// Declared up here so refreshProxyDot() can read them at module init time
+// (let bindings are TDZ-bound until their declaration line runs, so they must
+// physically precede any function-init call that reads them).
+let localProxyMode = 'inactive';
+let localProxyTimer = null;
+// True once the initial Dropbox auto-pull resolves (or immediately if there's
+// no Dropbox to wait for). Used by refreshFileList / refreshConversationList
+// to distinguish "empty list" (show '(empty)') from "still loading".
+let initialSyncDone = !localStorage.getItem('dbx-tokens');
+// Hoisted up here so refreshWelcome / refreshTokenMeter / etc. can read them
+// safely at module init — `let` bindings live in TDZ until their declaration
+// line runs, and `typeof` on a TDZ-bound name throws too.
+let pyPromise = null;
+let cachedManifests = [];
+let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+
+// ============================================================
+// Routing — picks proxy or direct based on hostname + config
+// ============================================================
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+// Wrap a full URL (https://...) in whichever proxy applies, or return it untouched.
+function api(url) {
+  const stripped = url.replace(/^https?:\/\//, '');
+  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  if (remote) return remote + '/proxy/' + stripped;
+  if (isLocalhost) return '/proxy/' + stripped;
+  return url;
+}
+
+function updateRoutingHint() {
+  const remote = ($('proxyUrl').value || '').trim();
+  const hint = $('routingHint');
+  if (remote) hint.textContent = `Routing via ${remote.replace(/^https?:\/\//, '')}`;
+  else if (isLocalhost) hint.textContent = 'Routing via local /proxy/';
+  else hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
+}
+$('proxyUrl').addEventListener('input', () => { updateRoutingHint(); refreshProxyDot(); });
+updateRoutingHint();
+
+// ============================================================
+// Service status dots — header indicators for AI / Cloud / Proxy
+// ============================================================
+function setDot(id, state) {
+  const dot = $(id);
+  if (!dot) return;
+  dot.classList.remove('ok', 'warn', 'err');
+  if (state) dot.classList.add(state);
+}
+function refreshAiDot() {
+  const ok = $('endpoint').value.trim() && $('apiKey').value.trim();
+  setDot('aiDot', ok ? 'ok' : null);
+}
+function refreshProxyDot() {
+  if (localProxyMode === 'connected') return setDot('proxyDot', 'ok');
+  if (localProxyMode === 'searching') return setDot('proxyDot', 'warn');
+  if ($('proxyUrl').value.trim()) return setDot('proxyDot', 'ok');
+  setDot('proxyDot', null);
+}
+['endpoint', 'apiKey'].forEach(id => $(id).addEventListener('input', refreshAiDot));
+refreshAiDot();
+refreshProxyDot();
+
+// Open AI section on first load only when it's NOT configured yet — once green,
+// it stays out of the way until the user clicks to expand.
+if (!$('endpoint').value.trim() || !$('apiKey').value.trim()) {
+  $('aiSection').setAttribute('open', '');
+}
+
+// Autosave: any change to a config field persists immediately. No Save button.
+['endpoint', 'model', 'apiKey', 'dbxAppKey', 'proxyUrl'].forEach(id => {
+  $(id).addEventListener('input', saveConfig);
+});
+
+// ============================================================
+// Token meter — rough context-size estimate against a user-set limit.
+// Estimation is the standard ~4 chars/token heuristic; close enough to surface
+// "you're approaching the model's window" without per-tokenizer accuracy.
+// ============================================================
+const TOKEN_LIMIT_KEY = 'sandpie-token-limit';
+const DEFAULT_TOKEN_LIMIT = 200000;
+let tokenLimit = parseInt(localStorage.getItem(TOKEN_LIMIT_KEY) || '0', 10) || DEFAULT_TOKEN_LIMIT;
+
+function estimateTokens(msgs) {
+  let chars = 0;
+  for (const m of msgs) {
+    chars += String(m.content || '').length;
+    if (m.tool_calls) {
+      for (const tc of m.tool_calls) {
+        chars += String(tc.function?.name || '').length;
+        chars += String(tc.function?.arguments || '').length;
+      }
+    }
+  }
+  return Math.ceil(chars / 4);
+}
+
+function fmtTokens(n) {
+  if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k';
+  return String(n);
+}
+
+function refreshTokenMeter() {
+  const meter = $('tokenMeter');
+  if (!meter) return;
+  let used = 0;
+  try { used = estimateTokens([buildSystemPrompt(), ...messages]); }
+  catch { used = estimateTokens(messages); }
+  const ratio = tokenLimit > 0 ? used / tokenLimit : 0;
+  const pct = Math.max(0, Math.min(100, ratio * 100));
+  // Set width AND color inline so no CSS cascade can wipe them — the previous
+  // class-based approach was somehow rendering colorless on overflow.
+  const fill = $('tokenFill');
+  const color = ratio >= 0.9 ? '#f85149'        // red (incl. overflow)
+              : ratio >= 0.75 ? '#d29922'        // amber
+              : '#3fb950';                       // green
+  fill.style.width = pct + '%';
+  fill.style.backgroundColor = color;
+  fill.classList.remove('warn', 'err'); // legacy, kept only to not surprise CSS readers
+  const overflow = used > tokenLimit;
+  $('tokenLabel').textContent = overflow
+    ? `${fmtTokens(used)} / ${fmtTokens(tokenLimit)} — over by ${fmtTokens(used - tokenLimit)}`
+    : `${fmtTokens(used)} / ${fmtTokens(tokenLimit)}`;
+}
+
+function editTokenLimit() {
+  const v = prompt(`Context token limit (current: ${tokenLimit.toLocaleString()})\nClaude/GPT-4o ≈ 200k · Gemini Pro ≈ 1M · old GPT-3.5 ≈ 16k`, String(tokenLimit));
+  if (v === null) return;
+  const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
+  if (!n || n < 1000) { alert('Enter a number ≥ 1000.'); return; }
+  tokenLimit = n;
+  localStorage.setItem(TOKEN_LIMIT_KEY, String(n));
+  refreshTokenMeter();
+  refreshWelcome();
+}
+refreshTokenMeter();
+
+// Chat input: textarea that auto-grows up to a cap, with Enter-to-send /
+// Shift+Enter-to-newline behavior.
+(function setupInput() {
+  const ta = $('input');
+  if (!ta) return;
+  function autosize() {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  }
+  ta.addEventListener('input', autosize);
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      ta.form?.requestSubmit();
+    }
+  });
+  // After send() clears the value, also reset the height
+  const observer = new MutationObserver(autosize);
+  observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
+  // Reset on form submit
+  ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
+  autosize();
+})();
+
+// Mobile drawer toggle. Hamburger glyph flips ☰ ⇄ ✕ to act as the close affordance.
+function toggleSidebar() {
+  const open = document.body.classList.toggle('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = open ? '✕' : '☰';
+}
+// Close drawer when user sends a message — drawer is for config, not for the chat
+document.addEventListener('submit', () => {
+  document.body.classList.remove('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = '☰';
+});
+
+// ============================================================
+// Local proxy — download embedded serve.py, auto-detect when running
+// ============================================================
+function downloadProxy() {
+  const code = document.getElementById('serve-py-source').textContent.trim() + '\n';
+  const blob = new Blob([code], { type: 'text/x-python' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sandpie-proxy.py';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const hint = $('proxyDownloadHint');
+  if (hint) hint.textContent = 'Downloaded. From the project directory you want the AI to operate in, run: python sandpie-proxy.py — auto-connect once it\'s up.';
+}
+
+// Local proxy state machine: 'inactive' | 'searching' | 'connected'
+//   inactive  → no polling, no probes, no UI noise. Default.
+//   searching → user clicked Activate; we probe once. If found → connected.
+//               If not → show download prompt and keep probing every 3s
+//               so a freshly-started proxy auto-connects.
+//   connected → background verify every 15s; if it goes down, drop to inactive.
+// (localProxyMode and localProxyTimer are declared near the top so refreshProxyDot
+//  can read them safely at module init.)
+async function probeLocalProxy() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 800);
+  try {
+    const r = await fetch('http://localhost:8080/', { method: 'OPTIONS', signal: ctrl.signal });
+    return !!r.headers.get('access-control-allow-origin');
+  } catch { return false; }
+  finally { clearTimeout(t); }
+}
+
+function setLocalProxyUI(mode) {
+  localProxyMode = mode;
+  refreshProxyDot();
+  const btn = $('localProxyToggle');
+  const status = $('proxyStatus');
+  const prompt = $('proxyDownloadPrompt');
+  if (mode === 'inactive') {
+    btn.textContent = 'Activate local proxy';
+    btn.disabled = false;
+    status.style.display = 'none';
+    prompt.style.display = 'none';
+    if ($('proxyUrl').value.trim() === 'http://localhost:8080') {
+      $('proxyUrl').value = '';
+      updateRoutingHint();
+    }
+  } else if (mode === 'searching') {
+    btn.textContent = 'Cancel';
+    btn.disabled = false;
+    status.textContent = 'Searching for local proxy…';
+    status.style.color = '#8b949e';
+    status.style.display = '';
+    prompt.style.display = 'none';
+  } else if (mode === 'connected') {
+    btn.textContent = 'Deactivate';
+    btn.disabled = false;
+    status.textContent = '✓ Local proxy connected';
+    status.style.color = '#3fb950';
+    status.style.display = '';
+    prompt.style.display = 'none';
+    if (!$('proxyUrl').value.trim()) {
+      $('proxyUrl').value = 'http://localhost:8080';
+      updateRoutingHint();
+    }
+  }
+}
+
+function showDownloadPrompt() {
+  $('proxyStatus').style.display = 'none';
+  $('proxyDownloadPrompt').style.display = '';
+  $('localProxyToggle').textContent = 'Cancel';
+  $('proxyDownloadHint').textContent = '';
+}
+
+function startLocalProxyTimer(intervalMs, onAlive, onDead) {
+  if (localProxyTimer) clearInterval(localProxyTimer);
+  localProxyTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const alive = await probeLocalProxy();
+    if (alive) onAlive(); else if (onDead) onDead();
+  }, intervalMs);
+}
+
+async function toggleLocalProxy() {
+  if (localProxyMode === 'inactive') {
+    setLocalProxyUI('searching');
+    if (await probeLocalProxy()) {
+      setLocalProxyUI('connected');
+      startLocalProxyTimer(15000, () => {}, () => {
+        if (localProxyMode === 'connected') {
+          addMsg('info', 'Local proxy disconnected.');
+          if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+          setLocalProxyUI('inactive');
+        }
+      });
+    } else {
+      showDownloadPrompt();
+      // keep probing — user is presumably about to start it
+      startLocalProxyTimer(3000, () => {
+        if (localProxyMode === 'searching') {
+          if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+          setLocalProxyUI('connected');
+          startLocalProxyTimer(15000, () => {}, () => {
+            if (localProxyMode === 'connected') {
+              addMsg('info', 'Local proxy disconnected.');
+              if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+              setLocalProxyUI('inactive');
+            }
+          });
+        }
+      });
+    }
+  } else {
+    if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
+    setLocalProxyUI('inactive');
+  }
+}
+
+// ============================================================
+// OPFS — nested filesystem (paths use forward slashes)
+// ============================================================
+function splitPath(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  const name = parts.pop();
+  return { parts, name };
+}
+
+const opfs = {
+  async root() { return await navigator.storage.getDirectory(); },
+
+  // Resolve a directory by its parts. If create=true, create missing segments.
+  async resolveDir(parts, { create = false } = {}) {
+    let dir = await this.root();
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
+    return dir;
+  },
+
+  async read(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return await (await handle.getFile()).text();
+  },
+
+  async write(path, content) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts, { create: true });
+    const handle = await dir.getFileHandle(name, { create: true });
+    const w = await handle.createWritable();
+    await w.write(content);
+    await w.close();
+  },
+
+  async remove(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    await dir.removeEntry(name, { recursive: true });
+  },
+
+  async mkdir(path) {
+    const parts = String(path).split('/').filter(Boolean);
+    await this.resolveDir(parts, { create: true });
+  },
+
+  // Entries at one directory level (for browsing).
+  async listDir(path = '') {
+    const parts = String(path).split('/').filter(Boolean);
+    const dir = await this.resolveDir(parts);
+    const out = [];
+    for await (const [n, h] of dir.entries()) out.push({ name: n, kind: h.kind });
+    return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
+  },
+
+  // Recursive flat list of all files (paths joined by '/').
+  async list(prefix = '') {
+    const out = [];
+    const walk = async (dir, p) => {
+      for await (const [n, h] of dir.entries()) {
+        const full = p ? `${p}/${n}` : n;
+        if (h.kind === 'file') out.push(full);
+        else await walk(h, full);
+      }
+    };
+    const startParts = String(prefix).split('/').filter(Boolean);
+    const start = await this.resolveDir(startParts);
+    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
+    return out.sort();
+  },
+
+  // Recursive list of all entries (files + dirs).
+  async listAll(prefix = '') {
+    const out = [];
+    const walk = async (dir, p) => {
+      for await (const [n, h] of dir.entries()) {
+        const full = p ? `${p}/${n}` : n;
+        out.push({ path: full, kind: h.kind });
+        if (h.kind === 'directory') await walk(h, full);
+      }
+    };
+    const startParts = String(prefix).split('/').filter(Boolean);
+    const start = await this.resolveDir(startParts);
+    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
+    return out;
+  },
+};
+
+// ============================================================
+// Dropbox — OAuth2 PKCE + REST API via /proxy
+// ============================================================
+const DBX_REDIRECT = location.origin + location.pathname;
+
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function pkceChallenge() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return { verifier, challenge: b64url(hash) };
+}
+
+function dbxStatus(text, kind) {
+  const el = $('dbxStatus');
+  el.textContent = text;
+  el.className = 'dbx-status ' + kind;
+  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
+  const btn = $('dbxToggleBtn');
+  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
+  if (typeof refreshWelcome === 'function') refreshWelcome();
+}
+
+function dbxToggleConnection() {
+  if (dbxTokens()) dbxDisconnect();
+  else dbxConnect();
+}
+
+function dbxTokens() {
+  return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+}
+
+async function dbxAccessToken() {
+  const stored = dbxTokens();
+  if (!stored) throw new Error('Dropbox not connected');
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  // refresh
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: stored.refresh_token,
+    client_id: stored.app_key,
+  });
+  const res = await fetch(api('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
+  const data = await res.json();
+  stored.access_token = data.access_token;
+  stored.expires_at = Date.now() + data.expires_in * 1000;
+  localStorage.setItem('dbx-tokens', JSON.stringify(stored));
+  return data.access_token;
+}
+
+async function dbxConnect() {
+  const appKey = $('dbxAppKey').value.trim();
+  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
+  saveConfig();
+  const { verifier, challenge } = await pkceChallenge();
+  sessionStorage.setItem('dbx-verifier', verifier);
+  sessionStorage.setItem('dbx-app-key', appKey);
+  const params = new URLSearchParams({
+    client_id: appKey,
+    response_type: 'code',
+    redirect_uri: DBX_REDIRECT,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    token_access_type: 'offline',
+  });
+  location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
+}
+
+function dbxDisconnect() {
+  localStorage.removeItem('dbx-tokens');
+  localStorage.removeItem('dbx-index');
+  dbxStatus('Not connected', 'disconnected');
+  refreshFileList();
+}
+
+async function dbxExchangeCode(code) {
+  const verifier = sessionStorage.getItem('dbx-verifier');
+  const appKey = sessionStorage.getItem('dbx-app-key');
+  if (!verifier || !appKey) throw new Error('Missing PKCE state');
+  const body = new URLSearchParams({
+    code,
+    grant_type: 'authorization_code',
+    client_id: appKey,
+    code_verifier: verifier,
+    redirect_uri: DBX_REDIRECT,
+  });
+  const res = await fetch(api('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Code exchange failed: ' + await res.text());
+  const data = await res.json();
+  localStorage.setItem('dbx-tokens', JSON.stringify({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Date.now() + data.expires_in * 1000,
+    app_key: appKey,
+  }));
+  sessionStorage.removeItem('dbx-verifier');
+  sessionStorage.removeItem('dbx-app-key');
+}
+
+async function dbxApi(path, body) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://api.dropboxapi.com' + path), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+async function dbxList(folderPath, { recursive = false } = {}) {
+  let data = await dbxApi('/2/files/list_folder', {
+    path: folderPath === '/' ? '' : folderPath,
+    recursive,
+  });
+  let entries = data.entries.slice();
+  while (data.has_more) {
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+  }
+  return entries.map(e => ({ name: e.name, kind: e['.tag'], path: e.path_display }));
+}
+
+async function dbxDownload(path) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://content.dropboxapi.com/2/files/download'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Content-Type': 'text/plain',
+    },
+  });
+  if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
+  return await res.text();
+}
+
+async function dbxUpload(path, content) {
+  const token = await dbxAccessToken();
+  const res = await fetch(api('https://content.dropboxapi.com/2/files/upload'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+}
+
+async function dbxDelete(path) {
+  // Dropbox delete_v2; tolerates already-gone paths so a sync after a
+  // local move doesn't break if the cloud copy was already removed.
+  try {
+    return await dbxApi('/2/files/delete_v2', { path });
+  } catch (e) {
+    if (String(e.message).includes('not_found')) return null;
+    throw e;
+  }
+}
+
+// ----- Sync state helpers -----
+function dbxIndex() { return JSON.parse(localStorage.getItem('dbx-index') || '{}'); }
+function setDbxIndex(idx) { localStorage.setItem('dbx-index', JSON.stringify(idx)); }
+function manifest() { return JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}'); }
+function setManifest(m) { localStorage.setItem('opfs-sync-manifest', JSON.stringify(m)); }
+
+async function opfsLastModified(relPath) {
+  try {
+    const { parts, name } = splitPath(relPath);
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return (await handle.getFile()).lastModified;
+  } catch { return 0; }
+}
+
+// Re-list one Dropbox folder (recursively) and merge into the local index.
+async function refreshDbxIndex(basePath) {
+  const folder = basePath ? '/' + basePath : '/';
+  const entries = await dbxList(folder, { recursive: true });
+  const idx = dbxIndex();
+  // Drop everything currently indexed under this base, then re-add fresh.
+  const baseLower = basePath.toLowerCase();
+  for (const k of Object.keys(idx)) {
+    const kl = k.toLowerCase();
+    if (!baseLower) delete idx[k];
+    else if (kl === baseLower || kl.startsWith(baseLower + '/')) delete idx[k];
+  }
+  for (const e of entries) {
+    const rel = e.path.replace(/^\/+/, '');
+    if (!rel) continue;
+    idx[rel] = { kind: e.kind, dbxPath: e.path };
+  }
+  setDbxIndex(idx);
+}
+
+// Bidirectional sync of the current folder's subtree:
+//   • upload files that are local-only or modified since last sync
+//   • download files that are cloud-only
+// Refreshes the file list after each file so dots flip from local/cloud → synced
+// progressively rather than at the very end.
+async function syncCurrent() {
+  if (!dbxTokens()) { dbxStatus('Not connected', 'error'); return; }
+  const btn = $('syncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+  const basePath = opfsCurrentPath();
+  try {
+    dbxStatus('Syncing…', 'connected');
+    await refreshDbxIndex(basePath);
+
+    const idx = dbxIndex();
+    const m = manifest();
+    let pushed = 0, pulled = 0;
+
+    // PUSH
+    const opfsRels = await opfs.list(basePath);
+    for (const rel of opfsRels) {
+      const fullKey = basePath ? basePath + '/' + rel : rel;
+      const lastMod = await opfsLastModified(fullKey);
+      if (m[fullKey] && lastMod <= m[fullKey]) continue;
+      dbxStatus(`↑ ${rel}`, 'connected');
+      const content = await opfs.read(fullKey);
+      const dbxPath = '/' + fullKey;
+      await dbxUpload(dbxPath, content);
+      m[fullKey] = lastMod;
+      idx[fullKey] = { kind: 'file', dbxPath };
+      setManifest(m);
+      setDbxIndex(idx);
+      await refreshFileList();
+      pushed++;
+    }
+
+    // PULL / DELETE
+    // For each cloud file: if missing locally, the manifest tells us why.
+    //   manifest has it → it was synced before, then deleted locally (likely
+    //                     a tool move/delete) → propagate the delete to Dropbox.
+    //   manifest doesn't → never synced → pull it down.
+    let deleted = 0;
+    for (const [key, val] of Object.entries(idx)) {
+      if (val.kind !== 'file') continue;
+      const kl = key.toLowerCase();
+      const bl = basePath.toLowerCase();
+      if (bl && !kl.startsWith(bl + '/') && kl !== bl) continue;
+      let exists = false;
+      try { await opfs.read(key); exists = true; } catch {}
+      if (exists) continue;
+      if (m[key]) {
+        dbxStatus(`× ${key}`, 'connected');
+        await dbxDelete(val.dbxPath || ('/' + key));
+        delete idx[key];
+        delete m[key];
+        setManifest(m);
+        setDbxIndex(idx);
+        await refreshFileList();
+        deleted++;
+      } else {
+        dbxStatus(`↓ ${key}`, 'connected');
+        const content = await dbxDownload(val.dbxPath || ('/' + key));
+        await opfs.write(key, content);
+        m[key] = await opfsLastModified(key);
+        setManifest(m);
+        await refreshFileList();
+        pulled++;
+      }
+    }
+
+    setManifest(m);
+    setDbxIndex(idx);
+    await refreshFileList();
+    const summary = `Sync done: ↑${pushed} ↓${pulled}` + (deleted ? ` ×${deleted}` : '');
+    dbxStatus(summary, 'connected');
+  } catch (e) {
+    dbxStatus('Sync failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sync'; }
+  }
+}
+
+// Periodic poll while connected: pull cloud-only files in the background so
+// new conversations / files added from another device show up without manual
+// action. Pulls only — never pushes (matches autoSyncOnLoad's policy).
+async function cloudPollTick() {
+  if (!dbxTokens() || document.hidden) return;
+  try {
+    await refreshDbxIndex('');
+    const idx = dbxIndex();
+    const m = manifest();
+    let pulled = 0;
+    for (const [key, val] of Object.entries(idx)) {
+      if (val.kind !== 'file') continue;
+      let exists = false;
+      try { await opfs.read(key); exists = true; } catch {}
+      if (!exists) {
+        // Skip files we previously synced and have since been deleted locally
+        // — re-pulling would undo a tool move/delete. The next explicit Sync
+        // is what propagates the deletion to Dropbox.
+        if (m[key]) continue;
+        const content = await dbxDownload(val.dbxPath || ('/' + key));
+        await opfs.write(key, content);
+        m[key] = await opfsLastModified(key);
+        pulled++;
+      } else if (!m[key]) {
+        m[key] = await opfsLastModified(key);
+      }
+    }
+    if (pulled > 0) {
+      setManifest(m);
+      await refreshFileList();
+      await refreshConversationList();
+    }
+  } catch { /* silent — don't spam on poll errors */ }
+}
+setInterval(cloudPollTick, 60000);
+
+// On page load (when already authenticated), pull anything that exists in the
+// cloud but not in OPFS, and write baseline manifest entries for files that
+// exist on both sides without any baseline yet. Never pushes — local creations
+// and modifications stay under user control via the explicit Sync button.
+async function autoSyncOnLoad() {
+  if (!dbxTokens()) return;
+  try {
+    dbxStatus('Auto-pull…', 'connected');
+    await refreshDbxIndex('');
+    const idx = dbxIndex();
+    const m = manifest();
+    let pulled = 0, baselined = 0;
+    for (const [key, val] of Object.entries(idx)) {
+      if (val.kind !== 'file') continue;
+      let exists = false;
+      try { await opfs.read(key); exists = true; } catch {}
+      if (!exists) {
+        // Same rule as cloudPollTick: don't re-pull files we previously synced
+        // and have since deleted locally. Explicit Sync propagates the delete.
+        if (m[key]) continue;
+        dbxStatus(`↓ ${key}`, 'connected');
+        const content = await dbxDownload(val.dbxPath || ('/' + key));
+        await opfs.write(key, content);
+        m[key] = await opfsLastModified(key);
+        setManifest(m);
+        await refreshFileList();
+        pulled++;
+      } else if (!m[key]) {
+        m[key] = await opfsLastModified(key);
+        baselined++;
+      }
+    }
+    setManifest(m);
+    dbxStatus(pulled ? `Connected · pulled ${pulled}` : 'Connected', 'connected');
+  } catch (e) {
+    dbxStatus('Auto-pull failed: ' + e.message, 'error');
+  } finally {
+    initialSyncDone = true;
+    await refreshFileList();
+    await refreshConversationList();
+  }
+}
+
+function joinPath(folder, name) {
+  if (folder === '/' || folder === '') return '/' + name;
+  return folder.replace(/\/$/, '') + '/' + name;
+}
+
+// Handle OAuth redirect-back (?code=…) on page load
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (code) {
+    try {
+      await dbxExchangeCode(code);
+      history.replaceState({}, '', location.pathname);
+      dbxStatus('Connected', 'connected');
+      await autoSyncOnLoad();
+    } catch (e) {
+      dbxStatus('Auth failed: ' + e.message, 'error');
+    }
+  } else if (dbxTokens()) {
+    dbxStatus('Connected', 'connected');
+    await autoSyncOnLoad();
+  }
+})();
+
+// ============================================================
+// Pyodide — lazy-loaded Python runtime (pyPromise hoisted near the top)
+// ============================================================
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function getPy() {
+  if (pyPromise) return pyPromise;
+  pyPromise = (async () => {
+    await loadScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    const p = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+    try { p.FS.mkdir('/files'); } catch {}
+    return p;
+  })();
+  return pyPromise;
+}
+
+// Wipe Pyodide's /files dir, copy the entire OPFS tree into it (with subdirs).
+async function syncOpfsToPy(p) {
+  const rmTree = (full) => {
+    let stat;
+    try { stat = p.FS.stat(full); } catch { return; }
+    if (p.FS.isDir(stat.mode)) {
+      for (const name of p.FS.readdir(full)) {
+        if (name === '.' || name === '..') continue;
+        rmTree(full + '/' + name);
+      }
+      if (full !== '/files') p.FS.rmdir(full);
+    } else {
+      p.FS.unlink(full);
+    }
+  };
+  rmTree('/files');
+  try { p.FS.mkdir('/files'); } catch {}
+
+  for (const rel of await opfs.list()) {
+    const segs = rel.split('/');
+    const fileName = segs.pop();
+    let cur = '/files';
+    for (const s of segs) {
+      cur += '/' + s;
+      try { p.FS.mkdir(cur); } catch {}
+    }
+    p.FS.writeFile(cur + '/' + fileName, await opfs.read(rel));
+  }
+}
+
+// Mirror Pyodide's /files (recursively) back to OPFS.
+async function syncPyToOpfs(p) {
+  const pyFiles = new Set();
+  const walk = (full, rel) => {
+    for (const name of p.FS.readdir(full)) {
+      if (name === '.' || name === '..') continue;
+      const childFull = full + '/' + name;
+      const childRel = rel ? rel + '/' + name : name;
+      const stat = p.FS.stat(childFull);
+      if (p.FS.isFile(stat.mode)) pyFiles.add(childRel);
+      else walk(childFull, childRel);
+    }
+  };
+  walk('/files', '');
+
+  for (const rel of pyFiles) {
+    const newContent = p.FS.readFile('/files/' + rel, { encoding: 'utf8' });
+    // Only write when content actually changed — otherwise OPFS bumps
+    // lastModified and refreshFileList flips the dot to 'modified' even
+    // though Pyodide never touched the file.
+    let oldContent = null;
+    try { oldContent = await opfs.read(rel); } catch {}
+    if (oldContent !== newContent) {
+      await opfs.write(rel, newContent);
+    }
+  }
+  for (const rel of await opfs.list()) {
+    if (!pyFiles.has(rel)) await opfs.remove(rel);
+  }
+}
+
+// ============================================================
+// Tools — backed by OPFS
+// ============================================================
+const tools = {
+  run_python: {
+    description: `Execute Python via Pyodide. The working directory is /files/ — this IS the user's persistent filesystem. Use bare relative paths (e.g. open('foo.txt')); they resolve under /files/. Anything written outside /files/ (including os.getcwd() defaults like /home/pyodide) is ephemeral and discarded after this call. Nested directories supported. Output via print(). Top-level await is supported.
+
+PACKAGES — IMPORTANT, READ THIS FIRST:
+• ~100 packages are PREBUILT for Pyodide (numpy, pandas, scipy, sympy, matplotlib, beautifulsoup4, lxml, regex, micropip, ...). Sandpie auto-loads them based on the \`import\` statements in your code, so plain \`import numpy as np\` Just Works on first call.
+• For ANY OTHER package (pure-Python wheels from PyPI), you must install it explicitly. Pattern:
+    import micropip                      # micropip itself is prebuilt — just import it
+    await micropip.install('feedparser') # name as on PyPI
+    import feedparser
+• If a first-time \`import\` fails with ModuleNotFoundError, that means it's NOT in the prebuilt set — fall back to micropip.install. Don't keep retrying the bare import.
+• Compiled C extensions that aren't in the prebuilt list cannot be installed. Pure-Python wheels only.
+
+HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, route through \`/proxy/<host>/<path>\`.
+
+No raw sockets, no subprocess.
+
+Examples:
+  list    →  import os; print(os.listdir())               # lists /files
+  read    →  print(open('notes.txt').read())
+  write   →  open('out.md','w').write(text)
+  edit    →  p='notes.txt'; open(p,'w').write(open(p).read().replace('old','new'))
+  search  →  import re, glob
+             for f in glob.glob('**/*', recursive=True):
+                 if not __import__('os').path.isfile(f): continue
+                 hits = re.findall(r'TODO.*', open(f).read())
+                 if hits: print(f, hits)
+  numpy   →  import numpy as np                           # prebuilt, auto-loaded
+             print(np.array([1,2,3]).mean())
+  pypi    →  import micropip
+             await micropip.install('feedparser')
+             import feedparser
+             print(feedparser.parse('https://news.ycombinator.com/rss').entries[0].title)
+  fetch   →  from pyodide.http import pyfetch
+             r = await pyfetch('https://httpbin.org/html')
+             print((await r.string())[:200])
+  noCORS  →  r = await pyfetch('/proxy/example.com/')     # site lacks CORS: route via local proxy
+             print((await r.string())[:200])`,
+    parameters: { type: 'object', properties: { code: { type: 'string', description: 'Python source to execute' } }, required: ['code'] },
+    run: async ({ code }) => {
+      let loadingMsg = null;
+      if (!pyPromise) loadingMsg = addMsg('info', '⏳ Loading Pyodide (~10MB, first call only)…');
+      let p;
+      try { p = await getPy(); }
+      catch (e) { loadingMsg?.remove(); return 'Error loading Pyodide: ' + e.message; }
+      loadingMsg?.remove();
+
+      let stdout = '', stderr = '';
+      p.setStdout({ batched: s => stdout += s + '\n' });
+      p.setStderr({ batched: s => stderr += s + '\n' });
+      try {
+        await syncOpfsToPy(p);
+        // Pin working directory to /files so bare relative paths land in OPFS,
+        // and so os.getcwd() reports the user's filesystem, not /home/pyodide.
+        p.runPython('import os; os.chdir("/files")');
+        // Auto-load any prebuilt Pyodide packages referenced by `import` lines
+        // (numpy, pandas, beautifulsoup4, micropip, …). Without this the LLM
+        // hits ModuleNotFoundError for ~100 packages that are otherwise free.
+        try { await p.loadPackagesFromImports(code); } catch {}
+        await p.runPythonAsync(code);
+        await syncPyToOpfs(p);
+        await refreshFileList();
+        let out = stdout.trimEnd();
+        if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+        return out || '(no output)';
+      } catch (e) {
+        const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
+        return `Error: ${e.message}${tail}`;
+      } finally {
+        p.setStdout({});
+        p.setStderr({});
+      }
+    },
+  },
+  shell: {
+    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user to click "Download proxy" and run "python sandpie-proxy.py". Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
+
+AVOID filesystem-wide recursive searches like \`dir /s C:\\\` or \`find / -name X\` — they take many minutes, will hit the timeout, and produce nothing useful. If you don't know where a file is, ASK the user for the project path before searching, or check pwd / ls of likely candidates.
+
+Examples:
+  pwd       →  {"cmd": "pwd"}                              # always run first if cwd unknown
+  list      →  {"cmd": "ls -la"}
+  git       →  {"cmd": "git status"}
+  build     →  {"cmd": "npm run build", "timeout": 120}
+  find good →  {"cmd": "find . -name 'config.*' -maxdepth 4"}    # scoped to current dir, depth-limited
+  find bad  →  DON'T:  {"cmd": "find / -name 'foo'"}             # will hang and be killed`,
+    parameters: {
+      type: 'object',
+      properties: {
+        cmd: { type: 'string', description: 'Shell command to execute' },
+        cwd: { type: 'string', description: 'Working directory (optional)' },
+        timeout: { type: 'integer', description: 'Timeout in seconds (default 30, max 120)' },
+      },
+      required: ['cmd'],
+    },
+    run: async ({ cmd, cwd, timeout }) => {
+      const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const base = remote || (isLocal ? '' : null);
+      if (base === null) return 'Error: shell requires the local proxy. Click "Download proxy" in the sidebar, run "python sandpie-proxy.py", then retry.';
+      try {
+        const payload = { cmd };
+        if (cwd) payload.cwd = cwd;
+        if (timeout) payload.timeout = timeout;
+        const res = await fetch(base + '/shell', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) return `Error ${res.status}: ${data.error || 'unknown'}`;
+        let out = (data.stdout || '').trimEnd();
+        const err = (data.stderr || '').trimEnd();
+        if (err) out += (out ? '\n' : '') + '--- stderr ---\n' + err;
+        out += `\n--- exit ${data.code} (cwd: ${data.cwd}) ---`;
+        return out;
+      } catch (e) {
+        return `Error: ${e.message}`;
+      }
+    },
+  },
+};
+
+function isShellAvailable() {
+  if (localProxyMode === 'connected') return true;
+  const remote = ($('proxyUrl').value || '').trim();
+  if (remote && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(remote)) return true;
+  if (!remote && isLocalhost) return true;
+  return false;
+}
+
+const toolDefs = () => Object.entries(tools)
+  .filter(([name]) => name !== 'shell' || isShellAvailable())
+  .map(([name, t]) => ({
+    type: 'function',
+    function: { name, description: t.description, parameters: t.parameters },
+  }));
+
+// ============================================================
+// Context manifests — sandpie_*.md files anywhere in OPFS get auto-loaded
+// into the system prompt. Convention: a manifest is a short markdown note
+// describing what's in its folder and pointing at other key docs (skills,
+// prompts, project READMEs). LLM gets oriented without searching.
+// ============================================================
+const MANIFEST_PATTERN = /^sandpie_.*\.md$/i;
+const MANIFEST_CONTENT_CAP = 2048; // chars per manifest, post-truncation
+// cachedManifests hoisted near the top
+
+async function gatherSandpieManifests() {
+  const out = [];
+  async function walk(path) {
+    let entries = [];
+    try { entries = await opfs.listDir(path); } catch { return; }
+    for (const e of entries) {
+      const full = path ? `${path}/${e.name}` : e.name;
+      if (e.kind === 'directory') {
+        // Skip private app folders to keep scan cheap and context clean
+        if (full === '_conversations' || full.startsWith('_conversations/')) continue;
+        await walk(full);
+      } else if (MANIFEST_PATTERN.test(e.name)) {
+        try {
+          const content = String(await opfs.read(full));
+          out.push({
+            path: full,
+            content: content.length > MANIFEST_CONTENT_CAP
+              ? content.slice(0, MANIFEST_CONTENT_CAP) + `\n…[truncated, full size ${content.length} chars]`
+              : content,
+          });
+        } catch {}
+      }
+    }
+  }
+  await walk('');
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+async function refreshManifests() {
+  cachedManifests = await gatherSandpieManifests();
+  refreshTokenMeter();
+  refreshWelcome();
+}
+
+// Built fresh on every request so it reflects the current state of Dropbox/proxy/shell.
+function buildSystemPrompt() {
+  const dbxConnected = !!dbxTokens();
+  const proxyUrl = ($('proxyUrl').value || '').trim();
+  const shellOk = isShellAvailable();
+
+  const lines = [
+    'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
+    '',
+    '# Tools',
+    '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
+  ];
+  if (shellOk) {
+    lines.push(`- shell: Run shell commands on the user's machine via the local proxy. Default cwd is the directory where the proxy was started. Be careful with destructive commands; ask before running anything that could lose data.`);
+  }
+
+  lines.push('', '# Environment');
+  lines.push(`- Cloud sync (Dropbox): ${dbxConnected ? 'connected. The user can sync /files/ ↔ Dropbox via UI buttons. You don\'t call Dropbox directly — read/write OPFS via run_python and the user controls the sync.' : 'not connected. The user can connect from the sidebar Cloud sync panel if they want offsite backup.'}`);
+  if (proxyUrl) {
+    lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
+  }
+  if (!shellOk) {
+    lines.push('- Shell: not available. Don\'t suggest running shell commands. If the user wants you to run commands on their machine, point them to "Activate local proxy" in the sidebar.');
+  }
+
+  lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
+
+  // Context manifests
+  lines.push('', '# Context manifests (sandpie_*.md)');
+  lines.push('Convention: any file matching `sandpie_*.md` anywhere under /files/ is auto-loaded below as orientation context. A manifest should be a short markdown note that describes what\'s in its folder and *points at* other important docs (skills, prompts, project READMEs) by relative path — read those with run_python when relevant. If the user starts a project without one, suggest creating /files/sandpie_overview.md as an entry point.');
+  if (cachedManifests.length) {
+    lines.push('', `Loaded manifests (${cachedManifests.length}):`);
+    for (const m of cachedManifests) {
+      lines.push('', `## /files/${m.path}`);
+      lines.push(m.content);
+    }
+  } else {
+    lines.push('', 'No sandpie_*.md files exist yet.');
+  }
+
+  lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
+  return { role: 'system', content: lines.join('\n') };
+}
+
+// ============================================================
+// OPFS file-list UI
+// ============================================================
+function opfsCurrentPath() {
+  return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
+}
+
+function opfsJoin(base, child) {
+  return base ? base + '/' + child : child;
+}
+
+async function refreshFileList() {
+  const ul = $('fileList');
+  const path = opfsCurrentPath();
+
+  // OPFS entries at this level (may be empty if dir doesn't exist locally)
+  let opfsList = [];
+  try { opfsList = await opfs.listDir(path); } catch {}
+  const localMap = new Map();
+  for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
+
+  // Direct children at this level from the cached Dropbox index. We also
+  // derive folder presence from any deeper entry — Dropbox doesn't have a
+  // "create empty folder" primitive, so a freshly-pushed file at /a/b/c.txt
+  // implies /a/ exists remotely even if no explicit folder entry was added.
+  const idx = dbxIndex();
+  const prefix = path ? path + '/' : '';
+  const remoteMap = new Map();
+  for (const [k, v] of Object.entries(idx)) {
+    const kl = k.toLowerCase();
+    if (!kl.startsWith(prefix.toLowerCase())) continue;
+    const rest = k.slice(prefix.length);
+    if (!rest) continue;
+    if (rest.includes('/')) {
+      const firstSeg = rest.split('/')[0];
+      if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+    } else {
+      remoteMap.set(rest, v.kind === 'folder' ? 'folder' : 'file');
+    }
+  }
+
+  const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  // Build new content into a fragment so the list never goes empty mid-refresh
+  // — otherwise mid-sync refreshes cause the panel to collapse and reflow.
+  const frag = document.createDocumentFragment();
+  if (!names.size) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = initialSyncDone ? '(empty)' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+
+  const m = manifest();
+  const items = [];
+  for (const name of names) {
+    const local = localMap.get(name);
+    const remote = remoteMap.get(name);
+    const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
+    const fullKey = opfsJoin(path, name);
+
+    let status = 'synced';
+    if (kind === 'folder') {
+      status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+    } else if (!local) {
+      status = 'cloud';
+    } else if (!remote) {
+      status = 'local';
+    } else if (!m[fullKey]) {
+      // No baseline yet — first time we've seen this file on both sides.
+      // Trust-on-first-use: assume synced. autoSyncOnLoad / syncCurrent will
+      // write a baseline so future edits flip to 'modified' correctly.
+      status = 'synced';
+    } else {
+      const lastMod = await opfsLastModified(fullKey);
+      status = lastMod <= m[fullKey] ? 'synced' : 'modified';
+    }
+    items.push({ name, kind, status, fullKey });
+  }
+  items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+  if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
+  // Re-scan manifests when the file tree changes — keeps system-prompt context current.
+  refreshManifests();
+
+  for (const it of items) {
+    const li = document.createElement('li');
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + it.status;
+    dot.title = it.status;
+    const span = document.createElement('span');
+    span.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+    const kindIcon = it.kind === 'folder' ? '📁 ' : '📄 ';
+    span.textContent = kindIcon + it.name;
+    span.title = `${it.kind} · ${it.status}`;
+    if (it.kind === 'folder') {
+      span.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
+    }
+    li.append(dot, span);
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      showContextMenu(ev.clientX, ev.clientY, [
+        { label: 'Delete', danger: true, action: async () => {
+          const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
+          const dbxNote = dbxTokens()
+            ? ' Next sync will also remove the Dropbox copy.'
+            : '';
+          if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
+          // Leave the manifest entry alone — that way the next sync sees the
+          // file as "was synced, now missing locally" and propagates the
+          // deletion to Dropbox. Removing from the manifest here would make
+          // the next sync treat it as never-synced and re-pull it.
+          try { await opfs.remove(it.fullKey); } catch {}
+          await refreshFileList();
+        }},
+      ]);
+    });
+    frag.appendChild(li);
+  }
+  ul.replaceChildren(frag);
+}
+
+let activeCtxMenu = null;
+function closeCtxMenu() { activeCtxMenu?.remove(); activeCtxMenu = null; }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
+window.addEventListener('blur', closeCtxMenu);
+
+function showContextMenu(x, y, items) {
+  closeCtxMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  for (const item of items) {
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    if (item.danger) btn.className = 'danger';
+    btn.onclick = (e) => { e.stopPropagation(); closeCtxMenu(); item.action(); };
+    menu.appendChild(btn);
+  }
+  document.body.appendChild(menu);
+  // Clamp into viewport
+  const r = menu.getBoundingClientRect();
+  const px = Math.min(x, window.innerWidth - r.width - 4);
+  const py = Math.min(y, window.innerHeight - r.height - 4);
+  menu.style.left = Math.max(0, px) + 'px';
+  menu.style.top = Math.max(0, py) + 'px';
+  activeCtxMenu = menu;
+}
+
+function opfsUp() {
+  const cur = ($('opfsPath').value || '').trim() || '/';
+  if (cur === '/' || cur === '') return;
+  $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
+  refreshFileList();
+}
+
+$('opfsPath').addEventListener('change', refreshFileList);
+$('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
+
+// Drag & drop uploads — handles files and (Chromium-only) folders.
+async function uploadEntry(entry, dirPath) {
+  if (entry.isFile) {
+    const file = await new Promise(r => entry.file(r));
+    await opfs.write(opfsJoin(dirPath, entry.name), await file.text());
+  } else if (entry.isDirectory) {
+    const sub = opfsJoin(dirPath, entry.name);
+    const reader = entry.createReader();
+    while (true) {
+      const batch = await new Promise(r => reader.readEntries(r));
+      if (!batch.length) break;
+      for (const child of batch) await uploadEntry(child, sub);
+    }
+  }
+}
+
+(() => {
+  const list = $('fileList');
+  list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
+  list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
+  list.addEventListener('drop', async e => {
+    e.preventDefault();
+    list.classList.remove('drag-over');
+    const path = opfsCurrentPath();
+    const items = Array.from(e.dataTransfer.items || []);
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) await uploadEntry(entry, path);
+    }
+    // Fallback for browsers without webkitGetAsEntry
+    if (!items.length) {
+      for (const f of e.dataTransfer.files) {
+        await opfs.write(opfsJoin(path, f.name), await f.text());
+      }
+    }
+    await refreshFileList();
+  });
+})();
+
+refreshFileList();
+// Restore the last active conversation (if any) and render its history.
+(async () => {
+  await refreshConversationList();
+  if (activeConvId) {
+    try {
+      const data = JSON.parse(await opfs.read(convPath(activeConvId)));
+      for (const m of data.messages || []) {
+        messages.push(m);
+        renderHistoricalMessage(m);
+      }
+    } catch { /* file may not exist yet — that's fine */ }
+  }
+  refreshTokenMeter();
+  refreshWelcome();
+})();
+
+// ============================================================
+// Config / chat
+// ============================================================
+function saveConfig() {
+  localStorage.setItem('opencode-config', JSON.stringify({
+    endpoint: $('endpoint').value,
+    model: $('model').value,
+    apiKey: $('apiKey').value,
+    dbxAppKey: $('dbxAppKey').value,
+    proxyUrl: $('proxyUrl').value,
+  }));
+}
+
+function isAtBottom(el, slack = 60) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < slack;
+}
+
+function addMsg(role, text = '') {
+  const m = $('messages');
+  const stick = isAtBottom(m);
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+  m.appendChild(div);
+  // Only auto-scroll if the user was already near the bottom — otherwise leave
+  // them where they are so they can read history without getting yanked back.
+  if (stick) div.scrollIntoView({ block: 'end' });
+  return div;
+}
+
+// ============================================================
+// Conversations — auto-saved to OPFS, sync to Dropbox like any file
+// ============================================================
+const CONV_DIR = '_conversations';
+// activeConvId hoisted near the top
+
+function newConvId() {
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+}
+function convPath(id) { return `${CONV_DIR}/${id}.json`; }
+
+async function ensureActiveConv() {
+  if (activeConvId) return;
+  activeConvId = newConvId();
+  localStorage.setItem('sandpie-active-conv', activeConvId);
+}
+
+async function saveActiveConv() {
+  if (!activeConvId || !messages.length) return;
+  const firstUser = messages.find(m => m.role === 'user');
+  const title = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
+  const data = { id: activeConvId, title, updated: new Date().toISOString(), messages };
+  await opfs.write(convPath(activeConvId), JSON.stringify(data));
+  await refreshConversationList();
+}
+
+function renderHistoricalMessage(m) {
+  if (m.role === 'user') {
+    addMsg('user', m.content);
+  } else if (m.role === 'assistant') {
+    if (m.content) {
+      const div = addMsg('assistant');
+      div.innerHTML = renderMd(m.content);
+    }
+    if (m.tool_calls) {
+      for (const tc of m.tool_calls) {
+        let args = tc.function.arguments;
+        try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
+        addMsg('tool-call', `→ ${tc.function.name}(${args})`);
+      }
+    }
+  } else if (m.role === 'tool') {
+    const t = String(m.content || '');
+    addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`);
+  }
+}
+
+function clearMessagesUI() {
+  // Remove message bubbles, tool calls, info/err messages — but preserve the
+  // #welcome card so it can be re-shown for fresh conversations.
+  const host = $('messages');
+  for (const child of [...host.children]) {
+    if (child.id !== 'welcome') child.remove();
+  }
+}
+
+async function loadConv(id) {
+  if (id === activeConvId && messages.length) return;
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); }
+  catch (e) { addMsg('err', 'Failed to load conversation: ' + e.message); return; }
+  messages.length = 0;
+  clearMessagesUI();
+  for (const m of data.messages || []) {
+    messages.push(m);
+    renderHistoricalMessage(m);
+  }
+  activeConvId = id;
+  localStorage.setItem('sandpie-active-conv', id);
+  await refreshConversationList();
+  refreshTokenMeter();
+  document.body.classList.remove('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = '☰';
+}
+
+async function newConversation() {
+  await saveActiveConv();
+  activeConvId = newConvId();
+  localStorage.setItem('sandpie-active-conv', activeConvId);
+  messages.length = 0;
+  clearMessagesUI();
+  await refreshConversationList();
+  refreshTokenMeter();
+  refreshWelcome();
+}
+
+async function listConversations() {
+  let entries = [];
+  try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
+  const out = [];
+  for (const e of entries) {
+    if (e.kind !== 'file' || !e.name.endsWith('.json')) continue;
+    const id = e.name.slice(0, -5);
+    try {
+      const data = JSON.parse(await opfs.read(convPath(id)));
+      out.push({ id: data.id || id, title: data.title || '(no title)', updated: data.updated || '' });
+    } catch {}
+  }
+  return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+}
+
+function refreshNewChatButton() {
+  const btn = $('newChatBtn');
+  if (!btn) return;
+  const empty = messages.length === 0;
+  btn.disabled = empty;
+  btn.title = empty ? "Already a fresh chat — just start typing below." : '';
+}
+
+// Show a welcome card in the messages area when the chat is empty — disappears
+// the moment the user sends a message (or loads a conversation with history).
+function refreshWelcome() {
+  const w = $('welcome');
+  if (!w) return;
+  const empty = messages.length === 0;
+  w.style.display = empty ? '' : 'none';
+  if (!empty) return;
+  // One-line summary, only the things that are actually loaded/active.
+  const parts = [];
+  let convCount = 0;
+  try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
+  if (convCount > 0) parts.push(`${convCount} chat${convCount === 1 ? '' : 's'} restored`);
+  if (pyPromise) parts.push('pyodide loaded');
+  if (dbxTokens()) parts.push('dropbox synced');
+  const proxyUrl = ($('proxyUrl').value || '').trim();
+  if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
+  else if (localProxyMode === 'connected') parts.push('local proxy');
+  if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
+  $('welcomeStatus').textContent = parts.length ? parts.join(' · ') : 'fresh start';
+}
+
+async function refreshConversationList() {
+  refreshNewChatButton();
+  const ul = $('convList');
+  if (!ul) return;
+  const list = await listConversations();
+  $('convCount').textContent = list.length ? `${list.length}` : '';
+  const frag = document.createDocumentFragment();
+  if (!list.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = initialSyncDone ? '(no chats yet)' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+  for (const c of list) {
+    const li = document.createElement('li');
+    if (c.id === activeConvId) li.classList.add('active');
+    const span = document.createElement('span');
+    span.className = 'name';
+    span.textContent = c.title;
+    span.title = c.updated || '';
+    span.onclick = () => loadConv(c.id);
+    li.appendChild(span);
+    frag.appendChild(li);
+  }
+  ul.replaceChildren(frag);
+}
+
+// Tracks the in-flight LLM round so the user can interrupt mid-stream.
+// While non-null, the Send button shows "Stop" (red) and submitting aborts.
+let currentAbort = null;
+
+function setSendingState(sending) {
+  const btn = $('sendBtn');
+  if (sending) {
+    currentAbort = new AbortController();
+    btn.textContent = 'Stop';
+    btn.classList.add('sending');
+    btn.disabled = false;
+  } else {
+    currentAbort = null;
+    btn.textContent = 'Send';
+    btn.classList.remove('sending');
+    btn.disabled = false;
+  }
+}
+
+function handleSend() {
+  if (currentAbort) currentAbort.abort();
+  else send();
+}
+
+async function streamRound(signal) {
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = api(endpoint + '/chat/completions');
+  const body = { model: $('model').value, messages: [buildSystemPrompt(), ...messages], stream: true, tools: toolDefs() };
+
+  const reply = addMsg('assistant');
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  reply.appendChild(cursor);
+
+  let displayed = '', pending = '', streamDone = false;
+  const drain = new Promise(resolve => {
+    const tick = () => {
+      if (pending.length === 0) {
+        if (streamDone) return resolve();
+        return requestAnimationFrame(tick);
+      }
+      const m = $('messages');
+      // Capture intent BEFORE we mutate so the new content doesn't shift the
+      // measurement: if user was at bottom, follow; if scrolled up, hold.
+      const stick = isAtBottom(m);
+      const n = Math.max(1, Math.ceil(pending.length / 30));
+      displayed += pending.slice(0, n);
+      pending = pending.slice(n);
+      reply.innerHTML = renderMd(displayed);
+      reply.appendChild(cursor);
+      if (stick) m.scrollTop = m.scrollHeight;
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+
+  const toolCalls = [];
+  let content = '';
+  let aborted = false;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      streamDone = true;
+      reply.remove();
+      throw new Error(`${res.status}: ${(await res.text()).slice(0, 300)}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const delta = JSON.parse(data).choices?.[0]?.delta;
+          if (!delta) continue;
+          if (delta.content) {
+            content += delta.content;
+            pending += delta.content;
+          }
+          if (delta.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const i = tc.index || 0;
+              if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+              if (tc.id) toolCalls[i].id = tc.id;
+              if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
+              if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError' || (signal && signal.aborted)) {
+      aborted = true;
+    } else {
+      streamDone = true;
+      reply.remove();
+      throw e;
+    }
+  }
+
+  streamDone = true;
+  await drain;
+  cursor.remove();
+  if (!content && !toolCalls.length) reply.remove();
+  return { content, toolCalls: toolCalls.filter(tc => tc.id), aborted };
+}
+
+async function send() {
+  const text = $('input').value.trim();
+  if (!text) return;
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Fill in endpoint, model, and API key.');
+    return;
+  }
+  await ensureActiveConv();
+  messages.push({ role: 'user', content: text });
+  addMsg('user', text);
+  $('input').value = '';
+  setSendingState(true);
+
+  try {
+    while (true) {
+      if (currentAbort?.signal.aborted) break;
+      const { content, toolCalls, aborted } = await streamRound(currentAbort?.signal);
+      if (aborted) {
+        if (content) messages.push({ role: 'assistant', content });
+        addMsg('info', 'Stopped.');
+        break;
+      }
+      if (!toolCalls.length) {
+        if (content) messages.push({ role: 'assistant', content });
+        break;
+      }
+      messages.push({ role: 'assistant', content, tool_calls: toolCalls });
+      for (const tc of toolCalls) {
+        if (currentAbort?.signal.aborted) break;
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+        addMsg('tool-call', `→ ${tc.function.name}(${JSON.stringify(args)})`);
+        const result = await tools[tc.function.name].run(args);
+        addMsg('tool-result', `← ${result.length > 500 ? result.slice(0, 500) + '…' : result}`);
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      }
+      if (currentAbort?.signal.aborted) { addMsg('info', 'Stopped.'); break; }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') addMsg('info', 'Stopped.');
+    else addMsg('err', 'Error: ' + e.message);
+  } finally {
+    setSendingState(false);
+    await saveActiveConv();
+    refreshTokenMeter();
+  }
+}
+</script>
+</body>
+</html>
