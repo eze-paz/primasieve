@@ -206,13 +206,23 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    position: relative;
   }
   .tool-call {
-    background: rgba(88,166,255,0.08);
+    background: rgba(88,166,255,0.1);
   }
   .tool-result {
-    background: rgba(63,185,80,0.08);
+    background: rgba(63,185,80,0.1);
   }
+  .tool-call::before, .tool-result::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    z-index: -1;
+  }
+  .tool-call::before { background: rgba(88,166,255,0.45); }
+  .tool-result::before { background: rgba(63,185,80,0.45); }
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
   .assistant p { margin: 0.5em 0; }
