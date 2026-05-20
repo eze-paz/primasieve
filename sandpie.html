@@ -302,6 +302,15 @@
     background: transparent;
     position: relative;
     --chamfer: 8px;
+    display: grid;
+    grid-template-rows: auto 0fr;
+    transition: grid-template-rows 0.35s ease;
+  }
+  aside details.service[open] {
+    grid-template-rows: auto 1fr;
+  }
+  aside details.service .service-body {
+    overflow: hidden;
   }
   aside details.service::before {
     content: "";
