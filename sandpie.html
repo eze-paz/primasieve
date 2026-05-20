@@ -102,7 +102,7 @@
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: #21262d; }
   .ctx-menu button.danger { color: var(--sp-danger); }
-  ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.4rem; background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
+  ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.4rem; background: transparent; border: none; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
   ul.fs-list li.empty { color: var(--sp-muted); justify-content: center; font-style: italic; font-family: inherit; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
@@ -1597,20 +1597,45 @@ function refreshTokenMeter() {
   catch { used = estimateTokens(messages); }
   const ratio = tokenLimit > 0 ? used / tokenLimit : 0;
   const pct = Math.max(0, Math.min(100, ratio * 100));
-  // Set width AND color inline so no CSS cascade can wipe them — the previous
-  // class-based approach was somehow rendering colorless on overflow.
+  const color = ratio >= 0.9 ? '#f85149'
+              : ratio >= 0.75 ? '#d29922'
+              : '#3fb950';
   const fill = $('tokenFill');
-  const color = ratio >= 0.9 ? '#f85149'        // red (incl. overflow)
-              : ratio >= 0.75 ? '#d29922'        // amber
-              : '#3fb950';                       // green
-  fill.style.width = pct + '%';
   fill.style.backgroundColor = color;
-  fill.classList.remove('warn', 'err'); // legacy, kept only to not surprise CSS readers
+  fill.classList.remove('warn', 'err');
+  fill.style.setProperty('--target-width', pct + '%');
+  animateTokenFill();
   const overflow = used > tokenLimit;
   $('tokenLabel').textContent = overflow
     ? `${fmtTokens(used)} / ${fmtTokens(tokenLimit)} — over by ${fmtTokens(used - tokenLimit)}`
     : `${fmtTokens(used)} / ${fmtTokens(tokenLimit)}`;
 }
+
+(function() {
+  let currentWidth = 0;
+  let targetWidth = 0;
+  let animating = false;
+  window.animateTokenFill = function() {
+    const fill = $('tokenFill');
+    if (!fill) return;
+    targetWidth = parseFloat(fill.style.getPropertyValue('--target-width') || '0');
+    if (!animating) { animating = true; tick(); }
+  };
+  function tick() {
+    const diff = targetWidth - currentWidth;
+    if (Math.abs(diff) < 0.3) {
+      currentWidth = targetWidth;
+      const fill = $('tokenFill');
+      if (fill) fill.style.width = currentWidth + '%';
+      animating = false;
+      return;
+    }
+    currentWidth += diff * 0.15;
+    const fill = $('tokenFill');
+    if (fill) fill.style.width = currentWidth + '%';
+    requestAnimationFrame(tick);
+  }
+})();
 
 function editTokenLimit() {
   const v = prompt(`Context token limit (current: ${tokenLimit.toLocaleString()})\nClaude/GPT-4o ≈ 200k · Gemini Pro ≈ 1M · old GPT-3.5 ≈ 16k`, String(tokenLimit));
