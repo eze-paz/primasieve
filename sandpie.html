@@ -377,6 +377,30 @@
   }
   ul.conv-list li.archived-toggle:hover { color: #b4bcd0; background: transparent; border: none; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
+  ul.conv-list .conv-num {
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--sp-muted);
+    opacity: 0.55;
+    min-width: 1.2rem;
+    text-align: right;
+    margin-right: 0.6rem;
+    margin-left: -0.15rem;
+    user-select: none;
+    position: relative;
+  }
+  ul.conv-list .conv-num::after {
+    content: '';
+    position: absolute;
+    right: -0.35rem;
+    top: 10%;
+    height: 80%;
+    width: 1px;
+    background: var(--sp-border);
+    opacity: 0.5;
+  }
   /* Pulsing dot shown on a conversation row while an LLM stream for that
      conversation is still in flight — so the user can navigate away and
      know which chats are still generating in the background. */
@@ -5039,7 +5063,6 @@ function buildConvLi(c, idx) {
   const num = document.createElement('span');
   num.className = 'conv-num';
   num.textContent = String(idx).padStart(2, '0');
-  num.style.cssText = 'font-family: "JetBrains Mono", monospace; font-size: 0.68rem; color: var(--sp-muted); min-width: 1.4rem; text-align: right; user-select: none;';
   const span = document.createElement('span');
   span.className = 'name';
   span.textContent = (c.pinned ? '📌 ' : '') + c.title;
