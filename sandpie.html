@@ -4146,7 +4146,7 @@ function applyToolsMinimized() {
 }
 
 // === Touch / long-press helpers =============================================
-const _lp = { timer: null, target: null, startX: 0, startY: 0, slop: 10, delay: 600 };
+const _lp = { timer: null, target: null, startX: 0, startY: 0, slop: 24, delay: 600 };
 function _onTouchStart(e, handler) {
   const t = e.touches[0];
   _lp.target = e.currentTarget;
@@ -4171,7 +4171,15 @@ function _onTouchMove(e) {
 function _onTouchEnd(e) {
   if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
   if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
-  if (e.currentTarget._lpFired) { e.currentTarget._lpFired = false; e.preventDefault(); e.stopPropagation(); }
+  if (e.currentTarget._lpFired) {
+    e.currentTarget._lpFired = false;
+    // Browsers synthesize a click ~300ms after touch; capture and kill it
+    // before it reaches the document listener that auto-closes context menus.
+    setTimeout(() => {
+      const kill = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+      document.addEventListener('click', kill, { capture: true, once: true });
+    }, 0);
+  }
 }
 function _onTouchCancel() {
   if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
@@ -4179,12 +4187,11 @@ function _onTouchCancel() {
 }
 /**
  * Attach long-press handlers to an element.
- * Uses CSS touch-action:none to prevent drag/scroll without blocking clicks.
- * The touchend handler swallows the synthetic click only when a long-press
- * fired, so normal taps still go through to the underlying click handler.
+ * touch-action is left default so vertical scroll works; -webkit-user-drag
+ * prevents HTML5 drag ghost.  A 24px slop lets the finger drift without
+ * cancelling the long-press, but a real scroll (big Y delta) still cancels.
  */
 function attachLongPress(el, handler) {
-  el.style.touchAction = 'none';
   el.addEventListener('touchstart', (e) => _onTouchStart(e, handler), { passive: true });
   el.addEventListener('touchmove', _onTouchMove, { passive: true });
   el.addEventListener('touchend', _onTouchEnd);
