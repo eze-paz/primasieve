@@ -4740,12 +4740,12 @@ async function ensureActiveConv() {
   localStorage.setItem('sandpie-active-conv', activeConvId);
 }
 
-async function saveActiveConv() { return saveConv(activeConvId); }
+async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
 
 // Save a specific conversation's stream state to disk. Used by background
 // streams so a save reaches the conv that actually generated the messages,
 // even if the user has since switched to a different conv.
-async function saveConv(convId) {
+async function saveConv(convId, { touchUpdated = true } = {}) {
   if (!convId) return;
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
@@ -4760,7 +4760,7 @@ async function saveConv(convId) {
     ...prev,
     id: convId,
     title,
-    updated: new Date().toISOString(),
+    updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
     messages: msgs,
   };
   await opfs.write(convPath(convId), JSON.stringify(data));
