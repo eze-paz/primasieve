@@ -161,15 +161,15 @@
     color: #fff;
     white-space: pre-wrap;
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translateY(calc(var(--py) * 1px));
+    transform: translateY(calc(var(--py) * 2px));
   }
   .user::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(88, 166, 255, 0.3);
+    background: rgba(88, 166, 255, 0.5);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(3px, calc(3px + var(--py) * -2px));
+    transform: translate(5px, calc(5px + var(--py) * -4px));
   }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
   .err { align-self: center; color: #f85149; font-style: italic; }
@@ -5453,19 +5453,20 @@ function dispatchAgentEvent(ev, renderer, host) {
 
 
 // ═══════════════════════════════════════════════════════════════════════
-// SCROLL PARALLAX — clone offset shifts based on viewport position
+// SCROLL PARALLAX — clone offset with momentum/inertia
 // ═══════════════════════════════════════════════════════════════════════
 (function() {
   const messages = document.getElementById('messages');
   if (!messages) return;
 
-  let ticking = false;
+  const state = new Map(); // msg -> { current, target }
+  let animating = false;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
 
-  function updateParallax() {
+  function updateTargets() {
     const users = messages.querySelectorAll('.msg.user');
     const vh = window.innerHeight;
     const center = vh / 2;
@@ -5473,23 +5474,52 @@ function dispatchAgentEvent(ev, renderer, host) {
     for (const msg of users) {
       const rect = msg.getBoundingClientRect();
       const msgCenter = rect.top + rect.height / 2;
-      // -1 when at top of viewport, +1 when at bottom, 0 at center
       const ny = (msgCenter - center) / (vh / 2);
-      // Clamp so clone never drifts too far (max ±0.6 = ~60% of viewport)
-      msg.style.setProperty('--py', clamp(ny, -0.6, 0.6).toFixed(2));
+      const target = clamp(ny, -0.6, 0.6);
+
+      if (!state.has(msg)) {
+        state.set(msg, { current: target, target: target });
+      } else {
+        state.get(msg).target = target;
+      }
     }
-    ticking = false;
   }
 
-  messages.addEventListener('scroll', function() {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(updateParallax);
+  function tick() {
+    let moving = false;
+
+    for (const [msg, s] of state) {
+      // Lerp current toward target (12% per frame = ~0.5s settle time)
+      const diff = s.target - s.current;
+      if (Math.abs(diff) > 0.001) {
+        s.current += diff * 0.12;
+        moving = true;
+      } else {
+        s.current = s.target;
+      }
+      msg.style.setProperty('--py', s.current.toFixed(3));
     }
-  }, { passive: true });
+
+    if (moving) {
+      requestAnimationFrame(tick);
+    } else {
+      animating = false;
+    }
+  }
+
+  function onScroll() {
+    updateTargets();
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(tick);
+    }
+  }
+
+  messages.addEventListener('scroll', onScroll, { passive: true });
 
   // Initial run
-  updateParallax();
+  updateTargets();
+  tick();
 })();
 </script>
 </body>
