@@ -738,7 +738,7 @@ async function runAgent(config, ctx) {
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
       ctx.emit({ type: 'tool_result', id: tc.id, result: toolOut.result, artifacts: toolOut.artifacts || [] });
-      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result };
+      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result, artifacts: toolOut.artifacts || [] };
       messages.push(toolMsg);
       ctx.emit({ type: 'message_added', message: toolMsg });
     }
