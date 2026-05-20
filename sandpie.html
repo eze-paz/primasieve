@@ -9,18 +9,19 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --sp-bg: var(--sp-bg);
-    --sp-surface: var(--sp-surface);
-    --sp-elevated: var(--sp-bg);
-    --sp-border: var(--sp-border);
-    --sp-accent: var(--sp-accent);
+    --sp-bg: #0d1117;
+    --sp-surface: #161b22;
+    --sp-border: #30363d;
+    --sp-border-bright: #484f58;
+    --sp-panel: #21262d;
+    --sp-accent: #58a6ff;
     --sp-accent-dim: rgba(88,166,255,0.35);
-    --sp-text: var(--sp-text);
+    --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
-    --sp-muted: var(--sp-muted);
-    --sp-success: var(--sp-success);
-    --sp-danger: var(--sp-danger);
-    --sp-warn: var(--sp-warn);
+    --sp-muted: #8b949e;
+    --sp-success: #3fb950;
+    --sp-danger: #f85149;
+    --sp-warn: #d29922;
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -5736,8 +5737,9 @@ const THEMES = {
   midnight: {
     '--sp-bg': '#0d1117',
     '--sp-surface': '#161b22',
-    '--sp-elevated': '#0d1117',
     '--sp-border': '#30363d',
+    '--sp-border-bright': '#484f58',
+    '--sp-panel': '#21262d',
     '--sp-accent': '#58a6ff',
     '--sp-accent-dim': 'rgba(88,166,255,0.35)',
     '--sp-text': '#e6edf3',
@@ -5750,8 +5752,9 @@ const THEMES = {
   light: {
     '--sp-bg': '#f6f8fa',
     '--sp-surface': '#ffffff',
-    '--sp-elevated': '#f6f8fa',
     '--sp-border': '#d0d7de',
+    '--sp-border-bright': '#afb8c1',
+    '--sp-panel': '#eaeef2',
     '--sp-accent': '#0969da',
     '--sp-accent-dim': 'rgba(9,105,218,0.25)',
     '--sp-text': '#1f2328',
@@ -5799,7 +5802,6 @@ function applyCustomTheme() {
 
   document.documentElement.style.setProperty('--sp-bg', bg);
   document.documentElement.style.setProperty('--sp-surface', surface);
-  document.documentElement.style.setProperty('--sp-elevated', bg);
   document.documentElement.style.setProperty('--sp-accent', accent);
   document.documentElement.style.setProperty('--sp-accent-dim', `rgba(${r},${g},${b},0.35)`);
   document.documentElement.style.setProperty('--sp-text', text);
