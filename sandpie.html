@@ -4067,6 +4067,87 @@ function applyToolsMinimized() {
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
+// === Touch / long-press helpers =============================================
+// Mobile browsers don't fire contextmenu on long-press reliably; we emulate it
+// with touch timers.  We also need to distinguish "tap" from "long-press" so
+// that normal scrolling doesn't accidentally open menus.
+
+const _lp = {
+  timer: null,
+  target: null,
+  startX: 0,
+  startY: 0,
+  // px — finger may drift this far before the timer fires and we still treat
+  // it as a long-press (not a scroll).
+  slop: 10,
+  // ms — how long the finger must stay down before we call it a long-press.
+  delay: 600,
+};
+
+function _onTouchStart(e, handler) {
+  const t = e.touches[0];
+  _lp.target = e.currentTarget;
+  _lp.startX = t.clientX;
+  _lp.startY = t.clientY;
+  _lp.timer = setTimeout(() => {
+    _lp.timer = null;
+    // Cancel the pending click so the menu doesn't immediately close.
+    _lp.target._lpFired = true;
+    handler({
+      type: 'longpress',
+      currentTarget: _lp.target,
+      target: _lp.target,
+      clientX: _lp.startX,
+      clientY: _lp.startY,
+      preventDefault() {},
+      stopPropagation() {},
+    });
+  }, _lp.delay);
+}
+
+function _onTouchMove(e) {
+  if (!_lp.timer) return;
+  const t = e.touches[0];
+  const dx = Math.abs(t.clientX - _lp.startX);
+  const dy = Math.abs(t.clientY - _lp.startY);
+  if (dx > _lp.slop || dy > _lp.slop) {
+    clearTimeout(_lp.timer);
+    _lp.timer = null;
+    _lp.target = null;
+  }
+}
+
+function _onTouchEnd(e) {
+  if (_lp.timer) {
+    clearTimeout(_lp.timer);
+    _lp.timer = null;
+  }
+  _lp.target = null;
+  // If the long-press fired, swallow the next click so the menu stays open.
+  if (e.currentTarget._lpFired) {
+    e.currentTarget._lpFired = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}
+
+function _onTouchCancel() {
+  if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
+  _lp.target = null;
+}
+
+/**
+ * Attach long-press handlers to an element.
+ * @param {HTMLElement} el
+ * @param {Function} handler  called with a synthetic event on long-press
+ */
+function attachLongPress(el, handler) {
+  el.addEventListener('touchstart',  (e) => _onTouchStart(e, handler), { passive: true });
+  el.addEventListener('touchmove',   _onTouchMove, { passive: true });
+  el.addEventListener('touchend',    _onTouchEnd);
+  el.addEventListener('touchcancel', _onTouchCancel);
+}
+
 function bindBubble(div, msgRef) {
   if (!div) return div;
   // Idempotent: attach the contextmenu/click listeners exactly once per
@@ -4075,13 +4156,14 @@ function bindBubble(div, msgRef) {
   // handlers that fire the menu twice.
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-    div.addEventListener('contextmenu', onBubbleContextMenu);
-    // Tool-call chips also open the menu on left-click — the chip is itself
-    // the affordance for "interact with this step". For text bubbles (user /
-    // assistant) we keep left-click as text-selection, so this is scoped to
-    // .tool-call only.
+    // On tool-call bubbles we ONLY use click (left-click) to open the menu.
+    // Long-press / contextmenu is intentionally omitted so that mobile users
+    // can select and copy text inside the bubble.  For user / assistant text
+    // bubbles we keep the right-click menu.
     if (div.classList.contains('tool-call')) {
       div.addEventListener('click', onBubbleContextMenu);
+    } else {
+      div.addEventListener('contextmenu', onBubbleContextMenu);
     }
   }
   if (msgRef) div._msg = msgRef;
@@ -4955,8 +5037,7 @@ function buildConvLi(c) {
     dot.title = 'Still generating…';
     li.appendChild(dot);
   }
-  li.addEventListener('contextmenu', (ev) => {
-    ev.preventDefault();
+  const _openConvMenu = (ev) => {
     const items = [
       { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
       { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
@@ -4975,7 +5056,9 @@ function buildConvLi(c) {
     }
     items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
     showContextMenu(ev.clientX, ev.clientY, items);
-  });
+  };
+  li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
+  attachLongPress(li, _openConvMenu);
   // HTML5 drag — dropping the LI onto #messagesWrap opens it in the side
   // panel (the wrap's dragover/drop handlers, wired in SidePanel._wireEvents,
   // read the carried `text/sandpie-conv-id`). Touch devices don't fire HTML5
