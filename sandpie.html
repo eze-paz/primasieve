@@ -9,18 +9,18 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --sp-bg: var(--sp-bg);
-    --sp-surface: var(--sp-surface);
-    --sp-elevated: var(--sp-bg);
-    --sp-border: var(--sp-border);
-    --sp-accent: var(--sp-accent);
-    --sp-accent-dim: rgba(88,166,255,0.35);
-    --sp-text: var(--sp-text);
-    --sp-text-dim: #9ab0c8;
-    --sp-muted: var(--sp-muted);
-    --sp-success: var(--sp-success);
-    --sp-danger: var(--sp-danger);
-    --sp-warn: var(--sp-warn);
+    --sp-bg: #0a0e14;
+    --sp-surface: #0f1419;
+    --sp-elevated: #131820;
+    --sp-border: rgba(88,166,255,0.12);
+    --sp-accent: #58a6ff;
+    --sp-accent-dim: rgba(88,166,255,0.15);
+    --sp-text: #c9d1d9;
+    --sp-text-dim: #8b949e;
+    --sp-muted: #6e7681;
+    --sp-success: #3fb950;
+    --sp-danger: #f85149;
+    --sp-warn: #d29922;
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -32,24 +32,12 @@
   aside {
     width: 300px;
     padding: 1rem;
-    background: var(--sp-surface);
-    border-right: 1px solid var(--sp-border);
+    background: var(--sp-bg);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     overflow-y: auto;
     scrollbar-gutter: stable;
-    position: relative;
-  }
-  aside::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: -4px;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(to right, rgba(88,166,255,0.08), transparent);
-    pointer-events: none;
   }
   /* Themed scrollbars everywhere — Firefox + WebKit/Chromium/Edge/Safari */
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
@@ -59,13 +47,13 @@
   *::-webkit-scrollbar-thumb:hover { background: #444c56; }
   *::-webkit-scrollbar-corner { background: transparent; }
   aside input, aside button {
-    padding: 0.45rem 0.625rem;
+    padding: 0.5rem 0.625rem;
     background: var(--sp-bg);
     border: 1px solid var(--sp-border);
     color: var(--sp-text);
     font: inherit;
     align-self: stretch;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    border-radius: 4px;
   }
   aside button { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; cursor: pointer; }
   aside button:hover { background: #79b8ff; }
@@ -196,10 +184,9 @@
   }
   .assistant {
     align-self: flex-start;
-    padding: 0.75rem 1rem 0.75rem 1.25rem;
+    padding: 0.75rem 1rem;
     color: var(--sp-text);
     line-height: 1.6;
-    border-left: 2px solid rgba(88, 166, 255, 0.15);
   }
   .assistant .bubble {
     display: block;
@@ -210,28 +197,20 @@
     align-self: flex-start;
     max-width: 85%;
     min-width: 0;
-    padding: 0.5rem 0.75rem;
-    font: 12px/1.4 'JetBrains Mono', Consolas, monospace;
+    padding: 0.4rem 0.6rem;
+    font: 11px/1.4 'JetBrains Mono', Consolas, monospace;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    position: relative;
+    border-radius: 4px;
   }
   .tool-call {
-    background: rgba(88,166,255,0.1);
+    background: var(--sp-elevated);
+    color: var(--sp-accent);
   }
   .tool-result {
-    background: rgba(63,185,80,0.1);
+    background: var(--sp-elevated);
+    color: var(--sp-success);
   }
-  .tool-call::before, .tool-result::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    z-index: -1;
-  }
-  .tool-call::before { background: rgba(88,166,255,0.45); }
-  .tool-result::before { background: rgba(63,185,80,0.45); }
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
   .assistant p { margin: 0.5em 0; }
@@ -276,25 +255,10 @@
   @keyframes blink { 50% { opacity: 0; } }
   /* Collapsible service sections */
   aside details.service {
-    border: none;
-    background: transparent;
-    position: relative;
-    --chamfer: 8px;
-  }
-  aside details.service::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--sp-border);
-    clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
-    opacity: 0.6;
-    transform: translate(2px, 2px);
-    z-index: 0;
-  }
-  aside details.service[open]::before {
-    opacity: 0.4;
-    background: rgba(0, 0, 0, 0.6);
-    transform: translate(3px, 3px);
+    background: var(--sp-surface);
+    border: 1px solid var(--sp-border);
+    border-radius: 6px;
+    overflow: hidden;
   }
   aside details.service summary {
     list-style: none;
@@ -303,34 +267,28 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     color: var(--sp-muted);
     user-select: none;
-    background: var(--sp-bg);
-    clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
-    position: relative;
-    z-index: 1;
-    transition: color 0.15s, background 0.15s;
+    transition: color 0.15s;
   }
   aside details.service summary::-webkit-details-marker { display: none; }
   aside details.service summary::before {
     content: '▸';
-    font-size: 0.65em;
+    font-size: 0.6em;
     color: var(--sp-accent);
     transition: transform 0.15s;
     width: 0.6em;
   }
   aside details.service[open] summary::before { transform: rotate(90deg); }
-  aside details.service summary:hover { color: var(--sp-text); background: var(--sp-surface); }
+  aside details.service summary:hover { color: var(--sp-text); }
   aside details.service .service-body {
     padding: 0 0.75rem 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-    position: relative;
-    z-index: 1;
+    gap: 0.5rem;
   }
   aside details.service .service-body {
     padding: 0 0.75rem 0.75rem;
