@@ -418,11 +418,17 @@
   /* Pulsing dot shown on a conversation row while an LLM stream for that
      conversation is still in flight — so the user can navigate away and
      know which chats are still generating in the background. */
+  ul.conv-list li .conv-meta.gen-dot,
   ul.conv-list li .gen-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--sp-accent); box-shadow: 0 0 5px rgba(88,166,255,0.6);
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--sp-accent);
+    box-shadow: 0 0 5px rgba(88,166,255,0.6);
     flex-shrink: 0;
     min-width: 0;
+    font-size: 0;
+    text-align: left;
     animation: status-dot-pulse 0.9s ease-in-out infinite;
   }
   ul.conv-list li .conv-meta {
