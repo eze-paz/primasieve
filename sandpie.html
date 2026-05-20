@@ -4172,14 +4172,13 @@ function _onTouchCancel() {
 }
 /**
  * Attach long-press handlers to an element.
- * On touch devices this prevents the browser's default drag/scroll so the
- * long-press can fire.  The touchend handler swallows the synthetic click
- * that would otherwise immediately dismiss the context menu.
+ * Uses CSS touch-action:none to prevent drag/scroll without blocking clicks.
+ * The touchend handler swallows the synthetic click only when a long-press
+ * fired, so normal taps still go through to the underlying click handler.
  */
 function attachLongPress(el, handler) {
-  // Non-passive: we call preventDefault() on touchstart to stop the browser
-  // from initiating a drag (especially important because the LI is draggable).
-  el.addEventListener('touchstart', (e) => { _onTouchStart(e, handler); e.preventDefault(); }, { passive: false });
+  el.style.touchAction = 'none';
+  el.addEventListener('touchstart', (e) => _onTouchStart(e, handler), { passive: true });
   el.addEventListener('touchmove', _onTouchMove, { passive: true });
   el.addEventListener('touchend', _onTouchEnd);
   el.addEventListener('touchcancel', _onTouchCancel);
@@ -5102,7 +5101,6 @@ function buildConvLi(c, idx) {
   // read the carried `text/sandpie-conv-id`). Touch devices don't fire HTML5
   // drag events; they get the same affordance via the context menu above.
   li.draggable = true;
-  li.style.webkitUserDrag = 'none';
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
     ev.dataTransfer.effectAllowed = 'copy';
