@@ -152,6 +152,10 @@
     position: relative;
     padding: 0;
     background: transparent;
+    --px: 0px;
+    --py: 0px;
+    --cx: 4px;
+    --cy: 4px;
   }
   .user .bubble {
     display: block;
@@ -160,22 +164,17 @@
     color: #fff;
     white-space: pre-wrap;
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translate(var(--px), var(--py));
+    transition: transform 0.15s ease-out;
   }
   .user::before {
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(88, 166, 255, 0.22);
+    background: rgba(88, 166, 255, 0.35);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(2px, 2px);
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .user:hover .bubble {
-    transform: translate(-2px, -2px);
-  }
-  .user:hover::before {
-    transform: translate(5px, 5px);
+    transform: translate(calc(var(--cx) + var(--px) * -0.5), calc(var(--cy) + var(--py) * -0.5));
+    transition: transform 0.15s ease-out;
   }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
   .err { align-self: center; color: #f85149; font-style: italic; }
@@ -5453,6 +5452,49 @@ function dispatchAgentEvent(ev, renderer, host) {
     rebuildShield();
     setInterval(rebuildShield, 2000);
   }
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// MOUSE PARALLAX — 2.5D clone effect on user message bubbles
+// ═══════════════════════════════════════════════════════════════════════
+(function() {
+  let ticking = false;
+
+  document.addEventListener('mousemove', function(e) {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function() {
+      const users = document.querySelectorAll('.msg.user');
+      const mx = e.clientX;
+      const my = e.clientY;
+
+      for (const msg of users) {
+        const rect = msg.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        // Distance from mouse to bubble center (-1 to 1 normalized)
+        const nx = (mx - cx) / (window.innerWidth / 2);
+        const ny = (my - cy) / (window.innerHeight / 2);
+
+        // Bubble shifts toward mouse (lift effect)
+        const bx = nx * 3;
+        const by = ny * 3;
+
+        // Clone shifts opposite (deeper shadow)
+        const cx_off = 4 + nx * -2;
+        const cy_off = 4 + ny * -2;
+
+        msg.style.setProperty('--px', bx.toFixed(1) + 'px');
+        msg.style.setProperty('--py', by.toFixed(1) + 'px');
+        msg.style.setProperty('--cx', cx_off.toFixed(1) + 'px');
+        msg.style.setProperty('--cy', cy_off.toFixed(1) + 'px');
+      }
+
+      ticking = false;
+    });
+  });
 })();
 </script>
 </body>
