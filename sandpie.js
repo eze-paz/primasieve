@@ -135,12 +135,48 @@ self.addEventListener('unhandledrejection', (ev) => {
 // Drain the boot buffer when a client connects + asks for it. The page
 // pings us with `sandpie-sw-flush-logs` on its message-handler init.
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'sandpie-sw-flush-logs') {
+  const data = event.data;
+  if (!data) return;
+  if (data.type === 'sandpie-sw-flush-logs') {
     for (const msg of _swLogBuffer) {
       try { event.source.postMessage(msg); } catch (_) {}
     }
+    return;
+  }
+  if (data.type === 'opfs-removed' && Array.isArray(data.paths)) {
+    // Page deleted these paths from OPFS. Drop them from Pyodide's MEMFS
+    // view too, otherwise the next post-run syncfs() would push the stale
+    // in-memory copy back to OPFS and resurrect the file (which then gets
+    // re-uploaded to Dropbox on the next sync tick).
+    if (!py) return;  // Pyodide not booted yet — nothing to clean up.
+    for (const rel of data.paths) {
+      const full = '/files/' + String(rel).replace(/^\/+/, '');
+      try {
+        const st = py.FS.stat(full);
+        if (py.FS.isDir(st.mode)) _swRmTree(full);
+        else py.FS.unlink(full);
+      } catch (_) { /* already gone in MEMFS — fine */ }
+    }
+    return;
   }
 });
+
+// Recursive rmdir within Pyodide's Emscripten FS. Used by the opfs-removed
+// handler when the deleted path is a directory.
+function _swRmTree(full) {
+  let entries = [];
+  try { entries = py.FS.readdir(full); } catch (_) { return; }
+  for (const name of entries) {
+    if (name === '.' || name === '..') continue;
+    const child = full + '/' + name;
+    try {
+      const st = py.FS.stat(child);
+      if (py.FS.isDir(st.mode)) _swRmTree(child);
+      else py.FS.unlink(child);
+    } catch (_) {}
+  }
+  try { py.FS.rmdir(full); } catch (_) {}
+}
 
 // Version stamp logged on every SW boot — confirms a fresh build is running.
 const SW_VERSION = '1.6.0';

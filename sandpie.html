@@ -1692,6 +1692,14 @@ const opfs = {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
     await dir.removeEntry(name, { recursive: true });
+    // Tell the SW to drop this path from Pyodide's MEMFS view too. Without
+    // this, the next post-run syncfs() would push the stale in-memory copy
+    // back to OPFS and the file would resurrect (and get re-uploaded to
+    // Dropbox on the next sync tick).
+    try {
+      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+      if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
+    } catch (_) {}
   },
 
   // Cheap existence check — does NOT read file bytes. Important for the
