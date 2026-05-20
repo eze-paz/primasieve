@@ -4146,56 +4146,60 @@ function applyToolsMinimized() {
 }
 
 // === Touch / long-press helpers =============================================
-const _lp = { timer: null, target: null, startX: 0, startY: 0, slop: 24, delay: 600 };
-function _onTouchStart(e, handler) {
-  const t = e.touches[0];
-  _lp.target = e.currentTarget;
-  _lp.startX = t.clientX;
-  _lp.startY = t.clientY;
-  _lp.target.classList.add('lp-active');
-  _lp.timer = setTimeout(() => {
-    _lp.timer = null;
-    _lp.target._lpFired = true;
-    _lp.target.classList.remove('lp-active');
-    handler({ currentTarget: _lp.target, target: _lp.target, clientX: _lp.startX, clientY: _lp.startY, preventDefault() {}, stopPropagation() {} });
-  }, _lp.delay);
-}
-function _onTouchMove(e) {
-  if (!_lp.timer) return;
-  const t = e.touches[0];
-  if (Math.abs(t.clientX - _lp.startX) > _lp.slop || Math.abs(t.clientY - _lp.startY) > _lp.slop) {
-    clearTimeout(_lp.timer); _lp.timer = null;
-    if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
-  }
-}
-function _onTouchEnd(e) {
-  if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
-  if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
-  if (e.currentTarget._lpFired) {
-    e.currentTarget._lpFired = false;
-    // Browsers synthesize a click ~300ms after touch; capture and kill it
-    // before it reaches the document listener that auto-closes context menus.
-    setTimeout(() => {
-      const kill = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
-      document.addEventListener('click', kill, { capture: true, once: true });
-    }, 0);
-  }
-}
-function _onTouchCancel() {
-  if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
-  if (_lp.target) { _lp.target.classList.remove('lp-active'); _lp.target = null; }
-}
-/**
- * Attach long-press handlers to an element.
- * touch-action is left default so vertical scroll works; -webkit-user-drag
- * prevents HTML5 drag ghost.  A 24px slop lets the finger drift without
- * cancelling the long-press, but a real scroll (big Y delta) still cancels.
- */
+// Per-element state (stored on the DOM node) so concurrent touches on
+// different items never interfere.
+const LP_DELAY = 500;
+const LP_SLOP = 30;
+
 function attachLongPress(el, handler) {
-  el.addEventListener('touchstart', (e) => _onTouchStart(e, handler), { passive: true });
-  el.addEventListener('touchmove', _onTouchMove, { passive: true });
-  el.addEventListener('touchend', _onTouchEnd);
-  el.addEventListener('touchcancel', _onTouchCancel);
+  el.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    el._lp = {
+      timer: setTimeout(() => {
+        el._lp.timer = null;
+        el.classList.remove('lp-active');
+        handler({
+          currentTarget: el, target: el,
+          clientX: el._lp.x, clientY: el._lp.y,
+          preventDefault() {}, stopPropagation() {}
+        });
+        // Swallow the synthetic click that fires ~300 ms later so the
+        // context menu isn't immediately dismissed.
+        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+        document.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 350);
+      }, LP_DELAY),
+      x: t.clientX,
+      y: t.clientY,
+    };
+    el.classList.add('lp-active');
+  }, { passive: true });
+
+  el.addEventListener('touchmove', (e) => {
+    if (!el._lp || !el._lp.timer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - el._lp.x) > LP_SLOP || Math.abs(t.clientY - el._lp.y) > LP_SLOP) {
+      clearTimeout(el._lp.timer);
+      el._lp = null;
+      el.classList.remove('lp-active');
+    }
+  }, { passive: true });
+
+  el.addEventListener('touchend', () => {
+    if (el._lp) {
+      if (el._lp.timer) clearTimeout(el._lp.timer);
+      el._lp = null;
+    }
+    el.classList.remove('lp-active');
+  });
+
+  el.addEventListener('touchcancel', () => {
+    if (el._lp) {
+      if (el._lp.timer) clearTimeout(el._lp.timer);
+      el._lp = null;
+    }
+    el.classList.remove('lp-active');
+  });
 }
 
 
