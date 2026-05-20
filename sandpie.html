@@ -149,16 +149,33 @@
   .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
   .user {
     align-self: flex-end;
+    position: relative;
+    padding: 0;
+    background: transparent;
+  }
+  .user .bubble {
+    display: block;
+    padding: 0.75rem 1rem;
     background: #58a6ff;
     color: #fff;
     white-space: pre-wrap;
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    filter: drop-shadow(8px 8px 0 rgba(88, 166, 255, 0.35));
-    transition: filter 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .user:hover {
-    filter: drop-shadow(16px 16px 0 rgba(88, 166, 255, 0.5));
-    transform: translate(-3px, -3px);
+  .user::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(88, 166, 255, 0.4);
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    transform: translate(8px, 8px);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .user:hover .bubble {
+    transform: translate(-2px, -2px);
+  }
+  .user:hover::before {
+    transform: translate(16px, 16px);
   }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
   .err { align-self: center; color: #f85149; font-style: italic; }
@@ -3936,7 +3953,10 @@ function addMsg(role, text = '', host = null) {
     div.appendChild(expanded);
     div.appendChild(collapsed);
   } else {
-    div.textContent = text;
+    const bubble = document.createElement('span');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    div.appendChild(bubble);
   }
   target.appendChild(div);
   // Keep the host's *active* total timer pinned to the bottom of its bubbles.
