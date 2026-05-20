@@ -99,22 +99,24 @@
   aside .navbar { display: flex; gap: 0.25rem; align-items: stretch; }
   aside .navbar input {
     flex: 1;
-    border: 1px solid var(--sp-border);
+    border: none;
     background: var(--sp-panel);
     color: var(--sp-text);
     padding: 0.45rem 0.625rem;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    border-radius: 4px;
+    clip-path: none;
   }
   aside .navbar .back {
     flex: 0 0 32px;
     padding: 0;
-    border: 1px solid var(--sp-border);
+    border: none;
     background: var(--sp-panel);
     color: var(--sp-muted);
     cursor: pointer;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    border-radius: 4px;
+    clip-path: none;
   }
-  aside .navbar .back:hover { color: var(--sp-text); border-color: var(--sp-border-bright); }
+  aside .navbar .back:hover { color: var(--sp-text); background: var(--sp-surface); }
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; padding: 2px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: rgba(88,166,255,0.08); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
