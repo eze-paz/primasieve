@@ -166,16 +166,16 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: rgba(88, 166, 255, 0.4);
+    background: rgba(88, 166, 255, 0.22);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(8px, 8px);
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translate(2px, 2px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .user:hover .bubble {
     transform: translate(-2px, -2px);
   }
   .user:hover::before {
-    transform: translate(16px, 16px);
+    transform: translate(5px, 5px);
   }
   .assistant { align-self: flex-start; background: #161b22; border: 1px solid #30363d; }
   .err { align-self: center; color: #f85149; font-style: italic; }
