@@ -393,36 +393,50 @@
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
   ul.conv-list .conv-num {
     font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     color: var(--sp-muted);
-    opacity: 0.55;
-    min-width: 1.2rem;
+    opacity: 0.45;
+    min-width: 0.9rem;
     text-align: right;
-    margin-right: 0.6rem;
-    margin-left: -0.15rem;
+    margin-right: 0.35rem;
+    margin-left: 0;
     user-select: none;
     position: relative;
   }
   ul.conv-list .conv-num::after {
     content: '';
     position: absolute;
-    right: -0.35rem;
-    top: 10%;
-    height: 80%;
+    right: -0.2rem;
+    top: 15%;
+    height: 70%;
     width: 1px;
     background: var(--sp-border);
-    opacity: 0.5;
+    opacity: 0.4;
   }
   /* Pulsing dot shown on a conversation row while an LLM stream for that
      conversation is still in flight — so the user can navigate away and
      know which chats are still generating in the background. */
   ul.conv-list li .gen-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--sp-accent); box-shadow: 0 0 6px rgba(88,166,255,0.7);
-    flex-shrink: 0; margin-left: 0.35rem;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--sp-accent); box-shadow: 0 0 5px rgba(88,166,255,0.6);
+    flex-shrink: 0;
     animation: status-dot-pulse 0.9s ease-in-out infinite;
+  }
+  ul.conv-list li .conv-meta {
+    font-size: 0.6rem;
+    color: var(--sp-muted);
+    opacity: 0.6;
+    flex-shrink: 0;
+    min-width: 1.5rem;
+    text-align: right;
+    user-select: none;
+  }
+  ul.conv-list li .conv-meta.unseen {
+    color: var(--sp-accent);
+    opacity: 0.9;
+    font-weight: 600;
   }
   /* Each conversation's bubbles live in a .conv-host. Only the active
      conv's host is mounted under #messages; in-flight non-visible convs
@@ -1218,6 +1232,7 @@ let messages = [];
 // per-stream queue/abort/timer so a background stream can finish writing
 // into its own conv without leaking into another one.
 const convStreams = new Map();
+const convLastViewed = new Map(); // convId -> ISO string of last time user viewed it
 function ensureStream(id) {
   let s = convStreams.get(id);
   if (!s) {
@@ -4863,6 +4878,7 @@ async function loadConv(id) {
     mountConv(id);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
+  convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
   refreshTokenMeter();
   document.body.classList.remove('sidebar-open');
@@ -4879,6 +4895,7 @@ async function newConversation() {
   const id = newConvId();
   ensureStream(id);
   mountConv(id);
+  convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
   refreshTokenMeter();
   updateVersionDisplay();
@@ -5045,6 +5062,25 @@ async function deleteConv(id, title) {
   await refreshConversationList();
 }
 
+function fmtRelTime(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  const now = new Date();
+  const sec = Math.floor((now - then) / 1000);
+  if (sec < 60) return 'now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm';
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + 'h';
+  const day = Math.floor(hr / 24);
+  if (day < 7) return day + 'd';
+  const wk = Math.floor(day / 7);
+  if (wk < 4) return wk + 'w';
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return mo + 'mo';
+  return Math.floor(day / 365) + 'y';
+}
+
 function buildConvLi(c, idx) {
   const li = document.createElement('li');
   if (c.id === activeConvId) li.classList.add('active');
@@ -5059,16 +5095,20 @@ function buildConvLi(c, idx) {
   span.onclick = () => loadConv(c.id);
   li.appendChild(num);
   li.appendChild(span);
-  // Background-generating indicator: pulsing blue dot to the right of the
-  // title while this conv has an in-flight LLM round (even if the user has
-  // navigated to a different conv). Disappears the moment the stream ends.
+  // Meta indicator: shows generating dot OR relative time (shares same spot)
+  const meta = document.createElement('span');
+  meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
   if (stream && stream.generating) {
-    const dot = document.createElement('span');
-    dot.className = 'gen-dot';
-    dot.title = 'Still generating…';
-    li.appendChild(dot);
+    meta.classList.add('gen-dot');
+    meta.title = 'Still generating…';
+  } else {
+    meta.textContent = fmtRelTime(c.updated);
+    const lastViewed = convLastViewed.get(c.id);
+    const hasNew = c.updated && (!lastViewed || new Date(c.updated) > new Date(lastViewed));
+    if (hasNew && c.id !== activeConvId) meta.classList.add('unseen');
   }
+  li.appendChild(meta);
   const _openConvMenu = (ev) => {
     const items = [
       { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
