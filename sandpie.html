@@ -4197,13 +4197,8 @@ function bindBubble(div, msgRef) {
   // handlers that fire the menu twice.
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-    // Tool-call bubbles: click ONLY (no contextmenu) so mobile users can
-    // long-press to select/copy text.  User/assistant bubbles keep right-click.
-    if (div.classList.contains('tool-call')) {
-      div.addEventListener('click', onBubbleContextMenu);
-    } else {
-      div.addEventListener('contextmenu', onBubbleContextMenu);
-    }
+    // Tap/click shows the bubble menu; long-press is left for native text selection
+    div.addEventListener('click', onBubbleContextMenu);
   }
   if (msgRef) div._msg = msgRef;
   return div;
@@ -4212,8 +4207,6 @@ function bindBubble(div, msgRef) {
 let _bubbleMenuTarget = null;
 
 function onBubbleContextMenu(e) {
-  // Ignore touch long-press (allows mobile copy/paste); only respond to real right-clicks
-  if ('button' in e && e.button !== 2) return;
   e.preventDefault();
   e.stopPropagation();
   _bubbleMenuTarget = e.currentTarget;
