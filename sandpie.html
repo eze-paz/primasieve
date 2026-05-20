@@ -983,13 +983,7 @@ window._sandpieDisplay = function (html) {
         <input id="opfsPath" value="/">
       </div>
       <ul class="fs-list" id="fileList"></ul>
-      <div class="hint" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-        <span>drop to upload · right-click for actions</span>
-        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot synced"></span>synced</span>
-        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot modified"></span>modified</span>
-        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot local"></span>local</span>
-        <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot cloud"></span>cloud</span>
-      </div>
+
     </div>
   </details>
 
@@ -3348,9 +3342,6 @@ async function refreshFileList() {
 
   for (const it of items) {
     const li = document.createElement('li');
-    const dot = document.createElement('span');
-    dot.className = 'dot ' + it.status;
-    dot.title = it.status;
     const span = document.createElement('span');
     span.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
     // Phase D: distinct icon for cloud-only placeholders. Click hydrates
@@ -3381,7 +3372,7 @@ async function refreshFileList() {
     } else {
       span.onclick = () => openFileViewer(it.fullKey, it.name);
     }
-    li.append(dot, span);
+    li.append(span);
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
