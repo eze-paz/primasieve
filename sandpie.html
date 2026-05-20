@@ -187,27 +187,12 @@
   }
   .assistant {
     align-self: flex-start;
-    position: relative;
-    padding: 0;
-    background: transparent;
-    --py: 0;
+    padding: 0.75rem 1rem;
+    color: var(--sp-text);
+    line-height: 1.6;
   }
   .assistant .bubble {
     display: block;
-    padding: 0.75rem 1rem;
-    background: var(--sp-surface);
-    color: var(--sp-text);
-    border: 1px solid var(--sp-border);
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translateY(calc(var(--py) * 2px));
-  }
-  .assistant::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(4px, calc(4px + var(--py) * -3px));
   }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
   .info { align-self: center; color: var(--sp-muted); font-style: italic; font-size: 0.85em; }
@@ -5578,7 +5563,7 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 
   function updateTargets() {
-    const parallaxMsgs = messages.querySelectorAll('.msg.user, .msg.assistant');
+    const parallaxMsgs = messages.querySelectorAll('.msg.user');
     const vh = window.innerHeight;
     const center = vh / 2;
 
