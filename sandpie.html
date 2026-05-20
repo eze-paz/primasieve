@@ -4356,10 +4356,15 @@ function renderTcPreparing(div, fname, args) {
   // arguments — each character is a real token coming in. During the tool's
   // execution phase (running) nothing new is generated, so we hide it there.
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
-  el.innerHTML =
-    '<span class="tc-spinner tc-dim"></span>' +
-    `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
-    (tok > 0 ? `<span class="tc-meta">~${tok} tok</span>` : '');
+  // Build once, then only update the token count so the spinner never resets.
+  if (!el.querySelector('.tc-spinner')) {
+    el.innerHTML =
+      '<span class="tc-spinner tc-dim"></span>' +
+      `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
+      '<span class="tc-meta"></span>';
+  }
+  const meta = el.querySelector('.tc-meta');
+  if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
 }
 
 function renderTcRunning(div, fname, flavor) {
