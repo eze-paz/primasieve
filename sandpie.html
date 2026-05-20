@@ -828,26 +828,7 @@ window._sandpieDisplay = function (html) {
     </div>
   
 
-  <details class="service" id="themeSection">
-    <summary>Theme</summary>
-    <div class="service-body">
-      <div class="chip-row" id="themePresets">
-        <span class="chip active" data-theme="midnight" onclick="setTheme('midnight')">Midnight</span>
-        <span class="chip" data-theme="light" onclick="setTheme('light')">Light</span>
-        <span class="chip" data-theme="custom" onclick="setTheme('custom')">Custom</span>
-      </div>
-      <div id="customColors" style="display:none; flex-direction:column; gap:0.375rem; margin-top:0.5rem;">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Accent</label>
-        <input type="color" id="customAccent" value="#58a6ff" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Background</label>
-        <input type="color" id="customBg" value="#0d1117" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Surface</label>
-        <input type="color" id="customSurface" value="#161b22" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Text</label>
-        <input type="color" id="customText" value="#e6edf3" onchange="applyCustomTheme()">
-      </div>
-    </div>
-  </details></details>
+  </details>
 
   <!-- Provider Modal -->
   <div id="providerModal" class="modal" style="display:none;">
@@ -906,6 +887,27 @@ window._sandpieDisplay = function (html) {
         <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot modified"></span>modified</span>
         <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot local"></span>local</span>
         <span style="display:inline-flex; gap:0.3rem; align-items:center;"><span class="dot cloud"></span>cloud</span>
+      </div>
+    </div>
+  </details>
+
+  <details class="service" id="themeSection">
+    <summary>Theme</summary>
+    <div class="service-body">
+      <div class="chip-row" id="themePresets">
+        <span class="chip active" data-theme="midnight" onclick="setTheme('midnight')">Midnight</span>
+        <span class="chip" data-theme="light" onclick="setTheme('light')">Light</span>
+        <span class="chip" data-theme="custom" onclick="setTheme('custom')">Custom</span>
+      </div>
+      <div id="customColors" style="display:none; flex-direction:column; gap:0.375rem; margin-top:0.5rem;">
+        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Accent</label>
+        <input type="color" id="customAccent" value="#58a6ff" onchange="applyCustomTheme()">
+        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Background</label>
+        <input type="color" id="customBg" value="#0d1117" onchange="applyCustomTheme()">
+        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Surface</label>
+        <input type="color" id="customSurface" value="#161b22" onchange="applyCustomTheme()">
+        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Text</label>
+        <input type="color" id="customText" value="#e6edf3" onchange="applyCustomTheme()">
       </div>
     </div>
   </details>
