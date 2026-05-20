@@ -4109,6 +4109,40 @@ function applyToolsMinimized() {
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
+// === Touch / long-press helpers =============================================
+const _lp = { timer: null, target: null, startX: 0, startY: 0, slop: 10, delay: 600 };
+function _onTouchStart(e, handler) {
+  const t = e.touches[0];
+  _lp.target = e.currentTarget;
+  _lp.startX = t.clientX;
+  _lp.startY = t.clientY;
+  _lp.timer = setTimeout(() => {
+    _lp.timer = null;
+    _lp.target._lpFired = true;
+    handler({ currentTarget: _lp.target, target: _lp.target, clientX: _lp.startX, clientY: _lp.startY, preventDefault() {}, stopPropagation() {} });
+  }, _lp.delay);
+}
+function _onTouchMove(e) {
+  if (!_lp.timer) return;
+  const t = e.touches[0];
+  if (Math.abs(t.clientX - _lp.startX) > _lp.slop || Math.abs(t.clientY - _lp.startY) > _lp.slop) {
+    clearTimeout(_lp.timer); _lp.timer = null; _lp.target = null;
+  }
+}
+function _onTouchEnd(e) {
+  if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; }
+  _lp.target = null;
+  if (e.currentTarget._lpFired) { e.currentTarget._lpFired = false; e.preventDefault(); e.stopPropagation(); }
+}
+function _onTouchCancel() { if (_lp.timer) { clearTimeout(_lp.timer); _lp.timer = null; } _lp.target = null; }
+function attachLongPress(el, handler) {
+  el.addEventListener('touchstart', (e) => _onTouchStart(e, handler), { passive: true });
+  el.addEventListener('touchmove', _onTouchMove, { passive: true });
+  el.addEventListener('touchend', _onTouchEnd);
+  el.addEventListener('touchcancel', _onTouchCancel);
+}
+
+
 function bindBubble(div, msgRef) {
   if (!div) return div;
   // Idempotent: attach the contextmenu/click listeners exactly once per
@@ -4117,13 +4151,12 @@ function bindBubble(div, msgRef) {
   // handlers that fire the menu twice.
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-    div.addEventListener('contextmenu', onBubbleContextMenu);
-    // Tool-call chips also open the menu on left-click — the chip is itself
-    // the affordance for "interact with this step". For text bubbles (user /
-    // assistant) we keep left-click as text-selection, so this is scoped to
-    // .tool-call only.
+    // Tool-call bubbles: click ONLY (no contextmenu) so mobile users can
+    // long-press to select/copy text.  User/assistant bubbles keep right-click.
     if (div.classList.contains('tool-call')) {
       div.addEventListener('click', onBubbleContextMenu);
+    } else {
+      div.addEventListener('contextmenu', onBubbleContextMenu);
     }
   }
   if (msgRef) div._msg = msgRef;
@@ -4997,15 +5030,12 @@ function buildConvLi(c) {
     dot.title = 'Still generating…';
     li.appendChild(dot);
   }
-  li.addEventListener('contextmenu', (ev) => {
-    ev.preventDefault();
+  const _openConvMenu = (ev) => {
     const items = [
       { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
       { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
       { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
     ];
-    // Side-panel entry: only offer if (a) viewport can fit two panels and
-    // (b) this conv isn't already showing in either panel.
     const sideOpen = sidePanel?.isOpen;
     const inActive = c.id === activeConvId;
     const inSide   = sideOpen && c.id === sidePanel.sideId;
@@ -5017,7 +5047,9 @@ function buildConvLi(c) {
     }
     items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
     showContextMenu(ev.clientX, ev.clientY, items);
-  });
+  };
+  li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
+  attachLongPress(li, _openConvMenu);
   // HTML5 drag — dropping the LI onto #messagesWrap opens it in the side
   // panel (the wrap's dragover/drop handlers, wired in SidePanel._wireEvents,
   // read the carried `text/sandpie-conv-id`). Touch devices don't fire HTML5
