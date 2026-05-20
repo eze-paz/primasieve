@@ -3,25 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>sandpie</title>
+<title>Sandpie</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <style>
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --sp-bg: #0d1117;
-    --sp-surface: #161b22;
-    --sp-border: #30363d;
-    --sp-border-bright: #484f58;
-    --sp-panel: #21262d;
-    --sp-accent: #58a6ff;
+    --sp-bg: var(--sp-bg);
+    --sp-surface: var(--sp-surface);
+    --sp-elevated: var(--sp-bg);
+    --sp-border: var(--sp-border);
+    --sp-accent: var(--sp-accent);
     --sp-accent-dim: rgba(88,166,255,0.35);
-    --sp-text: #e6edf3;
+    --sp-text: var(--sp-text);
     --sp-text-dim: #9ab0c8;
-    --sp-muted: #8b949e;
-    --sp-success: #3fb950;
-    --sp-danger: #f85149;
-    --sp-warn: #d29922;
+    --sp-muted: var(--sp-muted);
+    --sp-success: var(--sp-success);
+    --sp-danger: var(--sp-danger);
+    --sp-warn: var(--sp-warn);
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -367,7 +367,7 @@
     flex-shrink: 0;
   }
   aside .status-dot.ok   { background: var(--sp-success); box-shadow: 0 0 4px rgba(63,185,80,0.5); }
-  aside .status-dot.warn { background: #f8b251; box-shadow: 0 0 4px rgba(248,178,81,0.5); }
+  aside .status-dot.warn { background: #d4a574; box-shadow: 0 0 4px rgba(248,178,81,0.5); }
   aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px rgba(248,81,73,0.5); }
   /* `.busy` pulses the dot while a sync operation is in flight (auto-pull on
      init, auto-push on conv end, fetch_file hydration, manifest scan). It
@@ -547,7 +547,40 @@
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
 /* Token meter — shows current context size vs configured limit. Click to edit. */
-
+  .token-meter {
+    position: relative;
+    height: 22px;
+    background: var(--sp-bg);
+    border: 1px solid var(--sp-border);
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.15s;
+    /* Flex centering — keeps label vertically centered regardless of font metrics */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .token-meter:hover { border-color: var(--sp-accent); }
+  .token-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0%;
+    background-color: var(--sp-success);
+    transition: width 0.2s ease-out, background-color 0.2s;
+  }
+  .token-fill.warn { background-color: var(--sp-warn); }
+  .token-fill.err  { background-color: var(--sp-danger); }
+  .token-label {
+    position: relative;
+    z-index: 1;
+    font: 0.7rem 'JetBrains Mono', Consolas, monospace;
+    color: #fff;
+    user-select: none;
+    text-shadow: 0 0 3px rgba(0,0,0,0.8), 0 0 1px rgba(0,0,0,0.8);
+  }
 
   /* Mobile header (only shown < 768px) */
   .mobile-header { display: none; }
@@ -590,9 +623,55 @@
     }
     .mobile-header .hamburger:active { background: #21262d; }
     .mobile-header .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Outfit', system-ui, sans-serif;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: -0.01em;
       color: var(--sp-text);
+      font-size: 1.15rem;
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      color: #d4a574;
+      flex-shrink: 0;
+    }
+    .brand-text {
+      display: flex;
+      align-items: baseline;
+    }
+    .brand-accent {
+      color: #d4a574;
+      font-weight: 700;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0.5rem 0.25rem 1rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--sp-border);
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--sp-text);
+      letter-spacing: -0.01em;
+    }
+    .sidebar-brand-logo {
+      width: 36px;
+      height: 36px;
+      color: #d4a574;
+      flex-shrink: 0;
+    }
+    .sidebar-brand-text {
+      display: flex;
+      align-items: baseline;
+    }
+    .sidebar-brand-accent {
+      color: #d4a574;
+      font-weight: 700;
     }
     aside {
       position: fixed;
@@ -835,6 +914,7 @@
     from { opacity: 0; transform: translateY(3px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+
 </style>
 <script>
 // Render an HTML string as a sandboxed (allow-scripts, no same-origin) iframe
@@ -854,7 +934,9 @@ window._renderArtifact = function (host, html) {
     'table{max-width:100%;border-collapse:collapse;}' +
     'pre{white-space:pre-wrap;word-wrap:break-word;}';
   frame.srcdoc =
-    '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
+    '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style>  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M12 6 L36 6 L36 10 L26 24 L36 38 L36 42 L12 42 L12 38 L22 24 L12 10 Z' stroke='%23d4a574' stroke-width='3' fill='none'/%3E%3Cpath d='M14 8 L34 8 L34 9 Q30 12 28 16 Q26 14 24 16 Q22 18 20 16 Q18 14 16 16 Q14 12 14 9 Z' fill='%23d4a574'/%3E%3Cpath d='M24 16 Q26 18 25 20 Q24 22 25 24 Q26 26 25 28 Q24 30 25 32' stroke='%23d4a574' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='25' cy='34' rx='3' ry='2.5' fill='%23d4a574' transform='rotate(15 25 34)'/%3E%3C/svg%3E">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head><body>' +
     String(html || '') +
     '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
     '</body></html>';
@@ -885,10 +967,53 @@ window._sandpieDisplay = function (html) {
 <body>
 <header class="mobile-header">
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
-  <span class="brand">sandpie</span>
+  <span class="brand">
+        <svg class="brand-logo" viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M12 6 L36 6 L36 10 L26 24 L36 38 L36 42 L12 42 L12 38 L22 24 L12 10 Z" stroke="currentColor" stroke-width="2" fill="none"/>
+          <path d="M14 8 L34 8 L34 9 Q30 12 28 16 Q26 14 24 16 Q22 18 20 16 Q18 14 16 16 Q14 12 14 9 Z" fill="currentColor" opacity="0.7"/>
+          <path d="M24 16 Q26 18 25 20 Q24 22 25 24 Q26 26 25 28 Q24 30 25 32" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <line x1="23.5" y1="18" x2="26.5" y2="18" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+          <line x1="24" y1="21" x2="26" y2="21" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+          <line x1="24.5" y1="24" x2="25.5" y2="24" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+          <line x1="24" y1="27" x2="26" y2="27" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+          <line x1="23.5" y1="30" x2="26.5" y2="30" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+          <ellipse cx="25" cy="34" rx="3" ry="2.5" fill="currentColor" transform="rotate(15 25 34)"/>
+          <circle cx="26" cy="33.5" r="0.7" fill="var(--sp-surface)"/>
+          <circle cx="26.2" cy="33.3" r="0.25" fill="var(--sp-surface)"/>
+          <path d="M16 40 Q24 32 32 40 Z" fill="currentColor" opacity="0.5"/>
+          <circle cx="23" cy="20" r="0.4" fill="currentColor" opacity="0.6"/>
+          <circle cx="26" cy="22" r="0.3" fill="currentColor" opacity="0.5"/>
+          <circle cx="24" cy="26" r="0.4" fill="currentColor" opacity="0.5"/>
+          <circle cx="25" cy="29" r="0.3" fill="currentColor" opacity="0.4"/>
+          <circle cx="23" cy="32" r="0.4" fill="currentColor" opacity="0.4"/>
+        </svg>
+        <span class="brand-text">sand<span class="brand-accent">pie</span></span>
+      </span>
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
 <aside>
+    <div class="sidebar-brand">
+      <svg class="sidebar-brand-logo" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M12 6 L36 6 L36 10 L26 24 L36 38 L36 42 L12 42 L12 38 L22 24 L12 10 Z" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M14 8 L34 8 L34 9 Q30 12 28 16 Q26 14 24 16 Q22 18 20 16 Q18 14 16 16 Q14 12 14 9 Z" fill="currentColor" opacity="0.7"/>
+        <path d="M24 16 Q26 18 25 20 Q24 22 25 24 Q26 26 25 28 Q24 30 25 32" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <line x1="23.5" y1="18" x2="26.5" y2="18" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+        <line x1="24" y1="21" x2="26" y2="21" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+        <line x1="24.5" y1="24" x2="25.5" y2="24" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+        <line x1="24" y1="27" x2="26" y2="27" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+        <line x1="23.5" y1="30" x2="26.5" y2="30" stroke="var(--sp-surface)" stroke-width="0.5" opacity="0.3"/>
+        <ellipse cx="25" cy="34" rx="3" ry="2.5" fill="currentColor" transform="rotate(15 25 34)"/>
+        <circle cx="26" cy="33.5" r="0.7" fill="var(--sp-surface)"/>
+        <circle cx="26.2" cy="33.3" r="0.25" fill="var(--sp-surface)"/>
+        <path d="M16 40 Q24 32 32 40 Z" fill="currentColor" opacity="0.5"/>
+        <circle cx="23" cy="20" r="0.4" fill="currentColor" opacity="0.6"/>
+        <circle cx="26" cy="22" r="0.3" fill="currentColor" opacity="0.5"/>
+        <circle cx="24" cy="26" r="0.4" fill="currentColor" opacity="0.5"/>
+        <circle cx="25" cy="29" r="0.3" fill="currentColor" opacity="0.4"/>
+        <circle cx="23" cy="32" r="0.4" fill="currentColor" opacity="0.4"/>
+      </svg>
+      <span class="sidebar-brand-text">sand<span class="sidebar-brand-accent">pie</span></span>
+    </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -4879,6 +5004,7 @@ async function newConversation() {
   const id = newConvId();
   ensureStream(id);
   mountConv(id);
+  convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
   refreshTokenMeter();
   updateVersionDisplay();
@@ -5043,6 +5169,25 @@ async function deleteConv(id, title) {
     }
   }
   await refreshConversationList();
+}
+
+function fmtRelTime(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  const now = new Date();
+  const sec = Math.floor((now - then) / 1000);
+  if (sec < 60) return 'now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm';
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + 'h';
+  const day = Math.floor(hr / 24);
+  if (day < 7) return day + 'd';
+  const wk = Math.floor(day / 7);
+  if (wk < 4) return wk + 'w';
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return mo + 'mo';
+  return Math.floor(day / 365) + 'y';
 }
 
 function buildConvLi(c, idx) {
