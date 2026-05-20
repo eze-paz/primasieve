@@ -5461,6 +5461,10 @@ function dispatchAgentEvent(ev, renderer, host) {
 
   let ticking = false;
 
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
   function updateParallax() {
     const users = messages.querySelectorAll('.msg.user');
     const vh = window.innerHeight;
@@ -5471,7 +5475,8 @@ function dispatchAgentEvent(ev, renderer, host) {
       const msgCenter = rect.top + rect.height / 2;
       // -1 when at top of viewport, +1 when at bottom, 0 at center
       const ny = (msgCenter - center) / (vh / 2);
-      msg.style.setProperty('--py', ny.toFixed(2));
+      // Clamp so clone never drifts too far (max ±0.6 = ~60% of viewport)
+      msg.style.setProperty('--py', clamp(ny, -0.6, 0.6).toFixed(2));
     }
     ticking = false;
   }
