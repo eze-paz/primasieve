@@ -675,6 +675,13 @@
       padding-bottom: max(1rem, env(safe-area-inset-bottom));
       box-shadow: 0 0 24px rgba(0,0,0,0.4);
     }
+    aside.collapsed {
+      width: min(85vw, 320px);
+      padding: 1rem;
+      left: -100%;
+    }
+    .sidebar-header { display: none; }
+    .sidebar-expand-btn { display: none !important; }
     body.sidebar-open aside { left: 0; }
     .backdrop {
       display: block;
