@@ -1172,7 +1172,13 @@ const _artifactStatus = new Map();
 function _forwardArtifactStatus(data) {
   _artifactStatus.set(data.id, { h: data.h, error: data.msg, t: Date.now() });
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  if (sw) sw.postMessage({ type: 'artifact-status', ...data });
+  console.log('[artifact] forward', data.id, 'sw=', !!sw, 'h=', data.h, 'err=', data.msg);
+  if (sw) {
+    try { sw.postMessage({ type: 'artifact-status', ...data }); }
+    catch (e) { console.error('[artifact] postMessage failed', e); }
+  } else {
+    console.warn('[artifact] no SW controller');
+  }
 }
 
 // Sandboxed iframes postMessage their content height so we can autosize them.
