@@ -1308,6 +1308,8 @@ function ensureStream(id) {
       abort: null,
       timerEl: null, timerStart: 0, timerInterval: null,
       generating: false,
+      pinned: false,
+      archived: false,
     };
     convStreams.set(id, s);
   }
@@ -4900,18 +4902,22 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
-  // Read existing file to preserve user-set flags (pinned/archived/titleLocked).
+  // Read existing file to preserve user-set flags (titleLocked).
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
   const derived = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
   const title = (prev.titleLocked && prev.title) ? prev.title : derived;
+  // Use in-memory stream flags for pinned/archived to avoid race with updateConvFile.
+  const stream = convStreams.get(convId);
   const data = {
     ...prev,
     id: convId,
     title,
     updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
     messages: msgs,
+    pinned: stream ? stream.pinned : !!prev.pinned,
+    archived: stream ? stream.archived : !!prev.archived,
   };
   await opfs.write(convPath(convId), JSON.stringify(data));
   await refreshConversationList();
@@ -5017,6 +5023,8 @@ async function loadConv(id) {
     }
     const s = ensureStream(id);
     s.messages = (data.messages || []).slice();
+    s.pinned = !!data.pinned;
+    s.archived = !!data.archived;
     mountConv(id);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
@@ -5134,6 +5142,12 @@ async function updateConvFile(id, patch) {
   catch { return; }
   Object.assign(data, patch);
   await opfs.write(convPath(id), JSON.stringify(data));
+  // Sync to in-memory stream so saveConv doesn't overwrite with stale flags.
+  const stream = convStreams.get(id);
+  if (stream) {
+    if ('pinned' in patch) stream.pinned = !!patch.pinned;
+    if ('archived' in patch) stream.archived = !!patch.archived;
+  }
 }
 
 async function renameConv(id, current) {
