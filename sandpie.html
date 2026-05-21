@@ -3128,16 +3128,20 @@ builtins.open = _sandpie_open
 
 const DISPLAY_PATCH = \`
 def _sandpie_display(*objs, **kwargs):
-    import base64
+    import base64, traceback, sys
     try:
         import js
-    except Exception:
+    except Exception as e:
+        print('[sandpie] cannot import js:', e, file=sys.stderr)
         return
     for obj in objs:
         html = None
+        err = None
         try:
             if hasattr(obj, '_repr_html_'):
                 html = obj._repr_html_()
+                if html is None:
+                    err = '_repr_html_() returned None for ' + repr(type(obj).__name__) + '. Data: ' + repr(getattr(obj, 'data', 'NO .data ATTR'))
             if html is None and hasattr(obj, '_repr_svg_'):
                 html = obj._repr_svg_()
             if html is None and hasattr(obj, '_repr_png_'):
@@ -3151,19 +3155,26 @@ def _sandpie_display(*objs, **kwargs):
                     d = base64.b64encode(d).decode()
                 html = '<img src="data:image/jpeg;base64,' + d + '">'
         except Exception as e:
-            html = '<pre>display error: ' + str(e) + '</pre>'
+            err = 'display error: ' + str(e) + '\n' + traceback.format_exc()
         if html is None:
-            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html = '<pre>' + s + '</pre>'
+            if err is None:
+                err = 'No _repr_html_, _repr_svg_, _repr_png_, or _repr_jpeg_ for ' + repr(type(obj).__name__)
+            # Include full object repr for debugging
+            try:
+                obj_repr = repr(obj)
+            except Exception:
+                obj_repr = '<unrepr-able object>'
+            html = '<pre style="color:#f85149;background:#0d1117;padding:8px;border-radius:4px;"><b>Artifact render failed</b>\n' + err.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + '\n\n<b>Object repr:</b>\n' + obj_repr.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + '</pre>'
         try:
             js._sandpieDisplay(html)
-        except Exception:
-            pass
+        except Exception as e:
+            print('[sandpie] _sandpieDisplay failed:', e, file=sys.stderr)
 try:
     import IPython.display as _ipd
     _ipd.display = _sandpie_display
-except Exception:
-    pass
+    print('[sandpie] display() patched')
+except Exception as e:
+    print('[sandpie] failed to patch display():', e, file=sys.stderr)
 \`;
 
 self.addEventListener('message', async (e) => {
