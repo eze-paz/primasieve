@@ -5099,7 +5099,6 @@ class RoundRenderer {
     // ancestor of `reply` is #messages or #messagesSide — the side panel
     // case is the one the user noticed.
     const scrollHost = this._scrollHost();
-    const wasAtBottom = scrollHost ? isAtBottom(scrollHost) : false;
 
     // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
     // so a big batch reveals fast and a trickle reveals smoothly.
@@ -5128,9 +5127,10 @@ class RoundRenderer {
       this.cursor.remove();
       this.cursor = null;
     }
-    // Re-pin to bottom if we were there before painting. Done last so the
-    // scrollHeight measurement reflects everything we just appended.
-    if (scrollHost && wasAtBottom) scrollHost.scrollTop = scrollHost.scrollHeight;
+    // Re-pin to bottom only if the user is still near bottom right now.
+    // Live check (not a snapshot) so scrolling up during generation breaks
+    // the pin cleanly on the next frame without jank.
+    if (scrollHost && isAtBottom(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
 
