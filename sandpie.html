@@ -1115,15 +1115,7 @@ window._renderArtifact = function (host, html) {
       processedHtml +
       '<script>(function(){' +
       'var id="' + id + '";' +
-      'var logs=[];' +
-      'var origLog=console.log,origErr=console.error,origWarn=console.warn;' +
-      'console.log=function(){logs.push({t:"log",d:Array.prototype.slice.call(arguments).map(function(a){return String(a);}).join(" ")});origLog.apply(console,arguments);};' +
-      'console.error=function(){logs.push({t:"err",d:Array.prototype.slice.call(arguments).map(function(a){return String(a);}).join(" ")});origErr.apply(console,arguments);};' +
-      'console.warn=function(){logs.push({t:"warn",d:Array.prototype.slice.call(arguments).map(function(a){return String(a);}).join(" ")});origWarn.apply(console,arguments);};' +
-      'var flushLogs=function(){if(logs.length){parent.postMessage({type:"sandpie-artifact-logs",id:id,logs:logs.slice()},"*");logs.length=0;}};' +
-      'setInterval(flushLogs,500);' +
       'var report=function(){' +
-        'flushLogs();' +
         'var h=Math.max(document.body?document.body.scrollHeight:0,document.documentElement?document.documentElement.scrollHeight:0,100);' +
         'parent.postMessage({type:"sandpie-artifact-resize",id:id,h:h},"*");' +
       '};' +
@@ -1147,20 +1139,9 @@ window._renderArtifact = function (host, html) {
     frame.style.display = 'none';
     const err = document.createElement('div');
     err.style.cssText = 'padding:12px;font:12px monospace;color:#d29922;';
-    var logHtml = '';
-    if (frame._artifactLogs && frame._artifactLogs.length) {
-      logHtml = '<br><br><b style="color:#e6edf3;">Iframe console:</b><br><pre style="margin:4px 0;padding:6px;background:#161b22;border-radius:4px;max-height:120px;overflow:auto;font-size:11px;">' +
-        frame._artifactLogs.map(function(l){return '<span style="color:'+(l.t==='err'?'#f85149':l.t==='warn'?'#d29922':'#8b949e')+';">'+(l.t==='err'?'ERR':l.t==='warn'?'WARN':'LOG')+'</span> '+l.d.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}).join('<br>') +
-        '</pre>';
-    }
     err.innerHTML = '<b>⚠ Artifact timeout</b><br><span style="color:#8b949e;">Iframe loaded but did not report dimensions.<br>Possible causes: JavaScript error in content, or content too large.</span>' +
-      '<br><br><span style="color:#e6edf3;">Content length: ' + htmlStr.length + ' chars</span>' + logHtml;
-    // Also surface in chat so user sees the failure in the tool result
-    var errSummary = 'Artifact failed: iframe did not report size (' + htmlStr.length + ' chars)';
-    if (frame._artifactLogs && frame._artifactLogs.length) {
-      errSummary += '\n' + frame._artifactLogs.map(function(l){return '[' + l.t + '] ' + l.d;}).join('\n');
-    }
-    addMsg('err', errSummary);
+      '<br><br><span style="color:#e6edf3;">Content length: ' + htmlStr.length + ' chars</span>';
+    addMsg('err', 'Artifact failed: iframe did not report size (' + htmlStr.length + ' chars). Check browser console (F12) for iframe JS errors.');
     wrap.appendChild(err);
     wrap.style.borderColor = '#d29922';
   }, 10000);
@@ -1224,16 +1205,6 @@ window.addEventListener('message', function(e) {
       }
     }
     console.warn('[artifact] resize message from unknown iframe', e.data.id);
-  }
-
-  // Logs from inside iframe
-  if (e.data.type === 'sandpie-artifact-logs') {
-    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-      if (f.dataset.artifactId === e.data.id) {
-        f._artifactLogs = (f._artifactLogs || []).concat(e.data.logs);
-        return;
-      }
-    }
   }
 
   // Error from inside iframe
