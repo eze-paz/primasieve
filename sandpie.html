@@ -3522,6 +3522,30 @@ async function refreshFileList() {
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
+      if (it.kind === 'folder') {
+        menuItems.push({ label: 'Make available offline', action: async () => {
+          const state = syncState();
+          const prefix = it.fullKey + '/';
+          const remoteFiles = Object.keys(state).filter(k => k.toLowerCase().startsWith(prefix.toLowerCase()));
+          if (!remoteFiles.length) { addMsg('info', 'No cloud files in this folder.'); return; }
+          const localFiles = new Set();
+          try { for (const f of await opfs.list(it.fullKey)) localFiles.add((it.fullKey ? it.fullKey + '/' : '') + f); } catch {}
+          const toHydrate = remoteFiles.filter(f => !localFiles.has(f));
+          if (!toHydrate.length) { addMsg('info', 'All files already available offline.'); return; }
+          let done = 0;
+          for (const f of toHydrate) {
+            try {
+              const result = await tools.fetch_file.run({ path: f });
+              if (!result.startsWith('Hydrated')) addMsg('info', result);
+              done++;
+            } catch (e) {
+              addMsg('err', `Hydrate failed for ${f}: ${e.message}`);
+            }
+          }
+          addMsg('info', `Hydrated ${done}/${toHydrate.length} files.`);
+          await refreshFileList();
+        }});
+      }
       if (it.kind === 'file') {
         menuItems.push({ label: 'Download', action: async () => {
           try {
