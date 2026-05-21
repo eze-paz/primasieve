@@ -621,6 +621,80 @@
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
+  /* Desktop sidebar collapse */
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.25rem 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--sp-border);
+    margin-bottom: 0.25rem;
+    flex-shrink: 0;
+  }
+  .sidebar-brand {
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+    color: var(--sp-accent);
+    font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  .sidebar-collapse-btn {
+    background: transparent;
+    border: 1px solid var(--sp-border);
+    color: var(--sp-text-dim);
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0;
+  }
+  .sidebar-collapse-btn:hover {
+    background: var(--sp-panel);
+    color: var(--sp-text);
+    border-color: var(--sp-border-bright);
+  }
+  aside.collapsed {
+    width: 0;
+    padding: 0;
+    border: none;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  aside.collapsed .sidebar-header,
+  aside.collapsed .service,
+  aside.collapsed .navbar {
+    display: none;
+  }
+  .sidebar-expand-btn {
+    display: none;
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 50;
+    width: 32px;
+    height: 32px;
+    background: var(--sp-surface);
+    border: 1px solid var(--sp-border);
+    border-radius: 6px;
+    color: var(--sp-text);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+  }
+  .sidebar-expand-btn:hover {
+    background: var(--sp-panel);
+    border-color: var(--sp-border-bright);
+  }
+  body.sidebar-collapsed .sidebar-expand-btn {
+    display: flex;
+  }
   /* Tablet/phone: stack layout, sidebar becomes a drawer.
      Also matches any touch device (hover: none + pointer: coarse) so iOS
      Safari's "Request Desktop Site" or post-OAuth handoff that fakes a
@@ -965,6 +1039,10 @@ window._sandpieDisplay = function (html) {
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
 <aside>
+  <div class="sidebar-header">
+    <span class="sidebar-brand">sandpie</span>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">◀</button>
+  </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -1069,6 +1147,7 @@ window._sandpieDisplay = function (html) {
   </div>
 </aside>
 
+<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">▶</button>
 <main>
   <!-- #messagesWrap is the dual-pane container. By default only #messages is
        visible; when the SidePanel controller opens a second conv, the
@@ -1813,6 +1892,15 @@ function toggleSidebar() {
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = open ? '✕' : '☰';
 }
+
+// Desktop sidebar collapse (PC only — mobile CSS hides these controls)
+function toggleSidebarCollapse() {
+  const aside = document.querySelector('aside');
+  const isCollapsed = aside.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+  localStorage.setItem('sandpie-sidebar-collapsed', isCollapsed ? '1' : '');
+}
+
 // Close drawer when user sends a message — drawer is for config, not for the chat
 document.addEventListener('submit', () => {
   document.body.classList.remove('sidebar-open');
@@ -6160,6 +6248,14 @@ function resetCustomTheme() {
       document.getElementById('customSurface').value = c.surface;
       document.getElementById('customText').value = c.text;
     } catch(e) {}
+  }
+  // Restore desktop sidebar collapse state
+  if (localStorage.getItem('sandpie-sidebar-collapsed')) {
+    const aside = document.querySelector('aside');
+    if (aside) {
+      aside.classList.add('collapsed');
+      document.body.classList.add('sidebar-collapsed');
+    }
   }
 })();
 </script>
