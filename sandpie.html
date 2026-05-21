@@ -4635,7 +4635,7 @@ function saveConfig() {
   }));
 }
 
-function isAtBottom(el, slack = 5) {
+function isAtBottom(el, slack = 20) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < slack;
 }
 
