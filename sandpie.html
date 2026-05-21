@@ -2729,6 +2729,7 @@ async function syncOpfsToPy(p, placeholdersList) {
   rmTree('/files');
   try { p.FS.mkdir('/files'); } catch (_) {}
   const files = await opfsList();
+  console.log('[syncOpfsToPy] OPFS files:', files.length, 'placeholdersList:', (placeholdersList || []).length);
   const hydrated = new Set(files);
   const ensureDirs = (segs) => {
     let cur = '/files';
@@ -2746,15 +2747,17 @@ async function syncOpfsToPy(p, placeholdersList) {
   }
   const placeholders = new Set();
   for (const rel of (placeholdersList || [])) {
-    if (hydrated.has(rel)) continue;
+    if (hydrated.has(rel)) { console.log('[syncOpfsToPy] skip hydrated:', rel); continue; }
     const segs = rel.split('/');
     const fn = segs.pop();
     const dir = ensureDirs(segs);
     try {
       p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
       placeholders.add(rel);
-    } catch (_) {}
+      console.log('[syncOpfsToPy] placeholder created:', rel);
+    } catch (e) { console.log('[syncOpfsToPy] FAILED:', rel, e.message); }
   }
+  console.log('[syncOpfsToPy] total placeholders created:', placeholders.size);
   return placeholders;
 }
 
@@ -3050,6 +3053,9 @@ Examples:
         for (const [rel, val] of Object.entries(st)) {
           if (!val.hydrated) placeholdersList.push(rel);
         }
+        console.log('[run_python] placeholdersList:', placeholdersList.length, 'unhydrated files');
+        const reixach = placeholdersList.filter(p => p.includes('reixach'));
+        if (reixach.length) console.log('[run_python] reixach placeholders:', reixach);
       } catch {}
       const requestId = ++_pyReqId;
       const resultPromise = new Promise(resolve => {
