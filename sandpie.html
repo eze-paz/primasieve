@@ -1226,6 +1226,16 @@ window.addEventListener('message', function(e) {
     console.warn('[artifact] resize message from unknown iframe', e.data.id);
   }
 
+  // Logs from inside iframe
+  if (e.data.type === 'sandpie-artifact-logs') {
+    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+      if (f.dataset.artifactId === e.data.id) {
+        f._artifactLogs = (f._artifactLogs || []).concat(e.data.logs);
+        return;
+      }
+    }
+  }
+
   // Error from inside iframe
   if (e.data.type === 'sandpie-artifact-error') {
     console.error('[artifact] iframe JS error', e.data.id, e.data.msg);
