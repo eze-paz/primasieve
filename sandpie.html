@@ -2256,18 +2256,25 @@ async function dbxUploadSessionFinishBatch(entries) {
 }
 
 async function dbxUploadBatch(files) {
+  // Start upload sessions in parallel (max 5 concurrent)
+  const CONCURRENCY = 5;
   const sessions = [];
-  for (const { rel, content, s, lm } of files) {
-    try {
-      const session = await dbxUploadSessionStart(content, true);
-      sessions.push({
-        cursor: { session_id: session.session_id, offset: content.byteLength },
-        commit: { path: '/' + rel, mode: 'overwrite', mute: true, autorename: false },
-        rel, s, lm, content
-      });
-    } catch (err) {
-      console.warn('session start failed:', rel, err);
-    }
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const chunk = files.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(chunk.map(async ({ rel, content, s, lm }) => {
+      try {
+        const session = await dbxUploadSessionStart(content, true);
+        return {
+          cursor: { session_id: session.session_id, offset: content.byteLength },
+          commit: { path: '/' + rel, mode: 'overwrite', mute: true, autorename: false },
+          rel, s, lm, content
+        };
+      } catch (err) {
+        console.warn('session start failed:', rel, err);
+        return null;
+      }
+    }));
+    sessions.push(...results.filter(Boolean));
   }
   if (sessions.length === 0) return [];
   const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
