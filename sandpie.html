@@ -1058,9 +1058,18 @@ window._renderArtifact = function (host, html) {
     srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
       htmlStr +
       '<script>(function(){' +
-      'var report=function(){parent.postMessage({type:"sandpie-artifact-resize",id:"' + id + '",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};' +
-      'var ro=new ResizeObserver(report);ro.observe(document.body);report();' +
-      'window.addEventListener("error",function(e){parent.postMessage({type:"sandpie-artifact-error",id:"' + id + '",msg:e.message},"*");});' +
+      'var id="' + id + '";' +
+      'var report=function(){' +
+        'var h=Math.max(document.body?document.body.scrollHeight:0,document.documentElement?document.documentElement.scrollHeight:0,100);' +
+        'parent.postMessage({type:"sandpie-artifact-resize",id:id,h:h},"*");' +
+      '};' +
+      'var ro=new ResizeObserver(function(){requestAnimationFrame(report);});' +
+      'if(document.body)ro.observe(document.body);' +
+      'if(document.documentElement)ro.observe(document.documentElement);' +
+      'window.addEventListener("load",report);' +
+      'setTimeout(report,50);' +
+      'setTimeout(report,300);' +
+      'window.addEventListener("error",function(e){parent.postMessage({type:"sandpie-artifact-error",id:id,msg:e.message},"*");});' +
       '})();<\/script>' +
       '</body></html>';
   } catch (e) {
@@ -1160,11 +1169,37 @@ window.addEventListener('message', function(e) {
 
 // Sandboxed iframes postMessage their content height so we can autosize them.
 window.addEventListener('message', e => {
-  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
-  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-    if (f.contentWindow === e.source) {
-      f.style.height = Math.max(20, e.data.h | 0) + 'px';
-      return;
+  if (!e.data || !e.data.type) return;
+  // Artifact resize: adjust iframe height
+  if (e.data.type === 'sandpie-artifact-resize') {
+    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+      if (f.contentWindow === e.source) {
+        const h = Math.max(60, e.data.h | 0);
+        f.style.height = h + 'px';
+        if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
+        if (f._artifactLoading && f._artifactLoading.parentNode) f._artifactLoading.remove();
+        const wrap = f.closest('.artifact-wrap');
+        if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
+        console.log('[artifact] resized', e.data.id || '?', 'to', h);
+        return;
+      }
+    }
+  }
+  // Artifact error: show visible error in wrapper
+  if (e.data.type === 'sandpie-artifact-error') {
+    console.error('[artifact] JS error', e.data.id, e.data.msg);
+    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+      if (f.contentWindow === e.source) {
+        const wrap = f.closest('.artifact-wrap');
+        if (wrap) {
+          wrap.style.borderColor = '#f85149';
+          const err = document.createElement('div');
+          err.style.cssText = 'padding:8px;font:11px monospace;color:#f85149;background:#0d1117;';
+          err.textContent = '⚠ JS Error: ' + (e.data.msg || 'unknown');
+          wrap.appendChild(err);
+        }
+        return;
+      }
     }
   }
 });
