@@ -994,28 +994,47 @@
 // appended to `host`. Used for Pyodide IPython.display output (live) and for
 // replaying persisted artifacts when a conversation is reloaded from OPFS.
 window._renderArtifact = function (host, html) {
-  if (!host) { console.warn('[artifact] no host provided'); return; }
-  const id = 'art-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-  console.log('[artifact] creating', id, 'html length', String(html || '').length);
+  const id = 'art-' + Date.now().toString(36);
 
-  // Wrapper — ALWAYS visible with bright border
+  // ── Error helper: never fail silently ──
+  function fail(reason, detail) {
+    console.error('[artifact]', id, reason, detail || '');
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:0.5rem;padding:12px;border:2px solid #f85149;border-radius:4px;background:#0d1117;font:12px monospace;color:#f85149;';
+    wrap.innerHTML = '<b>⚠ Artifact Error</b><br><span style="color:#e6edf3;">' + (reason || 'unknown') + '</span>' +
+      (detail ? '<br><span style="color:#8b949e;font-size:11px;">' + detail + '</span>' : '');
+    if (host) host.appendChild(wrap);
+    return wrap;
+  }
+
+  if (!host) return fail('No host element provided');
+
+  const htmlStr = String(html || '');
+  if (!htmlStr.trim()) return fail('Empty HTML content');
+
+  // ── Size guard: srcdoc has browser limits (~2MB practical) ──
+  const srcdocLimit = 1500000;  // 1.5MB safe limit
+  if (htmlStr.length > srcdocLimit) {
+    return fail('HTML too large for iframe', 'Size: ' + htmlStr.length + ' chars (limit: ' + srcdocLimit + ')');
+  }
+
+  console.log('[artifact]', id, 'rendering', htmlStr.length, 'chars');
+
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
   wrap.dataset.artifactId = id;
-  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:80px;border:2px solid #f85149;background:#161b22;border-radius:4px;overflow:hidden;';
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;';
 
-  // Header bar with status
   const header = document.createElement('div');
   header.className = 'artifact-header';
-  header.textContent = '📎 Artifact ' + id.slice(-4);
-  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:#f85149;background:#0d1117;border-bottom:1px solid #f85149;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  header.textContent = '📎 Artifact';
+  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-muted);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);';
   wrap.appendChild(header);
 
-  // Loading indicator
   const loading = document.createElement('div');
   loading.className = 'artifact-loading';
-  loading.textContent = '⏳ Loading iframe…';
-  loading.style.cssText = 'padding:8px;font:12px monospace;color:#58a6ff;text-align:center;';
+  loading.textContent = '⏳ Rendering…';
+  loading.style.cssText = 'padding:8px;font:12px monospace;color:var(--sp-accent);text-align:center;';
   wrap.appendChild(loading);
 
   const frame = document.createElement('iframe');
@@ -1023,8 +1042,9 @@ window._renderArtifact = function (host, html) {
   frame.dataset.artifactId = id;
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   frame.setAttribute('scrolling', 'no');
-  frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
+  frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;';
 
+  // ── Build srcdoc with error handling ──
   const baseCss =
     'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
     'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;min-width:100px;min-height:40px;}' +
@@ -1032,27 +1052,58 @@ window._renderArtifact = function (host, html) {
     'table{max-width:100%;border-collapse:collapse;}' +
     'pre{white-space:pre-wrap;word-wrap:break-word;}';
 
-  frame.srcdoc =
-    '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
-    String(html || '') +
-    '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",id:"' + id + '",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
-    '</body></html>';
+  let srcdoc;
+  try {
+    srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
+      htmlStr +
+      '<script>(function(){' +
+      'var report=function(){parent.postMessage({type:"sandpie-artifact-resize",id:"' + id + '",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};' +
+      'var ro=new ResizeObserver(report);ro.observe(document.body);report();' +
+      'window.addEventListener("error",function(e){parent.postMessage({type:"sandpie-artifact-error",id:"' + id + '",msg:e.message},"*");});' +
+      '})();<\/script>' +
+      '</body></html>';
+  } catch (e) {
+    return fail('Failed to build iframe content', e.message);
+  }
 
-  // Timeout: if no resize message, show fallback
-  const timeout = setTimeout(() => {
-    console.warn('[artifact]', id, 'resize timeout — showing fallback');
+  // ── Timeout: if iframe never reports size, show error ──
+  let timeout = setTimeout(function() {
+    console.error('[artifact]', id, 'timeout — iframe did not report size');
     if (loading.parentNode) loading.remove();
     frame.style.display = 'none';
-    const fallback = document.createElement('div');
-    fallback.className = 'artifact-fallback';
-    fallback.style.cssText = 'padding:8px;font:11px monospace;color:#d29922;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;';
-    fallback.textContent = '⚠ Iframe did not report size. Raw HTML (' + (html || '').length + ' chars):\n\n' + (html || '').slice(0, 500);
-    wrap.appendChild(fallback);
+    const err = document.createElement('div');
+    err.style.cssText = 'padding:12px;font:12px monospace;color:#d29922;';
+    err.innerHTML = '<b>⚠ Artifact timeout</b><br><span style="color:#8b949e;">Iframe loaded but did not report dimensions.<br>Possible causes: JavaScript error in content, or content too large.</span>' +
+      '<br><br><span style="color:#e6edf3;">Content length: ' + htmlStr.length + ' chars</span>';
+    wrap.appendChild(err);
     wrap.style.borderColor = '#d29922';
-    header.textContent = '📎 Artifact ' + id.slice(-4) + ' (fallback)';
-    header.style.color = '#d29922';
-    header.style.borderColor = '#d29922';
-  }, 8000);
+  }, 10000);
+
+  // ── Iframe event handlers ──
+  frame.onload = function() {
+    console.log('[artifact]', id, 'iframe onload fired');
+    // Give ResizeObserver a moment, then check if we got a resize
+    setTimeout(function() {
+      if (frame.style.height && frame.style.height !== '0px') {
+        console.log('[artifact]', id, 'has height after onload');
+      } else {
+        console.warn('[artifact]', id, 'no height reported after onload');
+      }
+    }, 500);
+  };
+
+  frame.onerror = function(e) {
+    clearTimeout(timeout);
+    fail('Iframe failed to load', String(e));
+  };
+
+  // ── Set srcdoc and append ──
+  try {
+    frame.srcdoc = srcdoc;
+  } catch (e) {
+    clearTimeout(timeout);
+    return fail('srcdoc assignment failed', e.message);
+  }
 
   frame._artifactTimeout = timeout;
   frame._artifactLoading = loading;
@@ -1060,39 +1111,48 @@ window._renderArtifact = function (host, html) {
 
   try {
     host.appendChild(wrap);
-    console.log('[artifact]', id, 'appended to host');
+    console.log('[artifact]', id, 'appended to DOM');
   } catch (e) {
-    console.error('[artifact]', id, 'append failed:', e);
+    clearTimeout(timeout);
+    return fail('Failed to append to DOM', e.message);
   }
 };
 
-// Sandboxed iframes postMessage their content height so we can autosize them.
-window.addEventListener('message', e => {
-  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
-  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-    if (f.contentWindow === e.source) {
-      const h = Math.max(60, e.data.h | 0);
-      f.style.height = h + 'px';
-      f.style.border = '0';
-      f.style.background = 'transparent';
-      if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
-      if (f._artifactLoading && f._artifactLoading.parentNode) {
-        f._artifactLoading.remove();
+// ── Message handler: resize AND errors ──
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+
+  // Resize
+  if (e.data.type === 'sandpie-artifact-resize') {
+    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+      if (f.contentWindow === e.source) {
+        const h = Math.max(60, e.data.h | 0);
+        f.style.height = h + 'px';
+        f.style.border = '0';
+        if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
+        if (f._artifactLoading && f._artifactLoading.parentNode) f._artifactLoading.remove();
+        const wrap = f.closest('.artifact-wrap');
+        if (wrap) wrap.style.border = '1px solid var(--sp-border)';
+        console.log('[artifact] resized', e.data.id || '?', 'to', h);
+        return;
       }
-      // Remove red diagnostic border on success
-      const wrap = f.closest('.artifact-wrap');
-      if (wrap) {
-        wrap.style.border = '1px solid var(--sp-border)';
-        wrap.style.background = 'transparent';
-        const header = wrap.querySelector('.artifact-header');
-        if (header) {
-          header.textContent = '📎 Artifact';
-          header.style.color = 'var(--sp-muted)';
-          header.style.borderColor = 'var(--sp-border)';
+    }
+    console.warn('[artifact] resize message from unknown iframe', e.data.id);
+  }
+
+  // Error from inside iframe
+  if (e.data.type === 'sandpie-artifact-error') {
+    console.error('[artifact] iframe JS error', e.data.id, e.data.msg);
+    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+      if (f.dataset.artifactId === e.data.id) {
+        const wrap = f.closest('.artifact-wrap');
+        if (wrap) {
+          wrap.style.border = '2px solid #f85149';
+          const header = wrap.querySelector('.artifact-header');
+          if (header) { header.textContent = '📎 Artifact Error'; header.style.color = '#f85149'; }
         }
+        return;
       }
-      console.log('[artifact] resized', e.data.id || '?', 'to', h);
-      return;
     }
   }
 });
