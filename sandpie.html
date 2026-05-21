@@ -2243,7 +2243,7 @@ async function dbxUploadSessionStart(content, close = true) {
 
 async function dbxUploadSessionFinishBatch(entries) {
   const token = await dbxAccessToken();
-  const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch'), {
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + token,
@@ -2272,6 +2272,15 @@ async function dbxUploadBatch(files) {
   if (sessions.length === 0) return [];
   const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
   const result = await dbxUploadSessionFinishBatch(entries);
+  // Defensive: v2 should return entries directly, but handle async job just in case
+  if (result['.tag'] === 'async_job_id') {
+    console.warn('Unexpected async_job_id from finish_batch_v2:', result.async_job_id);
+    return [];
+  }
+  if (!result.entries) {
+    console.warn('Unexpected finish_batch response:', result);
+    return [];
+  }
   return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
 }
 
@@ -2488,7 +2497,7 @@ async function sync() {
       try {
         const results = await dbxUploadBatch(files);
         for (const r of results) {
-          if (r.meta && r.meta['.tag'] !== 'failure') {
+          if (r.meta && r.meta['.tag'] === 'success') {
             state[r.rel] = {
               rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
               size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
