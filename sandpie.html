@@ -994,25 +994,76 @@
 // appended to `host`. Used for Pyodide IPython.display output (live) and for
 // replaying persisted artifacts when a conversation is reloaded from OPFS.
 window._renderArtifact = function (host, html) {
-  if (!host) return;
+  if (!host) { console.warn('[artifact] no host provided'); return; }
+  const id = 'art-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+  console.log('[artifact] creating', id, 'html length', String(html || '').length);
+
+  // Wrapper for visibility and diagnostics
+  const wrap = document.createElement('div');
+  wrap.className = 'artifact-wrap';
+  wrap.dataset.artifactId = id;
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;';
+
+  // Loading indicator
+  const loading = document.createElement('div');
+  loading.className = 'artifact-loading';
+  loading.textContent = 'Rendering…';
+  loading.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:1;padding:4px 8px;font:11px monospace;color:var(--sp-accent);background:var(--sp-panel);border:1px dashed var(--sp-border);border-radius:4px;';
+  wrap.appendChild(loading);
+
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
+  frame.dataset.artifactId = id;
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   frame.setAttribute('scrolling', 'no');
-  frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;margin-top:0.5rem';
+  frame.style.cssText = 'width:100%;min-height:60px;border:1px dashed var(--sp-border);background:var(--sp-bg);display:block;border-radius:4px;';
+
   const baseCss =
     'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
     'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
     'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
     'table{max-width:100%;border-collapse:collapse;}' +
     'pre{white-space:pre-wrap;word-wrap:break-word;}';
+
   frame.srcdoc =
     '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
     String(html || '') +
-    '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
+    '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",id:"' + id + '",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
     '</body></html>';
-  host.appendChild(frame);
+
+  // Timeout: if no resize message received, show error
+  const timeout = setTimeout(() => {
+    if (loading.parentNode) {
+      loading.textContent = '⚠ Artifact failed to render (no resize event)';
+      loading.style.color = 'var(--sp-danger)';
+      loading.style.borderColor = 'var(--sp-danger)';
+      console.warn('[artifact]', id, 'resize timeout');
+    }
+  }, 5000);
+
+  frame._artifactTimeout = timeout;
+  frame._artifactLoading = loading;
+  wrap.appendChild(frame);
+  host.appendChild(wrap);
 };
+
+// Sandboxed iframes postMessage their content height so we can autosize them.
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
+  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+    if (f.contentWindow === e.source) {
+      f.style.height = Math.max(60, e.data.h | 0) + 'px';
+      f.style.border = '0';
+      f.style.background = 'transparent';
+      if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
+      if (f._artifactLoading && f._artifactLoading.parentNode) {
+        f._artifactLoading.remove();
+      }
+      console.log('[artifact] resized', e.data.id || '?', 'to', e.data.h);
+      return;
+    }
+  }
+});
 
 // Sandboxed iframes postMessage their content height so we can autosize them.
 window.addEventListener('message', e => {
