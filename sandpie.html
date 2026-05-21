@@ -1167,11 +1167,19 @@ window.addEventListener('message', function(e) {
   }
 });
 
+// Artifact status log — forwarded to SW for AI feedback
+const _artifactStatus = new Map();
+function _forwardArtifactStatus(data) {
+  _artifactStatus.set(data.id, { h: data.h, error: data.msg, t: Date.now() });
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (sw) sw.postMessage({ type: 'artifact-status', ...data });
+}
+
 // Sandboxed iframes postMessage their content height so we can autosize them.
 window.addEventListener('message', e => {
   if (!e.data || !e.data.type) return;
-  // Artifact resize: adjust iframe height
   if (e.data.type === 'sandpie-artifact-resize') {
+    _forwardArtifactStatus(e.data);
     for (const f of document.querySelectorAll('iframe.artifact-frame')) {
       if (f.contentWindow === e.source) {
         const h = Math.max(60, e.data.h | 0);
@@ -1180,24 +1188,16 @@ window.addEventListener('message', e => {
         if (f._artifactLoading && f._artifactLoading.parentNode) f._artifactLoading.remove();
         const wrap = f.closest('.artifact-wrap');
         if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
-        console.log('[artifact] resized', e.data.id || '?', 'to', h);
         return;
       }
     }
   }
-  // Artifact error: show visible error in wrapper
   if (e.data.type === 'sandpie-artifact-error') {
-    console.error('[artifact] JS error', e.data.id, e.data.msg);
+    _forwardArtifactStatus(e.data);
     for (const f of document.querySelectorAll('iframe.artifact-frame')) {
       if (f.contentWindow === e.source) {
         const wrap = f.closest('.artifact-wrap');
-        if (wrap) {
-          wrap.style.borderColor = '#f85149';
-          const err = document.createElement('div');
-          err.style.cssText = 'padding:8px;font:11px monospace;color:#f85149;background:#0d1117;';
-          err.textContent = '⚠ JS Error: ' + (e.data.msg || 'unknown');
-          wrap.appendChild(err);
-        }
+        if (wrap) { wrap.style.borderColor = '#f85149'; wrap.style.background = '#f8514910'; }
         return;
       }
     }
