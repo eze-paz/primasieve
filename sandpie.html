@@ -638,9 +638,9 @@
     font-family: 'JetBrains Mono', Consolas, monospace;
   }
   .sidebar-collapse-btn {
-    background: transparent;
+    background: var(--sp-panel);
     border: none;
-    color: var(--sp-text-dim);
+    color: var(--sp-text);
     border-radius: 4px;
     width: 28px;
     height: 28px;
@@ -650,12 +650,12 @@
     cursor: pointer;
     font-size: 0.85rem;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    box-shadow: 0 0 12px var(--sp-accent-dim), 0 2px 6px rgba(0,0,0,0.3);
   }
   .sidebar-collapse-btn:hover {
-    background: var(--sp-panel);
-    color: var(--sp-text);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    background: var(--sp-surface);
+    color: var(--sp-accent);
+    box-shadow: 0 0 18px var(--sp-accent-dim), 0 4px 10px rgba(0,0,0,0.4);
   }
   aside.collapsed {
     width: 0;
@@ -678,7 +678,7 @@
     z-index: 50;
     width: 32px;
     height: 32px;
-    background: var(--sp-surface);
+    background: var(--sp-panel);
     border: none;
     border-radius: 6px;
     color: var(--sp-text);
@@ -687,11 +687,12 @@
     cursor: pointer;
     font-size: 0.9rem;
     padding: 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    box-shadow: 0 0 14px var(--sp-accent-dim), 0 2px 8px rgba(0,0,0,0.4);
   }
   .sidebar-expand-btn:hover {
-    background: var(--sp-panel);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    background: var(--sp-surface);
+    color: var(--sp-accent);
+    box-shadow: 0 0 22px var(--sp-accent-dim), 0 4px 12px rgba(0,0,0,0.5);
   }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
