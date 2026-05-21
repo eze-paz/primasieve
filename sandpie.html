@@ -168,6 +168,7 @@
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
+  ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-muted); white-space: nowrap; margin-left: 0.5rem; }
   /* File viewer overlay */
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
@@ -3400,6 +3401,58 @@ function buildSystemPrompt() {
   return { role: 'system', content: lines.join('\n') };
 }
 
+
+function formatSize(bytes) {
+  if (!bytes || bytes < 0) return '';
+  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
+  let u = 0;
+  while (bytes >= 1024 && u < units.length - 1) { bytes /= 1024; u++; }
+  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + ' ' + units[u];
+}
+async function getFileSize(path) {
+  // Local file: ask OPFS for size
+  try {
+    const parts = path.split('/').filter(Boolean);
+    const name = parts.pop();
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return (await handle.getFile()).size;
+  } catch {}
+  // Cloud placeholder: use sync state
+  const s = syncState()[path];
+  return s && s.size || 0;
+}
+async function getFolderSize(path) {
+  const prefix = path ? path + '/' : '';
+  let total = 0;
+  // Sum sizes from sync state (cloud files)
+  const state = syncState();
+  for (const k of Object.keys(state)) {
+    if (prefix && !k.toLowerCase().startsWith(prefix.toLowerCase())) continue;
+    if (!prefix || k.length > prefix.length) {
+      const rest = prefix ? k.slice(prefix.length) : k;
+      if (!rest.includes('/')) total += state[k].size || 0;
+    }
+  }
+  // Add local-only files not in sync state
+  try {
+    const localFiles = await opfs.list(path);
+    for (const f of localFiles) {
+      const full = prefix + f;
+      if (!state[full]) {
+        try {
+          const parts = full.split('/').filter(Boolean);
+          const name = parts.pop();
+          const dir = await opfs.resolveDir(parts);
+          const handle = await dir.getFileHandle(name);
+          total += (await handle.getFile()).size;
+        } catch {}
+      }
+    }
+  } catch {}
+  return total;
+}
+
 // ============================================================
 // OPFS file-list UI
 // ============================================================
@@ -3481,6 +3534,14 @@ async function refreshFileList() {
     }
     items.push({ name, kind, status, fullKey });
   }
+  // Fetch sizes in parallel
+  await Promise.all(items.map(async (it) => {
+    if (it.kind === 'folder') {
+      it.size = await getFolderSize(it.fullKey);
+    } else {
+      it.size = await getFileSize(it.fullKey);
+    }
+  }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
   // Re-scan manifests when the file tree changes — keeps system-prompt context current.
@@ -3497,6 +3558,10 @@ async function refreshFileList() {
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     span.textContent = kindIcon + it.name;
     span.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'file-size';
+    sizeSpan.textContent = formatSize(it.size);
+    li.append(sizeSpan);
     if (it.kind === 'folder') {
       span.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
     } else if (isPlaceholder) {
