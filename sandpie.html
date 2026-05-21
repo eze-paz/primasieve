@@ -998,17 +998,24 @@ window._renderArtifact = function (host, html) {
   const id = 'art-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
   console.log('[artifact] creating', id, 'html length', String(html || '').length);
 
-  // Wrapper for visibility and diagnostics
+  // Wrapper — ALWAYS visible with bright border
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
   wrap.dataset.artifactId = id;
-  wrap.style.cssText = 'position:relative;margin-top:0.5rem;';
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:80px;border:2px solid #f85149;background:#161b22;border-radius:4px;overflow:hidden;';
+
+  // Header bar with status
+  const header = document.createElement('div');
+  header.className = 'artifact-header';
+  header.textContent = '📎 Artifact ' + id.slice(-4);
+  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:#f85149;background:#0d1117;border-bottom:1px solid #f85149;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  wrap.appendChild(header);
 
   // Loading indicator
   const loading = document.createElement('div');
   loading.className = 'artifact-loading';
-  loading.textContent = 'Rendering…';
-  loading.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:1;padding:4px 8px;font:11px monospace;color:var(--sp-accent);background:var(--sp-panel);border:1px dashed var(--sp-border);border-radius:4px;';
+  loading.textContent = '⏳ Loading iframe…';
+  loading.style.cssText = 'padding:8px;font:12px monospace;color:#58a6ff;text-align:center;';
   wrap.appendChild(loading);
 
   const frame = document.createElement('iframe');
@@ -1016,11 +1023,11 @@ window._renderArtifact = function (host, html) {
   frame.dataset.artifactId = id;
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   frame.setAttribute('scrolling', 'no');
-  frame.style.cssText = 'width:100%;min-height:60px;border:1px dashed var(--sp-border);background:var(--sp-bg);display:block;border-radius:4px;';
+  frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
 
   const baseCss =
     'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
-    'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;}' +
+    'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;min-width:100px;min-height:40px;}' +
     'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
     'table{max-width:100%;border-collapse:collapse;}' +
     'pre{white-space:pre-wrap;word-wrap:break-word;}';
@@ -1031,20 +1038,32 @@ window._renderArtifact = function (host, html) {
     '<script>(function(){var p=function(){parent.postMessage({type:"sandpie-artifact-resize",id:"' + id + '",h:Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)},"*");};new ResizeObserver(p).observe(document.body);p();})();<\/script>' +
     '</body></html>';
 
-  // Timeout: if no resize message received, show error
+  // Timeout: if no resize message, show fallback
   const timeout = setTimeout(() => {
-    if (loading.parentNode) {
-      loading.textContent = '⚠ Artifact failed to render (no resize event)';
-      loading.style.color = 'var(--sp-danger)';
-      loading.style.borderColor = 'var(--sp-danger)';
-      console.warn('[artifact]', id, 'resize timeout');
-    }
-  }, 5000);
+    console.warn('[artifact]', id, 'resize timeout — showing fallback');
+    if (loading.parentNode) loading.remove();
+    frame.style.display = 'none';
+    const fallback = document.createElement('div');
+    fallback.className = 'artifact-fallback';
+    fallback.style.cssText = 'padding:8px;font:11px monospace;color:#d29922;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;';
+    fallback.textContent = '⚠ Iframe did not report size. Raw HTML (' + (html || '').length + ' chars):\n\n' + (html || '').slice(0, 500);
+    wrap.appendChild(fallback);
+    wrap.style.borderColor = '#d29922';
+    header.textContent = '📎 Artifact ' + id.slice(-4) + ' (fallback)';
+    header.style.color = '#d29922';
+    header.style.borderColor = '#d29922';
+  }, 8000);
 
   frame._artifactTimeout = timeout;
   frame._artifactLoading = loading;
   wrap.appendChild(frame);
-  host.appendChild(wrap);
+
+  try {
+    host.appendChild(wrap);
+    console.log('[artifact]', id, 'appended to host');
+  } catch (e) {
+    console.error('[artifact]', id, 'append failed:', e);
+  }
 };
 
 // Sandboxed iframes postMessage their content height so we can autosize them.
@@ -1052,14 +1071,27 @@ window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
   for (const f of document.querySelectorAll('iframe.artifact-frame')) {
     if (f.contentWindow === e.source) {
-      f.style.height = Math.max(60, e.data.h | 0) + 'px';
+      const h = Math.max(60, e.data.h | 0);
+      f.style.height = h + 'px';
       f.style.border = '0';
       f.style.background = 'transparent';
       if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
       if (f._artifactLoading && f._artifactLoading.parentNode) {
         f._artifactLoading.remove();
       }
-      console.log('[artifact] resized', e.data.id || '?', 'to', e.data.h);
+      // Remove red diagnostic border on success
+      const wrap = f.closest('.artifact-wrap');
+      if (wrap) {
+        wrap.style.border = '1px solid var(--sp-border)';
+        wrap.style.background = 'transparent';
+        const header = wrap.querySelector('.artifact-header');
+        if (header) {
+          header.textContent = '📎 Artifact';
+          header.style.color = 'var(--sp-muted)';
+          header.style.borderColor = 'var(--sp-border)';
+        }
+      }
+      console.log('[artifact] resized', e.data.id || '?', 'to', h);
       return;
     }
   }
