@@ -3558,10 +3558,6 @@ async function refreshFileList() {
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     span.textContent = kindIcon + it.name;
     span.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
-    const sizeSpan = document.createElement('span');
-    sizeSpan.className = 'file-size';
-    sizeSpan.textContent = formatSize(it.size);
-    li.append(sizeSpan);
     if (it.kind === 'folder') {
       span.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
     } else if (isPlaceholder) {
@@ -3584,6 +3580,10 @@ async function refreshFileList() {
       span.onclick = () => openFileViewer(it.fullKey, it.name);
     }
     li.append(span);
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'file-size';
+    sizeSpan.textContent = formatSize(it.size);
+    li.append(sizeSpan);
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
