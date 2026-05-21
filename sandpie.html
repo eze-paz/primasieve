@@ -5638,6 +5638,15 @@ async function enqueueForActive(text) {
   // typing rather than via the conv list), mount it now so bubbles are
   // visible as they stream in.
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+  // Restore pinned/archived from disk if this is a fresh stream after reload.
+  // Without this, sending immediately after reload loses flags.
+  if (s.messages.length === 0 && s.queue.length === 0 && !s.generating) {
+    try {
+      const data = JSON.parse(await opfs.read(convPath(activeConvId)));
+      s.pinned = !!data.pinned;
+      s.archived = !!data.archived;
+    } catch {}
+  }
   s.queue.push(text);
   updateQueueCount(s);
   processQueueFor(s);
