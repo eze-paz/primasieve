@@ -1225,7 +1225,7 @@ window._sandpieDisplay = function (html) {
 
 const $ = id => document.getElementById(id);
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.1-1779377073';
 
 // =============================================================================
 // SW console relay — surfaces sandpie.js's console output here.
@@ -2419,8 +2419,17 @@ async function cloudListAll() {
   const entries = await dbxList('/', { recursive: true });
   const out = {};
   for (const e of entries) {
-    const rel = e.path.replace(/^\/+/, '');
+    let rel = e.path.replace(/^\/+/, '');
     if (!rel) continue;
+    // Strip Dropbox app-folder prefix so paths match OPFS.
+    // Common prefixes: 'files/', 'Apps/sandpie/', etc.
+    const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
+    for (const p of prefixes) {
+      if (rel.toLowerCase().startsWith(p.toLowerCase())) {
+        rel = rel.slice(p.length);
+        break;
+      }
+    }
     out[rel] = e;
   }
   return out;
