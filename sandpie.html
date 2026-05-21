@@ -3114,6 +3114,7 @@ Examples:
       },
     },
     run: async ({ code, path: scriptPath, args }, signal, stream) => {
+      console.log('[run_python] TOOL CALLED');
       if (!code && !scriptPath) return 'Error: provide either "code" (inline source) or "path" (saved script under /files/).';
       if (code && scriptPath) return 'Error: provide either "code" or "path", not both.';
       if (!stream) return 'Error: run_python is missing conversation context (internal — refresh the page).';
@@ -3150,13 +3151,16 @@ Examples:
       const placeholdersList = [];
       try {
         const st = syncState();
+        console.log('[run_python] syncState keys:', Object.keys(st).length);
+        const reixachAll = Object.keys(st).filter(k => k.includes('reixach'));
+        console.log('[run_python] ALL reixach in syncState:', reixachAll.length, reixachAll);
         for (const [rel, val] of Object.entries(st)) {
           if (!val.hydrated) placeholdersList.push(rel);
         }
         console.log('[run_python] placeholdersList:', placeholdersList.length, 'unhydrated files');
         const reixach = placeholdersList.filter(p => p.includes('reixach'));
         if (reixach.length) console.log('[run_python] reixach placeholders:', reixach);
-      } catch {}
+      } catch (e) { console.log('[run_python] syncState error:', e); }
       const requestId = ++_pyReqId;
       const resultPromise = new Promise(resolve => {
         worker._pending.set(requestId, { resolve });
