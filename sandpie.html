@@ -5170,6 +5170,21 @@ async function toggleArchiveConv(id, currentlyArchived) {
   await refreshConversationList();
 }
 
+async function duplicateConv(id, title) {
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); }
+  catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
+  const newId = newConvId();
+  data.id = newId;
+  data.title = (data.title || title || '(no title)') + ' (copy)';
+  data.pinned = false;
+  data.archived = false;
+  data.updated = new Date().toISOString();
+  delete data.titleLocked;
+  await opfs.write(convPath(newId), JSON.stringify(data));
+  await refreshConversationList();
+}
+
 async function deleteConv(id, title) {
   const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
@@ -5275,6 +5290,7 @@ function buildConvLi(c, idx) {
       { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
       { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
       { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
+      { label: 'Duplicate',                          action: () => duplicateConv(c.id, c.title) },
     ];
     const sideOpen = sidePanel?.isOpen;
     const inActive = c.id === activeConvId;
