@@ -3407,7 +3407,7 @@ function formatSize(bytes) {
   const units = ['B', 'kB', 'MB', 'GB', 'TB'];
   let u = 0;
   while (bytes >= 1024 && u < units.length - 1) { bytes /= 1024; u++; }
-  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + ' ' + units[u];
+  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
 }
 async function getFileSize(path) {
   // Local file: ask OPFS for size
@@ -3423,22 +3423,21 @@ async function getFileSize(path) {
   return s && s.size || 0;
 }
 async function getFolderSize(path) {
-  const prefix = path ? path + '/' : '';
+  const prefix = path ? path.toLowerCase() + '/' : '';
   let total = 0;
-  // Sum sizes from sync state (cloud files)
   const state = syncState();
+  // Sum ALL descendant files from sync state (cloud files), including nested
   for (const k of Object.keys(state)) {
-    if (prefix && !k.toLowerCase().startsWith(prefix.toLowerCase())) continue;
-    if (!prefix || k.length > prefix.length) {
-      const rest = prefix ? k.slice(prefix.length) : k;
-      if (!rest.includes('/')) total += state[k].size || 0;
-    }
+    const kl = k.toLowerCase();
+    if (prefix && !kl.startsWith(prefix)) continue;
+    // Must be strictly under this path, not the path itself
+    if (prefix && kl.length <= prefix.length) continue;
+    total += state[k].size || 0;
   }
-  // Add local-only files not in sync state
+  // Add local-only files not tracked in sync state (recursively)
   try {
-    const localFiles = await opfs.list(path);
-    for (const f of localFiles) {
-      const full = prefix + f;
+    for (const f of await opfs.list(path)) {
+      const full = (path ? path + '/' : '') + f;
       if (!state[full]) {
         try {
           const parts = full.split('/').filter(Boolean);
