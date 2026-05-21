@@ -45,7 +45,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
     position: relative;
   }
@@ -145,7 +145,7 @@
   ul.fs-list li.empty { color: var(--sp-muted); justify-content: center; font-style: italic; font-family: inherit; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
-  ul.fs-list .name.folder { color: var(--sp-accent); }
+  ul.fs-list .name.folder { color: var(--sp-text); }
   /* File viewer overlay */
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
@@ -175,6 +175,15 @@
   .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
   .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: var(--sp-muted); }
   .dbx-status.connected { background: var(--sp-success-subtle); color: var(--sp-success); }
+  .dbx-progress {
+    margin-right: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--sp-accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
   .dbx-status.error { background: var(--sp-danger-subtle); color: var(--sp-danger); }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   /* SidePanel: #messagesWrap is a row container; #messages is always
@@ -381,7 +390,7 @@
     background: var(--sp-border);
     flex-shrink: 0;
   }
-  aside .status-dot.ok   { background: var(--sp-success); box-shadow: 0 0 4px rgba(63,185,80,0.5); }
+  aside .status-dot.ok   { background: var(--sp-accent); box-shadow: 0 0 4px var(--sp-accent-dim); }
   aside .status-dot.warn { background: var(--sp-warn); box-shadow: 0 0 4px var(--sp-warn-dim); }
   aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px var(--sp-danger-dim); }
   /* `.busy` pulses the dot while a sync operation is in flight (auto-pull on
@@ -711,9 +720,10 @@
     color: var(--sp-text);
   }
   .chip.active {
-    background: var(--sp-success-subtle);
-    border-color: var(--sp-success);
-    color: var(--sp-success);
+    background: var(--sp-panel);
+    border: 2px solid var(--sp-accent);
+    color: var(--sp-text);
+    padding: calc(0.3rem - 1px) calc(0.7rem - 1px);
   }
   .chip.add {
     border-style: dashed;
@@ -980,7 +990,7 @@ window._sandpieDisplay = function (html) {
   </div>
 
   <details class="service" id="cloudSection">
-    <summary>Cloud sync <span class="status-dot" id="dbxDot"></span></summary>
+    <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
     <div class="service-body">
       <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
       <div class="row">
@@ -1020,10 +1030,11 @@ window._sandpieDisplay = function (html) {
         <input type="color" id="customSurface" value="#161b22" onchange="applyCustomTheme()">
         <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Text</label>
         <input type="color" id="customText" value="#e6edf3" onchange="applyCustomTheme()">
+        <button class="ghost" onclick="resetCustomTheme()" style="margin-top:0.25rem; font-size:0.75rem;">Reset to midnight</button>
       </div>
     </div>
   </details>
-  <div style="font-size:0.65rem; color:#8b949e; padding:0.5rem; border-top:1px solid #30363d; margin-top:auto; text-align:center;">
+  <div style="font-size:0.65rem; color:var(--sp-muted); padding:0.5rem; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
   </div>
 </aside>
@@ -2046,11 +2057,19 @@ function dbxStatus(text, kind) {
   const el = $('dbxStatus');
   el.textContent = text;
   el.className = 'dbx-status ' + kind;
+  el.style.display = text ? '' : 'none';
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
   const btn = $('dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
   if (typeof refreshWelcome === 'function') updateVersionDisplay();
 refreshWelcome();
+}
+
+function dbxProgress(text) {
+  const el = $('dbxProgress');
+  const title = $('dbxTitle');
+  if (el) el.textContent = text || '';
+  if (title) title.style.display = text ? 'none' : '';
 }
 
 // Pulse the dropbox dot while sync work is in flight. Reference-counted so
@@ -2403,10 +2422,10 @@ async function sync() {
   _syncing = true;
   setDbxBusy(true);
   try {
-    dbxStatus('Syncing…', 'connected');
+    dbxStatus('', 'connected');
     const cloud = await cloudListAll();
     const state = syncState();
-    let pulled = 0, pushed = 0, removed = 0, baselined = 0;
+    let baselined = 0;
 
     // --- Pull: cross-device delete reconcile ---
     for (const path of Object.keys(state)) {
@@ -2418,7 +2437,7 @@ async function sync() {
         try { await opfs.remove(path); } catch {}
       }
       delete state[path];
-      removed++;
+      /* removed */
     }
 
     // --- Pull: cloud → local ---
@@ -2436,14 +2455,14 @@ async function sync() {
           };
           baselined++;
         } else if (eager) {
-          dbxStatus(`↓ ${path}`, 'connected');
+          dbxProgress(`downloading… ${path}`);
           const content = await dbxDownload(e.path);
           await opfs.write(path, content);
           state[path] = {
             rev: e.rev, size: e.size, hydrated: true,
             syncedMtime: await opfsLastModified(path),
           };
-          pulled++;
+          /* pulled */
         } else {
           state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
         }
@@ -2459,14 +2478,14 @@ async function sync() {
 
       if (cloudChanged) {
         if (eager && (s.hydrated || !localExists)) {
-          dbxStatus(`↓ ${path}`, 'connected');
+          dbxProgress(`downloading… ${path}`);
           const content = await dbxDownload(e.path);
           await opfs.write(path, content);
           state[path] = {
             rev: e.rev, size: e.size, hydrated: true,
             syncedMtime: await opfsLastModified(path),
           };
-          pulled++;
+          /* pulled */
         } else {
           if (localExists) { try { await opfs.remove(path); } catch {} }
           state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
@@ -2496,7 +2515,7 @@ async function sync() {
     const BATCH_SIZE = 50;
     for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
       const chunk = dirty.slice(i, i + BATCH_SIZE);
-      dbxStatus(`↑ batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(dirty.length/BATCH_SIZE)} (${chunk.length} files)`, 'connected');
+      dbxProgress(`uploading…(${i + chunk.length}/${dirty.length})`);
       const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
         const content = await opfs.readBytes(rel);
         return { rel, content, s, lm };
@@ -2511,7 +2530,7 @@ async function sync() {
               hydrated: true,
               syncedMtime: r.lm,
             };
-            pushed++;
+            /* pushed */
           } else {
             console.warn('batch item failed:', r.rel, r.meta);
           }
@@ -2522,19 +2541,17 @@ async function sync() {
     }
 
     setSyncState(state);
-    if (removed) await pruneOrphanDirs(cloud);
+    await pruneOrphanDirs(cloud);
 
-    const parts = [];
-    if (pulled) parts.push(`↓${pulled}`);
-    if (pushed) parts.push(`↑${pushed}`);
-    if (removed) parts.push(`-${removed}`);
-    dbxStatus(parts.length ? `Connected · ${parts.join(' ')}` : 'Connected', 'connected');
+    dbxProgress('');
     await refreshFileList();
     await refreshConversationList();
   } catch (e) {
+    dbxProgress('');
     dbxStatus('Sync failed: ' + e.message, 'error');
     console.warn('sync:', e);
   } finally {
+    dbxProgress('');
     initialSyncDone = true;
     setDbxBusy(false);
     _syncing = false;
@@ -2573,13 +2590,13 @@ async function manualResync() {
     try {
       await dbxExchangeCode(code);
       history.replaceState({}, '', location.pathname);
-      dbxStatus('Connected', 'connected');
+      dbxStatus('', 'connected');
       await sync();
     } catch (e) {
       dbxStatus('Auth failed: ' + e.message, 'error');
     }
   } else if (dbxTokens()) {
-    dbxStatus('Connected', 'connected');
+    dbxStatus('', 'connected');
     await sync();
   }
 })();
@@ -4294,7 +4311,7 @@ function bindBubble(div, msgRef) {
   if (!div._listenersAttached) {
     div._listenersAttached = true;
     // Tap/click shows the bubble menu; long-press is left for native text selection
-    div.addEventListener('click', onBubbleContextMenu);
+    div.addEventListener('contextmenu', onBubbleContextMenu);
   }
   if (msgRef) div._msg = msgRef;
   return div;
@@ -5191,7 +5208,7 @@ function buildConvLi(c, idx) {
   num.textContent = String(idx).padStart(2, '0');
   const span = document.createElement('span');
   span.className = 'name';
-  span.textContent = (c.pinned ? '📌 ' : '') + c.title;
+  span.textContent = (c.pinned ? '* ' : '') + c.title;
   span.title = c.updated || '';
   span.onclick = () => loadConv(c.id);
   li.appendChild(num);
@@ -5957,6 +5974,15 @@ function applyCustomTheme() {
   document.documentElement.style.setProperty('--sp-text-dim', text);
 
   localStorage.setItem('sandpie-custom', JSON.stringify({accent, bg, surface, text}));
+}
+
+function resetCustomTheme() {
+  document.getElementById('customAccent').value = '#58a6ff';
+  document.getElementById('customBg').value = '#0d1117';
+  document.getElementById('customSurface').value = '#161b22';
+  document.getElementById('customText').value = '#e6edf3';
+  localStorage.removeItem('sandpie-custom');
+  setTheme('midnight');
 }
 
 // Load saved theme on init
