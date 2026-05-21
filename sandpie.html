@@ -14,7 +14,7 @@
     --sp-border: #30363d;
     --sp-border-bright: #484f58;
     --sp-panel: #21262d;
-    --sp-accent: #58a6ff;
+    --sp-accent: #8ecae6;
     --sp-accent-dim: var(--sp-accent-dim);
     --sp-accent-subtle: var(--sp-accent-subtle);
     --sp-accent-dim-bg: rgba(88,166,255,0.15);
@@ -803,7 +803,7 @@
   body.tools-minimized .tool-call:hover {
     background: linear-gradient(135deg, var(--sp-accent-subtle), var(--sp-accent-dim-bg));
     border-color: var(--sp-accent-dim);
-    box-shadow: 0 0 0 1px rgba(88,166,255,0.15);
+    box-shadow: 0 0 0 1px var(--sp-accent-dim-bg);
   }
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
@@ -815,7 +815,7 @@
     line-height: 1.5;
     min-height: 30px;
     max-width: 88%;
-    background: linear-gradient(135deg, var(--sp-accent-subtle), var(--sp-accent-subtle));
+    background: linear-gradient(135deg, var(--sp-accent-dim-bg), var(--sp-accent-subtle));
     border: 1px solid var(--sp-accent-dim);
     white-space: normal;
     overflow: hidden;
@@ -2226,6 +2226,56 @@ async function dbxUpload(path, content) {
   return await res.json();
 }
 
+async function dbxUploadSessionStart(content, close = true) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ close }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+async function dbxUploadSessionFinishBatch(entries) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ entries }),
+  });
+  if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+
+async function dbxUploadBatch(files) {
+  const sessions = [];
+  for (const { rel, content, s, lm } of files) {
+    try {
+      const session = await dbxUploadSessionStart(content, true);
+      sessions.push({
+        cursor: { session_id: session.session_id, offset: content.byteLength },
+        commit: { path: '/' + rel, mode: 'overwrite', mute: true, autorename: false },
+        rel, s, lm, content
+      });
+    } catch (err) {
+      console.warn('session start failed:', rel, err);
+    }
+  }
+  if (sessions.length === 0) return [];
+  const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
+  const result = await dbxUploadSessionFinishBatch(entries);
+  return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
+}
+
+
 async function dbxDelete(path) {
   // Dropbox delete_v2; tolerates already-gone paths so a sync after a
   // local move doesn't break if the cloud copy was already removed.
@@ -2419,24 +2469,39 @@ async function sync() {
     // --- Push: local → cloud (dirty + local-only) ---
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
+    const dirty = [];
     for (const rel of opfsRels) {
-      if (rel === _openFilePath) continue;  // skip push for file open in viewer
+      if (rel === _openFilePath) continue;
       const lm = await opfsLastModified(rel);
       const s = state[rel];
       if (s && s.hydrated && lm <= s.syncedMtime) continue;
-      try {
+      dirty.push({ rel, lm, s });
+    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+      const chunk = dirty.slice(i, i + BATCH_SIZE);
+      dbxStatus(`↑ batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(dirty.length/BATCH_SIZE)} (${chunk.length} files)`, 'connected');
+      const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
         const content = await opfs.readBytes(rel);
-        dbxStatus(`↑ ${rel}`, 'connected');
-        const meta = await dbxUpload('/' + rel, content);
-        state[rel] = {
-          rev: (meta && meta.content_hash) || (s && s.rev) || '',
-          size: (meta && meta.size != null) ? meta.size : (s && s.size != null ? s.size : content.byteLength),
-          hydrated: true,
-          syncedMtime: lm,
-        };
-        pushed++;
+        return { rel, content, s, lm };
+      }));
+      try {
+        const results = await dbxUploadBatch(files);
+        for (const r of results) {
+          if (r.meta && r.meta['.tag'] !== 'failure') {
+            state[r.rel] = {
+              rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
+              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
+              hydrated: true,
+              syncedMtime: r.lm,
+            };
+            pushed++;
+          } else {
+            console.warn('batch item failed:', r.rel, r.meta);
+          }
+        }
       } catch (err) {
-        console.warn('sync push:', rel, err);
+        console.warn('batch upload failed:', err);
       }
     }
 
@@ -5196,7 +5261,7 @@ async function refreshConversationList() {
   pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
   if (pinned.length && regular.length) {
     const sep = document.createElement('li');
-    sep.style.cssText = 'height:4px; margin:2px 0; background: var(--sp-border); border-radius:2px; opacity:0.5; cursor:default; pointer-events:none;';
+    sep.style.cssText = 'height:6px; margin:0; cursor:default; pointer-events:none;';
     sep.setAttribute('aria-hidden', 'true');
     frag.appendChild(sep);
   }
@@ -5823,8 +5888,8 @@ const THEMES = {
     '--sp-border': '#d0d7de',
     '--sp-border-bright': '#afb8c1',
     '--sp-panel': '#eaeef2',
-    '--sp-accent': '#0969da',
-    '--sp-accent-dim': 'rgba(9,105,218,0.25)',
+    '--sp-accent': '#6fa8d8',
+    '--sp-accent-dim': 'rgba(111,168,216,0.25)',
     '--sp-text': '#1f2328',
     '--sp-text-dim': '#656d76',
     '--sp-muted': '#656d76',
