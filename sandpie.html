@@ -627,7 +627,6 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 0.25rem 0.5rem 0.25rem;
-    border-bottom: 1px solid var(--sp-border);
     margin-bottom: 0.25rem;
     flex-shrink: 0;
   }
@@ -635,12 +634,12 @@
     font-weight: 700;
     font-size: 1.1rem;
     letter-spacing: -0.02em;
-    color: var(--sp-accent);
+    color: var(--sp-text);
     font-family: 'JetBrains Mono', Consolas, monospace;
   }
   .sidebar-collapse-btn {
     background: transparent;
-    border: 1px solid var(--sp-border);
+    border: none;
     color: var(--sp-text-dim);
     border-radius: 4px;
     width: 28px;
@@ -649,13 +648,14 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   }
   .sidebar-collapse-btn:hover {
     background: var(--sp-panel);
     color: var(--sp-text);
-    border-color: var(--sp-border-bright);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   }
   aside.collapsed {
     width: 0;
@@ -679,18 +679,19 @@
     width: 32px;
     height: 32px;
     background: var(--sp-surface);
-    border: 1px solid var(--sp-border);
+    border: none;
     border-radius: 6px;
     color: var(--sp-text);
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     padding: 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
   }
   .sidebar-expand-btn:hover {
     background: var(--sp-panel);
-    border-color: var(--sp-border-bright);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.6);
   }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
@@ -1041,7 +1042,7 @@ window._sandpieDisplay = function (html) {
 <aside>
   <div class="sidebar-header">
     <span class="sidebar-brand">sandpie</span>
-    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">◀</button>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
   </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
@@ -1147,7 +1148,7 @@ window._sandpieDisplay = function (html) {
   </div>
 </aside>
 
-<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">▶</button>
+<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
   <!-- #messagesWrap is the dual-pane container. By default only #messages is
        visible; when the SidePanel controller opens a second conv, the
