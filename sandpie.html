@@ -381,7 +381,7 @@
   }
   aside details.service summary::-webkit-details-marker { display: none; }
   aside details.service summary::before {
-    content: '▸';
+    content: '^';
     font-size: 0.65em;
     color: var(--sp-accent);
     transition: transform 0.15s;
@@ -391,7 +391,7 @@
     color: var(--sp-text);
     background: var(--sp-panel);
   }
-  aside details.service[open] summary::before { transform: rotate(90deg); }
+  aside details.service[open] summary::before { content: 'v'; transform: none; }
   aside details.service summary:hover { color: var(--sp-text); background: var(--sp-panel); }
   aside details.service[open] .service-body {
     padding: 0.5rem 0.75rem 0.75rem;
@@ -1155,6 +1155,12 @@ window._renderArtifact = function (host, html) {
     }
     err.innerHTML = '<b>⚠ Artifact timeout</b><br><span style="color:#8b949e;">Iframe loaded but did not report dimensions.<br>Possible causes: JavaScript error in content, or content too large.</span>' +
       '<br><br><span style="color:#e6edf3;">Content length: ' + htmlStr.length + ' chars</span>' + logHtml;
+    // Also surface in chat so user sees the failure in the tool result
+    var errSummary = 'Artifact failed: iframe did not report size (' + htmlStr.length + ' chars)';
+    if (frame._artifactLogs && frame._artifactLogs.length) {
+      errSummary += '\n' + frame._artifactLogs.map(function(l){return '[' + l.t + '] ' + l.d;}).join('\n');
+    }
+    addMsg('err', errSummary);
     wrap.appendChild(err);
     wrap.style.borderColor = '#d29922';
   }, 10000);
@@ -1223,6 +1229,7 @@ window.addEventListener('message', function(e) {
   // Error from inside iframe
   if (e.data.type === 'sandpie-artifact-error') {
     console.error('[artifact] iframe JS error', e.data.id, e.data.msg);
+    addMsg('err', 'Artifact JS error: ' + (e.data.msg || 'unknown'));
     for (const f of document.querySelectorAll('iframe.artifact-frame')) {
       if (f.dataset.artifactId === e.data.id) {
         const wrap = f.closest('.artifact-wrap');
