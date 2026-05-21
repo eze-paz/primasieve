@@ -5378,7 +5378,7 @@ async function duplicateConv(id, title) {
   data.pinned = false;
   data.archived = false;
   data.updated = new Date().toISOString();
-  delete data.titleLocked;
+  data.titleLocked = true;  // lock the copied title so saveConv won't overwrite it
   await opfs.write(convPath(newId), JSON.stringify(data));
   await refreshConversationList();
 }
