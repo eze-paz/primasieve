@@ -5194,6 +5194,12 @@ async function refreshConversationList() {
     return;
   }
   pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
+  if (pinned.length && regular.length) {
+    const sep = document.createElement('li');
+    sep.style.cssText = 'height:4px; margin:2px 0; background: var(--sp-border); border-radius:2px; opacity:0.5; cursor:default; pointer-events:none;';
+    sep.setAttribute('aria-hidden', 'true');
+    frag.appendChild(sep);
+  }
   regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
   if (archived.length) {
     const header = document.createElement('li');
