@@ -1053,10 +1053,24 @@ window._renderArtifact = function (host, html) {
     'pre{white-space:pre-wrap;word-wrap:break-word;overflow-x:auto;}' +
     'div,section,article,aside,header,footer,main,nav{max-width:100%;}';
 
+  // Convert CSS @import to <link> tags — @import fails in dynamically injected
+  // iframe content (srcdoc), but <link> works reliably as a proper subresource.
+  let processedHtml = htmlStr;
+  const imports = [];
+  processedHtml = processedHtml.replace(
+    /@import\s+url\(['"]?([^'"\)]+)['"]?\)\s*;?/gi,
+    (match, url) => { imports.push(url); return ''; }
+  );
+  processedHtml = processedHtml.replace(
+    /@import\s+(['"])([^'"]+)\1\s*;?/gi,
+    (match, q, url) => { imports.push(url); return ''; }
+  );
+  const linkTags = imports.map(u => '<link rel="stylesheet" href="' + u.replace(/"/g, '&quot;') + '">').join('');
+
   let srcdoc;
   try {
-    srcdoc = '<!doctype html><html><head><meta charset="utf-8"><style>' + baseCss + '</style></head><body>' +
-      htmlStr +
+    srcdoc = '<!doctype html><html><head><meta charset="utf-8">' + linkTags + '<style>' + baseCss + '</style></head><body>' +
+      processedHtml +
       '<script>(function(){' +
       'var id="' + id + '";' +
       'var report=function(){' +
