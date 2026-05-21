@@ -4246,6 +4246,8 @@ class SidePanel {
     catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
     const s = ensureStream(id);
     s.messages = (data.messages || []).slice();
+    s.pinned = !!data.pinned;
+    s.archived = !!data.archived;
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
@@ -4322,6 +4324,8 @@ sidePanel = new SidePanel();
     try {
       const data = JSON.parse(await opfs.read(convPath(restoreId)));
       s.messages = (data.messages || []).slice();
+      s.pinned = !!data.pinned;
+      s.archived = !!data.archived;
     } catch { /* file may not exist yet — that's fine */ }
     mountConv(restoreId);
     for (const m of s.messages) renderHistoricalMessage(m);
