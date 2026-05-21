@@ -1023,7 +1023,7 @@ window._renderArtifact = function (host, html) {
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
   wrap.dataset.artifactId = id;
-  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;';
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:auto;max-width:100%;';
 
   const header = document.createElement('div');
   header.className = 'artifact-header';
@@ -1041,16 +1041,17 @@ window._renderArtifact = function (host, html) {
   frame.className = 'artifact-frame';
   frame.dataset.artifactId = id;
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
-  frame.setAttribute('scrolling', 'no');
-  frame.style.cssText = 'width:100%;min-height:40px;border:0;background:transparent;display:block;';
+  // scrolling handled by CSS overflow:auto
+  frame.style.cssText = 'width:100%;max-width:100%;min-height:40px;border:0;background:transparent;display:block;overflow:auto;';
 
   // ── Build srcdoc with error handling ──
   const baseCss =
-    'html,body{margin:0;padding:0;overflow:hidden;background:transparent;}' +
-    'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;min-width:100px;min-height:40px;}' +
-    'img,video,canvas,svg{max-width:100%;height:auto;display:block;}' +
-    'table{max-width:100%;border-collapse:collapse;}' +
-    'pre{white-space:pre-wrap;word-wrap:break-word;}';
+    'html,body{margin:0;padding:0;background:transparent;}' +
+    'body{font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;color:#e6edf3;padding:8px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;min-width:100px;min-height:40px;overflow:auto;}' +
+    'img,video,canvas,svg,iframe{max-width:100%;height:auto;display:block;}' +
+    'table{max-width:100%;border-collapse:collapse;display:block;overflow-x:auto;}' +
+    'pre{white-space:pre-wrap;word-wrap:break-word;overflow-x:auto;}' +
+    'div,section,article,aside,header,footer,main,nav{max-width:100%;}';
 
   let srcdoc;
   try {
