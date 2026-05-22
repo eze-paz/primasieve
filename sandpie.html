@@ -701,10 +701,7 @@
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
   }
-  /* Desktop: cap conversation width for readability */
-  @media (min-width: 769px) {
-    #messages { max-width: 900px; margin: 0 auto; width: 100%; }
-    #messagesSide { max-width: 900px; margin: 0 auto; width: 100%; }
+  
   }
   /* Tablet/phone: stack layout, sidebar becomes a drawer.
      Also matches any touch device (hover: none + pointer: coarse) so iOS
@@ -2116,7 +2113,7 @@ refreshTokenMeter();
     const stick = isAtBottom(m);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
-    if (stick) m.scrollTo({ top: m.scrollHeight, behavior: "smooth" });
+    if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
   }
   ta.addEventListener('input', autosize);
 
@@ -2125,6 +2122,15 @@ refreshTokenMeter();
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
   }
+    // Track when user manually scrolls up to disable auto-follow
+  const m = $('messages');
+  if (m) {
+    m.addEventListener('scroll', () => {
+      if (!isAtBottom(m)) markUserScrolledUp();
+      else markUserAtBottom(m);
+    }, { passive: true });
+  }
+
   ta.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -4088,7 +4094,7 @@ sidePanel = new SidePanel();
 refreshWelcome();
   // Scroll to the bottom after layout settles. Use a double rAF so any
   // late-arriving image loads also trigger a follow-up nudge.
-  const scrollEnd = () => { const m = $('messages'); m.scrollTo({ top: m.scrollHeight, behavior: "smooth" }); };
+  const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
   requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
   document.querySelectorAll('#messages img').forEach(img => {
     if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
@@ -4115,9 +4121,13 @@ function saveConfig() {
   }));
 }
 
-function isAtBottom(el, slack = 60) {
-  return el.scrollHeight - el.scrollTop - el.clientHeight < slack;
+let _userScrolledUp = false;
+function isAtBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= 2;
 }
+function markUserScrolledUp() { _userScrolledUp = true; }
+function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
+function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
 
 async function requestWakeLock() {
   try {
@@ -4220,7 +4230,7 @@ function addMsg(role, text = '', host = null) {
   // bottom on every new addMsg — burying the actually-ticking timer mid-history.
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
-  if (visible && stick) scrollHost.scrollTo({ top: scrollHost.scrollHeight, behavior: "smooth" });
+  if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 
@@ -4361,7 +4371,7 @@ async function rewindFromMenu() {
   // addMsg can return false (host briefly empty/short, scroll snaps to 0),
   // so leave the user where the conversation now ends.
   const messagesEl = $('messages');
-  if (messagesEl) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
+  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
 }
 
@@ -4712,7 +4722,6 @@ class RoundRenderer {
     // ancestor of `reply` is #messages or #messagesSide — the side panel
     // case is the one the user noticed.
     const scrollHost = this._scrollHost();
-    this._stickToBottom = scrollHost && isAtBottom(scrollHost);
 
     // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
     // so a big batch reveals fast and a trickle reveals smoothly.
@@ -5001,7 +5010,7 @@ async function loadConv(id) {
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
   const mEl = $('messages');
-  mEl.scrollTo({ top: mEl.scrollHeight, behavior: "smooth" });
+  mEl.scrollTop = mEl.scrollHeight;
   refreshWelcome();
 }
 
