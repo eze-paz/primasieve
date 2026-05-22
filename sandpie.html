@@ -979,6 +979,16 @@
   .chip.add {
     border-style: dashed;
   }
+  /* Light theme chip always looks light regardless of active theme */
+  .chip[data-theme="light"] {
+    background: #f0f4f8; border-color: #c8d4de; color: #3a5068;
+  }
+  .chip[data-theme="light"]:hover {
+    background: #e4eff8; border-color: #9ab8d0; color: #1a3a58;
+  }
+  .chip[data-theme="light"].active {
+    background: #e8f2fc; border-color: #6fa8d8; color: #1a3a58;
+  }
   .modal {
     position: fixed;
     inset: 0;
@@ -6030,10 +6040,10 @@ const THEMES = {
     '--sp-border': '#d0d7de',
     '--sp-border-bright': '#b0b7be',
     '--sp-panel': '#eaeef2',
-    '--sp-accent': '#0969da',
-    '--sp-accent-dim': 'rgba(9,105,218,0.25)',
-    '--sp-accent-subtle': 'rgba(9,105,218,0.08)',
-    '--sp-accent-dim-bg': 'rgba(9,105,218,0.12)',
+    '--sp-accent': '#6fa8d8',
+    '--sp-accent-dim': 'rgba(111,168,216,0.25)',
+    '--sp-accent-subtle': 'rgba(111,168,216,0.08)',
+    '--sp-accent-dim-bg': 'rgba(111,168,216,0.12)',
     '--sp-accent-neg': '#d26900',
     '--sp-text': '#1f2328',
     '--sp-text-dim': '#656d76',
