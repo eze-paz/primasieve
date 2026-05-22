@@ -1566,8 +1566,7 @@ window._sandpieDisplay = function (html) {
 //   F1  remove abort listener, stream.requestId = null.
 //   F2  releaseWakeLock, endTotalTimer, setStreamSending(false).
 //   F3  await saveConv(convId) — persist messages + artifacts to OPFS.
-//   F4  refreshTokenMeter() if active.
-//   F5  await sync() — Dropbox push of dirty conv files (no-op if not
+//   F4  await sync() — Dropbox push of dirty conv files (no-op if not
 //       connected).
 //   F6  processQueueFor loops back to U4 if more queued, else returns.
 //
@@ -1973,7 +1972,7 @@ let localProxyTimer = null;
 // no Dropbox to wait for). Used by refreshFileList / refreshConversationList
 // to distinguish "empty list" (show '(empty)') from "still loading".
 let initialSyncDone = !localStorage.getItem('dbx-tokens');
-// Hoisted up here so refreshWelcome / refreshTokenMeter / etc. can read them
+// Hoisted up here so refreshWelcome / etc. can read them
 // safely at module init — `let` bindings live in TDZ until their declaration
 // line runs, and `typeof` on a TDZ-bound name throws too.
 let cachedManifests = [];
@@ -2050,94 +2049,6 @@ if (!$('endpoint').value.trim() || !$('apiKey').value.trim()) {
   $(id).addEventListener('input', saveConfig);
 });
 
-// ============================================================
-// Token meter — rough context-size estimate against a user-set limit.
-// Estimation is the standard ~4 chars/token heuristic; close enough to surface
-// "you're approaching the model's window" without per-tokenizer accuracy.
-// ============================================================
-const TOKEN_LIMIT_KEY = 'sandpie-token-limit';
-const DEFAULT_TOKEN_LIMIT = 200000;
-let tokenLimit = parseInt(localStorage.getItem(TOKEN_LIMIT_KEY) || '0', 10) || DEFAULT_TOKEN_LIMIT;
-
-function estimateTokens(msgs) {
-  let chars = 0;
-  for (const m of msgs) {
-    chars += String(m.content || '').length;
-    if (m.tool_calls) {
-      for (const tc of m.tool_calls) {
-        chars += String(tc.function?.name || '').length;
-        chars += String(tc.function?.arguments || '').length;
-      }
-    }
-  }
-  return Math.ceil(chars / 4);
-}
-
-function fmtTokens(n) {
-  if (n >= 1000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k';
-  return String(n);
-}
-
-function refreshTokenMeter() {
-  const meter = $('tokenMeter');
-  if (!meter) return;
-  let used = 0;
-  try { used = estimateTokens([buildSystemPrompt(), ...messages]); }
-  catch { used = estimateTokens(messages); }
-  const ratio = tokenLimit > 0 ? used / tokenLimit : 0;
-  const pct = Math.max(0, Math.min(100, ratio * 100));
-  const color = ratio >= 0.9 ? '#f85149'
-              : ratio >= 0.75 ? '#d29922'
-              : '#3fb950';
-  const fill = $('tokenFill');
-  fill.style.backgroundColor = color;
-  fill.classList.remove('warn', 'err');
-  fill.style.setProperty('--target-width', pct + '%');
-  animateTokenFill();
-  const overflow = used > tokenLimit;
-  $('tokenLabel').textContent = overflow
-    ? `${fmtTokens(used)} / ${fmtTokens(tokenLimit)} — over by ${fmtTokens(used - tokenLimit)}`
-    : `${fmtTokens(used)} / ${fmtTokens(tokenLimit)}`;
-}
-
-(function() {
-  let currentWidth = 0;
-  let targetWidth = 0;
-  let animating = false;
-  window.animateTokenFill = function() {
-    const fill = $('tokenFill');
-    if (!fill) return;
-    targetWidth = parseFloat(fill.style.getPropertyValue('--target-width') || '0');
-    if (!animating) { animating = true; tick(); }
-  };
-  function tick() {
-    const diff = targetWidth - currentWidth;
-    if (Math.abs(diff) < 0.3) {
-      currentWidth = targetWidth;
-      const fill = $('tokenFill');
-      if (fill) fill.style.width = currentWidth + '%';
-      animating = false;
-      return;
-    }
-    currentWidth += diff * 0.15;
-    const fill = $('tokenFill');
-    if (fill) fill.style.width = currentWidth + '%';
-    requestAnimationFrame(tick);
-  }
-})();
-
-function editTokenLimit() {
-  const v = prompt(`Context token limit (current: ${tokenLimit.toLocaleString()})\nClaude/GPT-4o ≈ 200k · Gemini Pro ≈ 1M · old GPT-3.5 ≈ 16k`, String(tokenLimit));
-  if (v === null) return;
-  const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
-  if (!n || n < 1000) { alert('Enter a number ≥ 1000.'); return; }
-  tokenLimit = n;
-  localStorage.setItem(TOKEN_LIMIT_KEY, String(n));
-  refreshTokenMeter();
-  updateVersionDisplay();
-refreshWelcome();
-}
-refreshTokenMeter();
 
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
@@ -3260,7 +3171,6 @@ async function gatherSandpieManifests() {
 
 async function refreshManifests() {
   cachedManifests = await gatherSandpieManifests();
-  refreshTokenMeter();
   updateVersionDisplay();
 refreshWelcome();
 }
@@ -3992,7 +3902,6 @@ class SidePanel {
     messages = s?.messages || [];
     this._render();
     refreshSendButtonForActive();
-    refreshTokenMeter();
     refreshWelcome();
     refreshConversationList();
   }
@@ -4034,7 +3943,6 @@ class SidePanel {
     this._activeIsRight = false;
     this._render();
     refreshSendButtonForActive();
-    refreshTokenMeter();
     refreshWelcome();
     return true;
   }
@@ -4130,7 +4038,6 @@ sidePanel = new SidePanel();
     mountConv(restoreId);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
-  refreshTokenMeter();
   updateVersionDisplay();
 refreshWelcome();
   // Scroll to the bottom after layout settles. Use a double rAF so any
@@ -4441,8 +4348,7 @@ async function copyFromMenu() {
 }
 
 // === Tool-call collapsed view — spinner, rotating flavor text, token tick ===
-// Token estimate uses the same 4-chars-per-token approximation as the meter
-// (estimateTokens / fmtTokens) — sized to feel alive without being precise.
+// Token tick count uses a 4-chars-per-token approximation — sized to feel alive without being precise.
 const TOOL_FLAVOR = {
   run_python: [
     'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
@@ -5019,7 +4925,6 @@ async function loadConv(id) {
   }
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
-  refreshTokenMeter();
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
@@ -5036,7 +4941,6 @@ async function newConversation() {
   mountConv(id);
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
-  refreshTokenMeter();
   updateVersionDisplay();
   refreshWelcome();
 }
@@ -5202,7 +5106,6 @@ async function deleteConv(id, title) {
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
-      refreshTokenMeter();
       updateVersionDisplay();
       refreshWelcome();
     } else {
@@ -5666,7 +5569,6 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    if (convId === activeConvId) refreshTokenMeter();
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
