@@ -1148,23 +1148,41 @@ function renderArtifact(host, path) {
     return;
   }
 
+  // File types the browser can render inline; everything else gets a download link.
+  const RENDERABLE = new Set(['html','htm','svg','png','jpg','jpeg','gif','webp','pdf','csv','txt','json']);
+  const ext = clean.split('.').pop().toLowerCase();
+  const renderable = RENDERABLE.has(ext);
+
   const btns = document.createElement('span');
   btns.style.cssText = 'display:flex;gap:5px;align-items:center;';
-  const panelBtn = document.createElement('button');
-  panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
-  panelBtn.title = 'Open in side panel';
-  panelBtn.textContent = '⊞';
-  panelBtn.onclick = () => openArtifactPanel(clean);
+  if (renderable) {
+    const panelBtn = document.createElement('button');
+    panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
+    panelBtn.title = 'Open in side panel';
+    panelBtn.textContent = '⊞';
+    panelBtn.onclick = () => openArtifactPanel(clean);
+    btns.appendChild(panelBtn);
+  }
   const link = document.createElement('a');
   link.href = 'opfs/' + clean;
   link.target = '_blank';
-  link.title = 'Open in new tab';
-  link.textContent = '↗';
+  link.title = renderable ? 'Open in new tab' : 'Download';
+  link.textContent = renderable ? '↗' : '⬇';
+  if (!renderable) link.download = clean.split('/').pop();
   link.className = 'artifact-icon-btn';
-  btns.appendChild(panelBtn);
   btns.appendChild(link);
   header.appendChild(btns);
   wrap.appendChild(header);
+
+  if (!renderable) {
+    // Non-previewable file — show a download prompt instead of an iframe.
+    const dlRow = document.createElement('div');
+    dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-muted);';
+    dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
+    wrap.appendChild(dlRow);
+    target.appendChild(wrap);
+    return;
+  }
 
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
@@ -1172,10 +1190,6 @@ function renderArtifact(host, path) {
   frame.src = 'opfs/' + clean;
   // Show an error state if the SW returns a non-2xx (e.g. file not found).
   frame.addEventListener('load', () => {
-    // The SW returns a plain-text 404 body; detect it by trying to read the
-    // frame's document title/body after load. A same-origin SW-served 404
-    // still fires onload (not onerror), so check the response status via a
-    // HEAD fetch instead.
     fetch('opfs/' + clean, { method: 'HEAD' }).then(r => {
       if (!r.ok) showArtifactError(wrap, frame, '404 — file not found: ' + clean);
     }).catch(() => {});
