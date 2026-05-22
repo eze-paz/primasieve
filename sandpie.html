@@ -1537,7 +1537,7 @@ window._sandpieDisplay = function (html) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL EXECUTION                                               (sandpie.js)
 // ─────────────────────────────────────────────────────────────────────────────
-//   T1  run_python    → initPyodide (lazy) → syncOpfsToPy → exec → syncPyToOpfs
+//   T1  run_python    → initPyodide (lazy) → mountNativeFS → exec → syncfs()
 //   T2  shell         → POST proxyBase/shell
 //   T3  read_file     → GET  proxyBase/file?path=
 //   T4  write_file    → POST proxyBase/file?path=
@@ -2984,331 +2984,6 @@ async function manualResync() {
 })();
 
 // ============================================================
-// Pyodide — runs inside per-conv Web Workers (no main-thread instance).
-// Heavy Python in one conv stays off the UI thread; convs run truly in
-// parallel against their own Python interpreters.
-// ============================================================
-
-// One Pyodide worker per conversation = full Python isolation (separate
-// globals, imports, sys.argv, /files mount, stdout/stderr target). Heavy
-// Python runs in its own thread, so a tight CPU loop in one conv no longer
-// freezes the tab or trips Chrome's "page unresponsive" killer. Workers
-// are lazy-created on first run_python call and terminated when the conv
-// is deleted (see deleteConv).
-//
-// The worker source contains:
-//   * worker-side OPFS helpers (same async API as main; OPFS is per-origin)
-//   * pyodide bootstrap (importScripts the CDN)
-//   * syncOpfsToPy / syncPyToOpfs (port of the main-thread versions)
-//   * a `run` message handler that does setup + exec + sync + returns
-//     stdout/stderr/artifacts/filled-placeholders in a single result message
-//   * the open()/argv/IPython.display Python monkey-patches inline
-const PYODIDE_WORKER_SOURCE = `
-let py = null;
-let initPromise = null;
-
-// ---- worker-side OPFS helpers ----
-async function opfsRoot() { return navigator.storage.getDirectory(); }
-function splitPath(path) {
-  const parts = String(path).split('/').filter(Boolean);
-  const name = parts.pop();
-  return { parts, name };
-}
-async function opfsResolveDir(parts, create) {
-  let dir = await opfsRoot();
-  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
-  return dir;
-}
-async function opfsList(prefix) {
-  prefix = prefix || '';
-  const out = [];
-  const walk = async (dir, p) => {
-    for await (const [n, h] of dir.entries()) {
-      const full = p ? p + '/' + n : n;
-      // Skip the chats-store directory — same skip the main-thread sync uses.
-      if (full === '_conversations' || full.startsWith('_conversations/')) continue;
-      if (h.kind === 'file') out.push(full);
-      else await walk(h, full);
-    }
-  };
-  const start = prefix ? await opfsResolveDir(prefix.split('/').filter(Boolean)) : await opfsRoot();
-  await walk(start, prefix.replace(/^\\/+|\\/+$/g, ''));
-  return out.sort();
-}
-async function opfsReadBytes(path) {
-  const { parts, name } = splitPath(path);
-  const dir = await opfsResolveDir(parts);
-  const handle = await dir.getFileHandle(name);
-  return new Uint8Array(await (await handle.getFile()).arrayBuffer());
-}
-async function opfsWriteBytes(path, bytes) {
-  const { parts, name } = splitPath(path);
-  const dir = await opfsResolveDir(parts, true);
-  const handle = await dir.getFileHandle(name, { create: true });
-  const w = await handle.createWritable();
-  await w.write(bytes);
-  await w.close();
-}
-
-async function init() {
-  if (py) return py;
-  if (initPromise) return initPromise;
-  initPromise = (async () => {
-    importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
-    py = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
-    try { py.FS.mkdir('/files'); } catch (_) {}
-    return py;
-  })();
-  return initPromise;
-}
-
-async function syncOpfsToPy(p, placeholdersList) {
-  const rmTree = (full) => {
-    let stat;
-    try { stat = p.FS.stat(full); } catch (_) { return; }
-    if (p.FS.isDir(stat.mode)) {
-      for (const name of p.FS.readdir(full)) {
-        if (name === '.' || name === '..') continue;
-        rmTree(full + '/' + name);
-      }
-      if (full !== '/files') p.FS.rmdir(full);
-    } else {
-      p.FS.unlink(full);
-    }
-  };
-  rmTree('/files');
-  try { p.FS.mkdir('/files'); } catch (_) {}
-  const files = await opfsList();
-  console.log('[syncOpfsToPy] OPFS files:', files.length, 'placeholdersList:', (placeholdersList || []).length);
-  const hydrated = new Set(files);
-  const ensureDirs = (segs) => {
-    let cur = '/files';
-    for (const s of segs) {
-      cur += '/' + s;
-      try { p.FS.mkdir(cur); } catch (_) {}
-    }
-    return cur;
-  };
-  for (const rel of files) {
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    p.FS.writeFile(dir + '/' + fn, await opfsReadBytes(rel));
-  }
-  const placeholders = new Set();
-  for (const rel of (placeholdersList || [])) {
-    if (hydrated.has(rel)) { console.log('[syncOpfsToPy] skip hydrated:', rel); continue; }
-    const segs = rel.split('/');
-    const fn = segs.pop();
-    const dir = ensureDirs(segs);
-    try {
-      p.FS.writeFile(dir + '/' + fn, new Uint8Array(0));
-      placeholders.add(rel);
-      console.log('[syncOpfsToPy] placeholder created:', rel);
-    } catch (e) { console.log('[syncOpfsToPy] FAILED:', rel, e.message); }
-  }
-  console.log('[syncOpfsToPy] total placeholders created:', placeholders.size);
-  return placeholders;
-}
-
-function bytesEqual(a, b) {
-  if (!a || !b || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
-async function syncPyToOpfs(p, placeholders) {
-  const pyFiles = new Set();
-  const walk = (full, rel) => {
-    for (const name of p.FS.readdir(full)) {
-      if (name === '.' || name === '..') continue;
-      const childFull = full + '/' + name;
-      const childRel = rel ? rel + '/' + name : name;
-      const stat = p.FS.stat(childFull);
-      if (p.FS.isFile(stat.mode)) pyFiles.add(childRel);
-      else walk(childFull, childRel);
-    }
-  };
-  walk('/files', '');
-  const filled = [];
-  const written = [];
-  for (const rel of pyFiles) {
-    const newBytes = p.FS.readFile('/files/' + rel);
-    if (placeholders.has(rel) && newBytes.length === 0) continue;
-    let oldBytes = null;
-    try { oldBytes = await opfsReadBytes(rel); } catch (_) {}
-    if (oldBytes && bytesEqual(oldBytes, newBytes)) continue;
-    await opfsWriteBytes(rel, newBytes);
-    written.push(rel);
-    if (placeholders.has(rel)) filled.push(rel);
-  }
-  return { filled, written };
-}
-
-const OPEN_PATCH = \`
-import builtins, os
-if getattr(builtins.open, '__name__', None) == '_sandpie_open':
-    if hasattr(builtins, '_original_open'):
-        builtins.open = builtins._original_open
-if hasattr(builtins, '_original_open'):
-    _real_open = builtins._original_open
-else:
-    _real_open = builtins.open
-    builtins._original_open = _real_open
-try:
-    from js import _sandpie_cloud_paths
-    _sandpie_cloud_set = set(_sandpie_cloud_paths.to_py())
-except Exception:
-    _sandpie_cloud_set = set()
-def _sandpie_normalize(path):
-    s = str(path)
-    if s.startswith('/files/'): s = s[len('/files/'):]
-    while s.startswith('./'): s = s[2:]
-    return s.lstrip('/')
-def _sandpie_open(path, *args, **kwargs):
-    n = _sandpie_normalize(path)
-    if n in _sandpie_cloud_set:
-        raise FileNotFoundError(
-            f"[Errno 2] {path!s} is a sandpie cloud placeholder. "
-            f"Call fetch_file({{'path': '{n}'}}) to download it first, then re-run. "
-            f"If you meant a host path (outside /files/), use the read_file tool instead."
-        )
-    return _real_open(path, *args, **kwargs)
-builtins.open = _sandpie_open
-\`;
-
-const DISPLAY_PATCH = \`
-def _sandpie_display(*objs, **kwargs):
-    import base64, traceback, sys
-    try:
-        import js
-    except Exception as e:
-        print('[sandpie] cannot import js:', e, file=sys.stderr)
-        return
-    for obj in objs:
-        html = None
-        err = None
-        try:
-            if hasattr(obj, '_repr_html_'):
-                html = obj._repr_html_()
-                if html is None:
-                    err = '_repr_html_() returned None for ' + repr(type(obj).__name__) + '. Data: ' + repr(getattr(obj, 'data', 'NO .data ATTR'))
-            if html is None and hasattr(obj, '_repr_svg_'):
-                html = obj._repr_svg_()
-            if html is None and hasattr(obj, '_repr_png_'):
-                d = obj._repr_png_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/png;base64,' + d + '">'
-            if html is None and hasattr(obj, '_repr_jpeg_'):
-                d = obj._repr_jpeg_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/jpeg;base64,' + d + '">'
-        except Exception as e:
-            err = 'display error: ' + str(e) + '\n' + traceback.format_exc()
-        if html is None:
-            if err is None:
-                err = 'No _repr_html_, _repr_svg_, _repr_png_, or _repr_jpeg_ for ' + repr(type(obj).__name__)
-            # Include full object repr for debugging
-            try:
-                obj_repr = repr(obj)
-            except Exception:
-                obj_repr = '<unrepr-able object>'
-            html = '<pre style="color:#f85149;background:#0d1117;padding:8px;border-radius:4px;"><b>Artifact render failed</b>\n' + err.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + '\n\n<b>Object repr:</b>\n' + obj_repr.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + '</pre>'
-        try:
-            js._sandpieDisplay(html)
-        except Exception as e:
-            print('[sandpie] _sandpieDisplay failed:', e, file=sys.stderr)
-try:
-    import IPython.display as _ipd
-    _ipd.display = _sandpie_display
-    print('[sandpie] display() patched')
-except Exception as e:
-    print('[sandpie] failed to patch display():', e, file=sys.stderr)
-\`;
-
-self.addEventListener('message', async (e) => {
-  const m = e.data;
-  if (m.type !== 'run') return;
-  let stdout = '', stderr = '';
-  const artifacts = [];
-  let p = null;
-  try {
-    p = await init();
-    p.setStdout({ batched: s => stdout += s + '\\n' });
-    p.setStderr({ batched: s => stderr += s + '\\n' });
-    const placeholders = await syncOpfsToPy(p, m.placeholdersList);
-    p.runPython('import os; os.chdir(\"/files\")');
-    self._sandpie_cloud_paths = [...placeholders];
-    try { p.runPython(OPEN_PATCH); } catch (_) {}
-    if (m.argv) {
-      self._sandpie_argv = m.argv;
-      try { p.runPython('import sys\\nfrom js import _sandpie_argv\\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
-    }
-    self._sandpieDisplay = (html) => artifacts.push(html);
-    try { p.runPython(DISPLAY_PATCH); } catch (_) {}
-    try { await p.loadPackagesFromImports(m.code); } catch (_) {}
-    await p.runPythonAsync(m.code);
-    const sync = await syncPyToOpfs(p, placeholders);
-    let out = stdout.trimEnd();
-    if (stderr.trim()) out += (out ? '\\n' : '') + '--- stderr ---\\n' + stderr.trimEnd();
-    if (artifacts.length) {
-      const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
-      out = out ? out + '\\n' + note : note;
-    }
-    self.postMessage({ type: 'result', requestId: m.requestId, result: out || '(no output)', artifacts, filled: sync.filled, written: sync.written });
-  } catch (e) {
-    let msg = '';
-    if (e != null) {
-      if (typeof e === 'string') msg = e;
-      else if (e.message) msg = e.message;
-      else {
-        try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {}
-        if (!msg) { try { msg = JSON.stringify(e, Object.getOwnPropertyNames(Object(e))); if (msg === '{}') msg = ''; } catch (_) {} }
-      }
-    }
-    const tail = stderr.trim() ? '\\n--- stderr ---\\n' + stderr.trimEnd() : '';
-    if (!msg && !stderr.trim()) {
-      self.postMessage({ type: 'fatal', requestId: m.requestId, artifacts });
-      return;
-    }
-    self.postMessage({ type: 'error', requestId: m.requestId, message: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts });
-  } finally {
-    if (p) { try { p.setStdout({}); } catch (_) {} try { p.setStderr({}); } catch (_) {} }
-  }
-});
-`;
-
-// Lazy per-conv worker handle. Created the first time a conv's run_python is
-// invoked; terminated when the conv is deleted (deleteConv handles that).
-function getPyWorker(stream) {
-  if (stream.pyWorker) return stream.pyWorker;
-  const blob = new Blob([PYODIDE_WORKER_SOURCE], { type: 'application/javascript' });
-  const w = new Worker(URL.createObjectURL(blob));
-  w._pending = new Map(); // requestId -> { resolve }
-  w.addEventListener('message', (e) => {
-    const m = e.data;
-    const pending = w._pending.get(m.requestId);
-    if (!pending) return;
-    w._pending.delete(m.requestId);
-    pending.resolve(m);
-  });
-  stream.pyWorker = w;
-  return w;
-}
-let _pyReqId = 0;
-
-// Note: syncOpfsToPy / syncPyToOpfs used to live here. They now run inside
-// each conv's Pyodide worker (see PYODIDE_WORKER_SOURCE above) — the worker
-// has direct OPFS access via navigator.storage.getDirectory(), so no main-
-// thread round-trip is needed. One feature was dropped in the move: the old
-// syncPyToOpfs propagated python-side file *deletions* back to OPFS (and
-// Dropbox). The worker version only propagates writes; if the LLM deletes
-// a file inside Python, it'll reappear from OPFS on the next call. Add
-// back if that capability is missed.
-
-// ============================================================
 // Tools — backed by OPFS
 // ============================================================
 const tools = {
@@ -3374,97 +3049,6 @@ Examples:
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
       },
     },
-    run: async ({ code, path: scriptPath, args }, signal, stream) => {
-      console.log('[run_python] TOOL CALLED');
-      if (!code && !scriptPath) return 'Error: provide either "code" (inline source) or "path" (saved script under /files/).';
-      if (code && scriptPath) return 'Error: provide either "code" or "path", not both.';
-      if (!stream) return 'Error: run_python is missing conversation context (internal — refresh the page).';
-      // If path was given, load the script from OPFS up-front so the worker's
-      // executor can treat code and {path,args} the same way.
-      const scriptArgs = Array.isArray(args) ? args.map(String) : [];
-      let normPath = '';
-      if (scriptPath) {
-        normPath = String(scriptPath).replace(/^\/+/, '').replace(/^files\//, '');
-        try {
-          code = await opfs.read(normPath);
-        } catch (e) {
-          return `Error: could not read /files/${normPath}: ${e.message}. Did you save it yet? Use a code: call first to write the script — e.g. open('${normPath}','w').write(...).`;
-        }
-      }
-      // Each conv owns its own Pyodide worker — separate globals, imports,
-      // /files mount, stdout target. First call per conv pays the pyodide
-      // bootstrap (WASM is HTTP-cached, so ~2-3s after the very first page
-      // load); later calls are instant.
-      const firstCall = !stream.pyWorker;
-      let loadingMsg = null;
-      if (firstCall) {
-        loadingMsg = addMsg(
-          'info',
-          '⏳ Loading Pyodide for this conversation (~10MB, first call per conv)…',
-          stream.host,
-        );
-      }
-      const worker = getPyWorker(stream);
-      // Cloud-placeholder list comes from main-thread localStorage (workers
-      // can't reach it). Worker uses it to materialize zero-byte stubs so
-      // os.listdir / glob enumerate everything; open() on a placeholder
-      // raises FileNotFoundError with a fetch_file directive.
-      const placeholdersList = [];
-      try {
-        const st = syncState();
-        console.log('[run_python] syncState keys:', Object.keys(st).length);
-        const reixachAll = Object.keys(st).filter(k => k.includes('reixach'));
-        console.log('[run_python] ALL reixach in syncState:', reixachAll.length, reixachAll);
-        for (const [rel, val] of Object.entries(st)) {
-          if (!val.hydrated) placeholdersList.push(rel);
-        }
-        console.log('[run_python] placeholdersList:', placeholdersList.length, 'unhydrated files');
-        const reixach = placeholdersList.filter(p => p.includes('reixach'));
-        if (reixach.length) console.log('[run_python] reixach placeholders:', reixach);
-      } catch (e) { console.log('[run_python] syncState error:', e); }
-      const requestId = ++_pyReqId;
-      const resultPromise = new Promise(resolve => {
-        worker._pending.set(requestId, { resolve });
-      });
-      worker.postMessage({
-        type: 'run',
-        requestId,
-        code,
-        argv: normPath ? [normPath, ...scriptArgs] : null,
-        placeholdersList,
-      });
-      let msg;
-      try { msg = await resultPromise; }
-      finally { loadingMsg?.remove(); }
-      // Stage artifacts into the shared pending queue so sendSingle's
-      // existing artifact-drain (line ~5197) picks them up unchanged.
-      if (msg.artifacts && msg.artifacts.length) {
-        for (const html of msg.artifacts) window._pendingArtifacts.push(html);
-      }
-      // Mark filled cloud placeholders as hydrated so future syncOpfsToPy
-      // calls treat them as real files, not stubs.
-      if (msg.filled && msg.filled.length) {
-        try {
-          const st = syncState();
-          let changed = false;
-          for (const rel of msg.filled) {
-            if (st[rel]) { st[rel].hydrated = true; changed = true; }
-          }
-          if (changed) setSyncState(st);
-        } catch {}
-      }
-      // Refresh the sidebar file list if the worker wrote anything back.
-      try { await refreshFileList(); } catch {}
-      if (msg.type === 'fatal') {
-        // Kill this conv's worker so the next call gets a clean interpreter.
-        // Other convs' workers are unaffected.
-        try { worker.terminate(); } catch {}
-        stream.pyWorker = null;
-        return 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first. If this fires twice in a row, ask the user to reload the page.';
-      }
-      if (msg.type === 'error') return msg.message;
-      return msg.result;
-    },
   },
   shell: {
     description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user the local proxy must be running. Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
@@ -3491,33 +3075,6 @@ Examples:
       },
       required: ['cmd'],
     },
-    run: async ({ cmd, cwd, timeout }, signal) => {
-      const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
-      const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      const base = remote || (isLocal ? '' : null);
-      if (base === null) return 'Error: shell requires the local proxy. Start the local proxy, then retry.';
-      try {
-        const payload = { cmd };
-        if (cwd) payload.cwd = cwd;
-        if (timeout) payload.timeout = timeout;
-        const res = await fetch(base + '/shell', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal,                    // wires the Stop button into the fetch
-        });
-        const data = await res.json();
-        if (!res.ok) return `Error ${res.status}: ${data.error || 'unknown'}`;
-        let out = (data.stdout || '').trimEnd();
-        const err = (data.stderr || '').trimEnd();
-        if (err) out += (out ? '\n' : '') + '--- stderr ---\n' + err;
-        out += `\n--- exit ${data.code} (cwd: ${data.cwd}) ---`;
-        return out;
-      } catch (e) {
-        if (e.name === 'AbortError') return '[stopped — shell fetch aborted; server-side process may still finish]';
-        return `Error: ${e.message}`;
-      }
-    },
   },
   read_file: {
     description: `Read a file from the user's host filesystem (NOT OPFS — for OPFS paths use run_python). Requires the local proxy. Accepts absolute paths (C:\\..., /home/...). Returns text by default; binary files return base64. Max 5 MB per call by default — for larger files pass max_bytes (hard cap 20 MB) or use shell+head/tail.
@@ -3531,40 +3088,6 @@ ADDRESSING: host paths only. To read an OPFS file use run_python (open('foo.txt'
         max_bytes: { type: 'integer', description: 'Truncate after N bytes (default 5 MB, hard cap 20 MB).' },
       },
       required: ['path'],
-    },
-    run: async ({ path, encoding, max_bytes }, signal) => {
-      const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
-      const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: read_file requires the local proxy. Start the local proxy, then retry.';
-      if (!path) return 'Missing path.';
-      const cap = Math.min(Math.max(1, max_bytes || 5_000_000), 20_000_000);
-      try {
-        const res = await fetch(base + '/file?path=' + encodeURIComponent(path), { signal });
-        if (!res.ok) {
-          let detail = '';
-          try { detail = (await res.json()).error || ''; } catch { detail = await res.text().catch(() => ''); }
-          return `Error ${res.status}: ${detail || 'read failed'}`;
-        }
-        const buf = await res.arrayBuffer();
-        const truncated = buf.byteLength > cap;
-        const slice = truncated ? buf.slice(0, cap) : buf;
-        const note = truncated ? `\n[truncated at ${cap} bytes of ${buf.byteLength}]` : '';
-        if (encoding === 'base64') {
-          const bytes = new Uint8Array(slice);
-          let bin = '';
-          for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-          return btoa(bin) + note;
-        }
-        try {
-          const text = new TextDecoder('utf-8', { fatal: true }).decode(slice);
-          return text + note;
-        } catch (e) {
-          return `Error: file is not valid UTF-8 — retry with encoding="base64". (${e.message})`;
-        }
-      } catch (e) {
-        if (e.name === 'AbortError') return '[stopped — read_file aborted]';
-        return `Error: ${e.message}`;
-      }
     },
   },
   write_file: {
@@ -3581,37 +3104,6 @@ SAFETY: this OVERWRITES the target. For edits, read first then write the full ne
         encoding: { type: 'string', enum: ['text', 'base64'] },
       },
       required: ['path', 'content'],
-    },
-    run: async ({ path, content, encoding }, signal) => {
-      const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
-      const base = remote || (isLocalhost ? '' : null);
-      if (base === null) return 'Error: write_file requires the local proxy. Start the local proxy, then retry.';
-      if (!path) return 'Missing path.';
-      let body;
-      if (encoding === 'base64') {
-        let bin;
-        try { bin = atob(content); }
-        catch (e) { return `Error: invalid base64 content (${e.message})`; }
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        body = bytes;
-      } else {
-        body = new TextEncoder().encode(content);
-      }
-      try {
-        const res = await fetch(base + '/file?path=' + encodeURIComponent(path), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body,
-          signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return `Error ${res.status}: ${data.error || 'write failed'}`;
-        return `Wrote ${data.bytes} bytes to ${data.path}`;
-      } catch (e) {
-        if (e.name === 'AbortError') return '[stopped — write_file aborted]';
-        return `Error: ${e.message}`;
-      }
     },
   },
   fetch_file: {
@@ -5594,10 +5086,6 @@ function refreshWelcome() {
   let convCount = 0;
   try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
   if (convCount > 0) parts.push(`${convCount} chat${convCount === 1 ? '' : 's'} restored`);
-  // Count convs with a live pyodide worker (worker per conv now).
-  let pyConvs = 0;
-  for (const s of convStreams.values()) if (s.pyWorker) pyConvs++;
-  if (pyConvs > 0) parts.push(`pyodide × ${pyConvs}`);
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
@@ -5687,9 +5175,7 @@ async function deleteConv(id, title) {
     if (stream.abort) stream.abort.abort();
     if (stream.timerInterval) clearInterval(stream.timerInterval);
     if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
-    // Tear down this conv's Pyodide worker too — otherwise it keeps holding
-    // ~10MB of WASM heap forever even though no one can talk to it.
-    if (stream.pyWorker) { try { stream.pyWorker.terminate(); } catch {} stream.pyWorker = null; }
+
     convStreams.delete(id);
   }
   // Tell SidePanel first so it can drop its reference + collapse the right
