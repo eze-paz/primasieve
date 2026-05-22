@@ -141,7 +141,6 @@
   }
   aside .navbar .back {
     flex: 0 0 32px;
-    height: 32px;
     padding: 0;
     border: none;
     background: var(--sp-bg);
@@ -2140,11 +2139,11 @@ refreshWelcome();
 }
 refreshTokenMeter();
 
-let _userScrolledUp = false;
+const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
-function markUserScrolledUp() { _userScrolledUp = true; }
-function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
-function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
+function lockScroll(el) { if (el) _scrollLocked.add(el); }
+function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
+function shouldAutoScroll(el) { return _scrollLocked.has(el); }
 
 // Chat input: textarea that auto-grows up to a cap, with Enter-to-send /
 // Shift+Enter-to-newline behavior.
@@ -2153,7 +2152,6 @@ function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
   if (!ta) return;
   function autosize() {
     const m = $('messages');
-    const stick = isAtBottom(m);
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
     if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
@@ -2165,14 +2163,17 @@ function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
   }
-    // Track when user manually scrolls up to disable auto-follow
-  const m = $('messages');
-  if (m) {
-    m.addEventListener('scroll', () => {
-      if (!isAtBottom(m)) markUserScrolledUp();
-      else markUserAtBottom(m);
-    }, { passive: true });
+  function setupScrollTracking(el) {
+    if (!el) return;
+    lockScroll(el);
+    el.addEventListener('scroll', () => { if (isAtBottom(el)) lockScroll(el); }, { passive: true });
+    el.addEventListener('wheel', e => { if (e.deltaY < 0) unlockScroll(el); }, { passive: true });
+    let _ty = 0;
+    el.addEventListener('touchstart', e => { _ty = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener('touchmove', e => { if (e.touches[0].clientY > _ty) unlockScroll(el); }, { passive: true });
   }
+  setupScrollTracking($('messages'));
+  setupScrollTracking($('messagesSide'));
 
   ta.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -4231,11 +4232,6 @@ function addMsg(role, text = '', host = null) {
     scrollHost = scrollHost.parentNode;
   }
   const visible = !!scrollHost;
-  // Only auto-scroll from addMsg when NOT actively streaming.
-  // During streaming, _drainTick handles scroll pinning with a pre-paint
-  // snapshot so adding content doesn't falsely break the stick-to-bottom.
-  const streaming = activeStream() && activeStream().generating;
-  const stick = visible && !streaming ? isAtBottom(scrollHost) : false;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
@@ -4754,6 +4750,7 @@ class RoundRenderer {
     // ancestor of `reply` is #messages or #messagesSide — the side panel
     // case is the one the user noticed.
     const scrollHost = this._scrollHost();
+    const stick = shouldAutoScroll(scrollHost);
 
     // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
     // so a big batch reveals fast and a trickle reveals smoothly.
@@ -4782,9 +4779,7 @@ class RoundRenderer {
       this.cursor.remove();
       this.cursor = null;
     }
-    // Re-pin to bottom only if the user was already at bottom before we painted.
-    // Snapshot taken at the top of _drainTick before any DOM changes.
-    if (scrollHost && this._stickToBottom) scrollHost.scrollTo({ top: scrollHost.scrollHeight, behavior: "smooth" });
+    if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
 
@@ -5403,7 +5398,8 @@ function handleSubmit() {
   if (!text) return;
   $('input').value = '';
   const m = $('messages');
-  m.scrollTo({ top: m.scrollHeight, behavior: "smooth" });
+  lockScroll(m);
+  m.scrollTop = m.scrollHeight;
   enqueueForActive(text);
   // Reset textarea height after clearing value
   const ta = $('input');
