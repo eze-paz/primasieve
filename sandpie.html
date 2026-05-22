@@ -1127,6 +1127,20 @@
     font-size: 12px;
   }
   .tc-dim { opacity: 0.65; }
+  /* Artifact collapsed state */
+  .artifact-meta-row {
+    display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    padding: 8px 12px; font: 11px monospace; color: var(--sp-muted);
+    background: var(--sp-surface);
+  }
+  .artifact-show-btn {
+    background: var(--sp-panel); border: 1px solid var(--sp-border);
+    border-radius: 4px; padding: 3px 10px; font: 11px monospace;
+    color: var(--sp-text); cursor: pointer; white-space: nowrap;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .artifact-show-btn:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
+  .artifact-meta-info { color: var(--sp-muted); }
   @keyframes sp-spin { to { transform: rotate(360deg); } }
   @keyframes tc-fade {
     from { opacity: 0; transform: translateY(3px); }
@@ -1173,14 +1187,19 @@ function renderArtifact(host, path) {
   const ext = clean.split('.').pop().toLowerCase();
   const renderable = RENDERABLE.has(ext);
 
+  // Store metadata for the collapsed state
+  wrap.dataset.artifactPath    = clean;
+  wrap.dataset.artifactCreated = Date.now();
+
   const btns = document.createElement('span');
   btns.style.cssText = 'display:flex;gap:5px;align-items:center;';
+
   if (renderable) {
     const panelBtn = document.createElement('button');
     panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
     panelBtn.title = 'Open in side panel';
     panelBtn.textContent = '⊞';
-    panelBtn.onclick = () => openArtifactPanel(clean);
+    panelBtn.onclick = () => { collapseArtifact(wrap); openArtifactPanel(clean); };
     btns.appendChild(panelBtn);
     const openLink = document.createElement('a');
     openLink.href = 'opfs/' + clean;
@@ -1190,6 +1209,7 @@ function renderArtifact(host, path) {
     openLink.className = 'artifact-icon-btn';
     btns.appendChild(openLink);
   }
+
   const dlBtn = document.createElement('button');
   dlBtn.title = 'Download';
   dlBtn.textContent = '⬇';
@@ -1212,6 +1232,16 @@ function renderArtifact(host, path) {
     }
   };
   btns.appendChild(dlBtn);
+
+  if (renderable) {
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'artifact-icon-btn artifact-collapse-btn';
+    collapseBtn.title = 'Collapse';
+    collapseBtn.textContent = '−';
+    collapseBtn.onclick = () => toggleArtifactCollapse(wrap);
+    btns.appendChild(collapseBtn);
+  }
+
   header.appendChild(btns);
   wrap.appendChild(header);
 
@@ -1225,11 +1255,25 @@ function renderArtifact(host, path) {
     return;
   }
 
+  // Collapsed meta row (hidden by default, shown when artifact is collapsed)
+  const metaRow = document.createElement('div');
+  metaRow.className = 'artifact-meta-row';
+  metaRow.style.display = 'none';
+  const showBtn = document.createElement('button');
+  showBtn.className = 'artifact-show-btn';
+  showBtn.textContent = '▼ Show artifact';
+  showBtn.onclick = () => toggleArtifactCollapse(wrap);
+  const metaInfo = document.createElement('span');
+  metaInfo.className = 'artifact-meta-info';
+  metaInfo.textContent = clean.split('/').pop();
+  metaRow.appendChild(showBtn);
+  metaRow.appendChild(metaInfo);
+  wrap.appendChild(metaRow);
+
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
   frame.src = 'opfs/' + clean;
-  // Show an error state if the SW returns a non-2xx (e.g. file not found).
   frame.addEventListener('load', () => {
     fetch('opfs/' + clean, { method: 'HEAD' }).then(r => {
       if (!r.ok) showArtifactError(wrap, frame, '404 — file not found: ' + clean);
@@ -1237,6 +1281,63 @@ function renderArtifact(host, path) {
   });
   wrap.appendChild(frame);
   target.appendChild(wrap);
+}
+
+function formatArtifactBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function formatArtifactAge(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 10)  return 'just now';
+  if (s < 60)  return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  return Math.floor(s / 3600) + 'h ago';
+}
+
+function collapseArtifact(wrap) {
+  if (!wrap || wrap.dataset.artifactCollapsed === '1') return;
+  wrap.dataset.artifactCollapsed = '1';
+  const frame    = wrap.querySelector('.artifact-frame');
+  const metaRow  = wrap.querySelector('.artifact-meta-row');
+  const colBtn   = wrap.querySelector('.artifact-collapse-btn');
+  if (frame)   frame.style.display = 'none';
+  if (colBtn)  { colBtn.textContent = '+'; colBtn.title = 'Expand'; }
+  if (metaRow) {
+    metaRow.style.display = 'flex';
+    // Populate size + age lazily
+    const path = wrap.dataset.artifactPath;
+    const ts   = parseInt(wrap.dataset.artifactCreated || '0', 10);
+    const info = metaRow.querySelector('.artifact-meta-info');
+    if (info) {
+      const age = ts ? ' · ' + formatArtifactAge(ts) : '';
+      fetch('opfs/' + path, { method: 'HEAD' }).then(r => {
+        const len = r.headers.get('content-length');
+        const size = len ? ' · ' + formatArtifactBytes(parseInt(len, 10)) : '';
+        if (info) info.textContent = path.split('/').pop() + size + age;
+      }).catch(() => {
+        if (info) info.textContent = path.split('/').pop() + age;
+      });
+    }
+  }
+}
+
+function expandArtifact(wrap) {
+  if (!wrap || wrap.dataset.artifactCollapsed !== '1') return;
+  delete wrap.dataset.artifactCollapsed;
+  const frame   = wrap.querySelector('.artifact-frame');
+  const metaRow = wrap.querySelector('.artifact-meta-row');
+  const colBtn  = wrap.querySelector('.artifact-collapse-btn');
+  if (frame)   frame.style.display = 'block';
+  if (metaRow) metaRow.style.display = 'none';
+  if (colBtn)  { colBtn.textContent = '−'; colBtn.title = 'Collapse'; }
+}
+
+function toggleArtifactCollapse(wrap) {
+  if (wrap.dataset.artifactCollapsed === '1') expandArtifact(wrap);
+  else collapseArtifact(wrap);
 }
 
 function showArtifactError(wrap, frame, msg) {
