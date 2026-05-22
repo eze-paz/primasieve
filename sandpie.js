@@ -225,7 +225,7 @@ self.addEventListener('fetch', (event) => {
   if (path.endsWith('/sandpie-agent'))  return event.respondWith(handleAgent(event.request));
   if (path.endsWith('/sandpie-stream')) return event.respondWith(handleStream(event.request));
   if (path.endsWith('/sandpie-py'))     return event.respondWith(handlePy(event.request));
-  if (path.startsWith('/opfs/'))        return event.respondWith(handleOpfs(path));
+  if (path.includes('/opfs/'))          return event.respondWith(handleOpfs(path));
   // Anything else falls through to the network.
 });
 
@@ -813,7 +813,7 @@ async function handlePy(req) {
 // Serve an OPFS file over HTTP. HTML files get the postMessage resize script
 // injected so the page-side resize listener can autosize the artifact iframe.
 async function handleOpfs(path) {
-  const opfsPath = decodeURIComponent(path.slice('/opfs/'.length));
+  const opfsPath = decodeURIComponent(path.slice(path.indexOf('/opfs/') + '/opfs/'.length));
   try {
     const bytes = await opfsReadBytes(opfsPath);
     const ext = (opfsPath.split('.').pop() || '').toLowerCase();

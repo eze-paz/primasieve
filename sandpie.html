@@ -1076,7 +1076,7 @@
 <script>
 // Render an OPFS file as a live artifact iframe appended to `host`.
 // path is the OPFS-relative path (e.g. "files/outputs/chart.html").
-// The SW serves it at /opfs/<path> and injects the resize postMessage script.
+// The SW serves it at opfs/<path> (relative URL → SW scope intercepts it) and injects the resize postMessage script.
 function renderArtifact(host, path) {
   if (!host || !path) return;
   const clean = String(path).replace(/^\/+/, '');
@@ -1089,7 +1089,7 @@ function renderArtifact(host, path) {
   const label = document.createElement('span');
   label.textContent = '📎 Artifact';
   const link = document.createElement('a');
-  link.href = '/opfs/' + clean;
+  link.href = 'opfs/' + clean;
   link.target = '_blank';
   link.textContent = '↗ open';
   link.style.cssText = 'color:var(--sp-accent);text-decoration:none;font-size:0.8rem;';
@@ -1099,7 +1099,7 @@ function renderArtifact(host, path) {
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
-  frame.src = '/opfs/' + clean;
+  frame.src = 'opfs/' + clean;
   wrap.appendChild(frame);
   host.appendChild(wrap);
 }
