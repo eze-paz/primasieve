@@ -634,19 +634,42 @@
     flex-shrink: 0;
   }
   .sidebar-brand {
-    font-weight: 700;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 400;
     font-size: 1.1rem;
-    letter-spacing: -0.02em;
+    letter-spacing: 2px;
     color: var(--sp-text);
-    font-family: 'JetBrains Mono', Consolas, monospace;
+    position: relative;
+    display: inline-block;
+  }
+  .sidebar-brand::before,
+  .sidebar-brand::after {
+    content: '[sandpie]';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .sidebar-brand::before {
+    color: var(--sp-accent);
+    clip-path: inset(0 40% 0 0);
+    animation: chromaShift 1.2s ease-out 1 forwards;
+  }
+  .sidebar-brand::after {
+    color: var(--sp-accent-neg);
+    clip-path: inset(0 0 0 40%);
+    animation: chromaShift2 1.2s ease-out 1 forwards;
   }
   .sidebar-collapse-btn {
     background: var(--sp-panel);
     border: none;
     color: var(--sp-text);
-    border-radius: 4px;
-    width: 28px;
-    height: 28px;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -705,6 +728,20 @@
     margin-left: 48px;
   }
   
+  }
+  @keyframes chromaShift {
+    0% { opacity: 0; transform: translateX(0); }
+    15% { opacity: 0.9; transform: translateX(-3px); }
+    40% { opacity: 0.7; transform: translateX(-2px); }
+    70% { opacity: 0.3; transform: translateX(-1px); }
+    100% { opacity: 0; transform: translateX(0); }
+  }
+  @keyframes chromaShift2 {
+    0% { opacity: 0; transform: translateX(0); }
+    15% { opacity: 0.9; transform: translateX(3px); }
+    40% { opacity: 0.7; transform: translateX(2px); }
+    70% { opacity: 0.3; transform: translateX(1px); }
+    100% { opacity: 0; transform: translateX(0); }
   }
   /* Tablet/phone: stack layout, sidebar becomes a drawer.
      Also matches any touch device (hover: none + pointer: coarse) so iOS
@@ -1291,7 +1328,7 @@ window._sandpieDisplay = function (html) {
 <div class="backdrop" onclick="toggleSidebar()"></div>
 <aside>
   <div class="sidebar-header">
-    <span class="sidebar-brand">sandpie</span>
+    <span class="sidebar-brand">[sandpie]</span>
     <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
   </div>
   <details class="service" id="convSection" open>
@@ -3460,6 +3497,7 @@ async function refreshFileList() {
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
+      menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
       if (it.kind === 'folder') {
         menuItems.push({ label: 'Make available offline', action: async () => {
           const state = syncState();
