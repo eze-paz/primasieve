@@ -223,15 +223,17 @@
     scrollbar-gutter: stable; min-width: 0;
     border-left: 1px solid var(--sp-border);
   }
-  body:not(.side-open) #messagesSide { display: none; }
+  /* #messagesSide hidden unless a conv OR artifact is open in it */
+  body:not(.side-open):not(.artifact-side-open) #messagesSide { display: none; }
+  body.artifact-side-open #messagesSide { display: flex; flex-direction: column; }
   body.side-open #messages,
   body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
-  /* Artifact panel — third pane in #messagesWrap, desktop-only */
-  #artifactPanel {
-    flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;
-    border-left: 1px solid var(--sp-border);
-  }
-  body:not(.artifact-panel-open) #artifactPanel { display: none; }
+  /* Artifact mode inside #messagesSide — hide conv hosts, show iframe */
+  #messagesSide.artifact-mode { padding: 0; gap: 0; overflow: hidden; }
+  #messagesSide.artifact-mode > *:not(#artifactPanelHeader):not(#artifactPanelFrame) { display: none !important; }
+  #messagesSide:not(.artifact-mode) #artifactPanelHeader,
+  #messagesSide:not(.artifact-mode) #artifactPanelFrame { display: none; }
+  /* Artifact panel header (inside #messagesSide) */
   #artifactPanelHeader {
     display: flex; align-items: center; justify-content: space-between;
     padding: 4px 10px; background: var(--sp-panel); border-bottom: 1px solid var(--sp-border);
@@ -244,18 +246,14 @@
   }
   #artifactPanelClose:hover { color: var(--sp-text); }
   #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
-  /* Resizer handle between chat and artifact panel */
-  #artifactResizer {
+  /* Resizer handle between #messages and #messagesSide */
+  #sideResizer {
     width: 5px; flex-shrink: 0; cursor: col-resize;
-    background: var(--sp-border);
-    transition: background 0.15s;
-    position: relative;
+    background: var(--sp-border); transition: background 0.15s; position: relative;
   }
-  #artifactResizer::after {
-    content: ''; position: absolute; inset: 0 -3px;
-  }
-  #artifactResizer:hover, #artifactResizer.dragging { background: var(--sp-accent); }
-  body:not(.artifact-panel-open) #artifactResizer { display: none; }
+  #sideResizer::after { content: ''; position: absolute; inset: 0 -3px; }
+  #sideResizer:hover, #sideResizer.dragging { background: var(--sp-accent); }
+  body:not(.side-open):not(.artifact-side-open) #sideResizer { display: none; }
   .artifact-icon-btn {
     cursor: pointer; background: var(--sp-surface); border: 1px solid var(--sp-border);
     color: var(--sp-text-dim); border-radius: 50%; width: 20px; height: 20px;
@@ -906,9 +904,10 @@
        JS drop handlers also early-return on mobile, so the only way in is
        the "View in side panel" context menu — and that's a desktop-only
        option in buildConvLi too. */
-    body.side-open #messagesSide { display: none; }
+    body.side-open #messagesSide,
+    body.artifact-side-open #messagesSide { display: none !important; }
     body.side-open #messages { flex: 1; }
-    body.artifact-panel-open #artifactPanel { display: none; }
+    #sideResizer { display: none !important; }
     .artifact-panel-btn { display: none !important; }
     /* Touch-friendly: bigger inputs and bottom-row chat */
     aside input, aside button {
@@ -1196,52 +1195,26 @@ function showArtifactError(wrap, frame, msg) {
 
 function openArtifactPanel(path) {
   const clean = String(path).replace(/^\/+/, '');
-  $('artifactPanelFrame').src = 'opfs/' + clean;
-  $('artifactPanelTitle').textContent = clean.split('/').pop();
-  document.body.classList.add('artifact-panel-open');
+  // Close conversation side panel first — right pane is shared
+  if (typeof sidePanel !== 'undefined' && sidePanel?.isOpen) sidePanel.close();
+  const frame = document.getElementById('artifactPanelFrame');
+  const title = document.getElementById('artifactPanelTitle');
+  const link  = document.getElementById('artifactOpenLink');
+  if (frame) frame.src = 'opfs/' + clean;
+  if (title) title.textContent = clean.split('/').pop();
+  if (link)  link.href = 'opfs/' + clean;
+  const side = document.getElementById('messagesSide');
+  if (side) side.classList.add('artifact-mode');
+  document.body.classList.add('artifact-side-open');
 }
 
-// ── Artifact panel resize drag ───────────────────────────────────────────────
-(function () {
-  const resizer = $('artifactResizer');
-  const panel   = $('artifactPanel');
-  if (!resizer || !panel) return;
-
-  resizer.addEventListener('mousedown', e => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = panel.offsetWidth;
-
-    // Switch panel to fixed width so flex stops fighting us
-    panel.style.flex = 'none';
-    panel.style.width = startW + 'px';
-    resizer.classList.add('dragging');
-    document.body.style.cursor    = 'col-resize';
-    document.body.style.userSelect = 'none';
-    // Prevent the artifact iframe from eating mouse events during drag
-    $('artifactPanelFrame').style.pointerEvents = 'none';
-
-    function onMove(e) {
-      const wrap  = $('messagesWrap');
-      const minW  = 200;
-      const maxW  = wrap.offsetWidth - 300;
-      const newW  = Math.max(minW, Math.min(startW + (startX - e.clientX), maxW));
-      panel.style.width = newW + 'px';
-    }
-
-    function onUp() {
-      resizer.classList.remove('dragging');
-      document.body.style.cursor     = '';
-      document.body.style.userSelect = '';
-      $('artifactPanelFrame').style.pointerEvents = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
-    }
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
-  });
-})();
+function closeArtifactPanel() {
+  const side  = document.getElementById('messagesSide');
+  const frame = document.getElementById('artifactPanelFrame');
+  if (side)  side.classList.remove('artifact-mode');
+  if (frame) frame.src = 'about:blank';
+  document.body.classList.remove('artifact-side-open');
+}
 
 
 // Artifact iframes postMessage their content height — autosize and border reveal.
@@ -1397,12 +1370,14 @@ window.addEventListener('message', e => {
         </div>
       </div>
     </div>
-    <div id="messagesSide"></div>
-    <div id="artifactResizer"></div>
-    <div id="artifactPanel">
+    <div id="sideResizer"></div>
+    <div id="messagesSide">
       <div id="artifactPanelHeader">
-        <span id="artifactPanelTitle">artifact</span>
-        <button id="artifactPanelClose" title="Close panel" onclick="document.body.classList.remove('artifact-panel-open')">✕</button>
+        <span id="artifactPanelTitle"></span>
+        <span style="display:flex;gap:4px;align-items:center;">
+          <a id="artifactOpenLink" class="artifact-icon-btn" target="_blank" title="Open in new tab">↗</a>
+          <button id="artifactPanelClose" class="artifact-icon-btn" title="Close panel" onclick="closeArtifactPanel()">✕</button>
+        </span>
       </div>
       <iframe id="artifactPanelFrame" src="about:blank"></iframe>
     </div>
@@ -3998,6 +3973,53 @@ let sidePanel = null;
 // reads sidePanel.activeMountTarget() to know which physical panel owns the
 // active conv. Construction wires up the click/drag handlers on #messagesWrap.
 sidePanel = new SidePanel();
+
+// ── Side-panel resize drag ────────────────────────────────────────────────────
+// Works for both conv side panel and artifact mode — the right pane is always
+// #messagesSide. The resizer sits between #messages and #messagesSide in the DOM.
+(function () {
+  const resizer = $('sideResizer');
+  const panel   = $('messagesSide');
+  if (!resizer || !panel) return;
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panel.offsetWidth;
+
+    panel.style.flex  = 'none';
+    panel.style.width = startW + 'px';
+    resizer.classList.add('dragging');
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+    // Prevent any iframe inside the panel eating mouse events during drag
+    const frame = $('artifactPanelFrame');
+    if (frame) frame.style.pointerEvents = 'none';
+
+    function onMove(ev) {
+      const wrap = $('messagesWrap');
+      const minW = 200;
+      const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
+      // Dragging left (decreasing clientX) widens the right panel
+      const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
+      panel.style.width = newW + 'px';
+    }
+
+    function onUp() {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      const frame = $('artifactPanelFrame');
+      if (frame) frame.style.pointerEvents = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+})();
+
 // Restore the last active conversation (if any) and render its history.
 (async () => {
   await refreshConversationList();
