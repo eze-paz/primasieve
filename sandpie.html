@@ -1636,6 +1636,8 @@ function ensureStream(id) {
       generating: false,
       pinned: false,
       archived: false,
+      title: null,
+      titleLocked: false,
     };
     convStreams.set(id, s);
   }
@@ -5358,14 +5360,18 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
-  // Read existing file to preserve user-set flags (titleLocked).
+  // Stream is source of truth for metadata; only read disk for fields
+  // the stream doesn't track (e.g. old sync state, other app data).
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
   const derived = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
-  const title = (prev.titleLocked && prev.title) ? prev.title : derived;
-  // Use in-memory stream flags for pinned/archived to avoid race with updateConvFile.
   const stream = convStreams.get(convId);
+  // Title: use stream's locked title if available, else derive from first message.
+  // This avoids race where updateConvFile changed title while saveConv was in-flight.
+  const title = (stream && stream.titleLocked && stream.title) ? stream.title
+              : (stream && stream.title) ? stream.title
+              : derived;
   const data = {
     ...prev,
     id: convId,
@@ -5374,6 +5380,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     messages: msgs,
     pinned: stream ? stream.pinned : !!prev.pinned,
     archived: stream ? stream.archived : !!prev.archived,
+    titleLocked: stream ? stream.titleLocked : !!prev.titleLocked,
   };
   await opfs.write(convPath(convId), JSON.stringify(data));
   await refreshConversationList();
@@ -5481,6 +5488,8 @@ async function loadConv(id) {
     s.messages = (data.messages || []).slice();
     s.pinned = !!data.pinned;
     s.archived = !!data.archived;
+    s.title = data.title || null;
+    s.titleLocked = !!data.titleLocked;
     mountConv(id);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
@@ -5598,11 +5607,13 @@ async function updateConvFile(id, patch) {
   catch { return; }
   Object.assign(data, patch);
   await opfs.write(convPath(id), JSON.stringify(data));
-  // Sync to in-memory stream so saveConv doesn't overwrite with stale flags.
+  // Sync to in-memory stream so saveConv doesn't overwrite with stale metadata.
   const stream = convStreams.get(id);
   if (stream) {
     if ('pinned' in patch) stream.pinned = !!patch.pinned;
     if ('archived' in patch) stream.archived = !!patch.archived;
+    if ('title' in patch) stream.title = patch.title;
+    if ('titleLocked' in patch) stream.titleLocked = !!patch.titleLocked;
   }
 }
 
@@ -5638,6 +5649,12 @@ async function duplicateConv(id, title) {
   data.updated = new Date().toISOString();
   data.titleLocked = true;  // lock the copied title so saveConv won't overwrite it
   await opfs.write(convPath(newId), JSON.stringify(data));
+  // Prime the new stream so immediate edits don't race with stale metadata.
+  const s = ensureStream(newId);
+  s.title = data.title;
+  s.titleLocked = true;
+  s.pinned = false;
+  s.archived = false;
   await refreshConversationList();
 }
 
@@ -5896,13 +5913,15 @@ async function enqueueForActive(text) {
   // typing rather than via the conv list), mount it now so bubbles are
   // visible as they stream in.
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
-  // Restore pinned/archived from disk if this is a fresh stream after reload.
-  // Without this, sending immediately after reload loses flags.
+  // Restore metadata from disk if this is a fresh stream after reload.
+  // Without this, sending immediately after reload loses flags, title, etc.
   if (s.messages.length === 0 && s.queue.length === 0 && !s.generating) {
     try {
       const data = JSON.parse(await opfs.read(convPath(activeConvId)));
       s.pinned = !!data.pinned;
       s.archived = !!data.archived;
+      s.title = data.title || null;
+      s.titleLocked = !!data.titleLocked;
     } catch {}
   }
   s.queue.push(text);
