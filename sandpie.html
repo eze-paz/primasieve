@@ -1096,10 +1096,6 @@ window._renderArtifact = function (host, html) {
   const htmlStr = String(html || '');
   if (!htmlStr.trim()) return fail('Empty HTML content');
 
-  // ── Size guard: srcdoc has browser limits (~2MB practical) ──
-  const srcdocLimit = 1500000;  // 1.5MB safe limit
-  if (htmlStr.length > srcdocLimit) {
-    return fail('HTML too large for iframe', 'Size: ' + htmlStr.length + ' chars (limit: ' + srcdocLimit + ')');
   }
 
   console.log('[artifact]', id, 'rendering', htmlStr.length, 'chars');
