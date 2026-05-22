@@ -241,7 +241,6 @@
     padding: 0;
     background: transparent;
     --py: 0;
-    margin-right: 15%;
   }
   .user .bubble {
     display: block;
@@ -266,7 +265,6 @@
     color: var(--sp-text);
     line-height: 1.6;
     border-left: 2px solid var(--sp-accent-dim-bg);
-    margin-left: 15%;
   }
   .assistant .bubble {
     display: block;
@@ -277,7 +275,6 @@
     align-self: flex-start;
     max-width: 85%;
     min-width: 0;
-    margin-left: 15%;
     padding: 0.5rem 0.75rem;
     font: 12px/1.4 'JetBrains Mono', Consolas, monospace;
     white-space: pre-wrap;
@@ -703,6 +700,9 @@
   }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
+  }
+  body.sidebar-collapsed main {
+    margin-left: 48px;
   }
   
   }
@@ -2105,12 +2105,6 @@ function editTokenLimit() {
 refreshWelcome();
 }
 refreshTokenMeter();
-
-let _userScrolledUp = false;
-function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
-function markUserScrolledUp() { _userScrolledUp = true; }
-function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
-function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
 
 // Chat input: textarea that auto-grows up to a cap, with Enter-to-send /
 // Shift+Enter-to-newline behavior.
@@ -4130,6 +4124,13 @@ function saveConfig() {
   }));
 }
 
+let _userScrolledUp = false;
+function isAtBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= 2;
+}
+function markUserScrolledUp() { _userScrolledUp = true; }
+function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
+function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
 
 async function requestWakeLock() {
   try {
