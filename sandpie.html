@@ -17,14 +17,11 @@
     --sp-panel: #21262d;
     --sp-accent: #8ecae6;
     --sp-accent-dim: rgba(142, 202, 230, 0.35);
-    --sp-success-subtle: rgba(63, 185, 80, 0.12);
     --sp-success-dim: rgba(63, 185, 80, 0.35);
-    --sp-danger-subtle: rgba(248, 81, 73, 0.12);
     --sp-danger-dim: rgba(248, 81, 73, 0.35);
     --sp-warn-dim: rgba(210, 153, 34, 0.35);
     --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
-    --sp-muted: #8b949e;
     --sp-success: #3fb950;
     --sp-danger: #f85149;
     --sp-warn: #d29922;
@@ -38,14 +35,11 @@
     --sp-panel: #eaeef2;
     --sp-accent: #1565ef;
     --sp-accent-dim: rgba(21, 101, 239, 0.25);
-    --sp-success-subtle: rgba(31, 136, 61, 0.08);
     --sp-success-dim: rgba(31, 136, 61, 0.25);
-    --sp-danger-subtle: rgba(207, 34, 46, 0.08);
     --sp-danger-dim: rgba(207, 34, 46, 0.25);
     --sp-warn-dim: rgba(154, 103, 0, 0.25);
     --sp-text: #1f2328;
     --sp-text-dim: #656d76;
-    --sp-muted: #8c959f;
     --sp-success: #1f883d;
     --sp-danger: #cf222e;
     --sp-warn: #9a6700;
@@ -122,10 +116,10 @@
   aside button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); }
   aside button.ghost:hover { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
   aside fieldset { border: 1px solid var(--sp-border); border-radius: 5px; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; }
-  aside legend { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-muted); padding: 0 0.25rem; }
+  aside legend { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-text-dim); padding: 0 0.25rem; }
   aside .row { display: flex; gap: 0.25rem; }
   aside .row > * { flex: 1; }
-  aside .hint { font-size: 0.7rem; color: var(--sp-muted); }
+  aside .hint { font-size: 0.7rem; color: var(--sp-text-dim); }
   aside .navbar { display: flex; gap: 0.25rem; align-items: stretch; }
   aside .navbar input {
     flex: 1;
@@ -163,22 +157,22 @@
   .ctx-menu button:hover { background: var(--sp-panel); }
   .ctx-menu button.danger { color: var(--sp-danger); }
   ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.2rem; background: transparent; border: none; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
-  ul.fs-list li.empty { color: var(--sp-muted); justify-content: center; font-style: italic; font-family: inherit; }
+  ul.fs-list li.empty { color: var(--sp-text-dim); justify-content: center; font-style: italic; font-family: inherit; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
-  ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-muted); white-space: nowrap; margin-left: 0.5rem; }
+  ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; margin-left: 0.5rem; }
   /* File viewer overlay */
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
   .file-viewer .panel header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--sp-border); }
   .file-viewer .panel header .title { font: 0.85rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .file-viewer .panel header button { background: transparent; border: none; color: var(--sp-muted); font-size: 1.1rem; cursor: pointer; padding: 0 0.25rem; }
+  .file-viewer .panel header button { background: transparent; border: none; color: var(--sp-text-dim); font-size: 1.1rem; cursor: pointer; padding: 0 0.25rem; }
   .file-viewer .panel header button:hover { color: var(--sp-danger); }
   .file-viewer .body { padding: 0.75rem 0.9rem; overflow: auto; }
   .file-viewer pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font: 0.8rem/1.45 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); }
   .file-viewer img, .file-viewer video, .file-viewer audio { max-width: 100%; display: block; margin: 0 auto; }
-  .file-viewer .meta { color: var(--sp-muted); font-size: 0.78rem; }
+  .file-viewer .meta { color: var(--sp-text-dim); font-size: 0.78rem; }
   .file-viewer .panel header button.mode { font-size: 0.78rem; padding: 0.1rem 0.4rem; border: 1px solid var(--sp-border); border-radius: 3px; }
   .file-viewer .panel header button.mode:hover { color: var(--sp-text); border-color: var(--sp-accent); }
   .file-viewer textarea.editor { width: 100%; min-height: 60vh; background: var(--sp-bg); color: var(--sp-text); border: 1px solid var(--sp-border); border-radius: 4px; padding: 0.5rem; font: 0.8rem/1.45 'JetBrains Mono', Consolas, monospace; resize: vertical; box-sizing: border-box; outline: none; }
@@ -188,15 +182,15 @@
   .file-viewer .md-preview code { background: var(--sp-surface); padding: 0.15em 0.35em; border-radius: 3px; font: 0.85em 'JetBrains Mono', Consolas, monospace; }
   .file-viewer .md-preview pre { background: var(--sp-surface); padding: 0.6rem; border-radius: 4px; overflow: auto; }
   .file-viewer .md-preview pre code { background: transparent; padding: 0; }
-  .file-viewer .md-preview blockquote { border-left: 3px solid var(--sp-border); margin: 0; padding-left: 0.8rem; color: var(--sp-muted); }
+  .file-viewer .md-preview blockquote { border-left: 3px solid var(--sp-border); margin: 0; padding-left: 0.8rem; color: var(--sp-text-dim); }
   .file-viewer .md-preview a { color: var(--sp-accent); }
   .file-viewer .md-preview table { border-collapse: collapse; }
   .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid var(--sp-border); padding: 0.3rem 0.6rem; }
-  ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-muted); cursor: pointer; }
+  ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
   ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
   .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
-  .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: var(--sp-muted); }
-  .dbx-status.connected { background: var(--sp-success-subtle); color: var(--sp-success); }
+  .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: var(--sp-text-dim); }
+  .dbx-status.connected { background: var(--sp-success-dim); color: var(--sp-success); }
   .dbx-progress {
     margin-right: 0.5rem;
     font-size: 0.7rem;
@@ -206,7 +200,7 @@
     text-overflow: ellipsis;
     max-width: 140px;
   }
-  .dbx-status.error { background: var(--sp-danger-subtle); color: var(--sp-danger); }
+  .dbx-status.error { background: var(--sp-danger-dim); color: var(--sp-danger); }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   /* SidePanel: #messagesWrap is a row container; #messages is always
      present, #messagesSide is hidden until body.side-open. body.active-right
@@ -234,11 +228,11 @@
   #artifactPanelHeader {
     display: flex; align-items: center; justify-content: space-between;
     padding: 4px 10px; background: var(--sp-panel); border-bottom: 1px solid var(--sp-border);
-    font: 11px monospace; color: var(--sp-muted); flex-shrink: 0;
+    font: 11px monospace; color: var(--sp-text-dim); flex-shrink: 0;
   }
   #artifactPanelTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #artifactPanelClose {
-    background: none; border: none; color: var(--sp-muted); cursor: pointer;
+    background: none; border: none; color: var(--sp-text-dim); cursor: pointer;
     font-size: 14px; padding: 0 2px; line-height: 1; flex-shrink: 0;
   }
   #artifactPanelClose:hover { color: var(--sp-text); }
@@ -303,7 +297,7 @@
     display: block;
   }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
-  .info { align-self: center; color: var(--sp-muted); font-style: italic; font-size: 0.85em; }
+  .info { align-self: center; color: var(--sp-text-dim); font-style: italic; font-size: 0.85em; }
   .tool-call, .tool-result {
     align-self: flex-start;
     max-width: 85%;
@@ -319,7 +313,7 @@
     background: var(--sp-accent-dim);
   }
   .tool-result {
-    background: var(--sp-success-subtle);
+    background: var(--sp-success-dim);
   }
   .tool-call::before, .tool-result::before {
     content: "";
@@ -358,7 +352,7 @@
   }
   form button { padding: 0.5rem 1.25rem; background: var(--sp-accent); border: none; border-radius: 8px; color: var(--sp-text); cursor: pointer; }
   form button.sending { background: #6e7681; }
-  form button.sending:hover { background: var(--sp-muted); }
+  form button.sending:hover { background: var(--sp-text-dim); }
   form button:disabled { opacity: 0.5; cursor: not-allowed; }
   .cursor { display: inline-block; width: 2px; height: 1em; background: var(--sp-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
   /* Per-completion duration ticker. Sits under the assistant bubble; updates
@@ -404,7 +398,7 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     user-select: none;
     background: var(--sp-bg);
     clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
@@ -468,7 +462,7 @@
   ul.conv-list li.lp-active { background: var(--sp-accent-dim); border-color: var(--sp-accent); }
   ul.conv-list li.archived { opacity: 0.55; }
   ul.conv-list li.archived-toggle {
-    background: transparent; border: none; color: var(--sp-muted);
+    background: transparent; border: none; color: var(--sp-text-dim);
     font: 0.7rem inherit; padding: 0.45rem 0.4rem 0.15rem; justify-content: flex-start;
     letter-spacing: 0.04em; text-transform: uppercase;
   }
@@ -479,7 +473,7 @@
     font-size: 0.55rem;
     font-weight: 600;
     letter-spacing: 0.04em;
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     opacity: 0.45;
     min-width: 0.9rem;
     text-align: right;
@@ -516,7 +510,7 @@
   }
   ul.conv-list li .conv-meta {
     font-size: 0.6rem;
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     opacity: 0.6;
     flex-shrink: 0;
     min-width: 1.5rem;
@@ -541,7 +535,7 @@
     margin: auto 0;
     padding: 2rem 1rem;
     text-align: center;
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -612,7 +606,7 @@
     position: relative;
     height: 1.4em;
     font-size: 0.78rem;
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     margin-top: 0.6rem;
     letter-spacing: 0.04em;
     min-width: 18ch;
@@ -956,14 +950,14 @@
     font-size: 0.78rem;
     background: var(--sp-panel);
     border: 1px solid var(--sp-border);
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     cursor: pointer;
     user-select: none;
     transition: all 0.15s;
     white-space: nowrap;
   }
   .chip:hover {
-    border-color: var(--sp-muted);
+    border-color: var(--sp-text-dim);
     color: var(--sp-text);
   }
   .chip.active {
@@ -1044,7 +1038,7 @@
     color: var(--sp-danger);
   }
   .context-delete:hover {
-    background: var(--sp-danger-subtle);
+    background: var(--sp-danger-dim);
   }
 
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
@@ -1099,7 +1093,7 @@
   .tc-title { color: var(--sp-text); white-space: nowrap; }
   .tc-title b { color: var(--sp-accent); font-weight: 600; }
   .tc-flavor {
-    color: var(--sp-muted);
+    color: var(--sp-text-dim);
     font-style: italic;
     font-size: 11px;
     overflow: hidden;
@@ -1127,7 +1121,7 @@
   /* Artifact collapsed state */
   .artifact-meta-row {
     display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-    padding: 8px 12px; font: 11px monospace; color: var(--sp-muted);
+    padding: 8px 12px; font: 11px monospace; color: var(--sp-text-dim);
     background: var(--sp-surface);
   }
   .artifact-show-btn {
@@ -1137,7 +1131,7 @@
     transition: background 0.1s, border-color 0.1s;
   }
   .artifact-show-btn:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
-  .artifact-meta-info { color: var(--sp-muted); }
+  .artifact-meta-info { color: var(--sp-text-dim); }
   @keyframes sp-spin { to { transform: rotate(360deg); } }
   @keyframes tc-fade {
     from { opacity: 0; transform: translateY(3px); }
@@ -1158,7 +1152,7 @@ function renderArtifact(host, path) {
 
   const header = document.createElement('div');
   header.className = 'artifact-header';
-  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-muted);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;';
+  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;';
   const label = document.createElement('span');
   label.textContent = '📎 Artifact' + (clean ? ' — ' + clean.split('/').pop() : '');
   header.appendChild(label);
@@ -1245,7 +1239,7 @@ function renderArtifact(host, path) {
   if (!renderable) {
     // Non-previewable file — show a download prompt instead of an iframe.
     const dlRow = document.createElement('div');
-    dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-muted);';
+    dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-text-dim);';
     dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
     wrap.appendChild(dlRow);
     target.appendChild(wrap);
@@ -1483,19 +1477,19 @@ window.addEventListener('message', e => {
         <span class="chip" data-preset="custom" onclick="setTheme('custom')">Custom</span>
       </div>
       <div id="customColors" style="display:none; flex-direction:column; gap:0.375rem; margin-top:0.5rem;">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Accent</label>
+        <label style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase;">Accent</label>
         <input type="color" id="customAccent" value="#58a6ff" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Background</label>
+        <label style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase;">Background</label>
         <input type="color" id="customBg" value="#0d1117" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Surface</label>
+        <label style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase;">Surface</label>
         <input type="color" id="customSurface" value="#161b22" onchange="applyCustomTheme()">
-        <label style="font-size:0.7rem; color:var(--sp-muted); text-transform:uppercase;">Text</label>
+        <label style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase;">Text</label>
         <input type="color" id="customText" value="#e6edf3" onchange="applyCustomTheme()">
         <button class="ghost" onclick="resetCustomTheme()" style="margin-top:0.25rem; font-size:0.75rem;">Reset to midnight</button>
       </div>
     </div>
   </details>
-  <div style="font-size:0.65rem; color:var(--sp-muted); padding:0.5rem; margin-top:auto; text-align:center;">
+  <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
   </div>
 </aside>
@@ -6016,7 +6010,6 @@ const THEMES = {
     '--sp-accent-dim': 'rgba(88,166,255,0.35)',
     '--sp-text': '#e6edf3',
     '--sp-text-dim': '#9ab0c8',
-    '--sp-muted': '#8b949e',
     '--sp-success': '#3fb950',
     '--sp-danger': '#f85149',
     '--sp-warn': '#d29922',
@@ -6032,12 +6025,9 @@ const THEMES = {
     '--sp-accent-neg': '#d26900',
     '--sp-text': '#1f2328',
     '--sp-text-dim': '#656d76',
-    '--sp-muted': '#8c959f',
     '--sp-success': '#1f883d',
-    '--sp-success-subtle': 'rgba(31,136,61,0.08)',
     '--sp-success-dim': 'rgba(31,136,61,0.25)',
     '--sp-danger': '#cf222e',
-    '--sp-danger-subtle': 'rgba(207,34,46,0.08)',
     '--sp-danger-dim': 'rgba(207,34,46,0.25)',
     '--sp-warn': '#9a6700',
     '--sp-warn-dim': 'rgba(154,103,0,0.25)',
