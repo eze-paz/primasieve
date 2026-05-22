@@ -401,7 +401,7 @@
   }
   aside details.service summary::-webkit-details-marker { display: none; }
   aside details.service summary::before {
-    content: 'v';
+    content: '>';
     font-size: 0.65em;
     color: var(--sp-accent);
     transition: transform 0.15s;
@@ -411,7 +411,7 @@
     color: var(--sp-text);
     background: var(--sp-panel);
   }
-  aside details.service[open] summary::before { content: '>'; transform: none; }
+  aside details.service[open] summary::before { content: 'v'; transform: none; }
   aside details.service summary:hover { color: var(--sp-text); background: var(--sp-panel); }
   aside details.service[open] .service-body {
     padding: 0.5rem 0.75rem 0.75rem;
