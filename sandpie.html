@@ -1565,38 +1565,10 @@ const VERSION = '1.0.1-1779377073';
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (ev) => {
     const d = ev.data;
-    if (!d) return;
-    if (d.type === 'sandpie-sw-log') {
-      // Map level → console method. Default to log for unknown.
-      const fn = console[d.level] || console.log;
-      fn.call(console, '[sw]', d.text);
-      return;
-    }
-    if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-      // Python deleted these via os.remove / shutil.rmtree etc. The SW has
-      // already flushed the deletion to OPFS via syncfs(). We just need to
-      // mirror to Dropbox + syncState, otherwise the cloud copy lingers and
-      // re-downloads on the next pull. dbxDelete tolerates not_found so
-      // double-fires are safe.
-      (async () => {
-        if (!dbxTokens()) return;
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          try { await dbxDelete('/' + path); } catch {}
-          const lk = path.toLowerCase();
-          for (const k of Object.keys(state)) {
-            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
-              delete state[k];
-              changed = true;
-            }
-          }
-        }
-        if (changed) setSyncState(state);
-        try { await refreshFileList(); } catch {}
-      })();
-      return;
-    }
+    if (!d || d.type !== 'sandpie-sw-log') return;
+    // Map level → console method. Default to log for unknown.
+    const fn = console[d.level] || console.log;
+    fn.call(console, '[sw]', d.text);
   });
   // Once a controller exists, ask it to replay the boot buffer so we don't
   // miss SW logs that fired before this listener was wired up. Try now and

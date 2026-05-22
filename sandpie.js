@@ -241,11 +241,6 @@ let pyInitPromise = null;
 // (browser without OPFS, permission error, etc.) — Python still runs in
 // MEMFS, just without /files.
 let _nativefs = null;
-// Active Set during one runPythonAsync — Pyodide's FS.unlink/FS.rmdir
-// hooks (installed in initPyodide) push deleted /files/* paths here so
-// tool_run_python can mirror them to Dropbox + syncState after syncfs().
-// Null between runs so the hooks no-op and don't grow forever.
-let _pyDeletes = null;
 async function initPyodide() {
   if (py) return py;
   if (pyInitPromise) return pyInitPromise;
@@ -275,26 +270,6 @@ async function initPyodide() {
         const opfsRoot = await navigator.storage.getDirectory();
         _nativefs = await p.mountNativeFS('/files', opfsRoot);
         p.runPython('import os; os.chdir("/files")');
-        // Capture Python-initiated deletions on Pyodide's FS so the page
-        // can mirror them to Dropbox + syncState. Without this, an LLM doing
-        // os.remove('foo.txt') would clear MEMFS + OPFS (via post-run syncfs)
-        // but the Dropbox copy would linger forever and re-download on the
-        // next pull. The wrap targets /files/* only and records into a Set
-        // that tool_run_python owns for the duration of one runPythonAsync.
-        const _origUnlink = p.FS.unlink.bind(p.FS);
-        p.FS.unlink = function(path) {
-          _origUnlink(path);
-          if (_pyDeletes && typeof path === 'string' && path.startsWith('/files/')) {
-            _pyDeletes.add(path.slice('/files/'.length));
-          }
-        };
-        const _origRmdir = p.FS.rmdir.bind(p.FS);
-        p.FS.rmdir = function(path) {
-          _origRmdir(path);
-          if (_pyDeletes && typeof path === 'string' && path.startsWith('/files/')) {
-            _pyDeletes.add(path.slice('/files/'.length));
-          }
-        };
         console.log('[sandpie-sw] OPFS mounted at /files (cwd)');
       } catch (e) {
         _nativefs = null;
@@ -499,7 +474,6 @@ async function tool_run_python({ code, path, args }, ctx) {
       // snippet surface to the LLM (it can run again, where they'd
       // already be local or trigger another single retry).
       let _retried = false;
-      _pyDeletes = new Set();
       while (true) {
         try {
           await p.runPythonAsync(code);
@@ -517,9 +491,6 @@ async function tool_run_python({ code, path, args }, ctx) {
           // the user sees a clean run, not an interleaving of attempts.
           stdout = '';
           stderr = '';
-          // Also reset the deletion set — a fetch_file→retry shouldn't
-          // carry over phantom unlinks from the failed first attempt.
-          _pyDeletes = new Set();
           _retried = true;
         }
       }
@@ -529,20 +500,6 @@ async function tool_run_python({ code, path, args }, ctx) {
       if (_nativefs) {
         try { await _nativefs.syncfs(); }
         catch (e) { console.warn('[sandpie-sw] syncfs after run_python failed:', e); }
-      }
-      // Tell the page about Python-initiated deletions so it can call
-      // dbxDelete + clean syncState. Done after syncfs so OPFS is already
-      // up to date; we just need Dropbox + state to catch up. The Set is
-      // captured-and-cleared so the next run starts fresh.
-      const _pyDeletedPaths = _pyDeletes ? [..._pyDeletes] : [];
-      _pyDeletes = null;
-      if (_pyDeletedPaths.length) {
-        try {
-          const clients = await self.clients.matchAll({ includeUncontrolled: true });
-          for (const c of clients) {
-            try { c.postMessage({ type: 'opfs-deleted-by-python', paths: _pyDeletedPaths }); } catch (_) {}
-          }
-        } catch (_) {}
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
@@ -577,11 +534,6 @@ async function tool_run_python({ code, path, args }, ctx) {
     } finally {
       try { p && p.setStdout({}); } catch (_) {}
       try { p && p.setStderr({}); } catch (_) {}
-      // Belt-and-suspenders: ensure the deletion set is closed even on
-      // a thrown/early-returned path. Without this, an error inside
-      // runPythonAsync would leak the Set into the next call where the
-      // FS hooks would keep adding to it.
-      _pyDeletes = null;
     }
   });
 }
