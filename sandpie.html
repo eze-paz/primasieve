@@ -1170,13 +1170,28 @@ function renderArtifact(host, path) {
     openLink.className = 'artifact-icon-btn';
     btns.appendChild(openLink);
   }
-  const dlLink = document.createElement('a');
-  dlLink.href = 'opfs/' + clean;
-  dlLink.download = clean.split('/').pop();
-  dlLink.title = 'Download';
-  dlLink.textContent = '⬇';
-  dlLink.className = 'artifact-icon-btn';
-  btns.appendChild(dlLink);
+  const dlBtn = document.createElement('button');
+  dlBtn.title = 'Download';
+  dlBtn.textContent = '⬇';
+  dlBtn.className = 'artifact-icon-btn';
+  dlBtn.onclick = async () => {
+    try {
+      const resp = await fetch('opfs/' + clean);
+      if (!resp.ok) throw new Error('SW returned ' + resp.status);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = clean.split('/').pop();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      console.error('[artifact] download failed:', err);
+    }
+  };
+  btns.appendChild(dlBtn);
   header.appendChild(btns);
   wrap.appendChild(header);
 
