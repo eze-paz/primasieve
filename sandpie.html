@@ -1050,9 +1050,8 @@
   }
 
   body.tools-minimized .tool-call:hover {
-    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
+    background: var(--sp-accent-dim);
     border-color: var(--sp-accent-dim);
-    box-shadow: 0 0 0 1px var(--sp-accent-dim);
   }
   .tool-call .tc-expanded { display: inline; }
   .tool-call .tc-collapsed { display: none; }
@@ -1064,8 +1063,9 @@
     line-height: 1.5;
     min-height: 30px;
     max-width: 88%;
-    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
-    border: 1px solid var(--sp-accent-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--sp-text-dim);
     white-space: normal;
     overflow: hidden;
     clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
