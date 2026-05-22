@@ -234,7 +234,7 @@
   body.side-open.active-left  #messagesSide:hover,
   body.side-open.active-right #messages:hover { opacity: 0.75; }
   #messagesWrap.drop-target { outline: 2px dashed var(--sp-accent); outline-offset: -8px; }
-  .msg { max-width: min(85%, 720px); min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
+  .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
   .user {
     align-self: flex-end;
     position: relative;
@@ -700,6 +700,11 @@
   }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
+  }
+  /* Desktop: cap conversation width for readability */
+  @media (min-width: 769px) {
+    #messages { max-width: 900px; margin: 0 auto; width: 100%; }
+    #messagesSide { max-width: 900px; margin: 0 auto; width: 100%; }
   }
   /* Tablet/phone: stack layout, sidebar becomes a drawer.
      Also matches any touch device (hover: none + pointer: coarse) so iOS
