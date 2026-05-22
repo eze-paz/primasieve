@@ -4692,7 +4692,11 @@ function addMsg(role, text = '', host = null) {
     scrollHost = scrollHost.parentNode;
   }
   const visible = !!scrollHost;
-  const stick = visible ? isAtBottom(scrollHost) : false;
+  // Only auto-scroll from addMsg when NOT actively streaming.
+  // During streaming, _drainTick handles scroll pinning with a pre-paint
+  // snapshot so adding content doesn't falsely break the stick-to-bottom.
+  const streaming = activeStream() && activeStream().generating;
+  const stick = visible && !streaming ? isAtBottom(scrollHost) : false;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
