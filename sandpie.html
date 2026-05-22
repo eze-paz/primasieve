@@ -4577,6 +4577,7 @@ function buildToolBox(args) {
     const parsed = JSON.parse(args);
     if (parsed.code) code = parsed.code;
     else if (parsed.cmd) code = parsed.cmd;
+    else if (parsed.path) code = `run_python(path="${parsed.path}", args=${JSON.stringify(parsed.args || [])})`;
     else code = JSON.stringify(parsed, null, 2);
   } catch (e) {
     code = args;
