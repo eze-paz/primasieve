@@ -4571,6 +4571,27 @@ function appendToolResult(toolCallDiv, result) {
   box.appendChild(resultDiv);
 }
 
+function buildToolBox(args) {
+  let code = '';
+  try {
+    const parsed = JSON.parse(args);
+    if (parsed.code) code = parsed.code;
+    else if (parsed.cmd) code = parsed.cmd;
+    else code = JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    code = args;
+  }
+  const lines = code.split('\n').filter(l => l.trim());
+  const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
+
+  const box = document.createElement('div');
+  box.className = 'tool-box';
+  box.innerHTML = `<div class="tool-code">${codeHtml}</div>`;
+  return box;
+}
+
+
+
 
 
 function renderTcPreparing(div, fname, args) {
@@ -4910,21 +4931,7 @@ class RoundRenderer {
   _paintTool(i) {
     if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
     const tc = this.toolCalls[i];
-    let code = '';
-    try {
-      const args = JSON.parse(tc.function.arguments);
-      if (args.code) code = args.code;
-      else if (args.cmd) code = args.cmd;
-      else code = JSON.stringify(args, null, 2);
-    } catch (e) {
-      code = tc.function.arguments;
-    }
-    const lines = code.split('\n').filter(l => l.trim());
-    const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
-
-    const box = document.createElement('div');
-    box.className = 'tool-box';
-    box.innerHTML = `<div class="tool-code">${codeHtml}</div>`;
+    const box = buildToolBox(tc.function.arguments);
 
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
@@ -5045,10 +5052,14 @@ function renderHistoricalMessage(m, host = null) {
             if (path) renderArtifact(host, path);
           } catch (_) {}
         } else {
-          let args = tc.function.arguments;
-          try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
-          const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`, host);
+          const tcDiv = addMsg('tool-call', '', host);
           tcDiv.dataset.fname = tc.function.name;
+          const box = buildToolBox(tc.function.arguments || '{}');
+          const expanded = tcDiv.querySelector('.tc-expanded');
+          if (expanded) {
+            expanded.innerHTML = '';
+            expanded.appendChild(box);
+          }
           renderTcDone(tcDiv, tc.function.name);
           bindBubble(tcDiv, m);
         }
