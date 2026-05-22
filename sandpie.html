@@ -979,16 +979,16 @@
   .chip.add {
     border-style: dashed;
   }
-  /* Light theme chip: scope the light palette so border uses var(--sp-accent) */
+  /* Light theme chip: uses current theme vars; scoped accent for active border */
   .chip[data-theme="light"] {
     --sp-accent: #6fa8d8;
-    background: #f0f4f8; border-color: #c8d4de; color: #3a5068;
+    background: var(--sp-panel); border-color: var(--sp-border); color: var(--sp-muted);
   }
   .chip[data-theme="light"]:hover {
-    background: #e4eff8; border-color: #9ab8d0; color: #1a3a58;
+    background: var(--sp-surface); border-color: var(--sp-border-bright); color: var(--sp-text);
   }
   .chip[data-theme="light"].active {
-    background: #e8f2fc; border-color: var(--sp-accent); color: #1a3a58;
+    background: var(--sp-accent-subtle); border-color: var(--sp-accent); color: var(--sp-text);
   }
   .modal {
     position: fixed;
