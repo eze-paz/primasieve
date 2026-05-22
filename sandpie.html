@@ -15,17 +15,13 @@
     --sp-border: #30363d;
     --sp-border-bright: #484f58;
     --sp-panel: #21262d;
-    --sp-accent: #8ecae6;
-    --sp-accent-dim: rgba(142, 202, 230, 0.35);
-    --sp-success-dim: rgba(63, 185, 80, 0.35);
-    --sp-danger-dim: rgba(248, 81, 73, 0.35);
-    --sp-warn-dim: rgba(210, 153, 34, 0.35);
+    --sp-accent: #58a6ff;
+    --sp-accent-dim: rgba(88, 166, 255, 0.35);
     --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
     --sp-success: #3fb950;
     --sp-danger: #f85149;
     --sp-warn: #d29922;
-    --sp-accent-neg: #ff8c00;
   }
   [data-theme="light"] {
     --sp-bg: #ffffff;
@@ -35,15 +31,12 @@
     --sp-panel: #eaeef2;
     --sp-accent: #1565ef;
     --sp-accent-dim: rgba(21, 101, 239, 0.25);
-    --sp-success-dim: rgba(31, 136, 61, 0.25);
-    --sp-danger-dim: rgba(207, 34, 46, 0.25);
-    --sp-warn-dim: rgba(154, 103, 0, 0.25);
+    --sp-accent-neg: #d26900;
     --sp-text: #1f2328;
     --sp-text-dim: #656d76;
     --sp-success: #1f883d;
     --sp-danger: #cf222e;
     --sp-warn: #9a6700;
-    --sp-accent-neg: #d26900;
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -5999,40 +5992,6 @@ function dispatchAgentEvent(ev, renderer, host) {
 // ═══════════════════════════════════════════════════════════════════════
 // THEME SYSTEM — preset + custom color picker
 // ═══════════════════════════════════════════════════════════════════════
-const THEMES = {
-  midnight: {
-    '--sp-bg': '#0d1117',
-    '--sp-surface': '#161b22',
-    '--sp-border': '#30363d',
-    '--sp-border-bright': '#484f58',
-    '--sp-panel': '#21262d',
-    '--sp-accent': '#58a6ff',
-    '--sp-accent-dim': 'rgba(88,166,255,0.35)',
-    '--sp-text': '#e6edf3',
-    '--sp-text-dim': '#9ab0c8',
-    '--sp-success': '#3fb950',
-    '--sp-danger': '#f85149',
-    '--sp-warn': '#d29922',
-  },
-  light: {
-    '--sp-bg': '#ffffff',
-    '--sp-surface': '#f6f8fa',
-    '--sp-border': '#d0d7de',
-    '--sp-border-bright': '#b0b7be',
-    '--sp-panel': '#eaeef2',
-    '--sp-accent': '#1565ef',
-    '--sp-accent-dim': 'rgba(21,101,239,0.25)',
-    '--sp-accent-neg': '#d26900',
-    '--sp-text': '#1f2328',
-    '--sp-text-dim': '#656d76',
-    '--sp-success': '#1f883d',
-    '--sp-success-dim': 'rgba(31,136,61,0.25)',
-    '--sp-danger': '#cf222e',
-    '--sp-danger-dim': 'rgba(207,34,46,0.25)',
-    '--sp-warn': '#9a6700',
-    '--sp-warn-dim': 'rgba(154,103,0,0.25)',
-  }
-};
 
 function setTheme(name) {
   // Update chips
@@ -6044,17 +6003,15 @@ function setTheme(name) {
   if (name === 'custom') {
     customPanel.style.display = 'flex';
     applyCustomTheme();
-    localStorage.setItem('sandpie-theme', 'custom');
   } else {
     customPanel.style.display = 'none';
-    const t = THEMES[name];
-    if (t) {
-      for (const [k, v] of Object.entries(t)) {
-        document.documentElement.style.setProperty(k, v);
-      }
+    if (name === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
     }
-    localStorage.setItem('sandpie-theme', name);
   }
+  localStorage.setItem('sandpie-theme', name);
 }
 
 function applyCustomTheme() {
