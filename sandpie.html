@@ -244,6 +244,18 @@
   }
   #artifactPanelClose:hover { color: var(--sp-text); }
   #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
+  /* Resizer handle between chat and artifact panel */
+  #artifactResizer {
+    width: 5px; flex-shrink: 0; cursor: col-resize;
+    background: var(--sp-border);
+    transition: background 0.15s;
+    position: relative;
+  }
+  #artifactResizer::after {
+    content: ''; position: absolute; inset: 0 -3px;
+  }
+  #artifactResizer:hover, #artifactResizer.dragging { background: var(--sp-accent); }
+  body:not(.artifact-panel-open) #artifactResizer { display: none; }
   .artifact-icon-btn {
     cursor: pointer; background: var(--sp-surface); border: 1px solid var(--sp-border);
     color: var(--sp-text-dim); border-radius: 50%; width: 20px; height: 20px;
@@ -1189,6 +1201,48 @@ function openArtifactPanel(path) {
   document.body.classList.add('artifact-panel-open');
 }
 
+// ── Artifact panel resize drag ───────────────────────────────────────────────
+(function () {
+  const resizer = $('artifactResizer');
+  const panel   = $('artifactPanel');
+  if (!resizer || !panel) return;
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panel.offsetWidth;
+
+    // Switch panel to fixed width so flex stops fighting us
+    panel.style.flex = 'none';
+    panel.style.width = startW + 'px';
+    resizer.classList.add('dragging');
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    // Prevent the artifact iframe from eating mouse events during drag
+    $('artifactPanelFrame').style.pointerEvents = 'none';
+
+    function onMove(e) {
+      const wrap  = $('messagesWrap');
+      const minW  = 200;
+      const maxW  = wrap.offsetWidth - 300;
+      const newW  = Math.max(minW, Math.min(startW + (startX - e.clientX), maxW));
+      panel.style.width = newW + 'px';
+    }
+
+    function onUp() {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      $('artifactPanelFrame').style.pointerEvents = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+})();
+
 
 // Artifact iframes postMessage their content height — autosize and border reveal.
 window.addEventListener('message', e => {
@@ -1344,6 +1398,7 @@ window.addEventListener('message', e => {
       </div>
     </div>
     <div id="messagesSide"></div>
+    <div id="artifactResizer"></div>
     <div id="artifactPanel">
       <div id="artifactPanelHeader">
         <span id="artifactPanelTitle">artifact</span>
