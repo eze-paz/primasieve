@@ -979,15 +979,16 @@
   .chip.add {
     border-style: dashed;
   }
-  /* Light theme chip always looks light regardless of active theme */
+  /* Light theme chip: scope the light palette so border uses var(--sp-accent) */
   .chip[data-theme="light"] {
+    --sp-accent: #6fa8d8;
     background: #f0f4f8; border-color: #c8d4de; color: #3a5068;
   }
   .chip[data-theme="light"]:hover {
     background: #e4eff8; border-color: #9ab8d0; color: #1a3a58;
   }
   .chip[data-theme="light"].active {
-    background: #e8f2fc; border-color: #6fa8d8; color: #1a3a58;
+    background: #e8f2fc; border-color: var(--sp-accent); color: #1a3a58;
   }
   .modal {
     position: fixed;
