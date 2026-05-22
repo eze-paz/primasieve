@@ -5072,7 +5072,8 @@ function renderHistoricalMessage(m, host = null) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
       // Find last tool-call div and append result to its box
-      const toolCalls = host.querySelectorAll('.msg.tool-call');
+      const target = host || $('messages');
+      const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
         appendToolResult(toolCalls[toolCalls.length - 1], display);
       }
