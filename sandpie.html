@@ -226,6 +226,25 @@
   body:not(.side-open) #messagesSide { display: none; }
   body.side-open #messages,
   body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
+  /* Artifact panel — third pane in #messagesWrap, desktop-only */
+  #artifactPanel {
+    flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    border-left: 1px solid var(--sp-border);
+  }
+  body:not(.artifact-panel-open) #artifactPanel { display: none; }
+  #artifactPanelHeader {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 10px; background: var(--sp-panel); border-bottom: 1px solid var(--sp-border);
+    font: 11px monospace; color: var(--sp-muted); flex-shrink: 0;
+  }
+  #artifactPanelTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #artifactPanelClose {
+    background: none; border: none; color: var(--sp-muted); cursor: pointer;
+    font-size: 14px; padding: 0 2px; line-height: 1; flex-shrink: 0;
+  }
+  #artifactPanelClose:hover { color: var(--sp-text); }
+  #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
+  .artifact-panel-btn { cursor: pointer; background: none; border: none; padding: 0; color: var(--sp-accent); font-size: 0.8rem; text-decoration: none; }
   body.side-open.active-left  #messagesSide,
   body.side-open.active-right #messages {
     opacity: 0.55; filter: grayscale(0.25); cursor: pointer;
@@ -869,6 +888,8 @@
        option in buildConvLi too. */
     body.side-open #messagesSide { display: none; }
     body.side-open #messages { flex: 1; }
+    body.artifact-panel-open #artifactPanel { display: none; }
+    .artifact-panel-btn { display: none; }
     /* Touch-friendly: bigger inputs and bottom-row chat */
     aside input, aside button {
       padding: 0.65rem 0.75rem;
@@ -1108,12 +1129,21 @@ function renderArtifact(host, path) {
     return;
   }
 
+  const btns = document.createElement('span');
+  btns.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  const panelBtn = document.createElement('button');
+  panelBtn.className = 'artifact-panel-btn';
+  panelBtn.title = 'Open in side panel';
+  panelBtn.textContent = '⊞ panel';
+  panelBtn.onclick = () => openArtifactPanel(clean);
   const link = document.createElement('a');
   link.href = 'opfs/' + clean;
   link.target = '_blank';
   link.textContent = '↗ open';
   link.style.cssText = 'color:var(--sp-accent);text-decoration:none;font-size:0.8rem;';
-  header.appendChild(link);
+  btns.appendChild(panelBtn);
+  btns.appendChild(link);
+  header.appendChild(btns);
   wrap.appendChild(header);
 
   const frame = document.createElement('iframe');
@@ -1141,6 +1171,13 @@ function showArtifactError(wrap, frame, msg) {
   errEl.textContent = '⚠ Artifact error: ' + msg;
   wrap.appendChild(errEl);
   wrap.style.borderColor = '#f85149';
+}
+
+function openArtifactPanel(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  $('artifactPanelFrame').src = 'opfs/' + clean;
+  $('artifactPanelTitle').textContent = clean.split('/').pop();
+  document.body.classList.add('artifact-panel-open');
 }
 
 
@@ -1298,6 +1335,13 @@ window.addEventListener('message', e => {
       </div>
     </div>
     <div id="messagesSide"></div>
+    <div id="artifactPanel">
+      <div id="artifactPanelHeader">
+        <span id="artifactPanelTitle">artifact</span>
+        <button id="artifactPanelClose" title="Close panel" onclick="document.body.classList.remove('artifact-panel-open')">✕</button>
+      </div>
+      <iframe id="artifactPanelFrame" src="about:blank"></iframe>
+    </div>
   </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
