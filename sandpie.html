@@ -2947,11 +2947,11 @@ No raw sockets, no subprocess.
 CLOUD FILES — your working directory is /files/ (the user's persistent storage, mounted from OPFS; changes persist across runs and sync to Dropbox). Use plain relative paths: open('notes.txt'), os.listdir('.'), pathlib.Path('data.csv') — they all resolve under /files/. If you open() a file that's in the user's Dropbox but not yet locally hydrated, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
 
 RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual content in the chat:
-  1. Write the output to a file under /files/ using run_python:
-       open('outputs/chart.html', 'w').write(html_string)   # HTML page, can load CDN JS
-       fig.write_html('outputs/plot.html')                   # Plotly / Bokeh etc.
+  1. Write the output to /files/artifacts/ by default (unless the user specifies otherwise):
+       open('artifacts/chart.html', 'w').write(html_string)   # HTML page, can load CDN JS
+       fig.write_html('artifacts/plot.html')                   # Plotly / Bokeh etc.
   2. Call load_artifact with the OPFS path (no leading slash):
-       load_artifact({ "path": "files/outputs/chart.html" })
+       load_artifact({ "path": "files/artifacts/chart.html" })
 
 The artifact renders as a live iframe below the message and persists across reloads.
 Any file type works: .html (full page), .svg, .png, .jpg, .csv.
@@ -3101,15 +3101,17 @@ Use this whenever:
 
 The file must already exist in OPFS — write it first with run_python, then call this.
 Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
-Path is OPFS-relative — do NOT include a leading slash (e.g. "files/outputs/chart.html").
+Path is OPFS-relative — do NOT include a leading slash (e.g. "files/artifacts/chart.html").
+
+Default output folder is /files/artifacts/ — use it unless the user specifies a different path.
 
 Typical flow:
-  run_python: open('outputs/chart.html', 'w').write(html)
-  load_artifact: { "path": "files/outputs/chart.html" }`,
+  run_python: open('artifacts/chart.html', 'w').write(html)
+  load_artifact: { "path": "files/artifacts/chart.html" }`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'OPFS path to the file (e.g. "files/outputs/chart.html"). No leading slash.' },
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "files/artifacts/chart.html"). No leading slash. Default folder: files/artifacts/.' },
       },
       required: ['path'],
     },
