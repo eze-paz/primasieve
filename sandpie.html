@@ -3229,6 +3229,38 @@ Typical flow:
       },
       required: ['path'],
     },
+    load_image: {
+      description: `Load an image file from OPFS so the model can see it. The image will be attached to the next user message in the conversation. Use this when the user asks you to analyze, describe, or look at an image in their workspace. Supports JPEG, PNG, GIF, WEBP. The image path is relative to /files/.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to image file relative to /files/ (e.g. "beach.jpg" or "images/photo.png")' },
+        },
+        required: ['path'],
+      },
+      run: async ({ path }, signal) => {
+        try {
+          const bytes = await opfs.readBytes(path);
+          const ext = path.split('.').pop().toLowerCase();
+          const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[ext] || 'image/jpeg';
+          const blob = new Blob([bytes], { type: mime });
+          const reader = new FileReader();
+          const dataUrl = await new Promise((resolve, reject) => {
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          // Store as pending image attachment for next user message
+          _attachedImage = { dataUrl, file: { name: path.split('/').pop() }, opfsPath: path };
+          const preview = $('imagePreview');
+          preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+          preview.style.display = '';
+          return { result: `Image loaded from ${path}. It will be attached to your next message.` };
+        } catch (e) {
+          return { result: 'Error loading image: ' + (e.message || String(e)) };
+        }
+      },
+    },
   },
 };
 
@@ -4341,7 +4373,22 @@ function addMsg(role, text = '', host = null) {
           bubble.appendChild(span);
         } else if (part.type === 'image_url') {
           const img = document.createElement('img');
-          img.src = part.image_url.url;
+          const url = part.image_url.url;
+          if (url.startsWith('opfs://')) {
+            // Resolve OPFS path to data URL asynchronously
+            img.src = '';
+            img.alt = '(loading image...)';
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '150px';
+            img.style.borderRadius = '4px';
+            img.style.display = 'block';
+            dataUrlFromOpfsPath(url.slice(7)).then(dataUrl => {
+              if (dataUrl) { img.src = dataUrl; img.alt = ''; }
+              else { img.alt = '(image not found)'; }
+            });
+          } else {
+            img.src = url;
+          }
           img.style.maxWidth = '200px';
           img.style.maxHeight = '150px';
           img.style.borderRadius = '4px';
@@ -5581,10 +5628,25 @@ function handleImageSelect(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    _attachedImage = { dataUrl: reader.result, file };
-    const preview = $('imagePreview');
-    preview.innerHTML = '<img src="' + reader.result + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
-    preview.style.display = '';
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      _attachedImage = { dataUrl, file, opfsPath: null };
+      const preview = $('imagePreview');
+      preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+      preview.style.display = '';
+    };
+    img.src = reader.result;
   };
   reader.readAsDataURL(file);
 }
@@ -5596,7 +5658,33 @@ function clearImage() {
   $('imageInput').value = '';
 }
 
-function handleSubmit() {
+async function saveImageToOpfs(dataUrl, filename) {
+  // Convert data URL to Uint8Array
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const path = 'images/' + filename;
+  await opfs.write(path, new Uint8Array(await blob.arrayBuffer()));
+  return path;
+}
+
+function dataUrlFromOpfsPath(path) {
+  // Read file from OPFS and return data URL
+  return new Promise(async (resolve) => {
+    try {
+      const bytes = await opfs.readBytes(path);
+      const ext = path.split('.').pop().toLowerCase();
+      const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[ext] || 'image/jpeg';
+      const blob = new Blob([bytes], { type: mime });
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !_attachedImage) return;
   $('input').value = '';
@@ -5604,8 +5692,11 @@ function handleSubmit() {
   // Build message content: string (text only) or array (multimodal)
   let content = text;
   if (_attachedImage) {
+    // Save image to OPFS, use opfs:// reference in message
+    const filename = _attachedImage.file.name || ('image_' + Date.now() + '.jpg');
+    const opfsPath = await saveImageToOpfs(_attachedImage.dataUrl, filename);
     content = [{ type: 'text', text: text || '' }];
-    content.push({ type: 'image_url', image_url: { url: _attachedImage.dataUrl, detail: 'high' } });
+    content.push({ type: 'image_url', image_url: { url: 'opfs://' + opfsPath, detail: 'high' } });
     clearImage();
   }
 
@@ -5800,7 +5891,7 @@ async function sendSingle(text, stream) {
   let wasAborted = false;
 
   // [R1] Build the SW request payload from current UI state.
-  const config = buildAgentConfig(convMessages);
+  const config = await buildAgentConfig(convMessages);
 
   // [R2] Wait for the SW to be controlling the page, then wire abort.
   await _swReady;
@@ -5885,7 +5976,7 @@ async function sendSingle(text, stream) {
 // [R1] Package the SW request body from the live UI state. Pure read of
 // $('endpoint') / $('apiKey') / $('model') / $('proxyUrl') + module-level
 // helpers; no DOM writes, no side effects.
-function buildAgentConfig(convMessages) {
+async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
@@ -5893,12 +5984,34 @@ function buildAgentConfig(convMessages) {
   const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
+
+  // Resolve opfs:// image URLs to data URLs before sending to API
+  const resolvedMessages = [];
+  for (const msg of convMessages) {
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      const resolvedContent = [];
+      for (const part of msg.content) {
+        if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
+          const dataUrl = await dataUrlFromOpfsPath(part.image_url.url.slice(7));
+          if (dataUrl) {
+            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl, detail: part.image_url.detail || 'high' } });
+          }
+        } else {
+          resolvedContent.push(part);
+        }
+      }
+      resolvedMessages.push({ ...msg, content: resolvedContent });
+    } else {
+      resolvedMessages.push(msg);
+    }
+  }
+
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
     systemPrompt: buildSystemPrompt(),
-    messages: convMessages.slice(),
+    messages: resolvedMessages,
     tools: toolDefs(),
     proxyBase,
     origin: location.origin,
