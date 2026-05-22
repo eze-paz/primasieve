@@ -3835,6 +3835,9 @@ class SidePanel {
     if (id === this._sideId) return;      // already in side
     if (this._activeIsRight) return;      // would clobber the active conv
 
+    // Artifact panel shares #messagesSide — close it before mounting a conv.
+    closeArtifactPanel();
+
     // Park the previous side conv (if any) so its host detaches cleanly.
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
@@ -3939,6 +3942,11 @@ class SidePanel {
     b.toggle('side-open',     this.isOpen);
     b.toggle('active-left',   this.isOpen && !this._activeIsRight);
     b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
+    // If a conv is now live in the right pane, clear any leftover artifact state.
+    if (this.isOpen) {
+      b.remove('artifact-side-open');
+      this.right.classList.remove('artifact-mode');
+    }
   }
 
   // Click-to-swap + drag-drop wiring. Attached once at construction.
