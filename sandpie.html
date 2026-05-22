@@ -1162,15 +1162,21 @@ function renderArtifact(host, path) {
     panelBtn.textContent = '⊞';
     panelBtn.onclick = () => openArtifactPanel(clean);
     btns.appendChild(panelBtn);
+    const openLink = document.createElement('a');
+    openLink.href = 'opfs/' + clean;
+    openLink.target = '_blank';
+    openLink.title = 'Open in new tab';
+    openLink.textContent = '↗';
+    openLink.className = 'artifact-icon-btn';
+    btns.appendChild(openLink);
   }
-  const link = document.createElement('a');
-  link.href = 'opfs/' + clean;
-  link.target = '_blank';
-  link.title = renderable ? 'Open in new tab' : 'Download';
-  link.textContent = renderable ? '↗' : '⬇';
-  if (!renderable) link.download = clean.split('/').pop();
-  link.className = 'artifact-icon-btn';
-  btns.appendChild(link);
+  const dlLink = document.createElement('a');
+  dlLink.href = 'opfs/' + clean;
+  dlLink.download = clean.split('/').pop();
+  dlLink.title = 'Download';
+  dlLink.textContent = '⬇';
+  dlLink.className = 'artifact-icon-btn';
+  btns.appendChild(dlLink);
   header.appendChild(btns);
   wrap.appendChild(header);
 
