@@ -2106,6 +2106,12 @@ refreshWelcome();
 }
 refreshTokenMeter();
 
+let _userScrolledUp = false;
+function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
+function markUserScrolledUp() { _userScrolledUp = true; }
+function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
+function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
+
 // Chat input: textarea that auto-grows up to a cap, with Enter-to-send /
 // Shift+Enter-to-newline behavior.
 (function setupInput() {
@@ -4123,14 +4129,6 @@ function saveConfig() {
     dbxAppKey: $('dbxAppKey').value,
   }));
 }
-
-let _userScrolledUp = false;
-function isAtBottom(el) {
-  return el.scrollHeight - el.scrollTop - el.clientHeight <= 2;
-}
-function markUserScrolledUp() { _userScrolledUp = true; }
-function markUserAtBottom(el) { if (isAtBottom(el)) _userScrolledUp = false; }
-function shouldAutoScroll(el) { return !_userScrolledUp && isAtBottom(el); }
 
 async function requestWakeLock() {
   try {
