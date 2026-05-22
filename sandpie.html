@@ -1149,6 +1149,11 @@
     from { opacity: 0; transform: translateY(3px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  .image-preview { display: flex; gap: 0.5rem; padding: 0.25rem 0; align-items: center; }
+  .image-preview img { max-height: 60px; border-radius: 4px; border: 1px solid var(--sp-border); }
+  #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
+  #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
+
 </style>
 <script>
 // Render an OPFS file as a live artifact iframe appended to `host`.
@@ -1542,7 +1547,10 @@ window.addEventListener('message', e => {
     </div>
   </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
+    <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+    <div id="imagePreview" class="image-preview" style="display:none"></div>
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
+    <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
     <button id="sendBtn" onclick="handleButtonClick()">Send</button>
   </form>
 </main>
@@ -2058,6 +2066,7 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 // line runs, and `typeof` on a TDZ-bound name throws too.
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+let _attachedImage = null; // { dataUrl: string, file: File } or null
 // Tool-call/result bubbles minimized by default. Persisted across reloads.
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -4321,7 +4330,28 @@ function addMsg(role, text = '', host = null) {
   } else {
     const bubble = document.createElement('span');
     bubble.className = 'bubble';
-    bubble.textContent = text;
+    if (Array.isArray(text)) {
+      // Multimodal content: render text parts + images
+      for (const part of text) {
+        if (part.type === 'text' && part.text) {
+          const span = document.createElement('span');
+          span.textContent = part.text;
+          span.style.display = 'block';
+          span.style.marginBottom = '0.5rem';
+          bubble.appendChild(span);
+        } else if (part.type === 'image_url') {
+          const img = document.createElement('img');
+          img.src = part.image_url.url;
+          img.style.maxWidth = '200px';
+          img.style.maxHeight = '150px';
+          img.style.borderRadius = '4px';
+          img.style.display = 'block';
+          bubble.appendChild(img);
+        }
+      }
+    } else {
+      bubble.textContent = text;
+    }
     div.appendChild(bubble);
   }
   target.appendChild(div);
@@ -5036,7 +5066,13 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
-  const derived = firstUser ? String(firstUser.content || '').slice(0, 60) : 'Untitled';
+  let derived = 'Untitled';
+  if (firstUser && firstUser.content) {
+    const text = typeof firstUser.content === 'string'
+      ? firstUser.content
+      : firstUser.content.filter(p => p.type === 'text').map(p => p.text).join('');
+    derived = text.slice(0, 60);
+  }
   const data = {
     ...prev,
     id: convId,
@@ -5056,9 +5092,11 @@ function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
     bindBubble(addMsg('user', m.content, host), m);
   } else if (m.role === 'assistant') {
-    if (m.content && m.content.trim()) {
+    const contentStr = typeof m.content === 'string' ? m.content :
+      m.content.filter(p => p.type === 'text').map(p => p.text).join('');
+    if (contentStr && contentStr.trim()) {
       const div = addMsg('assistant', '', host);
-      div.innerHTML = renderMd(m.content);
+      div.innerHTML = renderMd(contentStr);
       bindBubble(div, m);
     }
     if (m.tool_calls) {
@@ -5538,14 +5576,43 @@ function setStreamSending(stream, sending) {
   refreshConversationList();
 }
 
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    _attachedImage = { dataUrl: reader.result, file };
+    const preview = $('imagePreview');
+    preview.innerHTML = '<img src="' + reader.result + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+    preview.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  _attachedImage = null;
+  $('imagePreview').style.display = 'none';
+  $('imagePreview').innerHTML = '';
+  $('imageInput').value = '';
+}
+
 function handleSubmit() {
   const text = $('input').value.trim();
-  if (!text) return;
+  if (!text && !_attachedImage) return;
   $('input').value = '';
+
+  // Build message content: string (text only) or array (multimodal)
+  let content = text;
+  if (_attachedImage) {
+    content = [{ type: 'text', text: text || '' }];
+    content.push({ type: 'image_url', image_url: { url: _attachedImage.dataUrl, detail: 'high' } });
+    clearImage();
+  }
+
   const m = $('messages');
   lockScroll(m);
   m.scrollTop = m.scrollHeight;
-  enqueueForActive(text);
+  enqueueForActive(content);
   // Reset textarea height after clearing value
   const ta = $('input');
   if (ta) {
@@ -5554,14 +5621,14 @@ function handleSubmit() {
 }
 
 // Push a message into the currently visible conv's queue and start processing.
-async function enqueueForActive(text) {
+async function enqueueForActive(content) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
   // If the stream's host hasn't been mounted yet (fresh conv started by
   // typing rather than via the conv list), mount it now so bubbles are
   // visible as they stream in.
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
-  s.queue.push(text);
+  s.queue.push(content);
   updateQueueCount(s);
   processQueueFor(s);
 }
