@@ -291,32 +291,6 @@
   }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
   .info { align-self: center; color: var(--sp-text-dim); font-style: italic; font-size: 0.85em; }
-  .tool-call, .tool-result {
-    align-self: flex-start;
-    max-width: 85%;
-    min-width: 0;
-    padding: 0.5rem 0.75rem;
-    font: 12px/1.4 'JetBrains Mono', Consolas, monospace;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    position: relative;
-  }
-  .tool-call {
-    background: var(--sp-accent-dim);
-  }
-  .tool-result {
-    background: var(--sp-success-dim);
-  }
-  .tool-call::before, .tool-result::before {
-    content: "";
-    position: absolute;
-    inset: -1.5px;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    z-index: -1;
-  }
-  .tool-call::before { background: var(--sp-accent-dim); }
-  .tool-result::before { background: var(--sp-success-dim); }
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
   .assistant p { margin: 0.5em 0; }
@@ -1045,6 +1019,35 @@
     background: var(--sp-accent-dim);
     border-color: var(--sp-accent-dim);
   }
+  
+  /* Terminal-style tool call box */
+  .tool-box {
+    align-self: flex-start;
+    max-width: 90%;
+    border: 1px solid var(--sp-border);
+    border-radius: 0.375rem;
+    font: 12px/1.6 'JetBrains Mono', Consolas, monospace;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+  .tool-box .tool-code {
+    padding: 0.5rem 0.75rem;
+    color: var(--sp-text);
+  }
+  .tool-box .tool-code .line::before {
+    content: ">>> ";
+    color: var(--sp-text-dim);
+    user-select: none;
+  }
+  .tool-box .tool-sep {
+    border-top: 1px solid var(--sp-border);
+    margin: 0 0.75rem;
+  }
+  .tool-box .tool-result {
+    padding: 0.5rem 0.75rem;
+    color: var(--sp-accent);
+  }
+
   body.tools-minimized .tool-call:hover {
     background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
     border-color: var(--sp-accent-dim);
@@ -4542,6 +4545,33 @@ function tcEscape(s) {
   }[c]));
 }
 
+function appendToolResult(toolCallDiv, result) {
+  const expanded = toolCallDiv && toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+  // Remove existing sep + result if any
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+  // Add new result
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'tool-result';
+  resultDiv.textContent = result;
+  box.appendChild(sep);
+  box.appendChild(resultDiv);
+}
+
+
+
 function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
@@ -4736,7 +4766,9 @@ class RoundRenderer {
       return;
     }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
-    this.pendingToolResultDiv = addMsg('tool-result', '← ' + display, this.host);
+    if (idx >= 0 && this.toolCallEls[idx]) {
+      appendToolResult(this.toolCallEls[idx], display);
+    }
   }
 
   finalize() {
@@ -4876,7 +4908,28 @@ class RoundRenderer {
 
   _paintTool(i) {
     if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
-    tcSetExpanded(this.toolCallEls[i], '→ ' + this.toolCalls[i].function.name + '(' + this.toolDisplayed[i]);
+    const tc = this.toolCalls[i];
+    let code = '';
+    try {
+      const args = JSON.parse(tc.function.arguments);
+      if (args.code) code = args.code;
+      else if (args.cmd) code = args.cmd;
+      else code = JSON.stringify(args, null, 2);
+    } catch (e) {
+      code = tc.function.arguments;
+    }
+    const lines = code.split('\n').filter(l => l.trim());
+    const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
+
+    const box = document.createElement('div');
+    box.className = 'tool-box';
+    box.innerHTML = `<div class="tool-code">${codeHtml}</div>`;
+
+    const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
+    if (expanded) {
+      expanded.innerHTML = '';
+      expanded.appendChild(box);
+    }
   }
 
   _appendCloseParensIfReady() {
@@ -4885,7 +4938,6 @@ class RoundRenderer {
       const el = this.toolCallEls[i];
       if (!el || el._tcClosed) continue;
       if ((this.toolPending[i] || '').length === 0) {
-        tcAppendExpanded(el, ')');
         el._tcClosed = true;
       }
     }
@@ -5005,8 +5057,12 @@ function renderHistoricalMessage(m, host = null) {
     const content = String(m.content || '');
     if (!content.startsWith('artifact:')) {
       const t = content;
-      const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`, host);
-      bindBubble(div, m);
+      const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
+      // Find last tool-call div and append result to its box
+      const toolCalls = host.querySelectorAll('.msg.tool-call');
+      if (toolCalls.length > 0) {
+        appendToolResult(toolCalls[toolCalls.length - 1], display);
+      }
     }
     // legacy m.artifacts blobs ignored — new architecture uses load_artifact tool
   }
