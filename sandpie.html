@@ -1074,9 +1074,37 @@
   }
 </style>
 <script>
-// Render an HTML string as a sandboxed (allow-scripts, no same-origin) iframe
-// appended to `host`. Used for Pyodide IPython.display output (live) and for
-// replaying persisted artifacts when a conversation is reloaded from OPFS.
+// Render an OPFS file as a live artifact iframe appended to `host`.
+// path is the OPFS-relative path (e.g. "files/outputs/chart.html").
+// The SW serves it at /opfs/<path> and injects the resize postMessage script.
+function renderArtifact(host, path) {
+  if (!host || !path) return;
+  const clean = String(path).replace(/^\/+/, '');
+  const wrap = document.createElement('div');
+  wrap.className = 'artifact-wrap';
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;max-width:100%;';
+  const header = document.createElement('div');
+  header.className = 'artifact-header';
+  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-muted);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;';
+  const label = document.createElement('span');
+  label.textContent = '📎 Artifact';
+  const link = document.createElement('a');
+  link.href = '/opfs/' + clean;
+  link.target = '_blank';
+  link.textContent = '↗ open';
+  link.style.cssText = 'color:var(--sp-accent);text-decoration:none;font-size:0.8rem;';
+  header.appendChild(label);
+  header.appendChild(link);
+  wrap.appendChild(header);
+  const frame = document.createElement('iframe');
+  frame.className = 'artifact-frame';
+  frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
+  frame.src = '/opfs/' + clean;
+  wrap.appendChild(frame);
+  host.appendChild(wrap);
+}
+
+// Dead-code stub — remove after confirming no old conversations reference this.
 window._renderArtifact = function (host, html) {
   const id = 'art-' + Date.now().toString(36);
 
@@ -1223,97 +1251,19 @@ window._renderArtifact = function (host, html) {
   }
 };
 
-// ── Message handler: resize AND errors ──
-window.addEventListener('message', function(e) {
-  if (!e.data) return;
-
-  // Resize
-  if (e.data.type === 'sandpie-artifact-resize') {
-    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-      if (f.contentWindow === e.source) {
-        const h = Math.max(60, e.data.h | 0);
-        f.style.height = h + 'px';
-        f.style.border = '0';
-        if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
-        if (f._artifactLoading && f._artifactLoading.parentNode) f._artifactLoading.remove();
-        const wrap = f.closest('.artifact-wrap');
-        if (wrap) wrap.style.border = '1px solid var(--sp-border)';
-        console.log('[artifact] resized', e.data.id || '?', 'to', h);
-        return;
-      }
-    }
-    console.warn('[artifact] resize message from unknown iframe', e.data.id);
-  }
-
-  // Error from inside iframe
-  if (e.data.type === 'sandpie-artifact-error') {
-    console.error('[artifact] iframe JS error', e.data.id, e.data.msg);
-    addMsg('err', 'Artifact JS error: ' + (e.data.msg || 'unknown'));
-    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-      if (f.dataset.artifactId === e.data.id) {
-        const wrap = f.closest('.artifact-wrap');
-        if (wrap) {
-          wrap.style.border = '2px solid #f85149';
-          const header = wrap.querySelector('.artifact-header');
-          if (header) { header.textContent = '📎 Artifact Error'; header.style.color = '#f85149'; }
-        }
-        return;
-      }
-    }
-  }
-});
-
-// Artifact status log — forwarded to SW for AI feedback
-const _artifactStatus = new Map();
-function _forwardArtifactStatus(data) {
-  _artifactStatus.set(data.id, { h: data.h, error: data.msg, t: Date.now() });
-  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  console.log('[artifact] forward', data.id, 'sw=', !!sw, 'h=', data.h, 'err=', data.msg);
-  if (sw) {
-    try { sw.postMessage({ type: 'artifact-status', ...data }); }
-    catch (e) { console.error('[artifact] postMessage failed', e); }
-  } else {
-    console.warn('[artifact] no SW controller');
-  }
-}
-
-// Sandboxed iframes postMessage their content height so we can autosize them.
+// Artifact iframes postMessage their content height — autosize and border reveal.
 window.addEventListener('message', e => {
-  if (!e.data || !e.data.type) return;
-  if (e.data.type === 'sandpie-artifact-resize') {
-    _forwardArtifactStatus(e.data);
-    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-      if (f.contentWindow === e.source) {
-        const h = Math.max(60, e.data.h | 0);
-        f.style.height = h + 'px';
-        if (f._artifactTimeout) clearTimeout(f._artifactTimeout);
-        if (f._artifactLoading && f._artifactLoading.parentNode) f._artifactLoading.remove();
-        const wrap = f.closest('.artifact-wrap');
-        if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
-        return;
-      }
-    }
-  }
-  if (e.data.type === 'sandpie-artifact-error') {
-    _forwardArtifactStatus(e.data);
-    for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-      if (f.contentWindow === e.source) {
-        const wrap = f.closest('.artifact-wrap');
-        if (wrap) { wrap.style.borderColor = '#f85149'; wrap.style.background = '#f8514910'; }
-        return;
-      }
+  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
+  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+    if (f.contentWindow === e.source) {
+      f.style.height = Math.max(60, e.data.h | 0) + 'px';
+      const wrap = f.closest('.artifact-wrap');
+      if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
+      return;
     }
   }
 });
 
-// Buffer for artifacts emitted during the currently-running tool call. The
-// tool exec loop drains this immediately after the tool returns, so it
-// attaches the HTML to the matching tool message (persisted with the conv)
-// and renders into the originating stream's host.
-window._pendingArtifacts = [];
-window._sandpieDisplay = function (html) {
-  window._pendingArtifacts.push(String(html || ''));
-};
 </script>
 </head>
 <body>
@@ -2966,11 +2916,17 @@ No raw sockets, no subprocess.
 
 CLOUD FILES — your working directory is /files/ (the user's persistent storage, mounted from OPFS; changes persist across runs and sync to Dropbox). Use plain relative paths: open('notes.txt'), os.listdir('.'), pathlib.Path('data.csv') — they all resolve under /files/. If you open() a file that's in the user's Dropbox but not yet locally hydrated, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
 
-RICH OUTPUT — to render images, HTML, plots, SVG, dataframes, etc., use IPython.display:
-    from IPython.display import display, HTML, Image, SVG
-    display(HTML('<b>hi</b>'))                  # rendered as a sandboxed iframe artifact
-    display(Image(filename='plot.png'))         # PNG bytes shown inline
-The artifact appears below the assistant message. IPython.display is the only sanctioned channel for rich output: artifacts emitted this way are persisted with the conversation and reappear on page reload. Anything else you try (writing to document.body, attachShadow, fetching the host page, etc.) is not reachable from inside Pyodide and will not render — use display().
+RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual content in the chat:
+  1. Write the output to a file under /files/ using run_python:
+       open('outputs/chart.html', 'w').write(html_string)   # HTML page, can load CDN JS
+       fig.write_html('outputs/plot.html')                   # Plotly / Bokeh etc.
+  2. Call load_artifact with the OPFS path (no leading slash):
+       load_artifact({ "path": "files/outputs/chart.html" })
+
+The artifact renders as a live iframe below the message and persists across reloads.
+Any file type works: .html (full page), .svg, .png, .jpg, .csv.
+IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call load_artifact to inject it into chat.
+Use load_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
 
 Examples:
   list    →  import os; print(os.listdir())               # lists /files
@@ -3076,6 +3032,7 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
     },
     run: async ({ path }, signal) => {
       if (!dbxTokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
+
       if (!path) return 'Missing path.';
       const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
       const state = syncState();
@@ -3103,6 +3060,28 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
       } finally {
         setDbxBusy(false);
       }
+    },
+  },
+  load_artifact: {
+    description: `Render a file from OPFS as a live artifact injected directly into the chat.
+
+Use this whenever:
+- The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
+- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to /files/
+
+The file must already exist in OPFS — write it first with run_python, then call this.
+Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
+Path is OPFS-relative — do NOT include a leading slash (e.g. "files/outputs/chart.html").
+
+Typical flow:
+  run_python: open('outputs/chart.html', 'w').write(html)
+  load_artifact: { "path": "files/outputs/chart.html" }`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "files/outputs/chart.html"). No leading slash.' },
+      },
+      required: ['path'],
     },
   },
 };
@@ -4569,7 +4548,7 @@ class RoundRenderer {
     startToolTicker(this.toolCallEls[idx], tc);
   }
 
-  markToolDone(tcId, result, artifacts) {
+  markToolDone(tcId, result) {
     const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
     if (idx >= 0 && this.toolCallEls[idx]) {
       this.toolCallEls[idx].classList.remove('in-flight');
@@ -4577,11 +4556,14 @@ class RoundRenderer {
       renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
     }
     const text = String(result || '');
+    // load_artifact: render the file as an iframe, skip the "← ok" text bubble.
+    if (text.startsWith('artifact:')) {
+      const path = text.slice('artifact:'.length);
+      if (path) renderArtifact(this.host, path);
+      return;
+    }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
     this.pendingToolResultDiv = addMsg('tool-result', '← ' + display, this.host);
-    if (artifacts && artifacts.length) {
-      for (const html of artifacts) window._renderArtifact(this.host, html);
-    }
   }
 
   finalize() {
@@ -4831,24 +4813,29 @@ function renderHistoricalMessage(m, host = null) {
     }
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
-        let args = tc.function.arguments;
-        try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
-        const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`, host);
-        tcDiv.dataset.fname = tc.function.name;
-        renderTcDone(tcDiv, tc.function.name);
-        bindBubble(tcDiv, m);
+        if (tc.function.name === 'load_artifact') {
+          try {
+            const { path } = JSON.parse(tc.function.arguments || '{}');
+            if (path) renderArtifact(host, path);
+          } catch (_) {}
+        } else {
+          let args = tc.function.arguments;
+          try { args = JSON.stringify(JSON.parse(tc.function.arguments || '{}')); } catch {}
+          const tcDiv = addMsg('tool-call', `→ ${tc.function.name}(${args})`, host);
+          tcDiv.dataset.fname = tc.function.name;
+          renderTcDone(tcDiv, tc.function.name);
+          bindBubble(tcDiv, m);
+        }
       }
     }
   } else if (m.role === 'tool') {
-    const t = String(m.content || '');
-    const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`, host);
-    bindBubble(div, m);
-    // Replay any artifacts captured when this tool originally ran. They land
-    // in the same host as the tool-result bubble we just created.
-    if (Array.isArray(m.artifacts) && m.artifacts.length) {
-      const artifactHost = div.parentNode;
-      for (const html of m.artifacts) window._renderArtifact(artifactHost, html);
+    const content = String(m.content || '');
+    if (!content.startsWith('artifact:')) {
+      const t = content;
+      const div = addMsg('tool-result', `← ${t.length > 500 ? t.slice(0, 500) + '…' : t}`, host);
+      bindBubble(div, m);
     }
+    // legacy m.artifacts blobs ignored — new architecture uses load_artifact tool
   }
 }
 

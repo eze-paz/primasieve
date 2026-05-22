@@ -18,7 +18,7 @@
 //        { type:"delta", content?, tool_calls? }
 //        { type:"round_end", content, tool_calls }
 //        { type:"tool_started", tc }
-//        { type:"tool_result", id, result, artifacts? }
+//        { type:"tool_result", id, result }
 //        { type:"message_added", message }  (the assistant or tool message just appended)
 //        { type:"agent_done" }
 //        { type:"error", message }
@@ -36,10 +36,11 @@
 //
 //   W1  install  → skipWaiting()                                  [line ~33]
 //   W2  activate → clients.claim()                                [line ~34]
-//   W3  fetch event router — three intercepted paths:             [line ~36]
+//   W3  fetch event router — four intercepted paths:             [line ~36]
 //         /sandpie-agent  → handleAgent
 //         /sandpie-stream → handleStream  (legacy single-round SSE proxy)
 //         /sandpie-py     → handlePy      (one-shot run_python)
+//         /opfs/<path>    → handleOpfs    (serve OPFS file; injects resize script for HTML)
 //
 //   S1  handleAgent(req): parse config, open ReadableStream.      [line ~491]
 //   S2  ReadableStream.start → runAgent(config, ctx) with         [line ~446]
@@ -224,6 +225,7 @@ self.addEventListener('fetch', (event) => {
   if (path.endsWith('/sandpie-agent'))  return event.respondWith(handleAgent(event.request));
   if (path.endsWith('/sandpie-stream')) return event.respondWith(handleStream(event.request));
   if (path.endsWith('/sandpie-py'))     return event.respondWith(handlePy(event.request));
+  if (path.startsWith('/opfs/'))        return event.respondWith(handleOpfs(path));
   // Anything else falls through to the network.
 });
 
@@ -414,9 +416,14 @@ def _sandpie_display(*objs, **kwargs):
             s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             html = '<pre>' + s + '</pre>'
         try:
-            js._sandpieDisplay(html)
-        except Exception:
-            pass
+            import os as _os, time as _time
+            _os.makedirs('/files/outputs', exist_ok=True)
+            _art_path = 'outputs/display_' + format(int(_time.time() * 1000), 'x') + '.html'
+            with open('/files/' + _art_path, 'w') as _f:
+                _f.write(html)
+            print('Artifact saved → files/' + _art_path + ' — call load_artifact to display it.')
+        except Exception as _e:
+            print('display() failed: ' + str(_e))
 try:
     import IPython.display as _ipd
     _ipd.display = _sandpie_display
@@ -449,21 +456,18 @@ async function tool_run_python({ code, path, args }, ctx) {
     try { p = await initPyodide(); }
     catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
     let stdout = '', stderr = '';
-    const artifacts = [];
     try {
       p.setStdout({ batched: s => { stdout += s + '\n'; } });
       p.setStderr({ batched: s => { stderr += s + '\n'; } });
-      // Python environment: stdout/stderr capture + IPython.display →
-      // artifacts redirect + optional argv for `path:` mode. /files is
-      // mounted lazily via mountNativeFS at init — Python can use plain
-      // open()/os.listdir/glob and it reads OPFS on demand. Files not
-      // hydrated from Dropbox simply aren't present in /files (no
-      // placeholder shim needed); LLM uses fetch_file to bring them in.
+      // Python environment: stdout/stderr capture + optional argv for `path:` mode.
+      // /files is mounted lazily via mountNativeFS at init — Python can use plain
+      // open()/os.listdir/glob and it reads OPFS on demand. Files not hydrated
+      // from Dropbox simply aren't present in /files; LLM uses fetch_file to bring them in.
+      // display() writes HTML to /files/outputs/ — call load_artifact to render it.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
-      self._sandpieDisplay = (html) => artifacts.push(html);
       try { p.runPython(DISPLAY_PATCH); } catch (_) {}
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       // Single-retry: if user code dies with FileNotFoundError on a path
@@ -503,11 +507,7 @@ async function tool_run_python({ code, path, args }, ctx) {
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-      if (artifacts.length) {
-        const note = '(rendered ' + artifacts.length + ' artifact' + (artifacts.length === 1 ? '' : 's') + ' via IPython.display — visible to the user)';
-        out = out ? out + '\n' + note : note;
-      }
-      return { result: out || '(no output)', artifacts };
+      return { result: out || '(no output)' };
     } catch (e) {
       let msg = '';
       if (e != null) {
@@ -527,10 +527,9 @@ async function tool_run_python({ code, path, args }, ctx) {
           result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.'
             + (msg ? '\n--- crash signal ---\n' + msg : '')
             + tail,
-          artifacts,
         };
       }
-      return { result: 'Error: ' + (msg || 'unknown (no message)') + tail, artifacts };
+      return { result: 'Error: ' + (msg || 'unknown (no message)') + tail };
     } finally {
       try { p && p.setStdout({}); } catch (_) {}
       try { p && p.setStderr({}); } catch (_) {}
@@ -588,14 +587,28 @@ async function tool_fetch_file(args, ctx) {
   }
 }
 
+// Validate a file exists in OPFS and mark it for artifact rendering on the page.
+// The page recognises 'artifact:<path>' in the result and renders an iframe via /opfs/<path>.
+async function tool_load_artifact({ path }, ctx) {
+  if (!path) return { result: 'Error: path is required.' };
+  const clean = String(path).replace(/^\/+/, '');
+  try {
+    await opfsReadBytes(clean);
+    return { result: 'artifact:' + clean };
+  } catch (e) {
+    return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
+  }
+}
+
 async function runTool(name, args, ctx) {
   switch (name) {
-    case 'run_python': return tool_run_python(args, ctx);
-    case 'shell':      return tool_shell(args, ctx);
-    case 'read_file':  return tool_read_file(args, ctx);
-    case 'write_file': return tool_write_file(args, ctx);
-    case 'fetch_file': return tool_fetch_file(args, ctx);
-    default:           return { result: 'Error: unknown tool ' + name };
+    case 'run_python':    return tool_run_python(args, ctx);
+    case 'shell':         return tool_shell(args, ctx);
+    case 'read_file':     return tool_read_file(args, ctx);
+    case 'write_file':    return tool_write_file(args, ctx);
+    case 'fetch_file':    return tool_fetch_file(args, ctx);
+    case 'load_artifact': return tool_load_artifact(args, ctx);
+    default:              return { result: 'Error: unknown tool ' + name };
   }
 }
 
@@ -689,8 +702,8 @@ async function runAgent(config, ctx) {
       let toolOut;
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
-      ctx.emit({ type: 'tool_result', id: tc.id, result: toolOut.result, artifacts: toolOut.artifacts || [] });
-      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result, artifacts: toolOut.artifacts || [] };
+      ctx.emit({ type: 'tool_result', id: tc.id, result: toolOut.result });
+      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result };
       messages.push(toolMsg);
       ctx.emit({ type: 'message_added', message: toolMsg });
     }
@@ -795,6 +808,40 @@ async function handlePy(req) {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// Serve an OPFS file over HTTP. HTML files get the postMessage resize script
+// injected so the page-side resize listener can autosize the artifact iframe.
+async function handleOpfs(path) {
+  const opfsPath = decodeURIComponent(path.slice('/opfs/'.length));
+  try {
+    const bytes = await opfsReadBytes(opfsPath);
+    const ext = (opfsPath.split('.').pop() || '').toLowerCase();
+    const types = { html:'text/html', htm:'text/html', svg:'image/svg+xml',
+                    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+                    gif:'image/gif', webp:'image/webp', csv:'text/csv',
+                    json:'application/json', txt:'text/plain' };
+    const ct = types[ext] || 'application/octet-stream';
+    if (ext === 'html' || ext === 'htm') {
+      let text = new TextDecoder().decode(bytes);
+      const script = `<script>(function(){` +
+        `function report(){var h=Math.max(document.body?document.body.scrollHeight:0,` +
+        `document.documentElement?document.documentElement.scrollHeight:0,100);` +
+        `parent.postMessage({type:'sandpie-artifact-resize',h:h},'*');}` +
+        `var ro=new ResizeObserver(function(){requestAnimationFrame(report);});` +
+        `if(document.body)ro.observe(document.body);` +
+        `if(document.documentElement)ro.observe(document.documentElement);` +
+        `window.addEventListener('load',report);` +
+        `setTimeout(report,50);setTimeout(report,300);` +
+        `})();<\/script>`;
+      if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, script + '</body>');
+      else text += script;
+      return new Response(text, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
+    }
+    return new Response(bytes, { headers: { 'Content-Type': ct, 'Cache-Control': 'no-store' } });
+  } catch (e) {
+    return new Response('Not found: ' + opfsPath, { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  }
 }
 
 function jsonErr(status, message) {
