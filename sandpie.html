@@ -142,12 +142,12 @@
   aside .navbar .back:hover { background: var(--sp-surface); }
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: var(--sp-accent-dim); }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.synced   { background: var(--sp-success); }
-  .dot.modified { background: var(--sp-warn); }
-  .dot.local    { background: var(--sp-accent); }
-  .dot.cloud    { background: #6e7681; }
-  .dot.none     { background: transparent; }
+
+
+
+
+
+
   .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: var(--sp-panel); }
@@ -4979,7 +4979,7 @@ function renderHistoricalMessage(m, host = null) {
     }
   } else if (m.role === 'tool') {
     const content = String(m.content || '');
-    if (!content.startsWith('artifact:')) {
+    if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
       // Find last tool-call div and append result to its box
