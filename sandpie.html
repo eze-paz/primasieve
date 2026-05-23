@@ -3229,7 +3229,10 @@ Typical flow:
       },
       required: ['path'],
     },
-    load_image: {
+
+  },
+
+        load_image: {
       description: `Load an image file from OPFS so the model can see it. The image will be attached to the next user message in the conversation. Use this when the user asks you to analyze, describe, or look at an image in their workspace. Supports JPEG, PNG, GIF, WEBP. The image path is relative to /files/.`,
       parameters: {
         type: 'object',
@@ -3260,8 +3263,7 @@ Typical flow:
           return { result: 'Error loading image: ' + (e.message || String(e)) };
         }
       },
-    },
-  },
+    },,
 };
 
 function isShellAvailable() {
