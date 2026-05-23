@@ -421,7 +421,7 @@ def _sandpie_display(*objs, **kwargs):
             _art_path = 'outputs/display_' + format(int(_time.time() * 1000), 'x') + '.html'
             with open('/files/' + _art_path, 'w') as _f:
                 _f.write(html)
-            print('Artifact saved → files/' + _art_path + ' — call load_artifact to display it.')
+            print('Artifact saved → files/' + _art_path + ' — call show_artifact to display it.')
         except Exception as _e:
             print('display() failed: ' + str(_e))
 try:
@@ -463,7 +463,7 @@ async function tool_run_python({ code, path, args }, ctx) {
       // /files is mounted lazily via mountNativeFS at init — Python can use plain
       // open()/os.listdir/glob and it reads OPFS on demand. Files not hydrated
       // from Dropbox simply aren't present in /files; LLM uses fetch_file to bring them in.
-      // display() writes HTML to /files/outputs/ — call load_artifact to render it.
+      // display() writes HTML to /files/outputs/ — call show_artifact to render it.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
@@ -589,7 +589,7 @@ async function tool_fetch_file(args, ctx) {
 
 // Validate a file exists in OPFS and mark it for artifact rendering on the page.
 // The page recognises 'artifact:<path>' in the result and renders an iframe via /opfs/<path>.
-async function tool_load_artifact({ path }, ctx) {
+async function tool_show_artifact({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
   try {
@@ -618,7 +618,7 @@ async function runTool(name, args, ctx) {
     case 'read_file':     return tool_read_file(args, ctx);
     case 'write_file':    return tool_write_file(args, ctx);
     case 'fetch_file':    return tool_fetch_file(args, ctx);
-    case 'load_artifact': return tool_load_artifact(args, ctx);
+    case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     default:              return { result: 'Error: unknown tool ' + name };
   }
