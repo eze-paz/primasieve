@@ -355,18 +355,18 @@ function withPy(fn) {
 }
 
 // ---- OPFS helpers (same async API as the page, works in SW too) ----
-async async function opfsRoot() { return await navigator.storage.getDirectory(); }
+async function opfsRoot() { return navigator.storage.getDirectory(); }
 function splitPath(p) {
   const parts = String(p).split('/').filter(Boolean);
   const name = parts.pop();
   return { parts, name };
 }
-async async function opfsResolveDir(parts, create) {
+async function opfsResolveDir(parts, create) {
   let dir = await opfsRoot();
   for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
   return dir;
 }
-async async function opfsReadBytes(path) {
+async function opfsReadBytes(path) {
   const { parts, name } = splitPath(path);
   const dir = await opfsResolveDir(parts);
   const handle = await dir.getFileHandle(name);
