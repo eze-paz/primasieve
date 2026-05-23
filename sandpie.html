@@ -1662,6 +1662,8 @@ window.addEventListener('message', e => {
 // TOOL EXECUTION                                               (sandpie.js)
 // ─────────────────────────────────────────────────────────────────────────────
 //   T1  run_python    → initPyodide (lazy) → mountNativeFS → exec → syncfs()
+//   T3  read_file     → GET  proxyBase/file?path=
+//   T4  write_file    → POST proxyBase/file?path=
 //   T5  fetch_file    → Dropbox download via SW dbx helper
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3039,7 +3041,7 @@ const tools = {
 
 PREFERRED WORKFLOW (IMPORTANT): Save reusable scripts to /files/scripts/<name>.py once, then invoke them via {path:"scripts/<name>.py", args:[...]} on every later call instead of re-pasting the same source. This is the right way to operate in sandpie — it's faster (lower token cost per call), persists across sessions, and gives you proper CLI-style sys.argv handling. Use inline {code:...} only for one-shot snippets (a list, a quick computation, file inspection) or while you're actively iterating on a script that you're about to save. If you find yourself pasting >20 lines, you should be saving it instead. Within a single session the Pyodide globals also persist between calls, so a function defined once can be called by name on later turns — but path/args is the cleanest pattern for anything you might want again next session.
 
-SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — use run_python with pyfetch for URLs, or fetch_file for Dropbox cloud-only paths.
+SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — switch to the read_file tool (host paths) or fetch_file (Dropbox cloud-only paths).
 
 PACKAGES — IMPORTANT, READ THIS FIRST:
 • ~100 packages are PREBUILT for Pyodide (numpy, pandas, scipy, sympy, matplotlib, beautifulsoup4, lxml, regex, micropip, ...). Sandpie auto-loads them based on the \`import\` statements in your code, so plain \`import numpy as np\` Just Works on first call.
@@ -3108,7 +3110,7 @@ Examples:
   fetch_file: {
     description: `Download a single cloud-only file FROM DROPBOX into OPFS so run_python can read it. Use ONLY when run_python returns "sandpie cloud placeholder" for a path. Path is relative to /files/ (e.g. "notes.txt", "subdir/data.csv"). One file per call. Returns "Hydrated <path>" on success, or an explanatory error.
 
-SCOPE: Dropbox sync only. NOT for arbitrary host disk paths and NOT for URLs (use run_python + pyfetch). If the path isn't in the cached Dropbox listing, this fails — the file must already exist in the user's sandpie Dropbox folder.`,
+SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and NOT for URLs (use run_python + pyfetch). If the path isn't in the cached Dropbox listing, this fails — the file must already exist in the user's sandpie Dropbox folder.`,
     parameters: {
       type: 'object',
       properties: {
@@ -4507,8 +4509,14 @@ const TOOL_FLAVOR = {
     'checking traceback', 'resolving imports', 'walking the heap',
   ],
 ,
-  ,
-  ,
+  read_file: [
+    'opening file descriptor', 'decoding utf-8', 'buffering chunks',
+    'normalizing line endings', 'measuring byte length', 'sniffing encoding',
+  ],
+  write_file: [
+    'allocating storage', 'encoding payload', 'flushing to disk',
+    'updating mtime', 'syncing inode', 'committing bytes',
+  ],
   fetch_file: [
     'resolving hostname', 'negotiating TLS handshake', 'streaming bytes over the wire',
     'verifying content length', 'decoding response body', 'unpacking from Dropbox',
