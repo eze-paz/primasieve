@@ -4434,8 +4434,17 @@ function tcEscape(s) {
   }[c]));
 }
 
-function appendToolResult(toolCallDiv, result) {
-  const expanded = toolCallDiv && toolCallDiv.querySelector('.tc-expanded');
+function appendToolResult(tcId, result) {
+  const toolCalls = document.querySelectorAll('.msg.tool-call');
+  let toolCallDiv = null;
+  for (const div of toolCalls) {
+    if (div.dataset.tcId === tcId) {
+      toolCallDiv = div;
+      break;
+    }
+  }
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
   let box = expanded.querySelector('.tool-box');
   if (!box) {
@@ -4694,7 +4703,7 @@ class RoundRenderer {
     }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
     if (idx >= 0 && this.toolCallEls[idx]) {
-      appendToolResult(this.toolCallEls[idx], display);
+      appendToolResult(tcId, display);
     }
   }
 
@@ -4740,6 +4749,7 @@ class RoundRenderer {
       // them char-by-char or in one chunk.
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
       this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
+      this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
       this.toolDisplayed[i] = '';
       this.toolPending[i] = '';
     }
@@ -4967,6 +4977,7 @@ function renderHistoricalMessage(m, host = null) {
         } else {
           const tcDiv = addMsg('tool-call', '', host);
           tcDiv.dataset.fname = tc.function.name;
+          tcDiv.dataset.tcId = tc.id;
           const box = buildToolBox(tc.function.arguments || '{}', tc.function.name);
           const expanded = tcDiv.querySelector('.tc-expanded');
           if (expanded) {
