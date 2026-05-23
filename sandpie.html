@@ -5745,8 +5745,14 @@ async function sendSingle(text, stream) {
     setStreamSending(stream, false);
     await saveConv(convId);
     // Show notification if permission granted and not aborted
-    console.log('[sandpie] Completion check:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
-    if (!wasAborted && Notification.permission === 'granted') {
+    // Show notification if permission granted, page is hidden, and not aborted
+    console.log('[sandpie] Completion check:', { 
+      wasAborted, 
+      permission: Notification.permission, 
+      hidden: document.hidden,
+      hasNotificationAPI: 'Notification' in window 
+    });
+    if (!wasAborted && Notification.permission === 'granted' && document.hidden) {
       console.log('[sandpie] Showing notification...');
       const notif = new Notification('sandpie', {
         body: 'Conversation complete',
