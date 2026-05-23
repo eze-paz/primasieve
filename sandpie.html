@@ -3241,29 +3241,7 @@ Typical flow:
         },
         required: ['path'],
       },
-      run: async ({ path }, signal) => {
-        try {
-          const bytes = await opfs.readBytes(path);
-          const ext = path.split('.').pop().toLowerCase();
-          const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[ext] || 'image/jpeg';
-          const blob = new Blob([bytes], { type: mime });
-          const reader = new FileReader();
-          const dataUrl = await new Promise((resolve, reject) => {
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          // Store as pending image attachment for next user message
-          _attachedImage = { dataUrl, file: { name: path.split('/').pop() }, opfsPath: path };
-          const preview = $('imagePreview');
-          preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
-          preview.style.display = '';
-          return { result: `Image loaded from ${path}. It will be attached to your next message.` };
-        } catch (e) {
-          return { result: 'Error loading image: ' + (e.message || String(e)) };
-        }
-      },
-    },,
+    },
 };
 
 function isShellAvailable() {
@@ -4881,6 +4859,21 @@ class RoundRenderer {
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
+      return;
+    }
+    // load_image: attach image to next user message
+    if (text.startsWith('image:')) {
+      const path = text.slice('image:'.length);
+      if (path) {
+        dataUrlFromOpfsPath(path).then(dataUrl => {
+          if (dataUrl) {
+            _attachedImage = { dataUrl, file: { name: path.split('/').pop() }, opfsPath: path };
+            const preview = $('imagePreview');
+            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+            preview.style.display = '';
+          }
+        });
+      }
       return;
     }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;

@@ -600,6 +600,17 @@ async function tool_load_artifact({ path }, ctx) {
   }
 }
 
+async function tool_load_image({ path }, ctx) {
+  if (!path) return { result: 'Error: path is required.' };
+  const clean = String(path).replace(/^\/+/, '');
+  try {
+    await opfsReadBytes(clean);
+    return { result: 'image:' + clean };
+  } catch (e) {
+    return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
+  }
+}
+
 async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python(args, ctx);
@@ -608,6 +619,7 @@ async function runTool(name, args, ctx) {
     case 'write_file':    return tool_write_file(args, ctx);
     case 'fetch_file':    return tool_fetch_file(args, ctx);
     case 'load_artifact': return tool_load_artifact(args, ctx);
+    case 'load_image':    return tool_load_image(args, ctx);
     default:              return { result: 'Error: unknown tool ' + name };
   }
 }
