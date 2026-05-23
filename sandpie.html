@@ -935,17 +935,7 @@
   .chip.add {
     border-style: dashed;
   }
-  /* Light theme chip: uses current theme vars; scoped accent for active border */
-  .chip[data-theme="light"] {
-    --sp-accent: #6fa8d8;
-    background: var(--sp-panel); border-color: var(--sp-border); color: var(--sp-muted);
-  }
-  .chip[data-theme="light"]:hover {
-    background: var(--sp-surface); border-color: var(--sp-border-bright); color: var(--sp-text);
-  }
-  .chip[data-theme="light"].active {
-    background: var(--sp-accent-subtle); border-color: var(--sp-accent); color: var(--sp-text);
-  }
+
   .modal {
     position: fixed;
     inset: 0;
@@ -1498,9 +1488,9 @@ window.addEventListener('message', e => {
     <summary>Theme</summary>
     <div class="service-body">
       <div class="chip-row" id="themePresets">
-        <span class="chip active" data-theme="midnight" onclick="setTheme('midnight')">Midnight</span>
-        <span class="chip" data-theme="light" onclick="setTheme('light')">Light</span>
-        <span class="chip" data-theme="custom" onclick="setTheme('custom')">Custom</span>
+        <span class="chip active" data-preset="midnight" onclick="setTheme('midnight')">Midnight</span>
+        <span class="chip" data-preset="light" onclick="setTheme('light')">Light</span>
+        <span class="chip" data-preset="custom" onclick="setTheme('custom')">Custom</span>
       </div>
       <div id="customColors" style="display:none; flex-direction:column; gap:0.375rem; margin-top:0.5rem;">
         <label style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase;">Accent</label>
@@ -6184,7 +6174,7 @@ function dispatchAgentEvent(ev, renderer, host) {
 function setTheme(name) {
   // Update chips
   document.querySelectorAll('#themePresets .chip').forEach(c => {
-    c.classList.toggle('active', c.dataset.theme === name);
+    c.classList.toggle('active', c.dataset.preset === name);
   });
 
   const customPanel = document.getElementById('customColors');
