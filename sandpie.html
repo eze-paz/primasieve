@@ -2062,7 +2062,6 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 // line runs, and `typeof` on a TDZ-bound name throws too.
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
- or null
 // Tool-call/result bubbles minimized by default. Persisted across reloads.
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
