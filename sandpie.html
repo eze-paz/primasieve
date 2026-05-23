@@ -22,7 +22,6 @@
     --sp-accent-dim: rgba(88, 166, 255, 0.35);
     --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
-    --sp-success: #3fb950;
     --sp-danger: #f85149;
     --sp-warn: #d29922;
   }
@@ -37,7 +36,6 @@
     --sp-accent-neg: #d26900;
     --sp-text: #1f2328;
     --sp-text-dim: #656d76;
-    --sp-success: #1f883d;
     --sp-danger: #cf222e;
     --sp-warn: #9a6700;
   }
@@ -184,9 +182,9 @@
   .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid var(--sp-border); padding: 0.3rem 0.6rem; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
   ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
-  .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
-  .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: var(--sp-text-dim); }
-  .dbx-status.connected { background: var(--sp-success-dim); color: var(--sp-success); }
+
+
+
   .dbx-progress {
     margin-right: 0.5rem;
     font-size: 0.7rem;
@@ -196,7 +194,7 @@
     text-overflow: ellipsis;
     max-width: 140px;
   }
-  .dbx-status.error { background: var(--sp-danger-dim); color: var(--sp-danger); }
+
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   /* SidePanel: #messagesWrap is a row container; #messages is always
      present, #messagesSide is hidden until body.side-open. body.active-right
@@ -1472,7 +1470,7 @@ window.addEventListener('message', e => {
         <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
         <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
       </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+      
     </div>
   </details>
 
@@ -1680,7 +1678,7 @@ window.addEventListener('message', e => {
 
 const $ = id => document.getElementById(id);
 
-const VERSION = '1.0.2-1779377073';
+const VERSION = '1.0.3-1779558484';
 
 // =============================================================================
 // SW console relay — surfaces sandpie.js's console output here.
@@ -2378,17 +2376,6 @@ async function pkceChallenge() {
   return { verifier, challenge: b64url(hash) };
 }
 
-function dbxStatus(text, kind) {
-  const el = $('dbxStatus');
-  el.textContent = text;
-  el.className = 'dbx-status ' + kind;
-  el.style.display = text ? '' : 'none';
-  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
-  const btn = $('dbxToggleBtn');
-  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-  if (typeof refreshWelcome === 'function') updateVersionDisplay();
-refreshWelcome();
-}
 
 function dbxProgress(text) {
   const el = $('dbxProgress');
@@ -2443,7 +2430,7 @@ async function dbxAccessToken() {
 
 async function dbxConnect() {
   const appKey = $('dbxAppKey').value.trim();
-  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
+  if (!appKey) {  return; }
   saveConfig();
   const { verifier, challenge } = await pkceChallenge();
   localStorage.setItem('dbx-pkce', JSON.stringify({
@@ -2469,7 +2456,7 @@ function dbxDisconnect() {
   // reconnect doesn't pick them up via the migration path.
   localStorage.removeItem('dbx-index');
   localStorage.removeItem('opfs-sync-manifest');
-  dbxStatus('Not connected', 'disconnected');
+  
   refreshFileList();
 }
 
@@ -2756,7 +2743,7 @@ async function sync() {
   _syncing = true;
   setDbxBusy(true);
   try {
-    dbxStatus('', 'connected');
+    
     const cloud = await cloudListAll();
     const state = syncState();
     let baselined = 0;
@@ -2882,7 +2869,7 @@ async function sync() {
     await refreshConversationList();
   } catch (e) {
     dbxProgress('');
-    dbxStatus('Sync failed: ' + e.message, 'error');
+    
     console.warn('sync:', e);
   } finally {
     dbxProgress('');
@@ -2904,7 +2891,7 @@ function joinPath(folder, name) {
 // from the Resync button so users don't have to wait for it.
 async function manualResync() {
   if (!dbxTokens()) {
-    dbxStatus('Not connected', 'disconnected');
+    
     return;
   }
   const btn = $('dbxResyncBtn');
@@ -2924,13 +2911,13 @@ async function manualResync() {
     try {
       await dbxExchangeCode(code);
       history.replaceState({}, '', location.pathname);
-      dbxStatus('', 'connected');
+      
       await sync();
     } catch (e) {
-      dbxStatus('Auth failed: ' + e.message, 'error');
+      
     }
   } else if (dbxTokens()) {
-    dbxStatus('', 'connected');
+    
     await sync();
   }
 })();
@@ -5478,16 +5465,32 @@ async function saveImageToOpfs(dataUrl, filename) {
 }
 
 function dataUrlFromOpfsPath(path) {
-  // Read file from OPFS and return data URL
+  // Read file from OPFS, compress, and return data URL
   return new Promise(async (resolve) => {
     try {
       const bytes = await opfs.readBytes(path);
       const ext = path.split('.').pop().toLowerCase();
       const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }[ext] || 'image/jpeg';
       const blob = new Blob([bytes], { type: mime });
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
+
+      // Load image and compress
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1024;
+        let w = img.width, h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+          else { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(blob);
     } catch (e) {
       resolve(null);
     }
@@ -5792,7 +5795,7 @@ async function buildAgentConfig(convMessages) {
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
 
-  // Resolve opfs:// image URLs to data URLs before sending to API
+  // Resolve opfs:// image URLs to compressed data URLs before sending to API
   const resolvedMessages = [];
   for (const msg of convMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
@@ -5812,7 +5815,6 @@ async function buildAgentConfig(convMessages) {
       resolvedMessages.push(msg);
     }
   }
-
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
