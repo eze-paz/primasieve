@@ -353,11 +353,6 @@
     transform: translate(2px, 2px);
     z-index: 0;
   }
-  aside details.service[open]::before {
-    opacity: 0.4;
-    background: rgba(0, 0, 0, 0.6);
-    transform: translate(3px, 3px);
-  }
   aside details.service summary {
     list-style: none;
     cursor: pointer;
@@ -1555,7 +1550,7 @@ window.addEventListener('message', e => {
     <div id="imagePreview" class="image-preview" style="display:none"></div>
     <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
     <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-    <button id="sendBtn" onclick="handleButtonClick()">Send</button>
+    <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
   </form>
 </main>
 
@@ -2062,7 +2057,6 @@ let initialSyncDone = !localStorage.getItem('dbx-tokens');
 // line runs, and `typeof` on a TDZ-bound name throws too.
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
- or null
 // Tool-call/result bubbles minimized by default. Persisted across reloads.
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -3079,7 +3073,13 @@ Typical flow:
   },
 
         load_image: {
-      description: `Load an image file from OPFS so the model can see it. The image will be attached to the next user message in the conversation. Use this when the user asks you to analyze, describe, or look at an image in their workspace. Supports JPEG, PNG, GIF, WEBP. The image path is relative to /files/.`,
+      description: `Load an image file from OPFS into the conversation so you can see its pixel content.
+
+WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
+
+WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
+
+Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
       parameters: {
         type: 'object',
         properties: {
@@ -4998,7 +4998,7 @@ function renderHistoricalMessage(m, host = null) {
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1], display);
+        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
       }
     }
     // legacy m.artifacts blobs ignored — new architecture uses show_artifact tool
@@ -5644,15 +5644,6 @@ async function sendSingle(text, stream) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  // Request notification permission on first send (one-time prompt)
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('[sandpie] Notification permission granted');
-      }
-    });
-  }
-
   const { id: convId, messages: convMessages, host } = stream;
 
   // [U-tail] Persist + render the user message before kicking off the round.
@@ -5744,19 +5735,6 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Show notification if permission granted, page is hidden, and not aborted
-    if (!wasAborted && Notification.permission === 'granted' && document.hidden) {
-      const notif = new Notification('sandpie', {
-        body: 'Conversation complete',
-        icon: '/sdk/icon-192.png',
-        tag: 'sandpie-conversation'
-      });
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-    }
-
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
@@ -5779,7 +5757,7 @@ async function buildAgentConfig(convMessages) {
         if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
           const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
           if (dataUrl) {
-            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl, detail: part.image_url.detail || 'high' } });
+            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl } });
           }
         } else {
           resolvedContent.push(part);
