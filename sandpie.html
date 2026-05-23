@@ -5752,7 +5752,7 @@ async function sendSingle(text, stream) {
       hidden: document.hidden,
       hasNotificationAPI: 'Notification' in window 
     });
-    if (!wasAborted && Notification.permission === 'granted' && document.hidden) {
+    if (!wasAborted && Notification.permission === 'granted') {
       console.log('[sandpie] Showing notification...');
       const notif = new Notification('sandpie', {
         body: 'Conversation complete',
