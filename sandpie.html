@@ -3064,13 +3064,13 @@ RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual co
   1. Write the output to /files/artifacts/ by default (unless the user specifies otherwise):
        open('artifacts/chart.html', 'w').write(html_string)   # HTML page, can load CDN JS
        fig.write_html('artifacts/plot.html')                   # Plotly / Bokeh etc.
-  2. Call load_artifact with the OPFS path (no leading slash):
-       load_artifact({ "path": "files/artifacts/chart.html" })
+  2. Call show_artifact with the OPFS path (no leading slash):
+       show_artifact({ "path": "files/artifacts/chart.html" })
 
 The artifact renders as a live iframe below the message and persists across reloads.
 Any file type works: .html (full page), .svg, .png, .jpg, .csv.
-IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call load_artifact to inject it into chat.
-Use load_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
+IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call show_artifact to inject it into chat.
+Use show_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
 
 Examples:
   list    →  import os; print(os.listdir())               # lists /files
@@ -3206,7 +3206,7 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
       }
     },
   },
-  load_artifact: {
+  show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
 
 Use this whenever:
@@ -3221,7 +3221,7 @@ Default output folder is /files/artifacts/ — use it unless the user specifies 
 
 Typical flow:
   run_python: open('artifacts/chart.html', 'w').write(html)
-  load_artifact: { "path": "files/artifacts/chart.html" }`,
+  show_artifact: { "path": "files/artifacts/chart.html" }`,
     parameters: {
       type: 'object',
       properties: {
@@ -4877,7 +4877,7 @@ class RoundRenderer {
       renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
     }
     const text = String(result || '');
-    // load_artifact: render the file as an iframe, skip the "← ok" text bubble.
+    // show_artifact: render the file as an iframe, skip the "← ok" text bubble.
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
@@ -5150,7 +5150,7 @@ function renderHistoricalMessage(m, host = null) {
     }
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
-        if (tc.function.name === 'load_artifact') {
+        if (tc.function.name === 'show_artifact') {
           try {
             const { path } = JSON.parse(tc.function.arguments || '{}');
             if (path) renderArtifact(host, path);
@@ -5181,7 +5181,7 @@ function renderHistoricalMessage(m, host = null) {
         appendToolResult(toolCalls[toolCalls.length - 1], display);
       }
     }
-    // legacy m.artifacts blobs ignored — new architecture uses load_artifact tool
+    // legacy m.artifacts blobs ignored — new architecture uses show_artifact tool
   }
 }
 
