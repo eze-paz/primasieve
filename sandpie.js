@@ -61,7 +61,7 @@
 //           sanitize tc.function.arguments via JSON.parse fallback
 //           emit tool_started
 //           toolOut = await runTool(name, args, ctx)              [line ~377]
-//             → dispatches to tool_run_python / tool_shell /
+//             → dispatches to tool_run_python / 
 //               tool_read_file / tool_write_file / tool_fetch_file
 //           emit tool_result (with optional artifacts)
 //           emit message_added (tool)
@@ -540,31 +540,6 @@ async function tool_run_python({ code, path, args }, ctx) {
 // shell / read_file / write_file all go through the cloud proxy at /shell.
 // proxyBase is provided by the page (so the SW doesn't have to introspect
 // page state) — typically `https://gasn2cloud.com` or empty for same-origin.
-async function tool_shell(args, ctx) {
-  const r = await fetch((ctx.proxyBase || '') + '/shell', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': ctx.origin || '' },
-    body: JSON.stringify(args),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (j.error) return { result: 'Error: ' + j.error };
-  let out = (j.stdout || '');
-  if (j.stderr) out += (out ? '\n' : '') + '--- stderr ---\n' + j.stderr;
-  if (typeof j.code === 'number' && j.code !== 0) out += (out ? '\n' : '') + `[exit ${j.code}]`;
-  return { result: out || '(no output)' };
-}
-
-async function tool_read_file(args, ctx) {
-  return tool_shell({ cmd: `cat "${String(args.path).replace(/"/g, '\\"')}"`, cwd: args.cwd, timeout: args.timeout }, ctx);
-}
-async function tool_write_file(args, ctx) {
-  // Best-effort: shell-escape and use `tee`. Caller can pass content_b64 for binary safety.
-  const content = args.content || '';
-  const b64 = btoa(unescape(encodeURIComponent(content)));
-  const cmd = `printf '%s' "$(echo '${b64}' | base64 -d)" > "${String(args.path).replace(/"/g, '\\"')}"`;
-  return tool_shell({ cmd, cwd: args.cwd, timeout: args.timeout }, ctx);
-}
-
 async function tool_fetch_file(args, ctx) {
   // Dropbox download. Requires tokens from page (no localStorage in SW).
   if (!ctx.dbxTokens) return { result: 'Error: Dropbox tokens not available in SW context (page did not provide them).' };
@@ -614,9 +589,7 @@ async function tool_load_image({ path }, ctx) {
 async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python(args, ctx);
-    case 'shell':         return tool_shell(args, ctx);
-    case 'read_file':     return tool_read_file(args, ctx);
-    case 'write_file':    return tool_write_file(args, ctx);
+
     case 'fetch_file':    return tool_fetch_file(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
