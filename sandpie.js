@@ -62,6 +62,7 @@
 //           emit tool_started
 //           toolOut = await runTool(name, args, ctx)              [line ~377]
 //             → dispatches to tool_run_python / 
+//               tool_read_file / tool_write_file / tool_fetch_file
 //           emit tool_result (with optional artifacts)
 //           emit message_added (tool)
 //         next iteration
@@ -70,7 +71,10 @@
 //   T1  tool_run_python: lazy initPyodide (single shared interp),
 //       exec user code, return stdout + artifacts. NO automatic
 //       OPFS sync — Python operates in plain Pyodide MEMFS. The LLM
+//       uses read_file / write_file / fetch_file for actual file I/O.
 //   T2  tool_shell:      POST proxyBase/shell                     [line ~330]
+//   T3  tool_read_file:  GET  proxyBase/file?path=                [line ~344]
+//   T4  tool_write_file: POST proxyBase/file?path=                [line ~347]
 //   T5  tool_fetch_file: Dropbox download via SW dbx helper       [line ~355]
 //
 // Adding a new tool: register it in runTool's switch AND export its
@@ -533,7 +537,7 @@ async function tool_run_python({ code, path, args }, ctx) {
   });
 }
 
-// proxy calls go through the cloud proxy at /shell.
+// shell / read_file / write_file all go through the cloud proxy at /shell.
 // proxyBase is provided by the page (so the SW doesn't have to introspect
 // page state) — typically `https://gasn2cloud.com` or empty for same-origin.
 async function tool_fetch_file(args, ctx) {
