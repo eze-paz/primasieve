@@ -2,7 +2,7 @@
   "name": "sandpie",
   "short_name": "sandpie",
   "description": "Browser-based workspace with Pyodide, Dropbox sync, and AI chat",
-  "start_url": "/",
+  "start_url": "/sdk/sandpie.html",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#58a6ff",
@@ -25,5 +25,6 @@
     "developer",
     "productivity"
   ],
-  "lang": "en"
+  "lang": "en",
+  "scope": "/sdk/"
 }

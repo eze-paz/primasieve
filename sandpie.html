@@ -6140,5 +6140,14 @@ function resetCustomTheme() {
   }
 })();
 </script>
+<script>
+// Suppress automatic PWA install prompt — user can still install via menu
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  console.log('[sandpie] PWA install prompt suppressed (available via menu)');
+});
+</script>
 </body>
 </html>
