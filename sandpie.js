@@ -606,17 +606,17 @@ function swSleep(ms, signal) {
   });
 }
 async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
-  const MAX = 3;
-  const BACKOFF = [1000, 3000];
-  for (let attempt = 0; attempt < MAX; attempt++) {
+  const BACKOFF_MS = [1000, 2000, 5000, 10000]; // caps at 10s after 4th attempt
+  for (let attempt = 0; ; attempt++) {
     try {
+      if (attempt > 0) ctx.emit({ type: 'info', message: null });
       return await streamOneRound(reqUrl, headers, body, ctx);
     } catch (e) {
       if (ctx.signal?.aborted) throw e;
-      if (!isRetryableError(e) || attempt === MAX - 1) throw e;
-      ctx.emit({ type: 'info', message: `Provider error (${e.status || 'network'}), retrying in ${BACKOFF[attempt] / 1000}s… (${attempt + 1}/${MAX - 1})` });
-      await swSleep(BACKOFF[attempt], ctx.signal);
-      ctx.emit({ type: 'info', message: null });
+      if (!isRetryableError(e)) throw e;
+      const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
+      ctx.emit({ type: 'info', message: `Provider error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
+      await swSleep(delay, ctx.signal);
     }
   }
 }
