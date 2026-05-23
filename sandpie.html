@@ -1619,7 +1619,7 @@ window.addEventListener('message', e => {
 //         emit message_added (asst with tool_calls)
 //         for each tc:
 //           emit tool_started
-//           runTool(name, args, ctx) → tool_run_python / tool_shell / ...
+//           runTool(name, args, ctx) → tool_run_python / tool_fetch_file / ...
 //           emit tool_result (+ artifacts)
 //           emit message_added (tool)
 //         next round
@@ -1663,10 +1663,7 @@ window.addEventListener('message', e => {
 // TOOL EXECUTION                                               (sandpie.js)
 // ─────────────────────────────────────────────────────────────────────────────
 //   T1  run_python    → initPyodide (lazy) → mountNativeFS → exec → syncfs()
-//   T2  shell         → POST proxyBase/shell
-//   T3  read_file     → GET  proxyBase/file?path=
-//   T4  write_file    → POST proxyBase/file?path=
-//   T5  fetch_file    → Dropbox download via SW dbx helper
+//   T2  fetch_file    → Dropbox download via SW dbx helper
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // SW LIFECYCLE                                                 (sandpie.js)
@@ -2052,11 +2049,6 @@ function dedentMarkdownFences(text) {
   });
 }
 
-// Declared up here so refreshProxyDot() can read them at module init time
-// (let bindings are TDZ-bound until their declaration line runs, so they must
-// physically precede any function-init call that reads them).
-let localProxyMode = 'inactive';
-let localProxyTimer = null;
 // True once the initial Dropbox auto-pull resolves (or immediately if there's
 // no Dropbox to wait for). Used by refreshFileList / refreshConversationList
 // to distinguish "empty list" (show '(empty)') from "still loading".
@@ -2119,8 +2111,6 @@ function refreshAiDot() {
   setDot('aiDot', ok ? 'ok' : null);
 }
 function refreshProxyDot() {
-  if (localProxyMode === 'connected') return setDot('proxyDot', 'ok');
-  if (localProxyMode === 'searching') return setDot('proxyDot', 'warn');
   if ($('proxyUrl').value.trim()) return setDot('proxyDot', 'ok');
   setDot('proxyDot', null);
 }
@@ -2212,98 +2202,6 @@ document.addEventListener('submit', () => {
   if (btn) btn.textContent = '☰';
 });
 
-// ============================================================
-// Local proxy — auto-detect when an externally-started proxy is running
-// ============================================================
-// Local proxy state machine: 'inactive' | 'searching' | 'connected'
-//   inactive  → no polling, no probes, no UI noise. Default.
-//   searching → probing once. If found → connected, else stay searching
-//               and keep probing every 3s so a freshly-started proxy
-//               auto-connects.
-//   connected → background verify every 15s; if it goes down, drop to inactive.
-// (localProxyMode and localProxyTimer are declared near the top so refreshProxyDot
-//  can read them safely at module init.)
-async function probeLocalProxy() {
-  // 2s gives the OS a real chance to fail/succeed the connect; 800ms was
-  // racing with TCP handshake on slower machines and made the test feel like
-  // it didn't happen at all.
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 2000);
-  try {
-    const r = await fetch('http://localhost:8080/', { method: 'OPTIONS', signal: ctrl.signal });
-    return !!r.headers.get('access-control-allow-origin');
-  } catch { return false; }
-  finally { clearTimeout(t); }
-}
-
-function setLocalProxyUI(mode) {
-  localProxyMode = mode;
-  refreshProxyDot();
-  if (mode === 'inactive') {
-    if ($('proxyUrl').value.trim() === 'http://localhost:8080') {
-      $('proxyUrl').value = '';
-      updateRoutingHint();
-    }
-  } else if (mode === 'connected') {
-    if (!$('proxyUrl').value.trim()) {
-      $('proxyUrl').value = 'http://localhost:8080';
-      updateRoutingHint();
-    }
-  }
-}
-
-function startLocalProxyTimer(intervalMs, onAlive, onDead) {
-  if (localProxyTimer) clearInterval(localProxyTimer);
-  localProxyTimer = setInterval(async () => {
-    if (document.hidden) return;
-    const alive = await probeLocalProxy();
-    if (alive) onAlive(); else if (onDead) onDead();
-  }, intervalMs);
-}
-
-async function toggleLocalProxy() {
-  if (localProxyMode !== 'inactive') {
-    if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-    setLocalProxyUI('inactive');
-    return;
-  }
-
-  // Populate the proxy field BEFORE testing so the user can see exactly what
-  // URL we're probing. setLocalProxyUI('inactive') already clears this back
-  // to '' if the value still equals our default.
-  $('proxyUrl').value = 'http://localhost:8080';
-  updateRoutingHint();
-
-  setLocalProxyUI('searching');
-  const alive = await probeLocalProxy();
-
-  if (alive) {
-    setLocalProxyUI('connected');
-    startLocalProxyTimer(15000, () => {}, () => {
-      if (localProxyMode === 'connected') {
-        addMsg('info', 'Local proxy disconnected.');
-        if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-        setLocalProxyUI('inactive');
-      }
-    });
-    return;
-  }
-
-  // No proxy yet — keep probing in case the user starts one externally.
-  startLocalProxyTimer(3000, () => {
-    if (localProxyMode === 'searching') {
-      if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-      setLocalProxyUI('connected');
-      startLocalProxyTimer(15000, () => {}, () => {
-        if (localProxyMode === 'connected') {
-          addMsg('info', 'Local proxy disconnected.');
-          if (localProxyTimer) { clearInterval(localProxyTimer); localProxyTimer = null; }
-          setLocalProxyUI('inactive');
-        }
-      });
-    }
-  });
-}
 
 // ============================================================
 // OPFS — nested filesystem (paths use forward slashes)
@@ -3043,7 +2941,7 @@ const tools = {
 
 PREFERRED WORKFLOW (IMPORTANT): Save reusable scripts to /files/scripts/<name>.py once, then invoke them via {path:"scripts/<name>.py", args:[...]} on every later call instead of re-pasting the same source. This is the right way to operate in sandpie — it's faster (lower token cost per call), persists across sessions, and gives you proper CLI-style sys.argv handling. Use inline {code:...} only for one-shot snippets (a list, a quick computation, file inspection) or while you're actively iterating on a script that you're about to save. If you find yourself pasting >20 lines, you should be saving it instead. Within a single session the Pyodide globals also persist between calls, so a function defined once can be called by name on later turns — but path/args is the cleanest pattern for anything you might want again next session.
 
-SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — switch to the read_file tool (host paths) or fetch_file (Dropbox cloud-only paths).
+SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — for Dropbox cloud-only files use fetch_file.
 
 PACKAGES — IMPORTANT, READ THIS FIRST:
 • ~100 packages are PREBUILT for Pyodide (numpy, pandas, scipy, sympy, matplotlib, beautifulsoup4, lxml, regex, micropip, ...). Sandpie auto-loads them based on the \`import\` statements in your code, so plain \`import numpy as np\` Just Works on first call.
@@ -3105,62 +3003,6 @@ Examples:
         path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args]. PREFERRED for anything you want to run more than once — save once to /files/scripts/<name>.py, then invoke by path on every later call.' },
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
       },
-    },
-  },
-  shell: {
-    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user the local proxy must be running. Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
-
-SHELL ENVIRONMENT: cmd.exe on Windows, /bin/sh on Linux/macOS. \`sed\`/\`grep\`/\`head\`/\`tail\` are typically absent on Windows hosts — use \`findstr\`, \`type\`, or a one-shot \`python -c "..."\` instead. To read a file, prefer the read_file tool (cleaner, no quoting issues) over \`type\`/\`cat\`. PowerShell via \`powershell -Command "..."\` can be unreliable through this transport (nested-quote mangling can produce empty stdout) — prefer \`python -c\` or cmd built-ins.
-
-RETRY BUDGET: if the same command shape fails twice, switch tool or approach. Do not call a third variant of the same thing.
-
-AVOID filesystem-wide recursive searches like \`dir /s C:\\\` or \`find / -name X\` — they take many minutes, will hit the timeout, and produce nothing useful. If you don't know where a file is, ASK the user for the project path before searching, or check pwd / ls of likely candidates.
-
-Examples:
-  pwd       →  {"cmd": "pwd"}                              # always run first if cwd unknown
-  list      →  {"cmd": "ls -la"}
-  git       →  {"cmd": "git status"}
-  build     →  {"cmd": "npm run build", "timeout": 120}
-  find good →  {"cmd": "find . -name 'config.*' -maxdepth 4"}    # scoped to current dir, depth-limited
-  find bad  →  DON'T:  {"cmd": "find / -name 'foo'"}             # will hang and be killed`,
-    parameters: {
-      type: 'object',
-      properties: {
-        cmd: { type: 'string', description: 'Shell command to execute' },
-        cwd: { type: 'string', description: 'Working directory (optional)' },
-        timeout: { type: 'integer', description: 'Timeout in seconds (default 30, max 120)' },
-      },
-      required: ['cmd'],
-    },
-  },
-  read_file: {
-    description: `Read a file from the user's host filesystem (NOT OPFS — for OPFS paths use run_python). Requires the local proxy. Accepts absolute paths (C:\\..., /home/...). Returns text by default; binary files return base64. Max 5 MB per call by default — for larger files pass max_bytes (hard cap 20 MB) or use shell+head/tail.
-
-ADDRESSING: host paths only. To read an OPFS file use run_python (open('foo.txt')). To read a Dropbox cloud-only file use fetch_file.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path:      { type: 'string', description: 'Absolute host path' },
-        encoding:  { type: 'string', enum: ['text', 'base64'], description: 'Default text. Use base64 for binary.' },
-        max_bytes: { type: 'integer', description: 'Truncate after N bytes (default 5 MB, hard cap 20 MB).' },
-      },
-      required: ['path'],
-    },
-  },
-  write_file: {
-    description: `Write a file to the user's host filesystem (NOT OPFS). Requires the local proxy. Creates parent directories. Accepts absolute paths. Use encoding="base64" for binary payloads.
-
-ADDRESSING: host paths only. Writing OPFS files: use run_python (open('foo.txt','w').write(...)).
-
-SAFETY: this OVERWRITES the target. For edits, read first then write the full new content. Do not write to system directories without explicit user request.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path:     { type: 'string', description: 'Absolute host path' },
-        content:  { type: 'string', description: 'File content (text, or base64-encoded bytes if encoding=base64)' },
-        encoding: { type: 'string', enum: ['text', 'base64'] },
-      },
-      required: ['path', 'content'],
     },
   },
   fetch_file: {
@@ -3244,18 +3086,8 @@ Typical flow:
     },
 };
 
-function isShellAvailable() {
-  if (localProxyMode === 'connected') return true;
-  const remote = ($('proxyUrl').value || '').trim();
-  if (remote && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(remote)) return true;
-  if (!remote && isLocalhost) return true;
-  return false;
-}
-
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
-    if (name === 'shell' || name === 'read_file' || name === 'write_file')
-      return isShellAvailable();   // all three depend on the local proxy
     if (name === 'fetch_file') return !!dbxTokens();   // only useful when Dropbox is connected
     return true;
   })
@@ -3308,11 +3140,10 @@ async function refreshManifests() {
 refreshWelcome();
 }
 
-// Built fresh on every request so it reflects the current state of Dropbox/proxy/shell.
+// Built fresh on every request so it reflects the current state of Dropbox/proxy.
 function buildSystemPrompt() {
   const dbxConnected = !!dbxTokens();
   const proxyUrl = ($('proxyUrl').value || '').trim();
-  const shellOk = isShellAvailable();
 
   const lines = [
     'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
@@ -3320,17 +3151,11 @@ function buildSystemPrompt() {
     '# Tools',
     '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
   ];
-  if (shellOk) {
-    lines.push(`- shell: Run shell commands on the user's machine via the local proxy. Default cwd is the directory where the proxy was started. Be careful with destructive commands; ask before running anything that could lose data.`);
-  }
 
   lines.push('', '# Environment');
   lines.push(`- Cloud sync (Dropbox): ${dbxConnected ? 'connected. The user can sync /files/ ↔ Dropbox via UI buttons. You don\'t call Dropbox directly — read/write OPFS via run_python and the user controls the sync.' : 'not connected. The user can connect from the sidebar Cloud sync panel if they want offsite backup.'}`);
   if (proxyUrl) {
     lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
-  }
-  if (!shellOk) {
-    lines.push('- Shell: not available. Don\'t suggest running shell commands. If the user wants you to run commands on their machine, point them to "Activate local proxy" in the sidebar.');
   }
 
   lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
@@ -4578,19 +4403,6 @@ const TOOL_FLAVOR = {
     'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
     'tracing call frames', 'marshaling output buffer', 'flushing stdout',
     'checking traceback', 'resolving imports', 'walking the heap',
-  ],
-  shell: [
-    'spawning subprocess', 'piping stdout', 'draining stderr',
-    'awaiting exit code', 'parsing shell output', 'flushing pipe buffers',
-    'reading exit status', 'streaming bytes from child',
-  ],
-  read_file: [
-    'opening file descriptor', 'decoding utf-8', 'buffering chunks',
-    'normalizing line endings', 'measuring byte length', 'sniffing encoding',
-  ],
-  write_file: [
-    'allocating storage', 'encoding payload', 'flushing to disk',
-    'updating mtime', 'syncing inode', 'committing bytes',
   ],
   fetch_file: [
     'resolving hostname', 'negotiating TLS handshake', 'streaming bytes over the wire',
@@ -5974,9 +5786,6 @@ async function sendSingle(text, stream) {
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
-  // Empty string means same-origin (the SW resolves it against its own URL).
-  const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
 
@@ -6008,7 +5817,6 @@ async function buildAgentConfig(convMessages) {
     systemPrompt: buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
-    proxyBase,
     origin: location.origin,
     dbxTokens: dbxTokensSnap,
   };
