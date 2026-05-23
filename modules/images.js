@@ -4,6 +4,8 @@
 const SandpieImages = (function() {
   'use strict';
 
+  const $ = id => document.getElementById(id);
+
   // ============================================================
   // PRIVATE STATE
   // ============================================================

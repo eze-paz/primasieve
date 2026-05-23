@@ -4998,7 +4998,7 @@ function renderHistoricalMessage(m, host = null) {
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1], display);
+        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
       }
     }
     // legacy m.artifacts blobs ignored — new architecture uses show_artifact tool
