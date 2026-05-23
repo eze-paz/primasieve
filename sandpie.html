@@ -22,8 +22,6 @@
     --sp-accent-dim: rgba(88, 166, 255, 0.35);
     --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
-    --sp-danger: #f85149;
-    --sp-warn: #d29922;
   }
   [data-theme="light"] {
     --sp-bg: #ffffff;
@@ -36,8 +34,6 @@
     --sp-accent-neg: #d26900;
     --sp-text: #1f2328;
     --sp-text-dim: #656d76;
-    --sp-danger: #cf222e;
-    --sp-warn: #9a6700;
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -89,8 +85,8 @@
   aside button:hover { background: #79b8ff; }
   aside button:disabled,
   aside button:disabled:hover {
-    background: var(--sp-warn);
-    border-color: var(--sp-warn);
+    background: var(--sp-accent-neg);
+    border-color: var(--sp-accent-neg);
     color: var(--sp-bg);
     cursor: not-allowed;
     animation: sync-pulse 1.2s ease-in-out infinite;
@@ -149,7 +145,7 @@
   .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: var(--sp-panel); }
-  .ctx-menu button.danger { color: var(--sp-danger); }
+  .ctx-menu button.danger { color: var(--sp-accent-neg); }
   ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.2rem; background: transparent; border: none; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
   ul.fs-list li.empty { color: var(--sp-text-dim); justify-content: center; font-style: italic; font-family: inherit; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
@@ -162,7 +158,7 @@
   .file-viewer .panel header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--sp-border); }
   .file-viewer .panel header .title { font: 0.85rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .file-viewer .panel header button { background: transparent; border: none; color: var(--sp-text-dim); font-size: 1.1rem; cursor: pointer; padding: 0 0.25rem; }
-  .file-viewer .panel header button:hover { color: var(--sp-danger); }
+  .file-viewer .panel header button:hover { color: var(--sp-accent-neg); }
   .file-viewer .body { padding: 0.75rem 0.9rem; overflow: auto; }
   .file-viewer pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font: 0.8rem/1.45 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); }
   .file-viewer img, .file-viewer video, .file-viewer audio { max-width: 100%; display: block; margin: 0 auto; }
@@ -181,7 +177,7 @@
   .file-viewer .md-preview table { border-collapse: collapse; }
   .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid var(--sp-border); padding: 0.3rem 0.6rem; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
-  ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
+  ul.fs-list button:hover { color: var(--sp-accent-neg); background: transparent; }
 
 
 
@@ -290,7 +286,7 @@
   .assistant .bubble {
     display: block;
   }
-  .err { align-self: center; color: var(--sp-danger); font-style: italic; }
+  .err { align-self: center; color: var(--sp-accent-neg); font-style: italic; }
   .info { align-self: center; color: var(--sp-text-dim); font-style: italic; font-size: 0.85em; }
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
@@ -412,8 +408,8 @@
     flex-shrink: 0;
   }
   aside .status-dot.ok   { background: var(--sp-accent); box-shadow: 0 0 4px var(--sp-accent-dim); }
-  aside .status-dot.warn { background: var(--sp-warn); box-shadow: 0 0 4px var(--sp-warn-dim); }
-  aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px var(--sp-danger-dim); }
+  aside .status-dot.warn { background: var(--sp-accent-neg); box-shadow: 0 0 4px var(--sp-accent-dim); }
+  aside .status-dot.err  { background: var(--sp-accent-neg); box-shadow: 0 0 4px var(--sp-accent-dim); }
   /* `.busy` pulses the dot while a sync operation is in flight (auto-pull on
      init, auto-push on conv end, fetch_file hydration, manifest scan). It
      overlays whatever colour the dot already has so connection status stays
@@ -1003,10 +999,10 @@
     background: var(--sp-panel);
   }
   .context-delete {
-    color: var(--sp-danger);
+    color: var(--sp-accent-neg);
   }
   .context-delete:hover {
-    background: var(--sp-danger-dim);
+    background: var(--sp-accent-dim);
   }
 
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
@@ -4671,7 +4667,7 @@ class RoundRenderer {
           if (dataUrl) {
             _attachedImage = { dataUrl, file: { name: path.split('/').pop() }, opfsPath: path };
             const preview = $('imagePreview');
-            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
             preview.style.display = '';
           }
         });
@@ -5440,7 +5436,7 @@ function handleImageSelect(e) {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       _attachedImage = { dataUrl, file, opfsPath: null };
       const preview = $('imagePreview');
-      preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+      preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
       preview.style.display = '';
     };
     img.src = reader.result;
