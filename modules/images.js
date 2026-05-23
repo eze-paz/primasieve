@@ -199,7 +199,7 @@ const SandpieImages = (function() {
 
     return [
       { type: 'text', text: text || '' },
-      { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
+      { type: 'image_url', image_url: { url: dataUrl } }
     ];
   }
 

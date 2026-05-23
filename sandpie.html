@@ -5757,7 +5757,7 @@ async function buildAgentConfig(convMessages) {
         if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
           const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
           if (dataUrl) {
-            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl, detail: part.image_url.detail || 'high' } });
+            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl } });
           }
         } else {
           resolvedContent.push(part);
