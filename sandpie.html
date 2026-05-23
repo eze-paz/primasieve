@@ -5744,8 +5744,10 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Show notification if permission granted, page is hidden, and not aborted
-    if (!wasAborted && Notification.permission === 'granted' && document.hidden) {
+    // Show notification if permission granted and not aborted
+    console.log('[sandpie] Completion check:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
+    if (!wasAborted && Notification.permission === 'granted') {
+      console.log('[sandpie] Showing notification...');
       const notif = new Notification('sandpie', {
         body: 'Conversation complete',
         icon: '/sdk/icon-192.png',
@@ -5755,6 +5757,8 @@ async function sendSingle(text, stream) {
         window.focus();
         notif.close();
       };
+    } else {
+      console.log('[sandpie] Notification skipped:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
     }
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
