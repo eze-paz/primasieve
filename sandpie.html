@@ -1674,7 +1674,7 @@ window.addEventListener('message', e => {
 
 const $ = id => document.getElementById(id);
 
-const VERSION = '1.0.3-1779558484';
+const VERSION = '1.0.4-1779559276';
 
 // =============================================================================
 // SW console relay — surfaces sandpie.js's console output here.
@@ -4663,14 +4663,39 @@ class RoundRenderer {
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
       if (path) {
-        dataUrlFromOpfsPath(path).then(dataUrl => {
-          if (dataUrl) {
-            _attachedImage = { dataUrl, file: { name: path.split('/').pop() }, opfsPath: path };
-            const preview = $('imagePreview');
-            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
-            preview.style.display = '';
+        // Store opfsPath, create compressed preview
+        (async () => {
+          try {
+            const bytes = await opfs.readBytes(path);
+            const blob = new Blob([bytes], { type: 'image/jpeg' });
+            const dataUrl = await new Promise(resolve => {
+              const img = new Image();
+              img.onload = () => {
+                const MAX = 200;
+                let w = img.width, h = img.height;
+                if (w > MAX || h > MAX) {
+                  if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                  else { w = Math.round(w * MAX / h); h = MAX; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+              };
+              img.onerror = () => resolve(null);
+              img.src = URL.createObjectURL(blob);
+            });
+            if (dataUrl) {
+              _attachedImage = { opfsPath: path, file: { name: path.split('/').pop() } };
+              const preview = $('imagePreview');
+              preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
+              preview.style.display = '';
+            }
+          } catch (e) {
+            console.error('Failed to load image:', e);
           }
-        });
+        })();
       }
       return;
     }
@@ -5420,10 +5445,16 @@ function handleImageSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
+    // Save original to OPFS
+    const filename = file.name || ('image_' + Date.now() + '.' + file.type.split('/')[1]);
+    const opfsPath = 'images/' + filename;
+    await opfs.write(opfsPath, new Uint8Array(await (await fetch(reader.result)).arrayBuffer()));
+
+    // Create preview (compressed for display)
     const img = new Image();
     img.onload = () => {
-      const MAX = 1024;
+      const MAX = 200;
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) {
         if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -5433,10 +5464,10 @@ function handleImageSelect(e) {
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      _attachedImage = { dataUrl, file, opfsPath: null };
+      const previewUrl = canvas.toDataURL('image/jpeg', 0.7);
+      _attachedImage = { opfsPath, file };
       const preview = $('imagePreview');
-      preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
+      preview.innerHTML = '<img src="' + previewUrl + '"><button type="button" onclick="clearImage()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
       preview.style.display = '';
     };
     img.src = reader.result;
@@ -5501,11 +5532,32 @@ async function handleSubmit() {
   // Build message content: string (text only) or array (multimodal)
   let content = text;
   if (_attachedImage) {
-    // Save image to OPFS, use opfs:// reference in message
-    const filename = _attachedImage.file.name || ('image_' + Date.now() + '.jpg');
-    const opfsPath = await saveImageToOpfs(_attachedImage.dataUrl, filename);
-    content = [{ type: 'text', text: text || '' }];
-    content.push({ type: 'image_url', image_url: { url: 'opfs://' + opfsPath, detail: 'high' } });
+    // Read original from OPFS, compress, convert to dataUrl for LLM
+    const bytes = await opfs.readBytes(_attachedImage.opfsPath);
+    const blob = new Blob([bytes], { type: _attachedImage.file.type });
+    const dataUrl = await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1024;
+        let w = img.width, h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+          else { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(blob);
+    });
+
+    if (dataUrl) {
+      content = [{ type: 'text', text: text || '' }];
+      content.push({ type: 'image_url', image_url: { url: dataUrl, detail: 'high' } });
+    }
     clearImage();
   }
 
@@ -5791,26 +5843,6 @@ async function buildAgentConfig(convMessages) {
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
 
-  // Resolve opfs:// image URLs to compressed data URLs before sending to API
-  const resolvedMessages = [];
-  for (const msg of convMessages) {
-    if (msg.role === 'user' && Array.isArray(msg.content)) {
-      const resolvedContent = [];
-      for (const part of msg.content) {
-        if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
-          const dataUrl = await dataUrlFromOpfsPath(part.image_url.url.slice(7));
-          if (dataUrl) {
-            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl, detail: part.image_url.detail || 'high' } });
-          }
-        } else {
-          resolvedContent.push(part);
-        }
-      }
-      resolvedMessages.push({ ...msg, content: resolvedContent });
-    } else {
-      resolvedMessages.push(msg);
-    }
-  }
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
