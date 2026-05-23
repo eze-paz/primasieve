@@ -5858,6 +5858,16 @@ function dispatchAgentEvent(ev, renderer, host) {
     case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
     case 'agent_done':    return;
     case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
+    case 'info': {
+      if (ev.message) {
+        if (!renderer._retryNotice) renderer._retryNotice = addMsg('info', ev.message, host);
+        else renderer._retryNotice.textContent = ev.message;
+      } else if (renderer._retryNotice) {
+        renderer._retryNotice.remove();
+        renderer._retryNotice = null;
+      }
+      return;
+    }
   }
 }
 

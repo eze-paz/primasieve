@@ -590,6 +590,38 @@ async function runTool(name, args, ctx) {
 }
 
 // ============================================================
+// Auto-retry for transient upstream errors.
+// ============================================================
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
+function isRetryableError(e) {
+  if (!e || e.name === 'AbortError') return false;
+  if (typeof e.status === 'number' && RETRYABLE_STATUS.has(e.status)) return true;
+  if (e instanceof TypeError) return true; // bare network failure (DNS, dropped)
+  return false;
+}
+function swSleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(resolve, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(id); reject(new DOMException('aborted', 'AbortError')); }, { once: true });
+  });
+}
+async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
+  const MAX = 3;
+  const BACKOFF = [1000, 3000];
+  for (let attempt = 0; attempt < MAX; attempt++) {
+    try {
+      return await streamOneRound(reqUrl, headers, body, ctx);
+    } catch (e) {
+      if (ctx.signal?.aborted) throw e;
+      if (!isRetryableError(e) || attempt === MAX - 1) throw e;
+      ctx.emit({ type: 'info', message: `Provider error (${e.status || 'network'}), retrying in ${BACKOFF[attempt] / 1000}s… (${attempt + 1}/${MAX - 1})` });
+      await swSleep(BACKOFF[attempt], ctx.signal);
+      ctx.emit({ type: 'info', message: null });
+    }
+  }
+}
+
+// ============================================================
 // LLM round: stream once, return assembled content + tool_calls.
 // Emits delta events to ctx for live rendering on the page.
 // ============================================================
@@ -658,7 +690,7 @@ async function runAgent(config, ctx) {
       stream: true,
       tools: config.tools,
     };
-    const round = await streamOneRound(config.url, config.headers, reqBody, ctx);
+    const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (!round.tool_calls.length) {
       if (round.content) {
