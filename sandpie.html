@@ -22,6 +22,7 @@
     --sp-success: #3fb950;
     --sp-danger: #f85149;
     --sp-warn: #d29922;
+  }
   [data-theme="light"] {
     --sp-bg: #ffffff;
     --sp-surface: #f6f8fa;
@@ -1618,7 +1619,7 @@ window.addEventListener('message', e => {
 //         emit message_added (asst with tool_calls)
 //         for each tc:
 //           emit tool_started
-//           runTool(name, args, ctx) → tool_run_python / ...
+//           runTool(name, args, ctx) → tool_run_python / tool_shell / ...
 //           emit tool_result (+ artifacts)
 //           emit message_added (tool)
 //         next round
@@ -1662,6 +1663,7 @@ window.addEventListener('message', e => {
 // TOOL EXECUTION                                               (sandpie.js)
 // ─────────────────────────────────────────────────────────────────────────────
 //   T1  run_python    → initPyodide (lazy) → mountNativeFS → exec → syncfs()
+//   T2  shell         → POST proxyBase/shell
 //   T3  read_file     → GET  proxyBase/file?path=
 //   T4  write_file    → POST proxyBase/file?path=
 //   T5  fetch_file    → Dropbox download via SW dbx helper
@@ -3105,8 +3107,62 @@ Examples:
       },
     },
   },
-},
-},
+  shell: {
+    description: `Run a shell command on the user's machine via the local proxy. REQUIRES "Local proxy: ✓ active" in the sidebar; if not, tell the user the local proxy must be running. Default cwd = the directory where the proxy was started (run \`pwd\` first if you don't know where you are); pass cwd to override. Default timeout 30s, cap 120s. Returns combined stdout/stderr plus exit code.
+
+SHELL ENVIRONMENT: cmd.exe on Windows, /bin/sh on Linux/macOS. \`sed\`/\`grep\`/\`head\`/\`tail\` are typically absent on Windows hosts — use \`findstr\`, \`type\`, or a one-shot \`python -c "..."\` instead. To read a file, prefer the read_file tool (cleaner, no quoting issues) over \`type\`/\`cat\`. PowerShell via \`powershell -Command "..."\` can be unreliable through this transport (nested-quote mangling can produce empty stdout) — prefer \`python -c\` or cmd built-ins.
+
+RETRY BUDGET: if the same command shape fails twice, switch tool or approach. Do not call a third variant of the same thing.
+
+AVOID filesystem-wide recursive searches like \`dir /s C:\\\` or \`find / -name X\` — they take many minutes, will hit the timeout, and produce nothing useful. If you don't know where a file is, ASK the user for the project path before searching, or check pwd / ls of likely candidates.
+
+Examples:
+  pwd       →  {"cmd": "pwd"}                              # always run first if cwd unknown
+  list      →  {"cmd": "ls -la"}
+  git       →  {"cmd": "git status"}
+  build     →  {"cmd": "npm run build", "timeout": 120}
+  find good →  {"cmd": "find . -name 'config.*' -maxdepth 4"}    # scoped to current dir, depth-limited
+  find bad  →  DON'T:  {"cmd": "find / -name 'foo'"}             # will hang and be killed`,
+    parameters: {
+      type: 'object',
+      properties: {
+        cmd: { type: 'string', description: 'Shell command to execute' },
+        cwd: { type: 'string', description: 'Working directory (optional)' },
+        timeout: { type: 'integer', description: 'Timeout in seconds (default 30, max 120)' },
+      },
+      required: ['cmd'],
+    },
+  },
+  read_file: {
+    description: `Read a file from the user's host filesystem (NOT OPFS — for OPFS paths use run_python). Requires the local proxy. Accepts absolute paths (C:\\..., /home/...). Returns text by default; binary files return base64. Max 5 MB per call by default — for larger files pass max_bytes (hard cap 20 MB) or use shell+head/tail.
+
+ADDRESSING: host paths only. To read an OPFS file use run_python (open('foo.txt')). To read a Dropbox cloud-only file use fetch_file.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:      { type: 'string', description: 'Absolute host path' },
+        encoding:  { type: 'string', enum: ['text', 'base64'], description: 'Default text. Use base64 for binary.' },
+        max_bytes: { type: 'integer', description: 'Truncate after N bytes (default 5 MB, hard cap 20 MB).' },
+      },
+      required: ['path'],
+    },
+  },
+  write_file: {
+    description: `Write a file to the user's host filesystem (NOT OPFS). Requires the local proxy. Creates parent directories. Accepts absolute paths. Use encoding="base64" for binary payloads.
+
+ADDRESSING: host paths only. Writing OPFS files: use run_python (open('foo.txt','w').write(...)).
+
+SAFETY: this OVERWRITES the target. For edits, read first then write the full new content. Do not write to system directories without explicit user request.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:     { type: 'string', description: 'Absolute host path' },
+        content:  { type: 'string', description: 'File content (text, or base64-encoded bytes if encoding=base64)' },
+        encoding: { type: 'string', enum: ['text', 'base64'] },
+      },
+      required: ['path', 'content'],
+    },
+  },
   fetch_file: {
     description: `Download a single cloud-only file FROM DROPBOX into OPFS so run_python can read it. Use ONLY when run_python returns "sandpie cloud placeholder" for a path. Path is relative to /files/ (e.g. "notes.txt", "subdir/data.csv"). One file per call. Returns "Hydrated <path>" on success, or an explanatory error.
 
@@ -3188,8 +3244,18 @@ Typical flow:
     },
 };
 
+function isShellAvailable() {
+  if (localProxyMode === 'connected') return true;
+  const remote = ($('proxyUrl').value || '').trim();
+  if (remote && /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(remote)) return true;
+  if (!remote && isLocalhost) return true;
+  return false;
+}
+
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
+    if (name === 'shell' || name === 'read_file' || name === 'write_file')
+      return isShellAvailable();   // all three depend on the local proxy
     if (name === 'fetch_file') return !!dbxTokens();   // only useful when Dropbox is connected
     return true;
   })
@@ -3246,6 +3312,7 @@ refreshWelcome();
 function buildSystemPrompt() {
   const dbxConnected = !!dbxTokens();
   const proxyUrl = ($('proxyUrl').value || '').trim();
+  const shellOk = isShellAvailable();
 
   const lines = [
     'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
@@ -3253,6 +3320,8 @@ function buildSystemPrompt() {
     '# Tools',
     '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
   ];
+  if (shellOk) {
+    lines.push(`- shell: Run shell commands on the user's machine via the local proxy. Default cwd is the directory where the proxy was started. Be careful with destructive commands; ask before running anything that could lose data.`);
   }
 
   lines.push('', '# Environment');
@@ -3260,6 +3329,8 @@ function buildSystemPrompt() {
   if (proxyUrl) {
     lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
   }
+  if (!shellOk) {
+    lines.push('- Shell: not available. Don\'t suggest running shell commands. If the user wants you to run commands on their machine, point them to "Activate local proxy" in the sidebar.');
   }
 
   lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
@@ -4508,7 +4579,11 @@ const TOOL_FLAVOR = {
     'tracing call frames', 'marshaling output buffer', 'flushing stdout',
     'checking traceback', 'resolving imports', 'walking the heap',
   ],
-,
+  shell: [
+    'spawning subprocess', 'piping stdout', 'draining stderr',
+    'awaiting exit code', 'parsing shell output', 'flushing pipe buffers',
+    'reading exit status', 'streaming bytes from child',
+  ],
   read_file: [
     'opening file descriptor', 'decoding utf-8', 'buffering chunks',
     'normalizing line endings', 'measuring byte length', 'sniffing encoding',
@@ -5899,7 +5974,7 @@ async function sendSingle(text, stream) {
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  // proxyBase tells the SW where tool_run_python lives.
+  // proxyBase tells the SW where shell/read_file/write_file's /shell lives.
   // Empty string means same-origin (the SW resolves it against its own URL).
   const proxyBase = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
   let dbxTokensSnap = null;
