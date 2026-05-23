@@ -5733,7 +5733,8 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring.
+    // [F1] Tear down abort wiring
+    console.log('[sandpie] Finally block reached');.
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
     // [F2] Flush any in-flight typewriter so no bubble outlives the stream
