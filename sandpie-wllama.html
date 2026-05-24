@@ -1457,7 +1457,9 @@ window.addEventListener('message', e => {
           <option value="">— pick a model —</option>
         </select>
         <input id="modalWllamaCustom" autocomplete="off" placeholder="Custom GGUF URL (e.g. https://huggingface.co/.../model.gguf)" style="display:none; margin-top:0.375rem;">
-        <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;">Runs entirely in your browser via CPU/WASM (llama.cpp). Works on every device including iOS. First use streams the GGUF from the URL (~0.7–5 GB depending on model); subsequent loads are cached.</p>
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0.25rem; text-transform:uppercase; letter-spacing:0.05em;">Context size (tokens)</label>
+        <input id="modalWllamaCtx" type="number" min="512" step="512" placeholder="8192" autocomplete="off">
+        <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;">Runs entirely in your browser via WebGPU when available, with WASM/CPU fallback. First use streams the GGUF from the URL (~0.7–5 GB depending on model); subsequent loads are cached. Larger context = more memory + slower load; default 8192 covers sandpie's system prompt + tools comfortably.</p>
       </div>
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
@@ -1479,6 +1481,21 @@ window.addEventListener('message', e => {
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
   </div>
+
+  <details class="service" id="contextSection">
+    <summary>Context budget <span class="status-dot" id="contextDot"></span></summary>
+    <div class="service-body">
+      <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Trim what gets sent to the model on every turn. Useful when a small local model can't fit sandpie's full system prompt + all four tool schemas.</p>
+      <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer;">
+        <input type="checkbox" id="ctxSystemPromptToggle" onchange="onContextToggleChange()">
+        Include system prompt
+      </label>
+      <div style="margin-top:0.5rem;">
+        <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem;">Tools</div>
+        <div id="ctxToolsList" style="display:flex; flex-direction:column; gap:0.2rem; font-size:0.85rem;"></div>
+      </div>
+    </div>
+  </details>
 
   <details class="service" id="cloudSection">
     <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
@@ -1931,10 +1948,12 @@ function openProviderModal(providerId = null) {
     $('modalWllamaModel').value = known ? p.model : (p && p.endpoint ? '__custom__' : '');
     $('modalWllamaCustom').value = known ? '' : ((p && p.endpoint) || '');
     $('modalWllamaCustom').style.display = $('modalWllamaModel').value === '__custom__' ? '' : 'none';
+    $('modalWllamaCtx').value = (p && p.nCtx) ? p.nCtx : '';
   } else {
     $('modalWllamaModel').value = '';
     $('modalWllamaCustom').value = '';
     $('modalWllamaCustom').style.display = 'none';
+    $('modalWllamaCtx').value = '';
   }
   onProviderTypeChange();
 
@@ -1988,6 +2007,7 @@ function saveProviderModal() {
 
   let model = '';
   let endpoint = '', apiKey = '', proxyUrl = '';
+  let nCtx = null;
 
   if (type === 'wllama') {
     // For wllama we store the GGUF URL in `endpoint` and a friendly id in `model`.
@@ -2007,6 +2027,16 @@ function saveProviderModal() {
     } else {
       alert('Pick a model (or paste a custom GGUF URL).');
       return;
+    }
+    // Parse context size; empty / invalid → null (module falls back to its default).
+    const ctxRaw = $('modalWllamaCtx').value.trim();
+    if (ctxRaw) {
+      const n = parseInt(ctxRaw, 10);
+      if (!Number.isFinite(n) || n < 512) {
+        alert('Context size must be at least 512 tokens.');
+        return;
+      }
+      nCtx = n;
     }
   } else {
     endpoint = $('modalEndpoint').value.trim();
@@ -2028,6 +2058,7 @@ function saveProviderModal() {
       p.model = model;
       p.apiKey = apiKey;
       p.proxyUrl = proxyUrl;
+      if (nCtx) p.nCtx = nCtx; else delete p.nCtx;
     }
   } else {
     const newP = {
@@ -2039,6 +2070,7 @@ function saveProviderModal() {
       apiKey,
       proxyUrl,
     };
+    if (nCtx) newP.nCtx = nCtx;
     _providers.push(newP);
     _activeProviderId = newP.id;
   }
@@ -2238,6 +2270,88 @@ function refreshAiDot() {
   if (isWllamaActive()) ok = !!$('endpoint').value.trim();
   else ok = $('endpoint').value.trim() && $('apiKey').value.trim();
   setDot('aiDot', ok ? 'ok' : null);
+}
+
+// ============================================================
+// Context budget — user-trimmable system prompt + per-tool toggles.
+// Lets a small local model fit a sandpie turn under its n_ctx by
+// stripping pieces that aren't needed (e.g. fetch_file when not using
+// Dropbox; the system prompt entirely when the model is preconfigured).
+// State is in localStorage so it survives reloads.
+// ============================================================
+const CTX_SYS_KEY = 'sandpie-include-system';
+const CTX_DISABLED_TOOLS_KEY = 'sandpie-disabled-tools';
+
+function isSystemPromptEnabled() {
+  // Default ON; the key is only set when the user has explicitly turned it off.
+  return localStorage.getItem(CTX_SYS_KEY) !== '0';
+}
+function _readDisabledTools() {
+  try {
+    const raw = localStorage.getItem(CTX_DISABLED_TOOLS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (_) { return new Set(); }
+}
+function _writeDisabledTools(set) {
+  if (!set.size) localStorage.removeItem(CTX_DISABLED_TOOLS_KEY);
+  else localStorage.setItem(CTX_DISABLED_TOOLS_KEY, JSON.stringify([...set]));
+}
+function isToolEnabled(name) {
+  return !_readDisabledTools().has(name);
+}
+function setToolEnabled(name, on) {
+  const s = _readDisabledTools();
+  if (on) s.delete(name); else s.add(name);
+  _writeDisabledTools(s);
+  refreshContextDot();
+}
+
+function onContextToggleChange() {
+  const cb = $('ctxSystemPromptToggle');
+  if (!cb) return;
+  if (cb.checked) localStorage.removeItem(CTX_SYS_KEY);
+  else localStorage.setItem(CTX_SYS_KEY, '0');
+  refreshContextDot();
+}
+
+function onContextToolToggle(name, cb) {
+  setToolEnabled(name, !!cb.checked);
+}
+
+/**
+ * Render the per-tool checkbox list from the `tools` object. Called once
+ * on init; the list is small enough that a full re-render is fine.
+ */
+function populateContextSection() {
+  const cb = $('ctxSystemPromptToggle');
+  if (cb) cb.checked = isSystemPromptEnabled();
+  const list = $('ctxToolsList');
+  if (!list || typeof tools !== 'object') return;
+  list.innerHTML = '';
+  for (const name of Object.keys(tools)) {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex; align-items:center; gap:0.4rem; cursor:pointer;';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = isToolEnabled(name);
+    input.addEventListener('change', () => onContextToolToggle(name, input));
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(name));
+    list.appendChild(label);
+  }
+  refreshContextDot();
+}
+
+/**
+ * Light the Context section's status dot whenever the user is trimming
+ * anything (system prompt off OR any tool disabled) — gives them a
+ * quick visual reminder that the model isn't seeing the default budget.
+ */
+function refreshContextDot() {
+  const trimmed = !isSystemPromptEnabled() || _readDisabledTools().size > 0;
+  setDot('contextDot', trimmed ? 'warn' : null);
 }
 function refreshProxyDot() {
   if ($('proxyUrl').value.trim()) return setDot('proxyDot', 'ok');
@@ -3222,6 +3336,7 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
 
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
+    if (!isToolEnabled(name)) return false;            // user disabled this tool in the Context section
     if (name === 'fetch_file') return !!dbxTokens();   // only useful when Dropbox is connected
     return true;
   })
@@ -3229,6 +3344,9 @@ const toolDefs = () => Object.entries(tools)
     type: 'function',
     function: { name, description: t.description, parameters: t.parameters },
   }));
+
+// Now that `tools` exists, render the Context sidebar's per-tool checkboxes.
+populateContextSection();
 
 // ============================================================
 // Context manifests — sandpie_*.md files anywhere in OPFS get auto-loaded
@@ -5828,6 +5946,7 @@ async function runWllamaAgent(config, ctx) {
         messages: fullMessages,
         tools: config.tools,
         signal: ctx.signal,
+        nCtx: config.nCtx || undefined,
         onProgress: ({ progress }) => {
           const pct = typeof progress === 'number' ? Math.round(progress * 100) + '%' : '';
           ctx.emit({ type: 'info', message: pct ? `Loading ${config.model}: ${pct}` : null });
@@ -6024,14 +6143,18 @@ async function buildAgentConfig(convMessages) {
     }
   }
 
+  const activeProvider = getActiveProvider();
   return {
     url,
     endpoint,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: buildSystemPrompt(),
+    // Honour the "Include system prompt" toggle from the Context section.
+    // null collapses out of the [systemPrompt, ...messages] spread.
+    systemPrompt: isSystemPromptEnabled() ? buildSystemPrompt() : null,
     messages: resolvedMessages,
     tools: toolDefs(),
+    nCtx: activeProvider ? activeProvider.nCtx : null,
     origin: location.origin,
     dbxTokens: dbxTokensSnap,
   };

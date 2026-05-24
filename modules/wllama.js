@@ -73,27 +73,36 @@ const SandpieWllama = (function() {
     return _sdkPromise;
   }
 
-  // wllama holds at most one model in memory at a time. Switching
-  // providers tears the previous instance down. Key by URL because that's
-  // the identity (curated id maps 1:1 to canonical URL; custom = as typed).
+  // wllama's default n_ctx is 1024 — way too small for sandpie's
+  // ~4-5K-token system prompt + tools[]. We default to 8192 which
+  // handles a normal first-turn comfortably without blowing memory.
+  // The user can override per-provider in the modal.
+  const DEFAULT_N_CTX = 8192;
+
+  // wllama holds at most one model in memory at a time. We key by URL
+  // *plus* n_ctx because n_ctx is a load-time parameter — changing it
+  // requires a fresh load, not just a fresh chat.
   let _instance = null;
   let _instanceUrl = null;
-  let _loadingFor = null;
+  let _instanceCtx = 0;
+  let _loadingKey = null;
 
-  async function getInstance(modelUrl, onProgress) {
+  async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
-    if (_instance && _instanceUrl === modelUrl) return _instance;
-    if (_loadingFor === modelUrl) {
-      // Concurrent loader request — wait until the in-flight one finishes.
-      while (_loadingFor === modelUrl) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl) return _instance;
+    const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
+    const key = modelUrl + '|' + nCtx;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx) return _instance;
+    if (_loadingKey === key) {
+      while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx) return _instance;
     }
-    _loadingFor = modelUrl;
+    _loadingKey = key;
     try {
       if (_instance) {
         try { await _instance.exit(); } catch (_) {}
         _instance = null;
         _instanceUrl = null;
+        _instanceCtx = 0;
       }
       const { Wllama } = await loadSDK();
       // v3 constructor takes a single `default` WASM path; the worker
@@ -101,6 +110,7 @@ const SandpieWllama = (function() {
       // is needed. WebGPU is auto-enabled when supported.
       const inst = new Wllama({ default: WASM_URL });
       await inst.loadModelFromUrl(modelUrl, {
+        n_ctx: nCtx,
         progressCallback: ({ loaded, total }) => {
           try {
             onProgress && onProgress({
@@ -112,9 +122,10 @@ const SandpieWllama = (function() {
       });
       _instance = inst;
       _instanceUrl = modelUrl;
+      _instanceCtx = nCtx;
       return inst;
     } finally {
-      if (_loadingFor === modelUrl) _loadingFor = null;
+      if (_loadingKey === key) _loadingKey = null;
     }
   }
 
@@ -163,8 +174,8 @@ const SandpieWllama = (function() {
    * tool_calls entries in the chunks instead of having to parse them
    * out of free-form text.
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress }) {
-    const wllama = await getInstance(modelUrl, onProgress);
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     let aborted = false;
@@ -221,6 +232,7 @@ const SandpieWllama = (function() {
 
   return {
     DEFAULT_MODELS,
+    DEFAULT_N_CTX,
     getInstance,
     streamRound,
   };
