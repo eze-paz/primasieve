@@ -109,8 +109,10 @@ const SandpieNotifications = (function() {
 
   /**
    * Fire a completion notification for the given conversation.
-   * No-op if notifications are disabled (either layer off) or if
-   * the API isn't available.
+   * No-op if notifications are disabled (either layer off), if the API
+   * isn't available, or if the page is currently visible (the user is
+   * already looking at sandpie — they don't need a system toast for
+   * something happening on screen in front of them).
    *
    * Reads the canonical title from the conv JSON (so renames are
    * reflected) — the caller must have just saved the conv.
@@ -119,6 +121,7 @@ const SandpieNotifications = (function() {
    */
   async function notifyComplete(convId) {
     if (!effectivelyOn()) return;
+    if (!document.hidden) return;
     let title = 'Conversation complete';
     try {
       // Pull canonical title from the just-saved conv JSON.
