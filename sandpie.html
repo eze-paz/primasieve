@@ -1485,6 +1485,14 @@ window.addEventListener('message', e => {
     </div>
   </details>
 
+  <details class="service" id="notifSection">
+    <summary>Notifications</summary>
+    <div class="service-body">
+      <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
+      <button type="button" id="notifEnableBtn" onclick="enableNotifications()">Enable notifications</button>
+      <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+    </div>
+  </details>
   <details class="service" id="themeSection">
     <summary>Theme</summary>
     <div class="service-body">
@@ -1991,6 +1999,43 @@ const isLocalhost = location.hostname === 'localhost' || location.hostname === '
 
 // Load on init
 loadProviders();
+
+// --- Notifications ----------------------------------------------------------
+// Sidebar "Enable notifications" button: requests OS-level permission via a
+// user gesture (the right way — browsers de-prioritize or auto-deny prompts
+// not tied to a click). refreshNotifStatus() reflects the current permission
+// state into the button + helper text on load and after every change.
+function refreshNotifStatus() {
+  const btn = $('notifEnableBtn');
+  const status = $('notifStatus');
+  if (!btn || !status) return;
+  if (!('Notification' in self)) {
+    btn.disabled = true;
+    btn.textContent = 'Not supported';
+    status.textContent = 'This browser does not support notifications.';
+    return;
+  }
+  const p = Notification.permission;
+  if (p === 'granted') {
+    btn.disabled = true;
+    btn.textContent = 'Enabled';
+    status.textContent = 'You will be notified when conversations finish.';
+  } else if (p === 'denied') {
+    btn.disabled = true;
+    btn.textContent = 'Blocked';
+    status.textContent = 'Notifications are blocked. Re-enable in your browser settings to receive them.';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Enable notifications';
+    status.textContent = '';
+  }
+}
+async function enableNotifications() {
+  if (!('Notification' in self)) return;
+  try { await Notification.requestPermission(); } catch (_) {}
+  refreshNotifStatus();
+}
+refreshNotifStatus();
 
 // Dropbox config (separate from providers)
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
@@ -5645,15 +5690,6 @@ async function sendSingle(text, stream) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  // Request notification permission on first send (one-time prompt)
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('[sandpie] Notification permission granted');
-      }
-    });
-  }
-
   const { id: convId, messages: convMessages, host } = stream;
 
   // [U-tail] Persist + render the user message before kicking off the round.
@@ -5734,8 +5770,7 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring
-    console.log('[sandpie] Finally block reached');
+    // [F1] Tear down abort wiring.
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
     // [F2] Flush any in-flight typewriter so no bubble outlives the stream
@@ -5746,27 +5781,25 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Show notification if permission granted and not aborted
-    // Show notification if permission granted, page is hidden, and not aborted
-    console.log('[sandpie] Completion check:', { 
-      wasAborted, 
-      permission: Notification.permission, 
-      hidden: document.hidden,
-      hasNotificationAPI: 'Notification' in window 
-    });
-    if (!wasAborted && Notification.permission === 'granted') {
-      console.log('[sandpie] Showing notification...');
-      const notif = new Notification('sandpie', {
-        body: 'Conversation complete',
-        icon: '/sdk/icon-192.png',
-        tag: 'sandpie-conversation'
-      });
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-    } else {
-      console.log('[sandpie] Notification skipped:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
+    // [F6] System notification on completion. The Notification API guard is
+    // load-bearing: on browsers/contexts where Notification is undefined
+    // (some embedded webviews, insecure HTTP origins, locked-down profiles),
+    // bare `Notification.permission` throws ReferenceError and kills the
+    // finally chain — which would also skip the sync() call below.
+    if (!wasAborted && 'Notification' in self && Notification.permission === 'granted') {
+      let title = 'Conversation complete';
+      try {
+        const data = JSON.parse(await opfs.read(convPath(convId)));
+        if (data && data.title) title = data.title;
+      } catch (_) {}
+      try {
+        const notif = new Notification('sandpie', {
+          body: title,
+          icon: 'icon-192.png',
+          tag: 'sandpie-conv-' + convId,
+        });
+        notif.onclick = () => { window.focus(); notif.close(); };
+      } catch (_) {}
     }
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
