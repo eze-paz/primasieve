@@ -5808,20 +5808,36 @@ async function sendSingle(text, stream) {
     // (some embedded webviews, insecure HTTP origins, locked-down profiles),
     // bare `Notification.permission` throws ReferenceError and kills the
     // finally chain — which would also skip the sync() call below.
-    if (!wasAborted && notifEffectivelyOn()) {
-      let title = 'Conversation complete';
-      try {
-        const data = JSON.parse(await opfs.read(convPath(convId)));
-        if (data && data.title) title = data.title;
-      } catch (_) {}
-      try {
-        const notif = new Notification('sandpie', {
-          body: title,
-          icon: 'icon-192.png',
-          tag: 'sandpie-conv-' + convId,
-        });
-        notif.onclick = () => { window.focus(); notif.close(); };
-      } catch (_) {}
+    // Diagnostics: log every gate so we can see which one rejects when a
+    // notification doesn't fire. Errors from the Notification constructor
+    // are surfaced (a silent catch hid the real failure for too long).
+    {
+      const gate = {
+        wasAborted,
+        hasAPI: 'Notification' in self,
+        permission: ('Notification' in self) ? Notification.permission : 'n/a',
+        prefOn: notifPrefEnabled(),
+        effective: notifEffectivelyOn(),
+      };
+      console.log('[sandpie] notify gate:', gate);
+      if (!wasAborted && notifEffectivelyOn()) {
+        let title = 'Conversation complete';
+        try {
+          const data = JSON.parse(await opfs.read(convPath(convId)));
+          if (data && data.title) title = data.title;
+        } catch (e) { console.warn('[sandpie] notify: title read failed:', e); }
+        try {
+          const notif = new Notification('sandpie', {
+            body: title,
+            icon: 'icon-192.png',
+            tag: 'sandpie-conv-' + convId,
+          });
+          notif.onclick = () => { window.focus(); notif.close(); };
+          console.log('[sandpie] notify: constructed for conv', convId, 'title=', title);
+        } catch (e) {
+          console.error('[sandpie] notify: Notification constructor threw:', e);
+        }
+      }
     }
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
