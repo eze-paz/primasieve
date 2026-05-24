@@ -51,11 +51,16 @@ const SandpieNotifications = (function() {
 
   /**
    * Reflect the current permission + preference into the sidebar
-   * button label, disabled state, and helper text.
+   * button label, disabled state, helper text, and summary status dot.
+   * setDot is a global helper defined in sandpie.html; calling it
+   * with a missing element id is a safe no-op.
    */
   function refreshStatus() {
     const btn = $('notifEnableBtn');
     const status = $('notifStatus');
+    // Status dot mirrors effectivelyOn — lit only when notifications will
+    // actually fire (browser permission granted AND local pref on).
+    if (typeof setDot === 'function') setDot('notifDot', effectivelyOn() ? 'ok' : null);
     if (!btn || !status) return;
     if (!('Notification' in self)) {
       btn.disabled = true;
