@@ -111,6 +111,13 @@ const SandpieWllama = (function() {
       const inst = new Wllama({ default: WASM_URL });
       await inst.loadModelFromUrl(modelUrl, {
         n_ctx: nCtx,
+        // useCache:false disables wllama's OPFS-backed model cache.
+        // Without this, weights land at OPFS `cache/` which sandpie's
+        // Dropbox sync then tries to upload (~1-5 GB per model, 409s,
+        // session-limit blowouts). Trade-off: every page load re-fetches
+        // the GGUF from HF. Fine for a proof-of-concept; revisit once
+        // we have an OPFS-path exclusion mechanism for the sync walker.
+        useCache: false,
         progressCallback: ({ loaded, total }) => {
           try {
             onProgress && onProgress({
