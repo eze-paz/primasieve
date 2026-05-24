@@ -5803,37 +5803,48 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // [F6] System notification on completion. The Notification API guard is
-    // load-bearing: on browsers/contexts where Notification is undefined
-    // (some embedded webviews, insecure HTTP origins, locked-down profiles),
-    // bare `Notification.permission` throws ReferenceError and kills the
-    // finally chain — which would also skip the sync() call below.
-    // Diagnostics: log every gate so we can see which one rejects when a
-    // notification doesn't fire. Errors from the Notification constructor
-    // are surfaced (a silent catch hid the real failure for too long).
-    {
-      const gate = {
-        wasAborted,
-        hasAPI: 'Notification' in self,
-        permission: ('Notification' in self) ? Notification.permission : 'n/a',
-        prefOn: notifPrefEnabled(),
-        effective: notifEffectivelyOn(),
+    // [F6] System notification on completion. We route through the Service
+    // Worker registration's showNotification() rather than `new Notification()`
+    // because:
+    //   - Android Chrome silently no-ops `new Notification()` from a page;
+    //     SW.showNotification is the only path that works.
+    //   - iOS Safari only supports notifications at all when the app is added
+    //     to the home screen, and only via SW notifications (16.4+).
+    //   - Desktop browsers also accept the SW path, so one code path covers
+    //     all platforms.
+    // The API guard around `Notification` itself is still load-bearing — bare
+    // `Notification.permission` ReferenceErrors on locked-down contexts and
+    // would kill the finally chain (skipping sync()).
+    if (!wasAborted && notifEffectivelyOn()) {
+      let title = 'Conversation complete';
+      try {
+        const data = JSON.parse(await opfs.read(convPath(convId)));
+        if (data && data.title) title = data.title;
+      } catch (e) { console.warn('[sandpie] notify: title read failed:', e); }
+      const opts = {
+        body: title,
+        icon: 'icon-192.png',
+        tag: 'sandpie-conv-' + convId,
       };
-      console.log('[sandpie] notify gate:', gate);
-      if (!wasAborted && notifEffectivelyOn()) {
-        let title = 'Conversation complete';
+      let shown = false;
+      try {
+        const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+        if (reg && reg.showNotification) {
+          await reg.showNotification('sandpie', opts);
+          shown = true;
+          console.log('[sandpie] notify: SW showNotification for conv', convId, 'title=', title);
+        }
+      } catch (e) {
+        console.error('[sandpie] notify: SW showNotification threw:', e);
+      }
+      // Desktop fallback for environments where the SW path isn't usable
+      // (no registration, blocked by policy, etc). new Notification() will
+      // no-op on mobile, but on desktop it still works.
+      if (!shown) {
         try {
-          const data = JSON.parse(await opfs.read(convPath(convId)));
-          if (data && data.title) title = data.title;
-        } catch (e) { console.warn('[sandpie] notify: title read failed:', e); }
-        try {
-          const notif = new Notification('sandpie', {
-            body: title,
-            icon: 'icon-192.png',
-            tag: 'sandpie-conv-' + convId,
-          });
+          const notif = new Notification('sandpie', opts);
           notif.onclick = () => { window.focus(); notif.close(); };
-          console.log('[sandpie] notify: constructed for conv', convId, 'title=', title);
+          console.log('[sandpie] notify: page Notification fallback for conv', convId);
         } catch (e) {
           console.error('[sandpie] notify: Notification constructor threw:', e);
         }

@@ -214,6 +214,23 @@ try {
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
+// Completion notifications are shown via SW.registration.showNotification()
+// because new Notification() from a page is a no-op on Android Chrome and
+// not supported at all on iOS Safari tabs (iOS PWAs added to the home
+// screen need SW-based notifications too). When the user taps one, we
+// focus an existing sandpie window if there is one, otherwise open a new
+// one — same UX as the prior page-side notif.onclick.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of wins) {
+      if (c.url.includes('sandpie') && 'focus' in c) return c.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow('./sandpie.html');
+  })());
+});
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   const path = url.pathname;
