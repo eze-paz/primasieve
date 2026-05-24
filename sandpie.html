@@ -1395,6 +1395,7 @@ window.addEventListener('message', e => {
 
 </script>
   <script src="modules/images.js"></script>
+  <script src="modules/notifications.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -1489,7 +1490,7 @@ window.addEventListener('message', e => {
     <summary>Notifications</summary>
     <div class="service-body">
       <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
-      <button type="button" class="ghost" id="notifEnableBtn" onclick="enableNotifications()">Enable notifications</button>
+      <button type="button" class="ghost" id="notifEnableBtn" onclick="SandpieNotifications.toggle()">Enable notifications</button>
       <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
     </div>
   </details>
@@ -1999,65 +2000,6 @@ const isLocalhost = location.hostname === 'localhost' || location.hostname === '
 
 // Load on init
 loadProviders();
-
-// --- Notifications ----------------------------------------------------------
-// Two-layer state: (1) the browser permission (granted/denied/default —
-// sandpie can only REQUEST, never revoke; revoking lives in browser settings),
-// and (2) a sandpie-local on/off preference stored in localStorage so the
-// user can mute completion pings without yanking the underlying permission.
-// notifPrefEnabled() returns the effective state — both layers must be on.
-const NOTIF_PREF_KEY = 'sandpie-notify-enabled';
-function notifPrefEnabled() {
-  return localStorage.getItem(NOTIF_PREF_KEY) !== '0';
-}
-function notifEffectivelyOn() {
-  return 'Notification' in self && Notification.permission === 'granted' && notifPrefEnabled();
-}
-function refreshNotifStatus() {
-  const btn = $('notifEnableBtn');
-  const status = $('notifStatus');
-  if (!btn || !status) return;
-  if (!('Notification' in self)) {
-    btn.disabled = true;
-    btn.textContent = 'Not supported';
-    status.textContent = 'This browser does not support notifications.';
-    return;
-  }
-  const p = Notification.permission;
-  if (p === 'denied') {
-    btn.disabled = true;
-    btn.textContent = 'Blocked by browser';
-    status.textContent = 'Notifications are blocked. Re-enable in your browser settings, then come back here.';
-    return;
-  }
-  btn.disabled = false;
-  if (p === 'granted' && notifPrefEnabled()) {
-    btn.textContent = 'Disable notifications';
-    status.textContent = 'You will be notified when conversations finish.';
-  } else if (p === 'granted') {
-    btn.textContent = 'Enable notifications';
-    status.textContent = 'Muted in sandpie. Click to turn back on (no browser prompt needed).';
-  } else {
-    btn.textContent = 'Enable notifications';
-    status.textContent = '';
-  }
-}
-async function enableNotifications() {
-  if (!('Notification' in self)) return;
-  const p = Notification.permission;
-  if (p === 'granted') {
-    // Already authorised by the browser — just flip the sandpie-local pref.
-    if (notifPrefEnabled()) localStorage.setItem(NOTIF_PREF_KEY, '0');
-    else localStorage.removeItem(NOTIF_PREF_KEY);
-  } else if (p === 'default') {
-    // First time — ask the browser. Default to on if user grants.
-    try { await Notification.requestPermission(); } catch (_) {}
-    localStorage.removeItem(NOTIF_PREF_KEY);
-  }
-  // 'denied' is unreachable (button is disabled in that branch).
-  refreshNotifStatus();
-}
-refreshNotifStatus();
 
 // Dropbox config (separate from providers)
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
@@ -5803,53 +5745,10 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // [F6] System notification on completion. We route through the Service
-    // Worker registration's showNotification() rather than `new Notification()`
-    // because:
-    //   - Android Chrome silently no-ops `new Notification()` from a page;
-    //     SW.showNotification is the only path that works.
-    //   - iOS Safari only supports notifications at all when the app is added
-    //     to the home screen, and only via SW notifications (16.4+).
-    //   - Desktop browsers also accept the SW path, so one code path covers
-    //     all platforms.
-    // The API guard around `Notification` itself is still load-bearing — bare
-    // `Notification.permission` ReferenceErrors on locked-down contexts and
-    // would kill the finally chain (skipping sync()).
-    if (!wasAborted && notifEffectivelyOn()) {
-      let title = 'Conversation complete';
-      try {
-        const data = JSON.parse(await opfs.read(convPath(convId)));
-        if (data && data.title) title = data.title;
-      } catch (e) { console.warn('[sandpie] notify: title read failed:', e); }
-      const opts = {
-        body: title,
-        icon: 'icon-192.png',
-        tag: 'sandpie-conv-' + convId,
-      };
-      let shown = false;
-      try {
-        const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
-        if (reg && reg.showNotification) {
-          await reg.showNotification('sandpie', opts);
-          shown = true;
-          console.log('[sandpie] notify: SW showNotification for conv', convId, 'title=', title);
-        }
-      } catch (e) {
-        console.error('[sandpie] notify: SW showNotification threw:', e);
-      }
-      // Desktop fallback for environments where the SW path isn't usable
-      // (no registration, blocked by policy, etc). new Notification() will
-      // no-op on mobile, but on desktop it still works.
-      if (!shown) {
-        try {
-          const notif = new Notification('sandpie', opts);
-          notif.onclick = () => { window.focus(); notif.close(); };
-          console.log('[sandpie] notify: page Notification fallback for conv', convId);
-        } catch (e) {
-          console.error('[sandpie] notify: Notification constructor threw:', e);
-        }
-      }
-    }
+    // [F6] System notification on completion. The actual show path lives in
+    // modules/notifications.js — see that module for the SW-vs-page-fallback
+    // logic and why mobile requires the SW route.
+    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
