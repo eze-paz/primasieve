@@ -220,10 +220,7 @@ const SandpieWllama = (function() {
         if (aborted) break;
         const delta = chunk && chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
         if (!delta) continue;
-        if (delta.content) {
-          content += delta.content;
-          try { onDelta && onDelta({ content: delta.content }); } catch (_) {}
-        }
+        if (delta.content) content += delta.content;
         if (delta.tool_calls) {
           // Accumulate by index — same approach as the SW path. Some
           // models stream the function name/arguments in multiple pieces.
@@ -234,6 +231,15 @@ const SandpieWllama = (function() {
             if (tc.function && tc.function.name) toolCalls[i].function.name += tc.function.name;
             if (tc.function && tc.function.arguments) toolCalls[i].function.arguments += tc.function.arguments;
           }
+        }
+        // Forward the full delta object so the page-side applyDelta can
+        // both append content AND build streaming tool-call bubbles.
+        // Without delta.tool_calls reaching the renderer, the bubble is
+        // never created and the later tool_started / tool_result events
+        // silently no-op (markToolStarted looks up an element by tc.id
+        // and bails when it can't find one).
+        if (delta.content || delta.tool_calls) {
+          try { onDelta && onDelta(delta); } catch (_) {}
         }
       }
     } finally {

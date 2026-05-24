@@ -1007,6 +1007,36 @@
     background: var(--sp-danger-dim);
   }
 
+  /* <think>...</think> blocks: some models (Qwen-2.5-thinking, QwQ, DeepSeek
+     R1 distills, custom GGUFs) stream their reasoning inside a <think> tag
+     before the actual response. marked.js passes unknown HTML through, so
+     these land in the rendered bubble as a <think> element that browsers
+     treat as inline-by-default HTMLUnknownElement. Re-style as a quiet
+     block with a header so the user can see reasoning separated from
+     the final answer. */
+  .bubble think {
+    display: block;
+    font-style: italic;
+    color: var(--sp-text-dim);
+    border-left: 2px solid var(--sp-border);
+    padding: 0.3rem 0.55rem;
+    margin: 0.35rem 0;
+    background: rgba(127, 127, 127, 0.05);
+    white-space: pre-wrap;
+    font-size: 0.9em;
+  }
+  .bubble think::before {
+    content: "Thinking";
+    display: block;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--sp-text-dim);
+    opacity: 0.7;
+    margin-bottom: 0.25rem;
+  }
   /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
      .tc-collapsed (rich spinner/flavor card). CSS swaps which is visible based
      on the global minimize state. Tool-result bubbles are hidden when minimized. */
