@@ -104,29 +104,40 @@ const SandpieWllama = (function() {
         _instanceUrl = null;
         _instanceCtx = 0;
       }
+      // Fetch the GGUF ourselves and pass a Blob to loadModel(), which
+      // skips wllama's ModelManager/CacheManager entirely. We do this
+      // instead of loadModelFromUrl({useCache:false}) because that flag
+      // is misnamed in the SDK — it forces a fresh download but still
+      // writes the bytes to OPFS `cache/`, which sandpie's Dropbox sync
+      // then tries to upload (multi-GB → 409s + session-limit blowouts).
+      // Trade-off: page reload re-fetches the model. Browser HTTP cache
+      // mitigates the worst case; for proof-of-concept this is fine.
+      const res = await fetch(modelUrl);
+      if (!res.ok) throw new Error(`wllama: model fetch failed (${res.status} ${res.statusText}) for ${modelUrl}`);
+      const total = parseInt(res.headers.get('content-length') || '0', 10);
+      const reader = res.body.getReader();
+      const chunks = [];
+      let loaded = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.byteLength;
+        try {
+          onProgress && onProgress({
+            loaded, total,
+            progress: total ? loaded / total : 0,
+          });
+        } catch (_) {}
+      }
+      const ggufBlob = new Blob(chunks);
+
       const { Wllama } = await loadSDK();
       // v3 constructor takes a single `default` WASM path; the worker
       // code is inlined into the SDK bundle so no separate worker URL
       // is needed. WebGPU is auto-enabled when supported.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModelFromUrl(modelUrl, {
-        n_ctx: nCtx,
-        // useCache:false disables wllama's OPFS-backed model cache.
-        // Without this, weights land at OPFS `cache/` which sandpie's
-        // Dropbox sync then tries to upload (~1-5 GB per model, 409s,
-        // session-limit blowouts). Trade-off: every page load re-fetches
-        // the GGUF from HF. Fine for a proof-of-concept; revisit once
-        // we have an OPFS-path exclusion mechanism for the sync walker.
-        useCache: false,
-        progressCallback: ({ loaded, total }) => {
-          try {
-            onProgress && onProgress({
-              loaded, total,
-              progress: total ? loaded / total : 0,
-            });
-          } catch (_) {}
-        },
-      });
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
