@@ -1489,7 +1489,7 @@ window.addEventListener('message', e => {
     <summary>Notifications</summary>
     <div class="service-body">
       <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
-      <button type="button" id="notifEnableBtn" onclick="enableNotifications()">Enable notifications</button>
+      <button type="button" class="ghost" id="notifEnableBtn" onclick="enableNotifications()">Enable notifications</button>
       <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
     </div>
   </details>
@@ -2001,10 +2001,18 @@ const isLocalhost = location.hostname === 'localhost' || location.hostname === '
 loadProviders();
 
 // --- Notifications ----------------------------------------------------------
-// Sidebar "Enable notifications" button: requests OS-level permission via a
-// user gesture (the right way — browsers de-prioritize or auto-deny prompts
-// not tied to a click). refreshNotifStatus() reflects the current permission
-// state into the button + helper text on load and after every change.
+// Two-layer state: (1) the browser permission (granted/denied/default —
+// sandpie can only REQUEST, never revoke; revoking lives in browser settings),
+// and (2) a sandpie-local on/off preference stored in localStorage so the
+// user can mute completion pings without yanking the underlying permission.
+// notifPrefEnabled() returns the effective state — both layers must be on.
+const NOTIF_PREF_KEY = 'sandpie-notify-enabled';
+function notifPrefEnabled() {
+  return localStorage.getItem(NOTIF_PREF_KEY) !== '0';
+}
+function notifEffectivelyOn() {
+  return 'Notification' in self && Notification.permission === 'granted' && notifPrefEnabled();
+}
 function refreshNotifStatus() {
   const btn = $('notifEnableBtn');
   const status = $('notifStatus');
@@ -2016,23 +2024,37 @@ function refreshNotifStatus() {
     return;
   }
   const p = Notification.permission;
-  if (p === 'granted') {
+  if (p === 'denied') {
     btn.disabled = true;
-    btn.textContent = 'Enabled';
+    btn.textContent = 'Blocked by browser';
+    status.textContent = 'Notifications are blocked. Re-enable in your browser settings, then come back here.';
+    return;
+  }
+  btn.disabled = false;
+  if (p === 'granted' && notifPrefEnabled()) {
+    btn.textContent = 'Disable notifications';
     status.textContent = 'You will be notified when conversations finish.';
-  } else if (p === 'denied') {
-    btn.disabled = true;
-    btn.textContent = 'Blocked';
-    status.textContent = 'Notifications are blocked. Re-enable in your browser settings to receive them.';
+  } else if (p === 'granted') {
+    btn.textContent = 'Enable notifications';
+    status.textContent = 'Muted in sandpie. Click to turn back on (no browser prompt needed).';
   } else {
-    btn.disabled = false;
     btn.textContent = 'Enable notifications';
     status.textContent = '';
   }
 }
 async function enableNotifications() {
   if (!('Notification' in self)) return;
-  try { await Notification.requestPermission(); } catch (_) {}
+  const p = Notification.permission;
+  if (p === 'granted') {
+    // Already authorised by the browser — just flip the sandpie-local pref.
+    if (notifPrefEnabled()) localStorage.setItem(NOTIF_PREF_KEY, '0');
+    else localStorage.removeItem(NOTIF_PREF_KEY);
+  } else if (p === 'default') {
+    // First time — ask the browser. Default to on if user grants.
+    try { await Notification.requestPermission(); } catch (_) {}
+    localStorage.removeItem(NOTIF_PREF_KEY);
+  }
+  // 'denied' is unreachable (button is disabled in that branch).
   refreshNotifStatus();
 }
 refreshNotifStatus();
@@ -5786,7 +5808,7 @@ async function sendSingle(text, stream) {
     // (some embedded webviews, insecure HTTP origins, locked-down profiles),
     // bare `Notification.permission` throws ReferenceError and kills the
     // finally chain — which would also skip the sync() call below.
-    if (!wasAborted && 'Notification' in self && Notification.permission === 'granted') {
+    if (!wasAborted && notifEffectivelyOn()) {
       let title = 'Conversation complete';
       try {
         const data = JSON.parse(await opfs.read(convPath(convId)));
