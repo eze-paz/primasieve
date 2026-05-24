@@ -351,9 +351,9 @@ function _extractMissingPath(e) {
 // =============================================================================
 // The SW holds ONE Pyodide interpreter shared across all convs. tool_run_python
 // mutates interpreter-global state (setStdout/setStderr batched callbacks
-// closed over caller-local accumulators, self._sandpieDisplay, self._sandpie_argv,
-// the DISPLAY_PATCH IPython redirect). Two concurrent callers would trample
-// these and one would return garbage — withPy serializes the critical section.
+// closed over caller-local accumulators, self._sandpie_argv for script-mode
+// sys.argv). Two concurrent callers would trample these and one would return
+// garbage — withPy serializes the critical section.
 //
 // Trade-off: no parallelism across convs for Python. Acceptable; the only way
 // to get true parallelism would be per-conv interpreters (workers), which
@@ -398,51 +398,6 @@ async function opfsWriteBytes(path, bytes) {
   await w.close();
 }
 
-const DISPLAY_PATCH = `
-def _sandpie_display(*objs, **kwargs):
-    import base64
-    try:
-        import js
-    except Exception:
-        return
-    for obj in objs:
-        html = None
-        try:
-            if hasattr(obj, '_repr_html_'):
-                html = obj._repr_html_()
-            if html is None and hasattr(obj, '_repr_svg_'):
-                html = obj._repr_svg_()
-            if html is None and hasattr(obj, '_repr_png_'):
-                d = obj._repr_png_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/png;base64,' + d + '">'
-            if html is None and hasattr(obj, '_repr_jpeg_'):
-                d = obj._repr_jpeg_()
-                if isinstance(d, (bytes, bytearray)):
-                    d = base64.b64encode(d).decode()
-                html = '<img src="data:image/jpeg;base64,' + d + '">'
-        except Exception as e:
-            html = '<pre>display error: ' + str(e) + '</pre>'
-        if html is None:
-            s = str(obj).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html = '<pre>' + s + '</pre>'
-        try:
-            import os as _os, time as _time
-            _os.makedirs('/files/outputs', exist_ok=True)
-            _art_path = 'outputs/display_' + format(int(_time.time() * 1000), 'x') + '.html'
-            with open('/files/' + _art_path, 'w') as _f:
-                _f.write(html)
-            print('Artifact saved → files/' + _art_path + ' — call show_artifact to display it.')
-        except Exception as _e:
-            print('display() failed: ' + str(_e))
-try:
-    import IPython.display as _ipd
-    _ipd.display = _sandpie_display
-except Exception:
-    pass
-`;
-
 // ============================================================
 // Tool implementations (run inside the SW).
 // ============================================================
@@ -462,7 +417,7 @@ async function tool_run_python({ code, path, args }, ctx) {
   }
   // Serialize the interpreter-touching critical section so concurrent
   // run_python calls don't race on the shared interpreter's globals
-  // (setStdout closures, IPython.display redirect, etc).
+  // (setStdout closures, sys.argv, etc).
   return withPy(async () => {
     let p;
     try { p = await initPyodide(); }
@@ -475,12 +430,10 @@ async function tool_run_python({ code, path, args }, ctx) {
       // /files is mounted lazily via mountNativeFS at init — Python can use plain
       // open()/os.listdir/glob and it reads OPFS on demand. Files not hydrated
       // from Dropbox simply aren't present in /files; LLM uses fetch_file to bring them in.
-      // display() writes HTML to /files/outputs/ — call show_artifact to render it.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
-      try { p.runPython(DISPLAY_PATCH); } catch (_) {}
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       // Single-retry: if user code dies with FileNotFoundError on a path
       // that turns out to live in Dropbox, fetch_file it and re-run the
