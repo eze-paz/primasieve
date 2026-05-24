@@ -1649,7 +1649,7 @@ window.addEventListener('message', e => {
 //   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
 //       <script> runs.
 //   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
-//       localProxyMode, providers, ... .
+//       providers, ... .
 //   P2  navigator.serviceWorker.register('./sandpie.js'); _swReady waits
 //       for controllerchange so first /sandpie-agent POST is intercepted.
 //   P3  init() → loadProviders, restore active conv, mountConv,
@@ -5443,7 +5443,6 @@ function refreshWelcome() {
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
-  else if (localProxyMode === 'connected') parts.push('local proxy');
   if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
   const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
