@@ -1489,7 +1489,23 @@ window.addEventListener('message', e => {
         <input id="modalWllamaCustom" autocomplete="off" placeholder="Custom GGUF URL (e.g. https://huggingface.co/.../model.gguf)" style="display:none; margin-top:0.375rem;">
         <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0.25rem; text-transform:uppercase; letter-spacing:0.05em;">Context size (tokens)</label>
         <input id="modalWllamaCtx" type="number" min="512" step="512" placeholder="8192" autocomplete="off">
-        <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;">Runs entirely in your browser via WebGPU when available, with WASM/CPU fallback. First use streams the GGUF from the URL (~0.7–5 GB depending on model); subsequent loads are cached. Larger context = more memory + slower load; default 8192 covers sandpie's system prompt + tools comfortably.</p>
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0.75rem 0 0.25rem; text-transform:uppercase; letter-spacing:0.05em;">Max output tokens</label>
+        <input id="modalWllamaMaxTokens" type="number" min="64" step="64" placeholder="2048" autocomplete="off">
+        <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+          <div style="flex:1;">
+            <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin-bottom:0.25rem; text-transform:uppercase; letter-spacing:0.05em;">Temperature</label>
+            <input id="modalWllamaTemperature" type="number" min="0" max="2" step="0.05" placeholder="0.7" autocomplete="off" style="width:100%;">
+          </div>
+          <div style="flex:1;">
+            <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin-bottom:0.25rem; text-transform:uppercase; letter-spacing:0.05em;">Top P</label>
+            <input id="modalWllamaTopP" type="number" min="0" max="1" step="0.05" placeholder="0.9" autocomplete="off" style="width:100%;">
+          </div>
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem; margin:0.75rem 0 0; font-size:0.85rem; cursor:pointer;">
+          <input type="checkbox" id="modalWllamaFlashAttn" checked style="width:auto; padding:0; accent-color:var(--sp-accent);">
+          Flash attention <span style="font-size:0.7rem; color:var(--sp-text-dim);">— faster on long context; requires model reload if toggled</span>
+        </label>
+        <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.75rem 0 0;">Runs entirely in your browser via WebGPU when available, with WASM/CPU fallback. First use streams the GGUF from the URL (~0.7–5 GB depending on model); subsequent loads are cached. Larger context = more memory + slower load; default 8192 covers sandpie's system prompt + tools comfortably.</p>
       </div>
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
@@ -1979,11 +1995,19 @@ function openProviderModal(providerId = null) {
     $('modalWllamaCustom').value = known ? '' : ((p && p.endpoint) || '');
     $('modalWllamaCustom').style.display = $('modalWllamaModel').value === '__custom__' ? '' : 'none';
     $('modalWllamaCtx').value = (p && p.nCtx) ? p.nCtx : '';
+    $('modalWllamaMaxTokens').value = (p && p.maxTokens) ? p.maxTokens : '';
+    $('modalWllamaTemperature').value = (p && p.temperature != null) ? p.temperature : '';
+    $('modalWllamaTopP').value = (p && p.topP != null) ? p.topP : '';
+    $('modalWllamaFlashAttn').checked = !p || p.flashAttn !== false;
   } else {
     $('modalWllamaModel').value = '';
     $('modalWllamaCustom').value = '';
     $('modalWllamaCustom').style.display = 'none';
     $('modalWllamaCtx').value = '';
+    $('modalWllamaMaxTokens').value = '';
+    $('modalWllamaTemperature').value = '';
+    $('modalWllamaTopP').value = '';
+    $('modalWllamaFlashAttn').checked = true;
   }
   onProviderTypeChange();
 
@@ -2037,7 +2061,7 @@ function saveProviderModal() {
 
   let model = '';
   let endpoint = '', apiKey = '', proxyUrl = '';
-  let nCtx = null;
+  let nCtx = null, maxTokens = null, temperature = null, topP = null, flashAttn = true;
 
   if (type === 'wllama') {
     // For wllama we store the GGUF URL in `endpoint` and a friendly id in `model`.
@@ -2068,6 +2092,25 @@ function saveProviderModal() {
       }
       nCtx = n;
     }
+    const maxTokRaw = $('modalWllamaMaxTokens').value.trim();
+    if (maxTokRaw) {
+      const n = parseInt(maxTokRaw, 10);
+      if (!Number.isFinite(n) || n < 1) { alert('Max tokens must be a positive integer.'); return; }
+      maxTokens = n;
+    }
+    const tempRaw = $('modalWllamaTemperature').value.trim();
+    if (tempRaw) {
+      const t = parseFloat(tempRaw);
+      if (!Number.isFinite(t) || t < 0 || t > 2) { alert('Temperature must be between 0 and 2.'); return; }
+      temperature = t;
+    }
+    const topPRaw = $('modalWllamaTopP').value.trim();
+    if (topPRaw) {
+      const t = parseFloat(topPRaw);
+      if (!Number.isFinite(t) || t < 0 || t > 1) { alert('Top P must be between 0 and 1.'); return; }
+      topP = t;
+    }
+    flashAttn = $('modalWllamaFlashAttn').checked;
   } else {
     endpoint = $('modalEndpoint').value.trim();
     model = $('modalModel').value.trim();
@@ -2089,6 +2132,10 @@ function saveProviderModal() {
       p.apiKey = apiKey;
       p.proxyUrl = proxyUrl;
       if (nCtx) p.nCtx = nCtx; else delete p.nCtx;
+      if (maxTokens) p.maxTokens = maxTokens; else delete p.maxTokens;
+      if (temperature != null) p.temperature = temperature; else delete p.temperature;
+      if (topP != null) p.topP = topP; else delete p.topP;
+      p.flashAttn = flashAttn;
     }
   } else {
     const newP = {
@@ -2099,8 +2146,12 @@ function saveProviderModal() {
       model,
       apiKey,
       proxyUrl,
+      flashAttn,
     };
     if (nCtx) newP.nCtx = nCtx;
+    if (maxTokens) newP.maxTokens = maxTokens;
+    if (temperature != null) newP.temperature = temperature;
+    if (topP != null) newP.topP = topP;
     _providers.push(newP);
     _activeProviderId = newP.id;
   }
@@ -5976,9 +6027,14 @@ async function runWllamaAgent(config, ctx) {
         tools: config.tools,
         signal: ctx.signal,
         nCtx: config.nCtx || undefined,
-        onProgress: ({ progress }) => {
+        flashAttn: config.flashAttn !== false,
+        maxTokens: config.maxTokens || undefined,
+        temperature: config.temperature != null ? config.temperature : undefined,
+        topP: config.topP != null ? config.topP : undefined,
+        onProgress: ({ progress, fromCache }) => {
           const pct = typeof progress === 'number' ? Math.round(progress * 100) + '%' : '';
-          ctx.emit({ type: 'info', message: pct ? `Loading ${config.model}: ${pct}` : null });
+          const verb = fromCache ? 'Loading from cache' : 'Downloading';
+          ctx.emit({ type: 'info', message: pct ? `${verb} ${config.model}: ${pct}` : null });
         },
         onDelta: (delta) => ctx.emit({ type: 'delta', delta }),
       });
@@ -6184,6 +6240,10 @@ async function buildAgentConfig(convMessages) {
     messages: resolvedMessages,
     tools: toolDefs(),
     nCtx: activeProvider ? activeProvider.nCtx : null,
+    flashAttn: activeProvider ? (activeProvider.flashAttn !== false) : true,
+    maxTokens: (activeProvider && activeProvider.maxTokens) || null,
+    temperature: (activeProvider && activeProvider.temperature != null) ? activeProvider.temperature : null,
+    topP: (activeProvider && activeProvider.topP != null) ? activeProvider.topP : null,
     origin: location.origin,
     dbxTokens: dbxTokensSnap,
   };

@@ -81,6 +81,73 @@ const SandpieWllama = (function() {
   }
 
   // ============================================================
+  // GGUF cache (Cache Storage API — NOT OPFS, so Dropbox can't see it)
+  // ============================================================
+  // Cache Storage is a per-origin store the browser manages, separate
+  // from OPFS. Survives reloads. Browser may evict under quota pressure
+  // but for the curated models (≤5 GB) we'd typically be well under
+  // the per-origin quota (~6%+ of disk). Cache key = the GGUF URL.
+  const MODEL_CACHE_NAME = 'sandpie-wllama-models';
+
+  /**
+   * Fetch a model GGUF, populating Cache Storage on miss. Streams the
+   * body chunk-by-chunk so onProgress fires the same way whether we're
+   * reading from the network or from the cache.
+   *
+   * @param {string} url
+   * @param {(report:{loaded:number,total:number,progress:number,fromCache:boolean}) => void} [onProgress]
+   * @returns {Promise<Blob>}
+   */
+  async function fetchModelBlob(url, onProgress) {
+    let cache = null;
+    try { cache = await caches.open(MODEL_CACHE_NAME); }
+    catch (e) { dbg('Cache Storage unavailable, falling back to direct fetch:', e && e.message); }
+
+    let res;
+    let fromCache = false;
+    if (cache) {
+      const hit = await cache.match(url);
+      if (hit) {
+        dbg(`cache hit: ${url}`);
+        res = hit;
+        fromCache = true;
+      }
+    }
+    if (!res) {
+      dbg(`cache miss → fetching: ${url}`);
+      const network = await fetch(url);
+      if (!network.ok) throw new Error(`wllama: model fetch failed (${network.status} ${network.statusText}) for ${url}`);
+      // Stash a clone in Cache Storage in the background. Clone the
+      // Response BEFORE we start reading; once a body is read, the
+      // clone's body would be locked too. cache.put is best-effort —
+      // failures (quota, write race) just mean next reload re-downloads.
+      if (cache) {
+        cache.put(url, network.clone()).catch(e => console.warn('[wllama] cache.put failed:', e && e.message));
+      }
+      res = network;
+    }
+
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    const reader = res.body.getReader();
+    const chunks = [];
+    let loaded = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      loaded += value.byteLength;
+      try {
+        onProgress && onProgress({
+          loaded, total,
+          progress: total ? loaded / total : 0,
+          fromCache,
+        });
+      } catch (_) {}
+    }
+    return new Blob(chunks);
+  }
+
+  // ============================================================
   // SDK + model singleton
   // ============================================================
 
@@ -124,33 +191,19 @@ const SandpieWllama = (function() {
         _instanceCtx = 0;
         _instanceFlashAttn = true;
       }
-      // Fetch the GGUF ourselves and pass a Blob to loadModel(), which
-      // skips wllama's ModelManager/CacheManager entirely. We do this
-      // instead of loadModelFromUrl({useCache:false}) because that flag
-      // is misnamed in the SDK — it forces a fresh download but still
-      // writes the bytes to OPFS `cache/`, which sandpie's Dropbox sync
-      // then tries to upload (multi-GB → 409s + session-limit blowouts).
-      // Trade-off: page reload re-fetches the model. Browser HTTP cache
-      // mitigates the worst case; for proof-of-concept this is fine.
-      const res = await fetch(modelUrl);
-      if (!res.ok) throw new Error(`wllama: model fetch failed (${res.status} ${res.statusText}) for ${modelUrl}`);
-      const total = parseInt(res.headers.get('content-length') || '0', 10);
-      const reader = res.body.getReader();
-      const chunks = [];
-      let loaded = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.byteLength;
-        try {
-          onProgress && onProgress({
-            loaded, total,
-            progress: total ? loaded / total : 0,
-          });
-        } catch (_) {}
-      }
-      const ggufBlob = new Blob(chunks);
+      // Fetch the GGUF and pass a Blob to loadModel(), which skips
+      // wllama's ModelManager/CacheManager entirely (its useCache:false
+      // flag is misnamed in the SDK — it forces a fresh download but
+      // STILL writes to OPFS `cache/`, which sandpie's Dropbox sync
+      // then tries to upload).
+      //
+      // We persist the fetched bytes in the browser's Cache Storage
+      // API. That's a different storage area from OPFS — opfs.list()
+      // doesn't walk it, so Dropbox sync never sees it. Survives page
+      // reloads; eviction follows the browser's per-origin quota
+      // policy. Falls back to a direct fetch when Cache Storage is
+      // unavailable (private mode in some browsers, etc).
+      const ggufBlob = await fetchModelBlob(modelUrl, onProgress);
 
       const { Wllama } = await loadSDK();
       // v3 constructor takes a single `default` WASM path; the worker
