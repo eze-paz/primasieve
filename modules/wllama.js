@@ -64,6 +64,23 @@ const SandpieWllama = (function() {
   ];
 
   // ============================================================
+  // Debug logging
+  // ============================================================
+  // Off by default. Flip via DevTools console:
+  //   localStorage.setItem('sandpie-wllama-debug', '1')
+  // (then reload) — or just inspect window.__wllamaLastRound which is
+  // always populated regardless of the flag. The flag controls noisy
+  // per-round console output; the raw payload capture is free.
+  const DEBUG_KEY = 'sandpie-wllama-debug';
+  function isDebug() {
+    try { return localStorage.getItem(DEBUG_KEY) === '1'; }
+    catch (_) { return false; }
+  }
+  function dbg(...args) {
+    if (isDebug()) console.log('[wllama]', ...args);
+  }
+
+  // ============================================================
   // SDK + model singleton
   // ============================================================
 
@@ -79,22 +96,24 @@ const SandpieWllama = (function() {
   // The user can override per-provider in the modal.
   const DEFAULT_N_CTX = 8192;
 
-  // wllama holds at most one model in memory at a time. We key by URL
-  // *plus* n_ctx because n_ctx is a load-time parameter — changing it
-  // requires a fresh load, not just a fresh chat.
+  // wllama holds at most one model in memory at a time. We key by URL,
+  // n_ctx, and flash_attn — all are load-time parameters that require a
+  // fresh model load when changed.
   let _instance = null;
   let _instanceUrl = null;
   let _instanceCtx = 0;
+  let _instanceFlashAttn = true;
   let _loadingKey = null;
 
   async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
-    const key = modelUrl + '|' + nCtx;
-    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx) return _instance;
+    const flashAttn = (opts && opts.flashAttn !== false);
+    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
     if (_loadingKey === key) {
       while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx) return _instance;
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
     }
     _loadingKey = key;
     try {
@@ -103,6 +122,7 @@ const SandpieWllama = (function() {
         _instance = null;
         _instanceUrl = null;
         _instanceCtx = 0;
+        _instanceFlashAttn = true;
       }
       // Fetch the GGUF ourselves and pass a Blob to loadModel(), which
       // skips wllama's ModelManager/CacheManager entirely. We do this
@@ -137,10 +157,11 @@ const SandpieWllama = (function() {
       // code is inlined into the SDK bundle so no separate worker URL
       // is needed. WebGPU is auto-enabled when supported.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx });
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
+      _instanceFlashAttn = flashAttn;
       return inst;
     } finally {
       if (_loadingKey === key) _loadingKey = null;
@@ -191,9 +212,16 @@ const SandpieWllama = (function() {
    * engine handles the function-calling output format, so we get proper
    * tool_calls entries in the chunks instead of having to parse them
    * out of free-form text.
+   *
+   * Inference options (all optional, fall back to sensible defaults):
+   *   nCtx        — context window in tokens (load-time; triggers reload)
+   *   flashAttn   — enable flash attention (load-time; triggers reload)
+   *   maxTokens   — max output tokens per round
+   *   temperature — sampling temperature (0–2)
+   *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx }) {
-    const wllama = await getInstance(modelUrl, onProgress, { nCtx });
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     let aborted = false;
@@ -205,20 +233,36 @@ const SandpieWllama = (function() {
 
     let content = '';
     const toolCalls = [];
+    let finishReason = null;
+    const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+    const request = {
+      modelUrl,
+      messages: adaptMessages(messages),
+      max_tokens: maxTokens || 2048,
+      temperature: temperature != null ? temperature : 0.7,
+      top_p: topP != null ? topP : 0.9,
+      tools: tools && tools.length ? tools : undefined,
+    };
+    dbg(`→ round: ${request.messages.length} msgs, ${tools ? tools.length : 0} tools, last role: ${request.messages.length ? request.messages[request.messages.length - 1].role : '(none)'}`);
 
     try {
       const stream = await wllama.createChatCompletion({
-        messages: adaptMessages(messages),
-        max_tokens: 1024,
-        temperature: 0.7,
-        top_p: 0.9,
+        messages: request.messages,
+        max_tokens: request.max_tokens,
+        temperature: request.temperature,
+        top_p: request.top_p,
         stream: true,
-        ...(tools && tools.length ? { tools } : {}),
+        ...(request.tools ? { tools: request.tools } : {}),
       });
 
       for await (const chunk of stream) {
         if (aborted) break;
-        const delta = chunk && chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
+        const choice = chunk && chunk.choices && chunk.choices[0];
+        const delta = choice && choice.delta;
+        // finish_reason lands on the LAST chunk for that choice — capture
+        // it so we can surface length-clipping vs natural stop in logs.
+        if (choice && choice.finish_reason) finishReason = choice.finish_reason;
         if (!delta) continue;
         if (delta.content) content += delta.content;
         if (delta.tool_calls) {
@@ -248,10 +292,26 @@ const SandpieWllama = (function() {
 
     if (aborted) throw new DOMException('aborted', 'AbortError');
 
-    return {
-      content,
-      tool_calls: toolCalls.filter(tc => tc && tc.id),
-    };
+    const keptToolCalls = toolCalls.filter(tc => tc && tc.id);
+    const dtMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+
+    // Always capture the last round's raw payloads on window so users can
+    // poke at them in DevTools regardless of whether the debug flag is
+    // set. Cheap (one assignment); only the previous round is held.
+    try {
+      self.__wllamaLastRound = {
+        ts: new Date().toISOString(),
+        request,
+        response: { content, tool_calls: keptToolCalls, finish_reason: finishReason, duration_ms: dtMs },
+      };
+    } catch (_) {}
+
+    dbg(`← finish: ${finishReason || '(none)'} · content: ${content.length} chars · tool_calls: ${keptToolCalls.length} · ${dtMs}ms`);
+    if (isDebug() && keptToolCalls.length) {
+      for (const tc of keptToolCalls) dbg(`  tool: ${tc.function.name} args: ${tc.function.arguments}`);
+    }
+
+    return { content, tool_calls: keptToolCalls };
   }
 
   return {
