@@ -1395,6 +1395,7 @@ window.addEventListener('message', e => {
 
 </script>
   <script src="modules/images.js"></script>
+  <script src="modules/notifications.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -1485,6 +1486,14 @@ window.addEventListener('message', e => {
     </div>
   </details>
 
+  <details class="service" id="notifSection">
+    <summary>Notifications <span class="status-dot" id="notifDot"></span></summary>
+    <div class="service-body">
+      <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
+      <button type="button" class="ghost" id="notifEnableBtn" onclick="SandpieNotifications.toggle()">Enable notifications</button>
+      <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+    </div>
+  </details>
   <details class="service" id="themeSection">
     <summary>Theme</summary>
     <div class="service-body">
@@ -1556,11 +1565,65 @@ window.addEventListener('message', e => {
 </main>
 
 <script>
+// =============================================================================
+// sandpie-sw end-to-end flow
+const $ = id => document.getElementById(id);
+
+const VERSION = '1.0.2-1779377073';
+
+// =============================================================================
+// SW console relay — surfaces sandpie.js's console output here.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d) return;
+    if (d.type === 'sandpie-sw-log') {
+      // Map level → console method. Default to log for unknown.
+      const fn = console[d.level] || console.log;
+      fn.call(console, '[sw]', d.text);
+      return;
+    }
+    if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
+      // Python deleted these via os.remove / shutil.rmtree etc. The SW has
+      // already flushed the deletion to OPFS via syncfs(). We just need to
+      // mirror to Dropbox + syncState, otherwise the cloud copy lingers and
+      // re-downloads on the next pull. dbxDelete tolerates not_found so
+      // double-fires are safe.
+      (async () => {
+        if (!dbxTokens()) return;
+        const state = syncState();
+        let changed = false;
+        for (const path of d.paths) {
+          try { await dbxDelete('/' + path); } catch {}
+          const lk = path.toLowerCase();
+          for (const k of Object.keys(state)) {
+            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
+              delete state[k];
+              changed = true;
             }
           }
         }
         if (changed) setSyncState(state);
         try { await refreshFileList(); } catch {}
+      })();
+      return;
+    }
+  });
+  // Once a controller exists, ask it to replay the boot buffer so we don't
+  // miss SW logs that fired before this listener was wired up. Try now and
+  // also on controllerchange (covers cold + warm boots).
+  const flush = () => {
+    const c = navigator.serviceWorker.controller;
+    if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
+  };
+  flush();
+  navigator.serviceWorker.addEventListener('controllerchange', flush);
+}
+
+// Active-conversation message array. Reassigned (not mutated in place) when
+// the user switches conversations — so any in-flight stream that captured the
+// previous reference keeps pushing to its own conversation's array instead of
+// contaminating whichever conv is now visible. See convStreams below.
 let messages = [];
 // Per-conversation stream state. Each conv the user has touched in this
 // session gets an entry. Holds the conv's messages array, its bubble host
@@ -1810,6 +1873,7 @@ document.addEventListener('click', hideChipMenu);
 // would otherwise reach its initializer (TDZ).
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
+// Load on init
 loadProviders();
 
 // Dropbox config (separate from providers)
@@ -2238,6 +2302,7 @@ async function dbxAccessToken() {
   const stored = dbxTokens();
   if (!stored) throw new Error('Dropbox not connected');
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+  // refresh
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: stored.refresh_token,
@@ -2464,20 +2529,13 @@ async function dbxDelete(path) {
 
 // ============================================================
 // Sync engine — Dropbox is the source of truth.
-// ============================================================
-// Replaces the older dbxIndex + manifest split (three sources of truth,
-// four entry points, drift between them). One state map, one cloud
-//   rev,           // Dropbox content_hash. Drives "did cloud change?".
-//   size,          // Cloud size in bytes. Drives lazy-hydration decision.
-//   hydrated,      // true = file in OPFS; false = placeholder.
-//   syncedMtime,   // OPFS mtime as of last successful sync (0 if not
-//                  // hydrated). Drives "did local change?".
 const SYNC_STATE_KEY = 'sandpie-sync-state';
 function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
 function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
 
 // One-shot migration: project the older dbx-index + opfs-sync-manifest pair
 // into the new shape. Old keys are left in localStorage as a safety net but
+// nothing reads them anymore.
 (function migrateLegacyState() {
   if (localStorage.getItem(SYNC_STATE_KEY)) return;
   const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
@@ -2506,6 +2564,31 @@ async function opfsLastModified(relPath) {
 
 // Carve-outs for files that should be downloaded eagerly even under lazy
 // mode. Conversations + sandpie_*.md manifests are read at init by code
+// that needs them local; small files are cheap and sidestep most
+// placeholder gotchas. Everything else stays a placeholder until the user
+// clicks it or fetch_file pulls it.
+function isEagerHydrate(path, size) {
+  if (path === '_conversations' || path.startsWith('_conversations/')) return true;
+  if (/(?:^|\/)sandpie_[^/]*\.md$/.test(path)) return true;
+  if (typeof size === 'number' && size < 64 * 1024) return true;
+  return false;
+}
+
+// Recursive list of /. Returns { relPath: { kind, path, size, rev, cloudMtime } },
+// keyed by Dropbox-relative path. Treats Dropbox listing as truth.
+async function cloudListAll() {
+  const entries = await dbxList('/', { recursive: true });
+  const out = {};
+  for (const e of entries) {
+    let rel = e.path.replace(/^\/+/, '');
+    if (!rel) continue;
+    // Strip Dropbox app-folder prefix so paths match OPFS.
+    // Common prefixes: 'files/', 'Apps/sandpie/', etc.
+    const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
+    for (const p of prefixes) {
+      if (rel.toLowerCase().startsWith(p.toLowerCase())) {
+        rel = rel.slice(p.length);
+        break;
       }
     }
     out[rel] = e;
@@ -2518,6 +2601,8 @@ let _openFilePath = null;  // file currently open in viewer — skip sync for th
 
 // Single sync entry point. Called on connect, on the Resync button, on a
 // 60s background tick (when foregrounded), and at conversation end.
+//
+// Pull phase:
 //   * Drops local copies of paths that vanished from cloud, except when
 //     the local file is dirty (lastMod > syncedMtime) — those are kept and
 //     re-pushed in the push phase (last-write-wins).
@@ -2527,8 +2612,10 @@ let _openFilePath = null;  // file currently open in viewer — skip sync for th
 //     re-download (eager) or demote to placeholder (lazy).
 //   * If cloud unchanged but local copy disappeared, demote to placeholder
 //     (cloud is authority — accidental local removals don't propagate).
+//
 // Push phase: any OPFS file with no state entry, or with mtime newer than
 // syncedMtime, gets uploaded and the state row refreshed.
+//
 // Empty-dir prune: directories with no children and no cloud counterpart
 // get removed (cascades up).
 async function sync() {
@@ -2751,7 +2838,6 @@ RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual co
 
 The artifact renders as a live iframe below the message and persists across reloads.
 Any file type works: .html (full page), .svg, .png, .jpg, .csv.
-IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call show_artifact to inject it into chat.
 Use show_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
 
 Examples:
@@ -3095,6 +3181,7 @@ async function refreshFileList() {
       const s = state[fullKey];
       if (!s || !s.hydrated) {
         // Cloud has it, local has it, no synced state — TOFU until next sync
+        // baselines it.
         status = 'synced';
       } else {
         const lastMod = await opfsLastModified(fullKey);
@@ -3269,6 +3356,7 @@ function showContextMenu(x, y, items) {
 // Minimalist file viewer. Reads the file's Blob from OPFS, picks a reasonable
 // renderer by extension/MIME (image/audio/video/pdf vs text), and shows it in
 // a dismissable overlay. Marked data-chrome so the quarantine observer leaves
+// it alone.
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
@@ -3546,37 +3634,6 @@ async function uploadEntry(entry, dirPath) {
 refreshFileList();
 // =============================================================================
 // SidePanel — controller for the dual-conversation view.
-// =============================================================================
-// State model (single source of truth lives in this object):
-//   left      = $('messages')      — primary DOM panel, ALWAYS the host for
-//                                    activeConvId's conv when activeIsRight is
-//                                    false, swaps with right on flip()
-//   right     = $('messagesSide')  — secondary DOM panel, shown iff isOpen
-//   _sideId   = string | null      — conv mounted in the inactive panel
-//   _activeIsRight = bool          — which physical panel currently owns
-//                                    activeConvId. Flips on flip().
-// Public API (everything else in the file goes through THESE four methods —
-// no caller touches body classes or DOM panels directly):
-//   open(id)            — mount conv `id` into the right panel (lazy-loads
-//                         from OPFS if needed). No-op if id is the active
-//                         conv or already in the side panel.
-//   close()             — unmount the side conv; collapse the right panel.
-//   flip()              — swap which side is active. Conv hosts STAY in
-//                         their pane; only the activeConvId↔sideId labels
-//                         and the active-left/active-right body class swap.
-//   notifyDeleted(id)   — called by deleteConv to clear references if the
-//                         deleted conv was on the side.
-// Read-only accessors:
-//   isOpen, sideId, activeIsRight, activeMountTarget()
-// Invariant: every public method ends by calling _render(), which derives
-// body.side-open / body.active-left / body.active-right from current state.
-// That's the single place DOM/CSS sync happens — no scattered classList
-// toggles elsewhere.
-// Mobile (<=768px): CSS hides the right panel; buildConvLi suppresses the
-// "View in side panel" menu item; the drop handler early-returns. The
-// controller itself is viewport-agnostic — it'll happily track state for
-// a panel that's CSS-hidden, and the user gets it back on resize.
-// =============================================================================
 class SidePanel {
   constructor() {
     this.left = $('messages');
@@ -3599,6 +3656,53 @@ class SidePanel {
 
   // ─── State operations ───────────────────────────────────────────────────
 
+  async open(id) {
+    if (!id) return;
+    if (id === activeConvId) return;      // already showing
+    if (id === this._sideId) return;      // already in side
+    if (this._activeIsRight) return;      // would clobber the active conv
+
+    // Artifact panel shares #messagesSide — close it before mounting a conv.
+    closeArtifactPanel();
+
+    // Park the previous side conv (if any) so its host detaches cleanly.
+    if (this._sideId) {
+      const prev = convStreams.get(this._sideId);
+      prev?.host?.parentNode?.removeChild(prev.host);
+    }
+    await this._lazyLoad(id);
+    this._sideId = id;
+    const s = convStreams.get(id);
+    if (s?.host) this.right.appendChild(s.host);
+    this._render();
+    // Land on the latest messages, not the top of history. rAF so the
+    // browser has measured the just-mounted host before we scroll.
+    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
+    refreshConversationList();
+  }
+
+  close() {
+    if (!this.isOpen) return;
+    if (this._activeIsRight) this.flip();  // bring user back to left first
+    const s = convStreams.get(this._sideId);
+    s?.host?.parentNode?.removeChild(s.host);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshConversationList();
+  }
+
+  flip() {
+    if (!this.isOpen) return;
+    // Swap the activeConvId ↔ sideId labels. Hosts stay where they are
+    // — _render flips active-left/active-right and the dimming follows.
+    [activeConvId, this._sideId] = [this._sideId, activeConvId];
+    this._activeIsRight = !this._activeIsRight;
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    const s = convStreams.get(activeConvId);
+    messages = s?.messages || [];
+    this._render();
+    refreshSendButtonForActive();
     refreshWelcome();
     refreshConversationList();
   }
@@ -3799,6 +3903,7 @@ refreshWelcome();
 })();
 
 // ============================================================
+// Config / chat
 // ============================================================
 function saveConfig() {
   // Save active provider changes back to the provider object
@@ -4189,6 +4294,7 @@ function appendToolResult(tcId, result) {
   const existingResult = box.querySelector('.tool-result');
   if (existingSep) existingSep.remove();
   if (existingResult) existingResult.remove();
+  // Add new result
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
   const resultDiv = document.createElement('div');
@@ -4291,28 +4397,6 @@ function stopToolTicker(div) {
 
 // =============================================================================
 // RoundRenderer — owns ALL per-round render state for one streaming exchange.
-// =============================================================================
-// One instance per sendSingle call. The dispatch layer (dispatchAgentEvent
-// below) is the ONLY caller of its public methods; it does not touch render
-// state directly. Lifecycle, matching the flow-chart event labels:
-//   r = new RoundRenderer(host, convMessages)
-//   r.startRound()                              // E1  round_start
-//   r.applyDelta(ev.delta)                      // E2  delta
-//   r.endRound()                                // E3  round_end
-//   r.bindMessage(msg)                          // E4  message_added
-//   r.markToolStarted(tc)                       // E5  tool_started
-//   r.finalize()                                // F2  always, from finally
-//  * Bubble DOM lives in this.host only.
-//  * drainTick is the ONLY writer of tool-arg text during a round; applyDelta
-//    just enqueues into toolPending[i]. This is the structural reason the
-//    typewriter can't be "skipped" by a fast-arriving delta.
-//  * startRound() and finalize() share one private flush path
-//    (_flushAllPending) so a fast tool that fires tool_result → next
-//    round_start before the typewriter has finished cannot strand the prior
-//    bubble mid-arg.
-//  * finalize() is idempotent and safe to call from any finally regardless
-//    of where the round/tool cycle left off.
-// =============================================================================
 class RoundRenderer {
   constructor(host, convMessages) {
     this.host = host;
@@ -4351,6 +4435,44 @@ class RoundRenderer {
     this.toolCalls.length = 0;
     this.toolCallEls.length = 0;
     this.toolDisplayed.length = 0;
+    this.toolPending.length = 0;
+    this.toolsShouldClose = false;
+  }
+
+  applyDelta(delta) {
+    if (!delta) return;
+    if (delta.content) this._appendContent(delta.content);
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
+    }
+  }
+
+  endRound() {
+    // Don't remove the cursor here — the typewriter may still be revealing
+    // text, and yanking the cursor mid-stream looks jumpy. drainTick
+    // (and finalize on hard exit) handle cursor removal once pending hits 0.
+    this.toolsShouldClose = true;
+    this._scheduleDrain();
+    // Remove the assistant bubble entirely if no text was ever streamed
+    // (round contained only tool calls). Checked against `content` not
+    // `displayed` because the SW has finished emitting deltas by now —
+    // any text that's going to arrive has already arrived.
+    if (this.reply && (!this.content || !this.content.trim())) {
+      this.reply.remove();
+      this.reply = null;
+      this.cursor = null;
+    }
+  }
+
+  bindMessage(msg) {
+    this.convMessages.push(msg);
+    if (msg.role === 'assistant') {
+      if (this.reply) bindBubble(this.reply, msg);
+      for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
+    } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
+      bindBubble(this.pendingToolResultDiv, msg);
+      this.pendingToolResultDiv = null;
+    }
   }
 
   markToolStarted(tc) {
@@ -4538,8 +4660,14 @@ class RoundRenderer {
 
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
+      // Preserve existing tool result (tool-sep + tool-result) if any
+      const existingBox = expanded.querySelector('.tool-box');
+      const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
+      const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
       expanded.innerHTML = '';
       expanded.appendChild(box);
+      if (existingSep) box.appendChild(existingSep);
+      if (existingResult) box.appendChild(existingResult);
     }
   }
 
@@ -4853,7 +4981,6 @@ function refreshWelcome() {
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
-  else if (localProxyMode === 'connected') parts.push('local proxy');
   if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
   const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
@@ -5230,39 +5357,21 @@ async function processQueueFor(stream) {
 
 // ============================================================
 // LLM streaming via Service Worker — sibling sandpie.js owns the
-// upstream fetch + buffered SSE drain. The page just issues a normal
-// fetch to a sentinel path the SW intercepts. Why a SW instead of a
-// dedicated Web Worker:
-//   * Dedicated workers freeze WITH the page (Chrome's energy-saver
-//     freezing suspends task execution including network event handlers).
-//     When the tab unfreezes the in-flight stream is often dead — no
-//     bytes were read, the upstream's idle timer fired, FIN never
-//     propagated cleanly. The Web Worker version had a watchdog to
-//     retry past this, but at the cost of restarting the completion.
-//   * Service workers have a separate lifecycle — they're explicitly
-//     exempt from freezing while a fetch handler is in flight, so a
-//     mid-stream tab freeze of 1-2 minutes is survivable: the SW keeps
-//     draining bytes into an in-memory buffer, and the page picks up
-//     where it left off when it unfreezes.
-//   * Bonus: page-side code is simpler. No postMessage protocol, no
-//     requestId multiplex — just `fetch(SW_STREAM_PATH, { body })`
-//     and read the response body like any other SSE stream.
-// ============================================================
-
-// Same-origin path the SW intercepts. Relative resolution puts it under
-// the SW's scope (the directory containing sandpie.js).
 const SW_STREAM_PATH = './sandpie-stream';
 
 // Register the SW. Two requirements that have to coexist:
+//
 //   1. FAST in the common case. Unregister-and-reinstall on every page load
 //      pays the SW install cost (importScripts of ~1MB pyodide.asm.js) every
 //      time, which makes the page feel slow even though OPFS reads aren't
 //      slow. Idempotent register() is a no-op when the SW is already
 //      installed at the same URL — no install, no Pyodide reparse, fast.
+//
 //   2. RELIABLE in the failure case. If the page comes up uncontrolled
 //      (hard refresh, a stale SW from the sandpie-sw.js rename, weird
 //      claim state), we have to recover — otherwise /sandpie-agent fetches
 //      404 against the network and the user sees nothing happen.
+//
 // Strategy: try the fast path first. If it ends with no controller, fall
 // back to the heavy unregister-and-reinstall which forces a fresh activate
 // (and therefore clients.claim, which fires controllerchange).
@@ -5294,21 +5403,29 @@ let _swReady = (async () => {
   // the install cost; subsequent reloads stay on the fast path.
   if (!navigator.serviceWorker.controller) {
     console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
+    await reg.unregister();
+    reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise(resolve => {
+        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+      });
+    }
+  }
+
+  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
+  return reg;
+})();
+_swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
+
+// =============================================================================
+// sendSingle — orchestrates ONE round-trip with the agent loop.
 async function sendSingle(text, stream) {
   // [R1] Pre-flight
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  // Request notification permission on first send (one-time prompt)
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('[sandpie] Notification permission granted');
-      }
-    });
-  }
-
   const { id: convId, messages: convMessages, host } = stream;
 
   // [U-tail] Persist + render the user message before kicking off the round.
@@ -5351,6 +5468,29 @@ async function sendSingle(text, stream) {
     dispatchAgentEvent(ev, renderer, host);
   };
 
+  try {
+    // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
+    const res = await fetch('./sandpie-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
+      return;
+    }
+    // [R3 → E*] Drain the NDJSON stream into the renderer.
+    await readAgentEvents(res.body, dispatch);
+    // [R3.5] Stream ended without `agent_done`. SW likely died — Pyodide
+    // WASM aborts (memory access, out-of-bounds, abort()) terminate the
+    // whole SW thread, so our SW-side try/catch never runs. Surface a
+    // clear bubble so the user knows what happened and that retry will
+    // recover (browsers spawn a fresh SW for the next fetch event).
+    if (!agentDoneSeen && !wasAborted) {
+      const trigger = lastInFlightTool
+        ? ` while running \`${lastInFlightTool}\``
         : '';
       addMsg('err',
         `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
@@ -5366,8 +5506,7 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring
-    console.log('[sandpie] Finally block reached');
+    // [F1] Tear down abort wiring.
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
     // [F2] Flush any in-flight typewriter so no bubble outlives the stream
@@ -5378,28 +5517,10 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Show notification if permission granted and not aborted
-    // Show notification if permission granted, page is hidden, and not aborted
-    console.log('[sandpie] Completion check:', { 
-      wasAborted, 
-      permission: Notification.permission, 
-      hidden: document.hidden,
-      hasNotificationAPI: 'Notification' in window 
-    });
-    if (!wasAborted && Notification.permission === 'granted') {
-      console.log('[sandpie] Showing notification...');
-      const notif = new Notification('sandpie', {
-        body: 'Conversation complete',
-        icon: '/sdk/icon-192.png',
-        tag: 'sandpie-conversation'
-      });
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-    } else {
-      console.log('[sandpie] Notification skipped:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
-    }
+    // [F6] System notification on completion. The actual show path lives in
+    // modules/notifications.js — see that module for the SW-vs-page-fallback
+    // logic and why mobile requires the SW route.
+    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
@@ -5687,6 +5808,7 @@ function dispatchAgentEvent(ev, renderer, host) {
 
   messages.addEventListener('scroll', onScroll, { passive: true });
 
+  // Initial run
   updateTargets();
   tick();
 })();
@@ -5697,6 +5819,7 @@ function dispatchAgentEvent(ev, renderer, host) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function setTheme(name) {
+  // Update chips
   document.querySelectorAll('#themePresets .chip').forEach(c => {
     c.classList.toggle('active', c.dataset.preset === name);
   });
