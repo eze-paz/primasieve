@@ -1395,6 +1395,7 @@ window.addEventListener('message', e => {
 
 </script>
   <script src="modules/images.js"></script>
+  <script src="modules/notifications.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -1485,6 +1486,14 @@ window.addEventListener('message', e => {
     </div>
   </details>
 
+  <details class="service" id="notifSection">
+    <summary>Notifications <span class="status-dot" id="notifDot"></span></summary>
+    <div class="service-body">
+      <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
+      <button type="button" class="ghost" id="notifEnableBtn" onclick="SandpieNotifications.toggle()">Enable notifications</button>
+      <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+    </div>
+  </details>
   <details class="service" id="themeSection">
     <summary>Theme</summary>
     <div class="service-body">
@@ -1575,7 +1584,7 @@ window.addEventListener('message', e => {
 //   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
 //       <script> runs.
 //   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
-//       localProxyMode, providers, ... .
+//       providers, ... .
 //   P2  navigator.serviceWorker.register('./sandpie.js'); _swReady waits
 //       for controllerchange so first /sandpie-agent POST is intercepted.
 //   P3  init() → loadProviders, restore active conv, mountConv,
@@ -2966,7 +2975,6 @@ RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual co
 
 The artifact renders as a live iframe below the message and persists across reloads.
 Any file type works: .html (full page), .svg, .png, .jpg, .csv.
-IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call show_artifact to inject it into chat.
 Use show_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
 
 Examples:
@@ -4851,8 +4859,13 @@ class RoundRenderer {
 
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
+      // Preserve any existing tool-box (which contains the tool result)
+      const existingBox = expanded.querySelector('.tool-box');
       expanded.innerHTML = '';
       expanded.appendChild(box);
+      if (existingBox) {
+        expanded.appendChild(existingBox);
+      }
     }
   }
 
@@ -5166,7 +5179,6 @@ function refreshWelcome() {
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
-  else if (localProxyMode === 'connected') parts.push('local proxy');
   if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
   const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
@@ -5645,15 +5657,6 @@ async function sendSingle(text, stream) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
-  // Request notification permission on first send (one-time prompt)
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('[sandpie] Notification permission granted');
-      }
-    });
-  }
-
   const { id: convId, messages: convMessages, host } = stream;
 
   // [U-tail] Persist + render the user message before kicking off the round.
@@ -5734,8 +5737,7 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring
-    console.log('[sandpie] Finally block reached');
+    // [F1] Tear down abort wiring.
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
     // [F2] Flush any in-flight typewriter so no bubble outlives the stream
@@ -5746,28 +5748,10 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // Show notification if permission granted and not aborted
-    // Show notification if permission granted, page is hidden, and not aborted
-    console.log('[sandpie] Completion check:', { 
-      wasAborted, 
-      permission: Notification.permission, 
-      hidden: document.hidden,
-      hasNotificationAPI: 'Notification' in window 
-    });
-    if (!wasAborted && Notification.permission === 'granted') {
-      console.log('[sandpie] Showing notification...');
-      const notif = new Notification('sandpie', {
-        body: 'Conversation complete',
-        icon: '/sdk/icon-192.png',
-        tag: 'sandpie-conversation'
-      });
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-    } else {
-      console.log('[sandpie] Notification skipped:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
-    }
+    // [F6] System notification on completion. The actual show path lives in
+    // modules/notifications.js — see that module for the SW-vs-page-fallback
+    // logic and why mobile requires the SW route.
+    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
