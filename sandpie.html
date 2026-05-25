@@ -4859,13 +4859,14 @@ class RoundRenderer {
 
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
-      // Preserve any existing tool-box (which contains the tool result)
+      // Preserve existing tool result (tool-sep + tool-result) if any
       const existingBox = expanded.querySelector('.tool-box');
+      const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
+      const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
       expanded.innerHTML = '';
       expanded.appendChild(box);
-      if (existingBox) {
-        expanded.appendChild(existingBox);
-      }
+      if (existingSep) box.appendChild(existingSep);
+      if (existingResult) box.appendChild(existingResult);
     }
   }
 
