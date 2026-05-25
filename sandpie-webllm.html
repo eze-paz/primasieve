@@ -726,7 +726,6 @@
     margin-left: 48px;
   }
   
-  }
   @keyframes chromaShift {
     0% { opacity: 0; transform: translateX(0); }
     15% { opacity: 0.9; transform: translateX(-3px); }
@@ -1395,8 +1394,6 @@ window.addEventListener('message', e => {
 
 </script>
   <script src="modules/images.js"></script>
-  <script src="modules/notifications.js"></script>
-  <script type="module" src="modules/webllm.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -1438,27 +1435,10 @@ window.addEventListener('message', e => {
     <div class="modal-content">
       <h3>Edit provider</h3>
       <input id="modalName" autocomplete="off" placeholder="Name (e.g. Main, Backup, Local proxy)">
-      <div class="row" style="gap:0.75rem; margin: 0.25rem 0; font-size:0.85rem;">
-        <label style="display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
-          <input type="radio" name="modalType" value="openai" onchange="onProviderTypeChange()" checked> OpenAI-compatible
-        </label>
-        <label style="display:flex; align-items:center; gap:0.35rem; cursor:pointer;">
-          <input type="radio" name="modalType" value="webllm" onchange="onProviderTypeChange()"> WebLLM (in-browser)
-        </label>
-      </div>
-      <div id="modalOpenAIFields">
-        <input id="modalEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-        <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
-        <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
-        <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
-      </div>
-      <div id="modalWebLLMFields" style="display:none;">
-        <select id="modalWebLLMModel" onchange="onWebLLMModelChange()" style="width:100%; padding:0.45rem 0.625rem; background:var(--sp-panel); color:var(--sp-text); border:1px solid var(--sp-border); border-radius:4px;">
-          <option value="">— pick a model —</option>
-        </select>
-        <input id="modalWebLLMCustom" autocomplete="off" placeholder="Custom MLC model ID (e.g. Llama-3.1-8B-Instruct-q4f16_1-MLC)" style="display:none; margin-top:0.375rem;">
-        <p style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;">Runs entirely in your browser via WebGPU. First use downloads the model (~0.5–5 GB depending on size); subsequent loads are cached.</p>
-      </div>
+      <input id="modalEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
+      <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
+      <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
       <div class="modal-actions">
         <button onclick="saveProviderModal()">Save</button>
         <button class="ghost" onclick="closeProviderModal()">Cancel</button>
@@ -1504,14 +1484,6 @@ window.addEventListener('message', e => {
     </div>
   </details>
 
-  <details class="service" id="notifSection">
-    <summary>Notifications <span class="status-dot" id="notifDot"></span></summary>
-    <div class="service-body">
-      <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
-      <button type="button" class="ghost" id="notifEnableBtn" onclick="SandpieNotifications.toggle()">Enable notifications</button>
-      <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
-    </div>
-  </details>
   <details class="service" id="themeSection">
     <summary>Theme</summary>
     <div class="service-body">
@@ -1602,7 +1574,7 @@ window.addEventListener('message', e => {
 //   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
 //       <script> runs.
 //   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
-//       providers, ... .
+//       localProxyMode, providers, ... .
 //   P2  navigator.serviceWorker.register('./sandpie.js'); _swReady waits
 //       for controllerchange so first /sandpie-agent POST is intercepted.
 //   P3  init() → loadProviders, restore active conv, mountConv,
@@ -1623,7 +1595,7 @@ window.addEventListener('message', e => {
 // ONE ROUND — PAGE SIDE                                           (this file)
 // ─────────────────────────────────────────────────────────────────────────────
 //   R1  sendSingle builds config: { url, headers, model,
-//       systemPrompt: buildSystemPrompt(), messages, tools: toolDefs(),
+//       systemPrompt: buildSystemPrompt(), messages, tools: supportsToolCalling($("model").value) ? toolDefs() : undefined,
 //       proxyBase, origin, dbxTokens, convId }.
 //   R2  await _swReady; POST ./sandpie-agent with the config as body.
 //   R3  Read response body line-by-line, JSON.parse each NDJSON line, dispatch
@@ -1856,22 +1828,12 @@ function getActiveProvider() {
 
 function applyActiveProvider() {
   const p = getActiveProvider();
-  // WebLLM providers don't have endpoint/apiKey/proxy — only model (the MLC id).
-  // We still write through to the same UI fields so sendSingle's pre-flight
-  // sees a non-empty model, and updateRoutingHint can reflect the in-browser
-  // status instead of an HTTP endpoint.
-  $('endpoint').value = p ? (p.endpoint || '') : '';
-  $('model').value = p ? (p.model || '') : '';
-  $('apiKey').value = p ? (p.apiKey || '') : '';
-  $('proxyUrl').value = p ? (p.proxyUrl || '') : '';
+  $('endpoint').value = p ? p.endpoint : '';
+  $('model').value = p ? p.model : '';
+  $('apiKey').value = p ? p.apiKey : '';
+  $('proxyUrl').value = p ? p.proxyUrl : '';
   updateRoutingHint();
   refreshAiDot();
-}
-
-/** True when the active provider is a WebLLM (in-browser) provider. */
-function isWebLLMActive() {
-  const p = getActiveProvider();
-  return !!(p && p.type === 'webllm');
 }
 
 function renderChips() {
@@ -1914,29 +1876,11 @@ function activateProvider(id) {
 function openProviderModal(providerId = null) {
   _editingProviderId = providerId;
   const p = providerId ? _providers.find(x => x.id === providerId) : null;
-  const type = p ? (p.type || 'openai') : 'openai';
   $('modalName').value = p ? (p.name || p.model || '') : '';
-  $('modalEndpoint').value = p ? (p.endpoint || '') : '';
-  $('modalModel').value = p ? (p.model || '') : '';
-  $('modalApiKey').value = p ? (p.apiKey || '') : '';
-  $('modalProxyUrl').value = p ? (p.proxyUrl || '') : '';
-
-  // Type radio + WebLLM dropdown state
-  const radios = document.querySelectorAll('input[name="modalType"]');
-  for (const r of radios) r.checked = (r.value === type);
-  populateWebLLMModels();
-  if (type === 'webllm') {
-    const known = SandpieWebLLM.DEFAULT_MODELS.some(m => m.id === (p && p.model));
-    $('modalWebLLMModel').value = known ? p.model : (p && p.model ? '__custom__' : '');
-    $('modalWebLLMCustom').value = known ? '' : ((p && p.model) || '');
-    $('modalWebLLMCustom').style.display = $('modalWebLLMModel').value === '__custom__' ? '' : 'none';
-  } else {
-    $('modalWebLLMModel').value = '';
-    $('modalWebLLMCustom').value = '';
-    $('modalWebLLMCustom').style.display = 'none';
-  }
-  onProviderTypeChange();
-
+  $('modalEndpoint').value = p ? p.endpoint : '';
+  $('modalModel').value = p ? p.model : '';
+  $('modalApiKey').value = p ? p.apiKey : '';
+  $('modalProxyUrl').value = p ? p.proxyUrl : '';
   $('providerModal').style.display = '';
 }
 
@@ -1945,81 +1889,21 @@ function closeProviderModal() {
   _editingProviderId = null;
 }
 
-/**
- * Show/hide the OpenAI vs WebLLM field groups based on the radio
- * selection. Called from the radio's onchange and on modal open.
- */
-function onProviderTypeChange() {
-  const sel = document.querySelector('input[name="modalType"]:checked');
-  const type = sel ? sel.value : 'openai';
-  $('modalOpenAIFields').style.display = type === 'openai' ? '' : 'none';
-  $('modalWebLLMFields').style.display = type === 'webllm' ? '' : 'none';
-}
-
-/**
- * The WebLLM model dropdown's curated entries are pulled from the
- * module; the trailing __custom__ option reveals a free-text input
- * for any other MLC model id the user wants to try.
- */
-function populateWebLLMModels() {
-  const sel = $('modalWebLLMModel');
-  if (!sel || sel.dataset.populated === '1') return;
-  // Wipe any stale options (the static placeholder is preserved by re-adding it).
-  sel.innerHTML = '';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = '— pick a model —';
-  sel.appendChild(placeholder);
-  for (const m of SandpieWebLLM.DEFAULT_MODELS) {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = m.label;
-    sel.appendChild(opt);
-  }
-  const custom = document.createElement('option');
-  custom.value = '__custom__';
-  custom.textContent = 'Custom (paste MLC id…)';
-  sel.appendChild(custom);
-  sel.dataset.populated = '1';
-}
-
-function onWebLLMModelChange() {
-  const sel = $('modalWebLLMModel');
-  $('modalWebLLMCustom').style.display = sel.value === '__custom__' ? '' : 'none';
-}
-
 function saveProviderModal() {
-  const sel = document.querySelector('input[name="modalType"]:checked');
-  const type = sel ? sel.value : 'openai';
   const name = $('modalName').value.trim();
+  const endpoint = $('modalEndpoint').value.trim();
+  const model = $('modalModel').value.trim();
+  const apiKey = $('modalApiKey').value.trim();
+  const proxyUrl = $('modalProxyUrl').value.trim();
 
-  let model = '';
-  let endpoint = '', apiKey = '', proxyUrl = '';
-
-  if (type === 'webllm') {
-    const picked = $('modalWebLLMModel').value;
-    model = picked === '__custom__'
-      ? $('modalWebLLMCustom').value.trim()
-      : picked.trim();
-    if (!model) {
-      alert('Pick a model (or paste a custom MLC id).');
-      return;
-    }
-  } else {
-    endpoint = $('modalEndpoint').value.trim();
-    model = $('modalModel').value.trim();
-    apiKey = $('modalApiKey').value.trim();
-    proxyUrl = $('modalProxyUrl').value.trim();
-    if (!endpoint || !model || !apiKey) {
-      alert('Endpoint, model, and API key are required.');
-      return;
-    }
+  if (!endpoint || !model || !apiKey) {
+    alert('Endpoint, model, and API key are required.');
+    return;
   }
 
   if (_editingProviderId) {
     const p = _providers.find(x => x.id === _editingProviderId);
     if (p) {
-      p.type = type;
       p.name = name || model;
       p.endpoint = endpoint;
       p.model = model;
@@ -2029,12 +1913,11 @@ function saveProviderModal() {
   } else {
     const newP = {
       id: 'provider_' + Date.now(),
-      type,
       name: name || model,
       endpoint,
       model,
       apiKey,
-      proxyUrl,
+      proxyUrl
     };
     _providers.push(newP);
     _activeProviderId = newP.id;
@@ -2203,15 +2086,8 @@ function dbxRoute(url) {
 }
 
 function updateRoutingHint() {
-  const hint = $('routingHint');
-  if (isWebLLMActive()) {
-    const model = ($('model').value || '').trim();
-    hint.textContent = model
-      ? `In-browser WebLLM · ${model}`
-      : 'In-browser WebLLM · pick a model';
-    return;
-  }
   const remote = ($('proxyUrl').value || '').trim();
+  const hint = $('routingHint');
   if (remote) hint.textContent = `Routing via ${remote.replace(/^https?:\/\//, '')}`;
   else if (isLocalhost) hint.textContent = 'Routing via local /proxy/';
   else hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
@@ -2229,11 +2105,7 @@ function setDot(id, state) {
   if (state) dot.classList.add(state);
 }
 function refreshAiDot() {
-  // WebLLM providers don't need endpoint/apiKey — just a model id is enough.
-  // Everything else still needs endpoint + apiKey before the dot lights up.
-  let ok;
-  if (isWebLLMActive()) ok = !!$('model').value.trim();
-  else ok = $('endpoint').value.trim() && $('apiKey').value.trim();
+  const ok = $('endpoint').value.trim() && $('apiKey').value.trim();
   setDot('aiDot', ok ? 'ok' : null);
 }
 function refreshProxyDot() {
@@ -3093,6 +2965,7 @@ RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual co
 
 The artifact renders as a live iframe below the message and persists across reloads.
 Any file type works: .html (full page), .svg, .png, .jpg, .csv.
+IPython.display() still works — it writes to /files/outputs/ automatically and prints the path; you still need to call show_artifact to inject it into chat.
 Use show_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
 
 Examples:
@@ -3224,8 +3097,20 @@ const toolDefs = () => Object.entries(tools)
   })
   .map(([name, t]) => ({
     type: 'function',
-    function: { name, description: t.description, parameters: t.parameters },
+    function: { name, description: t.description, parameters: t.parameters }
   }));
+// Check if a model supports tool calling (OpenAI-compatible tools API)
+function supportsToolCalling(modelId) {
+  const supported = [
+    'Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC',
+    'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC',
+    'Hermes-2-Pro-Mistral-7B-q4f16_1-MLC',
+    'Hermes-3-Llama-3.1-8B-q4f32_1-MLC',
+    'Hermes-3-Llama-3.1-8B-q4f16_1-MLC',
+  ];
+  return supported.includes(modelId);
+}
+
 
 // ============================================================
 // Context manifests — sandpie_*.md files anywhere in OPFS get auto-loaded
@@ -4081,18 +3966,6 @@ class SidePanel {
       if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
       this.flip();
     };
-
-// Check if a model supports tool calling (OpenAI-compatible tools API)
-function supportsToolCalling(modelId) {
-  const supported = [
-    'Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC',
-    'Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC',
-    'Hermes-2-Pro-Mistral-7B-q4f16_1-MLC',
-    'Hermes-3-Llama-3.1-8B-q4f32_1-MLC',
-    'Hermes-3-Llama-3.1-8B-q4f16_1-MLC',
-  ];
-  return supported.includes(modelId);
-}
     this.left.addEventListener('click',  onPanelClick(false));
     this.right.addEventListener('click', onPanelClick(true));
 
@@ -5304,6 +5177,7 @@ function refreshWelcome() {
   if (dbxTokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
+  else if (localProxyMode === 'connected') parts.push('local proxy');
   if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
   const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
@@ -5776,118 +5650,21 @@ _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 //   [F1..F5] finally       — abort cleanup, persistence, Dropbox sync
 //
 // All per-round render state is in the RoundRenderer constructed at the top.
-// ============================================================
-// WebLLM agent loop (page-side)
-// ============================================================
-// WebGPU isn't reliably available in service workers, so when the
-// active provider is WebLLM the inference and the surrounding agent
-// loop run here on the page instead of going through /sandpie-agent.
-// Event shape matches the SW path (round_start, delta, round_end,
-// tool_started, tool_result, message_added, agent_done, info, error)
-// so dispatchAgentEvent / RoundRenderer are reused untouched.
-//
-// Tool dispatch in WebLLM mode:
-//   run_python    → POST /sandpie-py (the SW's existing one-shot Python endpoint)
-//   show_artifact, load_image → inline OPFS existence check (matches the SW)
-//   fetch_file    → not supported in this variant; returns an error result
-async function runWebLLMTool(name, args) {
-  if (name === 'run_python') {
-    try {
-      const res = await fetch('./sandpie-py', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args),
-      });
-      if (!res.ok) return { result: 'Error: run_python returned HTTP ' + res.status };
-      const data = await res.json();
-      return { result: data && typeof data.result === 'string' ? data.result : '(no output)' };
-    } catch (e) {
-      return { result: 'Error invoking run_python: ' + ((e && e.message) || e) };
-    }
-  }
-  if (name === 'show_artifact') {
-    if (!args.path) return { result: 'Error: path is required.' };
-    const clean = String(args.path).replace(/^\/+/, '');
-    try { await opfs.readBytes(clean); return { result: 'artifact:' + clean }; }
-    catch (_) { return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' }; }
-  }
-  if (name === 'load_image') {
-    if (!args.path) return { result: 'Error: path is required.' };
-    const clean = String(args.path).replace(/^\/+/, '');
-    try { await opfs.readBytes(clean); return { result: 'image:' + clean }; }
-    catch (_) { return { result: 'Error: file not found: ' + clean }; }
-  }
-  if (name === 'fetch_file') {
-    return { result: 'Error: fetch_file is not supported in WebLLM mode in this variant. Use the standard sandpie for Dropbox-backed workflows.' };
-  }
-  return { result: 'Error: unknown tool ' + name };
-}
-
-async function runWebLLMAgent(config, ctx) {
-  const fullMessages = [config.systemPrompt, ...config.messages].filter(Boolean);
-  while (true) {
-    if (ctx.signal && ctx.signal.aborted) break;
-    ctx.emit({ type: 'round_start' });
-    let round;
-    try {
-      round = await SandpieWebLLM.streamRound({
-        model: config.model,
-        messages: fullMessages,
-        tools: (config.tools && supportsToolCalling(config.model)) ? config.tools : undefined,
-        signal: ctx.signal,
-        onProgress: (report) => {
-          const pct = typeof report.progress === 'number' ? Math.round(report.progress * 100) + '%' : '';
-          const txt = report.text || pct;
-          ctx.emit({ type: 'info', message: txt ? `Loading ${config.model}: ${txt}` : null });
-        },
-        onDelta: (delta) => ctx.emit({ type: 'delta', delta }),
-      });
-      ctx.emit({ type: 'info', message: null });  // clear any model-load notice
-    } catch (e) {
-      if (e && (e.name === 'AbortError' || (ctx.signal && ctx.signal.aborted))) throw e;
-      ctx.emit({ type: 'error', message: (e && e.message) || String(e) });
-      break;
-    }
-    ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
-    if (!round.tool_calls.length) {
-      if (round.content) {
-        const m = { role: 'assistant', content: round.content };
-        fullMessages.push(m);
-        ctx.emit({ type: 'message_added', message: m });
-      }
-      break;
-    }
-    const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
-    fullMessages.push(asstMsg);
-    ctx.emit({ type: 'message_added', message: asstMsg });
-    for (const tc of round.tool_calls) {
-      if (ctx.signal && ctx.signal.aborted) break;
-      let parsedArgs = {};
-      try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
-      ctx.emit({ type: 'tool_started', tc });
-      let toolOut;
-      try { toolOut = await runWebLLMTool(tc.function.name, parsedArgs); }
-      catch (e) { toolOut = { result: 'Error: ' + ((e && e.message) || e) }; }
-      ctx.emit({ type: 'tool_result', id: tc.id, result: toolOut.result });
-      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result };
-      fullMessages.push(toolMsg);
-      ctx.emit({ type: 'message_added', message: toolMsg });
-    }
-  }
-  ctx.emit({ type: 'agent_done' });
-}
-
 async function sendSingle(text, stream) {
-  // [R1] Pre-flight — WebLLM only needs a model; OpenAI-compat needs endpoint/model/apiKey.
-  if (isWebLLMActive()) {
-    if (!$('model').value.trim()) {
-      addMsg('err', 'Pick a WebLLM model in the provider settings first.', stream && stream.host);
-      return;
-    }
-  } else if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+  // [R1] Pre-flight
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
+  // Request notification permission on first send (one-time prompt)
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        console.log('[sandpie] Notification permission granted');
+      }
+    });
+  }
+
   const { id: convId, messages: convMessages, host } = stream;
 
   // [U-tail] Persist + render the user message before kicking off the round.
@@ -5931,40 +5708,33 @@ async function sendSingle(text, stream) {
   };
 
   try {
-    if (isWebLLMActive()) {
-      // [R2-WebLLM] Inference happens in this page (WebGPU isn't reliably
-      // available in service workers). dispatch is the same callback the
-      // SW path uses, so the renderer / event handling is unchanged.
-      await runWebLLMAgent(config, { emit: dispatch, signal: ctrl.signal });
-    } else {
-      // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
-      const res = await fetch('./sandpie-agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
-        return;
-      }
-      // [R3 → E*] Drain the NDJSON stream into the renderer.
-      await readAgentEvents(res.body, dispatch);
-      // [R3.5] Stream ended without `agent_done`. SW likely died — Pyodide
-      // WASM aborts (memory access, out-of-bounds, abort()) terminate the
-      // whole SW thread, so our SW-side try/catch never runs. Surface a
-      // clear bubble so the user knows what happened and that retry will
-      // recover (browsers spawn a fresh SW for the next fetch event).
-      if (!agentDoneSeen && !wasAborted) {
-        const trigger = lastInFlightTool
-          ? ` while running \`${lastInFlightTool}\``
-          : '';
-        addMsg('err',
-          `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
-          host,
-        );
-      }
+    // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
+    const res = await fetch('./sandpie-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
+      return;
+    }
+    // [R3 → E*] Drain the NDJSON stream into the renderer.
+    await readAgentEvents(res.body, dispatch);
+    // [R3.5] Stream ended without `agent_done`. SW likely died — Pyodide
+    // WASM aborts (memory access, out-of-bounds, abort()) terminate the
+    // whole SW thread, so our SW-side try/catch never runs. Surface a
+    // clear bubble so the user knows what happened and that retry will
+    // recover (browsers spawn a fresh SW for the next fetch event).
+    if (!agentDoneSeen && !wasAborted) {
+      const trigger = lastInFlightTool
+        ? ` while running \`${lastInFlightTool}\``
+        : '';
+      addMsg('err',
+        `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
+        host,
+      );
     }
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
@@ -5975,7 +5745,8 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring.
+    // [F1] Tear down abort wiring
+    console.log('[sandpie] Finally block reached');
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
     // [F2] Flush any in-flight typewriter so no bubble outlives the stream
@@ -5986,10 +5757,28 @@ async function sendSingle(text, stream) {
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // [F6] System notification on completion. The actual show path lives in
-    // modules/notifications.js — see that module for the SW-vs-page-fallback
-    // logic and why mobile requires the SW route.
-    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
+    // Show notification if permission granted and not aborted
+    // Show notification if permission granted, page is hidden, and not aborted
+    console.log('[sandpie] Completion check:', { 
+      wasAborted, 
+      permission: Notification.permission, 
+      hidden: document.hidden,
+      hasNotificationAPI: 'Notification' in window 
+    });
+    if (!wasAborted && Notification.permission === 'granted') {
+      console.log('[sandpie] Showing notification...');
+      const notif = new Notification('sandpie', {
+        body: 'Conversation complete',
+        icon: '/sdk/icon-192.png',
+        tag: 'sandpie-conversation'
+      });
+      notif.onclick = () => {
+        window.focus();
+        notif.close();
+      };
+    } else {
+      console.log('[sandpie] Notification skipped:', { wasAborted, permission: Notification.permission, hidden: document.hidden });
+    }
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
@@ -6032,3 +5821,344 @@ async function buildAgentConfig(convMessages) {
     systemPrompt: buildSystemPrompt(),
     messages: resolvedMessages,
     tools: supportsToolCalling($("model").value) ? toolDefs() : undefined,
+    origin: location.origin,
+    dbxTokens: dbxTokensSnap,
+  };
+}
+
+// [R3] Drain an NDJSON response body line-by-line, calling onEvent(parsed)
+// for each successfully-parsed line. Bad lines are logged and skipped so a
+// single malformed event can't kill the whole stream.
+async function readAgentEvents(body, onEvent) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let lineBuf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    lineBuf += decoder.decode(value, { stream: true });
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop() || '';  // last fragment may be incomplete; carry it forward
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try { onEvent(JSON.parse(line)); }
+      catch (e) { console.warn('[sandpie] bad event line:', line, e); }
+    }
+  }
+}
+
+// [E1..E8] Map an SW event to the renderer's method. Errors are surfaced as
+// info-bubbles in the host; everything else routes to RoundRenderer.
+function dispatchAgentEvent(ev, renderer, host) {
+  switch (ev.type) {
+    case 'round_start':   return renderer.startRound();
+    case 'delta':         return renderer.applyDelta(ev.delta);
+    case 'round_end':     return renderer.endRound();
+    case 'message_added': return renderer.bindMessage(ev.message);
+    case 'tool_started':  return renderer.markToolStarted(ev.tc);
+    case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
+    case 'agent_done':    return;
+    case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
+    case 'info': {
+      if (ev.message) {
+        if (!renderer._retryNotice) renderer._retryNotice = addMsg('info', ev.message, host);
+        else renderer._retryNotice.textContent = ev.message;
+      } else if (renderer._retryNotice) {
+        renderer._retryNotice.remove();
+        renderer._retryNotice = null;
+      }
+      return;
+    }
+  }
+}
+
+// handleSubmit() enqueues into the active conv's stream; processQueueFor(s)
+// drains that queue by repeatedly calling sendSingle(text, s).
+
+// === Welcome shield · v14 layered echo ===
+// Asymmetric jittered ring mesh, rebuilt with a new random seed every 2s.
+// At most three generations of the mesh coexist in the DOM at any time, each
+// running its own 6s lifecycle (fade in → shimmer → fade out). Rebuild is
+// skipped while #welcome is hidden so it costs nothing during normal chatting.
+(function () {
+  const svg = document.getElementById('welcomeShield');
+  if (!svg) return;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = 'http://www.w3.org/2000/svg';
+  const cx = 50, cy = 55;
+  const HEATER_SEGS = [
+    ['L', [50, 8],   [90, 22]],
+    ['L', [90, 22],  [90, 58]],
+    ['Q', [90, 58],  [50, 114], [90, 100]],
+    ['Q', [50, 114], [10, 58],  [10, 100]],
+    ['L', [10, 58],  [10, 22]],
+    ['L', [10, 22],  [50, 8]],
+  ];
+  function segLength(s) {
+    if (s[0] === 'L') return Math.hypot(s[2][0]-s[1][0], s[2][1]-s[1][1]);
+    let L = 0, prev = s[1];
+    for (let i = 1; i <= 32; i++) {
+      const t = i/32, u = 1-t;
+      const x = u*u*s[1][0] + 2*u*t*s[3][0] + t*t*s[2][0];
+      const y = u*u*s[1][1] + 2*u*t*s[3][1] + t*t*s[2][1];
+      L += Math.hypot(x-prev[0], y-prev[1]); prev = [x, y];
+    }
+    return L;
+  }
+  const SEG_LENS = HEATER_SEGS.map(segLength);
+  const TOTAL_LEN = SEG_LENS.reduce((a,b)=>a+b, 0);
+  function perimAt(target) {
+    let acc = 0;
+    for (let i = 0; i < HEATER_SEGS.length; i++) {
+      if (acc + SEG_LENS[i] >= target || i === HEATER_SEGS.length - 1) {
+        const t = (target - acc) / SEG_LENS[i], u = 1 - t, s = HEATER_SEGS[i];
+        if (s[0] === 'L') return [s[1][0] + (s[2][0]-s[1][0])*t, s[1][1] + (s[2][1]-s[1][1])*t];
+        return [u*u*s[1][0] + 2*u*t*s[3][0] + t*t*s[2][0],
+                u*u*s[1][1] + 2*u*t*s[3][1] + t*t*s[2][1]];
+      }
+      acc += SEG_LENS[i];
+    }
+  }
+  function samplePerim(N) { const p=[]; for (let k=0;k<N;k++) p.push(perimAt((k/N)*TOTAL_LEN)); return p; }
+  function buildJitteredRings(N, scales, seed, jitter) {
+    let s = seed || 1;
+    const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const outer = samplePerim(N);
+    return scales.map((scale, ri) => outer.map(([x, y]) => {
+      let nx = cx + (x - cx) * scale, ny = cy + (y - cy) * scale;
+      if (ri > 0) { nx += (rng() - 0.5) * jitter; ny += (rng() - 0.5) * jitter; }
+      return [nx, ny];
+    }));
+  }
+  function ringsToTris(rings, N) {
+    const tris = [];
+    for (let r = 0; r < rings.length - 1; r++) {
+      for (let i = 0; i < N; i++) {
+        const j = (i+1) % N;
+        tris.push([rings[r][i], rings[r][j], rings[r+1][j]]);
+        tris.push([rings[r][i], rings[r+1][j], rings[r+1][i]]);
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      const j = (i+1) % N;
+      tris.push([rings[rings.length-1][i], rings[rings.length-1][j], [cx, cy]]);
+    }
+    return tris;
+  }
+  function triCentroid(t) { return [(t[0][0]+t[1][0]+t[2][0])/3, (t[0][1]+t[1][1]+t[2][1])/3]; }
+  function triPath(t) {
+    return 'M ' + t[0][0].toFixed(2) + ' ' + t[0][1].toFixed(2) +
+           ' L ' + t[1][0].toFixed(2) + ' ' + t[1][1].toFixed(2) +
+           ' L ' + t[2][0].toFixed(2) + ' ' + t[2][1].toFixed(2) + ' Z';
+  }
+
+  function rebuildShield() {
+    // Cheap skip while the welcome card is hidden (during an active chat).
+    const welcome = document.getElementById('welcome');
+    if (!welcome || welcome.style.display === 'none' || welcome.offsetParent === null) return;
+    const hosts = svg.querySelectorAll('.mesh-host');
+    if (hosts.length >= 3) hosts[0].remove();
+    const host = document.createElementNS(NS, 'g');
+    host.setAttribute('class', 'mesh-host');
+    host.setAttribute('clip-path', 'url(#welcome-clip)');
+    svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
+    const N = 14;
+    const seed = Math.floor(Math.random() * 1e6) + 1;
+    const tris = ringsToTris(buildJitteredRings(N, [1.0, 0.62, 0.28], seed, 6), N);
+    tris.sort((a, b) => Math.atan2(triCentroid(a)[1]-cy, triCentroid(a)[0]-cx) -
+                         Math.atan2(triCentroid(b)[1]-cy, triCentroid(b)[0]-cx));
+    tris.forEach((tri, i) => {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', triPath(tri));
+      p.setAttribute('class', 'dtri-layered');
+      p.style.setProperty('--shim-delay', (i / tris.length * 3).toFixed(2) + 's');
+      host.appendChild(p);
+    });
+  }
+
+  if (reduceMotion) {
+    // Single static mesh, no shimmer, no rebuild loop.
+    const host = document.createElementNS(NS, 'g');
+    host.setAttribute('clip-path', 'url(#welcome-clip)');
+    svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
+    const N = 14;
+    const tris = ringsToTris(buildJitteredRings(N, [1.0, 0.62, 0.28], 1337, 4), N);
+    tris.forEach(tri => {
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', triPath(tri));
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', 'currentColor');
+      p.setAttribute('stroke-width', '0.4');
+      p.setAttribute('stroke-opacity', '0.3');
+      host.appendChild(p);
+    });
+  } else {
+    rebuildShield();
+    setInterval(rebuildShield, 2000);
+  }
+})();
+
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCROLL PARALLAX — clone offset with momentum/inertia
+// ═══════════════════════════════════════════════════════════════════════
+(function() {
+  const messages = document.getElementById('messages');
+  if (!messages) return;
+
+  const state = new Map(); // msg -> { current, target }
+  let animating = false;
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function updateTargets() {
+    const parallaxMsgs = messages.querySelectorAll('.msg.user');
+    const vh = window.innerHeight;
+    const center = vh / 2;
+
+    for (const msg of parallaxMsgs) {
+      const rect = msg.getBoundingClientRect();
+      const msgCenter = rect.top + rect.height / 2;
+      const ny = (msgCenter - center) / (vh / 2);
+      const target = clamp(ny, -0.6, 0.6);
+
+      if (!state.has(msg)) {
+        state.set(msg, { current: target, target: target });
+      } else {
+        state.get(msg).target = target;
+      }
+    }
+  }
+
+  function tick() {
+    let moving = false;
+
+    for (const [msg, s] of state) {
+      // Lerp current toward target (12% per frame = ~0.5s settle time)
+      const diff = s.target - s.current;
+      if (Math.abs(diff) > 0.001) {
+        s.current += diff * 0.12;
+        moving = true;
+      } else {
+        s.current = s.target;
+      }
+      msg.style.setProperty('--py', s.current.toFixed(3));
+    }
+
+    if (moving) {
+      requestAnimationFrame(tick);
+    } else {
+      animating = false;
+    }
+  }
+
+  function onScroll() {
+    updateTargets();
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(tick);
+    }
+  }
+
+  messages.addEventListener('scroll', onScroll, { passive: true });
+
+  // Initial run
+  updateTargets();
+  tick();
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// THEME SYSTEM — preset + custom color picker
+// ═══════════════════════════════════════════════════════════════════════
+
+function setTheme(name) {
+  // Update chips
+  document.querySelectorAll('#themePresets .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.preset === name);
+  });
+
+  const customPanel = document.getElementById('customColors');
+  if (name === 'custom') {
+    customPanel.style.display = 'flex';
+    applyCustomTheme();
+  } else {
+    customPanel.style.display = 'none';
+    if (name === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+  localStorage.setItem('sandpie-theme', name);
+}
+
+function applyCustomTheme() {
+  const accent = document.getElementById('customAccent').value;
+  const bg = document.getElementById('customBg').value;
+  const surface = document.getElementById('customSurface').value;
+  const text = document.getElementById('customText').value;
+
+  // Parse hex to rgb for rgba variants
+  const r = parseInt(accent.slice(1,3), 16);
+  const g = parseInt(accent.slice(3,5), 16);
+  const b = parseInt(accent.slice(5,7), 16);
+
+  document.documentElement.style.setProperty('--sp-bg', bg);
+  document.documentElement.style.setProperty('--sp-surface', surface);
+  document.documentElement.style.setProperty('--sp-accent', accent);
+  document.documentElement.style.setProperty('--sp-accent-dim', `rgba(${r},${g},${b},0.35)`);
+  document.documentElement.style.setProperty('--sp-text', text);
+  document.documentElement.style.setProperty('--sp-text-dim', text);
+
+  localStorage.setItem('sandpie-custom', JSON.stringify({accent, bg, surface, text}));
+}
+
+function resetCustomTheme() {
+  document.getElementById('customAccent').value = '#58a6ff';
+  document.getElementById('customBg').value = '#0d1117';
+  document.getElementById('customSurface').value = '#161b22';
+  document.getElementById('customText').value = '#e6edf3';
+  localStorage.removeItem('sandpie-custom');
+  setTheme('midnight');
+}
+
+// Load saved theme on init
+(function() {
+  const saved = localStorage.getItem('sandpie-theme') || 'midnight';
+  setTheme(saved);
+  const custom = localStorage.getItem('sandpie-custom');
+  if (custom) {
+    try {
+      const c = JSON.parse(custom);
+      document.getElementById('customAccent').value = c.accent;
+      document.getElementById('customBg').value = c.bg;
+      document.getElementById('customSurface').value = c.surface;
+      document.getElementById('customText').value = c.text;
+    } catch(e) {}
+  }
+  // Restore desktop sidebar collapse state
+  if (localStorage.getItem('sandpie-sidebar-collapsed')) {
+    const aside = document.querySelector('aside');
+    if (aside) {
+      aside.classList.add('collapsed');
+      document.body.classList.add('sidebar-collapsed');
+    }
+  }
+})();
+</script>
+<script>
+// Suppress automatic PWA install prompt — user can still install via menu
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  console.log('[sandpie] PWA install prompt suppressed (available via menu)');
+});
+</script>
+</body>
+</html>
