@@ -555,6 +555,8 @@ async function runTool(name, args, ctx) {
     case 'fetch_file':    return tool_fetch_file(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
+    case 'write_file':    return tool_write_file(args, ctx);   // ← add
+    case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
     default:              return { result: 'Error: unknown tool ' + name };
   }
 }
@@ -827,4 +829,43 @@ function jsonErr(status, message) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+async function tool_write_file({ path, content }) {
+  if (!path) return { result: 'Error: path is required.' };
+  const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  try {
+    const root = await opfsRoot();
+    // Check existence
+    const parts = norm.split('/').filter(Boolean);
+    const name = parts.pop();
+    let dir = root;
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: false }).catch(() => null) || await (async () => { throw new Error('checking'); })();
+    try {
+      await dir.getFileHandle(name);
+      return { result: `File already exists: ${norm}. Use edit_file to modify it.` };
+    } catch (_) { /* doesn't exist — good */ }
+  } catch (_) { /* parent dir doesn't exist yet — that's fine, write creates it */ }
+  try {
+    await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
+    return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
+  } catch (e) { return { result: `Write failed: ${e.message}` }; }
+}
+
+async function tool_edit_file({ path, old_str, new_str = '' }) {
+  if (!path)    return { result: 'Error: path is required.' };
+  if (!old_str) return { result: 'Error: old_str is required.' };
+  const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  let current;
+  try {
+    current = new TextDecoder().decode(await opfsReadBytes(norm));
+  } catch { return { result: `File not found: ${norm}` }; }
+  const count = current.split(old_str).length - 1;
+  if (count === 0) return { result: `old_str not found in ${norm}. Read the file first to verify exact content.` };
+  if (count > 1)  return { result: `old_str matches ${count} times in ${norm} — make it more specific.` };
+  try {
+    const updated = current.replace(old_str, new_str);
+    await opfsWriteBytes(norm, new TextEncoder().encode(updated));
+    return { result: `Edited: ${norm}` };
+  } catch (e) { return { result: `Edit failed: ${e.message}` }; }
 }
