@@ -2945,7 +2945,10 @@ async function manualResync() {
 // ============================================================
 const tools = {
   run_python: {
-    description: `Execute Python via Pyodide. Working dir is /files/ (persistent OPFS). Use bare relative paths.
+    description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
+
+Scripts must already exist in OPFS, typically under scripts/. Use write_file to create
+a script first if it doesn't exist yet.
 
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
 Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
@@ -2955,19 +2958,16 @@ HTTP: pyodide.http.pyfetch (CORS). Non-CORS: pyfetch('/proxy/host/path').
 OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
 
 Examples:
-  list   → import os; print(os.listdir())
-  read   → print(open('f.txt').read())
-  write  → open('f.txt','w').write(text)
-  numpy  → import numpy as np; print(np.array([1,2,3]).mean())
-  pypi   → import micropip; await micropip.install('feedparser'); import feedparser
-  fetch  → from pyodide.http import pyfetch; r=await pyfetch('https://…'); print(await r.string())
-  html   → open('artifacts/out.html','w').write(html); show_artifact({"path":"artifacts/out.html"})`,
+  run      → {path: "scripts/random_numbers.py", args: ["5"]}
+  with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
+  numpy    → script imports numpy as np — prebuilt, no install needed
+  pypi     → script runs: import micropip; await micropip.install('feedparser')
+  html out → script writes artifacts/out.html, then show_artifact({"path":"artifacts/out.html"})`,
     parameters: {
       type: 'object',
       properties: {
-        code: { type: 'string', description: 'Inline Python source. Mutually exclusive with path. Use for one-shot snippets or while iterating on a script you are about to save.' },
-        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args]. PREFERRED for anything you want to run more than once — save once to /files/scripts/<name>.py, then invoke by path on every later call.' },
-        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used. Ignored when code is used.' },
+        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
+        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
       },
     },
   },
@@ -3014,6 +3014,54 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
       }
     },
   },
+  write_file: {
+  description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      content: { type: 'string', description: 'Full file content' },
+    },
+    required: ['path', 'content'],
+  },
+  run: async ({ path, content }) => {
+    const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+    if (await opfs.exists(norm)) return `File already exists: ${norm}. Use edit_file to modify it.`;
+    try {
+      await opfs.write(norm, content);
+      await refreshFileList();
+      return `Created: ${norm} (${new Blob([content]).size} bytes)`;
+    } catch (e) { return `Write failed: ${e.message}`; }
+  },
+},
+
+edit_file: {
+  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      old_str: { type: 'string', description: 'Exact string to replace. Must match exactly once.' },
+      new_str: { type: 'string', description: 'Replacement string. Omit to delete old_str.' },
+    },
+    required: ['path', 'old_str'],
+  },
+  run: async ({ path, old_str, new_str = '' }) => {
+    const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+    let current;
+    try { current = await opfs.read(norm); }
+    catch { return `File not found: ${norm}`; }
+    const count = current.split(old_str).length - 1;
+    if (count === 0) return `old_str not found in ${norm}. Read the file first to verify exact content.`;
+    if (count > 1)  return `old_str matches ${count} times in ${norm} — make it more specific.`;
+    try {
+      const updated = current.replace(old_str, new_str);
+      await opfs.write(norm, updated);
+      await refreshFileList();
+      return `Edited: ${norm}`;
+    } catch (e) { return `Edit failed: ${e.message}`; }
+  },
+},
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
 
