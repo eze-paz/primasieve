@@ -2945,64 +2945,23 @@ async function manualResync() {
 // ============================================================
 const tools = {
   run_python: {
-    description: `Execute Python via Pyodide. The working directory is /files/ — this IS the user's persistent filesystem. Use bare relative paths (e.g. open('foo.txt')); they resolve under /files/. Anything written outside /files/ (including os.getcwd() defaults like /home/pyodide) is ephemeral and discarded after this call. Nested directories supported. Output via print(). Top-level await is supported.
+    description: `Execute Python via Pyodide. Working dir is /files/ (persistent OPFS). Use bare relative paths.
 
-PREFERRED WORKFLOW (IMPORTANT): Save reusable scripts to /files/scripts/<name>.py once, then invoke them via {path:"scripts/<name>.py", args:[...]} on every later call instead of re-pasting the same source. This is the right way to operate in sandpie — it's faster (lower token cost per call), persists across sessions, and gives you proper CLI-style sys.argv handling. Use inline {code:...} only for one-shot snippets (a list, a quick computation, file inspection) or while you're actively iterating on a script that you're about to save. If you find yourself pasting >20 lines, you should be saving it instead. Within a single session the Pyodide globals also persist between calls, so a function defined once can be called by name on later turns — but path/args is the cleanest pattern for anything you might want again next session.
+PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
+Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
 
-SCOPE — IMPORTANT: Pyodide is sandboxed to OPFS under /files/. Host filesystem paths (C:\\..., /Users/..., /home/...) ARE NOT ACCESSIBLE and will raise FileNotFoundError. Do NOT retry the same open() with a different path style after such a failure — for Dropbox cloud-only files use fetch_file.
+HTTP: pyodide.http.pyfetch (CORS). Non-CORS: pyfetch('/proxy/host/path').
 
-PACKAGES — IMPORTANT, READ THIS FIRST:
-• ~100 packages are PREBUILT for Pyodide (numpy, pandas, scipy, sympy, matplotlib, beautifulsoup4, lxml, regex, micropip, ...). Sandpie auto-loads them based on the \`import\` statements in your code, so plain \`import numpy as np\` Just Works on first call.
-• For ANY OTHER package (pure-Python wheels from PyPI), you must install it explicitly. Pattern:
-    import micropip                      # micropip itself is prebuilt — just import it
-    await micropip.install('feedparser') # name as on PyPI
-    import feedparser
-• If a first-time \`import\` fails with ModuleNotFoundError, that means it's NOT in the prebuilt set — fall back to micropip.install. Don't keep retrying the bare import.
-• Compiled C extensions that aren't in the prebuilt list cannot be installed. Pure-Python wheels only.
-
-HTTP via pyodide.http.pyfetch (subject to browser CORS). For non-CORS sites, route through \`/proxy/<host>/<path>\`.
-
-No raw sockets, no subprocess.
-
-CLOUD FILES — your working directory is /files/ (the user's persistent storage, mounted from OPFS; changes persist across runs and sync to Dropbox). Use plain relative paths: open('notes.txt'), os.listdir('.'), pathlib.Path('data.csv') — they all resolve under /files/. If you open() a file that's in the user's Dropbox but not yet locally hydrated, sandpie fetches it automatically and re-runs your code once — write code as if the file were already local. Files that don't exist anywhere raise a normal FileNotFoundError. os.listdir / glob only show locally-hydrated files; if the user mentions a filename you don't see, just open() it — auto-hydration handles the rest.
-
-RICH OUTPUT — to render HTML, plots, SVG, dataframes, images, or any visual content in the chat:
-  1. Write the output to /files/artifacts/ by default (unless the user specifies otherwise):
-       open('artifacts/chart.html', 'w').write(html_string)   # HTML page, can load CDN JS
-       fig.write_html('artifacts/plot.html')                   # Plotly / Bokeh etc.
-  2. Call show_artifact with the OPFS path (no leading slash):
-       show_artifact({ "path": "files/artifacts/chart.html" })
-
-The artifact renders as a live iframe below the message and persists across reloads.
-Any file type works: .html (full page), .svg, .png, .jpg, .csv.
-Use show_artifact whenever the user says "show", "artifact", "add into chat", "inject", "put in the DOM", or after writing any visual output.
+OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
 
 Examples:
-  list    →  import os; print(os.listdir())               # lists /files
-  read    →  print(open('notes.txt').read())
-  write   →  open('out.md','w').write(text)
-  edit    →  p='notes.txt'; open(p,'w').write(open(p).read().replace('old','new'))
-  search  →  import re, glob
-             for f in glob.glob('**/*', recursive=True):
-                 if not __import__('os').path.isfile(f): continue
-                 hits = re.findall(r'TODO.*', open(f).read())
-                 if hits: print(f, hits)
-  numpy   →  import numpy as np                           # prebuilt, auto-loaded
-             print(np.array([1,2,3]).mean())
-  pypi    →  import micropip
-             await micropip.install('feedparser')
-             import feedparser
-             print(feedparser.parse('https://news.ycombinator.com/rss').entries[0].title)
-  fetch   →  from pyodide.http import pyfetch
-             r = await pyfetch('https://httpbin.org/html')
-             print((await r.string())[:200])
-  noCORS  →  r = await pyfetch('/proxy/example.com/')     # site lacks CORS: route via local proxy
-             print((await r.string())[:200])
-  saved   →  # FIRST call (one time) — save the script:
-             #   {code: "import os; os.makedirs('scripts', exist_ok=True); open('scripts/score.py','w').write('import sys; print(sys.argv)')"}
-             # LATER calls — invoke it without re-pasting:
-             #   {path: "scripts/score.py", args: ["--day", "2026-05-08"]}
-             # The script sees sys.argv = ["scripts/score.py", "--day", "2026-05-08"].`,
+  list   → import os; print(os.listdir())
+  read   → print(open('f.txt').read())
+  write  → open('f.txt','w').write(text)
+  numpy  → import numpy as np; print(np.array([1,2,3]).mean())
+  pypi   → import micropip; await micropip.install('feedparser'); import feedparser
+  fetch  → from pyodide.http import pyfetch; r=await pyfetch('https://…'); print(await r.string())
+  html   → open('artifacts/out.html','w').write(html); show_artifact({"path":"artifacts/out.html"})`,
     parameters: {
       type: 'object',
       properties: {
@@ -3060,21 +3019,21 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
 
 Use this whenever:
 - The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
-- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to /files/
+- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
 
 The file must already exist in OPFS — write it first with run_python, then call this.
 Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
-Path is OPFS-relative — do NOT include a leading slash (e.g. "files/artifacts/chart.html").
+Path is OPFS-relative — do NOT include a leading slash (e.g. "artifacts/chart.html").
 
-Default output folder is /files/artifacts/ — use it unless the user specifies a different path.
+Default output folder is artifacts/ — use it unless the user specifies a different path.
 
 Typical flow:
   run_python: open('artifacts/chart.html', 'w').write(html)
-  show_artifact: { "path": "files/artifacts/chart.html" }`,
+  show_artifact: { "path": "artifacts/chart.html" }`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'OPFS path to the file (e.g. "files/artifacts/chart.html"). No leading slash. Default folder: files/artifacts/.' },
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "artifacts/chart.html"). No leading slash. Default folder: artifacts/.' },
       },
       required: ['path'],
     },
