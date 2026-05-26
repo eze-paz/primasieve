@@ -3024,15 +3024,6 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
     },
     required: ['path', 'content'],
   },
-  run: async ({ path, content }) => {
-    const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-    if (await opfs.exists(norm)) return `File already exists: ${norm}. Use edit_file to modify it.`;
-    try {
-      await opfs.write(norm, content);
-      await refreshFileList();
-      return `Created: ${norm} (${new Blob([content]).size} bytes)`;
-    } catch (e) { return `Write failed: ${e.message}`; }
-  },
 },
 
 edit_file: {
@@ -3045,21 +3036,6 @@ edit_file: {
       new_str: { type: 'string', description: 'Replacement string. Omit to delete old_str.' },
     },
     required: ['path', 'old_str'],
-  },
-  run: async ({ path, old_str, new_str = '' }) => {
-    const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-    let current;
-    try { current = await opfs.read(norm); }
-    catch { return `File not found: ${norm}`; }
-    const count = current.split(old_str).length - 1;
-    if (count === 0) return `old_str not found in ${norm}. Read the file first to verify exact content.`;
-    if (count > 1)  return `old_str matches ${count} times in ${norm} — make it more specific.`;
-    try {
-      const updated = current.replace(old_str, new_str);
-      await opfs.write(norm, updated);
-      await refreshFileList();
-      return `Edited: ${norm}`;
-    } catch (e) { return `Edit failed: ${e.message}`; }
   },
 },
   show_artifact: {
