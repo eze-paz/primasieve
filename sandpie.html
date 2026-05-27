@@ -3363,6 +3363,75 @@ async function refreshFileList() {
           addMsg('info', `Hydrated ${done}/${toHydrate.length} files.`);
           await refreshFileList();
         }});
+
+        menuItems.push({ label: 'Rename', action: async () => {
+          const newName = prompt('Enter new folder name:', it.name);
+          if (!newName || newName === it.name) return;
+          const { parts } = splitPath(it.fullKey);
+          parts.pop(); // remove old name
+          parts.push(newName);
+          const newPath = parts.join('/');
+          try {
+            const dir = await opfs.resolveDir(splitPath(it.fullKey).parts);
+            const newDir = await opfs.resolveDir(parts, { create: true });
+            // Move all contents
+            for await (const [name, handle] of dir.entries()) {
+              if (handle.kind === 'file') {
+                const bytes = await opfs.readBytes(it.fullKey + '/' + name);
+                await opfs.write(newPath + '/' + name, bytes);
+              } else {
+                await opfs.mkdir(newPath + '/' + name);
+                // Recursively move subdirectory contents
+                const subDir = await dir.getDirectoryHandle(name);
+                const newSubDir = await newDir.getDirectoryHandle(name, { create: true });
+                for await (const [subName, subHandle] of subDir.entries()) {
+                  if (subHandle.kind === 'file') {
+                    const subBytes = await opfs.readBytes(it.fullKey + '/' + name + '/' + subName);
+                    await opfs.write(newPath + '/' + name + '/' + subName, subBytes);
+                  }
+                }
+              }
+            }
+            await opfs.remove(it.fullKey);
+            // Update Dropbox if connected
+            if (dbxTokens()) {
+              const state = syncState();
+              const oldPrefix = it.fullKey.toLowerCase() + '/';
+              const newPrefix = newPath.toLowerCase() + '/';
+              const updates = {};
+              for (const k of Object.keys(state)) {
+                if (k.toLowerCase() === it.fullKey.toLowerCase() || k.toLowerCase().startsWith(oldPrefix)) {
+                  const newKey = newPath + k.slice(it.fullKey.length);
+                  updates[newKey] = state[k];
+                  delete state[k];
+                }
+              }
+              Object.assign(state, updates);
+              setSyncState(state);
+            }
+            await refreshFileList();
+            addMsg('info', `Renamed "${it.name}" to "${newName}"`);
+          } catch (e) {
+            addMsg('err', `Rename failed: ${e.message}`);
+          }
+        }});
+        menuItems.push({ label: 'Upload new file', action: async () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+              const bytes = await file.arrayBuffer();
+              await opfs.write(it.fullKey + '/' + file.name, new Uint8Array(bytes));
+              addMsg('info', `Uploaded "${file.name}" to "${it.fullKey}"`);
+              await refreshFileList();
+            } catch (err) {
+              addMsg('err', `Upload failed: ${err.message}`);
+            }
+          };
+          input.click();
+        }});
       }
       if (it.kind === 'file') {
         menuItems.push({ label: 'Download', action: async () => {
