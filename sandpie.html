@@ -2300,9 +2300,15 @@ async function cloudListAll() {
 let _syncing = false;
 let _openFilePath = null;  
 
+function anyStreamGenerating() {
+  for (const s of convStreams.values()) if (s.generating) return true;
+  return false;
+}
+
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
+  if (anyStreamGenerating()) return;
   _syncing = true;
   setDbxBusy(true);
   try {
