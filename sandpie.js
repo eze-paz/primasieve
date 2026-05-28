@@ -155,6 +155,27 @@ self.addEventListener('message', (event) => {
     }
     return;
   }
+  if (data.type === 'opfs-changed' && Array.isArray(data.paths)) {
+    // Page wrote new files to OPFS. Sync them into Pyodide's MEMFS view
+    // so the next run_python can see them without a full syncfs() walk.
+    if (!py || !_nativefs) return;
+    for (const rel of data.paths) {
+      const full = '/files/' + String(rel).replace(/^\/+/, '');
+      try {
+        // Read from OPFS and write into MEMFS
+        const bytes = await opfsReadBytes(rel);
+        // Ensure parent dirs exist
+        const dir = full.substring(0, full.lastIndexOf('/'));
+        if (dir && dir !== '/files') {
+          try { py.FS.mkdirTree(dir); } catch (_) {}
+        }
+        py.FS.writeFile(full, bytes);
+      } catch (e) {
+        console.warn('[sandpie-sw] opfs-changed sync failed for', rel, e);
+      }
+    }
+    return;
+  }
 });
 
 // Recursive rmdir within Pyodide's Emscripten FS. Used by the opfs-removed

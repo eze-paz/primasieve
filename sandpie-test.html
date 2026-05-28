@@ -3264,9 +3264,10 @@ $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshF
 async function uploadEntry(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
-    
-    
-    await opfs.write(opfsJoin(dirPath, entry.name), file);
+    const destPath = opfsJoin(dirPath, entry.name);
+    await opfs.write(destPath, file);
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
   } else if (entry.isDirectory) {
     const sub = opfsJoin(dirPath, entry.name);
     const reader = entry.createReader();
@@ -3294,7 +3295,10 @@ async function uploadEntry(entry, dirPath) {
     
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
-        await opfs.write(opfsJoin(path, f.name), f);
+        const destPath = opfsJoin(path, f.name);
+        await opfs.write(destPath, f);
+        const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+        if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
       }
     }
     await refreshFileList();
