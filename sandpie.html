@@ -2910,13 +2910,11 @@ async function refreshFileList() {
           for (const f of toHydrate) {
             try {
               const result = await tools.fetch_file.run({ path: f });
-              if (!result.startsWith('Hydrated')) addMsg('info', result);
-              done++;
+              if (result.startsWith('Hydrated')) done++;
             } catch (e) {
-              addMsg('err', `Hydrate failed for ${f}: ${e.message}`);
+              // Silently skip failed downloads
             }
           }
-          addMsg('info', `Hydrated ${done}/${toHydrate.length} files.`);
           await refreshFileList();
         }});
       }
