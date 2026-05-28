@@ -1505,6 +1505,91 @@ window.addEventListener('message', e => {
 
 const $ = id => document.getElementById(id);
 
+/* =============================================================================
+   SandpieMenu — Sidebar Section Registry
+   ============================================================================= */
+const SandpieMenu = (() => {
+  const sections = new Map();
+  let sidebarEl = null;
+
+  function ensureSidebar() {
+    if (!sidebarEl) sidebarEl = document.querySelector('aside');
+    return sidebarEl;
+  }
+
+  function createSectionEl(id, config) {
+    const details = document.createElement('details');
+    details.className = 'service';
+    details.id = id;
+    if (config.open) details.open = true;
+
+    const summary = document.createElement('summary');
+    summary.innerHTML = config.title + (config.badge ? ` <span style="margin-left:auto; font-size:0.7rem; color:var(--sp-text-dim);">${config.badge}</span>` : '');
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'service-body';
+    if (typeof config.html === 'string') {
+      body.innerHTML = config.html;
+    } else if (config.html instanceof HTMLElement) {
+      body.appendChild(config.html);
+    }
+    details.appendChild(body);
+
+    return details;
+  }
+
+  function insertBeforeFooter(el) {
+    const sidebar = ensureSidebar();
+    if (!sidebar) return;
+    const footer = sidebar.querySelector('#versionDisplay')?.closest('div');
+    if (footer) {
+      sidebar.insertBefore(el, footer);
+    } else {
+      sidebar.appendChild(el);
+    }
+  }
+
+  return {
+    add(id, config = {}) {
+      if (sections.has(id)) {
+        console.warn(`SandpieMenu: section "${id}" already exists`);
+        return false;
+      }
+      const el = createSectionEl(id, config);
+      insertBeforeFooter(el);
+      sections.set(id, { el, config });
+      if (config.onRender) config.onRender(el.querySelector('.service-body'));
+      return true;
+    },
+
+    remove(id) {
+      const section = sections.get(id);
+      if (!section) return false;
+      section.el.remove();
+      sections.delete(id);
+      return true;
+    },
+
+    get(id) {
+      return sections.get(id)?.el || null;
+    },
+
+    updateBadge(id, text) {
+      const section = sections.get(id);
+      if (!section) return false;
+      const badge = section.el.querySelector('summary span');
+      if (badge) badge.textContent = text;
+      return true;
+    },
+
+    list() {
+      return Array.from(sections.keys());
+    }
+  };
+})();
+
+
 const VERSION = '1.0.2-1779377073';
 
 if ('serviceWorker' in navigator) {
@@ -5447,7 +5532,7 @@ function resetCustomTheme() {
     }
   }
 })();
-</script>
+</script></script>
 <script>
 
 let _deferredInstallPrompt = null;
@@ -5457,5 +5542,51 @@ window.addEventListener('beforeinstallprompt', (e) => {
   console.log('[sandpie] PWA install prompt suppressed (available via menu)');
 });
 </script>
+
+<script>
+/* === Artifacts Module (inline for testing) === */
+(function () {
+  'use strict';
+
+  function init() {
+    if (typeof SandpieMenu === 'undefined') {
+      setTimeout(init, 500);
+      return;
+    }
+
+    SandpieMenu.add('artifactsSection', {
+      title: 'Artifacts',
+      badge: '0',
+      open: false,
+      html: '<p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0;">WIP</p>',
+      onRender(bodyEl) {
+        console.log('Artifacts section rendered');
+      }
+    });
+
+    console.log('Artifacts module registered');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  window.SandpieArtifacts = {
+    setCount(n) {
+      SandpieMenu.updateBadge('artifactsSection', String(n));
+    },
+    increment() {
+      const el = SandpieMenu.get('artifactsSection');
+      if (!el) return;
+      const badge = el.querySelector('summary span');
+      const current = parseInt(badge?.textContent || '0', 10);
+      SandpieMenu.updateBadge('artifactsSection', String(current + 1));
+    }
+  };
+})();
+</script>
+
 </body>
 </html>
