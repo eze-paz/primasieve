@@ -159,6 +159,7 @@ const SandpieNotifications = (function() {
 
     SandpieMenu.add('notificationsSection', {
       title: 'Notifications',
+      dot: 'notifDot',
       badge: null,
       open: false,
       html: `

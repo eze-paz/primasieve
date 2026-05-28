@@ -1515,7 +1515,14 @@ const SandpieMenu = (() => {
     if (config.open) details.open = true;
 
     const summary = document.createElement('summary');
-    summary.innerHTML = config.title + (config.badge ? ` <span style="margin-left:auto; font-size:0.7rem; color:var(--sp-text-dim);">${config.badge}</span>` : '');
+    let summaryHtml = config.title;
+    if (config.dot) {
+      summaryHtml += ` <span class="status-dot" id="${config.dot}"></span>`;
+    }
+    if (config.badge) {
+      summaryHtml += ` <span style="margin-left:auto; font-size:0.7rem; color:var(--sp-text-dim);">${config.badge}</span>`;
+    }
+    summary.innerHTML = summaryHtml;
     details.appendChild(summary);
 
     const body = document.createElement('div');
