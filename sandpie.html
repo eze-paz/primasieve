@@ -1421,7 +1421,7 @@ window.addEventListener('message', e => {
     </div>
   </details>
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
-    <div>sandpie <span id="versionDisplay">v0.0.0</span></div>
+    <div>sandpie <span id="versionDisplay">v1.0.2-1779377073</span></div>
   </div>
 </aside>
 
@@ -1565,7 +1565,6 @@ const SandpieMenu = (() => {
 })();
 
 
-const VERSION = '1.0.2-1779377073';
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (ev) => {
@@ -5233,10 +5232,6 @@ function dispatchAgentEvent(ev, renderer, host) {
       } catch(e) {}
     }
   }
-  // Set version display once at startup
-  const v = document.getElementById('versionDisplay');
-  if (v) v.textContent = VERSION;
-
   if (localStorage.getItem('sandpie-sidebar-collapsed')) {
     const aside = document.querySelector('aside');
     if (aside) {
