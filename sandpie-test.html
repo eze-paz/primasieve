@@ -71,7 +71,7 @@
     background: linear-gradient(to right, var(--sp-accent-dim), transparent);
     pointer-events: none;
   }
-  /* Scrollbars for main content areas only */
+  
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
   #messages::-webkit-scrollbar, aside::-webkit-scrollbar, .file-viewer .panel::-webkit-scrollbar { width: 8px; height: 8px; }
   #messages::-webkit-scrollbar-track, aside::-webkit-scrollbar-track, .file-viewer .panel::-webkit-scrollbar-track { background: transparent; }
@@ -99,8 +99,7 @@
     animation: sync-pulse 1.2s ease-in-out infinite;
   }
   @keyframes sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-  /* Ghost buttons in disabled state should look quietly inactive — no amber pulse,
-     just a muted style that says "you don't need to click this right now." */
+  
   aside button.ghost:disabled,
   aside button.ghost:disabled:hover {
     background: transparent;
@@ -144,11 +143,6 @@
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: var(--sp-accent-dim); }
 
-
-
-
-
-
   .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: var(--sp-panel); }
@@ -159,7 +153,7 @@
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
   ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; margin-left: 0.5rem; }
-  /* File viewer overlay */
+  
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
   .file-viewer .panel header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--sp-border); }
@@ -199,10 +193,7 @@
   }
   .dbx-status.error { background: var(--sp-danger-dim); color: var(--sp-danger); }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  /* SidePanel: #messagesWrap is a row container; #messages is always
-     present, #messagesSide is hidden until body.side-open. body.active-right
-     dims #messages and vice-versa — convs stay in their pane and only the
-     "active" label flips. drop-target = a draggable conv is hovering. */
+  
   #messagesWrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; min-width: 0; }
   #messagesSide {
@@ -211,17 +202,17 @@
     scrollbar-gutter: stable; min-width: 0;
     border-left: 1px solid var(--sp-border);
   }
-  /* #messagesSide hidden unless a conv OR artifact is open in it */
+  
   body:not(.side-open):not(.artifact-side-open) #messagesSide { display: none; }
   body.artifact-side-open #messagesSide { display: flex; flex-direction: column; }
   body.side-open #messages,
   body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
-  /* Artifact mode inside #messagesSide — hide conv hosts, show iframe */
+  
   #messagesSide.artifact-mode { padding: 0; gap: 0; overflow: hidden; }
   #messagesSide.artifact-mode > *:not(#artifactPanelHeader):not(#artifactPanelFrame) { display: none !important; }
   #messagesSide:not(.artifact-mode) #artifactPanelHeader,
   #messagesSide:not(.artifact-mode) #artifactPanelFrame { display: none; }
-  /* Artifact panel header (inside #messagesSide) */
+  
   #artifactPanelHeader {
     display: flex; align-items: center; justify-content: space-between;
     padding: 4px 10px; background: var(--sp-panel); border-bottom: 1px solid var(--sp-border);
@@ -234,7 +225,7 @@
   }
   #artifactPanelClose:hover { color: var(--sp-text); }
   #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
-  /* Resizer handle between #messages and #messagesSide */
+  
   #sideResizer {
     width: 5px; flex-shrink: 0; cursor: col-resize;
     background: var(--sp-border); transition: background 0.15s; position: relative;
@@ -250,7 +241,7 @@
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .artifact-icon-btn:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-text); }
-  .artifact-panel-btn { /* alias */ }
+  .artifact-panel-btn {  }
   body.side-open.active-left  #messagesSide,
   body.side-open.active-right #messages {
     opacity: 0.55; filter: grayscale(0.25); cursor: pointer;
@@ -319,15 +310,14 @@
     resize: none;
     overflow-y: hidden;
     line-height: 1.4;
-    min-height: calc(1.4em + 1rem + 2px); /* one line + padding + border */
+    min-height: calc(1.4em + 1rem + 2px); 
   }
   form button { padding: 0.5rem 1.25rem; background: var(--sp-accent); border: none; border-radius: 8px; color: var(--sp-text); cursor: pointer; }
   form button.sending { background: #6e7681; }
   form button.sending:hover { background: var(--sp-text-dim); }
   form button:disabled { opacity: 0.5; cursor: not-allowed; }
   .cursor { display: inline-block; width: 2px; height: 1em; background: var(--sp-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
-  /* Per-completion duration ticker. Sits under the assistant bubble; updates
-     once a second while the round is in flight, then locks the final value. */
+  
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
@@ -337,7 +327,7 @@
   }
   .msg-timer.done { color: #6e7681; }
   @keyframes blink { 50% { opacity: 0; } }
-  /* Collapsible service sections */
+  
   aside details.service {
     border: none;
     background: transparent;
@@ -412,16 +402,13 @@
   aside .status-dot.ok   { background: var(--sp-accent); box-shadow: 0 0 4px var(--sp-accent-dim); }
   aside .status-dot.warn { background: var(--sp-warn); box-shadow: 0 0 4px var(--sp-warn-dim); }
   aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px var(--sp-danger-dim); }
-  /* `.busy` pulses the dot while a sync operation is in flight (auto-pull on
-     init, auto-push on conv end, fetch_file hydration, manifest scan). It
-     overlays whatever colour the dot already has so connection status stays
-     readable underneath. */
+  
   aside .status-dot.busy { animation: status-dot-pulse 0.9s ease-in-out infinite; }
   @keyframes status-dot-pulse {
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.55); opacity: 0.55; }
   }
-  /* Conversations list */
+  
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: var(--sp-surface); border-color: var(--sp-border-bright); }
   ul.conv-list li.active { background: var(--sp-panel); border-color: var(--sp-accent); }
@@ -458,9 +445,7 @@
     background: var(--sp-border);
     opacity: 0.4;
   }
-  /* Pulsing dot shown on a conversation row while an LLM stream for that
-     conversation is still in flight — so the user can navigate away and
-     know which chats are still generating in the background. */
+  
   ul.conv-list li .conv-meta.gen-dot,
   ul.conv-list li .gen-dot {
     display: inline-block;
@@ -488,15 +473,9 @@
     opacity: 0.9;
     font-weight: 600;
   }
-  /* Each conversation's bubbles live in a .conv-host. Only the active
-     conv's host is mounted under #messages; in-flight non-visible convs
-     keep their host detached so their stream can keep mutating bubbles
-     without contaminating whichever conv the user is currently looking at. */
+  
   .conv-host { display: flex; flex-direction: column; gap: 1rem; flex: 0 0 auto; }
-  /* Empty-conversation welcome — vertically centered greeting + status.
-     Held invisible for 1s after load, then faded in over 0.5s so the page
-     finishes settling (fonts, JS-built shield mesh, layout shifts) before
-     anything in the hero is painted. Eliminates the load flash. */
+  
   .welcome {
     margin: auto 0;
     padding: 2rem 1rem;
@@ -521,8 +500,7 @@
     font-weight: 600;
   }
   .welcome-title .sidebar-brand { font-size: inherit; letter-spacing: 3px; }
-  /* Override the one-shot sidebar animation with a looping version that starts
-     after the welcome fade-in completes (1s delay + 0.5s fade = 1.5s visible). */
+  
   .welcome-title .sidebar-brand::before {
     animation: chromaShiftWelcome 6s ease-out 1.6s infinite;
   }
@@ -531,9 +509,7 @@
   }
   .welcome-by { display: block; text-align: center; color: #6e7681; font-weight: 400; font-size: 0.75rem; letter-spacing: 0.06em; margin-top: 0.2rem; }
   .welcome-tag { font-size: 0.78rem; color: #6e7681; }
-  /* Welcome shield — layered echo: 3 generations of an asymmetric jittered mesh
-     coexist at different lifecycle phases, rebuilt with a new random seed every 2s.
-     Communicates the pyodide/OPFS containment story without text. */
+  
   .welcome-shield {
     width: 96px;
     height: 115px;
@@ -567,7 +543,7 @@
     4%       { fill-opacity: 0.3; stroke-opacity: 1; }
     11%      { fill-opacity: 0;   stroke-opacity: 0.18; }
   }
-  /* Rotating tagline carousel that replaces the old "ready when you are" CTA */
+  
   .welcome-rotating {
     position: relative;
     height: 1.4em;
@@ -614,14 +590,12 @@
     .welcome-rotating span { animation: none; }
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
-/* Token meter — shows current context size vs configured limit. Click to edit. */
 
-
-  /* Mobile header (only shown < 768px) */
+  
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
-  /* Desktop sidebar collapse */
+  
   .sidebar-header {
     display: flex;
     align-items: center;
@@ -741,7 +715,7 @@
     70% { opacity: 0.3; transform: translateX(1px); }
     100% { opacity: 0; transform: translateX(0); }
   }
-  /* Looping variants for the welcome screen — flash on enter, then pause */
+  
   @keyframes chromaShiftWelcome {
     0%        { opacity: 0;   transform: translateX(0); }
     8%        { opacity: 0.9; transform: translateX(-3px); }
@@ -756,14 +730,11 @@
     33%       { opacity: 0.3; transform: translateX(1px); }
     40%, 100% { opacity: 0;   transform: translateX(0); }
   }
-  /* Tablet/phone: stack layout, sidebar becomes a drawer.
-     Also matches any touch device (hover: none + pointer: coarse) so iOS
-     Safari's "Request Desktop Site" or post-OAuth handoff that fakes a
-     desktop viewport still gets the mobile layout. */
+  
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     body {
       flex-direction: column;
-      /* dvh handles iOS Safari url-bar; vh fallback for older browsers */
+      
       height: 100vh;
       height: 100dvh;
     }
@@ -776,7 +747,7 @@
       background: var(--sp-surface);
       border-bottom: 1px solid var(--sp-border);
       flex: 0 0 auto;
-      /* Sits above the drawer so the hamburger stays tappable when open */
+      
       position: relative;
       z-index: 101;
     }
@@ -838,8 +809,7 @@
     }
     aside {
       position: fixed;
-      /* Drawer slides in below the mobile header — ~52px of header content
-         + safe-area-inset-top on notched iOS, with a 60px floor on Android. */
+      
       top: max(60px, calc(env(safe-area-inset-top, 0px) + 52px));
       bottom: 0;
       left: -100%;
@@ -872,20 +842,15 @@
       opacity: 1;
       pointer-events: auto;
     }
-    /* Backdrop also sits above the header? No — header z-index 101 stays clickable
-       above the backdrop's z-index 99, so the hamburger ends up the close button. */
+    
     main { flex: 1 1 auto; min-height: 0; }
-    /* Mobile: side panel splits the screen too narrow. Hide it entirely
-       (the side conv stays in memory; resizing to desktop brings it back).
-       JS drop handlers also early-return on mobile, so the only way in is
-       the "View in side panel" context menu — and that's a desktop-only
-       option in buildConvLi too. */
+    
     body.side-open #messagesSide,
     body.artifact-side-open #messagesSide { display: none !important; }
     body.side-open #messages { flex: 1; }
     #sideResizer { display: none !important; }
     .artifact-panel-btn { display: none !important; }
-    /* Touch-friendly: bigger inputs and bottom-row chat */
+    
     aside input, aside button {
       padding: 0.65rem 0.75rem;
       font-size: 0.95rem;
@@ -896,7 +861,7 @@
       padding: 0.75rem 1rem;
       padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
-    form input, form textarea { font-size: 16px; /* prevents iOS auto-zoom on focus */ }
+    form input, form textarea { font-size: 16px;  }
     #messages { padding: 1rem; }
     .msg { max-width: 95%; }
   }
@@ -1007,9 +972,7 @@
     background: var(--sp-danger-dim);
   }
 
-  /* Tool-call bubbles host two parallel views: .tc-expanded (default text) and
-     .tc-collapsed (rich spinner/flavor card). CSS swaps which is visible based
-     on the global minimize state. Tool-result bubbles are hidden when minimized. */
+  
   .tool-call {
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1019,7 +982,7 @@
     border-color: var(--sp-accent-dim);
   }
   
-  /* Terminal-style tool call box */
+  
   .tool-box {
     align-self: flex-start;
     max-width: 100%;
@@ -1129,7 +1092,7 @@
     font-size: 12px;
   }
   .tc-dim { opacity: 0.65; }
-  /* Artifact collapsed state */
+  
   .artifact-meta-row {
     display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
     padding: 8px 12px; font: 11px monospace; color: var(--sp-text-dim);
@@ -1155,9 +1118,7 @@
 
 </style>
 <script>
-// Render an OPFS file as a live artifact iframe appended to `host`.
-// path is the OPFS-relative path (e.g. "files/outputs/chart.html").
-// The SW serves it at opfs/<path> (relative URL → SW scope intercepts it) and injects the resize postMessage script.
+
 function renderArtifact(host, path) {
   const target = host || (activeStream() && activeStream().host) || $('messages');
   const clean = path ? String(path).replace(/^\/+/, '') : '';
@@ -1174,7 +1135,7 @@ function renderArtifact(host, path) {
   header.appendChild(label);
 
   if (!target) {
-    // Truly unrecoverable — no DOM node to append to.
+    
     console.error('[artifact] renderArtifact: no target for path', path);
     return;
   }
@@ -1189,12 +1150,12 @@ function renderArtifact(host, path) {
     return;
   }
 
-  // File types the browser can render inline; everything else gets a download link.
+  
   const RENDERABLE = new Set(['html','htm','svg','png','jpg','jpeg','gif','webp','pdf','csv','txt','json']);
   const ext = clean.split('.').pop().toLowerCase();
   const renderable = RENDERABLE.has(ext);
 
-  // Store metadata for the collapsed state
+  
   wrap.dataset.artifactPath    = clean;
   wrap.dataset.artifactCreated = Date.now();
 
@@ -1253,7 +1214,7 @@ function renderArtifact(host, path) {
   wrap.appendChild(header);
 
   if (!renderable) {
-    // Non-previewable file — show a download prompt instead of an iframe.
+    
     const dlRow = document.createElement('div');
     dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-text-dim);';
     dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
@@ -1262,7 +1223,7 @@ function renderArtifact(host, path) {
     return;
   }
 
-  // Collapsed meta row (hidden by default, shown when artifact is collapsed)
+  
   const metaRow = document.createElement('div');
   metaRow.className = 'artifact-meta-row';
   metaRow.style.display = 'none';
@@ -1314,7 +1275,7 @@ function collapseArtifact(wrap) {
   if (colBtn)  { colBtn.textContent = '+'; colBtn.title = 'Expand'; }
   if (metaRow) {
     metaRow.style.display = 'flex';
-    // Populate size + age lazily
+    
     const path = wrap.dataset.artifactPath;
     const ts   = parseInt(wrap.dataset.artifactCreated || '0', 10);
     const info = metaRow.querySelector('.artifact-meta-info');
@@ -1358,7 +1319,7 @@ function showArtifactError(wrap, frame, msg) {
 
 function openArtifactPanel(path) {
   const clean = String(path).replace(/^\/+/, '');
-  // Close conversation side panel first — right pane is shared
+  
   if (typeof sidePanel !== 'undefined' && sidePanel?.isOpen) sidePanel.close();
   const frame = document.getElementById('artifactPanelFrame');
   const title = document.getElementById('artifactPanelTitle');
@@ -1379,8 +1340,6 @@ function closeArtifactPanel() {
   document.body.classList.remove('artifact-side-open');
 }
 
-
-// Artifact iframes postMessage their content height — autosize and border reveal.
 window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
   for (const f of document.querySelectorAll('iframe.artifact-frame')) {
@@ -1431,7 +1390,7 @@ window.addEventListener('message', e => {
 
   </details>
 
-  <!-- Provider Modal -->
+  
   <div id="providerModal" class="modal" style="display:none;">
     <div class="modal-backdrop" onclick="closeProviderModal()"></div>
     <div class="modal-content">
@@ -1448,14 +1407,14 @@ window.addEventListener('message', e => {
     </div>
   </div>
 
-  <!-- Chip Context Menu -->
+  
   <div id="chipContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="editProviderFromMenu()">Edit</div>
     <div class="context-item" onclick="duplicateProviderFromMenu()">Duplicate</div>
     <div class="context-item context-delete" onclick="deleteProviderFromMenu()">Delete</div>
   </div>
 
-  <!-- Message Bubble Context Menu -->
+  
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
@@ -1522,10 +1481,7 @@ window.addEventListener('message', e => {
 
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
-  <!-- #messagesWrap is the dual-pane container. By default only #messages is
-       visible; when the SidePanel controller opens a second conv, the
-       <body> gets `side-open` and #messagesSide becomes the right half.
-       See the SidePanel class for state model. -->
+  
   <div id="messagesWrap">
     <div id="messages">
       <div id="welcome" class="welcome">
@@ -1565,155 +1521,27 @@ window.addEventListener('message', e => {
 </main>
 
 <script>
-// =============================================================================
-// sandpie-sw end-to-end flow
-// =============================================================================
-// The system is fan-shaped: the page boots → registers a Service Worker → the
-// user sends a message → the page POSTs to a same-origin /sandpie-agent path
-// that the SW intercepts → the SW runs the full LLM agent loop (stream upstream,
-// dispatch tool calls, recurse) → the SW emits NDJSON events back to the page
-// → the page renders each event into the conversation's bubble host.
-//
-// When editing, find the step that owns the concern you're touching and read
-// the surrounding section banner. State that lives in one step must not be
-// mutated from another.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// PAGE LIFECYCLE                                                  (this file)
-// ─────────────────────────────────────────────────────────────────────────────
-//   P0  HTML parses → marked.js + DOMPurify <script src> load → this inline
-//       <script> runs.
-//   P1  Globals init: convStreams (Map), activeConvId, cachedManifests,
-//       providers, ... .
-//   P2  navigator.serviceWorker.register('./sandpie.js'); _swReady waits
-//       for controllerchange so first /sandpie-agent POST is intercepted.
-//   P3  init() → loadProviders, restore active conv, mountConv,
-//       refreshFileList, refreshWelcome, refreshConversationList.
-//   P4  await sync() pulls Dropbox if connected (no-op otherwise).
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// USER SEND                                                       (this file)
-// ─────────────────────────────────────────────────────────────────────────────
-//   U1  <form onsubmit> → handleSubmit().
-//   U2  handleSubmit reads $('input'), calls enqueueForActive(text).
-//   U3  enqueueForActive: ensureActiveConv → ensureStream(id) → mountConv if
-//       host detached → stream.queue.push(text) → processQueueFor(s).
-//   U4  processQueueFor: while queue non-empty → await sendSingle(text,
-//       stream). Resets queueAborted on entry, sets isProcessing.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// ONE ROUND — PAGE SIDE                                           (this file)
-// ─────────────────────────────────────────────────────────────────────────────
-//   R1  sendSingle builds config: { url, headers, model,
-//       systemPrompt: buildSystemPrompt(), messages, tools: toolDefs(),
-//       proxyBase, origin, dbxTokens, convId }.
-//   R2  await _swReady; POST ./sandpie-agent with the config as body.
-//   R3  Read response body line-by-line, JSON.parse each NDJSON line, dispatch
-//       to handleEvent(ev).
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// ONE ROUND — SW SIDE                                          (sandpie.js)
-// ─────────────────────────────────────────────────────────────────────────────
-//   S1  fetch event on /sandpie-agent → handleAgent(req).
-//   S2  ReadableStream.start → runAgent(config, ctx) with ctx.emit pushing
-//       events back to the page.
-//   S3  runAgent loop:
-//         emit round_start
-//         streamOneRound(url, headers, body, ctx):
-//           fetch upstream LLM with stream=true
-//           for each SSE delta: accumulate, emit { type:'delta', delta }
-//           return { content, tool_calls }
-//         emit round_end
-//         if no tool_calls: emit message_added (asst only), break
-//         emit message_added (asst with tool_calls)
-//         for each tc:
-//           emit tool_started
-//           runTool(name, args, ctx) → tool_run_python / tool_fetch_file / ...
-//           emit tool_result (+ artifacts)
-//           emit message_added (tool)
-//         next round
-//       emit agent_done
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// EVENT DISPATCH — PAGE SIDE                                      (this file)
-// ─────────────────────────────────────────────────────────────────────────────
-// All per-round render state is owned by `RoundRenderer` (a single object
-// constructed at the top of sendSingle). handleEvent dispatches events into
-// the renderer's methods — it does NOT touch render state directly.
-//   E1  round_start    → renderer.startRound()
-//   E2  delta          → renderer.applyDelta(ev.delta)
-//                          ├─ content delta → typewriter into reply
-//                          └─ tool_call delta → bubble, then typewriter for
-//                             args via toolPending / toolDisplayed / drainTick
-//   E3  round_end      → renderer.endRound() — schedules ')' append after
-//                        the args drain completes (NOT before, otherwise the
-//                        paren jumps ahead of still-typing args).
-//   E4  message_added  → renderer.bindMessage(msg) — convMessages.push,
-//                        bindBubble to wire the rewind/copy menu.
-//   E5  tool_started   → renderer.markToolStarted(tcId) — in-flight class +
-//                        flavor ticker.
-//   E6  tool_result    → renderer.markToolDone(tcId, result, artifacts) —
-//                        renderTcDone, append tool-result bubble, render
-//                        artifacts.
-//   E7  agent_done     → renderer.finalize(); break read loop.
-//   E8  error          → addMsg('err', ...). renderer.finalize() in finally.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// POST-STREAM                                                     (this file)
-// ─────────────────────────────────────────────────────────────────────────────
-//   F1  remove abort listener, stream.requestId = null.
-//   F2  releaseWakeLock, endTotalTimer, setStreamSending(false).
-//   F3  await saveConv(convId) — persist messages + artifacts to OPFS.
-//   F4  await sync() — Dropbox push of dirty conv files (no-op if not
-//       connected).
-//   F6  processQueueFor loops back to U4 if more queued, else returns.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// TOOL EXECUTION                                               (sandpie.js)
-// ─────────────────────────────────────────────────────────────────────────────
-//   T1  run_python    → initPyodide (lazy) → mountNativeFS → exec → syncfs()
-//   T2  fetch_file    → Dropbox download via SW dbx helper
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// SW LIFECYCLE                                                 (sandpie.js)
-// ─────────────────────────────────────────────────────────────────────────────
-//   W1  install  → skipWaiting()
-//   W2  activate → clients.claim() so first page load is controlled without
-//                  a reload
-//   W3  ~30s idle → SW terminates. Next /sandpie-agent fetch re-boots it.
-//                  Pyodide reinitializes lazily on next run_python.
-// =============================================================================
 
 const $ = id => document.getElementById(id);
 
 const VERSION = '1.0.2-1779377073';
 
-// =============================================================================
-// SW console relay — surfaces sandpie.js's console output here.
-// =============================================================================
-// SW logs normally live in a separate DevTools window (Application → Service
-// Workers → click the SW link → its own Console tab). That makes Pyodide
-// aborts, init failures, fatal-reset reasons invisible unless you go hunting.
-// This receiver listens for the SW's `sandpie-sw-log` postMessages and
-// re-emits them in the page's regular console with a `[sw]` prefix, plus a
-// one-shot ping that asks the SW to flush its boot-time log buffer so even
-// pre-page-load lines (version stamp, importScripts results) appear here.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (ev) => {
     const d = ev.data;
     if (!d) return;
     if (d.type === 'sandpie-sw-log') {
-      // Map level → console method. Default to log for unknown.
+      
       const fn = console[d.level] || console.log;
       fn.call(console, '[sw]', d.text);
       return;
     }
     if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-      // Python deleted these via os.remove / shutil.rmtree etc. The SW has
-      // already flushed the deletion to OPFS via syncfs(). We just need to
-      // mirror to Dropbox + syncState, otherwise the cloud copy lingers and
-      // re-downloads on the next pull. dbxDelete tolerates not_found so
-      // double-fires are safe.
+      
+      
+      
+      
+      
       (async () => {
         if (!dbxTokens()) return;
         const state = syncState();
@@ -1734,9 +1562,9 @@ if ('serviceWorker' in navigator) {
       return;
     }
   });
-  // Once a controller exists, ask it to replay the boot buffer so we don't
-  // miss SW logs that fired before this listener was wired up. Try now and
-  // also on controllerchange (covers cold + warm boots).
+  
+  
+  
   const flush = () => {
     const c = navigator.serviceWorker.controller;
     if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
@@ -1745,18 +1573,10 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', flush);
 }
 
-// Active-conversation message array. Reassigned (not mutated in place) when
-// the user switches conversations — so any in-flight stream that captured the
-// previous reference keeps pushing to its own conversation's array instead of
-// contaminating whichever conv is now visible. See convStreams below.
 let messages = [];
-// Per-conversation stream state. Each conv the user has touched in this
-// session gets an entry. Holds the conv's messages array, its bubble host
-// (DOM div mounted under #messages only while the conv is active), and the
-// per-stream queue/abort/timer so a background stream can finish writing
-// into its own conv without leaking into another one.
+
 const convStreams = new Map();
-const convLastViewed = new Map(); // convId -> ISO string of last time user viewed it
+const convLastViewed = new Map(); 
 function ensureStream(id) {
   let s = convStreams.get(id);
   if (!s) {
@@ -1776,7 +1596,7 @@ function ensureStream(id) {
   return s;
 }
 function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
-// Provider system with backward compat migration
+
 const PROVIDERS_KEY = 'sandpie-providers';
 const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
 let _providers = [];
@@ -1786,8 +1606,8 @@ let _chipMenuTarget = null;
 
 function loadProviders() {
   const raw = localStorage.getItem(PROVIDERS_KEY);
-  // Defensive: a corrupted entry must not crash the whole boot, or the
-  // chip row stays empty and even the + Add button never renders.
+  
+  
   try {
     const parsed = raw ? JSON.parse(raw) : [];
     _providers = Array.isArray(parsed) ? parsed.filter(p => p && typeof p === 'object' && p.id) : [];
@@ -1797,7 +1617,7 @@ function loadProviders() {
   }
   _activeProviderId = localStorage.getItem(ACTIVE_PROVIDER_KEY);
 
-  // Migrate old single-provider config
+  
   if (_providers.length === 0) {
     const old = JSON.parse(localStorage.getItem('opencode-config') || '{}');
     if (old.endpoint || old.model || old.apiKey) {
@@ -1815,7 +1635,7 @@ function loadProviders() {
     }
   }
 
-  // Ensure active provider exists
+  
   if (_activeProviderId && !_providers.find(p => p.id === _activeProviderId)) {
     _activeProviderId = _providers.length ? _providers[0].id : null;
   }
@@ -1851,9 +1671,9 @@ function renderChips() {
   if (!row) return;
   row.innerHTML = '';
 
-  // Render provider chips defensively — one malformed entry must not
-  // prevent the + Add chip from showing (otherwise the user can't even
-  // create a new provider to recover from a bad state).
+  
+  
+  
   for (const p of _providers) {
     try {
       if (!p || !p.id) continue;
@@ -1993,26 +1813,15 @@ function deleteProviderFromMenu() {
 
 document.addEventListener('click', hideChipMenu);
 
-// Hoisted: loadProviders() → applyActiveProvider() → updateRoutingHint()
-// references isLocalhost during this top-level call, before the const
-// would otherwise reach its initializer (TDZ).
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-// Load on init
 loadProviders();
 
-// Dropbox config (separate from providers)
 const cfg = JSON.parse(localStorage.getItem('opencode-config') || '{}');
 $('dbxAppKey').value = cfg.dbxAppKey || '';
 
 marked.setOptions({ breaks: true, gfm: true });
 
-// Strip common leading whitespace from every <pre> block's content.
-// Some models emit fenced thinking blocks whose body starts indented, and
-// once that lands in the conversation history the model mimics with a bit
-// more indent each round — consecutive thinking boxes drift visibly right.
-// Dedent preserves intra-block relative structure (code that's intentionally
-// indented stays indented) and only removes the common offset.
 function dedentPreBlocks(html) {
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
@@ -2037,9 +1846,6 @@ function dedentPreBlocks(html) {
 
 const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
 
-// Source-level dedent: strip the common leading whitespace from the body of
-// every fenced code block in raw markdown. Used before persisting assistant
-// content so the model doesn't see (and amplify) drifted indent next round.
 function dedentMarkdownFences(text) {
   if (!text) return text;
   return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
@@ -2058,25 +1864,14 @@ function dedentMarkdownFences(text) {
   });
 }
 
-// True once the initial Dropbox auto-pull resolves (or immediately if there's
-// no Dropbox to wait for). Used by refreshFileList / refreshConversationList
-// to distinguish "empty list" (show '(empty)') from "still loading".
 let initialSyncDone = !localStorage.getItem('dbx-tokens');
-// Hoisted up here so refreshWelcome / etc. can read them
-// safely at module init — `let` bindings live in TDZ until their declaration
-// line runs, and `typeof` on a TDZ-bound name throws too.
+
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
-// Tool-call/result bubbles minimized by default. Persisted across reloads.
+
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
 
-// ============================================================
-// Routing — picks proxy or direct based on hostname + config
-// (isLocalhost is hoisted above loadProviders() to avoid a TDZ during init.)
-// ============================================================
-
-// Wrap a full URL (https://...) in whichever proxy applies, or return it untouched.
 function api(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
@@ -2085,10 +1880,6 @@ function api(url) {
   return url;
 }
 
-// Dropbox endpoints never permit browser CORS, so they MUST go through a
-// proxy regardless of host. Order: explicit remote proxy → same-origin
-// /proxy/ (works on localhost when a local proxy is running and on cloud-hosted sandpie
-// where the host serves its own /proxy/ forwarder).
 function dbxRoute(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
@@ -2105,9 +1896,6 @@ function updateRoutingHint() {
 $('proxyUrl').addEventListener('input', () => { updateRoutingHint(); refreshProxyDot(); });
 updateRoutingHint();
 
-// ============================================================
-// Service status dots — header indicators for AI / Cloud / Proxy
-// ============================================================
 function setDot(id, state) {
   const dot = $(id);
   if (!dot) return;
@@ -2126,17 +1914,13 @@ function refreshProxyDot() {
 refreshAiDot();
 refreshProxyDot();
 
-// Open AI section on first load only when it's NOT configured yet — once green,
-// it stays out of the way until the user clicks to expand.
 if (!$('endpoint').value.trim() || !$('apiKey').value.trim()) {
   $('aiSection').setAttribute('open', '');
 }
 
-// Autosave: any change to a config field persists immediately. No Save button.
 ['endpoint', 'model', 'apiKey', 'dbxAppKey', 'proxyUrl'].forEach(id => {
   $(id).addEventListener('input', saveConfig);
 });
-
 
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
@@ -2144,8 +1928,6 @@ function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
 
-// Chat input: textarea that auto-grows up to a cap, with Enter-to-send /
-// Shift+Enter-to-newline behavior.
 (function setupInput() {
   const ta = $('input');
   if (!ta) return;
@@ -2157,7 +1939,7 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   }
   ta.addEventListener('input', autosize);
 
-  // Conversation search
+  
   const searchInput = $('convSearch');
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
@@ -2180,22 +1962,20 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
       handleSubmit();
     }
   });
-  // After send() clears the value, also reset the height
+  
   const observer = new MutationObserver(autosize);
   observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
-  // Reset on form submit
+  
   ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
   autosize();
 })();
 
-// Mobile drawer toggle. Hamburger glyph flips ☰ ⇄ ✕ to act as the close affordance.
 function toggleSidebar() {
   const open = document.body.classList.toggle('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = open ? '✕' : '☰';
 }
 
-// Desktop sidebar collapse (PC only — mobile CSS hides these controls)
 function toggleSidebarCollapse() {
   const aside = document.querySelector('aside');
   const isCollapsed = aside.classList.toggle('collapsed');
@@ -2203,17 +1983,12 @@ function toggleSidebarCollapse() {
   localStorage.setItem('sandpie-sidebar-collapsed', isCollapsed ? '1' : '');
 }
 
-// Close drawer when user sends a message — drawer is for config, not for the chat
 document.addEventListener('submit', () => {
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
 });
 
-
-// ============================================================
-// OPFS — nested filesystem (paths use forward slashes)
-// ============================================================
 function splitPath(path) {
   const parts = String(path).split('/').filter(Boolean);
   const name = parts.pop();
@@ -2223,7 +1998,7 @@ function splitPath(path) {
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
-  // Resolve a directory by its parts. If create=true, create missing segments.
+  
   async resolveDir(parts, { create = false } = {}) {
     let dir = await this.root();
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
@@ -2237,7 +2012,7 @@ const opfs = {
     return await (await handle.getFile()).text();
   },
 
-  // Binary-safe read. Use this for any file that might not be UTF-8.
+  
   async readBytes(path) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
@@ -2259,19 +2034,19 @@ const opfs = {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
     await dir.removeEntry(name, { recursive: true });
-    // Tell the SW to drop this path from Pyodide's MEMFS view too. Without
-    // this, the next post-run syncfs() would push the stale in-memory copy
-    // back to OPFS and the file would resurrect (and get re-uploaded to
-    // Dropbox on the next sync tick).
+    
+    
+    
+    
     try {
       const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
       if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
     } catch (_) {}
   },
 
-  // Cheap existence check — does NOT read file bytes. Important for the
-  // sync engine, which previously called opfs.read() just to test presence
-  // and so loaded multi-GB files into memory for nothing.
+  
+  
+  
   async exists(path) {
     try {
       const { parts, name } = splitPath(path);
@@ -2286,7 +2061,7 @@ const opfs = {
     await this.resolveDir(parts, { create: true });
   },
 
-  // Entries at one directory level (for browsing).
+  
   async listDir(path = '') {
     const parts = String(path).split('/').filter(Boolean);
     const dir = await this.resolveDir(parts);
@@ -2295,7 +2070,7 @@ const opfs = {
     return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
   },
 
-  // Recursive flat list of all files (paths joined by '/').
+  
   async list(prefix = '') {
     const out = [];
     const walk = async (dir, p) => {
@@ -2311,7 +2086,7 @@ const opfs = {
     return out.sort();
   },
 
-  // Recursive list of all entries (files + dirs).
+  
   async listAll(prefix = '') {
     const out = [];
     const walk = async (dir, p) => {
@@ -2328,17 +2103,11 @@ const opfs = {
   },
 };
 
-// Removes empty OPFS directories that have no presence in the cached cloud
-// index. After a reconcile sweep deletes the last file under a folder, the
-// folder itself lingers in OPFS even though it has no children and no
-// cloud-side counterpart — that's how phantom "synced" folders accumulate
-// on a device that's been running across many cross-device deletes. Iterates
-// because removing a child dir may newly empty its parent.
 async function pruneOrphanDirs(cloud) {
-  // cloud is the {relPath: entry} listing returned by cloudListAll(); when
-  // omitted, fall back to the keys we know about in syncState. Either way
-  // we build a set of all paths AND their dir prefixes so we know which
-  // OPFS dirs are still referenced from the cloud side.
+  
+  
+  
+  
   const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
   const cloudPaths = new Set();
   for (const k of source) {
@@ -2353,7 +2122,7 @@ async function pruneOrphanDirs(cloud) {
     changed = false;
     let all;
     try { all = await opfs.listAll(''); } catch { return pruned; }
-    // Deepest first so children are removed before parents are checked.
+    
     all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
     for (const e of all) {
       if (e.kind !== 'directory') continue;
@@ -2367,9 +2136,6 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 
-// ============================================================
-// Dropbox — OAuth2 PKCE + REST API via /proxy
-// ============================================================
 const DBX_REDIRECT = location.origin + location.pathname;
 
 function b64url(buf) {
@@ -2402,9 +2168,6 @@ function dbxProgress(text) {
   if (title) title.style.display = text ? 'none' : '';
 }
 
-// Pulse the dropbox dot while sync work is in flight. Reference-counted so
-// concurrent calls (sync() + a parallel fetch_file, etc.) compose correctly
-// and the dot only stops pulsing when ALL operations finish.
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {
   dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
@@ -2427,7 +2190,7 @@ async function dbxAccessToken() {
   const stored = dbxTokens();
   if (!stored) throw new Error('Dropbox not connected');
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
-  // refresh
+  
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: stored.refresh_token,
@@ -2470,8 +2233,8 @@ async function dbxConnect() {
 function dbxDisconnect() {
   localStorage.removeItem('dbx-tokens');
   localStorage.removeItem(SYNC_STATE_KEY);
-  // Legacy keys from the pre-rewrite sync engine — clear so a future
-  // reconnect doesn't pick them up via the migration path.
+  
+  
   localStorage.removeItem('dbx-index');
   localStorage.removeItem('opfs-sync-manifest');
   dbxStatus('Not connected', 'disconnected');
@@ -2530,8 +2293,8 @@ async function dbxList(folderPath, { recursive = false } = {}) {
     data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
     entries = entries.concat(data.entries);
   }
-  // size / rev / cloudMtime captured for the lazy-hydration layer (Phase B).
-  // Folders don't carry size; leave undefined.
+  
+  
   return entries.map(e => ({
     name: e.name,
     kind: e['.tag'],
@@ -2554,8 +2317,8 @@ async function dbxDownload(path, signal) {
     signal,
   });
   if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
-  // Bytes — text() corrupts non-UTF-8 (images, PDFs, anything binary).
-  // opfs.write accepts BufferSource fine.
+  
+  
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -2571,7 +2334,7 @@ async function dbxUpload(path, content) {
     body: content,
   });
   if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
-  // FileMetadata: { name, path_display, content_hash, size, rev, server_modified, ... }
+  
   return await res.json();
 }
 
@@ -2605,7 +2368,7 @@ async function dbxUploadSessionFinishBatch(entries) {
 }
 
 async function dbxUploadBatch(files) {
-  // Start upload sessions in parallel (max 5 concurrent)
+  
   const CONCURRENCY = 5;
   const sessions = [];
   for (let i = 0; i < files.length; i += CONCURRENCY) {
@@ -2628,7 +2391,7 @@ async function dbxUploadBatch(files) {
   if (sessions.length === 0) return [];
   const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
   const result = await dbxUploadSessionFinishBatch(entries);
-  // Defensive: v2 should return entries directly, but handle async job just in case
+  
   if (result['.tag'] === 'async_job_id') {
     console.warn('Unexpected async_job_id from finish_batch_v2:', result.async_job_id);
     return [];
@@ -2640,10 +2403,9 @@ async function dbxUploadBatch(files) {
   return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
 }
 
-
 async function dbxDelete(path) {
-  // Dropbox delete_v2; tolerates already-gone paths so a sync after a
-  // local move doesn't break if the cloud copy was already removed.
+  
+  
   try {
     return await dbxApi('/2/files/delete_v2', { path });
   } catch (e) {
@@ -2652,27 +2414,10 @@ async function dbxDelete(path) {
   }
 }
 
-// ============================================================
-// Sync engine — Dropbox is the source of truth.
-// ============================================================
-// Replaces the older dbxIndex + manifest split (three sources of truth,
-// four entry points, drift between them). One state map, one cloud
-// listing, one sync function.
-//
-// Shape: syncState[relPath] = {
-//   rev,           // Dropbox content_hash. Drives "did cloud change?".
-//   size,          // Cloud size in bytes. Drives lazy-hydration decision.
-//   hydrated,      // true = file in OPFS; false = placeholder.
-//   syncedMtime,   // OPFS mtime as of last successful sync (0 if not
-//                  // hydrated). Drives "did local change?".
-// }
 const SYNC_STATE_KEY = 'sandpie-sync-state';
 function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
 function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
 
-// One-shot migration: project the older dbx-index + opfs-sync-manifest pair
-// into the new shape. Old keys are left in localStorage as a safety net but
-// nothing reads them anymore.
 (function migrateLegacyState() {
   if (localStorage.getItem(SYNC_STATE_KEY)) return;
   const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
@@ -2699,11 +2444,6 @@ async function opfsLastModified(relPath) {
   } catch { return 0; }
 }
 
-// Carve-outs for files that should be downloaded eagerly even under lazy
-// mode. Conversations + sandpie_*.md manifests are read at init by code
-// that needs them local; small files are cheap and sidestep most
-// placeholder gotchas. Everything else stays a placeholder until the user
-// clicks it or fetch_file pulls it.
 function isEagerHydrate(path, size) {
   if (path === '_conversations' || path.startsWith('_conversations/')) return true;
   if (/(?:^|\/)sandpie_[^/]*\.md$/.test(path)) return true;
@@ -2711,16 +2451,14 @@ function isEagerHydrate(path, size) {
   return false;
 }
 
-// Recursive list of /. Returns { relPath: { kind, path, size, rev, cloudMtime } },
-// keyed by Dropbox-relative path. Treats Dropbox listing as truth.
 async function cloudListAll() {
   const entries = await dbxList('/', { recursive: true });
   const out = {};
   for (const e of entries) {
     let rel = e.path.replace(/^\/+/, '');
     if (!rel) continue;
-    // Strip Dropbox app-folder prefix so paths match OPFS.
-    // Common prefixes: 'files/', 'Apps/sandpie/', etc.
+    
+    
     const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
     for (const p of prefixes) {
       if (rel.toLowerCase().startsWith(p.toLowerCase())) {
@@ -2734,27 +2472,8 @@ async function cloudListAll() {
 }
 
 let _syncing = false;
-let _openFilePath = null;  // file currently open in viewer — skip sync for this path
+let _openFilePath = null;  
 
-// Single sync entry point. Called on connect, on the Resync button, on a
-// 60s background tick (when foregrounded), and at conversation end.
-//
-// Pull phase:
-//   * Drops local copies of paths that vanished from cloud, except when
-//     the local file is dirty (lastMod > syncedMtime) — those are kept and
-//     re-pushed in the push phase (last-write-wins).
-//   * For each cloud entry: if first sighting and local has it too, baseline
-//     as synced (TOFU). If first sighting + cloud-only, eager-download or
-//     leave as placeholder. If state already had it and cloud rev changed,
-//     re-download (eager) or demote to placeholder (lazy).
-//   * If cloud unchanged but local copy disappeared, demote to placeholder
-//     (cloud is authority — accidental local removals don't propagate).
-//
-// Push phase: any OPFS file with no state entry, or with mtime newer than
-// syncedMtime, gets uploaded and the state row refreshed.
-//
-// Empty-dir prune: directories with no children and no cloud counterpart
-// get removed (cascades up).
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
@@ -2766,20 +2485,20 @@ async function sync() {
     const state = syncState();
     let baselined = 0;
 
-    // --- Pull: cross-device delete reconcile ---
+    
     for (const path of Object.keys(state)) {
       if (cloud[path]) continue;
       const s = state[path];
       if (s.hydrated) {
         const lm = await opfsLastModified(path);
-        if (lm > 0 && lm > s.syncedMtime) continue;  // dirty — defer to push
+        if (lm > 0 && lm > s.syncedMtime) continue;  
         try { await opfs.remove(path); } catch {}
       }
       delete state[path];
-      /* removed */
+      
     }
 
-    // --- Pull: cloud → local ---
+    
     for (const [path, e] of Object.entries(cloud)) {
       if (e.kind !== 'file') continue;
       const s = state[path];
@@ -2801,7 +2520,7 @@ async function sync() {
             rev: e.rev, size: e.size, hydrated: true,
             syncedMtime: await opfsLastModified(path),
           };
-          /* pulled */
+          
         } else {
           state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
         }
@@ -2811,9 +2530,9 @@ async function sync() {
       const cloudChanged = s.rev !== e.rev;
       const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
 
-      if (path === _openFilePath) continue;  // skip pull for file open in viewer
+      if (path === _openFilePath) continue;  
 
-      if (cloudChanged && localDirty) continue;  // last-write-wins → push phase
+      if (cloudChanged && localDirty) continue;  
 
       if (cloudChanged) {
         if (eager && (s.hydrated || !localExists)) {
@@ -2824,7 +2543,7 @@ async function sync() {
             rev: e.rev, size: e.size, hydrated: true,
             syncedMtime: await opfsLastModified(path),
           };
-          /* pulled */
+          
         } else {
           if (localExists) { try { await opfs.remove(path); } catch {} }
           state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
@@ -2832,7 +2551,7 @@ async function sync() {
         continue;
       }
 
-      // Cloud unchanged. Demote to placeholder if local copy went missing.
+      
       if (s.hydrated && !localExists) {
         state[path].hydrated = false;
         state[path].syncedMtime = 0;
@@ -2840,7 +2559,7 @@ async function sync() {
       state[path].size = e.size;
     }
 
-    // --- Push: local → cloud (dirty + local-only) ---
+    
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
     const dirty = [];
@@ -2869,7 +2588,7 @@ async function sync() {
               hydrated: true,
               syncedMtime: r.lm,
             };
-            /* pushed */
+            
           } else {
             console.warn('batch item failed:', r.rel, r.meta);
           }
@@ -2897,7 +2616,6 @@ async function sync() {
   }
 }
 
-// Background sync every 60s while foregrounded.
 setInterval(() => { if (!document.hidden) sync(); }, 60000);
 
 function joinPath(folder, name) {
@@ -2905,8 +2623,6 @@ function joinPath(folder, name) {
   return folder.replace(/\/$/, '') + '/' + name;
 }
 
-// User-triggered resync: same logic as the background tick, but invoked
-// from the Resync button so users don't have to wait for it.
 async function manualResync() {
   if (!dbxTokens()) {
     dbxStatus('Not connected', 'disconnected');
@@ -2921,7 +2637,6 @@ async function manualResync() {
   }
 }
 
-// Handle OAuth redirect-back (?code=…) on page load
 (async () => {
   const params = new URLSearchParams(location.search);
   const code = params.get('code');
@@ -2940,9 +2655,6 @@ async function manualResync() {
   }
 })();
 
-// ============================================================
-// Tools — backed by OPFS
-// ============================================================
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
@@ -3084,7 +2796,7 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
 
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
-    if (name === 'fetch_file') return !!dbxTokens();   // only useful when Dropbox is connected
+    if (name === 'fetch_file') return !!dbxTokens();   
     return true;
   })
   .map(([name, t]) => ({
@@ -3092,15 +2804,8 @@ const toolDefs = () => Object.entries(tools)
     function: { name, description: t.description, parameters: t.parameters },
   }));
 
-// ============================================================
-// Context manifests — sandpie_*.md files anywhere in OPFS get auto-loaded
-// into the system prompt. Convention: a manifest is a short markdown note
-// describing what's in its folder and pointing at other key docs (skills,
-// prompts, project READMEs). LLM gets oriented without searching.
-// ============================================================
 const MANIFEST_PATTERN = /^sandpie_.*\.md$/i;
-const MANIFEST_CONTENT_CAP = 2048; // chars per manifest, post-truncation
-// cachedManifests hoisted near the top
+const MANIFEST_CONTENT_CAP = 2048; 
 
 async function gatherSandpieManifests() {
   const out = [];
@@ -3110,7 +2815,7 @@ async function gatherSandpieManifests() {
     for (const e of entries) {
       const full = path ? `${path}/${e.name}` : e.name;
       if (e.kind === 'directory') {
-        // Skip private app folders to keep scan cheap and context clean
+        
         if (full === '_conversations' || full.startsWith('_conversations/')) continue;
         await walk(full);
       } else if (MANIFEST_PATTERN.test(e.name)) {
@@ -3136,7 +2841,6 @@ async function refreshManifests() {
 refreshWelcome();
 }
 
-// Built fresh on every request so it reflects the current state of Dropbox/proxy.
 function buildSystemPrompt() {
   const dbxConnected = !!dbxTokens();
   const proxyUrl = ($('proxyUrl').value || '').trim();
@@ -3156,7 +2860,7 @@ function buildSystemPrompt() {
 
   lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
 
-  // Context manifests
+  
   lines.push('', '# Context manifests (sandpie_*.md)');
   lines.push('Convention: any file matching `sandpie_*.md` anywhere under /files/ is auto-loaded below as orientation context. A manifest should be a short markdown note that describes what\'s in its folder and *points at* other important docs (skills, prompts, project READMEs) by relative path — read those with run_python when relevant. If the user starts a project without one, suggest creating /files/sandpie_overview.md as an entry point.');
   if (cachedManifests.length) {
@@ -3178,7 +2882,6 @@ function buildSystemPrompt() {
   return { role: 'system', content: lines.join('\n') };
 }
 
-
 function formatSize(bytes) {
   if (!bytes || bytes < 0) return '';
   const units = ['B', 'kB', 'MB', 'GB', 'TB'];
@@ -3187,7 +2890,7 @@ function formatSize(bytes) {
   return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
 }
 async function getFileSize(path) {
-  // Local file: ask OPFS for size
+  
   try {
     const parts = path.split('/').filter(Boolean);
     const name = parts.pop();
@@ -3195,7 +2898,7 @@ async function getFileSize(path) {
     const handle = await dir.getFileHandle(name);
     return (await handle.getFile()).size;
   } catch {}
-  // Cloud placeholder: use sync state
+  
   const s = syncState()[path];
   return s && s.size || 0;
 }
@@ -3203,15 +2906,15 @@ async function getFolderSize(path) {
   const prefix = path ? path.toLowerCase() + '/' : '';
   let total = 0;
   const state = syncState();
-  // Sum ALL descendant files from sync state (cloud files), including nested
+  
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (prefix && !kl.startsWith(prefix)) continue;
-    // Must be strictly under this path, not the path itself
+    
     if (prefix && kl.length <= prefix.length) continue;
     total += state[k].size || 0;
   }
-  // Add local-only files not tracked in sync state (recursively)
+  
   try {
     for (const f of await opfs.list(path)) {
       const full = (path ? path + '/' : '') + f;
@@ -3229,9 +2932,6 @@ async function getFolderSize(path) {
   return total;
 }
 
-// ============================================================
-// OPFS file-list UI
-// ============================================================
 function opfsCurrentPath() {
   return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
 }
@@ -3244,16 +2944,16 @@ async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
 
-  // OPFS entries at this level (may be empty if dir doesn't exist locally)
+  
   let opfsList = [];
   try { opfsList = await opfs.listDir(path); } catch {}
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
-  // Direct children at this level derived from the sync state. Dropbox has
-  // no "create empty folder" primitive, so a known-cloud file at /a/b/c.txt
-  // implies /a/ exists remotely — we synthesize folder rows from path
-  // prefixes the same way the cloud listing does.
+  
+  
+  
+  
   const state = syncState();
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
@@ -3271,8 +2971,8 @@ async function refreshFileList() {
   }
 
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
-  // Build new content into a fragment so the list never goes empty mid-refresh
-  // — otherwise mid-sync refreshes cause the panel to collapse and reflow.
+  
+  
   const frag = document.createDocumentFragment();
   if (!names.size) {
     const li = document.createElement('li');
@@ -3300,8 +3000,8 @@ async function refreshFileList() {
     } else {
       const s = state[fullKey];
       if (!s || !s.hydrated) {
-        // Cloud has it, local has it, no synced state — TOFU until next sync
-        // baselines it.
+        
+        
         status = 'synced';
       } else {
         const lastMod = await opfsLastModified(fullKey);
@@ -3310,7 +3010,7 @@ async function refreshFileList() {
     }
     items.push({ name, kind, status, fullKey });
   }
-  // Fetch sizes in parallel
+  
   await Promise.all(items.map(async (it) => {
     if (it.kind === 'folder') {
       it.size = await getFolderSize(it.fullKey);
@@ -3320,16 +3020,16 @@ async function refreshFileList() {
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
-  // Re-scan manifests when the file tree changes — keeps system-prompt context current.
+  
   refreshManifests();
 
   for (const it of items) {
     const li = document.createElement('li');
     const span = document.createElement('span');
     span.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    // Phase D: distinct icon for cloud-only placeholders. Click hydrates
-    // them via the same fetch_file tool the LLM uses; once local, the row
-    // re-renders with 📄 + the file viewer click handler.
+    
+    
+    
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     span.textContent = kindIcon + it.name;
@@ -3344,8 +3044,8 @@ async function refreshFileList() {
         try {
           const result = await tools.fetch_file.run({ path: it.fullKey });
           if (!result.startsWith('Hydrated')) addMsg('info', result);
-          // refreshFileList() runs inside fetch_file's run() so this row
-          // gets re-rendered with the hydrated state automatically.
+          
+          
         } catch (e) {
           span.textContent = orig;
           span.style.pointerEvents = '';
@@ -3416,17 +3116,17 @@ async function refreshFileList() {
           const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
           const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
           if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
-          // Local delete first — recursive:true handles folders.
+          
           try { await opfs.remove(it.fullKey); } catch {}
-          // Eagerly propagate to Dropbox so the row vanishes immediately.
-          // Without this, a deleted folder would reappear as a 'cloud' ghost
-          // until the next sync, because the cached dbxIndex still has the
-          // descendant entries that drive folder presence in the UI.
+          
+          
+          
+          
           if (dbxTokens()) {
             try { await dbxDelete('/' + it.fullKey); } catch {}
           }
-          // Strip the deleted path + descendants from sync state. Matching
-          // is case-insensitive to mirror Dropbox semantics.
+          
+          
           const lkPrefix = it.fullKey.toLowerCase();
           const isHit = (k) => {
             const kl = k.toLowerCase();
@@ -3464,7 +3164,7 @@ function showContextMenu(x, y, items) {
     menu.appendChild(btn);
   }
   document.body.appendChild(menu);
-  // Clamp into viewport
+  
   const r = menu.getBoundingClientRect();
   const px = Math.min(x, window.innerWidth - r.width - 4);
   const py = Math.min(y, window.innerHeight - r.height - 4);
@@ -3473,14 +3173,10 @@ function showContextMenu(x, y, items) {
   activeCtxMenu = menu;
 }
 
-// Minimalist file viewer. Reads the file's Blob from OPFS, picks a reasonable
-// renderer by extension/MIME (image/audio/video/pdf vs text), and shows it in
-// a dismissable overlay. Marked data-chrome so the quarantine observer leaves
-// it alone.
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
-const TEXT_PREVIEW_CAP = 200_000; // chars
+const TEXT_PREVIEW_CAP = 200_000; 
 
 function closeFileViewer() {
   _openFilePath = null;
@@ -3491,7 +3187,6 @@ function closeFileViewer() {
   });
 }
 
-// Lazy-loaded markdown renderer (only fetched when the first .md preview opens).
 let markedPromise = null;
 function getMarked() {
   if (!markedPromise) {
@@ -3507,7 +3202,7 @@ function getMarked() {
 }
 
 async function openFileViewer(fullKey, name) {
-  // Fetch the underlying File object so we get a Blob (works for binary too).
+  
   let file;
   try {
     const { parts, name: fname } = splitPath(fullKey);
@@ -3536,7 +3231,7 @@ async function openFileViewer(fullKey, name) {
   meta.className = 'meta';
   meta.textContent = `${file.size.toLocaleString()} bytes`;
 
-  // Buttons created up-front; visibility is driven by the current mode.
+  
   const mdBtn = document.createElement('button');
   mdBtn.className = 'mode';
   mdBtn.style.display = 'none';
@@ -3561,7 +3256,7 @@ async function openFileViewer(fullKey, name) {
   panel.append(header, body);
   overlay.appendChild(panel);
 
-  // ---- Non-editable paths (binary media). Unchanged. ----
+  
   const finalize = (closeFn) => {
     closeBtn.onclick = closeFn;
     overlay._close = closeFn;
@@ -3594,7 +3289,7 @@ async function openFileViewer(fullKey, name) {
     finalize(closeFileViewer); return;
   }
 
-  // ---- Text-y path: read full content, detect binary by replacement-char density. ----
+  
   const text = await file.text();
   const sample = text.slice(0, 4000);
   const repl = (sample.match(/�/g) || []).length;
@@ -3608,10 +3303,10 @@ async function openFileViewer(fullKey, name) {
 
   const isMd = ext === 'md' || ext === 'markdown';
   const editable = text.length <= TEXT_PREVIEW_CAP;
-  // mode: 'rendered' (md preview), 'raw' (read-only <pre>), 'edit' (textarea)
+  
   let mode = isMd ? 'rendered' : 'raw';
-  let current = text;      // last-saved version
-  let textareaEl = null;   // populated while editing
+  let current = text;      
+  let textareaEl = null;   
 
   const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
   const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
@@ -3710,12 +3405,11 @@ function opfsUp() {
 $('opfsPath').addEventListener('change', refreshFileList);
 $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
 
-// Drag & drop uploads — handles files and (Chromium-only) folders.
 async function uploadEntry(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
-    // Write the File/Blob directly — calling .text() corrupts binary
-    // payloads (images, GIFs, PDFs, etc.) via UTF-8 decoding.
+    
+    
     await opfs.write(opfsJoin(dirPath, entry.name), file);
   } else if (entry.isDirectory) {
     const sub = opfsJoin(dirPath, entry.name);
@@ -3741,7 +3435,7 @@ async function uploadEntry(entry, dirPath) {
       const entry = item.webkitGetAsEntry?.();
       if (entry) await uploadEntry(entry, path);
     }
-    // Fallback for browsers without webkitGetAsEntry
+    
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
         await opfs.write(opfsJoin(path, f.name), f);
@@ -3752,44 +3446,7 @@ async function uploadEntry(entry, dirPath) {
 })();
 
 refreshFileList();
-// =============================================================================
-// SidePanel — controller for the dual-conversation view.
-// =============================================================================
-// State model (single source of truth lives in this object):
-//
-//   left      = $('messages')      — primary DOM panel, ALWAYS the host for
-//                                    activeConvId's conv when activeIsRight is
-//                                    false, swaps with right on flip()
-//   right     = $('messagesSide')  — secondary DOM panel, shown iff isOpen
-//   _sideId   = string | null      — conv mounted in the inactive panel
-//   _activeIsRight = bool          — which physical panel currently owns
-//                                    activeConvId. Flips on flip().
-//
-// Public API (everything else in the file goes through THESE four methods —
-// no caller touches body classes or DOM panels directly):
-//   open(id)            — mount conv `id` into the right panel (lazy-loads
-//                         from OPFS if needed). No-op if id is the active
-//                         conv or already in the side panel.
-//   close()             — unmount the side conv; collapse the right panel.
-//   flip()              — swap which side is active. Conv hosts STAY in
-//                         their pane; only the activeConvId↔sideId labels
-//                         and the active-left/active-right body class swap.
-//   notifyDeleted(id)   — called by deleteConv to clear references if the
-//                         deleted conv was on the side.
-//
-// Read-only accessors:
-//   isOpen, sideId, activeIsRight, activeMountTarget()
-//
-// Invariant: every public method ends by calling _render(), which derives
-// body.side-open / body.active-left / body.active-right from current state.
-// That's the single place DOM/CSS sync happens — no scattered classList
-// toggles elsewhere.
-//
-// Mobile (<=768px): CSS hides the right panel; buildConvLi suppresses the
-// "View in side panel" menu item; the drop handler early-returns. The
-// controller itself is viewport-agnostic — it'll happily track state for
-// a panel that's CSS-hidden, and the user gets it back on resize.
-// =============================================================================
+
 class SidePanel {
   constructor() {
     this.left = $('messages');
@@ -3801,27 +3458,27 @@ class SidePanel {
     this._wireEvents();
   }
 
-  // ─── Read-only ───────────────────────────────────────────────────────────
+  
   get isOpen() { return this._sideId !== null; }
   get sideId() { return this._sideId; }
   get activeIsRight() { return this._activeIsRight; }
-  // Where mountConv should put the active conv's host. Returns the panel
-  // currently owning activeConvId. (Conv hosts are explicit DOM children
-  // and are never moved by anything except SidePanel methods + mountConv.)
+  
+  
+  
   activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
 
-  // ─── State operations ───────────────────────────────────────────────────
+  
 
   async open(id) {
     if (!id) return;
-    if (id === activeConvId) return;      // already showing
-    if (id === this._sideId) return;      // already in side
-    if (this._activeIsRight) return;      // would clobber the active conv
+    if (id === activeConvId) return;      
+    if (id === this._sideId) return;      
+    if (this._activeIsRight) return;      
 
-    // Artifact panel shares #messagesSide — close it before mounting a conv.
+    
     closeArtifactPanel();
 
-    // Park the previous side conv (if any) so its host detaches cleanly.
+    
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
       prev?.host?.parentNode?.removeChild(prev.host);
@@ -3831,15 +3488,15 @@ class SidePanel {
     const s = convStreams.get(id);
     if (s?.host) this.right.appendChild(s.host);
     this._render();
-    // Land on the latest messages, not the top of history. rAF so the
-    // browser has measured the just-mounted host before we scroll.
+    
+    
     requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
     refreshConversationList();
   }
 
   close() {
     if (!this.isOpen) return;
-    if (this._activeIsRight) this.flip();  // bring user back to left first
+    if (this._activeIsRight) this.flip();  
     const s = convStreams.get(this._sideId);
     s?.host?.parentNode?.removeChild(s.host);
     this._sideId = null;
@@ -3850,8 +3507,8 @@ class SidePanel {
 
   flip() {
     if (!this.isOpen) return;
-    // Swap the activeConvId ↔ sideId labels. Hosts stay where they are
-    // — _render flips active-left/active-right and the dimming follows.
+    
+    
     [activeConvId, this._sideId] = [this._sideId, activeConvId];
     this._activeIsRight = !this._activeIsRight;
     if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
@@ -3863,9 +3520,9 @@ class SidePanel {
     refreshConversationList();
   }
 
-  // Called from deleteConv to clean up references to the deleted conv.
-  // If the deleted conv was the active one AND a side conv exists, we
-  // promote the side to active so the user isn't stranded.
+  
+  
+  
   notifyDeleted(id) {
     if (id === this._sideId) {
       this._sideId = null;
@@ -3874,22 +3531,22 @@ class SidePanel {
     }
   }
 
-  // Side conv becomes active; side panel collapses back to single-pane.
-  // Used by deleteConv when the active conv is the one being deleted but a
-  // side conv exists. flip() is the wrong primitive there — it only swaps
-  // the `activeConvId ↔ sideId` labels, leaving the surviving conv's HOST
-  // mounted in the (now-hidden) side panel and the new mount target wrong.
-  // This explicitly moves the host, clears the side state, and returns
-  // `_activeIsRight` to false so future mountConv calls land in #messages.
-  // Caller is responsible for clearing the deleted conv's activeConvId
-  // BEFORE calling this — we only promote, we don't validate.
+  
+  
+  
+  
+  
+  
+  
+  
+  
   promoteSideToActive() {
     if (!this.isOpen) return false;
     const sId = this._sideId;
     const s = convStreams.get(sId);
     if (s && s.host) {
-      // Move from right pane → left pane. The host's bubbles stay attached
-      // to it through the move, so no re-render is needed.
+      
+      
       if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
       this.left.appendChild(s.host);
     }
@@ -3904,10 +3561,10 @@ class SidePanel {
     return true;
   }
 
-  // ─── Private ─────────────────────────────────────────────────────────────
+  
 
-  // Hydrate a conv from OPFS into convStreams. Same logic as loadConv but
-  // local to here so opening into the side doesn't disturb activeConvId.
+  
+  
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
     let data;
@@ -3918,29 +3575,29 @@ class SidePanel {
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
-  // The ONLY place that mutates body classes for panel state. Every public
-  // method calls this last so derived DOM/CSS is always in sync with state.
+  
+  
   _render() {
     const b = document.body.classList;
     b.toggle('side-open',     this.isOpen);
     b.toggle('active-left',   this.isOpen && !this._activeIsRight);
     b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
-    // If a conv is now live in the right pane, clear any leftover artifact state.
+    
     if (this.isOpen) {
       b.remove('artifact-side-open');
       this.right.classList.remove('artifact-mode');
     }
   }
 
-  // Click-to-swap + drag-drop wiring. Attached once at construction.
+  
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
 
-    // Click on the dim panel → flip. Skips clicks on interactive children
-    // and text selections so it doesn't fight normal interactions.
+    
+    
     const onPanelClick = (targetIsRight) => (ev) => {
       if (!this.isOpen) return;
-      if (targetIsRight === this._activeIsRight) return;  // already active
+      if (targetIsRight === this._activeIsRight) return;  
       const sel = window.getSelection?.().toString();
       if (sel && sel.length > 0) return;
       if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
@@ -3949,9 +3606,9 @@ class SidePanel {
     this.left.addEventListener('click',  onPanelClick(false));
     this.right.addEventListener('click', onPanelClick(true));
 
-    // HTML5 drag-drop: a conv LI carries text/sandpie-conv-id; dropping it
-    // anywhere in the wrap opens it in the side panel. Touch devices don't
-    // fire these events, so they fall back to the right-click menu.
+    
+    
+    
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
       ev.preventDefault();
@@ -3976,18 +3633,10 @@ function isMobileViewport() {
   return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
 }
 
-// Instantiated below after all dependencies (convStreams, ensureStream, opfs,
-// renderHistoricalMessage, addMsg, refresh* functions) are defined.
 let sidePanel = null;
 
-// Instantiate the SidePanel controller before any mountConv call — mountConv
-// reads sidePanel.activeMountTarget() to know which physical panel owns the
-// active conv. Construction wires up the click/drag handlers on #messagesWrap.
 sidePanel = new SidePanel();
 
-// ── Side-panel resize drag ────────────────────────────────────────────────────
-// Works for both conv side panel and artifact mode — the right pane is always
-// #messagesSide. The resizer sits between #messages and #messagesSide in the DOM.
 (function () {
   const resizer = $('sideResizer');
   const panel   = $('messagesSide');
@@ -4003,7 +3652,7 @@ sidePanel = new SidePanel();
     resizer.classList.add('dragging');
     document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
-    // Prevent any iframe inside the panel eating mouse events during drag
+    
     const frame = $('artifactPanelFrame');
     if (frame) frame.style.pointerEvents = 'none';
 
@@ -4011,7 +3660,7 @@ sidePanel = new SidePanel();
       const wrap = $('messagesWrap');
       const minW = 200;
       const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
-      // Dragging left (decreasing clientX) widens the right panel
+      
       const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
       panel.style.width = newW + 'px';
     }
@@ -4031,26 +3680,25 @@ sidePanel = new SidePanel();
   });
 })();
 
-// Restore the last active conversation (if any) and render its history.
 (async () => {
   await refreshConversationList();
   if (activeConvId) {
-    // Bootstrap the active conv as a stream record so all the conv-switching
-    // / parking machinery has a consistent in-memory state to swap against.
+    
+    
     const restoreId = activeConvId;
-    activeConvId = null; // mountConv expects no parked active during init
+    activeConvId = null; 
     const s = ensureStream(restoreId);
     try {
       const data = JSON.parse(await opfs.read(convPath(restoreId)));
       s.messages = (data.messages || []).slice();
-    } catch { /* file may not exist yet — that's fine */ }
+    } catch {  }
     mountConv(restoreId);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
   updateVersionDisplay();
 refreshWelcome();
-  // Scroll to the bottom after layout settles. Use a double rAF so any
-  // late-arriving image loads also trigger a follow-up nudge.
+  
+  
   const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
   requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
   document.querySelectorAll('#messages img').forEach(img => {
@@ -4058,11 +3706,8 @@ refreshWelcome();
   });
 })();
 
-// ============================================================
-// Config / chat
-// ============================================================
 function saveConfig() {
-  // Save active provider changes back to the provider object
+  
   const p = getActiveProvider();
   if (p) {
     p.endpoint = $('endpoint').value;
@@ -4072,7 +3717,7 @@ function saveConfig() {
     saveProviders();
     renderChips();
   }
-  // Keep old config for backward compat (Dropbox key only)
+  
   localStorage.setItem('opencode-config', JSON.stringify({
     dbxAppKey: $('dbxAppKey').value,
   }));
@@ -4084,7 +3729,7 @@ async function requestWakeLock() {
       wakeLock = await navigator.wakeLock.request('screen');
       wakeLock.addEventListener('release', () => { wakeLock = null; });
     }
-  } catch (e) { /* wakeLock may be denied, ignore */ }
+  } catch (e) {  }
 }
 
 function releaseWakeLock() {
@@ -4094,8 +3739,6 @@ function releaseWakeLock() {
   }
 }
 
-// Re-acquire wake lock when user returns to tab and any conversation is
-// still generating in the background.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   for (const s of convStreams.values()) {
@@ -4103,20 +3746,15 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-
-// Hard cap on the tool-result content fed back to the LLM. 30 KB is roomy
-// enough for legitimate long output (recursive `dir`, full pyodide tracebacks,
-// big JSON dumps) but small enough that one runaway print() can't blow past
-// the upstream's body limit and 413 the next request.
 const TOOL_RESULT_MAX = 30000;
 function capToolResult(s) {
   s = String(s ?? '');
   if (s.length <= TOOL_RESULT_MAX) {
     return { content: s, truncated: false, original: s.length, kept: s.length };
   }
-  // Head+tail: a single big print() often has its useful summary at the end
-  // (the final traceback line, the "Done." after a long log). Keeping both
-  // ends costs nothing over head-only and saves the model a re-run.
+  
+  
+  
   const reserve = 180;
   const budget = TOOL_RESULT_MAX - reserve;
   const headLen = Math.floor(budget * 0.7);
@@ -4135,14 +3773,14 @@ function humanBytes(n) {
 }
 
 function addMsg(role, text = '', host = null) {
-  // Default target = active conv's host so bubbles created from arbitrary
-  // callsites land in the conversation the user is currently viewing.
-  // Stream code passes its captured host explicitly so background streams
-  // route into their own (possibly parked / off-DOM) conversation host.
+  
+  
+  
+  
   const target = host || (activeStream() && activeStream().host) || $('messages');
-  // Auto-scroll the container the target lives in — could be #messages
-  // (single-pane or active-left) or #messagesSide (active-right side
-  // panel). Walk up so we don't have to know which.
+  
+  
+  
   let scrollHost = target;
   while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
     scrollHost = scrollHost.parentNode;
@@ -4151,8 +3789,8 @@ function addMsg(role, text = '', host = null) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
-    // Dual view: .tc-expanded carries the full text (visible when tools are
-    // shown); .tc-collapsed carries the minimized spinner/flavor/token card.
+    
+    
     const expanded = document.createElement('span');
     expanded.className = 'tc-expanded';
     expanded.textContent = text;
@@ -4164,7 +3802,7 @@ function addMsg(role, text = '', host = null) {
     const bubble = document.createElement('span');
     bubble.className = 'bubble';
     if (Array.isArray(text)) {
-      // Multimodal content: render text parts + images
+      
       for (const part of text) {
         if (part.type === 'text' && part.text) {
           const span = document.createElement('span');
@@ -4176,7 +3814,7 @@ function addMsg(role, text = '', host = null) {
           const img = document.createElement('img');
           const url = part.image_url.url;
           if (url.startsWith('opfs://')) {
-            // Resolve OPFS path to data URL asynchronously
+            
             img.src = '';
             img.alt = '(loading image...)';
             img.style.maxWidth = '200px';
@@ -4203,30 +3841,24 @@ function addMsg(role, text = '', host = null) {
     div.appendChild(bubble);
   }
   target.appendChild(div);
-  // Keep the host's *active* total timer pinned to the bottom of its bubbles.
-  // The `:not(.done)` guard is load-bearing: finished rounds leave their
-  // "done · 12s" bubble in the host (chronologically first, with .done),
-  // and a bare `:scope > .msg-timer` selector would re-anchor THAT to the
-  // bottom on every new addMsg — burying the actually-ticking timer mid-history.
+  
+  
+  
+  
+  
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 
-// === Bubble context menu (rewind + minimize tool calls) =====================
-// Bubbles are bound to their backing message via object reference (div._msg),
-// not array index — so rewind survives slices and re-renders cleanly.
 function applyToolsMinimized() {
-  // Class lives on <body> so the rule reaches both #messages and
-  // #messagesSide. Previously it was on #messages only, which meant the
-  // side panel kept showing expanded tool calls regardless of the setting.
+  
+  
+  
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
-// === Touch / long-press helpers =============================================
-// Per-element state (stored on the DOM node) so concurrent touches on
-// different items never interfere.
 const LP_DELAY = 500;
 const LP_SLOP = 30;
 
@@ -4242,8 +3874,8 @@ function attachLongPress(el, handler) {
           clientX: el._lp.x, clientY: el._lp.y,
           preventDefault() {}, stopPropagation() {}
         });
-        // Swallow the synthetic click that fires ~300 ms later so the
-        // context menu isn't immediately dismissed.
+        
+        
         const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         document.addEventListener('click', swallow, { capture: true, once: true });
         setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 350);
@@ -4281,16 +3913,15 @@ function attachLongPress(el, handler) {
   });
 }
 
-
 function bindBubble(div, msgRef) {
   if (!div) return div;
-  // Idempotent: attach the contextmenu/click listeners exactly once per
-  // bubble so we can call bindBubble at creation time (no msg yet) AND
-  // again once the message is pushed, without ending up with duplicate
-  // handlers that fire the menu twice.
+  
+  
+  
+  
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-    // Tap/click shows the bubble menu; long-press is left for native text selection
+    
     div.addEventListener('contextmenu', onBubbleContextMenu);
   }
   if (msgRef) div._msg = msgRef;
@@ -4321,9 +3952,9 @@ async function rewindFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
   if (!target) return;
-  // _msg is only set once the assistant message is pushed (after the LLM
-  // finishes streaming this round). During the preparing phase the chip is
-  // clickable but there's no message to rewind to yet.
+  
+  
+  
   if (!target._msg) {
     const s = activeStream();
     addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
@@ -4336,8 +3967,8 @@ async function rewindFromMenu() {
     ? 'Remove this message?'
     : `Remove this message and ${after} message(s) after it?`;
   if (!confirm(msg)) return;
-  // Abort any in-flight stream for the active conv before truncating, so the
-  // in-flight round doesn't push messages into the slot we just freed.
+  
+  
   const s = activeStream();
   if (s) {
     if (s.abort) { s.queueAborted = true; s.abort.abort(); }
@@ -4347,9 +3978,9 @@ async function rewindFromMenu() {
   messages.length = idx;
   clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
-  // After a wholesale re-render the per-bubble isAtBottom check inside
-  // addMsg can return false (host briefly empty/short, scroll snaps to 0),
-  // so leave the user where the conversation now ends.
+  
+  
+  
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
@@ -4367,8 +3998,8 @@ async function copyFromMenu() {
   hideBubbleMenu();
   if (!target) return;
   let text;
-  // For tool-call chips, prefer the full `→ funcname(args)` line — that's
-  // what the user sees in the expanded view and what they'd want to grab.
+  
+  
   const expanded = target.querySelector && target.querySelector('.tc-expanded');
   if (expanded && expanded.textContent) {
     text = expanded.textContent;
@@ -4380,7 +4011,7 @@ async function copyFromMenu() {
   try {
     await navigator.clipboard.writeText(text);
   } catch (e) {
-    // Fallback for non-secure-context / older browsers.
+    
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
@@ -4392,8 +4023,6 @@ async function copyFromMenu() {
   }
 }
 
-// === Tool-call collapsed view — spinner, rotating flavor text, token tick ===
-// Token tick count uses a 4-chars-per-token approximation — sized to feel alive without being precise.
 const TOOL_FLAVOR = {
   run_python: [
     'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
@@ -4445,12 +4074,12 @@ function appendToolResult(tcId, result) {
     expanded.innerHTML = '';
     expanded.appendChild(box);
   }
-  // Remove existing sep + result if any
+  
   const existingSep = box.querySelector('.tool-sep');
   const existingResult = box.querySelector('.tool-result');
   if (existingSep) existingSep.remove();
   if (existingResult) existingResult.remove();
-  // Add new result
+  
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
   const resultDiv = document.createElement('div');
@@ -4481,18 +4110,14 @@ function buildToolBox(args, toolName) {
   return box;
 }
 
-
-
-
-
 function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  // Token count is meaningful here because the LLM is actively streaming the
-  // arguments — each character is a real token coming in. During the tool's
-  // execution phase (running) nothing new is generated, so we hide it there.
+  
+  
+  
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
-  // Build once, then only update the token count so the spinner never resets.
+  
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
       '<span class="tc-spinner tc-dim"></span>' +
@@ -4506,9 +4131,9 @@ function renderTcPreparing(div, fname, args) {
 function renderTcRunning(div, fname, flavor) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  // Build the structure once, then only update the flavor text so the CSS
-  // spinner animation never resets.  The spinner is a border+animation element
-  // — destroying it via innerHTML every 1.4s causes a visible jank.
+  
+  
+  
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
       '<span class="tc-spinner"></span>' +
@@ -4551,45 +4176,17 @@ function stopToolTicker(div) {
   }
 }
 
-// =============================================================================
-// RoundRenderer — owns ALL per-round render state for one streaming exchange.
-// =============================================================================
-// One instance per sendSingle call. The dispatch layer (dispatchAgentEvent
-// below) is the ONLY caller of its public methods; it does not touch render
-// state directly. Lifecycle, matching the flow-chart event labels:
-//
-//   r = new RoundRenderer(host, convMessages)
-//   r.startRound()                              // E1  round_start
-//   r.applyDelta(ev.delta)                      // E2  delta
-//   r.endRound()                                // E3  round_end
-//   r.bindMessage(msg)                          // E4  message_added
-//   r.markToolStarted(tc)                       // E5  tool_started
-//   r.markToolDone(id, result, artifacts)       // E6  tool_result
-//   r.finalize()                                // F2  always, from finally
-//
-// Invariants:
-//  * Bubble DOM lives in this.host only.
-//  * drainTick is the ONLY writer of tool-arg text during a round; applyDelta
-//    just enqueues into toolPending[i]. This is the structural reason the
-//    typewriter can't be "skipped" by a fast-arriving delta.
-//  * startRound() and finalize() share one private flush path
-//    (_flushAllPending) so a fast tool that fires tool_result → next
-//    round_start before the typewriter has finished cannot strand the prior
-//    bubble mid-arg.
-//  * finalize() is idempotent and safe to call from any finally regardless
-//    of where the round/tool cycle left off.
-// =============================================================================
 class RoundRenderer {
   constructor(host, convMessages) {
     this.host = host;
     this.convMessages = convMessages;
-    // Per-round state. startRound() resets these AFTER flushing the prior
-    // round's pending bytes — see _flushAllPending.
+    
+    
     this.reply = null;
     this.cursor = null;
-    // Assistant text: `content` is the LLM-truthful accumulation; `displayed`
-    // is what's actually painted into the bubble; `pending` is queued chars
-    // waiting for the next typewriter tick.
+    
+    
+    
     this.content = '';
     this.displayed = '';
     this.pending = '';
@@ -4602,7 +4199,7 @@ class RoundRenderer {
     this.pendingToolResultDiv = null;
   }
 
-  // ─── public API ──────────────────────────────────────────────────────────
+  
 
   startRound() {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
@@ -4630,15 +4227,15 @@ class RoundRenderer {
   }
 
   endRound() {
-    // Don't remove the cursor here — the typewriter may still be revealing
-    // text, and yanking the cursor mid-stream looks jumpy. drainTick
-    // (and finalize on hard exit) handle cursor removal once pending hits 0.
+    
+    
+    
     this.toolsShouldClose = true;
     this._scheduleDrain();
-    // Remove the assistant bubble entirely if no text was ever streamed
-    // (round contained only tool calls). Checked against `content` not
-    // `displayed` because the SW has finished emitting deltas by now —
-    // any text that's going to arrive has already arrived.
+    
+    
+    
+    
     if (this.reply && (!this.content || !this.content.trim())) {
       this.reply.remove();
       this.reply = null;
@@ -4672,13 +4269,13 @@ class RoundRenderer {
       renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
     }
     const text = String(result || '');
-    // show_artifact: render the file as an iframe, skip the "← ok" text bubble.
+    
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
       return;
     }
-    // load_image: attach image to next user message
+    
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
       if (path) {
@@ -4700,21 +4297,21 @@ class RoundRenderer {
   }
 
   finalize() {
-    // Idempotent — safe to call from finally regardless of where the
-    // round/tool cycle left off. Force-closes any open '(' so the user
-    // sees a complete tool call even on abrupt stream end.
+    
+    
+    
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
     this._flushAllPending();
     if (this.cursor) { this.cursor.remove(); this.cursor = null; }
   }
 
-  // ─── private ─────────────────────────────────────────────────────────────
+  
 
   _appendContent(chunk) {
-    // `content` is the LLM-truthful accumulation (used at save time).
-    // `pending` queues chars for the typewriter; drainTick reveals them
-    // into `displayed`, which is what's actually painted.
+    
+    
+    
     this.content += chunk;
     this.pending += chunk;
     this._scheduleDrain();
@@ -4736,9 +4333,9 @@ class RoundRenderer {
     if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
     if (!this.toolCalls[i].function.name) return;
     if (!this.toolCallEls[i]) {
-      // Bubble starts with `→ name(` only — args stream in via toolPending
-      // / drainTick so they type out smoothly whether the upstream sent
-      // them char-by-char or in one chunk.
+      
+      
+      
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
       this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
       this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
@@ -4761,17 +4358,17 @@ class RoundRenderer {
   _drainTick() {
     this.drainTimer = null;
     let anyPending = false;
-    // Stick-to-bottom auto-scroll: snapshot whether the scroll container is
-    // already at the bottom BEFORE we paint, then re-pin it after. Without
-    // this, content grows inside the bubble but scrollTop stays put, so the
-    // user has to manually chase the cursor. The scroll host is whichever
-    // ancestor of `reply` is #messages or #messagesSide — the side panel
-    // case is the one the user noticed.
+    
+    
+    
+    
+    
+    
     const scrollHost = this._scrollHost();
     const stick = shouldAutoScroll(scrollHost);
 
-    // Assistant text typewriter — same Math.ceil(buf/30) cadence as tool args
-    // so a big batch reveals fast and a trickle reveals smoothly.
+    
+    
     if (this.pending.length > 0) {
       const n = Math.max(1, Math.ceil(this.pending.length / 30));
       this.displayed += this.pending.slice(0, n);
@@ -4779,7 +4376,7 @@ class RoundRenderer {
       this._paintContent();
       if (this.pending.length > 0) anyPending = true;
     }
-    // Tool-call args typewriter.
+    
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i];
       if (!buf || buf.length === 0) continue;
@@ -4790,9 +4387,9 @@ class RoundRenderer {
       if (this.toolPending[i].length > 0) anyPending = true;
     }
     this._appendCloseParensIfReady();
-    // Once round_end has fired AND the assistant-text typewriter has fully
-    // caught up, the cursor's purpose is done — drop it. (Tool-call drains
-    // can still be running; the cursor only blinks for the text bubble.)
+    
+    
+    
     if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
       this.cursor.remove();
       this.cursor = null;
@@ -4801,9 +4398,9 @@ class RoundRenderer {
     if (anyPending) this._scheduleDrain();
   }
 
-  // Walks up from `this.reply` (or any tool-call bubble fallback) to find the
-  // #messages / #messagesSide container that scrolls. Both panels need this
-  // — the side panel was the regression case the user reported.
+  
+  
+  
   _scrollHost() {
     let el = this.reply || this.host;
     while (el && el.id !== 'messages' && el.id !== 'messagesSide') {
@@ -4812,18 +4409,18 @@ class RoundRenderer {
     return el;
   }
 
-  // Synchronously reveal everything still queued and append the closing ')'
-  // to any bubble whose round has ended. Called from startRound (prior-round
-  // cleanup) and finalize (stream-exit cleanup) — single place where the
-  // "args got stranded mid-stream" bug class is structurally prevented.
+  
+  
+  
+  
   _flushAllPending() {
-    // Assistant text first.
+    
     if (this.pending.length > 0) {
       this.displayed += this.pending;
       this.pending = '';
       this._paintContent();
     }
-    // Then tool args + close-paren.
+    
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i] || '';
       if (buf.length > 0) {
@@ -4842,7 +4439,7 @@ class RoundRenderer {
 
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
-      // Preserve existing tool result (tool-sep + tool-result) if any
+      
       const existingBox = expanded.querySelector('.tool-box');
       const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
       const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
@@ -4865,10 +4462,6 @@ class RoundRenderer {
   }
 }
 
-// === Total-interaction timer (covers all rounds + tool execution) ============
-// Per-stream: each conversation's timer lives on its stream record so a
-// background conv keeps ticking against its own bubble host without colliding
-// with whichever conv is currently visible.
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
@@ -4900,11 +4493,7 @@ function endTotalTimer(stream, label) {
   stream.timerEl = null;
 }
 
-// ============================================================
-// Conversations — auto-saved to OPFS, sync to Dropbox like any file
-// ============================================================
 const CONV_DIR = '_conversations';
-// activeConvId hoisted near the top
 
 function newConvId() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -4919,16 +4508,13 @@ async function ensureActiveConv() {
 
 async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
 
-// Save a specific conversation's stream state to disk. Used by background
-// streams so a save reaches the conv that actually generated the messages,
-// even if the user has since switched to a different conv.
 async function saveConv(convId, { touchUpdated = true } = {}) {
   if (!convId) return;
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
-  // Disk is source of truth for metadata (title, pinned, archived, etc).
-  // saveConv only owns messages and updated — everything else comes from prev.
+  
+  
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
@@ -4950,10 +4536,6 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   await refreshConversationList();
 }
 
-// host: where to mount these bubbles. Defaults to addMsg's own default
-// (active conv's host), but MUST be passed when replaying history for a
-// non-active conv — e.g. opening a conv into the side panel — otherwise
-// the bubbles append into the active conv and the side panel renders empty.
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
     bindBubble(addMsg('user', m.content, host), m);
@@ -4992,26 +4574,24 @@ function renderHistoricalMessage(m, host = null) {
     if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
-      // Find last tool-call div and append result to its box
+      
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
         appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
       }
     }
-    // legacy m.artifacts blobs ignored — new architecture uses show_artifact tool
+    
   }
 }
 
 function clearActiveConvUI() {
-  // Wipe the active conv's bubble host children. The host itself stays
-  // mounted under #messages; #welcome (a sibling of the host) is untouched.
+  
+  
   const s = activeStream();
   if (s && s.host) s.host.innerHTML = '';
 }
 
-// Park the currently active conv: detach its host from #messages. Module
-// `messages` keeps pointing at the parked conv's array until mountConv runs.
 function parkActiveConv() {
   const s = activeStream();
   if (!s) return;
@@ -5019,18 +4599,15 @@ function parkActiveConv() {
   if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
 }
 
-// Mount a conv as the active one: rebind module-level `messages`, attach its
-// host to whichever DOM panel currently owns "active" (left by default; right
-// after the user has clicked into a side-panel conv), update the send button.
 function mountConv(convId) {
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
-    // The active mount target is owned by SidePanel — when the side panel
-    // is closed, this is always #messages; when open, it's whichever
-    // panel SidePanel currently considers active.
+    
+    
+    
     const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
     if (s.host.parentNode !== target) target.appendChild(s.host);
   } else {
@@ -5042,22 +4619,22 @@ function mountConv(convId) {
 
 async function loadConv(id) {
   if (id === activeConvId) return;
-  // If the requested conv is already shown in the side panel, clicking it
-  // in the sidebar just flips which side is active — the host doesn't move.
+  
+  
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
-  // Persist the conv we're leaving before switching — otherwise it vanishes
-  // from disk and refreshConversationList() won't show it.
+  
+  
   await saveActiveConv();
-  // Snapshot whichever conv we're leaving — its bubbles + state persist
-  // unmounted so any in-flight stream keeps writing into them safely.
+  
+  
   parkActiveConv();
   if (convStreams.has(id)) {
-    // Already in-memory (currently generating, or previously loaded this
-    // session). Re-mount its host: no disk read, no re-render.
+    
+    
     mountConv(id);
   } else {
-    // First time looking at this conv this session — pull from disk into a
-    // fresh stream record and render bubbles into its host.
+    
+    
     let data;
     try { data = JSON.parse(await opfs.read(convPath(id))); }
     catch (e) {
@@ -5095,16 +4672,16 @@ async function newConversation() {
 async function listConversations() {
   let entries = [];
   try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
-  // Only build the searchable full-text body when the search box actually
-  // has content. It's used solely by the filter step in refreshConversationList,
-  // so for the common case (no active search) we skip iterating + joining
-  // every message in every conv. Was a per-call O(total_message_bytes) cost
-  // that ran after every send / save / rename / sync — easily 10+s with a
-  // populated Dropbox account.
+  
+  
+  
+  
+  
+  
   const searchActive = !!($('convSearch')?.value.trim());
-  // Read all conv files in parallel. The previous serial `for ... await` made
-  // boot O(N × disk_latency); Promise.all collapses that to roughly one disk
-  // round-trip's worth (OPFS handles concurrent reads fine).
+  
+  
+  
   const reads = entries
     .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
     .map(async (e) => {
@@ -5126,8 +4703,8 @@ async function listConversations() {
       } catch { return null; }
     });
   const out = (await Promise.all(reads)).filter(Boolean);
-  // Seed last-viewed from each conv's own updated time so on reload
-  // nothing looks "unseen" — only new messages during this session turn blue.
+  
+  
   for (const c of out) {
     if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
   }
@@ -5142,8 +4719,6 @@ function refreshNewChatButton() {
   btn.title = empty ? "Already a fresh chat — just start typing below." : '';
 }
 
-// Show a welcome card in the messages area when the chat is empty — disappears
-// the moment the user sends a message (or loads a conversation with history).
 function updateVersionDisplay() {
   const els = document.querySelectorAll('#versionDisplay, #welcomeVersion');
   els.forEach(el => { if (el) el.textContent = VERSION; });
@@ -5155,7 +4730,7 @@ function refreshWelcome() {
   const empty = messages.length === 0;
   w.style.display = empty ? '' : 'none';
   if (!empty) return;
-  // One-line summary, only the things that are actually loaded/active.
+  
   const parts = [];
   let convCount = 0;
   try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
@@ -5167,8 +4742,6 @@ function refreshWelcome() {
   const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
 }
 
-// Persists across re-renders (module-level) so toggling expansion doesn't
-// snap shut every time saveActiveConv triggers a refresh.
 let archivedExpanded = false;
 
 async function updateConvFile(id, patch) {
@@ -5217,8 +4790,8 @@ async function deleteConv(id, title) {
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
-  // Propagate to Dropbox + clear cached index/manifest so the row doesn't
-  // resurrect as a 'cloud' ghost (same fix as the file-list delete).
+  
+  
   if (dbxTokens()) {
     try { await dbxDelete('/' + path); } catch {}
   }
@@ -5226,7 +4799,7 @@ async function deleteConv(id, title) {
   const sync = syncState(); let sChanged = false;
   for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
   if (sChanged) setSyncState(sync);
-  // Tear down any in-memory stream record + parked bubbles for the deleted conv.
+  
   const stream = convStreams.get(id);
   if (stream) {
     if (stream.abort) stream.abort.abort();
@@ -5235,27 +4808,27 @@ async function deleteConv(id, title) {
 
     convStreams.delete(id);
   }
-  // Tell SidePanel first so it can drop its reference + collapse the right
-  // panel if this conv was the side one. (No-op if id is the active conv.)
+  
+  
   if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
-    // If a side conv exists, promote it to active — moves its host from
-    // #messagesSide → #messages and collapses the side layout. We DO NOT
-    // use sidePanel.flip() here: flip only swaps the activeConvId/sideId
-    // labels, leaving the surviving conv's host in the (now-hidden) side
-    // panel and mountConv targeting the wrong pane on subsequent loads.
-    // promoteSideToActive sets messages + activeConvId itself, so we only
-    // run the post-state UI refreshers below if it didn't fire.
+    
+    
+    
+    
+    
+    
+    
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
       updateVersionDisplay();
       refreshWelcome();
     } else {
-      // promoteSideToActive already ran send/token/welcome; just version.
+      
       updateVersionDisplay();
     }
   }
@@ -5295,7 +4868,7 @@ function buildConvLi(c, idx) {
   span.onclick = () => loadConv(c.id);
   li.appendChild(num);
   li.appendChild(span);
-  // Meta indicator: shows generating dot OR relative time (shares same spot)
+  
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
@@ -5330,10 +4903,10 @@ function buildConvLi(c, idx) {
   };
   li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
   attachLongPress(li, _openConvMenu);
-  // HTML5 drag — dropping the LI onto #messagesWrap opens it in the side
-  // panel (the wrap's dragover/drop handlers, wired in SidePanel._wireEvents,
-  // read the carried `text/sandpie-conv-id`). Touch devices don't fire HTML5
-  // drag events; they get the same affordance via the context menu above.
+  
+  
+  
+  
   li.draggable = true;
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
@@ -5348,7 +4921,7 @@ async function refreshConversationList() {
   if (!ul) return;
   let list = await listConversations();
 
-  // Apply search filter
+  
   const searchInput = $('convSearch');
   if (searchInput && searchInput.value.trim()) {
     const query = searchInput.value.trim().toLowerCase();
@@ -5358,11 +4931,11 @@ async function refreshConversationList() {
     );
   }
 
-  // listConversations already sorts by updated desc; partition preserves that.
+  
   const pinned   = list.filter(c => c.pinned && !c.archived);
   const regular  = list.filter(c => !c.pinned && !c.archived);
   const archived = list.filter(c => c.archived);
-  // Badge counts visible (non-archived) chats; archived live behind the toggle.
+  
   const visible = pinned.length + regular.length;
   $('convCount').textContent = visible ? `${visible}` : '';
   const frag = document.createDocumentFragment();
@@ -5393,12 +4966,8 @@ async function refreshConversationList() {
   ul.replaceChildren(frag);
 }
 
-// Per-stream abort/queue state. The Send button reflects whichever
-// conversation is currently visible (active stream). A background stream
-// for a parked conv keeps running and writes only to its own state.
 let wakeLock = null;
 
-// Sync the visible Send button to the active conv's stream.
 function refreshSendButtonForActive() {
   const btn = $('sendBtn');
   if (!btn) return;
@@ -5414,8 +4983,6 @@ function refreshSendButtonForActive() {
   }
 }
 
-// Toggle generating flag and visuals for a specific stream. Updates the
-// send button only if this stream belongs to the currently active conv.
 function setStreamSending(stream, sending) {
   if (!stream) return;
   if (sending) {
@@ -5425,11 +4992,11 @@ function setStreamSending(stream, sending) {
   } else {
     stream.abort = null;
     stream.generating = false;
-    // Clear any lingering tool spinners scoped to this stream's bubble host.
-    // Covers both phases: `.in-flight` (mid-execution, ticker running) AND
-    // preparing (LLM was still streaming args when the user hit Stop — no
-    // .in-flight class yet, but the chip already shows a spinner via
-    // renderTcPreparing). Anything with the done check is skipped.
+    
+    
+    
+    
+    
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
@@ -5438,27 +5005,19 @@ function setStreamSending(stream, sending) {
     }
   }
   if (stream === activeStream()) refreshSendButtonForActive();
-  // Conv-list spinner indicator follows the generating flag.
+  
   refreshConversationList();
 }
-
-
-
-
-
-
-
-
 
 async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !SandpieImages.hasImage()) return;
   $('input').value = '';
 
-  // Build message content: string (text only) or array (multimodal)
+  
   const content = await SandpieImages.buildContent(text);
 
-  // Clear attached image after building content
+  
   if (SandpieImages.hasImage()) {
     SandpieImages.clear();
   }
@@ -5467,20 +5026,19 @@ async function handleSubmit() {
   lockScroll(m);
   m.scrollTop = m.scrollHeight;
   enqueueForActive(content);
-  // Reset textarea height after clearing value
+  
   const ta = $('input');
   if (ta) {
     ta.style.height = 'auto';
   }
 }
 
-// Push a message into the currently visible conv's queue and start processing.
 async function enqueueForActive(content) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
-  // If the stream's host hasn't been mounted yet (fresh conv started by
-  // typing rather than via the conv list), mount it now so bubbles are
-  // visible as they stream in.
+  
+  
+  
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
   s.queue.push(content);
   updateQueueCount(s);
@@ -5491,7 +5049,7 @@ function handleButtonClick() {
   const btn = $('sendBtn');
   const s = activeStream();
   if (btn.classList.contains('sending') && s) {
-    // Stop the active stream. Other conv streams keep running.
+    
     s.queueAborted = true;
     if (s.abort) s.abort.abort();
     s.queue.length = 0;
@@ -5502,7 +5060,7 @@ function handleButtonClick() {
 }
 
 function updateQueueCount(stream) {
-  // Update the timer badge for the given stream (default = active).
+  
   const s = stream || activeStream();
   if (!s || !s.timerEl) return;
   const sec = Math.floor((Date.now() - s.timerStart) / 1000);
@@ -5528,63 +5086,24 @@ async function processQueueFor(stream) {
     updateQueueCount(stream);
   }
 
-  // Messages enqueued *while* we were running this pass (especially during
-  // an abort/teardown window — rewind, Stop, etc.) would have bounced off
-  // the `isProcessing` early-return in the entry. Now that we're idle, give
-  // them a fresh pass. Recursive but non-overlapping: the re-entry sees
-  // isProcessing=false, queue non-empty, and starts a new loop. Stops when
-  // the queue drains.
+  
+  
+  
+  
+  
+  
   if (stream.queue.length > 0) processQueueFor(stream);
 }
 
-// ============================================================
-// LLM streaming via Service Worker — sibling sandpie.js owns the
-// upstream fetch + buffered SSE drain. The page just issues a normal
-// fetch to a sentinel path the SW intercepts. Why a SW instead of a
-// dedicated Web Worker:
-//   * Dedicated workers freeze WITH the page (Chrome's energy-saver
-//     freezing suspends task execution including network event handlers).
-//     When the tab unfreezes the in-flight stream is often dead — no
-//     bytes were read, the upstream's idle timer fired, FIN never
-//     propagated cleanly. The Web Worker version had a watchdog to
-//     retry past this, but at the cost of restarting the completion.
-//   * Service workers have a separate lifecycle — they're explicitly
-//     exempt from freezing while a fetch handler is in flight, so a
-//     mid-stream tab freeze of 1-2 minutes is survivable: the SW keeps
-//     draining bytes into an in-memory buffer, and the page picks up
-//     where it left off when it unfreezes.
-//   * Bonus: page-side code is simpler. No postMessage protocol, no
-//     requestId multiplex — just `fetch(SW_STREAM_PATH, { body })`
-//     and read the response body like any other SSE stream.
-// ============================================================
-
-// Same-origin path the SW intercepts. Relative resolution puts it under
-// the SW's scope (the directory containing sandpie.js).
 const SW_STREAM_PATH = './sandpie-stream';
 
-// Register the SW. Two requirements that have to coexist:
-//
-//   1. FAST in the common case. Unregister-and-reinstall on every page load
-//      pays the SW install cost (importScripts of ~1MB pyodide.asm.js) every
-//      time, which makes the page feel slow even though OPFS reads aren't
-//      slow. Idempotent register() is a no-op when the SW is already
-//      installed at the same URL — no install, no Pyodide reparse, fast.
-//
-//   2. RELIABLE in the failure case. If the page comes up uncontrolled
-//      (hard refresh, a stale SW from the sandpie-sw.js rename, weird
-//      claim state), we have to recover — otherwise /sandpie-agent fetches
-//      404 against the network and the user sees nothing happen.
-//
-// Strategy: try the fast path first. If it ends with no controller, fall
-// back to the heavy unregister-and-reinstall which forces a fresh activate
-// (and therefore clients.claim, which fires controllerchange).
 let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
 
-  // Always purge the OLD sandpie-sw.js registration if it's still around
-  // (the rename leftover). Cheap — runs once per browser ever, then no-ops.
+  
+  
   const regs = await navigator.serviceWorker.getRegistrations();
   for (const r of regs) {
     const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
@@ -5594,16 +5113,16 @@ let _swReady = (async () => {
     }
   }
 
-  // FAST path: idempotent register. If sandpie.js is already installed at
-  // this scope, this returns the existing registration without paying the
-  // install cost. .ready resolves immediately when active.
+  
+  
+  
   let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
 
-  // SLOW path: if .ready resolved but we still don't have a controller
-  // (hard refresh / first install case), force a fresh activate by
-  // unregistering and reinstalling. This is the ONLY scenario that pays
-  // the install cost; subsequent reloads stay on the fast path.
+  
+  
+  
+  
   if (!navigator.serviceWorker.controller) {
     console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
     await reg.unregister();
@@ -5621,42 +5140,28 @@ let _swReady = (async () => {
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 
-// =============================================================================
-// sendSingle — orchestrates ONE round-trip with the agent loop.
-// =============================================================================
-// Reads as a near-1:1 mapping of the flow-chart steps. Each step's concern
-// lives in its own helper so this function stays a thin coordinator:
-//
-//   [R1] buildAgentConfig  — package the SW request payload from the UI state
-//   [R2] await _swReady    — make sure the SW is controlling this page
-//   [R2] fetch /sandpie-agent — POST the config, SW intercepts
-//   [R3] readAgentEvents   — NDJSON line reader, calls dispatch for each line
-//   [E*] dispatchAgentEvent — map ev.type to the renderer's method
-//   [F1..F5] finally       — abort cleanup, persistence, Dropbox sync
-//
-// All per-round render state is in the RoundRenderer constructed at the top.
 async function sendSingle(text, stream) {
-  // [R1] Pre-flight
+  
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
   const { id: convId, messages: convMessages, host } = stream;
 
-  // [U-tail] Persist + render the user message before kicking off the round.
+  
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
   bindBubble(addMsg('user', text, host), userMsg);
-  saveConv(convId).catch(() => {});  // best-effort: fresh conv hits the list immediately
+  saveConv(convId).catch(() => {});  
   requestWakeLock();
   setStreamSending(stream, true);
   startTotalTimer(stream);
   let wasAborted = false;
 
-  // [R1] Build the SW request payload from current UI state.
+  
   const config = await buildAgentConfig(convMessages);
 
-  // [R2] Wait for the SW to be controlling the page, then wire abort.
+  
   await _swReady;
   const ctrl = new AbortController();
   stream.requestId = ctrl;
@@ -5666,14 +5171,14 @@ async function sendSingle(text, stream) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  // [E*] Renderer owns ALL per-round render state. Dispatch is the only caller.
+  
   const renderer = new RoundRenderer(host, convMessages);
 
-  // Track stream completeness so we can detect a silent SW death — when a
-  // Pyodide WASM abort terminates the whole SW thread mid-stream, the NDJSON
-  // stream ends cleanly (no fetch error, no `error` event) but no
-  // `agent_done` was emitted. Without this guard the user sees nothing
-  // happen and assumes "completions stopped working" again.
+  
+  
+  
+  
+  
   let agentDoneSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
@@ -5684,7 +5189,7 @@ async function sendSingle(text, stream) {
   };
 
   try {
-    // [R2] POST to /sandpie-agent — SW intercepts and starts the agent loop.
+    
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5696,13 +5201,13 @@ async function sendSingle(text, stream) {
       addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
       return;
     }
-    // [R3 → E*] Drain the NDJSON stream into the renderer.
+    
     await readAgentEvents(res.body, dispatch);
-    // [R3.5] Stream ended without `agent_done`. SW likely died — Pyodide
-    // WASM aborts (memory access, out-of-bounds, abort()) terminate the
-    // whole SW thread, so our SW-side try/catch never runs. Surface a
-    // clear bubble so the user knows what happened and that retry will
-    // recover (browsers spawn a fresh SW for the next fetch event).
+    
+    
+    
+    
+    
     if (!agentDoneSeen && !wasAborted) {
       const trigger = lastInFlightTool
         ? ` while running \`${lastInFlightTool}\``
@@ -5721,36 +5226,33 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    // [F1] Tear down abort wiring.
+    
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
-    // [F2] Flush any in-flight typewriter so no bubble outlives the stream
-    // half-rendered. Idempotent: safe regardless of where we exited.
+    
+    
     renderer.finalize();
-    // [F3..F5] Post-stream housekeeping.
+    
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    // [F6] System notification on completion. The actual show path lives in
-    // modules/notifications.js — see that module for the SW-vs-page-fallback
-    // logic and why mobile requires the SW route.
+    
+    
+    
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 
-// [R1] Package the SW request body from the live UI state. Pure read of
-// $('endpoint') / $('apiKey') / $('model') / $('proxyUrl') + module-level
-// helpers; no DOM writes, no side effects.
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   let dbxTokensSnap = null;
   try { dbxTokensSnap = dbxTokens(); } catch (_) {}
 
-  // Resolve opfs:// image URLs to data URLs before sending to API
+  
   const resolvedMessages = [];
   for (const msg of convMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
@@ -5783,9 +5285,6 @@ async function buildAgentConfig(convMessages) {
   };
 }
 
-// [R3] Drain an NDJSON response body line-by-line, calling onEvent(parsed)
-// for each successfully-parsed line. Bad lines are logged and skipped so a
-// single malformed event can't kill the whole stream.
 async function readAgentEvents(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -5795,7 +5294,7 @@ async function readAgentEvents(body, onEvent) {
     if (done) break;
     lineBuf += decoder.decode(value, { stream: true });
     const lines = lineBuf.split('\n');
-    lineBuf = lines.pop() || '';  // last fragment may be incomplete; carry it forward
+    lineBuf = lines.pop() || '';  
     for (const line of lines) {
       if (!line.trim()) continue;
       try { onEvent(JSON.parse(line)); }
@@ -5804,8 +5303,6 @@ async function readAgentEvents(body, onEvent) {
   }
 }
 
-// [E1..E8] Map an SW event to the renderer's method. Errors are surfaced as
-// info-bubbles in the host; everything else routes to RoundRenderer.
 function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
@@ -5829,14 +5326,6 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 }
 
-// handleSubmit() enqueues into the active conv's stream; processQueueFor(s)
-// drains that queue by repeatedly calling sendSingle(text, s).
-
-// === Welcome shield · v14 layered echo ===
-// Asymmetric jittered ring mesh, rebuilt with a new random seed every 2s.
-// At most three generations of the mesh coexist in the DOM at any time, each
-// running its own 6s lifecycle (fade in → shimmer → fade out). Rebuild is
-// skipped while #welcome is hidden so it costs nothing during normal chatting.
 (function () {
   const svg = document.getElementById('welcomeShield');
   if (!svg) return;
@@ -5910,7 +5399,7 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 
   function rebuildShield() {
-    // Cheap skip while the welcome card is hidden (during an active chat).
+    
     const welcome = document.getElementById('welcome');
     if (!welcome || welcome.style.display === 'none' || welcome.offsetParent === null) return;
     const hosts = svg.querySelectorAll('.mesh-host');
@@ -5934,7 +5423,7 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 
   if (reduceMotion) {
-    // Single static mesh, no shimmer, no rebuild loop.
+    
     const host = document.createElementNS(NS, 'g');
     host.setAttribute('clip-path', 'url(#welcome-clip)');
     svg.insertBefore(host, svg.querySelector('.welcome-shield-outline'));
@@ -5955,17 +5444,11 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
 })();
 
-
-
-
-// ═══════════════════════════════════════════════════════════════════════
-// SCROLL PARALLAX — clone offset with momentum/inertia
-// ═══════════════════════════════════════════════════════════════════════
 (function() {
   const messages = document.getElementById('messages');
   if (!messages) return;
 
-  const state = new Map(); // msg -> { current, target }
+  const state = new Map(); 
   let animating = false;
 
   function clamp(n, min, max) {
@@ -5995,7 +5478,7 @@ function dispatchAgentEvent(ev, renderer, host) {
     let moving = false;
 
     for (const [msg, s] of state) {
-      // Lerp current toward target (12% per frame = ~0.5s settle time)
+      
       const diff = s.target - s.current;
       if (Math.abs(diff) > 0.001) {
         s.current += diff * 0.12;
@@ -6023,18 +5506,13 @@ function dispatchAgentEvent(ev, renderer, host) {
 
   messages.addEventListener('scroll', onScroll, { passive: true });
 
-  // Initial run
+  
   updateTargets();
   tick();
 })();
 
-
-// ═══════════════════════════════════════════════════════════════════════
-// THEME SYSTEM — preset + custom color picker
-// ═══════════════════════════════════════════════════════════════════════
-
 function setTheme(name) {
-  // Update chips
+  
   document.querySelectorAll('#themePresets .chip').forEach(c => {
     c.classList.toggle('active', c.dataset.preset === name);
   });
@@ -6060,7 +5538,7 @@ function applyCustomTheme() {
   const surface = document.getElementById('customSurface').value;
   const text = document.getElementById('customText').value;
 
-  // Parse hex to rgb for rgba variants
+  
   const r = parseInt(accent.slice(1,3), 16);
   const g = parseInt(accent.slice(3,5), 16);
   const b = parseInt(accent.slice(5,7), 16);
@@ -6084,7 +5562,6 @@ function resetCustomTheme() {
   setTheme('midnight');
 }
 
-// Load saved theme on init
 (function() {
   const saved = localStorage.getItem('sandpie-theme') || 'midnight';
   setTheme(saved);
@@ -6098,7 +5575,7 @@ function resetCustomTheme() {
       document.getElementById('customText').value = c.text;
     } catch(e) {}
   }
-  // Restore desktop sidebar collapse state
+  
   if (localStorage.getItem('sandpie-sidebar-collapsed')) {
     const aside = document.querySelector('aside');
     if (aside) {
@@ -6109,7 +5586,7 @@ function resetCustomTheme() {
 })();
 </script>
 <script>
-// Suppress automatic PWA install prompt — user can still install via menu
+
 let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
