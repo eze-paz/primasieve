@@ -130,7 +130,7 @@ self.addEventListener('unhandledrejection', (ev) => {
 
 // Drain the boot buffer when a client connects + asks for it. The page
 // pings us with `sandpie-sw-flush-logs` on its message-handler init.
-self.addEventListener('message', (event) => {
+self.addEventListener('message', async (event) => {
   const data = event.data;
   if (!data) return;
   if (data.type === 'sandpie-sw-flush-logs') {
