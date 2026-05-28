@@ -2491,8 +2491,8 @@ const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
 
-Scripts must already exist in OPFS, typically under scripts/. Use write_file to create
-a script first if it doesn't exist yet.
+REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
+ONLY path: + args: are accepted. Inline code: execution is disabled — scripts must be saved to OPFS before execution.
 
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
 Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
