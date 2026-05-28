@@ -1,31 +1,18 @@
-// sandpie/modules/notifications.js — User-completion notifications
-//
-// Two-layer state: (1) the browser permission (granted/denied/default —
-// sandpie can only REQUEST, never revoke; revoking lives in browser
-// settings), and (2) a sandpie-local on/off preference stored in
-// localStorage so the user can mute completion pings without yanking
-// the underlying permission. notifyComplete() is the call site for
-// the page's per-conversation completion hook.
-//
-// Notifications are routed through Service Worker registration's
-// showNotification() rather than `new Notification()` because:
-//   - Android Chrome silently no-ops `new Notification()` from a page.
-//   - iOS Safari only displays notifications when the app is added
-//     to the home screen, and only via SW notifications (16.4+).
-//   - Desktop also accepts the SW path, so one branch covers all.
-// The page-side `new Notification()` fallback stays for environments
-// where no SW registration is available (registration in flight,
-// blocked by policy, etc).
-//
-// Click handling lives in the SW's `notificationclick` listener
-// (sandpie.js) since SW.showNotification doesn't return a JS object
-// the page can attach onclick to.
+/**
+ * Notifications Module for Sandpie
+ *
+ * Registers a "Notifications" section in the sidebar via SandpieMenu.
+ * Usage: <script type="module" src="modules/notifications.js"></script>
+ */
 
 const SandpieNotifications = (function() {
   'use strict';
 
-  const $ = id => document.getElementById(id);
   const NOTIF_PREF_KEY = 'sandpie-notify-enabled';
+
+  // DOM references — populated by onRender
+  let btnEl = null;
+  let statusEl = null;
 
   // ============================================================
   // PREFERENCE LAYER
@@ -52,39 +39,35 @@ const SandpieNotifications = (function() {
   /**
    * Reflect the current permission + preference into the sidebar
    * button label, disabled state, helper text, and summary status dot.
-   * setDot is a global helper defined in sandpie.html; calling it
-   * with a missing element id is a safe no-op.
    */
   function refreshStatus() {
-    const btn = $('notifEnableBtn');
-    const status = $('notifStatus');
     // Status dot mirrors effectivelyOn — lit only when notifications will
     // actually fire (browser permission granted AND local pref on).
     if (typeof setDot === 'function') setDot('notifDot', effectivelyOn() ? 'ok' : null);
-    if (!btn || !status) return;
+    if (!btnEl || !statusEl) return;
     if (!('Notification' in self)) {
-      btn.disabled = true;
-      btn.textContent = 'Not supported';
-      status.textContent = 'This browser does not support notifications.';
+      btnEl.disabled = true;
+      btnEl.textContent = 'Not supported';
+      statusEl.textContent = 'This browser does not support notifications.';
       return;
     }
     const p = Notification.permission;
     if (p === 'denied') {
-      btn.disabled = true;
-      btn.textContent = 'Blocked by browser';
-      status.textContent = 'Notifications are blocked. Re-enable in your browser settings, then come back here.';
+      btnEl.disabled = true;
+      btnEl.textContent = 'Blocked by browser';
+      statusEl.textContent = 'Notifications are blocked. Re-enable in your browser settings, then come back here.';
       return;
     }
-    btn.disabled = false;
+    btnEl.disabled = false;
     if (p === 'granted' && prefEnabled()) {
-      btn.textContent = 'Disable notifications';
-      status.textContent = 'You will be notified when conversations finish.';
+      btnEl.textContent = 'Disable notifications';
+      statusEl.textContent = 'You will be notified when conversations finish.';
     } else if (p === 'granted') {
-      btn.textContent = 'Enable notifications';
-      status.textContent = 'Muted in sandpie. Click to turn back on (no browser prompt needed).';
+      btnEl.textContent = 'Enable notifications';
+      statusEl.textContent = 'Muted in sandpie. Click to turn back on (no browser prompt needed).';
     } else {
-      btn.textContent = 'Enable notifications';
-      status.textContent = '';
+      btnEl.textContent = 'Enable notifications';
+      statusEl.textContent = '';
     }
   }
 
@@ -168,7 +151,30 @@ const SandpieNotifications = (function() {
   // ============================================================
 
   function init() {
-    refreshStatus();
+    if (typeof SandpieMenu === 'undefined') {
+      console.warn('Notifications module: SandpieMenu not found, retrying in 500ms...');
+      setTimeout(init, 500);
+      return;
+    }
+
+    SandpieMenu.add('notificationsSection', {
+      title: 'Notifications',
+      badge: null,
+      open: false,
+      html: `
+        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
+        <button type="button" class="ghost" id="notifEnableBtn">Enable notifications</button>
+        <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+      `,
+      onRender(bodyEl) {
+        btnEl = bodyEl.querySelector('#notifEnableBtn');
+        statusEl = bodyEl.querySelector('#notifStatus');
+        if (btnEl) btnEl.addEventListener('click', toggle);
+        refreshStatus();
+      }
+    });
+
+    console.log('Notifications module registered');
   }
 
   return {
