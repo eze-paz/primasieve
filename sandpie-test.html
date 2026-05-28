@@ -1746,9 +1746,8 @@ if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 
 
-['endpoint', 'model', 'apiKey', 'dbxAppKey', 'proxyUrl'].forEach(id => {
-  $(id).addEventListener('input', saveConfig);
-});
+// Only dbxAppKey triggers saveConfig (provider inputs managed by module)
+$('dbxAppKey').addEventListener('input', saveConfig);
 
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
@@ -3535,17 +3534,8 @@ refreshWelcome();
 })();
 
 function saveConfig() {
-  
-  const p = SandpieProviders.getActive();
-  if (p) {
-    p.endpoint = $('endpoint').value;
-    p.model = $('model').value;
-    p.apiKey = $('apiKey').value;
-    p.proxyUrl = $('proxyUrl').value;
-    
-    if (typeof SandpieProviders !== "undefined") SandpieProviders.load();
-  }
-  
+  // Provider config is managed by modules/providers.js
+  // This function only saves non-provider (Dropbox) config
   localStorage.setItem('opencode-config', JSON.stringify({
     dbxAppKey: $('dbxAppKey').value,
   }));
