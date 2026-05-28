@@ -1745,9 +1745,6 @@ function refreshProxyDot() {
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 
-if (!$('endpoint').value.trim() || !$('apiKey').value.trim()) {
-  $('aiSection').setAttribute('open', '');
-}
 
 ['endpoint', 'model', 'apiKey', 'dbxAppKey', 'proxyUrl'].forEach(id => {
   $(id).addEventListener('input', saveConfig);

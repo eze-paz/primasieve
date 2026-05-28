@@ -34,6 +34,13 @@ function init() {
       renderChips();
       updateRoutingHint();
       refreshAiDot();
+      // Auto-open if credentials are missing
+      const ep = document.getElementById('endpoint');
+      const ak = document.getElementById('apiKey');
+      if ((!ep || !ep.value.trim()) || (!ak || !ak.value.trim())) {
+        const details = document.getElementById('aiSection');
+        if (details) details.open = true;
+      }
     }
   });
 
