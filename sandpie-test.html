@@ -1542,8 +1542,15 @@ const SandpieMenu = (() => {
   function insertBeforeFooter(el) {
     const sidebar = ensureSidebar();
     if (!sidebar) return;
-    const footer = sidebar.querySelector('#versionDisplay')?.closest('div');
-    if (footer) {
+    // Find the footer: the div containing #versionDisplay, then its parent
+    const versionEl = sidebar.querySelector('#versionDisplay');
+    let footer = versionEl?.closest('div');
+    // The footer might be wrapped, so check if it's a direct child of aside
+    if (footer && footer.parentElement !== sidebar) {
+      footer = footer.closest('div[style*="margin-top:auto"]') || footer.parentElement;
+    }
+    // Ensure footer is actually inside sidebar
+    if (footer && sidebar.contains(footer)) {
       sidebar.insertBefore(el, footer);
     } else {
       sidebar.appendChild(el);
