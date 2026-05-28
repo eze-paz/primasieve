@@ -1984,7 +1984,7 @@ function dbxStatus(text, kind) {
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
   const btn = $('dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-  if (typeof refreshWelcome === 'function') updateVersionDisplay();
+  if (typeof refreshWelcome === 'function') 
 refreshWelcome();
 }
 
@@ -2664,7 +2664,7 @@ async function gatherSandpieManifests() {
 
 async function refreshManifests() {
   cachedManifests = await gatherSandpieManifests();
-  updateVersionDisplay();
+  
 refreshWelcome();
 }
 
@@ -3522,7 +3522,7 @@ sidePanel = new SidePanel();
     mountConv(restoreId);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
-  updateVersionDisplay();
+  
 refreshWelcome();
   
   
@@ -4483,7 +4483,7 @@ async function newConversation() {
   mountConv(id);
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
-  updateVersionDisplay();
+  
   refreshWelcome();
 }
 
@@ -4537,10 +4537,6 @@ function refreshNewChatButton() {
   btn.title = empty ? "Already a fresh chat — just start typing below." : '';
 }
 
-function updateVersionDisplay() {
-  const els = document.querySelectorAll('#versionDisplay, #welcomeVersion');
-  els.forEach(el => { if (el) el.textContent = VERSION; });
-}
 
 function refreshWelcome() {
   const w = $('welcome');
@@ -4643,11 +4639,11 @@ async function deleteConv(id, title) {
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
-      updateVersionDisplay();
+      
       refreshWelcome();
     } else {
       
-      updateVersionDisplay();
+      
     }
   }
   await refreshConversationList();
@@ -5237,6 +5233,10 @@ function dispatchAgentEvent(ev, renderer, host) {
       } catch(e) {}
     }
   }
+  // Set version display once at startup
+  const v = document.getElementById('versionDisplay');
+  if (v) v.textContent = VERSION;
+
   if (localStorage.getItem('sandpie-sidebar-collapsed')) {
     const aside = document.querySelector('aside');
     if (aside) {
