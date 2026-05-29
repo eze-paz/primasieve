@@ -117,7 +117,7 @@ const SandpieImages = (function() {
 
         const preview = $('imagePreview');
         preview.innerHTML = '<img src="' + previewUrl + '" alt=""><span class="filename">' + (file.name || 'Image') + '</span><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
-        preview.classList.add('visible');
+        preview.style.display = '';
       } catch (err) {
         console.error('Failed to create image preview:', err);
       }
@@ -131,7 +131,7 @@ const SandpieImages = (function() {
   function clear() {
     _attachedImage = null;
     const preview = $('imagePreview');
-    preview.classList.remove('visible');
+    preview.style.display = 'none';
     preview.innerHTML = '';
     $('imageInput').value = '';
   }
