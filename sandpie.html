@@ -299,7 +299,8 @@
   .assistant h1, .assistant h2, .assistant h3 { margin: 0.75em 0 0.5em; line-height: 1.3; }
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
-  form { display: flex; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); align-items: stretch; }
+  form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); }
+  .input-row { display: flex; gap: 0.5rem; align-items: stretch; }
   form textarea {
     flex: 1;
     padding: 0.5rem 1rem;
@@ -1017,6 +1018,7 @@
   }
   .image-preview { display: flex; gap: 0.5rem; padding: 0.25rem 0; align-items: center; }
   .image-preview img { max-height: 60px; border-radius: 4px; border: 1px solid var(--sp-border); }
+  .image-preview .remove-btn { background: none; border: none; color: var(--sp-danger); cursor: pointer; font-size: 1rem; margin-left: auto; padding: 0 0.25rem; }
   #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
   #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
 
@@ -1337,6 +1339,7 @@ window.addEventListener('message', e => {
 
 </script>
   <script src="modules/images.js"></script>
+<script>SandpieImages.init();</script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/notifications.js"></script>
 </head>
@@ -1454,9 +1457,11 @@ window.addEventListener('message', e => {
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <input type="file" id="imageInput" accept="image/*" style="display:none" >
     <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
-    <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-    <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+    <div class="input-row">
+      <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
+      <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
+      <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+    </div>
   </form>
 </main>
 
@@ -4229,7 +4234,7 @@ class RoundRenderer {
           if (dataUrl) {
             SandpieImages.setState({ dataUrl, file: { name: path.split('/').pop() }, opfsPath: path });
             const preview = $('imagePreview');
-            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button"  style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
             preview.style.display = '';
           }
         });
