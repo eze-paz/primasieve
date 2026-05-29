@@ -1419,7 +1419,7 @@ window.addEventListener('message', e => {
     </div>
   </details>
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
-    <div>sandpie <span id="versionDisplay">v1.0.5</span></div>
+    <div>sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
 
@@ -2849,9 +2849,8 @@ async function refreshFileList() {
 
   for (const it of items) {
     const li = document.createElement('li');
-    const btn = document.createElement('button');
+    const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    btn.type = 'button';
     
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
@@ -5258,5 +5257,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
   <script type="module" src="modules/agents.js"></script>
   <script type="module" src="modules/context.js"></script>
   <script type="module" src="modules/artifacts.js"></script>
+<script>
+// Load version from version.txt
+fetch('version.txt')
+  .then(r => r.text())
+  .then(v => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = v.trim();
+  })
+  .catch(() => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = 'dev';
+  });
+</script>
 </body>
 </html>
