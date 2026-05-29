@@ -1837,18 +1837,6 @@ function splitPath(path) {
   return { parts, name };
 }
 
-async function opfsLastModified(path) {
-  try {
-    const { parts, name } = splitPath(path);
-    const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    const file = await handle.getFile();
-    return file.lastModified;
-  } catch (e) {
-    return 0;
-  }
-}
-
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
@@ -2396,12 +2384,6 @@ function anyStreamGenerating() {
   return false;
 }
 
-function isEagerHydrate(path, size) {
-  // Auto-download small files, leave larger ones as cloud placeholders
-  const EAGER_THRESHOLD = 1024 * 1024; // 1MB
-  return size < EAGER_THRESHOLD;
-}
-
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
@@ -2769,15 +2751,45 @@ async function refreshManifests() {
 refreshWelcome();
 }
 
-async function buildSystemPrompt() {
-  try {
-    const text = await opfsRead('sandpie_memory.md');
-    return text;
-  } catch (e) {
-    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-    await opfsWrite('sandpie_memory.md', basic);
-    return basic;
+function buildSystemPrompt() {
+  const dbxConnected = !!dbxTokens();
+  const proxyUrl = ($('proxyUrl').value || '').trim();
+
+  const lines = [
+    'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
+    '',
+    '# Tools',
+    '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
+  ];
+
+  lines.push('', '# Environment');
+  lines.push(`- Cloud sync (Dropbox): ${dbxConnected ? 'connected. The user can sync /files/ ↔ Dropbox via UI buttons. You don\'t call Dropbox directly — read/write OPFS via run_python and the user controls the sync.' : 'not connected. The user can connect from the sidebar Cloud sync panel if they want offsite backup.'}`);
+  if (proxyUrl) {
+    lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
   }
+
+  lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
+
+  
+  lines.push('', '# Context manifests (sandpie_*.md)');
+  lines.push('Convention: any file matching `sandpie_*.md` anywhere under /files/ is auto-loaded below as orientation context. A manifest should be a short markdown note that describes what\'s in its folder and *points at* other important docs (skills, prompts, project READMEs) by relative path — read those with run_python when relevant. If the user starts a project without one, suggest creating /files/sandpie_overview.md as an entry point.');
+  if (cachedManifests.length) {
+    lines.push('', `Loaded manifests (${cachedManifests.length}):`);
+    for (const m of cachedManifests) {
+      lines.push('', `## /files/${m.path}`);
+      lines.push(m.content);
+    }
+  } else {
+    lines.push('', 'No sandpie_*.md files exist yet.');
+  }
+
+  lines.push('', '# Operating rules');
+  lines.push('1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.');
+  lines.push('2. Reuse, don\'t re-paste — this is the PREFERRED way to operate. Save any non-trivial script to /files/scripts/<name>.py once, then invoke it on every later call via run_python({path: "scripts/<name>.py", args: [...]}) instead of re-sending the source. The script sees sys.argv = [path, *args], exactly like `python script.py --arg ...` from a shell. Within a single session, Pyodide globals also persist between run_python calls, so a function defined once can be called by name later — but saved scripts are reusable across sessions. If you find yourself pasting more than ~20 lines of code inline, save it instead.');
+  lines.push('3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.');
+  lines.push('4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don\'t duplicate lines already present.');
+  lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
+  return { role: 'system', content: lines.join('\n') };
 }
 
 function formatSize(bytes) {
@@ -5195,7 +5207,7 @@ async function buildAgentConfig(convMessages) {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: await buildSystemPrompt(),
+    systemPrompt: buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
     origin: location.origin,
