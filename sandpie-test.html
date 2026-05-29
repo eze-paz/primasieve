@@ -2057,10 +2057,10 @@ async function dbxConnect() {
 function dbxDisconnect() {
   localStorage.removeItem('dbx-tokens');
   localStorage.removeItem(SYNC_STATE_KEY);
-  
-  
   localStorage.removeItem('dbx-index');
   localStorage.removeItem('opfs-sync-manifest');
+  localStorage.removeItem(CLOUD_INDEX_KEY);
+  localStorage.removeItem(DBX_CURSOR_KEY);
   dbxStatus('Not connected', 'disconnected');
   refreshFileList();
 }
@@ -2107,26 +2107,54 @@ async function dbxApi(path, body) {
   return await res.json();
 }
 
-async function dbxList(folderPath, { recursive = false } = {}) {
+async function dbxListFull(folderPath, { recursive = false } = {}) {
   let data = await dbxApi('/2/files/list_folder', {
     path: folderPath === '/' ? '' : folderPath,
     recursive,
+    include_deleted: true,
   });
   let entries = data.entries.slice();
+  let pageCount = 1;
   while (data.has_more) {
+    dbxProgress(`listing… page ${pageCount}`);
     data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
     entries = entries.concat(data.entries);
+    pageCount++;
   }
-  
-  
-  return entries.map(e => ({
-    name: e.name,
-    kind: e['.tag'],
-    path: e.path_display,
-    size: e.size,
-    rev: e.content_hash,
-    cloudMtime: e.server_modified,
-  }));
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
+}
+
+async function dbxListContinue(cursor) {
+  let data = await dbxApi('/2/files/list_folder/continue', { cursor });
+  let entries = data.entries.slice();
+  let pageCount = 1;
+  while (data.has_more) {
+    dbxProgress(`checking changes… page ${pageCount}`);
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+    pageCount++;
+  }
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
 }
 
 async function dbxDownload(path, signal) {
@@ -2239,8 +2267,18 @@ async function dbxDelete(path) {
 }
 
 const SYNC_STATE_KEY = 'sandpie-sync-state';
+const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
+const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
+
 function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
 function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
+function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
+function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
+function dbxCursor() { return localStorage.getItem(DBX_CURSOR_KEY) || null; }
+function setDbxCursor(cursor) {
+  if (cursor) localStorage.setItem(DBX_CURSOR_KEY, cursor);
+  else localStorage.removeItem(DBX_CURSOR_KEY);
+}
 
 (function migrateLegacyState() {
   if (localStorage.getItem(SYNC_STATE_KEY)) return;
@@ -2257,6 +2295,14 @@ function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s
     };
   }
   setSyncState(s);
+})();
+
+(function validateCloudState() {
+  const idx = cloudIndex();
+  const cursor = dbxCursor();
+  if (Object.keys(idx).length > 0 && !cursor) {
+    setCloudIndex({});
+  }
 })();
 
 async function opfsLastModified(relPath) {
@@ -2276,13 +2322,42 @@ function isEagerHydrate(path, size) {
 }
 
 async function cloudListAll() {
-  const entries = await dbxList('/', { recursive: true });
+  const storedCursor = dbxCursor();
+  const existingIndex = cloudIndex();
+
+  if (storedCursor && Object.keys(existingIndex).length > 0) {
+    try {
+      const result = await dbxListContinue(storedCursor);
+      for (const e of result.entries) {
+        let rel = e.path.replace(/^\/+/, '');
+        if (!rel) continue;
+        const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
+        for (const p of prefixes) {
+          if (rel.toLowerCase().startsWith(p.toLowerCase())) {
+            rel = rel.slice(p.length);
+            break;
+          }
+        }
+        if (e.kind === 'deleted') {
+          delete existingIndex[rel];
+        } else {
+          existingIndex[rel] = e;
+        }
+      }
+      setDbxCursor(result.cursor);
+      setCloudIndex(existingIndex);
+      return existingIndex;
+    } catch (err) {
+      console.warn('Cursor sync failed, falling back to full sync:', err.message);
+      setDbxCursor(null);
+    }
+  }
+
+  const result = await dbxListFull('/', { recursive: true });
   const out = {};
-  for (const e of entries) {
+  for (const e of result.entries) {
     let rel = e.path.replace(/^\/+/, '');
     if (!rel) continue;
-    
-    
     const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
     for (const p of prefixes) {
       if (rel.toLowerCase().startsWith(p.toLowerCase())) {
@@ -2290,8 +2365,12 @@ async function cloudListAll() {
         break;
       }
     }
-    out[rel] = e;
+    if (e.kind !== 'deleted') {
+      out[rel] = e;
+    }
   }
+  setDbxCursor(result.cursor);
+  setCloudIndex(out);
   return out;
 }
 
@@ -4381,7 +4460,9 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
     messages: msgs,
   };
-  await opfs.write(convPath(convId), JSON.stringify(data));
+  const json = JSON.stringify(data);
+  if (json === JSON.stringify(prev)) return;
+  await opfs.write(convPath(convId), json);
   await refreshConversationList();
 }
 
