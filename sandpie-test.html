@@ -1174,7 +1174,6 @@ function renderArtifact(host, path) {
       if (!resp.ok) throw new Error('SW returned ' + resp.status);
       const a = document.createElement('a');
       a.href = 'opfs/' + clean;
-      a.download = clean.split('/').pop();
       a.target = '_blank';
       document.body.appendChild(a);
       a.click();
