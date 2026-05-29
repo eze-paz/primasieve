@@ -2954,8 +2954,8 @@ async function refreshFileList() {
             const blob = new Blob([bytes]);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = it.name;
+            a.href = 'opfs/' + it.fullKey;
+            a.target = '_blank';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
