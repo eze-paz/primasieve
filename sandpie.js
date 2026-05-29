@@ -839,7 +839,7 @@ async function handleOpfs(path) {
       else text += script;
       return new Response(text, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
     }
-    return new Response(bytes, { headers: { 'Content-Type': ct, 'Cache-Control': 'no-store' } });
+    return new Response(bytes, { headers: { 'Content-Type': ct, 'Content-Disposition': 'attachment', 'Cache-Control': 'no-store' } });
   } catch (e) {
     return new Response('Not found: ' + opfsPath, { status: 404, headers: { 'Content-Type': 'text/plain' } });
   }
