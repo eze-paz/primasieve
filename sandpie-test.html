@@ -1018,6 +1018,7 @@
   }
   .image-preview { display: flex; gap: 0.5rem; padding: 0.25rem 0; align-items: center; }
   .image-preview img { max-height: 60px; border-radius: 4px; border: 1px solid var(--sp-border); }
+  .image-preview .remove-btn { background: none; border: none; color: var(--sp-danger); cursor: pointer; font-size: 1rem; margin-left: auto; padding: 0 0.25rem; }
   #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
   #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
 
@@ -4240,7 +4241,7 @@ class RoundRenderer {
           if (dataUrl) {
             SandpieImages.setState({ dataUrl, file: { name: path.split('/').pop() }, opfsPath: path });
             const preview = $('imagePreview');
-            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button"  style="background:none;border:none;color:var(--sp-danger);cursor:pointer;font-size:1rem">✕</button>';
+            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
             preview.style.display = '';
           }
         });
