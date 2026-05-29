@@ -21,7 +21,7 @@ jobs:
           python3 << 'PYEOF'
           import re
 
-          FILE = 'projects/sandpie/sandpie-test.html'
+          FILE = 'version.txt'
 
           with open(FILE, 'r') as f:
               text = f.read()
