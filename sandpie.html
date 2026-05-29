@@ -1598,8 +1598,23 @@ if ('serviceWorker' in navigator) {
         try { await refreshFileList(); } catch {}
       })();
       return;
-    }
-  });
+      }
+      if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
+        const state = syncState();
+        let changed = false;
+        for (const path of d.paths) {
+          if (!state[path]) {
+            state[path] = { rev: '', size: 0, hydrated: true, syncedMtime: 0 };
+            changed = true;
+          } else {
+            state[path].syncedMtime = 0;
+            changed = true;
+          }
+        }
+        if (changed) setSyncState(state);
+        return;
+      }
+    });
   
   
   
