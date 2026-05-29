@@ -1172,16 +1172,13 @@ function renderArtifact(host, path) {
     try {
       const resp = await fetch('opfs/' + clean);
       if (!resp.ok) throw new Error('SW returned ' + resp.status);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = 'opfs/' + clean;
       a.download = clean.split('/').pop();
       a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error('[artifact] download failed:', err);
     }
@@ -1423,7 +1420,7 @@ window.addEventListener('message', e => {
     </div>
   </details>
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
-    <div>sandpie <span id="versionDisplay">v1.0.3-1780043117</span></div>
+    <div>sandpie <span id="versionDisplay">v1.0.4</span></div>
   </div>
 </aside>
 
