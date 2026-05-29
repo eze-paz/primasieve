@@ -2384,6 +2384,12 @@ function anyStreamGenerating() {
   return false;
 }
 
+function isEagerHydrate(path, size) {
+  // Auto-download small files, leave larger ones as cloud placeholders
+  const EAGER_THRESHOLD = 1024 * 1024; // 1MB
+  return size < EAGER_THRESHOLD;
+}
+
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
