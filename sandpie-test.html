@@ -1600,13 +1600,16 @@ if ('serviceWorker' in navigator) {
       return;
       }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
+        console.log('[sandpie] ← SW notified:', d.paths);
         const state = syncState();
         let changed = false;
         for (const path of d.paths) {
           if (!state[path]) {
+            console.log('[sandpie] adding to syncState:', path);
             state[path] = { rev: '', size: 0, hydrated: true, syncedMtime: 0 };
             changed = true;
           } else {
+            console.log('[sandpie] marking dirty:', path);
             state[path].syncedMtime = 0;
             changed = true;
           }
@@ -2469,7 +2472,11 @@ async function sync() {
       if (rel === _openFilePath) continue;
       const lm = await opfsLastModified(rel);
       const s = state[rel];
-      if (s && s.hydrated && lm <= s.syncedMtime) continue;
+      if (s && s.hydrated && lm <= s.syncedMtime) {
+        console.log('[sandpie] sync skip (clean):', rel);
+        continue;
+      }
+      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
       dirty.push({ rel, lm, s });
     }
     const BATCH_SIZE = 50;
