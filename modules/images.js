@@ -116,8 +116,8 @@ const SandpieImages = (function() {
         _attachedImage = { opfsPath, file };
 
         const preview = $('imagePreview');
-        preview.innerHTML = '<img src="' + previewUrl + '"><button type="button" onclick="SandpieImages.clear()" style="background:none;border:none;color:var(--sp-accent-neg);cursor:pointer;font-size:1rem">✕</button>';
-        preview.style.display = '';
+        preview.innerHTML = '<img src="' + previewUrl + '" alt=""><span class="filename">' + (file.name || 'Image') + '</span><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
+        preview.classList.add('visible');
       } catch (err) {
         console.error('Failed to create image preview:', err);
       }
@@ -130,8 +130,9 @@ const SandpieImages = (function() {
    */
   function clear() {
     _attachedImage = null;
-    $('imagePreview').style.display = 'none';
-    $('imagePreview').innerHTML = '';
+    const preview = $('imagePreview');
+    preview.classList.remove('visible');
+    preview.innerHTML = '';
     $('imageInput').value = '';
   }
 
