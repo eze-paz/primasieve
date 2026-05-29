@@ -149,6 +149,7 @@
   .ctx-menu button.danger { color: var(--sp-danger); }
   ul.fs-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; padding: 0.2rem 0.2rem; background: transparent; border: none; border-radius: 4px; font: 0.78rem 'JetBrains Mono', Consolas, monospace; }
   ul.fs-list li.empty { color: var(--sp-text-dim); justify-content: center; font-style: italic; font-family: inherit; }
+  ul.fs-list button.name { background: none; border: none; padding: 0; margin: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
@@ -1163,7 +1164,7 @@ function renderArtifact(host, path) {
     btns.appendChild(openLink);
   }
 
-  const dlBtn = document.createElement('button');
+  const dlBtn = document.createElement('span');
   dlBtn.title = 'Download';
   dlBtn.textContent = '⬇';
   dlBtn.className = 'artifact-icon-btn';
@@ -1171,15 +1172,12 @@ function renderArtifact(host, path) {
     try {
       const resp = await fetch('opfs/' + clean);
       if (!resp.ok) throw new Error('SW returned ' + resp.status);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = clean.split('/').pop();
+      a.href = 'opfs/' + clean;
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (err) {
       console.error('[artifact] download failed:', err);
     }
@@ -1421,7 +1419,7 @@ window.addEventListener('message', e => {
     </div>
   </details>
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
-    <div>sandpie <span id="versionDisplay">v1.0.2-1779377073</span></div>
+    <div>sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
 
@@ -2367,19 +2365,13 @@ async function sync() {
       if (cloudChanged && localDirty) continue;  
 
       if (cloudChanged) {
-        if (eager && (s.hydrated || !localExists)) {
-          dbxProgress(`downloading… ${path}`);
-          const content = await dbxDownload(e.path);
-          await opfs.write(path, content);
-          state[path] = {
-            rev: e.rev, size: e.size, hydrated: true,
-            syncedMtime: await opfsLastModified(path),
-          };
-          
-        } else {
-          if (localExists) { try { await opfs.remove(path); } catch {} }
-          state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
-        }
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path] = {
+          rev: e.rev, size: e.size, hydrated: true,
+          syncedMtime: await opfsLastModified(path),
+        };
         continue;
       }
 
@@ -2492,7 +2484,7 @@ const tools = {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
 
 REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
-ONLY path: + args: are accepted. Inline code: execution is disabled — scripts must be saved to OPFS before execution.
+ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
 Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
@@ -2513,6 +2505,7 @@ Examples:
         path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
       },
+      required: ['path'],
     },
   },
   fetch_file: {
@@ -2857,37 +2850,35 @@ async function refreshFileList() {
 
   for (const it of items) {
     const li = document.createElement('li');
-    const span = document.createElement('span');
-    span.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    
-    
+    const btn = document.createElement('span');
+    btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
     
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
-    span.textContent = kindIcon + it.name;
-    span.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
+    btn.textContent = kindIcon + it.name;
+    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
     if (it.kind === 'folder') {
-      span.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
+      btn.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
     } else if (isPlaceholder) {
-      span.onclick = async () => {
-        const orig = span.textContent;
-        span.textContent = '⏳ ' + it.name;
-        span.style.pointerEvents = 'none';
+      btn.onclick = async () => {
+        const orig = btn.textContent;
+        btn.textContent = '⏳ ' + it.name;
+        btn.disabled = true;
         try {
           const result = await tools.fetch_file.run({ path: it.fullKey });
           if (!result.startsWith('Hydrated')) addMsg('info', result);
           
           
         } catch (e) {
-          span.textContent = orig;
-          span.style.pointerEvents = '';
+          btn.textContent = orig;
+          btn.disabled = false;
           addMsg('err', 'Hydrate failed: ' + e.message);
         }
       };
     } else {
-      span.onclick = () => openFileViewer(it.fullKey, it.name);
+      btn.onclick = () => openFileViewer(it.fullKey, it.name);
     }
-    li.append(span);
+    li.append(btn);
     const sizeSpan = document.createElement('span');
     sizeSpan.className = 'file-size';
     sizeSpan.textContent = formatSize(it.size);
@@ -2897,6 +2888,25 @@ async function refreshFileList() {
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
       if (it.kind === 'folder') {
+        menuItems.push({ label: 'Make cloud only', action: async () => {
+          const state = syncState();
+          const prefix = it.fullKey + '/';
+          const toDehydrate = Object.keys(state).filter(k => k.toLowerCase().startsWith(prefix.toLowerCase()) && state[k].hydrated);
+          if (!toDehydrate.length) { addMsg('info', 'No local files in this folder.'); return; }
+          if (!confirm(`Archive ${toDehydrate.length} file(s) in "${it.fullKey}" to cloud-only?`)) return;
+          let done = 0;
+          for (const f of toDehydrate) {
+            try {
+              await opfs.remove(f);
+              state[f] = { ...state[f], hydrated: false, syncedMtime: 0 };
+              done++;
+            } catch (e) {
+              console.warn('dehydrate failed:', f, e);
+            }
+          }
+          setSyncState(state);
+          await refreshFileList();
+        }});
         menuItems.push({ label: 'Make available offline', action: async () => {
           const state = syncState();
           const prefix = it.fullKey + '/';
@@ -2919,6 +2929,19 @@ async function refreshFileList() {
         }});
       }
       if (it.kind === 'file') {
+        menuItems.push({ label: 'Make cloud only', action: async () => {
+          const state = syncState();
+          const s = state[it.fullKey];
+          if (!s || !s.hydrated) { addMsg('info', 'Already cloud-only.'); return; }
+          try {
+            await opfs.remove(it.fullKey);
+            state[it.fullKey] = { ...s, hydrated: false, syncedMtime: 0 };
+            setSyncState(state);
+            await refreshFileList();
+          } catch (e) {
+            addMsg('err', 'Failed to archive: ' + e.message);
+          }
+        }});
         menuItems.push({ label: 'Download', action: async () => {
           try {
             let bytes;
@@ -2928,14 +2951,15 @@ async function refreshFileList() {
             } else {
               bytes = await opfs.readBytes(it.fullKey);
             }
+            const blob = new Blob([bytes]);
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([bytes]));
-            a.download = it.name;
-            a.setAttribute('data-chrome', '');
+            a.href = 'opfs/' + it.fullKey;
+            a.target = '_blank';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
           } catch (e) {
             addMsg('err', 'Download failed: ' + e.message);
           }
@@ -3238,9 +3262,10 @@ $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshF
 async function uploadEntry(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
-    
-    
-    await opfs.write(opfsJoin(dirPath, entry.name), file);
+    const destPath = opfsJoin(dirPath, entry.name);
+    await opfs.write(destPath, file);
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
   } else if (entry.isDirectory) {
     const sub = opfsJoin(dirPath, entry.name);
     const reader = entry.createReader();
@@ -3268,7 +3293,10 @@ async function uploadEntry(entry, dirPath) {
     
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
-        await opfs.write(opfsJoin(path, f.name), f);
+        const destPath = opfsJoin(path, f.name);
+        await opfs.write(destPath, f);
+        const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+        if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
       }
     }
     await refreshFileList();
@@ -5230,5 +5258,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
   <script type="module" src="modules/agents.js"></script>
   <script type="module" src="modules/context.js"></script>
   <script type="module" src="modules/artifacts.js"></script>
+<script>
+// Load version from version.txt
+fetch('version.txt')
+  .then(r => r.text())
+  .then(v => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = v.trim();
+  })
+  .catch(() => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = 'dev';
+  });
+</script>
 </body>
 </html>
