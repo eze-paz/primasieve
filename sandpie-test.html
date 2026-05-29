@@ -1837,6 +1837,18 @@ function splitPath(path) {
   return { parts, name };
 }
 
+async function opfsLastModified(path) {
+  try {
+    const { parts, name } = splitPath(path);
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    return file.lastModified;
+  } catch (e) {
+    return 0;
+  }
+}
+
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
