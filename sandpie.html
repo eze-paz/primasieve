@@ -2381,6 +2381,25 @@ function anyStreamGenerating() {
   return false;
 }
 
+function isEagerHydrate(path, size) {
+  return size < 1024 * 1024; // Auto-download files under 1MB
+}
+
+async function opfsLastModified(path) {
+  try {
+    const { parts, name } = splitPath(path);
+    let dir = await navigator.storage.getDirectory();
+    for (const p of parts) {
+      dir = await dir.getDirectoryHandle(p);
+    }
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    return file.lastModified;
+  } catch (e) {
+    return 0;
+  }
+}
+
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
