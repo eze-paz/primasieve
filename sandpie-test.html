@@ -2391,7 +2391,10 @@ function isEagerHydrate(path, size) {
 async function opfsLastModified(path) {
   try {
     const { parts, name } = splitPath(path);
-    const dir = await opfs.resolveDir(parts);
+    let dir = await navigator.storage.getDirectory();
+    for (const p of parts) {
+      dir = await dir.getDirectoryHandle(p);
+    }
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
     return file.lastModified;
