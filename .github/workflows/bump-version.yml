@@ -1,0 +1,57 @@
+name: Auto Bump Version
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump version
+        run: |
+          python3 << 'PYEOF'
+          import re
+
+          FILE = 'projects/sandpie/sandpie-test.html'
+
+          with open(FILE, 'r') as f:
+              text = f.read()
+
+          match = re.search(r"v1\.0\.(\d+)", text)
+          if not match:
+              print("No version found")
+              exit(1)
+
+          old_patch = int(match.group(1))
+          new_patch = old_patch + 1
+          old_version = f"v1.0.{old_patch}"
+          new_version = f"v1.0.{new_patch}"
+
+          text = text.replace(old_version, new_version, 1)
+
+          with open(FILE, 'w') as f:
+              f.write(text)
+
+          print(f"Bumped: {old_version} -> {new_version}")
+          PYEOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add projects/sandpie/sandpie-test.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Bump version [ci skip]"
+          git push
