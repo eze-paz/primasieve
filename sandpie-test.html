@@ -1177,12 +1177,10 @@ function renderArtifact(host, path) {
       const a = document.createElement('a');
       a.href = url;
       a.download = clean.split('/').pop();
-      a.style.position = 'fixed';
-      a.style.top = '-9999px';
-      a.style.left = '-9999px';
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 5000);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (err) {
       console.error('[artifact] download failed:', err);
     }
@@ -2961,13 +2959,10 @@ async function refreshFileList() {
             const a = document.createElement('a');
             a.href = url;
             a.download = it.name;
-            a.setAttribute('data-chrome', '');
-            a.style.position = 'fixed';
-            a.style.top = '-9999px';
-            a.style.left = '-9999px';
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 5000);
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
           } catch (e) {
             addMsg('err', 'Download failed: ' + e.message);
           }
