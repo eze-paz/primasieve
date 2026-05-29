@@ -423,18 +423,15 @@ async function opfsWriteBytes(path, bytes) {
 // Tool implementations (run inside the SW).
 // ============================================================
 
-async function tool_run_python({ code, path, args }, ctx) {
-  if (!code && !path) return { result: 'Error: provide either "code" or "path".' };
-  if (code && path) return { result: 'Error: provide either "code" or "path", not both.' };
+async function tool_run_python({ path, args }, ctx) {
+  if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
-  let normPath = '';
-  if (path) {
-    normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-    try {
-      code = new TextDecoder().decode(await opfsReadBytes(normPath));
-    } catch (e) {
-      return { result: `Error: could not read /files/${normPath}: ${e.message}.` };
-    }
+  const normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  let code;
+  try {
+    code = new TextDecoder().decode(await opfsReadBytes(normPath));
+  } catch (e) {
+    return { result: `Error: could not read /files/${normPath}: ${e.message}.` };
   }
   // Serialize the interpreter-touching critical section so concurrent
   // run_python calls don't race on the shared interpreter's globals
