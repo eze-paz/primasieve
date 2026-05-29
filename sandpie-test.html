@@ -2484,7 +2484,7 @@ const tools = {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
 
 REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
-ONLY path: + args: are accepted. Inline code: execution is disabled — scripts must be saved to OPFS before execution.
+ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
 Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
@@ -2505,6 +2505,7 @@ Examples:
         path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
       },
+      required: ['path'],
     },
   },
   fetch_file: {
