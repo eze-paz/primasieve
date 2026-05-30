@@ -2775,12 +2775,15 @@ async function refreshManifests() {
 refreshWelcome();
 }
 
-function buildSystemPrompt() {
-  const stored = localStorage.getItem('sandpie-memory-prompt');
-  if (stored) return { role: 'system', content: stored };
-  const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-  localStorage.setItem('sandpie-memory-prompt', basic);
-  return { role: 'system', content: basic };
+async function buildSystemPrompt() {
+  try {
+    const text = await opfs.read('sandpie_memory.md');
+    return { role: 'system', content: text };
+  } catch (e) {
+    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+    await opfs.write('sandpie_memory.md', basic);
+    return { role: 'system', content: basic };
+  }
 }
 
 function formatSize(bytes) {
@@ -5198,7 +5201,7 @@ async function buildAgentConfig(convMessages) {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: buildSystemPrompt(),
+    systemPrompt: await buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
     origin: location.origin,
