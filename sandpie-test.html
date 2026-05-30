@@ -2779,9 +2779,19 @@ async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
     return { role: 'system', content: text };
-  } catch (e) {
+  } catch (e1) {
+    console.warn('[buildSystemPrompt] opfs.read failed:', e1.message);
+    try {
+      const resp = await fetch('/files/sandpie_memory.md');
+      if (resp.ok) {
+        const text = await resp.text();
+        return { role: 'system', content: text };
+      }
+    } catch (e2) {
+      console.warn('[buildSystemPrompt] fetch failed:', e2.message);
+    }
     const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-    await opfs.write('sandpie_memory.md', basic);
+    try { await opfs.write('sandpie_memory.md', basic); } catch (e3) {}
     return { role: 'system', content: basic };
   }
 }
