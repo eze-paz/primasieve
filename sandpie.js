@@ -408,8 +408,13 @@ async function tool_run_python({ path, args }, ctx) {
       }
 
       try { await p.loadPackagesFromImports(code); } catch (_) {}
-      // Single-retry: if user code dies with FileNotFoundError ...
-      let _retried = false;
+
+      // Execute the script from its file path so __file__,
+      // __name__ == "__main__", and tracebacks behave normally.
+      await p.runPythonAsync(`
+      import runpy
+      runpy.run_path(${JSON.stringify('/files/' + normPath)}, run_name="__main__")
+      `);
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
       // failed at init — Python had no /files to write to, nothing to flush.
