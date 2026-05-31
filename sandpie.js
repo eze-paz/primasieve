@@ -159,8 +159,8 @@ try {
   console.warn('[sandpie-sw] pyodide bootstrap failed:', e);
 }
 
-//self.addEventListener('install', () => self.skipWaiting());
-//self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 // Completion notifications are shown via SW.registration.showNotification()
 // because new Notification() from a page is a no-op on Android Chrome and
@@ -328,27 +328,6 @@ async function opfsWriteBytes(path, bytes) {
   const w = await handle.createWritable();
   await w.write(bytes);
   await w.close();
-}
-
-function combineSignals(signals) {
-  const ctl = new AbortController();
-
-  for (const s of signals) {
-    if (!s) continue;
-
-    if (s.aborted) {
-      ctl.abort();
-      break;
-    }
-
-    s.addEventListener(
-      'abort',
-      () => ctl.abort(),
-      { once: true }
-    );
-  }
-
-  return ctl.signal;
 }
 
 // ============================================================
@@ -529,10 +508,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: combineSignals([
-      ctx.signal,
-      timeoutSignal,
-    ]),
+    signal: ctx.signal,
   });
   
   if (!res.ok) {
