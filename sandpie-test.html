@@ -2775,41 +2775,17 @@ async function refreshManifests() {
 refreshWelcome();
 }
 
-let _cachedSystemPrompt = null;
 
-async function loadSystemPrompt() {
+
+async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
-    _cachedSystemPrompt = { role: 'system', content: text };
-    console.log('[buildSystemPrompt] loaded from OPFS');
-    return;
-  } catch (e1) {
-    console.warn('[buildSystemPrompt] opfs.read failed:', e1.message);
+    return { role: 'system', content: text };
+  } catch (e) {
+    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+    await opfs.write('sandpie_memory.md', basic);
+    return { role: 'system', content: basic };
   }
-  
-  try {
-    const resp = await fetch('/sandpie_memory.md');
-    if (resp.ok) {
-      const text = await resp.text();
-      _cachedSystemPrompt = { role: 'system', content: text };
-      console.log('[buildSystemPrompt] loaded from fetch');
-      return;
-    }
-  } catch (e2) {
-    console.warn('[buildSystemPrompt] fetch failed:', e2.message);
-  }
-  
-  const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-  _cachedSystemPrompt = { role: 'system', content: basic };
-  console.warn('[buildSystemPrompt] using fallback basic prompt');
-}
-
-function buildSystemPrompt() {
-  if (!_cachedSystemPrompt) {
-    console.warn('[buildSystemPrompt] called before loadSystemPrompt() - using fallback');
-    return { role: 'system', content: 'You are a helpful assistant that reasons through the users requests step-by-step.' };
-  }
-  return _cachedSystemPrompt;
 }
 
 function formatSize(bytes) {
@@ -3644,7 +3620,6 @@ sidePanel = new SidePanel();
 })();
 
 (async () => {
-  await loadSystemPrompt();
   await refreshConversationList();
   if (activeConvId) {
     
