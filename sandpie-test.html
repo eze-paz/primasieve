@@ -2788,7 +2788,7 @@ async function loadSystemPrompt() {
   }
   
   try {
-    const resp = await fetch('/files/sandpie_memory.md');
+    const resp = await fetch('/sandpie_memory.md');
     if (resp.ok) {
       const text = await resp.text();
       _cachedSystemPrompt = { role: 'system', content: text };
