@@ -599,7 +599,7 @@ async function runAgent(config, ctx) {
     ctx.emit({ type: 'message_added', message: asstMsg });
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
-      let parsedArgs = {};
+      
       if (!tc.function?.name) {
         continue;
       }
