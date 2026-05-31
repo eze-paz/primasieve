@@ -71,7 +71,8 @@
     background: linear-gradient(to right, var(--sp-accent-dim), transparent);
     pointer-events: none;
   }
-  
+
+
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
   #messages::-webkit-scrollbar, aside::-webkit-scrollbar, .file-viewer .panel::-webkit-scrollbar { width: 8px; height: 8px; }
   #messages::-webkit-scrollbar-track, aside::-webkit-scrollbar-track, .file-viewer .panel::-webkit-scrollbar-track { background: transparent; }
@@ -99,7 +100,8 @@
     animation: sync-pulse 1.2s ease-in-out infinite;
   }
   @keyframes sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-  
+
+
   aside button.ghost:disabled,
   aside button.ghost:disabled:hover {
     background: transparent;
@@ -142,7 +144,6 @@
   aside .navbar .back:hover { background: var(--sp-surface); }
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: var(--sp-accent-dim); }
-
   .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: var(--sp-panel); }
@@ -154,7 +155,8 @@
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
   ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; margin-left: 0.5rem; }
-  
+
+
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
   .file-viewer .panel header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--sp-border); }
@@ -194,7 +196,8 @@
   }
   .dbx-status.error { background: var(--sp-danger-dim); color: var(--sp-danger); }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  
+
+
   #messagesWrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; min-width: 0; }
   #messagesSide {
@@ -203,17 +206,20 @@
     scrollbar-gutter: stable; min-width: 0;
     border-left: 1px solid var(--sp-border);
   }
-  
+
+
   body:not(.side-open):not(.artifact-side-open) #messagesSide { display: none; }
   body.artifact-side-open #messagesSide { display: flex; flex-direction: column; }
   body.side-open #messages,
   body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
-  
+
+
   #messagesSide.artifact-mode { padding: 0; gap: 0; overflow: hidden; }
   #messagesSide.artifact-mode > *:not(#artifactPanelHeader):not(#artifactPanelFrame) { display: none !important; }
   #messagesSide:not(.artifact-mode) #artifactPanelHeader,
   #messagesSide:not(.artifact-mode) #artifactPanelFrame { display: none; }
-  
+
+
   #artifactPanelHeader {
     display: flex; align-items: center; justify-content: space-between;
     padding: 4px 10px; background: var(--sp-panel); border-bottom: 1px solid var(--sp-border);
@@ -226,7 +232,8 @@
   }
   #artifactPanelClose:hover { color: var(--sp-text); }
   #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
-  
+
+
   #sideResizer {
     width: 5px; flex-shrink: 0; cursor: col-resize;
     background: var(--sp-border); transition: background 0.15s; position: relative;
@@ -300,26 +307,113 @@
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
   form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); }
-  .input-row { display: flex; gap: 0.5rem; align-items: stretch; }
-  form textarea {
-    flex: 1;
-    padding: 0.5rem 1rem;
+  .input-wrap {
+    display: flex;
+    flex-direction: column;
     background: var(--sp-surface);
     border: 1px solid var(--sp-border);
-    border-radius: 8px;
+    border-radius: 12px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    overflow: hidden;
+  }
+  .input-wrap:focus-within {
+    border-color: var(--sp-accent);
+    box-shadow: 0 0 0 3px var(--sp-accent-dim);
+  }
+  .input-wrap textarea {
+    flex: 1;
+    padding: 0.65rem 0.85rem 0.4rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     color: var(--sp-text);
     font: inherit;
     resize: none;
-    overflow-y: hidden;
+    overflow-y: auto;
     line-height: 1.4;
-    min-height: calc(1.4em + 1rem + 2px); 
+    min-height: calc(1.4em + 0.8rem);
+    max-height: 12em;
+    outline: none;
   }
-  form button { padding: 0.5rem 1.25rem; background: var(--sp-accent); border: none; border-radius: 8px; color: var(--sp-text); cursor: pointer; }
-  form button.sending { background: #6e7681; }
-  form button.sending:hover { background: var(--sp-text-dim); }
-  form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .input-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.4rem 0.35rem;
+    border-top: 1px solid var(--sp-border);
+    min-height: 28px;
+  }
+  .attach-btn {
+    background: transparent !important;
+    border: none !important;
+    color: var(--sp-text-dim) !important;
+    padding: 0.15rem 0.4rem !important;
+    border-radius: 6px !important;
+    font-size: 1.15rem !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    transition: background 0.1s, color 0.1s !important;
+  }
+  .attach-btn:hover {
+    background: var(--sp-panel) !important;
+    color: var(--sp-text) !important;
+  }
+  .send-btn {
+    margin-left: auto;
+    width: 32px;
+    height: 32px;
+    padding: 0 !important;
+    background: var(--sp-accent) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: #fff !important;
+    font-size: 0.9rem !important;
+    line-height: 1 !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s, text-shadow 0.1s !important;
+    box-shadow: 0 2px 8px rgba(88,166,255,0.35);
+    text-shadow: none;
+  }
+  .send-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(88,166,255,0.45);
+    text-shadow:
+      -4px 0 0 rgba(255, 60, 60, 0.85),
+       4px 0 0 rgba(0, 240, 255, 0.85);
+  }
+  .send-btn:active {
+    transform: scale(0.78);
+    transition: transform 0.06s ease-out;
+  }
+  .send-btn.sending {
+    background: linear-gradient(135deg, #f85149, #da3633) !important;
+    box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35) !important;
+    cursor: pointer;
+    text-shadow: none !important;
+  }
+  .send-btn.sending:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(248, 81, 73, 0.45) !important;
+    text-shadow:
+      -4px 0 0 rgba(255, 200, 0, 0.8),
+       4px 0 0 rgba(255, 0, 255, 0.8) !important;
+  }
+  .send-btn.sending:active {
+    transform: scale(0.78);
+    transition: transform 0.06s ease-out;
+  }
+  .send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none !important;
+  }
+  /* Input styles moved to .input-wrap, .input-bar, .attach-btn, .send-btn */
   .cursor { display: inline-block; width: 2px; height: 1em; background: var(--sp-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
-  
+
+
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
@@ -329,7 +423,8 @@
   }
   .msg-timer.done { color: #6e7681; }
   @keyframes blink { 50% { opacity: 0; } }
-  
+
+
   aside details.service {
     border: none;
     background: transparent;
@@ -404,13 +499,15 @@
   aside .status-dot.ok   { background: var(--sp-accent); box-shadow: 0 0 4px var(--sp-accent-dim); }
   aside .status-dot.warn { background: var(--sp-warn); box-shadow: 0 0 4px var(--sp-warn-dim); }
   aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px var(--sp-danger-dim); }
-  
+
+
   aside .status-dot.busy { animation: status-dot-pulse 0.9s ease-in-out infinite; }
   @keyframes status-dot-pulse {
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.55); opacity: 0.55; }
   }
-  
+
+
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: var(--sp-surface); border-color: var(--sp-border-bright); }
   ul.conv-list li.active { background: var(--sp-panel); border-color: var(--sp-accent); }
@@ -447,7 +544,8 @@
     background: var(--sp-border);
     opacity: 0.4;
   }
-  
+
+
   ul.conv-list li .conv-meta.gen-dot,
   ul.conv-list li .gen-dot {
     display: inline-block;
@@ -475,12 +573,17 @@
     opacity: 0.9;
     font-weight: 600;
   }
-  
+
+
   .conv-host { display: flex; flex-direction: column; gap: 1rem; flex: 0 0 auto; }
-  
-  
-  
-  
+
+
+
+
+
+
+
+
   .queue-pill {
     font-size: 0.65rem;
     color: var(--sp-text);
@@ -496,11 +599,11 @@
   @media (prefers-reduced-motion: reduce) {
   }
 
-  
+
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
-  
+
   .sidebar-header {
     display: flex;
     align-items: center;
@@ -604,7 +707,8 @@
   body.sidebar-collapsed main {
     margin-left: 48px;
   }
-  
+
+
   }
   @keyframes chromaShift {
     0% { opacity: 0; transform: translateX(0); }
@@ -620,7 +724,8 @@
     70% { opacity: 0.3; transform: translateX(1px); }
     100% { opacity: 0; transform: translateX(0); }
   }
-  
+
+
   @keyframes chromaShiftWelcome {
     0%        { opacity: 0;   transform: translateX(0); }
     8%        { opacity: 0.9; transform: translateX(-3px); }
@@ -635,11 +740,13 @@
     33%       { opacity: 0.3; transform: translateX(1px); }
     40%, 100% { opacity: 0;   transform: translateX(0); }
   }
-  
+
+
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     body {
       flex-direction: column;
-      
+
+
       height: 100vh;
       height: 100dvh;
     }
@@ -652,7 +759,8 @@
       background: var(--sp-surface);
       border-bottom: 1px solid var(--sp-border);
       flex: 0 0 auto;
-      
+
+
       position: relative;
       z-index: 101;
     }
@@ -714,7 +822,8 @@
     }
     aside {
       position: fixed;
-      
+
+
       top: max(60px, calc(env(safe-area-inset-top, 0px) + 52px));
       bottom: 0;
       left: -100%;
@@ -747,15 +856,18 @@
       opacity: 1;
       pointer-events: auto;
     }
-    
+
+
     main { flex: 1 1 auto; min-height: 0; }
-    
+
+
     body.side-open #messagesSide,
     body.artifact-side-open #messagesSide { display: none !important; }
     body.side-open #messages { flex: 1; }
     #sideResizer { display: none !important; }
     .artifact-panel-btn { display: none !important; }
-    
+
+
     aside input, aside button {
       padding: 0.65rem 0.75rem;
       font-size: 0.95rem;
@@ -770,7 +882,6 @@
     #messages { padding: 1rem; }
     .msg { max-width: 95%; }
   }
-
   .chip-row {
     display: flex;
     flex-wrap: wrap;
@@ -805,7 +916,6 @@
   .chip.add {
     border-style: dashed;
   }
-
   .modal {
     position: fixed;
     inset: 0;
@@ -877,7 +987,7 @@
     background: var(--sp-danger-dim);
   }
 
-  
+
   .tool-call {
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
@@ -886,8 +996,10 @@
     background: var(--sp-accent-dim);
     border-color: var(--sp-accent-dim);
   }
-  
-  
+
+
+
+
   .tool-box {
     align-self: flex-start;
     max-width: 100%;
@@ -927,7 +1039,6 @@
     padding: 0.5rem 0.75rem;
     color: var(--sp-accent);
   }
-
   body.tools-minimized .tool-call:hover {
     background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
     border-color: var(--sp-accent-dim);
@@ -960,7 +1071,6 @@
     min-width: 0;
   }
   body.tools-minimized .tool-result { display: none; }
-
   .tc-spinner {
     flex-shrink: 0;
     width: 11px; height: 11px;
@@ -971,17 +1081,6 @@
   }
   .tc-title { color: var(--sp-text); white-space: nowrap; }
   .tc-title b { color: var(--sp-accent); font-weight: 600; }
-  .tc-flavor {
-    color: var(--sp-text-dim);
-    font-style: italic;
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-    flex: 1;
-    animation: tc-fade 0.35s ease-out;
-  }
   .tc-meta {
     margin-left: auto;
     font-size: 10px;
@@ -997,7 +1096,8 @@
     font-size: 12px;
   }
   .tc-dim { opacity: 0.65; }
-  
+
+
   .artifact-meta-row {
     display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
     padding: 8px 12px; font: 11px monospace; color: var(--sp-text-dim);
@@ -1021,7 +1121,6 @@
   .image-preview .remove-btn { background: none; border: none; color: var(--sp-danger); cursor: pointer; font-size: 1rem; margin-left: auto; padding: 0 0.25rem; }
   #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
   #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
-
   .welcome {
     margin: auto 0;
     padding: 2rem 1rem;
@@ -1072,7 +1171,6 @@
   .welcome-rotating span:nth-child(2) { animation-delay: 5s; }
   .welcome-rotating span:nth-child(3) { animation-delay: 10s; }
   .welcome-rotating span:nth-child(4) { animation-delay: 15s; }
-
   @keyframes welcome-fadein {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -1098,36 +1196,30 @@
     33%       { opacity: 0.3; transform: translateX(1px); }
     40%, 100% { opacity: 0;   transform: translateX(0); }
   }
-
   @media (prefers-reduced-motion: reduce) {
     .welcome-rotating span { animation: none; }
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
-
 </style>
 <script>
-
 function renderArtifact(host, path) {
   const target = host || (activeStream() && activeStream().host) || $('messages');
   const clean = path ? String(path).replace(/^\/+/, '') : '';
-
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
   wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;max-width:100%;';
-
   const header = document.createElement('div');
   header.className = 'artifact-header';
   header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;';
   const label = document.createElement('span');
   label.textContent = '📎 Artifact' + (clean ? ' — ' + clean.split('/').pop() : '');
   header.appendChild(label);
-
   if (!target) {
-    
+
+
     console.error('[artifact] renderArtifact: no target for path', path);
     return;
   }
-
   if (!clean) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'padding:10px 12px;font:12px monospace;color:#f85149;';
@@ -1138,18 +1230,16 @@ function renderArtifact(host, path) {
     return;
   }
 
-  
+
   const RENDERABLE = new Set(['html','htm','svg','png','jpg','jpeg','gif','webp','pdf','csv','txt','json']);
   const ext = clean.split('.').pop().toLowerCase();
   const renderable = RENDERABLE.has(ext);
 
-  
+
   wrap.dataset.artifactPath    = clean;
   wrap.dataset.artifactCreated = Date.now();
-
   const btns = document.createElement('span');
   btns.style.cssText = 'display:flex;gap:5px;align-items:center;';
-
   if (renderable) {
     const panelBtn = document.createElement('button');
     panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
@@ -1165,7 +1255,6 @@ function renderArtifact(host, path) {
     openLink.className = 'artifact-icon-btn';
     btns.appendChild(openLink);
   }
-
   const dlBtn = document.createElement('span');
   dlBtn.title = 'Download';
   dlBtn.textContent = '⬇';
@@ -1185,7 +1274,6 @@ function renderArtifact(host, path) {
     }
   };
   btns.appendChild(dlBtn);
-
   if (renderable) {
     const collapseBtn = document.createElement('button');
     collapseBtn.className = 'artifact-icon-btn artifact-collapse-btn';
@@ -1194,12 +1282,11 @@ function renderArtifact(host, path) {
     collapseBtn.onclick = () => toggleArtifactCollapse(wrap);
     btns.appendChild(collapseBtn);
   }
-
   header.appendChild(btns);
   wrap.appendChild(header);
-
   if (!renderable) {
-    
+
+
     const dlRow = document.createElement('div');
     dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-text-dim);';
     dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
@@ -1208,7 +1295,7 @@ function renderArtifact(host, path) {
     return;
   }
 
-  
+
   const metaRow = document.createElement('div');
   metaRow.className = 'artifact-meta-row';
   metaRow.style.display = 'none';
@@ -1222,7 +1309,6 @@ function renderArtifact(host, path) {
   metaRow.appendChild(showBtn);
   metaRow.appendChild(metaInfo);
   wrap.appendChild(metaRow);
-
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
@@ -1235,13 +1321,11 @@ function renderArtifact(host, path) {
   wrap.appendChild(frame);
   target.appendChild(wrap);
 }
-
 function formatArtifactBytes(n) {
   if (n < 1024) return n + ' B';
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
   return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
-
 function formatArtifactAge(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 10)  return 'just now';
@@ -1249,7 +1333,6 @@ function formatArtifactAge(ts) {
   if (s < 3600) return Math.floor(s / 60) + 'm ago';
   return Math.floor(s / 3600) + 'h ago';
 }
-
 function collapseArtifact(wrap) {
   if (!wrap || wrap.dataset.artifactCollapsed === '1') return;
   wrap.dataset.artifactCollapsed = '1';
@@ -1260,7 +1343,8 @@ function collapseArtifact(wrap) {
   if (colBtn)  { colBtn.textContent = '+'; colBtn.title = 'Expand'; }
   if (metaRow) {
     metaRow.style.display = 'flex';
-    
+
+
     const path = wrap.dataset.artifactPath;
     const ts   = parseInt(wrap.dataset.artifactCreated || '0', 10);
     const info = metaRow.querySelector('.artifact-meta-info');
@@ -1276,7 +1360,6 @@ function collapseArtifact(wrap) {
     }
   }
 }
-
 function expandArtifact(wrap) {
   if (!wrap || wrap.dataset.artifactCollapsed !== '1') return;
   delete wrap.dataset.artifactCollapsed;
@@ -1287,12 +1370,10 @@ function expandArtifact(wrap) {
   if (metaRow) metaRow.style.display = 'none';
   if (colBtn)  { colBtn.textContent = '−'; colBtn.title = 'Collapse'; }
 }
-
 function toggleArtifactCollapse(wrap) {
   if (wrap.dataset.artifactCollapsed === '1') expandArtifact(wrap);
   else collapseArtifact(wrap);
 }
-
 function showArtifactError(wrap, frame, msg) {
   if (frame) frame.style.display = 'none';
   const errEl = document.createElement('div');
@@ -1301,10 +1382,10 @@ function showArtifactError(wrap, frame, msg) {
   wrap.appendChild(errEl);
   wrap.style.borderColor = '#f85149';
 }
-
 function openArtifactPanel(path) {
   const clean = String(path).replace(/^\/+/, '');
-  
+
+
   if (typeof sidePanel !== 'undefined' && sidePanel?.isOpen) sidePanel.close();
   const frame = document.getElementById('artifactPanelFrame');
   const title = document.getElementById('artifactPanelTitle');
@@ -1316,7 +1397,6 @@ function openArtifactPanel(path) {
   if (side) side.classList.add('artifact-mode');
   document.body.classList.add('artifact-side-open');
 }
-
 function closeArtifactPanel() {
   const side  = document.getElementById('messagesSide');
   const frame = document.getElementById('artifactPanelFrame');
@@ -1324,7 +1404,6 @@ function closeArtifactPanel() {
   if (frame) frame.src = 'about:blank';
   document.body.classList.remove('artifact-side-open');
 }
-
 window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
   for (const f of document.querySelectorAll('iframe.artifact-frame')) {
@@ -1336,7 +1415,6 @@ window.addEventListener('message', e => {
     }
   }
 });
-
 </script>
   <script src="modules/images.js"></script>
 <script>SandpieImages.init();</script>
@@ -1363,7 +1441,7 @@ window.addEventListener('message', e => {
     </div>
   </details>
 
-  
+
   <input id="endpoint" type="hidden">
   <input id="model" type="hidden">
   <input id="apiKey" type="hidden">
@@ -1384,20 +1462,19 @@ window.addEventListener('message', e => {
     </div>
   </div>
 
-  
+
   <div id="chipContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="SandpieProviders.editFromMenu()">Edit</div>
     <div class="context-item" onclick="SandpieProviders.duplicateFromMenu()">Duplicate</div>
     <div class="context-item context-delete" onclick="SandpieProviders.deleteFromMenu()">Delete</div>
   </div>
 
-  
+
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
   </div>
-
   <details class="service" id="cloudSection">
     <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
     <div class="service-body">
@@ -1409,7 +1486,6 @@ window.addEventListener('message', e => {
       <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
     </div>
   </details>
-
     <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -1418,17 +1494,16 @@ window.addEventListener('message', e => {
         <input id="opfsPath" value="/">
       </div>
       <ul class="fs-list" id="fileList"></ul>
-
     </div>
   </details>
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
-
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
-  
+
+
   <div id="messagesWrap">
     <div id="messages">
       <div id="welcome" class="welcome">
@@ -1457,36 +1532,32 @@ window.addEventListener('message', e => {
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <input type="file" id="imageInput" accept="image/*" style="display:none" >
     <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <div class="input-row">
+    <div class="input-wrap">
       <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
-      <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-      <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+      <div class="input-bar">
+        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">+</button>
+        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
+      </div>
     </div>
   </form>
 </main>
-
 <script>
-
 const $ = id => document.getElementById(id);
-
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
    ============================================================================= */
 const SandpieMenu = (() => {
   const sections = new Map();
   let sidebarEl = null;
-
   function ensureSidebar() {
     if (!sidebarEl) sidebarEl = document.querySelector('aside');
     return sidebarEl;
   }
-
   function createSectionEl(id, config) {
     const details = document.createElement('details');
     details.className = 'service';
     details.id = id;
     if (config.open) details.open = true;
-
     const summary = document.createElement('summary');
     let summaryHtml = config.title;
     if (config.dot) {
@@ -1497,7 +1568,6 @@ const SandpieMenu = (() => {
     }
     summary.innerHTML = summaryHtml;
     details.appendChild(summary);
-
     const body = document.createElement('div');
     body.className = 'service-body';
     if (typeof config.html === 'string') {
@@ -1506,10 +1576,8 @@ const SandpieMenu = (() => {
       body.appendChild(config.html);
     }
     details.appendChild(body);
-
     return details;
   }
-
   function insertBeforeFooter(el) {
     const sidebar = ensureSidebar();
     if (!sidebar) return;
@@ -1527,7 +1595,6 @@ const SandpieMenu = (() => {
       sidebar.appendChild(el);
     }
   }
-
   return {
     add(id, config = {}) {
       if (sections.has(id)) {
@@ -1540,7 +1607,6 @@ const SandpieMenu = (() => {
       if (config.onRender) config.onRender(el.querySelector('.service-body'));
       return true;
     },
-
     remove(id) {
       const section = sections.get(id);
       if (!section) return false;
@@ -1548,11 +1614,9 @@ const SandpieMenu = (() => {
       sections.delete(id);
       return true;
     },
-
     get(id) {
       return sections.get(id)?.el || null;
     },
-
     updateBadge(id, text) {
       const section = sections.get(id);
       if (!section) return false;
@@ -1560,31 +1624,33 @@ const SandpieMenu = (() => {
       if (badge) badge.textContent = text;
       return true;
     },
-
     list() {
       return Array.from(sections.keys());
     }
   };
 })();
-
-
-
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (ev) => {
     const d = ev.data;
     if (!d) return;
     if (d.type === 'sandpie-sw-log') {
-      
+
+
       const fn = console[d.level] || console.log;
       fn.call(console, '[sw]', d.text);
       return;
     }
     if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-      
-      
-      
-      
-      
+
+
+
+
+
+
+
+
+
+
       (async () => {
         if (!dbxTokens()) return;
         const state = syncState();
@@ -1605,13 +1671,16 @@ if ('serviceWorker' in navigator) {
       return;
       }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
+        console.log('[sandpie] ← SW notified:', d.paths);
         const state = syncState();
         let changed = false;
         for (const path of d.paths) {
           if (!state[path]) {
+            console.log('[sandpie] adding to syncState:', path);
             state[path] = { rev: '', size: 0, hydrated: true, syncedMtime: 0 };
             changed = true;
           } else {
+            console.log('[sandpie] marking dirty:', path);
             state[path].syncedMtime = 0;
             changed = true;
           }
@@ -1620,9 +1689,12 @@ if ('serviceWorker' in navigator) {
         return;
       }
     });
-  
-  
-  
+
+
+
+
+
+
   const flush = () => {
     const c = navigator.serviceWorker.controller;
     if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
@@ -1630,11 +1702,9 @@ if ('serviceWorker' in navigator) {
   flush();
   navigator.serviceWorker.addEventListener('controllerchange', flush);
 }
-
 let messages = [];
-
 const convStreams = new Map();
-const convLastViewed = new Map(); 
+const convLastViewed = new Map();
 function ensureStream(id) {
   let s = convStreams.get(id);
   if (!s) {
@@ -1654,22 +1724,6 @@ function ensureStream(id) {
   return s;
 }
 function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function dedentPreBlocks(html) {
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
@@ -1691,9 +1745,7 @@ function dedentPreBlocks(html) {
   }
   return wrap.innerHTML;
 }
-
 const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
-
 function dedentMarkdownFences(text) {
   if (!text) return text;
   return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
@@ -1711,15 +1763,11 @@ function dedentMarkdownFences(text) {
     return lead + open + dedented + close;
   });
 }
-
 let initialSyncDone = !localStorage.getItem('dbx-tokens');
-
 let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
-
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
-
 function api(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
@@ -1727,13 +1775,11 @@ function api(url) {
   if (isLocalhost) return '/proxy/' + stripped;
   return url;
 }
-
 function dbxRoute(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
   return (remote || '') + '/proxy/' + stripped;
 }
-
 function updateRoutingHint() {
   const remote = ($('proxyUrl').value || '').trim();
   const hint = $('routingHint');
@@ -1743,7 +1789,6 @@ function updateRoutingHint() {
 }
 $('proxyUrl').addEventListener('input', () => { if (typeof SandpieProviders !== "undefined") SandpieProviders.updateHint(); if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot(); });
 if (typeof SandpieProviders !== "undefined") SandpieProviders.updateHint();
-
 function setDot(id, state) {
   const dot = $(id);
   if (!dot) return;
@@ -1761,29 +1806,28 @@ function refreshProxyDot() {
 ['endpoint', 'apiKey'].forEach(id => $(id).addEventListener('input', refreshAiDot));
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
-
-
 // Only dbxAppKey triggers saveConfig (provider inputs managed by module)
 $('dbxAppKey').addEventListener('input', saveConfig);
-
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
-
 (function setupInput() {
   const ta = $('input');
   if (!ta) return;
   function autosize() {
     const m = $('messages');
     ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
+    const maxH = 12 * parseFloat(getComputedStyle(ta).lineHeight || '1.4');
+    const newH = Math.min(ta.scrollHeight, maxH);
+    ta.style.height = newH + 'px';
+    ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
     if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
   }
   ta.addEventListener('input', autosize);
 
-  
+
   const searchInput = $('convSearch');
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
@@ -1799,56 +1843,51 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   }
   setupScrollTracking($('messages'));
   setupScrollTracking($('messagesSide'));
-
   ta.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       handleSubmit();
     }
   });
-  
+
+
   const observer = new MutationObserver(autosize);
   observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
-  
+
+
   ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
   autosize();
 })();
-
 function toggleSidebar() {
   const open = document.body.classList.toggle('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = open ? '✕' : '☰';
 }
-
 function toggleSidebarCollapse() {
   const aside = document.querySelector('aside');
   const isCollapsed = aside.classList.toggle('collapsed');
   document.body.classList.toggle('sidebar-collapsed', isCollapsed);
   localStorage.setItem('sandpie-sidebar-collapsed', isCollapsed ? '1' : '');
 }
-
 document.addEventListener('submit', () => {
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
 });
-
 function splitPath(path) {
   const parts = String(path).split('/').filter(Boolean);
   const name = parts.pop();
   return { parts, name };
 }
-
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
-  
+
   async resolveDir(parts, { create = false } = {}) {
     let dir = await this.root();
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
     return dir;
   },
-
   async read(path) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
@@ -1856,7 +1895,7 @@ const opfs = {
     return await (await handle.getFile()).text();
   },
 
-  
+
   async readBytes(path) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
@@ -1864,7 +1903,6 @@ const opfs = {
     const file = await handle.getFile();
     return new Uint8Array(await file.arrayBuffer());
   },
-
   async write(path, content) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts, { create: true });
@@ -1873,24 +1911,29 @@ const opfs = {
     await w.write(content);
     await w.close();
   },
-
   async remove(path) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
     await dir.removeEntry(name, { recursive: true });
-    
-    
-    
-    
+
+
+
+
+
+
+
+
     try {
       const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
       if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
     } catch (_) {}
   },
 
-  
-  
-  
+
+
+
+
+
   async exists(path) {
     try {
       const { parts, name } = splitPath(path);
@@ -1899,13 +1942,12 @@ const opfs = {
       return true;
     } catch { return false; }
   },
-
   async mkdir(path) {
     const parts = String(path).split('/').filter(Boolean);
     await this.resolveDir(parts, { create: true });
   },
 
-  
+
   async listDir(path = '') {
     const parts = String(path).split('/').filter(Boolean);
     const dir = await this.resolveDir(parts);
@@ -1914,7 +1956,7 @@ const opfs = {
     return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
   },
 
-  
+
   async list(prefix = '') {
     const out = [];
     const walk = async (dir, p) => {
@@ -1930,7 +1972,7 @@ const opfs = {
     return out.sort();
   },
 
-  
+
   async listAll(prefix = '') {
     const out = [];
     const walk = async (dir, p) => {
@@ -1946,12 +1988,15 @@ const opfs = {
     return out;
   },
 };
-
 async function pruneOrphanDirs(cloud) {
-  
-  
-  
-  
+
+
+
+
+
+
+
+
   const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
   const cloudPaths = new Set();
   for (const k of source) {
@@ -1966,7 +2011,8 @@ async function pruneOrphanDirs(cloud) {
     changed = false;
     let all;
     try { all = await opfs.listAll(''); } catch { return pruned; }
-    
+
+
     all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
     for (const e of all) {
       if (e.kind !== 'directory') continue;
@@ -1979,20 +2025,16 @@ async function pruneOrphanDirs(cloud) {
   }
   return pruned;
 }
-
 const DBX_REDIRECT = location.origin + location.pathname;
-
 function b64url(buf) {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
-
 async function pkceChallenge() {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   return { verifier, challenge: b64url(hash) };
 }
-
 function dbxStatus(text, kind) {
   const el = $('dbxStatus');
   el.textContent = text;
@@ -2001,17 +2043,13 @@ function dbxStatus(text, kind) {
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
   const btn = $('dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-  if (typeof refreshWelcome === 'function') 
-refreshWelcome();
 }
-
 function dbxProgress(text) {
   const el = $('dbxProgress');
   const title = $('dbxTitle');
   if (el) el.textContent = text || '';
   if (title) title.style.display = text ? 'none' : '';
 }
-
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {
   dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
@@ -2020,21 +2058,19 @@ function setDbxBusy(busy) {
   if (dbxBusyCount > 0) dot.classList.add('busy');
   else dot.classList.remove('busy');
 }
-
 function dbxToggleConnection() {
   if (dbxTokens()) dbxDisconnect();
   else dbxConnect();
 }
-
 function dbxTokens() {
   return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
 }
-
 async function dbxAccessToken() {
   const stored = dbxTokens();
   if (!stored) throw new Error('Dropbox not connected');
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
-  
+
+
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: stored.refresh_token,
@@ -2052,7 +2088,6 @@ async function dbxAccessToken() {
   localStorage.setItem('dbx-tokens', JSON.stringify(stored));
   return data.access_token;
 }
-
 async function dbxConnect() {
   const appKey = $('dbxAppKey').value.trim();
   if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
@@ -2073,7 +2108,6 @@ async function dbxConnect() {
   });
   location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
 }
-
 function dbxDisconnect() {
   localStorage.removeItem('dbx-tokens');
   localStorage.removeItem(SYNC_STATE_KEY);
@@ -2084,7 +2118,6 @@ function dbxDisconnect() {
   dbxStatus('Not connected', 'disconnected');
   refreshFileList();
 }
-
 async function dbxExchangeCode(code) {
   const stashed = JSON.parse(localStorage.getItem('dbx-pkce') || 'null');
   if (!stashed) throw new Error('Missing PKCE state');
@@ -2115,7 +2148,6 @@ async function dbxExchangeCode(code) {
   }));
   localStorage.removeItem('dbx-pkce');
 }
-
 async function dbxApi(path, body) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
@@ -2126,7 +2158,6 @@ async function dbxApi(path, body) {
   if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
   return await res.json();
 }
-
 async function dbxListFull(folderPath, { recursive = false } = {}) {
   let data = await dbxApi('/2/files/list_folder', {
     path: folderPath === '/' ? '' : folderPath,
@@ -2153,7 +2184,6 @@ async function dbxListFull(folderPath, { recursive = false } = {}) {
     cursor: data.cursor,
   };
 }
-
 async function dbxListContinue(cursor) {
   let data = await dbxApi('/2/files/list_folder/continue', { cursor });
   let entries = data.entries.slice();
@@ -2176,7 +2206,6 @@ async function dbxListContinue(cursor) {
     cursor: data.cursor,
   };
 }
-
 async function dbxDownload(path, signal) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
@@ -2189,11 +2218,12 @@ async function dbxDownload(path, signal) {
     signal,
   });
   if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
-  
-  
+
+
+
+
   return new Uint8Array(await res.arrayBuffer());
 }
-
 async function dbxUpload(path, content) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
@@ -2206,10 +2236,10 @@ async function dbxUpload(path, content) {
     body: content,
   });
   if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
-  
+
+
   return await res.json();
 }
-
 async function dbxUploadSessionStart(content, close = true) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
@@ -2224,7 +2254,6 @@ async function dbxUploadSessionStart(content, close = true) {
   if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
   return await res.json();
 }
-
 async function dbxUploadSessionFinishBatch(entries) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
@@ -2238,9 +2267,9 @@ async function dbxUploadSessionFinishBatch(entries) {
   if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
   return await res.json();
 }
-
 async function dbxUploadBatch(files) {
-  
+
+
   const CONCURRENCY = 5;
   const sessions = [];
   for (let i = 0; i < files.length; i += CONCURRENCY) {
@@ -2263,7 +2292,8 @@ async function dbxUploadBatch(files) {
   if (sessions.length === 0) return [];
   const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
   const result = await dbxUploadSessionFinishBatch(entries);
-  
+
+
   if (result['.tag'] === 'async_job_id') {
     console.warn('Unexpected async_job_id from finish_batch_v2:', result.async_job_id);
     return [];
@@ -2274,10 +2304,11 @@ async function dbxUploadBatch(files) {
   }
   return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
 }
-
 async function dbxDelete(path) {
-  
-  
+
+
+
+
   try {
     return await dbxApi('/2/files/delete_v2', { path });
   } catch (e) {
@@ -2285,11 +2316,9 @@ async function dbxDelete(path) {
     throw e;
   }
 }
-
 const SYNC_STATE_KEY = 'sandpie-sync-state';
 const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
 const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
-
 function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
 function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
 function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
@@ -2299,7 +2328,6 @@ function setDbxCursor(cursor) {
   if (cursor) localStorage.setItem(DBX_CURSOR_KEY, cursor);
   else localStorage.removeItem(DBX_CURSOR_KEY);
 }
-
 (function migrateLegacyState() {
   if (localStorage.getItem(SYNC_STATE_KEY)) return;
   const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
@@ -2316,7 +2344,6 @@ function setDbxCursor(cursor) {
   }
   setSyncState(s);
 })();
-
 (function validateCloudState() {
   const idx = cloudIndex();
   const cursor = dbxCursor();
@@ -2324,11 +2351,9 @@ function setDbxCursor(cursor) {
     setCloudIndex({});
   }
 })();
-
 async function cloudListAll() {
   const storedCursor = dbxCursor();
   const existingIndex = cloudIndex();
-
   if (storedCursor && Object.keys(existingIndex).length > 0) {
     try {
       const result = await dbxListContinue(storedCursor);
@@ -2356,7 +2381,6 @@ async function cloudListAll() {
       setDbxCursor(null);
     }
   }
-
   const result = await dbxListFull('/', { recursive: true });
   const out = {};
   for (const e of result.entries) {
@@ -2377,19 +2401,15 @@ async function cloudListAll() {
   setCloudIndex(out);
   return out;
 }
-
 let _syncing = false;
-let _openFilePath = null;  
-
+let _openFilePath = null;
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
 }
-
 function isEagerHydrate(path, size) {
   return size < 1024 * 1024; // Auto-download files under 1MB
 }
-
 async function opfsLastModified(path) {
   try {
     const { parts, name } = splitPath(path);
@@ -2404,7 +2424,6 @@ async function opfsLastModified(path) {
     return 0;
   }
 }
-
 async function sync() {
   if (!dbxTokens()) return;
   if (_syncing) return;
@@ -2417,26 +2436,26 @@ async function sync() {
     const state = syncState();
     let baselined = 0;
 
-    
+
     for (const path of Object.keys(state)) {
       if (cloud[path]) continue;
       const s = state[path];
       if (s.hydrated) {
         const lm = await opfsLastModified(path);
-        if (lm > 0 && lm > s.syncedMtime) continue;  
+        if (lm > 0 && lm > s.syncedMtime) continue;
         try { await opfs.remove(path); } catch {}
       }
       delete state[path];
-      
+
+
     }
 
-    
+
     for (const [path, e] of Object.entries(cloud)) {
       if (e.kind !== 'file') continue;
       const s = state[path];
       const eager = isEagerHydrate(path, e.size);
       const localExists = await opfs.exists(path);
-
       if (!s) {
         if (localExists) {
           state[path] = {
@@ -2452,20 +2471,17 @@ async function sync() {
             rev: e.rev, size: e.size, hydrated: true,
             syncedMtime: await opfsLastModified(path),
           };
-          
+
+
         } else {
           state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
         }
         continue;
       }
-
       const cloudChanged = s.rev !== e.rev;
       const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
-
-      if (path === _openFilePath) continue;  
-
-      if (cloudChanged && localDirty) continue;  
-
+      if (path === _openFilePath) continue;
+      if (cloudChanged && localDirty) continue;
       if (cloudChanged) {
         dbxProgress(`downloading… ${path}`);
         const content = await dbxDownload(e.path);
@@ -2477,7 +2493,7 @@ async function sync() {
         continue;
       }
 
-      
+
       if (s.hydrated && !localExists) {
         state[path].hydrated = false;
         state[path].syncedMtime = 0;
@@ -2485,7 +2501,7 @@ async function sync() {
       state[path].size = e.size;
     }
 
-    
+
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
     const dirty = [];
@@ -2493,7 +2509,11 @@ async function sync() {
       if (rel === _openFilePath) continue;
       const lm = await opfsLastModified(rel);
       const s = state[rel];
-      if (s && s.hydrated && lm <= s.syncedMtime) continue;
+      if (s && s.hydrated && lm <= s.syncedMtime) {
+        console.log('[sandpie] sync skip (clean):', rel);
+        continue;
+      }
+      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
       dirty.push({ rel, lm, s });
     }
     const BATCH_SIZE = 50;
@@ -2514,7 +2534,8 @@ async function sync() {
               hydrated: true,
               syncedMtime: r.lm,
             };
-            
+
+
           } else {
             console.warn('batch item failed:', r.rel, r.meta);
           }
@@ -2523,10 +2544,8 @@ async function sync() {
         console.warn('batch upload failed:', err);
       }
     }
-
     setSyncState(state);
     await pruneOrphanDirs(cloud);
-
     dbxProgress('');
     await refreshFileList();
     await refreshConversationList();
@@ -2541,14 +2560,11 @@ async function sync() {
     _syncing = false;
   }
 }
-
 setInterval(() => { if (!document.hidden) sync(); }, 60000);
-
 function joinPath(folder, name) {
   if (folder === '/' || folder === '') return '/' + name;
   return folder.replace(/\/$/, '') + '/' + name;
 }
-
 async function manualResync() {
   if (!dbxTokens()) {
     dbxStatus('Not connected', 'disconnected');
@@ -2562,7 +2578,6 @@ async function manualResync() {
     if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
   }
 }
-
 (async () => {
   const params = new URLSearchParams(location.search);
   const code = params.get('code');
@@ -2580,21 +2595,15 @@ async function manualResync() {
     await sync();
   }
 })();
-
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
-
 REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
-
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
 Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
-
 HTTP: pyodide.http.pyfetch (CORS). Non-CORS: pyfetch('/proxy/host/path').
-
 OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
-
 Examples:
   run      → {path: "scripts/random_numbers.py", args: ["5"]}
   with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
@@ -2610,49 +2619,6 @@ Examples:
       required: ['path'],
     },
   },
-  fetch_file: {
-    description: `Download a single cloud-only file FROM DROPBOX into OPFS so run_python can read it. Use ONLY when run_python returns "sandpie cloud placeholder" for a path. Path is relative to /files/ (e.g. "notes.txt", "subdir/data.csv"). One file per call. Returns "Hydrated <path>" on success, or an explanatory error.
-
-SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and NOT for URLs (use run_python + pyfetch). If the path isn't in the cached Dropbox listing, this fails — the file must already exist in the user's sandpie Dropbox folder.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'Cloud-only file path relative to /files/' },
-      },
-      required: ['path'],
-    },
-    run: async ({ path }, signal) => {
-      if (!dbxTokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
-
-      if (!path) return 'Missing path.';
-      const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
-      const state = syncState();
-      const entry = state[norm];
-      if (!entry) return `No such file in Dropbox listing: ${norm}. Check the path or refresh the file list.`;
-      if (await opfs.exists(norm)) return `Already local: ${norm}.`;
-      if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
-      setDbxBusy(true);
-      try {
-        const content = await dbxDownload('/' + norm, signal);
-        await opfs.write(norm, content);
-        const s = syncState();
-        s[norm] = {
-          rev: entry.rev, size: entry.size,
-          hydrated: true,
-          syncedMtime: await opfsLastModified(norm),
-        };
-        setSyncState(s);
-        await refreshFileList();
-        const sizeStr = entry.size != null ? ` (${entry.size} bytes)` : '';
-        return `Hydrated ${norm}${sizeStr}. You can now read it.`;
-      } catch (e) {
-        if (e.name === 'AbortError') return `[stopped — fetch_file ${norm} aborted]`;
-        return `Failed to fetch ${norm}: ${e.message}`;
-      } finally {
-        setDbxBusy(false);
-      }
-    },
-  },
   write_file: {
   description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
   parameters: {
@@ -2664,7 +2630,6 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
     required: ['path', 'content'],
   },
 },
-
 edit_file: {
   description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
   parameters: {
@@ -2679,17 +2644,13 @@ edit_file: {
 },
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
-
 Use this whenever:
 - The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
 - You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
-
 The file must already exist in OPFS — write it first with run_python, then call this.
 Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
 Path is OPFS-relative — do NOT include a leading slash (e.g. "artifacts/chart.html").
-
 Default output folder is artifacts/ — use it unless the user specifies a different path.
-
 Typical flow:
   run_python: open('artifacts/chart.html', 'w').write(html)
   show_artifact: { "path": "artifacts/chart.html" }`,
@@ -2700,16 +2661,11 @@ Typical flow:
       },
       required: ['path'],
     },
-
   },
-
         load_image: {
       description: `Load an image file from OPFS into the conversation so you can see its pixel content.
-
 WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
-
 WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
-
 Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
       parameters: {
         type: 'object',
@@ -2720,20 +2676,16 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
       },
     },
 };
-
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
-    if (name === 'fetch_file') return !!dbxTokens();   
     return true;
   })
   .map(([name, t]) => ({
     type: 'function',
     function: { name, description: t.description, parameters: t.parameters },
   }));
-
 const MANIFEST_PATTERN = /^sandpie_.*\.md$/i;
-const MANIFEST_CONTENT_CAP = 2048; 
-
+const MANIFEST_CONTENT_CAP = 2048;
 async function gatherSandpieManifests() {
   const out = [];
   async function walk(path) {
@@ -2742,7 +2694,8 @@ async function gatherSandpieManifests() {
     for (const e of entries) {
       const full = path ? `${path}/${e.name}` : e.name;
       if (e.kind === 'directory') {
-        
+
+
         if (full === '_conversations' || full.startsWith('_conversations/')) continue;
         await walk(full);
       } else if (MANIFEST_PATTERN.test(e.name)) {
@@ -2761,54 +2714,21 @@ async function gatherSandpieManifests() {
   await walk('');
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
-
 async function refreshManifests() {
   cachedManifests = await gatherSandpieManifests();
-  
-refreshWelcome();
 }
-
-function buildSystemPrompt() {
-  const dbxConnected = !!dbxTokens();
-  const proxyUrl = ($('proxyUrl').value || '').trim();
-
-  const lines = [
-    'You are an AI assistant running inside sandpie, a single-page browser-based workspace.',
-    '',
-    '# Tools',
-    '- run_python: Pyodide Python runtime. The working directory is /files/ — this is OPFS, the user\'s persistent filesystem for this conversation. Bare relative paths land there. stdlib + pyodide.http.pyfetch (CORS applies) + micropip.install for pure-Python wheels (~100 prebuilt: numpy, pandas, beautifulsoup4, lxml, ...). No raw sockets, no subprocess.',
-  ];
-
-  lines.push('', '# Environment');
-  lines.push(`- Cloud sync (Dropbox): ${dbxConnected ? 'connected. The user can sync /files/ ↔ Dropbox via UI buttons. You don\'t call Dropbox directly — read/write OPFS via run_python and the user controls the sync.' : 'not connected. The user can connect from the sidebar Cloud sync panel if they want offsite backup.'}`);
-  if (proxyUrl) {
-    lines.push(`- Proxy: API calls route through ${proxyUrl.replace(/^https?:\/\//, '')}.`);
+async function buildSystemPrompt() {
+  try {
+    const text = await opfs.read('sandpie_memory.md');
+    //const listTest = await opfs.list('');
+    //console.log("BOOT LIST:" + listTest);
+    return { role: 'system', content: text };
+  } catch (e) {
+    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+    await opfs.write('sandpie_memory.md', basic);
+    return { role: 'system', content: basic };
   }
-
-  lines.push(`- Conversation: this chat (and all past chats) are auto-saved to /_conversations/ in OPFS and synced to ${dbxConnected ? 'Dropbox' : 'OPFS only'}. Files in /files/ persist across conversations.`);
-
-  
-  lines.push('', '# Context manifests (sandpie_*.md)');
-  lines.push('Convention: any file matching `sandpie_*.md` anywhere under /files/ is auto-loaded below as orientation context. A manifest should be a short markdown note that describes what\'s in its folder and *points at* other important docs (skills, prompts, project READMEs) by relative path — read those with run_python when relevant. If the user starts a project without one, suggest creating /files/sandpie_overview.md as an entry point.');
-  if (cachedManifests.length) {
-    lines.push('', `Loaded manifests (${cachedManifests.length}):`);
-    for (const m of cachedManifests) {
-      lines.push('', `## /files/${m.path}`);
-      lines.push(m.content);
-    }
-  } else {
-    lines.push('', 'No sandpie_*.md files exist yet.');
-  }
-
-  lines.push('', '# Operating rules');
-  lines.push('1. Scope first. Before invoking a tool that runs user code, modifies state, or makes network calls: (a) state target (what/where) and approach (how) in one line; (b) read the script you are about to run if you have not yet; (c) verify its preconditions — required files exist AND are non-trivial in size (a 0-byte cache is not data), credentials/tokens present, network reachable for any API call. Do not run a script just because it exists. Read-only inspection calls (listdir, stat, head of a small file) are unrestricted.');
-  lines.push('2. Reuse, don\'t re-paste — this is the PREFERRED way to operate. Save any non-trivial script to /files/scripts/<name>.py once, then invoke it on every later call via run_python({path: "scripts/<name>.py", args: [...]}) instead of re-sending the source. The script sees sys.argv = [path, *args], exactly like `python script.py --arg ...` from a shell. Within a single session, Pyodide globals also persist between run_python calls, so a function defined once can be called by name later — but saved scripts are reusable across sessions. If you find yourself pasting more than ~20 lines of code inline, save it instead.');
-  lines.push('3. Print summaries, not dumps. Slice large structures (df.head(), list[:20], json.dumps(obj, indent=2)[:1000]). Tool results are capped at 30 KB; anything beyond is replaced with a truncation marker.');
-  lines.push('4. Learn from failures. When a tool returns an error you did not anticipate, append a one-line lesson to /files/sandpie_lessons.md (it auto-loads next session via the manifest convention). Don\'t duplicate lines already present.');
-  lines.push('', '# Style', 'Be concise. Prefer the smallest correct change. Ask before destructive operations when intent is unclear. When you propose code, write it complete enough to run, not skeleton.');
-  return { role: 'system', content: lines.join('\n') };
 }
-
 function formatSize(bytes) {
   if (!bytes || bytes < 0) return '';
   const units = ['B', 'kB', 'MB', 'GB', 'TB'];
@@ -2817,7 +2737,8 @@ function formatSize(bytes) {
   return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
 }
 async function getFileSize(path) {
-  
+
+
   try {
     const parts = path.split('/').filter(Boolean);
     const name = parts.pop();
@@ -2825,7 +2746,8 @@ async function getFileSize(path) {
     const handle = await dir.getFileHandle(name);
     return (await handle.getFile()).size;
   } catch {}
-  
+
+
   const s = syncState()[path];
   return s && s.size || 0;
 }
@@ -2833,15 +2755,18 @@ async function getFolderSize(path) {
   const prefix = path ? path.toLowerCase() + '/' : '';
   let total = 0;
   const state = syncState();
-  
+
+
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (prefix && !kl.startsWith(prefix)) continue;
-    
+
+
     if (prefix && kl.length <= prefix.length) continue;
     total += state[k].size || 0;
   }
-  
+
+
   try {
     for (const f of await opfs.list(path)) {
       const full = (path ? path + '/' : '') + f;
@@ -2858,29 +2783,29 @@ async function getFolderSize(path) {
   } catch {}
   return total;
 }
-
 function opfsCurrentPath() {
   return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
 }
-
 function opfsJoin(base, child) {
   return base ? base + '/' + child : child;
 }
-
 async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
 
-  
+
   let opfsList = [];
   try { opfsList = await opfs.listDir(path); } catch {}
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
-  
-  
-  
-  
+
+
+
+
+
+
+
   const state = syncState();
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
@@ -2896,10 +2821,11 @@ async function refreshFileList() {
       remoteMap.set(rest, 'file');
     }
   }
-
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
-  
-  
+
+
+
+
   const frag = document.createDocumentFragment();
   if (!names.size) {
     const li = document.createElement('li');
@@ -2909,14 +2835,12 @@ async function refreshFileList() {
     ul.replaceChildren(frag);
     return;
   }
-
   const items = [];
   for (const name of names) {
     const local = localMap.get(name);
     const remote = remoteMap.get(name);
     const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
     const fullKey = opfsJoin(path, name);
-
     let status = 'synced';
     if (kind === 'folder') {
       status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
@@ -2927,8 +2851,10 @@ async function refreshFileList() {
     } else {
       const s = state[fullKey];
       if (!s || !s.hydrated) {
-        
-        
+
+
+
+
         status = 'synced';
       } else {
         const lastMod = await opfsLastModified(fullKey);
@@ -2937,7 +2863,8 @@ async function refreshFileList() {
     }
     items.push({ name, kind, status, fullKey });
   }
-  
+
+
   await Promise.all(items.map(async (it) => {
     if (it.kind === 'folder') {
       it.size = await getFolderSize(it.fullKey);
@@ -2947,36 +2874,21 @@ async function refreshFileList() {
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
-  
-  refreshManifests();
 
+
+  refreshManifests();
   for (const it of items) {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    
+
+
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     btn.textContent = kindIcon + it.name;
     btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
     if (it.kind === 'folder') {
       btn.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
-    } else if (isPlaceholder) {
-      btn.onclick = async () => {
-        const orig = btn.textContent;
-        btn.textContent = '⏳ ' + it.name;
-        btn.disabled = true;
-        try {
-          const result = await tools.fetch_file.run({ path: it.fullKey });
-          if (!result.startsWith('Hydrated')) addMsg('info', result);
-          
-          
-        } catch (e) {
-          btn.textContent = orig;
-          btn.disabled = false;
-          addMsg('err', 'Hydrate failed: ' + e.message);
-        }
-      };
     } else {
       btn.onclick = () => openFileViewer(it.fullKey, it.name);
     }
@@ -3007,26 +2919,6 @@ async function refreshFileList() {
             }
           }
           setSyncState(state);
-          await refreshFileList();
-        }});
-        menuItems.push({ label: 'Make available offline', action: async () => {
-          const state = syncState();
-          const prefix = it.fullKey + '/';
-          const remoteFiles = Object.keys(state).filter(k => k.toLowerCase().startsWith(prefix.toLowerCase()));
-          if (!remoteFiles.length) { addMsg('info', 'No cloud files in this folder.'); return; }
-          const localFiles = new Set();
-          try { for (const f of await opfs.list(it.fullKey)) localFiles.add((it.fullKey ? it.fullKey + '/' : '') + f); } catch {}
-          const toHydrate = remoteFiles.filter(f => !localFiles.has(f));
-          if (!toHydrate.length) { addMsg('info', 'All files already available offline.'); return; }
-          let done = 0;
-          for (const f of toHydrate) {
-            try {
-              const result = await tools.fetch_file.run({ path: f });
-              if (result.startsWith('Hydrated')) done++;
-            } catch (e) {
-              // Silently skip failed downloads
-            }
-          }
           await refreshFileList();
         }});
       }
@@ -3072,17 +2964,24 @@ async function refreshFileList() {
           const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
           const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
           if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
-          
+
+
           try { await opfs.remove(it.fullKey); } catch {}
-          
-          
-          
-          
+
+
+
+
+
+
+
+
           if (dbxTokens()) {
             try { await dbxDelete('/' + it.fullKey); } catch {}
           }
-          
-          
+
+
+
+
           const lkPrefix = it.fullKey.toLowerCase();
           const isHit = (k) => {
             const kl = k.toLowerCase();
@@ -3100,13 +2999,11 @@ async function refreshFileList() {
   }
   ul.replaceChildren(frag);
 }
-
 let activeCtxMenu = null;
 function closeCtxMenu() { activeCtxMenu?.remove(); activeCtxMenu = null; }
 document.addEventListener('click', closeCtxMenu);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
 window.addEventListener('blur', closeCtxMenu);
-
 function showContextMenu(x, y, items) {
   closeCtxMenu();
   const menu = document.createElement('div');
@@ -3120,7 +3017,8 @@ function showContextMenu(x, y, items) {
     menu.appendChild(btn);
   }
   document.body.appendChild(menu);
-  
+
+
   const r = menu.getBoundingClientRect();
   const px = Math.min(x, window.innerWidth - r.width - 4);
   const py = Math.min(y, window.innerHeight - r.height - 4);
@@ -3128,12 +3026,10 @@ function showContextMenu(x, y, items) {
   menu.style.top = Math.max(0, py) + 'px';
   activeCtxMenu = menu;
 }
-
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
-const TEXT_PREVIEW_CAP = 200_000; 
-
+const TEXT_PREVIEW_CAP = 200_000;
 function closeFileViewer() {
   _openFilePath = null;
   document.querySelectorAll('.file-viewer').forEach(el => {
@@ -3142,7 +3038,6 @@ function closeFileViewer() {
     el.remove();
   });
 }
-
 let markedPromise = null;
 function getMarked() {
   if (!markedPromise) {
@@ -3156,9 +3051,9 @@ function getMarked() {
   }
   return markedPromise;
 }
-
 async function openFileViewer(fullKey, name) {
-  
+
+
   let file;
   try {
     const { parts, name: fname } = splitPath(fullKey);
@@ -3169,16 +3064,13 @@ async function openFileViewer(fullKey, name) {
     addMsg('err', `Could not open ${fullKey}: ${e.message}`);
     return;
   }
-
   _openFilePath = fullKey;
   const ext = (name.split('.').pop() || '').toLowerCase();
   const overlay = document.createElement('div');
   overlay.className = 'file-viewer';
   overlay.setAttribute('data-chrome', '');
-
   const panel = document.createElement('div');
   panel.className = 'panel';
-
   const header = document.createElement('header');
   const title = document.createElement('span');
   title.className = 'title';
@@ -3187,7 +3079,7 @@ async function openFileViewer(fullKey, name) {
   meta.className = 'meta';
   meta.textContent = `${file.size.toLocaleString()} bytes`;
 
-  
+
   const mdBtn = document.createElement('button');
   mdBtn.className = 'mode';
   mdBtn.style.display = 'none';
@@ -3204,22 +3096,19 @@ async function openFileViewer(fullKey, name) {
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close (Esc)';
-
   header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
-
   const body = document.createElement('div');
   body.className = 'body';
   panel.append(header, body);
   overlay.appendChild(panel);
 
-  
+
   const finalize = (closeFn) => {
     closeBtn.onclick = closeFn;
     overlay._close = closeFn;
     overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
     document.body.appendChild(overlay);
   };
-
   if (IMAGE_EXTS.has(ext)) {
     const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
     const img = document.createElement('img'); img.src = url; body.appendChild(img);
@@ -3245,7 +3134,7 @@ async function openFileViewer(fullKey, name) {
     finalize(closeFileViewer); return;
   }
 
-  
+
   const text = await file.text();
   const sample = text.slice(0, 4000);
   const repl = (sample.match(/�/g) || []).length;
@@ -3256,17 +3145,15 @@ async function openFileViewer(fullKey, name) {
     body.appendChild(pre);
     finalize(closeFileViewer); return;
   }
-
   const isMd = ext === 'md' || ext === 'markdown';
   const editable = text.length <= TEXT_PREVIEW_CAP;
-  
-  let mode = isMd ? 'rendered' : 'raw';
-  let current = text;      
-  let textareaEl = null;   
 
+
+  let mode = isMd ? 'rendered' : 'raw';
+  let current = text;
+  let textareaEl = null;
   const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
   const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
-
   function refreshButtons() {
     mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
     mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
@@ -3274,7 +3161,6 @@ async function openFileViewer(fullKey, name) {
     pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
     saveBtn.style.display = mode === 'edit' ? '' : 'none';
   }
-
   async function render() {
     body.innerHTML = '';
     textareaEl = null;
@@ -3313,10 +3199,8 @@ async function openFileViewer(fullKey, name) {
     refreshButtons();
     refreshTitle();
   }
-
   mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
   pencilBtn.onclick = () => { mode = 'edit'; render(); };
-
   async function doSave() {
     if (!textareaEl) return;
     const newContent = textareaEl.value;
@@ -3331,36 +3215,30 @@ async function openFileViewer(fullKey, name) {
     }
   }
   saveBtn.onclick = doSave;
-
   function attemptClose() {
     if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
     closeFileViewer();
   }
-
   closeBtn.onclick = attemptClose;
   overlay._close = attemptClose;
   overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
   document.body.appendChild(overlay);
   await render();
 }
-
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const v = document.querySelector('.file-viewer');
     if (v) (v._close || closeFileViewer)();
   }
 });
-
 function opfsUp() {
   const cur = ($('opfsPath').value || '').trim() || '/';
   if (cur === '/' || cur === '') return;
   $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
   refreshFileList();
 }
-
 $('opfsPath').addEventListener('change', refreshFileList);
 $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
-
 async function uploadEntry(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
@@ -3378,7 +3256,6 @@ async function uploadEntry(entry, dirPath) {
     }
   }
 }
-
 (() => {
   const list = $('fileList');
   list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
@@ -3392,7 +3269,8 @@ async function uploadEntry(entry, dirPath) {
       const entry = item.webkitGetAsEntry?.();
       if (entry) await uploadEntry(entry, path);
     }
-    
+
+
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
         const destPath = opfsJoin(path, f.name);
@@ -3404,9 +3282,7 @@ async function uploadEntry(entry, dirPath) {
     await refreshFileList();
   });
 })();
-
 refreshFileList();
-
 class SidePanel {
   constructor() {
     this.left = $('messages');
@@ -3418,27 +3294,29 @@ class SidePanel {
     this._wireEvents();
   }
 
-  
+
   get isOpen() { return this._sideId !== null; }
   get sideId() { return this._sideId; }
   get activeIsRight() { return this._activeIsRight; }
-  
-  
-  
+
+
+
+
+
+
   activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
 
-  
 
   async open(id) {
     if (!id) return;
-    if (id === activeConvId) return;      
-    if (id === this._sideId) return;      
-    if (this._activeIsRight) return;      
+    if (id === activeConvId) return;
+    if (id === this._sideId) return;
+    if (this._activeIsRight) return;
 
-    
+
     closeArtifactPanel();
 
-    
+
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
       prev?.host?.parentNode?.removeChild(prev.host);
@@ -3448,15 +3326,16 @@ class SidePanel {
     const s = convStreams.get(id);
     if (s?.host) this.right.appendChild(s.host);
     this._render();
-    
-    
+
+
+
+
     requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
     refreshConversationList();
   }
-
   close() {
     if (!this.isOpen) return;
-    if (this._activeIsRight) this.flip();  
+    if (this._activeIsRight) this.flip();
     const s = convStreams.get(this._sideId);
     s?.host?.parentNode?.removeChild(s.host);
     this._sideId = null;
@@ -3464,11 +3343,12 @@ class SidePanel {
     this._render();
     refreshConversationList();
   }
-
   flip() {
     if (!this.isOpen) return;
-    
-    
+
+
+
+
     [activeConvId, this._sideId] = [this._sideId, activeConvId];
     this._activeIsRight = !this._activeIsRight;
     if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
@@ -3476,13 +3356,14 @@ class SidePanel {
     messages = s?.messages || [];
     this._render();
     refreshSendButtonForActive();
-    refreshWelcome();
     refreshConversationList();
   }
 
-  
-  
-  
+
+
+
+
+
   notifyDeleted(id) {
     if (id === this._sideId) {
       this._sideId = null;
@@ -3491,22 +3372,32 @@ class SidePanel {
     }
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   promoteSideToActive() {
     if (!this.isOpen) return false;
     const sId = this._sideId;
     const s = convStreams.get(sId);
     if (s && s.host) {
-      
-      
+
+
+
+
       if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
       this.left.appendChild(s.host);
     }
@@ -3517,14 +3408,14 @@ class SidePanel {
     this._activeIsRight = false;
     this._render();
     refreshSendButtonForActive();
-    refreshWelcome();
     return true;
   }
 
-  
 
-  
-  
+
+
+
+
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
     let data;
@@ -3535,29 +3426,32 @@ class SidePanel {
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
-  
-  
+
+
+
   _render() {
     const b = document.body.classList;
     b.toggle('side-open',     this.isOpen);
     b.toggle('active-left',   this.isOpen && !this._activeIsRight);
     b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
-    
+
+
     if (this.isOpen) {
       b.remove('artifact-side-open');
       this.right.classList.remove('artifact-mode');
     }
   }
 
-  
+
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
 
-    
-    
+
+
+
     const onPanelClick = (targetIsRight) => (ev) => {
       if (!this.isOpen) return;
-      if (targetIsRight === this._activeIsRight) return;  
+      if (targetIsRight === this._activeIsRight) return;
       const sel = window.getSelection?.().toString();
       if (sel && sel.length > 0) return;
       if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
@@ -3566,9 +3460,11 @@ class SidePanel {
     this.left.addEventListener('click',  onPanelClick(false));
     this.right.addEventListener('click', onPanelClick(true));
 
-    
-    
-    
+
+
+
+
+
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
       ev.preventDefault();
@@ -3588,43 +3484,37 @@ class SidePanel {
     });
   }
 }
-
 function isMobileViewport() {
   return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
 }
-
 let sidePanel = null;
-
 sidePanel = new SidePanel();
-
 (function () {
   const resizer = $('sideResizer');
   const panel   = $('messagesSide');
   if (!resizer || !panel) return;
-
   resizer.addEventListener('mousedown', e => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = panel.offsetWidth;
-
     panel.style.flex  = 'none';
     panel.style.width = startW + 'px';
     resizer.classList.add('dragging');
     document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
-    
+
+
     const frame = $('artifactPanelFrame');
     if (frame) frame.style.pointerEvents = 'none';
-
     function onMove(ev) {
       const wrap = $('messagesWrap');
       const minW = 200;
       const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
-      
+
+
       const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
       panel.style.width = newW + 'px';
     }
-
     function onUp() {
       resizer.classList.remove('dragging');
       document.body.style.cursor     = '';
@@ -3634,19 +3524,19 @@ sidePanel = new SidePanel();
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup',   onUp);
     }
-
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup',   onUp);
   });
 })();
-
 (async () => {
   await refreshConversationList();
   if (activeConvId) {
-    
-    
+
+
+
+
     const restoreId = activeConvId;
-    activeConvId = null; 
+    activeConvId = null;
     const s = ensureStream(restoreId);
     try {
       const data = JSON.parse(await opfs.read(convPath(restoreId)));
@@ -3655,17 +3545,13 @@ sidePanel = new SidePanel();
     mountConv(restoreId);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
-  
-refreshWelcome();
-  
-  
+
   const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
   requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
   document.querySelectorAll('#messages img').forEach(img => {
     if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
   });
 })();
-
 function saveConfig() {
   // Provider config is managed by modules/providers.js
   // This function only saves non-provider (Dropbox) config
@@ -3673,7 +3559,6 @@ function saveConfig() {
     dbxAppKey: $('dbxAppKey').value,
   }));
 }
-
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
@@ -3682,30 +3567,30 @@ async function requestWakeLock() {
     }
   } catch (e) {  }
 }
-
 function releaseWakeLock() {
   if (wakeLock) {
     try { wakeLock.release(); } catch (e) {}
     wakeLock = null;
   }
 }
-
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   for (const s of convStreams.values()) {
     if (s.generating) { requestWakeLock(); break; }
   }
 });
-
 const TOOL_RESULT_MAX = 30000;
 function capToolResult(s) {
   s = String(s ?? '');
   if (s.length <= TOOL_RESULT_MAX) {
     return { content: s, truncated: false, original: s.length, kept: s.length };
   }
-  
-  
-  
+
+
+
+
+
+
   const reserve = 180;
   const budget = TOOL_RESULT_MAX - reserve;
   const headLen = Math.floor(budget * 0.7);
@@ -3716,22 +3601,27 @@ function capToolResult(s) {
   const marker = `\n\n[… truncated by sandpie: dropped ${dropped.toLocaleString()} bytes from the middle; kept first ${headLen.toLocaleString()} + last ${tailLen.toLocaleString()} of ${s.length.toLocaleString()}]\n\n`;
   return { content: head + marker + tail, truncated: true, original: s.length, kept: headLen + tailLen };
 }
-
 function humanBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
-
 function addMsg(role, text = '', host = null) {
-  
-  
-  
-  
+
+
+
+
+
+
+
+
   const target = host || (activeStream() && activeStream().host) || $('messages');
-  
-  
-  
+
+
+
+
+
+
   let scrollHost = target;
   while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
     scrollHost = scrollHost.parentNode;
@@ -3740,8 +3630,10 @@ function addMsg(role, text = '', host = null) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
-    
-    
+
+
+
+
     const expanded = document.createElement('span');
     expanded.className = 'tc-expanded';
     expanded.textContent = text;
@@ -3753,7 +3645,8 @@ function addMsg(role, text = '', host = null) {
     const bubble = document.createElement('span');
     bubble.className = 'bubble';
     if (Array.isArray(text)) {
-      
+
+
       for (const part of text) {
         if (part.type === 'text' && part.text) {
           const span = document.createElement('span');
@@ -3765,7 +3658,8 @@ function addMsg(role, text = '', host = null) {
           const img = document.createElement('img');
           const url = part.image_url.url;
           if (url.startsWith('opfs://')) {
-            
+
+
             img.src = '';
             img.alt = '(loading image...)';
             img.style.maxWidth = '200px';
@@ -3792,27 +3686,32 @@ function addMsg(role, text = '', host = null) {
     div.appendChild(bubble);
   }
   target.appendChild(div);
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
-
 function applyToolsMinimized() {
-  
-  
-  
+
+
+
+
+
+
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
-
 const LP_DELAY = 500;
 const LP_SLOP = 30;
-
 function attachLongPress(el, handler) {
   el.addEventListener('touchstart', (e) => {
     const t = e.touches[0];
@@ -3825,8 +3724,10 @@ function attachLongPress(el, handler) {
           clientX: el._lp.x, clientY: el._lp.y,
           preventDefault() {}, stopPropagation() {}
         });
-        
-        
+
+
+
+
         const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         document.addEventListener('click', swallow, { capture: true, once: true });
         setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 350);
@@ -3836,7 +3737,6 @@ function attachLongPress(el, handler) {
     };
     el.classList.add('lp-active');
   }, { passive: true });
-
   el.addEventListener('touchmove', (e) => {
     if (!el._lp || !el._lp.timer) return;
     const t = e.touches[0];
@@ -3846,7 +3746,6 @@ function attachLongPress(el, handler) {
       el.classList.remove('lp-active');
     }
   }, { passive: true });
-
   el.addEventListener('touchend', () => {
     if (el._lp) {
       if (el._lp.timer) clearTimeout(el._lp.timer);
@@ -3854,7 +3753,6 @@ function attachLongPress(el, handler) {
     }
     el.classList.remove('lp-active');
   });
-
   el.addEventListener('touchcancel', () => {
     if (el._lp) {
       if (el._lp.timer) clearTimeout(el._lp.timer);
@@ -3863,24 +3761,26 @@ function attachLongPress(el, handler) {
     el.classList.remove('lp-active');
   });
 }
-
 function bindBubble(div, msgRef) {
   if (!div) return div;
-  
-  
-  
-  
+
+
+
+
+
+
+
+
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-    
+
+
     div.addEventListener('contextmenu', onBubbleContextMenu);
   }
   if (msgRef) div._msg = msgRef;
   return div;
 }
-
 let _bubbleMenuTarget = null;
-
 function onBubbleContextMenu(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -3891,21 +3791,21 @@ function onBubbleContextMenu(e) {
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';
 }
-
 function hideBubbleMenu() {
   $('bubbleContextMenu').style.display = 'none';
   _bubbleMenuTarget = null;
 }
-
 document.addEventListener('click', hideBubbleMenu);
-
 async function rewindFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
   if (!target) return;
-  
-  
-  
+
+
+
+
+
+
   if (!target._msg) {
     const s = activeStream();
     addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
@@ -3918,8 +3818,10 @@ async function rewindFromMenu() {
     ? 'Remove this message?'
     : `Remove this message and ${after} message(s) after it?`;
   if (!confirm(msg)) return;
-  
-  
+
+
+
+
   const s = activeStream();
   if (s) {
     if (s.abort) { s.queueAborted = true; s.abort.abort(); }
@@ -3929,28 +3831,31 @@ async function rewindFromMenu() {
   messages.length = idx;
   clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
-  
-  
-  
+
+
+
+
+
+
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
 }
-
 function toggleToolsMinimizedFromMenu() {
   toolsMinimized = !toolsMinimized;
   localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
   applyToolsMinimized();
   hideBubbleMenu();
 }
-
 async function copyFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
   if (!target) return;
   let text;
-  
-  
+
+
+
+
   const expanded = target.querySelector && target.querySelector('.tc-expanded');
   if (expanded && expanded.textContent) {
     text = expanded.textContent;
@@ -3962,7 +3867,8 @@ async function copyFromMenu() {
   try {
     await navigator.clipboard.writeText(text);
   } catch (e) {
-    
+
+
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
@@ -3973,24 +3879,6 @@ async function copyFromMenu() {
     ta.remove();
   }
 }
-
-const TOOL_FLAVOR = {
-  run_python: [
-    'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
-    'tracing call frames', 'marshaling output buffer', 'flushing stdout',
-    'checking traceback', 'resolving imports', 'walking the heap',
-  ],
-  fetch_file: [
-    'resolving hostname', 'negotiating TLS handshake', 'streaming bytes over the wire',
-    'verifying content length', 'decoding response body', 'unpacking from Dropbox',
-  ],
-};
-const GENERIC_FLAVOR = [
-  'thinking', 'computing', 'processing', 'crunching numbers',
-  'consulting the oracle', 'reticulating splines', 'staring into the abyss',
-];
-function tcFlavorsFor(name) { return TOOL_FLAVOR[name] || GENERIC_FLAVOR; }
-
 function tcSetExpanded(div, text) {
   const el = div && div.querySelector && div.querySelector('.tc-expanded');
   if (el) el.textContent = text;
@@ -3999,13 +3887,11 @@ function tcAppendExpanded(div, text) {
   const el = div && div.querySelector && div.querySelector('.tc-expanded');
   if (el) el.textContent += text;
 }
-
 function tcEscape(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
-
 function appendToolResult(tcId, result) {
   const toolCalls = document.querySelectorAll('.msg.tool-call');
   let toolCallDiv = null;
@@ -4025,12 +3911,14 @@ function appendToolResult(tcId, result) {
     expanded.innerHTML = '';
     expanded.appendChild(box);
   }
-  
+
+
   const existingSep = box.querySelector('.tool-sep');
   const existingResult = box.querySelector('.tool-result');
   if (existingSep) existingSep.remove();
   if (existingResult) existingResult.remove();
-  
+
+
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
   const resultDiv = document.createElement('div');
@@ -4039,7 +3927,6 @@ function appendToolResult(tcId, result) {
   box.appendChild(sep);
   box.appendChild(resultDiv);
 }
-
 function buildToolBox(args, toolName) {
   let code = '';
   try {
@@ -4053,22 +3940,24 @@ function buildToolBox(args, toolName) {
   }
   const lines = code.split('\n').filter(l => l.trim());
   const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
-
   const name = toolName || 'tool';
   const box = document.createElement('div');
   box.className = 'tool-box';
   box.innerHTML = `<div class="tool-header">${tcEscape(name)}</div><div class="tool-code">${codeHtml}</div>`;
   return box;
 }
-
 function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  
-  
-  
+
+
+
+
+
+
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
-  
+
+
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
       '<span class="tc-spinner tc-dim"></span>' +
@@ -4078,23 +3967,15 @@ function renderTcPreparing(div, fname, args) {
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
 }
-
-function renderTcRunning(div, fname, flavor) {
+function renderTcRunning(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  
-  
-  
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
       '<span class="tc-spinner"></span>' +
-      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
-      '<span class="tc-flavor"></span>';
+      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>`;
   }
-  const flavorEl = el.querySelector('.tc-flavor');
-  if (flavorEl) flavorEl.textContent = flavor;
 }
-
 function renderTcDone(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
@@ -4102,42 +3983,22 @@ function renderTcDone(div, fname) {
     '<span class="tc-check">✓</span>' +
     `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>`;
 }
-
-function startToolTicker(div, tc) {
-  if (!div || div._ticker) return;
-  const flavors = tcFlavorsFor(tc.function.name);
-  let idx = 0;
-  div.dataset.fname = tc.function.name;
-  const tick = () => {
-    if (!div.isConnected || !div.classList.contains('in-flight')) {
-      div._ticker = null;
-      return;
-    }
-    renderTcRunning(div, tc.function.name, flavors[idx % flavors.length]);
-    idx++;
-    div._ticker = setTimeout(tick, 1400);
-  };
-  tick();
-}
-
-function stopToolTicker(div) {
-  if (div && div._ticker) {
-    clearTimeout(div._ticker);
-    div._ticker = null;
-  }
-}
-
 class RoundRenderer {
   constructor(host, convMessages) {
     this.host = host;
     this.convMessages = convMessages;
-    
-    
+
+
+
+
     this.reply = null;
     this.cursor = null;
-    
-    
-    
+
+
+
+
+
+
     this.content = '';
     this.displayed = '';
     this.pending = '';
@@ -4150,7 +4011,6 @@ class RoundRenderer {
     this.pendingToolResultDiv = null;
   }
 
-  
 
   startRound() {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
@@ -4168,7 +4028,6 @@ class RoundRenderer {
     this.toolPending.length = 0;
     this.toolsShouldClose = false;
   }
-
   applyDelta(delta) {
     if (!delta) return;
     if (delta.content) this._appendContent(delta.content);
@@ -4176,24 +4035,29 @@ class RoundRenderer {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
     }
   }
-
   endRound() {
-    
-    
-    
+
+
+
+
+
+
     this.toolsShouldClose = true;
     this._scheduleDrain();
-    
-    
-    
-    
+
+
+
+
+
+
+
+
     if (this.reply && (!this.content || !this.content.trim())) {
       this.reply.remove();
       this.reply = null;
       this.cursor = null;
     }
   }
-
   bindMessage(msg) {
     this.convMessages.push(msg);
     if (msg.role === 'assistant') {
@@ -4204,29 +4068,28 @@ class RoundRenderer {
       this.pendingToolResultDiv = null;
     }
   }
-
   markToolStarted(tc) {
     const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
     if (idx < 0 || !this.toolCallEls[idx]) return;
     this.toolCallEls[idx].classList.add('in-flight');
-    startToolTicker(this.toolCallEls[idx], tc);
+    renderTcRunning(this.toolCallEls[idx], tc.function.name);
   }
-
   markToolDone(tcId, result) {
     const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
     if (idx >= 0 && this.toolCallEls[idx]) {
       this.toolCallEls[idx].classList.remove('in-flight');
-      stopToolTicker(this.toolCallEls[idx]);
       renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
     }
     const text = String(result || '');
-    
+
+
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
       return;
     }
-    
+
+
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
       if (path) {
@@ -4246,34 +4109,36 @@ class RoundRenderer {
       appendToolResult(tcId, display);
     }
   }
-
   finalize() {
-    
-    
-    
+
+
+
+
+
+
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
     this._flushAllPending();
     if (this.cursor) { this.cursor.remove(); this.cursor = null; }
   }
 
-  
 
   _appendContent(chunk) {
-    
-    
-    
+
+
+
+
+
+
     this.content += chunk;
     this.pending += chunk;
     this._scheduleDrain();
   }
-
   _paintContent() {
     if (!this.reply) return;
     this.reply.innerHTML = renderMd(this.displayed);
     if (this.cursor) this.reply.appendChild(this.cursor);
   }
-
   _applyToolCallDelta(tc) {
     const i = tc.index || 0;
     if (!this.toolCalls[i]) {
@@ -4284,9 +4149,12 @@ class RoundRenderer {
     if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
     if (!this.toolCalls[i].function.name) return;
     if (!this.toolCallEls[i]) {
-      
-      
-      
+
+
+
+
+
+
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
       this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
       this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
@@ -4301,25 +4169,30 @@ class RoundRenderer {
       renderTcPreparing(this.toolCallEls[i], this.toolCalls[i].function.name, this.toolCalls[i].function.arguments);
     }
   }
-
   _scheduleDrain() {
     if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
   }
-
   _drainTick() {
     this.drainTimer = null;
     let anyPending = false;
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
     const scrollHost = this._scrollHost();
     const stick = shouldAutoScroll(scrollHost);
 
-    
-    
+
+
+
     if (this.pending.length > 0) {
       const n = Math.max(1, Math.ceil(this.pending.length / 30));
       this.displayed += this.pending.slice(0, n);
@@ -4327,7 +4200,8 @@ class RoundRenderer {
       this._paintContent();
       if (this.pending.length > 0) anyPending = true;
     }
-    
+
+
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i];
       if (!buf || buf.length === 0) continue;
@@ -4338,9 +4212,12 @@ class RoundRenderer {
       if (this.toolPending[i].length > 0) anyPending = true;
     }
     this._appendCloseParensIfReady();
-    
-    
-    
+
+
+
+
+
+
     if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
       this.cursor.remove();
       this.cursor = null;
@@ -4349,9 +4226,11 @@ class RoundRenderer {
     if (anyPending) this._scheduleDrain();
   }
 
-  
-  
-  
+
+
+
+
+
   _scrollHost() {
     let el = this.reply || this.host;
     while (el && el.id !== 'messages' && el.id !== 'messagesSide') {
@@ -4360,18 +4239,23 @@ class RoundRenderer {
     return el;
   }
 
-  
-  
-  
-  
+
+
+
+
+
+
+
   _flushAllPending() {
-    
+
+
     if (this.pending.length > 0) {
       this.displayed += this.pending;
       this.pending = '';
       this._paintContent();
     }
-    
+
+
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i] || '';
       if (buf.length > 0) {
@@ -4382,15 +4266,14 @@ class RoundRenderer {
     }
     this._appendCloseParensIfReady();
   }
-
   _paintTool(i) {
     if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
     const tc = this.toolCalls[i];
     const box = buildToolBox(tc.function.arguments, tc.function.name);
-
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
-      
+
+
       const existingBox = expanded.querySelector('.tool-box');
       const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
       const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
@@ -4400,7 +4283,6 @@ class RoundRenderer {
       if (existingResult) box.appendChild(existingResult);
     }
   }
-
   _appendCloseParensIfReady() {
     if (!this.toolsShouldClose) return;
     for (let i = 0; i < this.toolCallEls.length; i++) {
@@ -4412,7 +4294,6 @@ class RoundRenderer {
     }
   }
 }
-
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
@@ -4428,7 +4309,6 @@ function startTotalTimer(stream) {
     stream.timerEl.innerHTML = `${sec}s${queueBadge}`;
   }, 1000);
 }
-
 function endTotalTimer(stream, label) {
   if (!stream || !stream.timerEl) return;
   clearInterval(stream.timerInterval);
@@ -4443,29 +4323,26 @@ function endTotalTimer(stream, label) {
   }
   stream.timerEl = null;
 }
-
 const CONV_DIR = '_conversations';
-
 function newConvId() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 function convPath(id) { return `${CONV_DIR}/${id}.json`; }
-
 async function ensureActiveConv() {
   if (activeConvId) return;
   activeConvId = newConvId();
   localStorage.setItem('sandpie-active-conv', activeConvId);
 }
-
 async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
-
 async function saveConv(convId, { touchUpdated = true } = {}) {
   if (!convId) return;
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
-  
-  
+
+
+
+
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
@@ -4486,7 +4363,6 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   await opfs.write(convPath(convId), JSON.stringify(data));
   await refreshConversationList();
 }
-
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
     bindBubble(addMsg('user', m.content, host), m);
@@ -4525,40 +4401,44 @@ function renderHistoricalMessage(m, host = null) {
     if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
-      
+
+
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
         appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
       }
     }
-    
+
+
   }
 }
-
 function clearActiveConvUI() {
-  
-  
+
+
+
+
   const s = activeStream();
   if (s && s.host) s.host.innerHTML = '';
 }
-
 function parkActiveConv() {
   const s = activeStream();
   if (!s) return;
   s.messages = messages;
   if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
 }
-
 function mountConv(convId) {
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
-    
-    
-    
+
+
+
+
+
+
     const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
     if (s.host.parentNode !== target) target.appendChild(s.host);
   } else {
@@ -4567,25 +4447,34 @@ function mountConv(convId) {
   }
   refreshSendButtonForActive();
 }
-
 async function loadConv(id) {
   if (id === activeConvId) return;
-  
-  
+
+
+
+
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
-  
-  
+
+
+
+
   await saveActiveConv();
-  
-  
+
+
+
+
   parkActiveConv();
   if (convStreams.has(id)) {
-    
-    
+
+
+
+
     mountConv(id);
   } else {
-    
-    
+
+
+
+
     let data;
     try { data = JSON.parse(await opfs.read(convPath(id))); }
     catch (e) {
@@ -4605,9 +4494,7 @@ async function loadConv(id) {
   if (btn) btn.textContent = '☰';
   const mEl = $('messages');
   mEl.scrollTop = mEl.scrollHeight;
-  refreshWelcome();
 }
-
 async function newConversation() {
   await saveActiveConv();
   parkActiveConv();
@@ -4616,23 +4503,29 @@ async function newConversation() {
   mountConv(id);
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
-  
-  refreshWelcome();
 }
-
 async function listConversations() {
   let entries = [];
   try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
   const searchActive = !!($('convSearch')?.value.trim());
-  
-  
-  
+
+
+
+
+
+
   const reads = entries
     .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
     .map(async (e) => {
@@ -4654,14 +4547,15 @@ async function listConversations() {
       } catch { return null; }
     });
   const out = (await Promise.all(reads)).filter(Boolean);
-  
-  
+
+
+
+
   for (const c of out) {
     if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
   }
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
-
 function refreshNewChatButton() {
   const btn = $('newChatBtn');
   if (!btn) return;
@@ -4669,28 +4563,7 @@ function refreshNewChatButton() {
   btn.disabled = empty;
   btn.title = empty ? "Already a fresh chat — just start typing below." : '';
 }
-
-
-function refreshWelcome() {
-  const w = $('welcome');
-  if (!w) return;
-  const empty = messages.length === 0;
-  w.style.display = empty ? '' : 'none';
-  if (!empty) return;
-  
-  const parts = [];
-  let convCount = 0;
-  try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
-  if (convCount > 0) parts.push(`${convCount} chat${convCount === 1 ? '' : 's'} restored`);
-  if (dbxTokens()) parts.push('dropbox synced');
-  const proxyUrl = ($('proxyUrl').value || '').trim();
-  if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
-  if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
-  const ws = $('welcomeStatus'); if (ws) ws.textContent = parts.length ? parts.join(' · ') : 'fresh start';
-}
-
 let archivedExpanded = false;
-
 async function updateConvFile(id, patch) {
   let data;
   try { data = JSON.parse(await opfs.read(convPath(id))); }
@@ -4698,7 +4571,6 @@ async function updateConvFile(id, patch) {
   Object.assign(data, patch);
   await opfs.write(convPath(id), JSON.stringify(data));
 }
-
 async function renameConv(id, current) {
   const next = prompt('Rename conversation', current);
   if (next == null) return;
@@ -4707,17 +4579,14 @@ async function renameConv(id, current) {
   await updateConvFile(id, { title: trimmed });
   await refreshConversationList();
 }
-
 async function togglePinConv(id, currentlyPinned) {
   await updateConvFile(id, { pinned: !currentlyPinned });
   await refreshConversationList();
 }
-
 async function toggleArchiveConv(id, currentlyArchived) {
   await updateConvFile(id, { archived: !currentlyArchived });
   await refreshConversationList();
 }
-
 async function duplicateConv(id, title) {
   let data;
   try { data = JSON.parse(await opfs.read(convPath(id))); }
@@ -4731,14 +4600,15 @@ async function duplicateConv(id, title) {
   await opfs.write(convPath(newId), JSON.stringify(data));
   await refreshConversationList();
 }
-
 async function deleteConv(id, title) {
   const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
-  
-  
+
+
+
+
   if (dbxTokens()) {
     try { await dbxDelete('/' + path); } catch {}
   }
@@ -4746,42 +4616,50 @@ async function deleteConv(id, title) {
   const sync = syncState(); let sChanged = false;
   for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
   if (sChanged) setSyncState(sync);
-  
+
+
   const stream = convStreams.get(id);
   if (stream) {
     if (stream.abort) stream.abort.abort();
     if (stream.timerInterval) clearInterval(stream.timerInterval);
     if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
-
     convStreams.delete(id);
   }
-  
-  
+
+
+
+
   if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
-      
-      refreshWelcome();
     } else {
-      
-      
+
+
+
+
     }
   }
   await refreshConversationList();
 }
-
 function fmtRelTime(iso) {
   if (!iso) return '';
   const then = new Date(iso);
@@ -4800,7 +4678,6 @@ function fmtRelTime(iso) {
   if (mo < 12) return mo + 'mo';
   return Math.floor(day / 365) + 'y';
 }
-
 function buildConvLi(c, idx) {
   const li = document.createElement('li');
   if (c.id === activeConvId) li.classList.add('active');
@@ -4815,7 +4692,8 @@ function buildConvLi(c, idx) {
   span.onclick = () => loadConv(c.id);
   li.appendChild(num);
   li.appendChild(span);
-  
+
+
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
@@ -4850,10 +4728,14 @@ function buildConvLi(c, idx) {
   };
   li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
   attachLongPress(li, _openConvMenu);
-  
-  
-  
-  
+
+
+
+
+
+
+
+
   li.draggable = true;
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
@@ -4861,28 +4743,28 @@ function buildConvLi(c, idx) {
   });
   return li;
 }
-
 async function refreshConversationList() {
   refreshNewChatButton();
   const ul = $('convList');
   if (!ul) return;
   let list = await listConversations();
 
-  
+
   const searchInput = $('convSearch');
   if (searchInput && searchInput.value.trim()) {
     const query = searchInput.value.trim().toLowerCase();
-    list = list.filter(c => 
-      c.title.toLowerCase().includes(query) || 
+    list = list.filter(c =>
+      c.title.toLowerCase().includes(query) ||
       (c.messageContent && c.messageContent.includes(query))
     );
   }
 
-  
+
   const pinned   = list.filter(c => c.pinned && !c.archived);
   const regular  = list.filter(c => !c.pinned && !c.archived);
   const archived = list.filter(c => c.archived);
-  
+
+
   const visible = pinned.length + regular.length;
   $('convCount').textContent = visible ? `${visible}` : '';
   const frag = document.createDocumentFragment();
@@ -4912,24 +4794,23 @@ async function refreshConversationList() {
   }
   ul.replaceChildren(frag);
 }
-
 let wakeLock = null;
-
 function refreshSendButtonForActive() {
   const btn = $('sendBtn');
   if (!btn) return;
   const s = activeStream();
   if (s && s.generating) {
-    btn.textContent = 'Stop';
+    btn.textContent = '■';
+    btn.title = 'Stop';
     btn.classList.add('sending');
     btn.disabled = false;
   } else {
-    btn.textContent = 'Send';
+    btn.textContent = '▶';
+    btn.title = 'Send';
     btn.classList.remove('sending');
     btn.disabled = false;
   }
 }
-
 function setStreamSending(stream, sending) {
   if (!stream) return;
   if (sending) {
@@ -4939,64 +4820,70 @@ function setStreamSending(stream, sending) {
   } else {
     stream.abort = null;
     stream.generating = false;
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
-      stopToolTicker(el);
       renderTcDone(el, el.dataset.fname);
     }
   }
   if (stream === activeStream()) refreshSendButtonForActive();
-  
+
+
   refreshConversationList();
 }
-
 async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !SandpieImages.hasImage()) return;
   $('input').value = '';
 
-  
+
   const content = await SandpieImages.buildContent(text);
 
-  
+
   if (SandpieImages.hasImage()) {
     SandpieImages.clear();
   }
-
   const m = $('messages');
   lockScroll(m);
   m.scrollTop = m.scrollHeight;
   enqueueForActive(content);
-  
+
+
   const ta = $('input');
   if (ta) {
     ta.style.height = 'auto';
   }
 }
-
 async function enqueueForActive(content) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
-  
-  
-  
+
+
+
+
+
+
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
   s.queue.push(content);
   updateQueueCount(s);
   processQueueFor(s);
 }
-
 function handleButtonClick() {
   const btn = $('sendBtn');
   const s = activeStream();
   if (btn.classList.contains('sending') && s) {
-    
+
+
     s.queueAborted = true;
     if (s.abort) s.abort.abort();
     s.queue.length = 0;
@@ -5005,22 +4892,20 @@ function handleButtonClick() {
     handleSubmit();
   }
 }
-
 function updateQueueCount(stream) {
-  
+
+
   const s = stream || activeStream();
   if (!s || !s.timerEl) return;
   const sec = Math.floor((Date.now() - s.timerStart) / 1000);
   const queueBadge = s.queue.length > 0 ? ` <span class="queue-pill">${s.queue.length} queued</span>` : '';
   s.timerEl.innerHTML = `${sec}s${queueBadge}`;
 }
-
 async function processQueueFor(stream) {
   if (!stream || stream.isProcessing || stream.queue.length === 0) return;
   stream.isProcessing = true;
   stream.queueAborted = false;
   updateQueueCount(stream);
-
   try {
     while (stream.queue.length > 0) {
       const text = stream.queue.shift();
@@ -5033,24 +4918,28 @@ async function processQueueFor(stream) {
     updateQueueCount(stream);
   }
 
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
   if (stream.queue.length > 0) processQueueFor(stream);
 }
-
 const SW_STREAM_PATH = './sandpie-stream';
-
 let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
 
-  
-  
+
+
+
   const regs = await navigator.serviceWorker.getRegistrations();
   for (const r of regs) {
     const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
@@ -5060,16 +4949,21 @@ let _swReady = (async () => {
     }
   }
 
-  
-  
-  
+
+
+
+
+
   let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
 
-  
-  
-  
-  
+
+
+
+
+
+
+
   if (!navigator.serviceWorker.controller) {
     console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
     await reg.unregister();
@@ -5081,34 +4975,33 @@ let _swReady = (async () => {
       });
     }
   }
-
   console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
   return reg;
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
-
 async function sendSingle(text, stream) {
-  
+
+
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
   const { id: convId, messages: convMessages, host } = stream;
 
-  
+
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
   bindBubble(addMsg('user', text, host), userMsg);
-  saveConv(convId).catch(() => {});  
+  saveConv(convId).catch(() => {});
   requestWakeLock();
   setStreamSending(stream, true);
   startTotalTimer(stream);
   let wasAborted = false;
 
-  
+
   const config = await buildAgentConfig(convMessages);
 
-  
+
   await _swReady;
   const ctrl = new AbortController();
   stream.requestId = ctrl;
@@ -5118,14 +5011,18 @@ async function sendSingle(text, stream) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  
+
   const renderer = new RoundRenderer(host, convMessages);
 
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
   let agentDoneSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
@@ -5134,9 +5031,9 @@ async function sendSingle(text, stream) {
     if (ev.type === 'tool_result')  lastInFlightTool = null;
     dispatchAgentEvent(ev, renderer, host);
   };
-
   try {
-    
+
+
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5148,13 +5045,19 @@ async function sendSingle(text, stream) {
       addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
       return;
     }
-    
+
+
     await readAgentEvents(res.body, dispatch);
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
     if (!agentDoneSeen && !wasAborted) {
       const trigger = lastInFlightTool
         ? ` while running \`${lastInFlightTool}\``
@@ -5173,33 +5076,34 @@ async function sendSingle(text, stream) {
       addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
     }
   } finally {
-    
+
+
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
-    
-    
+
+
+
+
     renderer.finalize();
-    
+
+
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-    
-    
-    
-    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
+
+
+
+
+
+    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
-
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  let dbxTokensSnap = null;
-  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
-
-  
   const resolvedMessages = [];
   for (const msg of convMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
@@ -5219,19 +5123,16 @@ async function buildAgentConfig(convMessages) {
       resolvedMessages.push(msg);
     }
   }
-
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: buildSystemPrompt(),
+    systemPrompt: await buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
     origin: location.origin,
-    dbxTokens: dbxTokensSnap,
   };
 }
-
 async function readAgentEvents(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -5241,7 +5142,7 @@ async function readAgentEvents(body, onEvent) {
     if (done) break;
     lineBuf += decoder.decode(value, { stream: true });
     const lines = lineBuf.split('\n');
-    lineBuf = lines.pop() || '';  
+    lineBuf = lines.pop() || '';
     for (const line of lines) {
       if (!line.trim()) continue;
       try { onEvent(JSON.parse(line)); }
@@ -5249,7 +5150,6 @@ async function readAgentEvents(body, onEvent) {
     }
   }
 }
-
 function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
@@ -5272,29 +5172,23 @@ function dispatchAgentEvent(ev, renderer, host) {
     }
   }
 }
-
 (function() {
   const messages = document.getElementById('messages');
   if (!messages) return;
-
-  const state = new Map(); 
+  const state = new Map();
   let animating = false;
-
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
-
   function updateTargets() {
     const parallaxMsgs = messages.querySelectorAll('.msg.user');
     const vh = window.innerHeight;
     const center = vh / 2;
-
     for (const msg of parallaxMsgs) {
       const rect = msg.getBoundingClientRect();
       const msgCenter = rect.top + rect.height / 2;
       const ny = (msgCenter - center) / (vh / 2);
       const target = clamp(ny, -0.6, 0.6);
-
       if (!state.has(msg)) {
         state.set(msg, { current: target, target: target });
       } else {
@@ -5302,12 +5196,11 @@ function dispatchAgentEvent(ev, renderer, host) {
       }
     }
   }
-
   function tick() {
     let moving = false;
-
     for (const [msg, s] of state) {
-      
+
+
       const diff = s.target - s.current;
       if (Math.abs(diff) > 0.001) {
         s.current += diff * 0.12;
@@ -5317,14 +5210,12 @@ function dispatchAgentEvent(ev, renderer, host) {
       }
       msg.style.setProperty('--py', s.current.toFixed(3));
     }
-
     if (moving) {
       requestAnimationFrame(tick);
     } else {
       animating = false;
     }
   }
-
   function onScroll() {
     updateTargets();
     if (!animating) {
@@ -5332,22 +5223,14 @@ function dispatchAgentEvent(ev, renderer, host) {
       requestAnimationFrame(tick);
     }
   }
-
   messages.addEventListener('scroll', onScroll, { passive: true });
 
-  
+
   updateTargets();
   tick();
 })();
-
-
-
-
-
-
 </script></script>
 <script>
-
 let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -5355,7 +5238,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   console.log('[sandpie] PWA install prompt suppressed (available via menu)');
 });
 </script>
-
   <script type="module" src="modules/themes.js"></script>
   <script type="module" src="modules/agents.js"></script>
   <script type="module" src="modules/context.js"></script>
