@@ -2634,8 +2634,8 @@ refreshWelcome();
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
-    const listTest = await opfs.list('');
-    console.log("BOOT LIST:" + listTest);
+    //const listTest = await opfs.list('');
+    //console.log("BOOT LIST:" + listTest);
     return { role: 'system', content: text };
   } catch (e) {
     const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
