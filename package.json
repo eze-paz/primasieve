@@ -1,0 +1,13 @@
+{
+  "name": "sandpie",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "prettier --check .",
+    "lint:fix": "prettier --write .",
+    "format": "prettier --write sandpie-test.html sandpie.html"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5"
+  }
+}

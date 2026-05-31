@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# OPFS files
+scripts/
+_conversations/
+
+# Generated
+*.min.js
+*.min.css
