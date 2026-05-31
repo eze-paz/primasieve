@@ -61,7 +61,6 @@
 //           sanitize tc.function.arguments via JSON.parse fallback
 //           emit tool_started
 //           toolOut = await runTool(name, args, ctx)              [line ~377]
-//             → dispatches to tool_run_python / tool_fetch_file / tool_show_artifact / tool_load_image
 //           emit tool_result (with optional artifacts)
 //           emit message_added (tool)
 //         next iteration
@@ -69,7 +68,6 @@
 //
 //   T1  tool_run_python: lazy initPyodide (single shared interp),
 //       exec user code, return stdout + artifacts.
-//   T2  tool_fetch_file: Dropbox download via SW dbx helper
 //   T3  tool_show_artifact / tool_load_image: OPFS file validation + result tagging
 //
 // Adding a new tool: register it in runTool's switch AND export its
@@ -350,22 +348,6 @@ function isPyodideFatal(e, msg, stderr) {
   return false;
 }
 
-// Extract the missing file path from a Pyodide PythonError whose underlying
-// Python exception is FileNotFoundError. Standard repr in the JS-side error
-// message is:
-//   FileNotFoundError: [Errno 2] No such file or directory: 'path'
-// Returns the OPFS-relative path (no leading '/', no '/files/' prefix) so
-// it can be passed straight to tool_fetch_file. Returns null if the error
-// is anything other than that shape — caller treats null as "don't retry".
-function _extractMissingPath(e) {
-  const msg = (e && (e.message || String(e))) || '';
-  if (!/FileNotFoundError/.test(msg)) return null;
-  const m = msg.match(/No such file or directory:\s*['"]([^'"]+)['"]/);
-  if (!m) return null;
-  let p = m[1];
-  p = p.replace(/^\/+/, '').replace(/^files\//, '');
-  return p || null;
-}
 
 // =============================================================================
 // withPy — single-flight serializer for tool_run_python calls.
@@ -447,40 +429,20 @@ async function tool_run_python({ path, args }, ctx) {
       // Python environment: stdout/stderr capture + optional argv for `path:` mode.
       // /files is mounted lazily via mountNativeFS at init — Python can use plain
       // open()/os.listdir/glob and it reads OPFS on demand. Files not hydrated
-      // from Dropbox simply aren't present in /files; LLM uses fetch_file to bring them in.
+      // Files not in OPFS must be created with run_python first.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       // Single-retry: if user code dies with FileNotFoundError on a path
-      // that turns out to live in Dropbox, fetch_file it and re-run the
+      // that references a missing file — the user must create it first.
       // whole snippet once. The LLM never sees the failure-then-retry —
       // it just gets the successful result. Budget is 1 to avoid fetch
       // storms inside one call; subsequent missing files in the same
       // snippet surface to the LLM (it can run again, where they'd
       // already be local or trigger another single retry).
       let _retried = false;
-      while (true) {
-        try {
-          await p.runPythonAsync(code);
-          break;
-        } catch (runErr) {
-          if (_retried) throw runErr;
-          const missing = _extractMissingPath(runErr);
-          if (!missing || !ctx.dbxTokens) throw runErr;
-          const fr = await tool_fetch_file({ path: missing }, ctx);
-          if (typeof fr.result !== 'string' || fr.result.startsWith('Error')) throw runErr;
-          // Re-sync OPFS into Pyodide's /files view so the just-fetched
-          // file is now visible to open() / os.listdir on the retry.
-          if (_nativefs) { try { await _nativefs.syncfs(); } catch (_) {} }
-          // Discard partial output captured before the failing line so
-          // the user sees a clean run, not an interleaving of attempts.
-          stdout = '';
-          stderr = '';
-          _retried = true;
-        }
-      }
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
       // failed at init — Python had no /files to write to, nothing to flush.
@@ -521,27 +483,6 @@ async function tool_run_python({ path, args }, ctx) {
 }
 
 
-async function tool_fetch_file(args, ctx) {
-  // Dropbox download. Requires tokens from page (no localStorage in SW).
-  if (!ctx.dbxTokens) return { result: 'Error: Dropbox tokens not available in SW context (page did not provide them).' };
-  const rel = String(args.path || '').replace(/^\/+/, '');
-  if (!rel) return { result: 'Error: missing path' };
-  try {
-    const r = await fetch('https://content.dropboxapi.com/2/files/download', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + ctx.dbxTokens.access_token,
-        'Dropbox-API-Arg': JSON.stringify({ path: '/' + rel }),
-      },
-    });
-    if (!r.ok) return { result: `Error: dropbox returned ${r.status}: ${await r.text().catch(() => '')}` };
-    const bytes = new Uint8Array(await r.arrayBuffer());
-    await opfsWriteBytes(rel, bytes);
-    return { result: `Hydrated ${rel} (${bytes.length} bytes)` };
-  } catch (e) {
-    return { result: 'Error: ' + (e && e.message || e) };
-  }
-}
 
 // Validate a file exists in OPFS and mark it for artifact rendering on the page.
 // The page recognises 'artifact:<path>' in the result and renders an iframe via /opfs/<path>.
@@ -570,7 +511,6 @@ async function tool_load_image({ path }, ctx) {
 async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python(args, ctx);
-    case 'fetch_file':    return tool_fetch_file(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'write_file':    return tool_write_file(args, ctx);   // ← add
@@ -726,7 +666,6 @@ async function handleAgent(req) {
         emit(ev) { try { controller.enqueue(enc.encode(JSON.stringify(ev) + '\n')); } catch (_) {} },
         signal: abortCtl.signal,
         origin: config.origin || '',
-        dbxTokens: config.dbxTokens || null,
       };
       try {
         await runAgent(config, ctx);
