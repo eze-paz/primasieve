@@ -159,8 +159,8 @@ try {
   console.warn('[sandpie-sw] pyodide bootstrap failed:', e);
 }
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+//self.addEventListener('install', () => self.skipWaiting());
+//self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 // Completion notifications are shown via SW.registration.showNotification()
 // because new Notification() from a page is a no-op on Android Chrome and
