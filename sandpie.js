@@ -408,7 +408,7 @@ async function tool_run_python({ path, args }, ctx) {
       }
 
       try { await p.loadPackagesFromImports(code); } catch (_) {}
-      await p.runPythonAsync(await (await fetch('/files/' + normPath)).text());
+      await p.runPythonAsync(code);
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
       // failed at init — Python had no /files to write to, nothing to flush.
