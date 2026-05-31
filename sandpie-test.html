@@ -4780,11 +4780,13 @@ function refreshSendButtonForActive() {
   if (!btn) return;
   const s = activeStream();
   if (s && s.generating) {
-    btn.textContent = 'Stop';
+    btn.textContent = '■';
+    btn.title = 'Stop';
     btn.classList.add('sending');
     btn.disabled = false;
   } else {
-    btn.textContent = 'Send';
+    btn.textContent = '▶';
+    btn.title = 'Send';
     btn.classList.remove('sending');
     btn.disabled = false;
   }
