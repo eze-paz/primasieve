@@ -5103,10 +5103,6 @@ async function sendSingle(text, stream) {
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  let dbxTokensSnap = null;
-  try { dbxTokensSnap = dbxTokens(); } catch (_) {}
-
-
   const resolvedMessages = [];
   for (const msg of convMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
@@ -5134,7 +5130,6 @@ async function buildAgentConfig(convMessages) {
     messages: resolvedMessages,
     tools: toolDefs(),
     origin: location.origin,
-    dbxTokens: dbxTokensSnap,
   };
 }
 async function readAgentEvents(body, onEvent) {
