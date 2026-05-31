@@ -20,6 +20,7 @@
     --sp-panel: #21262d;
     --sp-accent: #58a6ff;
     --sp-accent-dim: rgba(88, 166, 255, 0.35);
+    --sp-accent-neg: #ff7b72;
     --sp-text: #e6edf3;
     --sp-text-dim: #9ab0c8;
     --sp-success: #3fb950;
@@ -389,7 +390,7 @@
     transition: transform 0.06s ease-out;
   }
   .send-btn.sending {
-    background: linear-gradient(135deg, #f85149, #da3633) !important;
+    background: linear-gradient(135deg, var(--sp-accent-neg), var(--sp-danger)) !important;
     box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35) !important;
     cursor: pointer;
     text-shadow: none !important;
