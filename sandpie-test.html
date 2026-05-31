@@ -307,7 +307,8 @@
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
   form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); }
-  .input-row { display: flex; gap: 0.5rem; align-items: stretch; }
+  .input-col { display: flex; flex-direction: column; gap: 0.5rem; }
+  .input-actions { display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center; }
   form textarea {
     flex: 1;
     padding: 0.5rem 1rem;
@@ -1446,10 +1447,12 @@ window.addEventListener('message', e => {
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <input type="file" id="imageInput" accept="image/*" style="display:none" >
     <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <div class="input-row">
+    <div class="input-col">
       <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
-      <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-      <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+      <div class="input-actions">
+        <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
+        <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+      </div>
     </div>
   </form>
 </main>
