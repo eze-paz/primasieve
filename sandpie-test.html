@@ -373,7 +373,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.1s, box-shadow 0.15s, text-shadow 0.1s !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s, text-shadow 0.1s !important;
     box-shadow: 0 2px 8px rgba(88,166,255,0.35);
     text-shadow: none;
   }
@@ -381,23 +381,17 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 14px rgba(88,166,255,0.45);
     text-shadow:
-      -2px 0 0 rgba(255, 60, 60, 0.8),
-       2px 0 0 rgba(0, 240, 255, 0.8);
+      -4px 0 0 rgba(255, 60, 60, 0.85),
+       4px 0 0 rgba(0, 240, 255, 0.85);
   }
   .send-btn:active {
-    animation: send-snap 0.25s ease-out;
-  }
-  @keyframes send-snap {
-    0%   { transform: scale(1); }
-    30%  { transform: scale(0.82); }
-    55%  { transform: scale(1.08); }
-    100% { transform: scale(1); }
+    transform: scale(0.78);
+    transition: transform 0.06s ease-out;
   }
   .send-btn.sending {
     background: #6e7681 !important;
     box-shadow: none !important;
     cursor: not-allowed;
-    animation: none !important;
     text-shadow: none !important;
   }
   .send-btn:disabled {
