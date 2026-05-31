@@ -72,13 +72,40 @@
   }
 
 
-  /* Scrollbars — cryocut style */
+  /* Scrollbars — cryocut style (default for all scrollables) */
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
   ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Sidebar: hidden scrollbar + shadow + chevron hints */
+  aside { scrollbar-width: none; }
+  aside::-webkit-scrollbar { display: none; }
+  aside .scroll-hint {
+    position: absolute;
+    left: 0; right: 0;
+    height: 28px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    font-size: 9px;
+    line-height: 28px;
+    text-align: center;
+    color: var(--sp-accent);
+    letter-spacing: 0;
+  }
+  aside .scroll-hint.top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--sp-accent-dim), transparent);
+  }
+  aside .scroll-hint.bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--sp-accent-dim), transparent);
+  }
+  aside .scroll-hint.visible { opacity: 0.7; }
   aside input[type="color"] { padding: 0; }
   aside input, aside button {
     padding: 0.45rem 0.625rem;
@@ -5299,6 +5326,33 @@ fetch('version.txt')
     const el = document.getElementById('versionDisplay');
     if (el) el.textContent = 'dev';
   });
+
+
+  /* Sidebar scroll hints — shadow + chevron */
+  (function() {
+    const SIDEBAR = document.querySelector('aside');
+    if (!SIDEBAR) return;
+    // Create hint elements
+    const topHint = document.createElement('div');
+    topHint.className = 'scroll-hint top';
+    topHint.textContent = '▲';
+    const bottomHint = document.createElement('div');
+    bottomHint.className = 'scroll-hint bottom';
+    bottomHint.textContent = '▼';
+    SIDEBAR.appendChild(topHint);
+    SIDEBAR.appendChild(bottomHint);
+    function updateHints() {
+      const hasTop = SIDEBAR.scrollTop > 6;
+      const hasBottom = SIDEBAR.scrollTop + SIDEBAR.clientHeight < SIDEBAR.scrollHeight - 6;
+      topHint.classList.toggle('visible', hasTop);
+      bottomHint.classList.toggle('visible', hasBottom);
+    }
+    SIDEBAR.addEventListener('scroll', updateHints, { passive: true });
+    updateHints();
+    // Re-check when sidebar content changes
+    new MutationObserver(updateHints).observe(SIDEBAR, { childList: true, subtree: true });
+  })();
+
 </script>
 </body>
 </html>
