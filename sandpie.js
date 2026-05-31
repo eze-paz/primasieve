@@ -1,101 +1,20 @@
-// sandpie.js — Service Worker that runs the LLM agent loop end-to-end.
-//
-// Why: when the page tab is frozen by Chrome's energy-saver freezing, all
-// page-side work stops — including the loop in sendSingle that decides
-// "round done, run the tool, kick off the next round". Moving that loop
-// into the SW (which is exempt from freezing while it's handling a fetch
-// event) lets autonomous LLM ↔ tool ↔ LLM workflows progress while the
-// page is minimized.
-//
-// Pyodide lives inside this SW directly so run_python doesn't have to
-// round-trip back to the page. This means a SINGLE shared interpreter
-// per origin (the per-conv isolation that the page-side pyWorker
-// architecture had is gone here — explicit trade-off).
-//
-// Wire:
-//   page POST /sandpie-agent { messages, model, endpoint, auth, ... }
-//     → SW returns NDJSON stream of events:
-//        { type:"delta", content?, tool_calls? }
-//        { type:"round_end", content, tool_calls }
-//        { type:"tool_started", tc }
-//        { type:"tool_result", id, result }
-//        { type:"message_added", message }  (the assistant or tool message just appended)
-//        { type:"agent_done" }
-//        { type:"error", message }
-//
-// Other endpoints kept for compat / discoverability:
-//   POST /sandpie-stream { url, headers, body } → raw SSE pass-through
-//                                                 (used when caller wants
-//                                                 only one round, no agent
-//                                                 loop)
-//   POST /sandpie-py { code, argv } → run python once
-//
-// =============================================================================
-// SW-side flow (mirrors the page-side flow chart in sandpie.html)
-// =============================================================================
-//
-//   W1  install  → skipWaiting()                                  [line ~33]
-//   W2  activate → clients.claim()                                [line ~34]
-//   W3  fetch event router — four intercepted paths:             [line ~36]
-//         /sandpie-agent  → handleAgent
-//         /sandpie-stream → handleStream  (legacy single-round SSE proxy)
-//         /sandpie-py     → handlePy      (one-shot run_python)
-//         /opfs/<path>    → handleOpfs    (serve OPFS file; injects resize script for HTML)
-//
-//   S1  handleAgent(req): parse config, open ReadableStream.      [line ~491]
-//   S2  ReadableStream.start → runAgent(config, ctx) with         [line ~446]
-//       ctx.emit(ev) pushing NDJSON lines back to the page.
-//   S3  runAgent loop (one iteration = one LLM round):
-//         emit round_start
-//         streamOneRound:                                         [line ~392]
-//           fetch upstream LLM with stream=true
-//           for each SSE delta:
-//             accumulate content + toolCalls[i] from delta
-//             emit { type:'delta', delta } VERBATIM (raw upstream
-//             shape — the page reconstructs its own view)
-//           return { content, tool_calls }
-//         emit round_end
-//         if no tool_calls: emit message_added (asst), break
-//         emit message_added (asst with tool_calls)
-//         for each tc in tool_calls:
-//           sanitize tc.function.arguments via JSON.parse fallback
-//           emit tool_started
-//           toolOut = await runTool(name, args, ctx)              [line ~377]
-//           emit tool_result (with optional artifacts)
-//           emit message_added (tool)
-//         next iteration
-//       emit agent_done
-//
-//   T1  tool_run_python: lazy initPyodide (single shared interp),
-//       exec user code, return stdout + artifacts.
-//   T3  tool_show_artifact / tool_load_image: OPFS file validation + result tagging
-//
-// Adding a new tool: register it in runTool's switch AND export its
-// schema to the page via tools[] in sandpie.html (the SW receives
-// the schema array verbatim and forwards it to upstream).
-// =============================================================================
-
-// =============================================================================
-// Console relay — every console.log/warn/error in the SW is also posted
-// to all clients so it shows up in the PAGE'S regular DevTools console
-// with a `[sw]` prefix. Without this the most actionable signals
-// (Pyodide aborts, init failures, fatal resets) get buried in a separate
-// DevTools window that you'd have to dig into Application → Service
-// Workers → click the SW link to find.
-// =============================================================================
-// Buffer logs emitted during install/activate when there are no clients
-// yet. First time a client connects (via the page-side message handler
-// pinging us with `sandpie-sw-flush-logs`), we drain the buffer.
 const _swLogBuffer = [];
 const _MAX_BUFFER = 200;
 function _relayLog(level, args) {
   // Best-effort stringification — most log args are strings or simple objects.
-  const text = args.map(a => {
+  let text = args.map(a => {
     if (a == null) return String(a);
     if (typeof a === 'string') return a;
     if (a instanceof Error) return (a.stack || a.message || String(a));
     try { return JSON.stringify(a); } catch (_) { return String(a); }
   }).join(' ');
+
+  const MAX_LOG_LEN = 5000;
+
+  if (text.length > MAX_LOG_LEN) {
+    text = text.slice(0, MAX_LOG_LEN) + '…';
+  }
+  
   const msg = { type: 'sandpie-sw-log', level, text, ts: Date.now() };
   // Buffer ALL logs so the page-side relay can fetch the recent history
   // when it connects (e.g. SW boot logs that fired before the page was
@@ -143,35 +62,45 @@ self.addEventListener('message', async (event) => {
     // in-memory copy back to OPFS and resurrect the file (which then gets
     // re-uploaded to Dropbox on the next sync tick).
     if (!py) return;  // Pyodide not booted yet — nothing to clean up.
-    for (const rel of data.paths) {
-      const full = '/files/' + String(rel).replace(/^\/+/, '');
-      try {
-        const st = py.FS.stat(full);
-        if (py.FS.isDir(st.mode)) _swRmTree(full);
-        else py.FS.unlink(full);
-      } catch (_) { /* already gone in MEMFS — fine */ }
-    }
+
+    await withPy(async () => {
+      for (const rel of data.paths) {
+        const full = '/files/' + String(rel).replace(/^\/+/, '');
+    
+        try {
+          const st = py.FS.stat(full);
+    
+          if (py.FS.isDir(st.mode)) _swRmTree(full);
+          else py.FS.unlink(full);
+        } catch (_) {}
+      }
+    });
+    
     return;
   }
   if (data.type === 'opfs-changed' && Array.isArray(data.paths)) {
     // Page wrote new files to OPFS. Sync them into Pyodide's MEMFS view
     // so the next run_python can see them without a full syncfs() walk.
     if (!py || !_nativefs) return;
-    for (const rel of data.paths) {
-      const full = '/files/' + String(rel).replace(/^\/+/, '');
-      try {
-        // Read from OPFS and write into MEMFS
-        const bytes = await opfsReadBytes(rel);
-        // Ensure parent dirs exist
-        const dir = full.substring(0, full.lastIndexOf('/'));
-        if (dir && dir !== '/files') {
-          try { py.FS.mkdirTree(dir); } catch (_) {}
+    
+    await withPy(async () => {
+      for (const rel of data.paths) {
+        const full = '/files/' + String(rel).replace(/^\/+/, '');
+        try {
+          const bytes = await opfsReadBytes(rel);
+    
+          const dir = full.substring(0, full.lastIndexOf('/'));
+          if (dir && dir !== '/files') {
+            try { py.FS.mkdirTree(dir); } catch (_) {}
+          }
+    
+          py.FS.writeFile(full, bytes);
+        } catch (e) {
+          console.warn('[sandpie-sw] opfs-changed sync failed for', rel, e);
         }
-        py.FS.writeFile(full, bytes);
-      } catch (e) {
-        console.warn('[sandpie-sw] opfs-changed sync failed for', rel, e);
       }
-    }
+    });
+    
     return;
   }
 });
@@ -401,6 +330,27 @@ async function opfsWriteBytes(path, bytes) {
   await w.close();
 }
 
+function combineSignals(signals) {
+  const ctl = new AbortController();
+
+  for (const s of signals) {
+    if (!s) continue;
+
+    if (s.aborted) {
+      ctl.abort();
+      break;
+    }
+
+    s.addEventListener(
+      'abort',
+      () => ctl.abort(),
+      { once: true }
+    );
+  }
+
+  return ctl.signal;
+}
+
 // ============================================================
 // Tool implementations (run inside the SW).
 // ============================================================
@@ -434,15 +384,15 @@ async function tool_run_python({ path, args }, ctx) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
+
       try { await p.loadPackagesFromImports(code); } catch (_) {}
-      // Single-retry: if user code dies with FileNotFoundError on a path
-      // that references a missing file — the user must create it first.
-      // whole snippet once. The LLM never sees the failure-then-retry —
-      // it just gets the successful result. Budget is 1 to avoid fetch
-      // storms inside one call; subsequent missing files in the same
-      // snippet surface to the LLM (it can run again, where they'd
-      // already be local or trigger another single retry).
-      let _retried = false;
+
+      // Execute the script from its file path so __file__,
+      // __name__ == "__main__", and tracebacks behave normally.
+      await p.runPythonAsync(`
+      import runpy
+      runpy.run_path(${JSON.stringify('/files/' + normPath)}, run_name="__main__")
+      `);
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
       // failed at init — Python had no /files to write to, nothing to flush.
@@ -556,12 +506,19 @@ async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
 // Emits delta events to ctx for live rendering on the page.
 // ============================================================
 async function streamOneRound(reqUrl, headers, body, ctx) {
+  
+  const timeoutSignal = AbortSignal.timeout(120000);
+
   const res = await fetch(reqUrl, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: ctx.signal,
+    signal: combineSignals([
+      ctx.signal,
+      timeoutSignal,
+    ]),
   });
+  
   if (!res.ok) {
     const text = (await res.text()).slice(0, 300);
     throw Object.assign(new Error(res.status + ': ' + text), { status: res.status });
@@ -602,7 +559,14 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   }
   try { reader.cancel(); } catch (_) {}
   // Filter out tool calls without an id (incomplete deltas) — same logic as page.
-  const keptToolCalls = toolCalls.filter(tc => tc && tc.id);
+  
+  const keptToolCalls = toolCalls.filter(tc =>
+    tc &&
+    tc.id &&
+    tc.function &&
+    tc.function.name
+  );
+  
   return { content, tool_calls: keptToolCalls };
 }
 
@@ -636,7 +600,17 @@ async function runAgent(config, ctx) {
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       let parsedArgs = {};
-      try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
+      if (!tc.function?.name) {
+        continue;
+      }
+      
+      let parsedArgs = {};
+      
+      try {
+        parsedArgs = JSON.parse(
+          tc.function.arguments || '{}'
+        );
+      } catch (_) {}
       ctx.emit({ type: 'tool_started', tc });
       let toolOut;
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
@@ -791,18 +765,36 @@ function jsonErr(status, message) {
 async function tool_write_file({ path, content }) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+
   try {
     const root = await opfsRoot();
-    // Check existence
+  
     const parts = norm.split('/').filter(Boolean);
     const name = parts.pop();
+  
     let dir = root;
-    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: false }).catch(() => null) || await (async () => { throw new Error('checking'); })();
+  
+    for (const p of parts) {
+      dir = await dir.getDirectoryHandle(p, {
+        create: false,
+      });
+    }
+  
     try {
       await dir.getFileHandle(name);
-      return { result: `File already exists: ${norm}. Use edit_file to modify it.` };
-    } catch (_) { /* doesn't exist — good */ }
-  } catch (_) { /* parent dir doesn't exist yet — that's fine, write creates it */ }
+  
+      return {
+        result: `File already exists: ${norm}. Use edit_file to modify it.`,
+      };
+    } catch (e) {
+      if (e.name !== 'NotFoundError') {
+        throw e;
+      }
+    }
+  } catch (_) {
+    // parent directory may not exist yet
+  }
+  
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
     return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
