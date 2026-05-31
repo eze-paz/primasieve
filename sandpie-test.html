@@ -307,25 +307,87 @@
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
   form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); }
-  .input-col { display: flex; flex-direction: column; gap: 0.5rem; }
-  .input-actions { display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center; }
-  form textarea {
-    flex: 1;
-    padding: 0.5rem 1rem;
+  .input-wrap {
+    display: flex;
+    flex-direction: column;
     background: var(--sp-surface);
     border: 1px solid var(--sp-border);
-    border-radius: 8px;
+    border-radius: 12px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input-wrap:focus-within {
+    border-color: var(--sp-accent);
+    box-shadow: 0 0 0 3px var(--sp-accent-dim);
+  }
+  .input-wrap textarea {
+    flex: 1;
+    padding: 0.6rem 0.85rem;
+    background: transparent;
+    border: none;
+    border-radius: 12px 12px 0 0;
     color: var(--sp-text);
     font: inherit;
     resize: none;
     overflow-y: hidden;
     line-height: 1.4;
-    min-height: calc(1.4em + 1rem + 2px);
+    min-height: calc(1.4em + 1.2rem);
+    outline: none;
   }
-  form button { padding: 0.5rem 1.25rem; background: var(--sp-accent); border: none; border-radius: 8px; color: var(--sp-text); cursor: pointer; }
-  form button.sending { background: #6e7681; }
-  form button.sending:hover { background: var(--sp-text-dim); }
-  form button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .input-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.5rem 0.5rem;
+    border-top: 1px solid var(--sp-border);
+  }
+  .attach-btn {
+    background: transparent !important;
+    border: none !important;
+    color: var(--sp-text-dim) !important;
+    padding: 0.35rem 0.5rem !important;
+    border-radius: 8px !important;
+    font-size: 1.05rem !important;
+    line-height: 1 !important;
+    transition: background 0.1s, color 0.1s !important;
+  }
+  .attach-btn:hover {
+    background: var(--sp-panel) !important;
+    color: var(--sp-text) !important;
+  }
+  .send-btn {
+    margin-left: auto;
+    padding: 0.45rem 1.1rem !important;
+    background: linear-gradient(135deg, var(--sp-accent), #79b8ff) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.02em !important;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.15s, filter 0.15s !important;
+    box-shadow: 0 2px 8px rgba(88,166,255,0.35), 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .send-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(88,166,255,0.45), 0 2px 4px rgba(0,0,0,0.25);
+    filter: brightness(1.08);
+  }
+  .send-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(88,166,255,0.3);
+  }
+  .send-btn.sending {
+    background: #6e7681 !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+  }
+  .send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none !important;
+  }
+  /* Input styles moved to .input-wrap, .input-bar, .attach-btn, .send-btn */
   .cursor { display: inline-block; width: 2px; height: 1em; background: var(--sp-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
 
 
@@ -1447,11 +1509,11 @@ window.addEventListener('message', e => {
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <input type="file" id="imageInput" accept="image/*" style="display:none" >
     <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <div class="input-col">
+    <div class="input-wrap">
       <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
-      <div class="input-actions">
-        <button type="button" id="attachBtn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-        <button type="button" id="sendBtn" onclick="handleButtonClick()">Send</button>
+      <div class="input-bar">
+        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">📎</button>
+        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()">Send</button>
       </div>
     </div>
   </form>
