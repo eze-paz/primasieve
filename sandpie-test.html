@@ -72,12 +72,13 @@
   }
 
 
+  /* Scrollbars — cryocut style */
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
-  #messages::-webkit-scrollbar, aside::-webkit-scrollbar, .file-viewer .panel::-webkit-scrollbar { width: 8px; height: 8px; }
-  #messages::-webkit-scrollbar-track, aside::-webkit-scrollbar-track, .file-viewer .panel::-webkit-scrollbar-track { background: transparent; }
-  #messages::-webkit-scrollbar-thumb, aside::-webkit-scrollbar-thumb, .file-viewer .panel::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 4px; }
-  #messages::-webkit-scrollbar-thumb:hover, aside::-webkit-scrollbar-thumb:hover, .file-viewer .panel::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
-  #messages::-webkit-scrollbar-corner, aside::-webkit-scrollbar-corner, .file-viewer .panel::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
+  ::-webkit-scrollbar-corner { background: transparent; }
   aside input[type="color"] { padding: 0; }
   aside input, aside button {
     padding: 0.45rem 0.625rem;
