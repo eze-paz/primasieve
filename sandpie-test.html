@@ -389,10 +389,21 @@
     transition: transform 0.06s ease-out;
   }
   .send-btn.sending {
-    background: #6e7681 !important;
-    box-shadow: none !important;
-    cursor: not-allowed;
+    background: linear-gradient(135deg, #f85149, #da3633) !important;
+    box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35) !important;
+    cursor: pointer;
     text-shadow: none !important;
+  }
+  .send-btn.sending:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(248, 81, 73, 0.45) !important;
+    text-shadow:
+      -4px 0 0 rgba(255, 200, 0, 0.8),
+       4px 0 0 rgba(255, 0, 255, 0.8) !important;
+  }
+  .send-btn.sending:active {
+    transform: scale(0.78);
+    transition: transform 0.06s ease-out;
   }
   .send-btn:disabled {
     opacity: 0.5;
@@ -1397,9 +1408,7 @@ window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
   for (const f of document.querySelectorAll('iframe.artifact-frame')) {
     if (f.contentWindow === e.source) {
-      const maxH = window.innerHeight * 0.5;
-      f.style.height = Math.min(Math.max(60, e.data.h | 0), maxH) + 'px';
-      f.style.overflow = 'auto';
+      f.style.height = Math.max(60, e.data.h | 0) + 'px';
       const wrap = f.closest('.artifact-wrap');
       if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
       return;
