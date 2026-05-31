@@ -355,6 +355,28 @@ function combineSignals(signals) {
 // Tool implementations (run inside the SW).
 // ============================================================
 
+const MAX_TOOL_RESULT_BYTES = 30 * 1024; // 30kB
+
+function truncateToolResult(result) {
+  if (typeof result !== 'string') {
+    try {
+      result = JSON.stringify(result);
+    } catch {
+      result = String(result);
+    }
+  }
+
+  const bytes = new TextEncoder().encode(result);
+
+  if (bytes.length <= MAX_TOOL_RESULT_BYTES) return result;
+
+  // trim safely at byte level
+  const sliced = bytes.slice(0, MAX_TOOL_RESULT_BYTES);
+  const text = new TextDecoder().decode(sliced);
+
+  return text + "\n\n[truncated: tool result exceeded 30kB]";
+}
+
 async function tool_run_python({ path, args }, ctx) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
@@ -613,11 +635,30 @@ async function runAgent(config, ctx) {
       } catch (_) {}
       ctx.emit({ type: 'tool_started', tc });
       let toolOut;
-      try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
-      catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
-      ctx.emit({ type: 'tool_result', id: tc.id, result: toolOut.result });
-      const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolOut.result };
+
+      try {
+        toolOut = await runTool(tc.function.name, parsedArgs, ctx);
+      } catch (e) {
+        toolOut = { result: 'Error: ' + (e && e.message || e) };
+      }
+      
+      // 🚨 enforce size cap here
+      const safeResult = truncateToolResult(toolOut.result);
+      
+      ctx.emit({
+        type: 'tool_result',
+        id: tc.id,
+        result: safeResult,
+      });
+      
+      const toolMsg = {
+        role: 'tool',
+        tool_call_id: tc.id,
+        content: safeResult,
+      };
+      
       messages.push(toolMsg);
+      
       ctx.emit({ type: 'message_added', message: toolMsg });
     }
   }
