@@ -411,9 +411,21 @@ async function tool_run_python({ path, args }, ctx) {
 
       // Execute the script from its file path so __file__,
       // __name__ == "__main__", and tracebacks behave normally.
+      const filePath = '/files/' + normPath;
+
       await p.runPythonAsync(`
-      import runpy
-      runpy.run_path(${JSON.stringify('/files/' + normPath)}, run_name="__main__")
+      from pyodide.ffi import to_js
+      
+      __file__ = "${filePath}"
+      __name__ = "__main__"
+      
+      with open("${filePath}", "r") as f:
+          code = f.read()
+      
+      exec(compile(code, "${filePath}", "exec"), {
+          "__name__": "__main__",
+          "__file__": "${filePath}",
+      })
       `);
       // Flush any writes Python made into /files back to OPFS. No-op when
       // Python didn't touch the FS. Skipped (with a warning) if the mount
