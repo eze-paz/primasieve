@@ -662,32 +662,66 @@ async function runAgent(config, ctx) {
 // ============================================================
 // Handler wiring.
 // ============================================================
-
 async function handleAgent(req) {
   let config;
   try { config = await req.json(); }
   catch (e) { return jsonErr(400, 'bad request body: ' + e.message); }
+
   const abortCtl = new AbortController();
   const enc = new TextEncoder();
+
+  // Unbounded event queue — agent pushes, stream pulls at its own pace
+  const queue = [];
+  let done = false;
+  let notify = null; // resolves when new items are pushed
+
+  function push(ev) {
+    queue.push(enc.encode(JSON.stringify(ev) + '\n'));
+    if (notify) { notify(); notify = null; }
+  }
+
+  // Run the agent completely independently of the stream
+  const agentPromise = (async () => {
+    const ctx = {
+      emit: push,
+      signal: abortCtl.signal,
+      origin: config.origin || '',
+    };
+    try {
+      await runAgent(config, ctx);
+    } catch (e) {
+      push({ type: 'error', message: (e && e.message) || String(e), status: e && e.status });
+    } finally {
+      done = true;
+      if (notify) { notify(); notify = null; }
+    }
+  })();
+
   const stream = new ReadableStream({
-    async start(controller) {
-      const ctx = {
-        emit(ev) { try { controller.enqueue(enc.encode(JSON.stringify(ev) + '\n')); } catch (_) {} },
-        signal: abortCtl.signal,
-        origin: config.origin || '',
-      };
-      try {
-        await runAgent(config, ctx);
-      } catch (e) {
-        ctx.emit({ type: 'error', message: (e && e.message) || String(e), status: e && e.status });
-      } finally {
-        try { controller.close(); } catch (_) {}
+    async pull(controller) {
+      // Drain everything currently in the queue
+      while (queue.length > 0) {
+        controller.enqueue(queue.shift());
+      }
+      // If agent is done and queue is empty, close
+      if (done && queue.length === 0) {
+        controller.close();
+        return;
+      }
+      // Otherwise wait for the next push() before pull() is called again
+      await new Promise(r => { notify = r; });
+      while (queue.length > 0) {
+        controller.enqueue(queue.shift());
+      }
+      if (done && queue.length === 0) {
+        controller.close();
       }
     },
-    async cancel() {
+    cancel() {
       try { abortCtl.abort(); } catch (_) {}
     },
   });
+
   return new Response(stream, {
     status: 200,
     headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' },
