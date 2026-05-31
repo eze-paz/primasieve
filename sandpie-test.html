@@ -314,6 +314,7 @@
     border: 1px solid var(--sp-border);
     border-radius: 12px;
     transition: border-color 0.15s, box-shadow 0.15s;
+    overflow: hidden;
   }
   .input-wrap:focus-within {
     border-color: var(--sp-accent);
@@ -321,32 +322,35 @@
   }
   .input-wrap textarea {
     flex: 1;
-    padding: 0.6rem 0.85rem;
+    padding: 0.65rem 0.85rem 0.4rem;
     background: transparent;
     border: none;
-    border-radius: 12px 12px 0 0;
+    border-radius: 0;
     color: var(--sp-text);
     font: inherit;
     resize: none;
-    overflow-y: hidden;
+    overflow-y: auto;
     line-height: 1.4;
-    min-height: calc(1.4em + 1.2rem);
+    min-height: calc(1.4em + 0.8rem);
+    max-height: 12em;
     outline: none;
   }
   .input-bar {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.5rem 0.5rem;
+    gap: 0.25rem;
+    padding: 0.2rem 0.4rem 0.35rem;
     border-top: 1px solid var(--sp-border);
+    min-height: 28px;
   }
   .attach-btn {
     background: transparent !important;
     border: none !important;
     color: var(--sp-text-dim) !important;
-    padding: 0.35rem 0.5rem !important;
-    border-radius: 8px !important;
-    font-size: 1.05rem !important;
+    padding: 0.15rem 0.4rem !important;
+    border-radius: 6px !important;
+    font-size: 1.15rem !important;
+    font-weight: 300 !important;
     line-height: 1 !important;
     transition: background 0.1s, color 0.1s !important;
   }
@@ -356,21 +360,20 @@
   }
   .send-btn {
     margin-left: auto;
-    padding: 0.45rem 1.1rem !important;
+    padding: 0.25rem 0.7rem !important;
     background: linear-gradient(135deg, var(--sp-accent), #79b8ff) !important;
     border: none !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     color: #fff !important;
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    letter-spacing: 0.02em !important;
+    font-size: 0.75rem !important;
+    line-height: 1 !important;
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.15s, filter 0.15s !important;
-    box-shadow: 0 2px 8px rgba(88,166,255,0.35), 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 6px rgba(88,166,255,0.35), 0 1px 2px rgba(0,0,0,0.2);
   }
   .send-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(88,166,255,0.45), 0 2px 4px rgba(0,0,0,0.25);
+    box-shadow: 0 3px 10px rgba(88,166,255,0.45), 0 2px 4px rgba(0,0,0,0.25);
     filter: brightness(1.08);
   }
   .send-btn:active {
@@ -1512,8 +1515,8 @@ window.addEventListener('message', e => {
     <div class="input-wrap">
       <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
       <div class="input-bar">
-        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">📎</button>
-        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()">Send</button>
+        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">+</button>
+        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
       </div>
     </div>
   </form>
@@ -1796,7 +1799,10 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   function autosize() {
     const m = $('messages');
     ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
+    const maxH = 12 * parseFloat(getComputedStyle(ta).lineHeight || '1.4');
+    const newH = Math.min(ta.scrollHeight, maxH);
+    ta.style.height = newH + 'px';
+    ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
     if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
   }
   ta.addEventListener('input', autosize);
