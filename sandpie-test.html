@@ -5072,7 +5072,7 @@ async function buildAgentConfig(convMessages) {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: buildSystemPrompt(),
+    systemPrompt: await buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
     origin: location.origin,
