@@ -995,17 +995,6 @@
   }
   .tc-title { color: var(--sp-text); white-space: nowrap; }
   .tc-title b { color: var(--sp-accent); font-weight: 600; }
-  .tc-flavor {
-    color: var(--sp-text-dim);
-    font-style: italic;
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-    flex: 1;
-    animation: tc-fade 0.35s ease-out;
-  }
   .tc-meta {
     margin-left: auto;
     font-size: 10px;
@@ -3810,18 +3799,6 @@ async function copyFromMenu() {
     ta.remove();
   }
 }
-const TOOL_FLAVOR = {
-  run_python: [
-    'warming pyodide kernel', 'compiling cell to bytecode', 'executing interpreter loop',
-    'tracing call frames', 'marshaling output buffer', 'flushing stdout',
-    'checking traceback', 'resolving imports', 'walking the heap',
-  ],
-};
-const GENERIC_FLAVOR = [
-  'thinking', 'computing', 'processing', 'crunching numbers',
-  'consulting the oracle', 'reticulating splines', 'staring into the abyss',
-];
-function tcFlavorsFor(name) { return TOOL_FLAVOR[name] || GENERIC_FLAVOR; }
 function tcSetExpanded(div, text) {
   const el = div && div.querySelector && div.querySelector('.tc-expanded');
   if (el) el.textContent = text;
@@ -3910,23 +3887,14 @@ function renderTcPreparing(div, fname, args) {
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
 }
-function renderTcRunning(div, fname, flavor) {
+function renderTcRunning(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-
-
-
-
-
-
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
       '<span class="tc-spinner"></span>' +
-      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
-      '<span class="tc-flavor"></span>';
+      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>`;
   }
-  const flavorEl = el.querySelector('.tc-flavor');
-  if (flavorEl) flavorEl.textContent = flavor;
 }
 function renderTcDone(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
@@ -3934,28 +3902,6 @@ function renderTcDone(div, fname) {
   el.innerHTML =
     '<span class="tc-check">✓</span>' +
     `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>`;
-}
-function startToolTicker(div, tc) {
-  if (!div || div._ticker) return;
-  const flavors = tcFlavorsFor(tc.function.name);
-  let idx = 0;
-  div.dataset.fname = tc.function.name;
-  const tick = () => {
-    if (!div.isConnected || !div.classList.contains('in-flight')) {
-      div._ticker = null;
-      return;
-    }
-    renderTcRunning(div, tc.function.name, flavors[idx % flavors.length]);
-    idx++;
-    div._ticker = setTimeout(tick, 1400);
-  };
-  tick();
-}
-function stopToolTicker(div) {
-  if (div && div._ticker) {
-    clearTimeout(div._ticker);
-    div._ticker = null;
-  }
 }
 class RoundRenderer {
   constructor(host, convMessages) {
@@ -4046,13 +3992,12 @@ class RoundRenderer {
     const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
     if (idx < 0 || !this.toolCallEls[idx]) return;
     this.toolCallEls[idx].classList.add('in-flight');
-    startToolTicker(this.toolCallEls[idx], tc);
+    renderTcRunning(this.toolCallEls[idx], tc.function.name);
   }
   markToolDone(tcId, result) {
     const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
     if (idx >= 0 && this.toolCallEls[idx]) {
       this.toolCallEls[idx].classList.remove('in-flight');
-      stopToolTicker(this.toolCallEls[idx]);
       renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
     }
     const text = String(result || '');
@@ -4831,7 +4776,6 @@ function setStreamSending(stream, sending) {
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
-      stopToolTicker(el);
       renderTcDone(el, el.dataset.fname);
     }
   }
