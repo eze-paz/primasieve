@@ -96,6 +96,9 @@
     text-align: center;
     color: var(--sp-accent);
     letter-spacing: 0;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: calc(100% + 2rem);
   }
   aside .scroll-hint.top {
     top: 0;
@@ -5339,7 +5342,7 @@ fetch('version.txt')
     const bottomHint = document.createElement('div');
     bottomHint.className = 'scroll-hint bottom';
     bottomHint.textContent = '▼';
-    SIDEBAR.appendChild(topHint);
+    SIDEBAR.prepend(topHint);
     SIDEBAR.appendChild(bottomHint);
     function updateHints() {
       const hasTop = SIDEBAR.scrollTop > 6;
