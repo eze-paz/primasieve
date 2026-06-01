@@ -61,7 +61,7 @@
     position: relative;
     z-index: 1;
   }
-  
+
   /* Scrollbars — cryocut style (default for all scrollables) */
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -1356,6 +1356,7 @@ window.addEventListener('message', e => {
 </script>
   <script src="modules/images.js"></script>
   <script type="module" src="modules/providers.js"></script>
+<script type="module" src="modules/dropbox.js"></script>
   <script src="modules/notifications.js"></script>
 </head>
 <body>
@@ -1412,18 +1413,6 @@ window.addEventListener('message', e => {
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
   </div>
-
-  <details class="service" id="cloudSection">
-    <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
-    <div class="service-body">
-      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
-      <div class="row">
-        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
-        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
-      </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
-    </div>
-  </details>
 
     <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
@@ -1599,11 +1588,11 @@ if ('serviceWorker' in navigator) {
       
       
       (async () => {
-        if (!dbx.tokens()) return;
+        if (!SandpieDropbox.tokens()) return;
         const state = syncState();
         let changed = false;
         for (const path of d.paths) {
-          try { await dbx.delete('/' + path); } catch {}
+          try { await SandpieDropbox.delete('/' + path); } catch {}
           const lk = path.toLowerCase();
           for (const k of Object.keys(state)) {
             if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
@@ -2001,110 +1990,6 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 
-function dbxStatus(text, kind) {
-  const el = $('dbxStatus');
-  el.textContent = text;
-  el.className = 'dbx-status ' + kind;
-  el.style.display = text ? '' : 'none';
-  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
-  const btn = $('dbxToggleBtn');
-  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-  if (typeof refreshWelcome === 'function') 
-refreshWelcome();
-}
-
-function dbxProgress(text) {
-  const el = $('dbxProgress');
-  const title = $('dbxTitle');
-  if (el) el.textContent = text || '';
-  if (title) title.style.display = text ? 'none' : '';
-}
-
-let dbxBusyCount = 0;
-function setDbxBusy(busy) {
-  dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
-  const dot = $('dbxDot');
-  if (!dot) return;
-  if (dbxBusyCount > 0) dot.classList.add('busy');
-  else dot.classList.remove('busy');
-}
-
-
-// --- Sync state helpers (shared between main app and Dropbox module) ---
-const SYNC_STATE_KEY = 'sandpie-sync-state';
-const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
-
-function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
-function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
-function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
-function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
-
-async function opfsLastModified(relPath) {
-  try {
-    const { parts, name } = splitPath(relPath);
-    const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    return (await handle.getFile()).lastModified;
-  } catch { return 0; }
-}
-
-// --- Dropbox module import ---
-// --- Dropbox module (loaded dynamically) ---
-let createDropboxSync = null;
-let dbxModulePromise = null;
-
-async function loadDropboxModule() {
-  if (createDropboxSync) return;
-  if (!dbxModulePromise) {
-    dbxModulePromise = import('./modules/dropbox.js');
-  }
-  const mod = await dbxModulePromise;
-  createDropboxSync = mod.createDropboxSync;
-}
-
-let dbx = null;
-
-function dbxToggleConnection() {
-  if (dbx) dbx.toggleConnection($('dbxAppKey').value.trim());
-}
-
-async function manualResync() {
-  if (!dbx || !dbx.tokens()) {
-    dbxStatus('Not connected', 'disconnected');
-    return;
-  }
-  const btn = $('dbxResyncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
-  try {
-    await dbx.manualResync();
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
-  }
-}
-
-async function initDropbox() {
-  await loadDropboxModule();
-  dbx = createDropboxSync({
-    route: dbxRoute,
-    onStatus: dbxStatus,
-    onProgress: dbxProgress,
-    setBusy: setDbxBusy,
-    opfs,
-    syncState,
-    setSyncState,
-    cloudIndex,
-    setCloudIndex,
-    splitPath,
-    refreshFileList,
-    refreshConversationList,
-    convStreams,
-  });
-  await dbx.init();
-}
-
-// Initialize Dropbox on startup (handles OAuth callback or existing session)
-initDropbox();
-
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
@@ -2146,7 +2031,7 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
       required: ['path'],
     },
     run: async ({ path }, signal) => {
-      if (!dbx.tokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
+      if (!SandpieDropbox.tokens()) return 'Dropbox not connected — sandpie cannot fetch cloud files. The user needs to connect first.';
 
       if (!path) return 'Missing path.';
       const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '').replace(/^\.\//, '');
@@ -2157,7 +2042,7 @@ SCOPE: Dropbox sync only. NOT for arbitrary host disk paths (use read_file) and 
       if (!navigator.onLine) return `Offline — cannot fetch ${norm} right now.`;
       setDbxBusy(true);
       try {
-        const content = await dbx.download('/' + norm, signal);
+        const content = await SandpieDropbox.download('/' + norm, signal);
         await opfs.write(norm, content);
         const s = syncState();
         s[norm] = {
@@ -2247,7 +2132,7 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
 
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
-    if (name === 'fetch_file') return !!dbx.tokens();   
+    if (name === 'fetch_file') return !!SandpieDropbox.tokens();   
     return true;
   })
   .map(([name, t]) => ({
@@ -2293,7 +2178,7 @@ refreshWelcome();
 }
 
 function buildSystemPrompt() {
-  const dbxConnected = !!dbx.tokens();
+  const dbxConnected = !!SandpieDropbox.tokens();
   const proxyUrl = ($('proxyUrl').value || '').trim();
 
   const lines = [
@@ -2572,8 +2457,8 @@ async function refreshFileList() {
           try {
             let bytes;
             if (it.status === 'cloud') {
-              if (!dbx.tokens()) { addMsg('err', 'Dropbox not connected — cannot download placeholder.'); return; }
-              bytes = await dbx.download('/' + it.fullKey);
+              if (!SandpieDropbox.tokens()) { addMsg('err', 'Dropbox not connected — cannot download placeholder.'); return; }
+              bytes = await SandpieDropbox.download('/' + it.fullKey);
             } else {
               bytes = await opfs.readBytes(it.fullKey);
             }
@@ -2594,7 +2479,7 @@ async function refreshFileList() {
       menuItems.push(
         { label: 'Delete', danger: true, action: async () => {
           const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
-          const dbxNote = dbx.tokens() ? ' This will also remove the Dropbox copy.' : '';
+          const dbxNote = SandpieDropbox.tokens() ? ' This will also remove the Dropbox copy.' : '';
           if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
           
           try { await opfs.remove(it.fullKey); } catch {}
@@ -2602,8 +2487,8 @@ async function refreshFileList() {
           
           
           
-          if (dbx.tokens()) {
-            try { await dbx.delete('/' + it.fullKey); } catch {}
+          if (SandpieDropbox.tokens()) {
+            try { await SandpieDropbox.delete('/' + it.fullKey); } catch {}
           }
           
           
@@ -4208,7 +4093,7 @@ function refreshWelcome() {
   let convCount = 0;
   try { convCount = parseInt($('convCount').textContent, 10) || 0; } catch {}
   if (convCount > 0) parts.push(`${convCount} chat${convCount === 1 ? '' : 's'} restored`);
-  if (dbx.tokens()) parts.push('dropbox synced');
+  if (SandpieDropbox.tokens()) parts.push('dropbox synced');
   const proxyUrl = ($('proxyUrl').value || '').trim();
   if (proxyUrl) parts.push(`proxy via ${proxyUrl.replace(/^https?:\/\//, '')}`);
   if (cachedManifests.length) parts.push(`${cachedManifests.length} manifest${cachedManifests.length === 1 ? '' : 's'}`);
@@ -4259,14 +4144,14 @@ async function duplicateConv(id, title) {
 }
 
 async function deleteConv(id, title) {
-  const dbxNote = dbx.tokens() ? ' This will also remove the Dropbox copy.' : '';
+  const dbxNote = SandpieDropbox.tokens() ? ' This will also remove the Dropbox copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
   
   
-  if (dbx.tokens()) {
-    try { await dbx.delete('/' + path); } catch {}
+  if (SandpieDropbox.tokens()) {
+    try { await SandpieDropbox.delete('/' + path); } catch {}
   }
   const lk = path.toLowerCase();
   const sync = syncState(); let sChanged = false;
@@ -4715,7 +4600,7 @@ async function sendSingle(text, stream) {
     
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
 
-    try { if (dbx) await dbx.sync(); } catch (e) { console.warn('sync failed:', e); }
+    try { if (SandpieDropbox) await SandpieDropbox.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 
@@ -4723,7 +4608,7 @@ async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   let dbxTokensSnap = null;
-  try { dbxTokensSnap = dbx.tokens(); } catch (_) {}
+  try { dbxTokensSnap = SandpieDropbox.tokens(); } catch (_) {}
 
   
   const resolvedMessages = [];
