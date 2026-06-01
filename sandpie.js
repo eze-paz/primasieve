@@ -528,6 +528,55 @@ function parseLeakedToolCalls(text) {
   return { toolCalls, stripped };
 }
 
+// Scrub a model's leaked NATIVE framing tokens (e.g. Kimi's <|tool_call_end|>,
+// <|tool_calls_section_end|>) out of a string. These must NEVER appear inside a
+// structured tool call; when a buggy route leaks them into the name/arguments
+// they corrupt the JSON, and once stored in history and sent back they make the
+// provider 400 on the malformed `arguments` — ending the round with no
+// agent_done, which the page then misreports as a service-worker crash.
+function scrubFramingTokens(s) {
+  return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '') : s;
+}
+
+// First balanced {...} object in a string (brace-aware and string-aware), used
+// to drop trailing junk left after a tool call's JSON arguments.
+function firstBalancedObject(s) {
+  const start = s.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') inStr = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return s.slice(start, i + 1);
+  }
+  return null;
+}
+
+// Force a tool call's `arguments` to a VALID JSON object string. Strips leaked
+// framing tokens, then parses; on failure applies minimal repairs (escape stray
+// backslashes, then isolate the first balanced {...}); if nothing parses, falls
+// back to "{}" so a malformed call degrades to a no-arg call the model can retry
+// — never poisoned JSON that 400s every subsequent round and kills the session.
+function normalizeToolArgs(raw) {
+  const s0 = raw == null ? '' : String(raw);
+  // Fast path: already-valid JSON with no leaked framing — leave it untouched.
+  if (s0.indexOf('<|') === -1) { try { JSON.parse(s0); return s0; } catch (_) {} }
+  const s = scrubFramingTokens(s0).trim();
+  if (!s) return '{}';
+  const tryParse = (t) => { try { return JSON.stringify(JSON.parse(t)); } catch (_) { return null; } };
+  const escStray = (t) => t.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+  let out = tryParse(s) || tryParse(escStray(s));
+  if (out) return out;
+  const obj = firstBalancedObject(s);
+  if (obj) { out = tryParse(obj) || tryParse(escStray(obj)); if (out) return out; }
+  return '{}';
+}
+
 // ============================================================
 // LLM round: stream once, return assembled content + tool_calls.
 // Emits delta events to ctx for live rendering on the page.
@@ -616,6 +665,18 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       parsed = parseLeakedToolCalls(reasoningText);
       if (parsed.toolCalls.length) keptToolCalls = parsed.toolCalls;
     }
+  }
+
+  // Scrub leaked framing tokens out of every structured tool call and force its
+  // arguments to valid JSON. A leaked <|tool_calls_section_end|> (or a bad escape
+  // such as \p) inside `arguments` would otherwise be persisted to history and
+  // 400 the provider on the next round — killing the session.
+  for (const tc of keptToolCalls) {
+    if (!tc || !tc.function) continue;
+    if (typeof tc.function.name === 'string') {
+      tc.function.name = scrubFramingTokens(tc.function.name).trim().replace(/^functions\./, '');
+    }
+    tc.function.arguments = normalizeToolArgs(tc.function.arguments);
   }
 
   return { content, tool_calls: keptToolCalls, usage };

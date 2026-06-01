@@ -3527,9 +3527,11 @@ async function sendSingle(text, stream) {
 
 
   let agentDoneSeen = false;
+  let errorSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
     if (ev.type === 'agent_done')  agentDoneSeen = true;
+    if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
     if (ev.type === 'tool_result')  lastInFlightTool = null;
     dispatchAgentEvent(ev, renderer, host);
@@ -3561,7 +3563,7 @@ async function sendSingle(text, stream) {
 
 
 
-    if (!agentDoneSeen && !wasAborted) {
+    if (!agentDoneSeen && !wasAborted && !errorSeen) {
       const trigger = lastInFlightTool
         ? ` while running \`${lastInFlightTool}\``
         : '';
