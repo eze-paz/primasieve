@@ -1766,6 +1766,134 @@ function ensureStream(id) {
   return s;
 }
 function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
+/* =============================================================================
+   SandpieTokens — conversation + weekly token accounting
+   Real counts come from the provider's usage object (include_usage); when a
+   provider doesn't return one we fall back to a chars/4 estimate. The context
+   window denominator is looked up from OpenRouter's public /models API.
+   ============================================================================= */
+const SandpieTokens = (() => {
+  const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
+  const MODELS_KEY = 'sandpie-openrouter-models';   // {fetched, map}
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const MODELS_TTL_MS = 24 * 60 * 60 * 1000;
+  const listeners = new Set();
+  let _modelMap = null;        // { normalizedId: context_length }
+  let _modelsFetching = null;  // in-flight promise guard
+
+  function usageTotal(u) {
+    if (!u) return 0;
+    return u.total_tokens || ((u.prompt_tokens || 0) + (u.completion_tokens || 0));
+  }
+
+  // --- weekly rolling log -----------------------------------------------------
+  function loadLog() {
+    try { const v = JSON.parse(localStorage.getItem(WEEK_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch { return []; }
+  }
+  function prune(log) {
+    const cutoff = Date.now() - WEEK_MS;
+    return log.filter(e => e && typeof e.t === 'number' && e.t >= cutoff);
+  }
+  function weeklyTotal() {
+    return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
+  }
+
+  // --- token estimate fallback ------------------------------------------------
+  function textOf(content) {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
+    return '';
+  }
+  function estimateTokens(msgs) {
+    let chars = 0;
+    for (const m of (msgs || [])) {
+      chars += textOf(m.content).length;
+      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
+    }
+    return Math.ceil(chars / 4);
+  }
+
+  // --- public reads -----------------------------------------------------------
+  function conversationTokens() {
+    const s = activeStream();
+    if (s && s.usage) return usageTotal(s.usage);
+    return estimateTokens(s ? s.messages : messages);
+  }
+  function isEstimated() {
+    const s = activeStream();
+    return !(s && s.usage);
+  }
+
+  // --- context window via OpenRouter -----------------------------------------
+  function normModel(id) { return String(id || '').trim().toLowerCase(); }
+  async function ensureModels() {
+    if (_modelMap) return _modelMap;
+    try {
+      const cached = JSON.parse(localStorage.getItem(MODELS_KEY) || 'null');
+      if (cached && cached.map && (Date.now() - cached.fetched) < MODELS_TTL_MS) {
+        _modelMap = cached.map;
+        return _modelMap;
+      }
+    } catch {}
+    if (_modelsFetching) return _modelsFetching;
+    _modelsFetching = (async () => {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/models');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        const map = {};
+        for (const m of (json.data || [])) {
+          const ctx = m.context_length || m.top_provider?.context_length;
+          if (m.id && ctx) map[normModel(m.id)] = ctx;
+        }
+        _modelMap = map;
+        localStorage.setItem(MODELS_KEY, JSON.stringify({ fetched: Date.now(), map }));
+        notify();
+      } catch (e) {
+        console.warn('SandpieTokens: OpenRouter model fetch failed:', e);
+        _modelMap = _modelMap || {};
+      } finally {
+        _modelsFetching = null;
+      }
+      return _modelMap;
+    })();
+    return _modelsFetching;
+  }
+  function contextWindow() {
+    if (!_modelMap) { ensureModels(); return null; }
+    const model = normModel($('model')?.value);
+    if (!model) return null;
+    if (_modelMap[model]) return _modelMap[model];
+    // Fall back to matching on the bare model name (after the provider prefix).
+    const tail = model.split('/').pop();
+    for (const [id, ctx] of Object.entries(_modelMap)) {
+      if (id === model || id.split('/').pop() === tail) return ctx;
+    }
+    return null;
+  }
+
+  // --- mutation ---------------------------------------------------------------
+  function recordUsage(convId, usage) {
+    if (!usage) return;
+    const s = convStreams.get(convId);
+    if (s) s.usage = usage;
+    const log = prune(loadLog());
+    log.push({ t: Date.now(), tokens: usageTotal(usage) });
+    localStorage.setItem(WEEK_LOG_KEY, JSON.stringify(log));
+    notify();
+  }
+
+  // --- subscription -----------------------------------------------------------
+  function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
+  function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
+
+  return {
+    recordUsage, conversationTokens, isEstimated, weeklyTotal,
+    contextWindow, ensureModels, subscribe, notify,
+  };
+})();
+window.SandpieTokens = SandpieTokens;
 function dedentPreBlocks(html) {
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
@@ -4401,6 +4529,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     title: prev.title || derived,
     updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
     messages: msgs,
+    usage: (s && s.usage) || prev.usage || null,
   };
   await opfs.write(convPath(convId), JSON.stringify(data));
   await refreshConversationList();
@@ -4488,6 +4617,7 @@ function mountConv(convId) {
     messages = [];
   }
   refreshSendButtonForActive();
+  if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -4526,6 +4656,7 @@ async function loadConv(id) {
     }
     const s = ensureStream(id);
     s.messages = (data.messages || []).slice();
+    if (data.usage) s.usage = data.usage;
     mountConv(id);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
@@ -5071,6 +5202,7 @@ async function sendSingle(text, stream) {
     if (ev.type === 'agent_done')  agentDoneSeen = true;
     if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
     if (ev.type === 'tool_result')  lastInFlightTool = null;
+    if (ev.type === 'usage')        SandpieTokens.recordUsage(convId, ev.usage);
     dispatchAgentEvent(ev, renderer, host);
   };
   try {
@@ -5201,6 +5333,7 @@ function dispatchAgentEvent(ev, renderer, host) {
     case 'tool_started':  return renderer.markToolStarted(ev.tc);
     case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
     case 'agent_done':    return;
+    case 'usage':         return; // handled in sendSingle's dispatch wrapper
     case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
     case 'info': {
       if (ev.message) {

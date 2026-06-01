@@ -520,6 +520,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   let buffer = '';
   let content = '';
   const toolCalls = [];
+  let usage = null;
   let sawDone = false;
   while (!sawDone) {
     const { done, value } = await reader.read();
@@ -533,6 +534,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       if (data === '[DONE]') { sawDone = true; break; }
       try {
         const parsed = JSON.parse(data);
+        // Usage arrives via stream_options:{include_usage:true}. It typically
+        // rides on a trailing chunk whose `choices` array is empty, so capture
+        // it before the `delta` guard below skips the chunk.
+        if (parsed && parsed.usage) usage = parsed.usage;
         const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
         if (!delta) continue;
         if (delta.content) content += delta.content;
@@ -559,7 +564,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     tc.function.name
   );
   
-  return { content, tool_calls: keptToolCalls };
+  return { content, tool_calls: keptToolCalls, usage };
 }
 
 // ============================================================
@@ -574,10 +579,15 @@ async function runAgent(config, ctx) {
       model: config.model,
       messages: [config.systemPrompt, ...messages].filter(Boolean),
       stream: true,
+      stream_options: { include_usage: true },
       tools: config.tools,
     };
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
+    // Real token counts when the provider honors include_usage. The final
+    // round's prompt_tokens reflects the full context being carried, so the
+    // page treats the last usage seen as the conversation's current size.
+    if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
     if (!round.tool_calls.length) {
       if (round.content) {
         const m = { role: 'assistant', content: round.content };
