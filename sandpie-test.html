@@ -378,7 +378,6 @@ function dedentMarkdownFences(text) {
   });
 }
 let initialSyncDone = !localStorage.getItem('dbx-tokens');
-let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -1281,39 +1280,6 @@ const toolDefs = () => Object.entries(tools)
     type: 'function',
     function: { name, description: t.description, parameters: t.parameters },
   }));
-const MANIFEST_PATTERN = /^sandpie_.*\.md$/i;
-const MANIFEST_CONTENT_CAP = 2048;
-async function gatherSandpieManifests() {
-  const out = [];
-  async function walk(path) {
-    let entries = [];
-    try { entries = await opfs.listDir(path); } catch { return; }
-    for (const e of entries) {
-      const full = path ? `${path}/${e.name}` : e.name;
-      if (e.kind === 'directory') {
-
-
-        if (full === '_conversations' || full.startsWith('_conversations/')) continue;
-        await walk(full);
-      } else if (MANIFEST_PATTERN.test(e.name)) {
-        try {
-          const content = String(await opfs.read(full));
-          out.push({
-            path: full,
-            content: content.length > MANIFEST_CONTENT_CAP
-              ? content.slice(0, MANIFEST_CONTENT_CAP) + `\n…[truncated, full size ${content.length} chars]`
-              : content,
-          });
-        } catch {}
-      }
-    }
-  }
-  await walk('');
-  return out.sort((a, b) => a.path.localeCompare(b.path));
-}
-async function refreshManifests() {
-  cachedManifests = await gatherSandpieManifests();
-}
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -1473,7 +1439,6 @@ async function refreshFileList() {
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
 
 
-  refreshManifests();
   for (const it of items) {
     const li = document.createElement('li');
     const btn = document.createElement('span');
