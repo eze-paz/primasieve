@@ -50,7 +50,7 @@
   }
   aside {
     width: 300px;
-    padding: 1rem;
+    padding: 0rem 1rem;
     background: var(--sp-surface);
     border-right: 1px solid var(--sp-border);
     display: flex;
@@ -60,16 +60,6 @@
     overflow-x: hidden;
     position: relative;
     z-index: 1;
-  }
-  aside::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: -4px;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(to right, var(--sp-accent-dim), transparent);
-    pointer-events: none;
   }
   
   html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
