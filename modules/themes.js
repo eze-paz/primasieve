@@ -83,6 +83,7 @@ function setTheme(name) {
     }
   }
   localStorage.setItem('sandpie-theme', name);
+  computeAccentNeg();
 }
 
 function applyCustomTheme() {
@@ -100,6 +101,7 @@ function applyCustomTheme() {
   document.documentElement.style.setProperty('--sp-text', text);
   document.documentElement.style.setProperty('--sp-text-dim', text);
   localStorage.setItem('sandpie-custom', JSON.stringify({ accent, bg, surface, text }));
+  computeAccentNeg();
 }
 
 function resetCustomTheme() {
@@ -110,6 +112,46 @@ function resetCustomTheme() {
   localStorage.removeItem('sandpie-custom');
   setTheme('midnight');
 }
+function computeAccentNeg() {
+  const root = document.documentElement;
+  const accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
+  if (!accent) return;
+  // Parse hex → RGB
+  const hex = accent.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
+  // RGB → HSL
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  h = (h + 0.5) % 1;
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const rr = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+  const gg = Math.round(hue2rgb(p, q, h) * 255);
+  const bb = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+  const neg = '#' + [rr, gg, bb].map(x => x.toString(16).padStart(2, '0')).join('');
+  root.style.setProperty('--sp-accent-neg', neg);
+}
+
+window.computeAccentNeg = computeAccentNeg;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
