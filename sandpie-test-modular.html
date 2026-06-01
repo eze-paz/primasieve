@@ -1987,6 +1987,15 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 
+// --- Sync state helpers (used by file manager, conversations, etc.) ---
+const SYNC_STATE_KEY = 'sandpie-sync-state';
+const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
+
+function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
+function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
+function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
+function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
+
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
