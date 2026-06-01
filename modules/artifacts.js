@@ -12,6 +12,24 @@
  */
 
 /* -------------------------------------------------------------------------- */
+/*  Artifact iframe resize handler (from embedded artifacts via postMessage)   */
+/* -------------------------------------------------------------------------- */
+
+window.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
+  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+    if (f.contentWindow === e.source) {
+      const maxH = window.innerHeight * 0.5;
+      f.style.height = Math.min(Math.max(60, e.data.h | 0), maxH) + 'px';
+      f.style.overflow = 'auto';
+      const wrap = f.closest('.artifact-wrap');
+      if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
+      return;
+    }
+  }
+});
+
+/* -------------------------------------------------------------------------- */
 /*  Global helpers (expected to exist in host page)                           */
 /* -------------------------------------------------------------------------- */
 

@@ -12,21 +12,6 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <link rel="stylesheet" href="sandpie.css">
 
-<script>
-window.addEventListener('message', e => {
-  if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
-  for (const f of document.querySelectorAll('iframe.artifact-frame')) {
-    if (f.contentWindow === e.source) {
-      const maxH = window.innerHeight * 0.5;
-      f.style.height = Math.min(Math.max(60, e.data.h | 0), maxH) + 'px';
-      f.style.overflow = 'auto';
-      const wrap = f.closest('.artifact-wrap');
-      if (wrap) { wrap.style.border = '1px solid var(--sp-border)'; wrap.style.background = 'transparent'; }
-      return;
-    }
-  }
-});
-</script>
   <script src="modules/images.js"></script>
 <script>SandpieImages.init();</script>
   <script type="module" src="modules/providers.js"></script>
