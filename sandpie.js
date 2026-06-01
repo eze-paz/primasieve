@@ -496,6 +496,38 @@ async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
   }
 }
 
+// Parse a model's NATIVE (non-OpenAI) tool-call special tokens out of raw text.
+// Handles the Kimi K2 / Moonshot syntax that some routes fail to translate into
+// structured `delta.tool_calls`, leaking it through as plain text instead:
+//   <|tool_calls_section_begin|>
+//     <|tool_call_begin|>functions.NAME:IDX<|tool_call_argument_begin|>{json}<|tool_call_end|>
+//   <|tool_calls_section_end|>
+// Returns { toolCalls, stripped } where `stripped` is the text with the whole
+// section removed. Safe no-op (empty toolCalls, text unchanged) when absent.
+function parseLeakedToolCalls(text) {
+  const toolCalls = [];
+  if (typeof text !== 'string' || text.indexOf('<|tool_call') === -1) {
+    return { toolCalls, stripped: text };
+  }
+  const callRe = /<\|tool_call_begin\|>\s*functions\.([A-Za-z0-9_.\-]+):(\d+)\s*<\|tool_call_argument_begin\|>([\s\S]*?)<\|tool_call_end\|>/g;
+  let m;
+  while ((m = callRe.exec(text)) !== null) {
+    const [, name, idx, rawArgs] = m;
+    toolCalls.push({
+      id: 'call_' + idx,
+      type: 'function',
+      function: { name, arguments: (rawArgs || '').trim() },
+    });
+  }
+  // Strip the well-formed section, then any dangling begin marker left by a
+  // truncated stream, so the raw tokens never reach history or the screen.
+  const stripped = text
+    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g, '')
+    .replace(/<\|tool_calls_section_begin\|>[\s\S]*$/g, '')
+    .trim();
+  return { toolCalls, stripped };
+}
+
 // ============================================================
 // LLM round: stream once, return assembled content + tool_calls.
 // Emits delta events to ctx for live rendering on the page.
@@ -519,6 +551,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   const decoder = new TextDecoder();
   let buffer = '';
   let content = '';
+  let reasoningText = '';
   const toolCalls = [];
   let usage = null;
   let sawDone = false;
@@ -541,6 +574,8 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
         if (!delta) continue;
         if (delta.content) content += delta.content;
+        if (typeof delta.reasoning_content === 'string') reasoningText += delta.reasoning_content;
+        else if (typeof delta.reasoning === 'string') reasoningText += delta.reasoning;
         if (delta.tool_calls) {
           for (const tc of delta.tool_calls) {
             const i = tc.index || 0;
@@ -557,13 +592,32 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   try { reader.cancel(); } catch (_) {}
   // Filter out tool calls without an id (incomplete deltas) — same logic as page.
   
-  const keptToolCalls = toolCalls.filter(tc =>
+  let keptToolCalls = toolCalls.filter(tc =>
     tc &&
     tc.id &&
     tc.function &&
     tc.function.name
   );
   
+  // Recovery: some models (notably Kimi K2) emit their NATIVE tool-call special
+  // tokens as plain text when the upstream route fails to parse them into
+  // structured `delta.tool_calls`. The tokens leak into `content` (or the
+  // reasoning/"thought" stream) and, because `tool_calls` stays empty, the
+  // agent loop sees "no tool calls" and stops mid-task. Re-parse them here so
+  // the loop can actually run the tool and continue.
+  if (!keptToolCalls.length) {
+    let parsed = parseLeakedToolCalls(content);
+    if (parsed.toolCalls.length) {
+      keptToolCalls = parsed.toolCalls;
+      content = parsed.stripped;        // don't persist/show the raw tokens
+    } else if (!content.trim()) {
+      // The call may have been emitted into the reasoning channel, which we
+      // don't fold into `content`. Recover it from there as a fallback.
+      parsed = parseLeakedToolCalls(reasoningText);
+      if (parsed.toolCalls.length) keptToolCalls = parsed.toolCalls;
+    }
+  }
+
   return { content, tool_calls: keptToolCalls, usage };
 }
 

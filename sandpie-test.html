@@ -2653,8 +2653,18 @@ class RoundRenderer {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
     }
   }
-  endRound() {
+  endRound(finalContent) {
     this._finishThinking();
+    // The SW may rewrite this round's content — e.g. stripping a model's leaked
+    // native tool-call tokens after recovering them into structured calls. When
+    // the authoritative final content differs from what we live-typed, reconcile
+    // so those raw tokens don't linger on screen. No-op in the normal case.
+    if (typeof finalContent === 'string' && finalContent !== this.content) {
+      this.content = finalContent;
+      this.displayed = finalContent;
+      this.pending = '';
+      this._paintContent();
+    }
     this.toolsShouldClose = true;
     this._scheduleDrain();
 
@@ -3807,7 +3817,7 @@ function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
     case 'delta':         return renderer.applyDelta(ev.delta);
-    case 'round_end':     return renderer.endRound();
+    case 'round_end':     return renderer.endRound(ev.content);
     case 'message_added': return renderer.bindMessage(ev.message);
     case 'tool_started':  return renderer.markToolStarted(ev.tc);
     case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
