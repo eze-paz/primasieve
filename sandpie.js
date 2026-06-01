@@ -582,6 +582,8 @@ async function runAgent(config, ctx) {
       stream_options: { include_usage: true },
       tools: config.tools,
     };
+    if (config.maxTokens != null) reqBody.max_tokens = config.maxTokens;
+    if (config.temperature != null) reqBody.temperature = config.temperature;
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     // Real token counts when the provider honors include_usage. The final

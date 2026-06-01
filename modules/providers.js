@@ -162,6 +162,10 @@ function openProviderModal(providerId = null) {
   document.getElementById('modalModel').value = p ? p.model : '';
   document.getElementById('modalApiKey').value = p ? p.apiKey : '';
   document.getElementById('modalProxyUrl').value = p ? p.proxyUrl : '';
+  const mt = document.getElementById('modalMaxTokens');
+  if (mt) mt.value = (p && p.maxTokens != null) ? p.maxTokens : '';
+  const tp = document.getElementById('modalTemperature');
+  if (tp) tp.value = (p && p.temperature != null) ? p.temperature : '';
   document.getElementById('providerModal').style.display = '';
 }
 
@@ -182,6 +186,21 @@ function saveProviderModal() {
     return;
   }
 
+  // Optional per-provider tuning. The inputs only exist on pages that expose
+  // them; where absent, leave any stored values untouched (don't clobber).
+  const mtEl = document.getElementById('modalMaxTokens');
+  const tpEl = document.getElementById('modalTemperature');
+  function applyTuning(p) {
+    if (mtEl) {
+      const v = parseInt(mtEl.value, 10);
+      if (Number.isFinite(v) && v > 0) p.maxTokens = v; else delete p.maxTokens;
+    }
+    if (tpEl) {
+      const t = parseFloat(tpEl.value);
+      if (Number.isFinite(t) && t >= 0) p.temperature = t; else delete p.temperature;
+    }
+  }
+
   if (_editingProviderId) {
     const p = _providers.find(x => x.id === _editingProviderId);
     if (p) {
@@ -190,6 +209,7 @@ function saveProviderModal() {
       p.model = model;
       p.apiKey = apiKey;
       p.proxyUrl = proxyUrl;
+      applyTuning(p);
     }
   } else {
     const newP = {
@@ -197,6 +217,7 @@ function saveProviderModal() {
       name: name || model,
       endpoint, model, apiKey, proxyUrl
     };
+    applyTuning(newP);
     _providers.push(newP);
     _activeProviderId = newP.id;
   }
@@ -239,6 +260,8 @@ function duplicateProviderFromMenu() {
     name: (p.name || p.model) + ' (copy)',
     endpoint: p.endpoint, model: p.model, apiKey: p.apiKey, proxyUrl: p.proxyUrl
   };
+  if (p.maxTokens != null) copy.maxTokens = p.maxTokens;
+  if (p.temperature != null) copy.temperature = p.temperature;
   _providers.push(copy);
   saveProviders();
   renderChips();
