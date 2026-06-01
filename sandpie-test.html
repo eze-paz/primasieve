@@ -276,7 +276,7 @@ if ('serviceWorker' in navigator) {
         for (const path of d.paths) {
           if (!state[path]) {
             console.log('[sandpie] adding to syncState:', path);
-            state[path] = { rev: '', size: 0, hydrated: true, syncedMtime: 0 };
+            state[path] = { rev: '', size: 0, syncedMtime: 0 };
             changed = true;
           } else {
             console.log('[sandpie] marking dirty:', path);
@@ -919,7 +919,7 @@ function setDbxCursor(cursor) {
     s[path] = {
       rev: info.rev,
       size: info.size,
-      hydrated: oldManifest[path] !== undefined,
+      
       syncedMtime: oldManifest[path] || 0,
     };
   }
@@ -988,9 +988,6 @@ function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
 }
-function isEagerHydrate(path, size) {
-  return size < 1024 * 1024; // Auto-download files under 1MB
-}
 async function opfsLastModified(path) {
   try {
     const { parts, name } = splitPath(path);
@@ -1021,11 +1018,9 @@ async function sync() {
     for (const path of Object.keys(state)) {
       if (cloud[path]) continue;
       const s = state[path];
-      if (s.hydrated) {
-        const lm = await opfsLastModified(path);
-        if (lm > 0 && lm > s.syncedMtime) continue;
-        try { await opfs.remove(path); } catch {}
-      }
+      const lm = await opfsLastModified(path);
+      if (lm > 0 && lm > s.syncedMtime) continue;
+      try { await opfs.remove(path); } catch {}
       delete state[path];
 
 
@@ -1035,27 +1030,22 @@ async function sync() {
     for (const [path, e] of Object.entries(cloud)) {
       if (e.kind !== 'file') continue;
       const s = state[path];
-      const eager = isEagerHydrate(path, e.size);
       const localExists = await opfs.exists(path);
       if (!s) {
         if (localExists) {
           state[path] = {
-            rev: e.rev, size: e.size, hydrated: true,
+            rev: e.rev, size: e.size,
             syncedMtime: await opfsLastModified(path),
           };
           baselined++;
-        } else if (eager) {
+        } else {
           dbxProgress(`downloading… ${path}`);
           const content = await dbxDownload(e.path);
           await opfs.write(path, content);
           state[path] = {
-            rev: e.rev, size: e.size, hydrated: true,
+            rev: e.rev, size: e.size,
             syncedMtime: await opfsLastModified(path),
           };
-
-
-        } else {
-          state[path] = { rev: e.rev, size: e.size, hydrated: false, syncedMtime: 0 };
         }
         continue;
       }
@@ -1068,16 +1058,18 @@ async function sync() {
         const content = await dbxDownload(e.path);
         await opfs.write(path, content);
         state[path] = {
-          rev: e.rev, size: e.size, hydrated: true,
+          rev: e.rev, size: e.size,
           syncedMtime: await opfsLastModified(path),
         };
         continue;
       }
 
 
-      if (s.hydrated && !localExists) {
-        state[path].hydrated = false;
-        state[path].syncedMtime = 0;
+      if (!localExists) {
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path].syncedMtime = await opfsLastModified(path);
       }
       state[path].size = e.size;
     }
@@ -1090,7 +1082,7 @@ async function sync() {
       if (rel === _openFilePath) continue;
       const lm = await opfsLastModified(rel);
       const s = state[rel];
-      if (s && s.hydrated && lm <= s.syncedMtime) {
+      if (s && lm <= s.syncedMtime) {
         console.log('[sandpie] sync skip (clean):', rel);
         continue;
       }
@@ -1112,7 +1104,6 @@ async function sync() {
             state[r.rel] = {
               rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
               size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
-              hydrated: true,
               syncedMtime: r.lm,
             };
 
@@ -1398,16 +1389,8 @@ async function refreshFileList() {
       status = 'local';
     } else {
       const s = state[fullKey];
-      if (!s || !s.hydrated) {
-
-
-
-
-        status = 'synced';
-      } else {
-        const lastMod = await opfsLastModified(fullKey);
-        status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
-      }
+      const lastMod = await opfsLastModified(fullKey);
+      status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
     }
     items.push({ name, kind, status, fullKey });
   }
@@ -1448,98 +1431,8 @@ async function refreshFileList() {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
-      if (it.kind === 'folder') {
-        menuItems.push({ label: 'Make cloud only', action: async () => {
-          const state = syncState();
-          const prefix = it.fullKey + '/';
-          const toDehydrate = Object.keys(state).filter(k => k.toLowerCase().startsWith(prefix.toLowerCase()) && state[k].hydrated);
-          if (!toDehydrate.length) { addMsg('info', 'No local files in this folder.'); return; }
-          if (!confirm(`Archive ${toDehydrate.length} file(s) in "${it.fullKey}" to cloud-only?`)) return;
-          let done = 0;
-          for (const f of toDehydrate) {
-            try {
-              await opfs.remove(f);
-              state[f] = { ...state[f], hydrated: false, syncedMtime: 0 };
-              done++;
-            } catch (e) {
-              console.warn('dehydrate failed:', f, e);
-            }
-          }
-          setSyncState(state);
-          await refreshFileList();
-        }});
-      }
-      if (it.kind === 'file') {
-        menuItems.push({ label: 'Make cloud only', action: async () => {
-          const state = syncState();
-          const s = state[it.fullKey];
-          if (!s || !s.hydrated) { addMsg('info', 'Already cloud-only.'); return; }
-          try {
-            await opfs.remove(it.fullKey);
-            state[it.fullKey] = { ...s, hydrated: false, syncedMtime: 0 };
-            setSyncState(state);
-            await refreshFileList();
-          } catch (e) {
-            addMsg('err', 'Failed to archive: ' + e.message);
-          }
-        }});
-        menuItems.push({ label: 'Download', action: async () => {
-          try {
-            let bytes;
-            if (it.status === 'cloud') {
-              if (!dbxTokens()) { addMsg('err', 'Dropbox not connected — cannot download placeholder.'); return; }
-              bytes = await dbxDownload('/' + it.fullKey);
-            } else {
-              bytes = await opfs.readBytes(it.fullKey);
-            }
-            const blob = new Blob([bytes]);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = 'opfs/' + it.fullKey;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 100);
-          } catch (e) {
-            addMsg('err', 'Download failed: ' + e.message);
-          }
-        }});
-      }
-      menuItems.push(
-        { label: 'Delete', danger: true, action: async () => {
-          const what = it.kind === 'folder' ? 'folder (recursive)' : 'file';
-          const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
-          if (!confirm(`Delete ${what} "${it.fullKey}"?${dbxNote}`)) return;
-
-
-          try { await opfs.remove(it.fullKey); } catch {}
-
-
-
-
-
-
-
-
-          if (dbxTokens()) {
-            try { await dbxDelete('/' + it.fullKey); } catch {}
-          }
-
-
-
-
-          const lkPrefix = it.fullKey.toLowerCase();
-          const isHit = (k) => {
-            const kl = k.toLowerCase();
-            return kl === lkPrefix || kl.startsWith(lkPrefix + '/');
-          };
-          const s = syncState(); let sChanged = false;
-          for (const k of Object.keys(s)) if (isHit(k)) { delete s[k]; sChanged = true; }
-          if (sChanged) setSyncState(s);
-          await refreshFileList();
-        }}
-      );
+            // folder context menu items
+            // file context menu items
       showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
