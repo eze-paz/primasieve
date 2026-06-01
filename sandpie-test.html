@@ -114,6 +114,8 @@ window.addEventListener('message', e => {
       <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
       <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
       <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
+      <input id="modalMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional, e.g. 8192)">
+      <input id="modalTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
       <div class="modal-actions">
         <button onclick="SandpieProviders.saveModal()">Save</button>
         <button class="ghost" onclick="SandpieProviders.closeModal()">Cancel</button>
@@ -428,6 +430,7 @@ let cachedManifests = [];
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 function api(url) {
   const stripped = url.replace(/^https?:\/\//, '');
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
@@ -3836,6 +3839,7 @@ async function buildAgentConfig(convMessages) {
       resolvedMessages.push(msg);
     }
   }
+  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
@@ -3843,6 +3847,8 @@ async function buildAgentConfig(convMessages) {
     systemPrompt: await buildSystemPrompt(),
     messages: resolvedMessages,
     tools: toolDefs(),
+    maxTokens: (active && active.maxTokens) || 8192,
+    temperature: (active && active.temperature != null) ? active.temperature : null,
     origin: location.origin,
   };
 }
