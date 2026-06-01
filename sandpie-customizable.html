@@ -1,0 +1,3838 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="default">
+<head>
+<meta name="theme-color" content="#58a6ff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sandpie</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+(function() {
+  var saved = localStorage.getItem('sandpie-theme') || 'default';
+  document.documentElement.dataset.theme = saved;
+})();
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<link rel="stylesheet" href="sandpie-customizable.css">
+
+  <script src="modules/images.js"></script>
+<script>SandpieImages.init();</script>
+  <script type="module" src="modules/providers.js"></script>
+  <script src="modules/notifications.js"></script>
+</head>
+<body>
+<header class="mobile-header">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
+  <span class="brand">[sandpie]</span>
+</header>
+<div class="backdrop" onclick="toggleSidebar()"></div>
+<aside>
+  <div class="sidebar-header">
+    <span class="sidebar-brand">[sandpie]</span>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
+  </div>
+  <details class="service" id="convSection" open>
+    <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
+    <div class="service-body">
+      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+      <ul class="fs-list conv-list" id="convList"></ul>
+      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-top:0.5rem;">+ New chat</button>
+    </div>
+  </details>
+
+
+  <input id="endpoint" type="hidden">
+  <input id="model" type="hidden">
+  <input id="apiKey" type="hidden">
+  <input id="proxyUrl" type="hidden">
+<div id="providerModal" class="modal" style="display:none;">
+    <div class="modal-backdrop" onclick="SandpieProviders.closeModal()"></div>
+    <div class="modal-content">
+      <h3>Edit provider</h3>
+      <input id="modalName" autocomplete="off" placeholder="Name (e.g. Main, Backup, Local proxy)">
+      <input id="modalEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+      <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
+      <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
+      <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
+      <input id="modalMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional, e.g. 8192)">
+      <input id="modalTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
+      <div class="modal-actions">
+        <button onclick="SandpieProviders.saveModal()">Save</button>
+        <button class="ghost" onclick="SandpieProviders.closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="chipContextMenu" class="context-menu" style="display:none;">
+    <div class="context-item" onclick="SandpieProviders.editFromMenu()">Edit</div>
+    <div class="context-item" onclick="SandpieProviders.duplicateFromMenu()">Duplicate</div>
+    <div class="context-item context-delete" onclick="SandpieProviders.deleteFromMenu()">Delete</div>
+  </div>
+
+
+  <div id="bubbleContextMenu" class="context-menu" style="display:none;">
+    <div class="context-item" onclick="copyFromMenu()">Copy</div>
+    <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
+    <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
+  </div>
+  <details class="service" id="cloudSection">
+    <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
+    <div class="service-body">
+      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
+      <div class="row">
+        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
+      </div>
+      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    </div>
+  </details>
+    <details class="service" id="filesSection" open>
+    <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
+    <div class="service-body">
+      <div class="navbar">
+        <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
+        <input id="opfsPath" value="/">
+      </div>
+      <ul class="fs-list" id="fileList"></ul>
+    </div>
+  </details>
+  <details class="service" id="themeSection">
+    <summary>Appearance</summary>
+    <div class="service-body">
+      <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+        <button class="ghost theme-btn" data-t="default" onclick="setTheme('default')" title="Classic sandpie">Classic</button>
+        <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
+        <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
+        <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
+      </div>
+      <p class="hint" id="themeHint">Pick a look. Saved locally.</p>
+    </div>
+  </details>
+
+<div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
+    <div>sandpie <span id="versionDisplay">loading...</span></div>
+  </div>
+</aside>
+<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
+<main>
+
+
+  <div id="messagesWrap">
+    <div id="messages">
+      <div id="welcome" class="welcome">
+        <div class="welcome-title"><span class="sidebar-brand">[sandpie]</span></div>
+        <span class="welcome-by">by GasN2</span>
+        <div class="welcome-rotating" aria-label="security taglines">
+          <span>nothing escapes the tab</span>
+          <span>zero install</span>
+          <span>designed for security</span>
+          <span>contained AI</span>
+        </div>
+      </div>
+    </div>
+    <div id="sideResizer"></div>
+    <div id="messagesSide">
+      <div id="artifactPanelHeader">
+        <span id="artifactPanelTitle"></span>
+        <span style="display:flex;gap:4px;align-items:center;">
+          <a id="artifactOpenLink" class="artifact-icon-btn" target="_blank" title="Open in new tab">↗</a>
+          <button id="artifactPanelClose" class="artifact-icon-btn" title="Close panel" onclick="closeArtifactPanel()">✕</button>
+        </span>
+      </div>
+      <iframe id="artifactPanelFrame" src="about:blank"></iframe>
+    </div>
+  </div>
+  <form onsubmit="event.preventDefault(); handleSubmit();">
+    <input type="file" id="imageInput" accept="image/*" style="display:none" >
+    <div id="imagePreview" class="image-preview" style="display:none"></div>
+    <div class="input-wrap">
+      <textarea id="input" placeholder="Type a message…" rows="1" autocomplete="off"></textarea>
+      <div class="input-bar">
+        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">+</button>
+        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
+      </div>
+    </div>
+  </form>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---- Theme Switcher ---- */
+function setTheme(name) {
+  document.documentElement.dataset.theme = name;
+  localStorage.setItem('sandpie-theme', name);
+  if (typeof updateThemeButtons === 'function') updateThemeButtons();
+}
+function updateThemeButtons() {
+  var current = document.documentElement.dataset.theme || 'default';
+  document.querySelectorAll('.theme-btn').forEach(function(btn) {
+    var active = btn.dataset.t === current;
+    btn.style.borderColor = active ? 'var(--sp-accent)' : '';
+    btn.style.color = active ? 'var(--sp-accent)' : '';
+    btn.style.background = active ? 'var(--sp-panel)' : '';
+  });
+  var hint = $('themeHint');
+  if (hint) {
+    var labels = { default: 'Classic sandpie', cyberpunk: 'Neon cyberpunk', aurora: 'Aurora glass', electric: 'Electric bold' };
+    hint.textContent = 'Current: ' + labels[current];
+  }
+}
+document.addEventListener('DOMContentLoaded', updateThemeButtons);
+
+;
+/* =============================================================================
+   SandpieMenu — Sidebar Section Registry
+   ============================================================================= */
+const SandpieMenu = (() => {
+  const sections = new Map();
+  let sidebarEl = null;
+  function ensureSidebar() {
+    if (!sidebarEl) sidebarEl = document.querySelector('aside');
+    return sidebarEl;
+  }
+  function createSectionEl(id, config) {
+    const details = document.createElement('details');
+    details.className = 'service';
+    details.id = id;
+    if (config.open) details.open = true;
+    const summary = document.createElement('summary');
+    let summaryHtml = config.title;
+    if (config.dot) {
+      summaryHtml += ` <span class="status-dot" id="${config.dot}"></span>`;
+    }
+    if (config.badge) {
+      summaryHtml += ` <span style="margin-left:auto; font-size:0.7rem; color:var(--sp-text-dim);">${config.badge}</span>`;
+    }
+    summary.innerHTML = summaryHtml;
+    details.appendChild(summary);
+    const body = document.createElement('div');
+    body.className = 'service-body';
+    if (typeof config.html === 'string') {
+      body.innerHTML = config.html;
+    } else if (config.html instanceof HTMLElement) {
+      body.appendChild(config.html);
+    }
+    details.appendChild(body);
+    return details;
+  }
+  function insertBeforeFooter(el) {
+    const sidebar = ensureSidebar();
+    if (!sidebar) return;
+    // Find the footer: the div containing #versionDisplay, then its parent
+    const versionEl = sidebar.querySelector('#versionDisplay');
+    let footer = versionEl?.closest('div');
+    // The footer might be wrapped, so check if it's a direct child of aside
+    if (footer && footer.parentElement !== sidebar) {
+      footer = footer.closest('div[style*="margin-top:auto"]') || footer.parentElement;
+    }
+    // Ensure footer is actually inside sidebar
+    if (footer && sidebar.contains(footer)) {
+      sidebar.insertBefore(el, footer);
+    } else {
+      sidebar.appendChild(el);
+    }
+  }
+  return {
+    add(id, config = {}) {
+      if (sections.has(id)) {
+        console.warn(`SandpieMenu: section "${id}" already exists`);
+        return false;
+      }
+      const el = createSectionEl(id, config);
+      insertBeforeFooter(el);
+      sections.set(id, { el, config });
+      if (config.onRender) config.onRender(el.querySelector('.service-body'));
+      return true;
+    },
+    remove(id) {
+      const section = sections.get(id);
+      if (!section) return false;
+      section.el.remove();
+      sections.delete(id);
+      return true;
+    },
+    get(id) {
+      return sections.get(id)?.el || null;
+    },
+    updateBadge(id, text) {
+      const section = sections.get(id);
+      if (!section) return false;
+      const badge = section.el.querySelector('summary span');
+      if (badge) badge.textContent = text;
+      return true;
+    },
+    list() {
+      return Array.from(sections.keys());
+    }
+  };
+})();
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d) return;
+    if (d.type === 'sandpie-sw-log') {
+
+
+      const fn = console[d.level] || console.log;
+      fn.call(console, '[sw]', d.text);
+      return;
+    }
+    if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
+
+
+
+
+
+
+
+
+
+
+      (async () => {
+        if (!dbxTokens()) return;
+        const state = syncState();
+        let changed = false;
+        for (const path of d.paths) {
+          try { await dbxDelete('/' + path); } catch {}
+          const lk = path.toLowerCase();
+          for (const k of Object.keys(state)) {
+            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
+              delete state[k];
+              changed = true;
+            }
+          }
+        }
+        if (changed) setSyncState(state);
+        try { await refreshFileList(); } catch {}
+      })();
+      return;
+      }
+      if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
+        console.log('[sandpie] ← SW notified:', d.paths);
+        const state = syncState();
+        let changed = false;
+        for (const path of d.paths) {
+          if (!state[path]) {
+            console.log('[sandpie] adding to syncState:', path);
+            state[path] = { rev: '', size: 0, syncedMtime: 0 };
+            changed = true;
+          } else {
+            console.log('[sandpie] marking dirty:', path);
+            state[path].syncedMtime = 0;
+            changed = true;
+          }
+        }
+        if (changed) setSyncState(state);
+        return;
+      }
+    });
+
+
+
+
+
+
+  const flush = () => {
+    const c = navigator.serviceWorker.controller;
+    if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
+  };
+  flush();
+  navigator.serviceWorker.addEventListener('controllerchange', flush);
+}
+let messages = [];
+const convStreams = new Map();
+const convLastViewed = new Map();
+function ensureStream(id) {
+  let s = convStreams.get(id);
+  if (!s) {
+    const host = document.createElement('div');
+    host.className = 'conv-host';
+    host.dataset.convId = id;
+    s = {
+      id, host,
+      messages: [],
+      queue: [], isProcessing: false, queueAborted: false,
+      abort: null,
+      timerEl: null, timerStart: 0, timerInterval: null,
+      generating: false,
+    };
+    convStreams.set(id, s);
+  }
+  return s;
+}
+function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
+function dedentPreBlocks(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  for (const pre of wrap.querySelectorAll('pre')) {
+    const root = pre.querySelector('code') || pre;
+    const original = root.textContent;
+    if (!original) continue;
+    const lines = original.split('\n');
+    let minIndent = Infinity;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^[ \t]*/);
+      if (m && m[0].length < minIndent) minIndent = m[0].length;
+    }
+    if (!isFinite(minIndent) || minIndent === 0) continue;
+    root.textContent = lines.map(
+      l => l.length >= minIndent ? l.slice(minIndent) : l,
+    ).join('\n');
+  }
+  return wrap.innerHTML;
+}
+const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
+function dedentMarkdownFences(text) {
+  if (!text) return text;
+  return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
+    const lines = body.split('\n');
+    let minIndent = Infinity;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^[ \t]*/);
+      if (m && m[0].length < minIndent) minIndent = m[0].length;
+    }
+    if (!isFinite(minIndent) || minIndent === 0) return lead + open + body + close;
+    const dedented = lines.map(
+      l => l.length >= minIndent ? l.slice(minIndent) : l,
+    ).join('\n');
+    return lead + open + dedented + close;
+  });
+}
+let initialSyncDone = !localStorage.getItem('dbx-tokens');
+let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
+applyToolsMinimized();
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+function api(url) {
+  const stripped = url.replace(/^https?:\/\//, '');
+  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  if (remote) return remote + '/proxy/' + stripped;
+  if (isLocalhost) return '/proxy/' + stripped;
+  return url;
+}
+function dbxRoute(url) {
+  const stripped = url.replace(/^https?:\/\//, '');
+  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  return (remote || '') + '/proxy/' + stripped;
+}
+
+function setDot(id, state) {
+  const dot = $(id);
+  if (!dot) return;
+  dot.classList.remove('ok', 'warn', 'err');
+  if (state) dot.classList.add(state);
+}
+
+// Only dbxAppKey triggers saveConfig (provider inputs managed by module)
+$('dbxAppKey').addEventListener('input', saveConfig);
+const _scrollLocked = new Set();
+function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
+function lockScroll(el) { if (el) _scrollLocked.add(el); }
+function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
+function shouldAutoScroll(el) { return _scrollLocked.has(el); }
+(function setupInput() {
+  const ta = $('input');
+  if (!ta) return;
+  function autosize() {
+    const m = $('messages');
+    ta.style.height = 'auto';
+    const maxH = 12 * parseFloat(getComputedStyle(ta).lineHeight || '1.4');
+    const newH = Math.min(ta.scrollHeight, maxH);
+    ta.style.height = newH + 'px';
+    ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
+    if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
+  }
+  ta.addEventListener('input', autosize);
+
+
+  const searchInput = $('convSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => refreshConversationList());
+  }
+  function setupScrollTracking(el) {
+    if (!el) return;
+    lockScroll(el);
+    el.addEventListener('scroll', () => { if (isAtBottom(el)) lockScroll(el); }, { passive: true });
+    el.addEventListener('wheel', e => { if (e.deltaY < 0) unlockScroll(el); }, { passive: true });
+    let _ty = 0;
+    el.addEventListener('touchstart', e => { _ty = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener('touchmove', e => { if (e.touches[0].clientY > _ty) unlockScroll(el); }, { passive: true });
+  }
+  setupScrollTracking($('messages'));
+  setupScrollTracking($('messagesSide'));
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  });
+
+
+  const observer = new MutationObserver(autosize);
+  observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
+
+
+  ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
+  autosize();
+})();
+function toggleSidebar() {
+  const open = document.body.classList.toggle('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = open ? '✕' : '☰';
+}
+function toggleSidebarCollapse() {
+  const aside = document.querySelector('aside');
+  const isCollapsed = aside.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+  localStorage.setItem('sandpie-sidebar-collapsed', isCollapsed ? '1' : '');
+}
+document.addEventListener('submit', () => {
+  document.body.classList.remove('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = '☰';
+});
+function splitPath(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  const name = parts.pop();
+  return { parts, name };
+}
+const opfs = {
+  async root() { return await navigator.storage.getDirectory(); },
+
+
+  async resolveDir(parts, { create = false } = {}) {
+    let dir = await this.root();
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
+    return dir;
+  },
+  async read(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return await (await handle.getFile()).text();
+  },
+
+
+  async readBytes(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    return new Uint8Array(await file.arrayBuffer());
+  },
+  async write(path, content) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts, { create: true });
+    const handle = await dir.getFileHandle(name, { create: true });
+    const w = await handle.createWritable();
+    await w.write(content);
+    await w.close();
+  },
+  async remove(path) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    await dir.removeEntry(name, { recursive: true });
+
+
+
+
+
+
+
+
+    try {
+      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+      if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
+    } catch (_) {}
+  },
+
+
+
+
+
+
+  async exists(path) {
+    try {
+      const { parts, name } = splitPath(path);
+      const dir = await this.resolveDir(parts);
+      await dir.getFileHandle(name);
+      return true;
+    } catch { return false; }
+  },
+  async mkdir(path) {
+    const parts = String(path).split('/').filter(Boolean);
+    await this.resolveDir(parts, { create: true });
+  },
+
+
+  async listDir(path = '') {
+    const parts = String(path).split('/').filter(Boolean);
+    const dir = await this.resolveDir(parts);
+    const out = [];
+    for await (const [n, h] of dir.entries()) out.push({ name: n, kind: h.kind });
+    return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
+  },
+
+
+  async list(prefix = '') {
+    const out = [];
+    const walk = async (dir, p) => {
+      for await (const [n, h] of dir.entries()) {
+        const full = p ? `${p}/${n}` : n;
+        if (h.kind === 'file') out.push(full);
+        else await walk(h, full);
+      }
+    };
+    const startParts = String(prefix).split('/').filter(Boolean);
+    const start = await this.resolveDir(startParts);
+    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
+    return out.sort();
+  },
+
+
+  async listAll(prefix = '') {
+    const out = [];
+    const walk = async (dir, p) => {
+      for await (const [n, h] of dir.entries()) {
+        const full = p ? `${p}/${n}` : n;
+        out.push({ path: full, kind: h.kind });
+        if (h.kind === 'directory') await walk(h, full);
+      }
+    };
+    const startParts = String(prefix).split('/').filter(Boolean);
+    const start = await this.resolveDir(startParts);
+    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
+    return out;
+  },
+};
+async function pruneOrphanDirs(cloud) {
+
+
+
+
+
+
+
+
+  const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
+  const cloudPaths = new Set();
+  for (const k of source) {
+    const lower = k.toLowerCase();
+    cloudPaths.add(lower);
+    const segs = lower.split('/');
+    for (let i = 1; i < segs.length; i++) cloudPaths.add(segs.slice(0, i).join('/'));
+  }
+  let pruned = 0;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let all;
+    try { all = await opfs.listAll(''); } catch { return pruned; }
+
+
+    all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
+    for (const e of all) {
+      if (e.kind !== 'directory') continue;
+      if (cloudPaths.has(e.path.toLowerCase())) continue;
+      let children;
+      try { children = await opfs.listDir(e.path); } catch { continue; }
+      if (children.length) continue;
+      try { await opfs.remove(e.path); pruned++; changed = true; } catch {}
+    }
+  }
+  return pruned;
+}
+const DBX_REDIRECT = location.origin + location.pathname;
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function pkceChallenge() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return { verifier, challenge: b64url(hash) };
+}
+function dbxStatus(text, kind) {
+  const el = $('dbxStatus');
+  el.textContent = text;
+  el.className = 'dbx-status ' + kind;
+  el.style.display = text ? '' : 'none';
+  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
+  const btn = $('dbxToggleBtn');
+  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
+}
+function dbxProgress(text) {
+  const el = $('dbxProgress');
+  const title = $('dbxTitle');
+  if (el) el.textContent = text || '';
+  if (title) title.style.display = text ? 'none' : '';
+}
+let dbxBusyCount = 0;
+function setDbxBusy(busy) {
+  dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
+  const dot = $('dbxDot');
+  if (!dot) return;
+  if (dbxBusyCount > 0) dot.classList.add('busy');
+  else dot.classList.remove('busy');
+}
+function dbxToggleConnection() {
+  if (dbxTokens()) dbxDisconnect();
+  else dbxConnect();
+}
+function dbxTokens() {
+  return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+}
+async function dbxAccessToken() {
+  const stored = dbxTokens();
+  if (!stored) throw new Error('Dropbox not connected');
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: stored.refresh_token,
+    client_id: stored.app_key,
+  });
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
+  const data = await res.json();
+  stored.access_token = data.access_token;
+  stored.expires_at = Date.now() + data.expires_in * 1000;
+  localStorage.setItem('dbx-tokens', JSON.stringify(stored));
+  return data.access_token;
+}
+async function dbxConnect() {
+  const appKey = $('dbxAppKey').value.trim();
+  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
+  saveConfig();
+  const { verifier, challenge } = await pkceChallenge();
+  localStorage.setItem('dbx-pkce', JSON.stringify({
+    verifier,
+    app_key: appKey,
+    ts: Date.now(),
+  }));
+  const params = new URLSearchParams({
+    client_id: appKey,
+    response_type: 'code',
+    redirect_uri: DBX_REDIRECT,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    token_access_type: 'offline',
+  });
+  location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
+}
+function dbxDisconnect() {
+  localStorage.removeItem('dbx-tokens');
+  localStorage.removeItem(SYNC_STATE_KEY);
+  localStorage.removeItem('dbx-index');
+  localStorage.removeItem('opfs-sync-manifest');
+  localStorage.removeItem(CLOUD_INDEX_KEY);
+  localStorage.removeItem(DBX_CURSOR_KEY);
+  dbxStatus('Not connected', 'disconnected');
+  refreshFileList();
+}
+async function dbxExchangeCode(code) {
+  const stashed = JSON.parse(localStorage.getItem('dbx-pkce') || 'null');
+  if (!stashed) throw new Error('Missing PKCE state');
+  if (Date.now() - stashed.ts > 10 * 60 * 1000) {
+    localStorage.removeItem('dbx-pkce');
+    throw new Error('PKCE state expired — please reconnect');
+  }
+  const { verifier, app_key: appKey } = stashed;
+  const body = new URLSearchParams({
+    code,
+    grant_type: 'authorization_code',
+    client_id: appKey,
+    code_verifier: verifier,
+    redirect_uri: DBX_REDIRECT,
+  });
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Code exchange failed: ' + await res.text());
+  const data = await res.json();
+  localStorage.setItem('dbx-tokens', JSON.stringify({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Date.now() + data.expires_in * 1000,
+    app_key: appKey,
+  }));
+  localStorage.removeItem('dbx-pkce');
+}
+async function dbxApi(path, body) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxListFull(folderPath, { recursive = false } = {}) {
+  let data = await dbxApi('/2/files/list_folder', {
+    path: folderPath === '/' ? '' : folderPath,
+    recursive,
+    include_deleted: true,
+  });
+  let entries = data.entries.slice();
+  let pageCount = 1;
+  while (data.has_more) {
+    dbxProgress(`listing… page ${pageCount}`);
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+    pageCount++;
+  }
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
+}
+async function dbxListContinue(cursor) {
+  let data = await dbxApi('/2/files/list_folder/continue', { cursor });
+  let entries = data.entries.slice();
+  let pageCount = 1;
+  while (data.has_more) {
+    dbxProgress(`checking changes… page ${pageCount}`);
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+    pageCount++;
+  }
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
+}
+async function dbxDownload(path, signal) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Content-Type': 'text/plain',
+    },
+    signal,
+  });
+  if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
+
+
+
+
+  return new Uint8Array(await res.arrayBuffer());
+}
+async function dbxUpload(path, content) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+
+
+  return await res.json();
+}
+async function dbxUploadSessionStart(content, close = true) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ close }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxUploadSessionFinishBatch(entries) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ entries }),
+  });
+  if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxUploadBatch(files) {
+
+
+  const CONCURRENCY = 5;
+  const sessions = [];
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const chunk = files.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(chunk.map(async ({ rel, content, s, lm }) => {
+      try {
+        const session = await dbxUploadSessionStart(content, true);
+        return {
+          cursor: { session_id: session.session_id, offset: content.byteLength },
+          commit: { path: '/' + rel, mode: 'overwrite', mute: true, autorename: false },
+          rel, s, lm, content
+        };
+      } catch (err) {
+        console.warn('session start failed:', rel, err);
+        return null;
+      }
+    }));
+    sessions.push(...results.filter(Boolean));
+  }
+  if (sessions.length === 0) return [];
+  const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
+  const result = await dbxUploadSessionFinishBatch(entries);
+
+
+  if (result['.tag'] === 'async_job_id') {
+    console.warn('Unexpected async_job_id from finish_batch_v2:', result.async_job_id);
+    return [];
+  }
+  if (!result.entries) {
+    console.warn('Unexpected finish_batch response:', result);
+    return [];
+  }
+  return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
+}
+async function dbxDelete(path) {
+
+
+
+
+  try {
+    return await dbxApi('/2/files/delete_v2', { path });
+  } catch (e) {
+    if (String(e.message).includes('not_found')) return null;
+    throw e;
+  }
+}
+const SYNC_STATE_KEY = 'sandpie-sync-state';
+const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
+const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
+function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
+function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
+function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
+function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
+function dbxCursor() { return localStorage.getItem(DBX_CURSOR_KEY) || null; }
+function setDbxCursor(cursor) {
+  if (cursor) localStorage.setItem(DBX_CURSOR_KEY, cursor);
+  else localStorage.removeItem(DBX_CURSOR_KEY);
+}
+(function migrateLegacyState() {
+  if (localStorage.getItem(SYNC_STATE_KEY)) return;
+  const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
+  const oldIndex = JSON.parse(localStorage.getItem('dbx-index') || '{}');
+  const s = {};
+  for (const [path, info] of Object.entries(oldIndex)) {
+    if (info.kind !== 'file') continue;
+    s[path] = {
+      rev: info.rev,
+      size: info.size,
+      
+      syncedMtime: oldManifest[path] || 0,
+    };
+  }
+  setSyncState(s);
+})();
+(function validateCloudState() {
+  const idx = cloudIndex();
+  const cursor = dbxCursor();
+  if (Object.keys(idx).length > 0 && !cursor) {
+    setCloudIndex({});
+  }
+})();
+async function cloudListAll() {
+  const storedCursor = dbxCursor();
+  const existingIndex = cloudIndex();
+  if (storedCursor && Object.keys(existingIndex).length > 0) {
+    try {
+      const result = await dbxListContinue(storedCursor);
+      for (const e of result.entries) {
+        let rel = e.path.replace(/^\/+/, '');
+        if (!rel) continue;
+        const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
+        for (const p of prefixes) {
+          if (rel.toLowerCase().startsWith(p.toLowerCase())) {
+            rel = rel.slice(p.length);
+            break;
+          }
+        }
+        if (e.kind === 'deleted') {
+          delete existingIndex[rel];
+        } else {
+          existingIndex[rel] = e;
+        }
+      }
+      setDbxCursor(result.cursor);
+      setCloudIndex(existingIndex);
+      return existingIndex;
+    } catch (err) {
+      console.warn('Cursor sync failed, falling back to full sync:', err.message);
+      setDbxCursor(null);
+    }
+  }
+  const result = await dbxListFull('/', { recursive: true });
+  const out = {};
+  for (const e of result.entries) {
+    let rel = e.path.replace(/^\/+/, '');
+    if (!rel) continue;
+    const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
+    for (const p of prefixes) {
+      if (rel.toLowerCase().startsWith(p.toLowerCase())) {
+        rel = rel.slice(p.length);
+        break;
+      }
+    }
+    if (e.kind !== 'deleted') {
+      out[rel] = e;
+    }
+  }
+  setDbxCursor(result.cursor);
+  setCloudIndex(out);
+  return out;
+}
+let _syncing = false;
+let _openFilePath = null;
+function anyStreamGenerating() {
+  for (const s of convStreams.values()) if (s.generating) return true;
+  return false;
+}
+async function opfsLastModified(path) {
+  try {
+    const { parts, name } = splitPath(path);
+    let dir = await navigator.storage.getDirectory();
+    for (const p of parts) {
+      dir = await dir.getDirectoryHandle(p);
+    }
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    return file.lastModified;
+  } catch (e) {
+    return 0;
+  }
+}
+async function sync() {
+  if (!dbxTokens()) return;
+  if (_syncing) return;
+  if (anyStreamGenerating()) return;
+  _syncing = true;
+  setDbxBusy(true);
+  try {
+    dbxStatus('', 'connected');
+    const cloud = await cloudListAll();
+    const state = syncState();
+    let baselined = 0;
+
+
+    for (const path of Object.keys(state)) {
+      if (cloud[path]) continue;
+      const s = state[path];
+      const lm = await opfsLastModified(path);
+      if (lm > 0 && lm > s.syncedMtime) continue;
+      try { await opfs.remove(path); } catch {}
+      delete state[path];
+
+
+    }
+
+
+    for (const [path, e] of Object.entries(cloud)) {
+      if (e.kind !== 'file') continue;
+      const s = state[path];
+      const localExists = await opfs.exists(path);
+      if (!s) {
+        if (localExists) {
+          state[path] = {
+            rev: e.rev, size: e.size,
+            syncedMtime: await opfsLastModified(path),
+          };
+          baselined++;
+        } else {
+          dbxProgress(`downloading… ${path}`);
+          const content = await dbxDownload(e.path);
+          await opfs.write(path, content);
+          state[path] = {
+            rev: e.rev, size: e.size,
+            syncedMtime: await opfsLastModified(path),
+          };
+        }
+        continue;
+      }
+      const cloudChanged = s.rev !== e.rev;
+      const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
+      if (path === _openFilePath) continue;
+      if (cloudChanged && localDirty) continue;
+      if (cloudChanged) {
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path] = {
+          rev: e.rev, size: e.size,
+          syncedMtime: await opfsLastModified(path),
+        };
+        continue;
+      }
+
+
+      if (!localExists) {
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path].syncedMtime = await opfsLastModified(path);
+      }
+      state[path].size = e.size;
+    }
+
+
+    let opfsRels = [];
+    try { opfsRels = await opfs.list(); } catch {}
+    const dirty = [];
+    for (const rel of opfsRels) {
+      if (rel === _openFilePath) continue;
+      const lm = await opfsLastModified(rel);
+      const s = state[rel];
+      if (s && lm <= s.syncedMtime) {
+        console.log('[sandpie] sync skip (clean):', rel);
+        continue;
+      }
+      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
+      dirty.push({ rel, lm, s });
+    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+      const chunk = dirty.slice(i, i + BATCH_SIZE);
+      dbxProgress(`uploading…(${i + chunk.length}/${dirty.length})`);
+      const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
+        const content = await opfs.readBytes(rel);
+        return { rel, content, s, lm };
+      }));
+      try {
+        const results = await dbxUploadBatch(files);
+        for (const r of results) {
+          if (r.meta && r.meta['.tag'] === 'success') {
+            state[r.rel] = {
+              rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
+              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
+              syncedMtime: r.lm,
+            };
+
+
+          } else {
+            console.warn('batch item failed:', r.rel, r.meta);
+          }
+        }
+      } catch (err) {
+        console.warn('batch upload failed:', err);
+      }
+    }
+    setSyncState(state);
+    await pruneOrphanDirs(cloud);
+    dbxProgress('');
+    await refreshFileList();
+    await refreshConversationList();
+  } catch (e) {
+    dbxProgress('');
+    dbxStatus('Sync failed: ' + e.message, 'error');
+    console.warn('sync:', e);
+  } finally {
+    dbxProgress('');
+    initialSyncDone = true;
+    setDbxBusy(false);
+    _syncing = false;
+  }
+}
+setInterval(() => { if (!document.hidden) sync(); }, 60000);
+function joinPath(folder, name) {
+  if (folder === '/' || folder === '') return '/' + name;
+  return folder.replace(/\/$/, '') + '/' + name;
+}
+async function manualResync() {
+  if (!dbxTokens()) {
+    dbxStatus('Not connected', 'disconnected');
+    return;
+  }
+  const btn = $('dbxResyncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
+  try {
+    await sync();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
+  }
+}
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (code) {
+    try {
+      await dbxExchangeCode(code);
+      history.replaceState({}, '', location.pathname);
+      dbxStatus('', 'connected');
+      await sync();
+    } catch (e) {
+      dbxStatus('Auth failed: ' + e.message, 'error');
+    }
+  } else if (dbxTokens()) {
+    dbxStatus('', 'connected');
+    await sync();
+  }
+})();
+const tools = {
+  run_python: {
+    description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
+REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
+ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
+ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it freezes the whole app) — use await asyncio.sleep(n).
+PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
+HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
+OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
+Examples:
+  run      → {path: "scripts/random_numbers.py", args: ["5"]}
+  with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
+  async    → script ends with await main()  (NOT asyncio.run(main()))
+  pypi     → script runs: import micropip; await micropip.install('feedparser')
+  html out → script writes artifacts/out.html, then show_artifact({"path":"artifacts/out.html"})`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
+        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
+      },
+      required: ['path'],
+    },
+  },
+  write_file: {
+  description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      content: { type: 'string', description: 'Full file content' },
+    },
+    required: ['path', 'content'],
+  },
+},
+edit_file: {
+  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      old_str: { type: 'string', description: 'Exact string to replace. Must match exactly once.' },
+      new_str: { type: 'string', description: 'Replacement string. Omit to delete old_str.' },
+    },
+    required: ['path', 'old_str'],
+  },
+},
+  show_artifact: {
+    description: `Render a file from OPFS as a live artifact injected directly into the chat.
+Use this whenever:
+- The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
+- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
+The file must already exist in OPFS — write it first with run_python, then call this.
+Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
+Path is OPFS-relative — do NOT include a leading slash (e.g. "artifacts/chart.html").
+Default output folder is artifacts/ — use it unless the user specifies a different path.
+Typical flow:
+  run_python: open('artifacts/chart.html', 'w').write(html)
+  show_artifact: { "path": "artifacts/chart.html" }`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "artifacts/chart.html"). No leading slash. Default folder: artifacts/.' },
+      },
+      required: ['path'],
+    },
+  },
+        load_image: {
+      description: `Load an image file from OPFS into the conversation so you can see its pixel content.
+WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
+WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
+Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to image file relative to /files/ (e.g. "beach.jpg" or "images/photo.png")' },
+        },
+        required: ['path'],
+      },
+    },
+};
+const toolDefs = () => Object.entries(tools)
+  .filter(([name]) => {
+    return true;
+  })
+  .map(([name, t]) => ({
+    type: 'function',
+    function: { name, description: t.description, parameters: t.parameters },
+  }));
+async function buildSystemPrompt() {
+  try {
+    const text = await opfs.read('sandpie_memory.md');
+    //const listTest = await opfs.list('');
+    //console.log("BOOT LIST:" + listTest);
+    return { role: 'system', content: text };
+  } catch (e) {
+    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+    await opfs.write('sandpie_memory.md', basic);
+    return { role: 'system', content: basic };
+  }
+}
+function formatSize(bytes) {
+  if (!bytes || bytes < 0) return '';
+  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
+  let u = 0;
+  while (bytes >= 1024 && u < units.length - 1) { bytes /= 1024; u++; }
+  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
+}
+async function getFileSize(path) {
+
+
+  try {
+    const parts = path.split('/').filter(Boolean);
+    const name = parts.pop();
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return (await handle.getFile()).size;
+  } catch {}
+
+
+  const s = syncState()[path];
+  return s && s.size || 0;
+}
+async function getFolderSize(path) {
+  const prefix = path ? path.toLowerCase() + '/' : '';
+  let total = 0;
+  const state = syncState();
+
+
+  for (const k of Object.keys(state)) {
+    const kl = k.toLowerCase();
+    if (prefix && !kl.startsWith(prefix)) continue;
+
+
+    if (prefix && kl.length <= prefix.length) continue;
+    total += state[k].size || 0;
+  }
+
+
+  try {
+    for (const f of await opfs.list(path)) {
+      const full = (path ? path + '/' : '') + f;
+      if (!state[full]) {
+        try {
+          const parts = full.split('/').filter(Boolean);
+          const name = parts.pop();
+          const dir = await opfs.resolveDir(parts);
+          const handle = await dir.getFileHandle(name);
+          total += (await handle.getFile()).size;
+        } catch {}
+      }
+    }
+  } catch {}
+  return total;
+}
+function opfsCurrentPath() {
+  return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
+}
+function opfsJoin(base, child) {
+  return base ? base + '/' + child : child;
+}
+async function refreshFileList() {
+  const ul = $('fileList');
+  const path = opfsCurrentPath();
+
+
+  let opfsList = [];
+  try { opfsList = await opfs.listDir(path); } catch {}
+  const localMap = new Map();
+  for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
+
+
+
+
+
+
+
+
+  const state = syncState();
+  const prefix = path ? path + '/' : '';
+  const remoteMap = new Map();
+  for (const k of Object.keys(state)) {
+    const kl = k.toLowerCase();
+    if (!kl.startsWith(prefix.toLowerCase())) continue;
+    const rest = k.slice(prefix.length);
+    if (!rest) continue;
+    if (rest.includes('/')) {
+      const firstSeg = rest.split('/')[0];
+      if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+    } else {
+      remoteMap.set(rest, 'file');
+    }
+  }
+  const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+
+
+
+
+  const frag = document.createDocumentFragment();
+  if (!names.size) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = initialSyncDone ? '(empty)' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+  const items = [];
+  for (const name of names) {
+    const local = localMap.get(name);
+    const remote = remoteMap.get(name);
+    const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
+    const fullKey = opfsJoin(path, name);
+    let status = 'synced';
+    if (kind === 'folder') {
+      status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+    } else if (!local) {
+      status = 'cloud';
+    } else if (!remote) {
+      status = 'local';
+    } else {
+      const s = state[fullKey];
+      const lastMod = await opfsLastModified(fullKey);
+      status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
+    }
+    items.push({ name, kind, status, fullKey });
+  }
+
+
+  await Promise.all(items.map(async (it) => {
+    if (it.kind === 'folder') {
+      it.size = await getFolderSize(it.fullKey);
+    } else {
+      it.size = await getFileSize(it.fullKey);
+    }
+  }));
+  items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+  if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
+
+
+  for (const it of items) {
+    const li = document.createElement('li');
+    const btn = document.createElement('span');
+    btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+
+
+    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
+    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
+    btn.textContent = kindIcon + it.name;
+    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
+    if (it.kind === 'folder') {
+      btn.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
+    } else {
+      btn.onclick = () => openFileViewer(it.fullKey, it.name);
+    }
+    li.append(btn);
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'file-size';
+    sizeSpan.textContent = formatSize(it.size);
+    li.append(sizeSpan);
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      const menuItems = [];
+      menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
+            // folder context menu items
+            // file context menu items
+      showContextMenu(ev.clientX, ev.clientY, menuItems);
+    });
+    frag.appendChild(li);
+  }
+  ul.replaceChildren(frag);
+}
+let activeCtxMenu = null;
+function closeCtxMenu() { activeCtxMenu?.remove(); activeCtxMenu = null; }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
+window.addEventListener('blur', closeCtxMenu);
+function showContextMenu(x, y, items) {
+  closeCtxMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.setAttribute('data-chrome', '');
+  for (const item of items) {
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    if (item.danger) btn.className = 'danger';
+    btn.onclick = (e) => { e.stopPropagation(); closeCtxMenu(); item.action(); };
+    menu.appendChild(btn);
+  }
+  document.body.appendChild(menu);
+
+
+  const r = menu.getBoundingClientRect();
+  const px = Math.min(x, window.innerWidth - r.width - 4);
+  const py = Math.min(y, window.innerHeight - r.height - 4);
+  menu.style.left = Math.max(0, px) + 'px';
+  menu.style.top = Math.max(0, py) + 'px';
+  activeCtxMenu = menu;
+}
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
+const TEXT_PREVIEW_CAP = 200_000;
+function closeFileViewer() {
+  _openFilePath = null;
+  document.querySelectorAll('.file-viewer').forEach(el => {
+    const url = el.dataset.blobUrl;
+    if (url) URL.revokeObjectURL(url);
+    el.remove();
+  });
+}
+let markedPromise = null;
+function getMarked() {
+  if (!markedPromise) {
+    markedPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/marked@13/marked.min.js';
+      s.onload = () => resolve(window.marked);
+      s.onerror = () => reject(new Error('failed to load marked'));
+      document.head.appendChild(s);
+    });
+  }
+  return markedPromise;
+}
+async function openFileViewer(fullKey, name) {
+
+
+  let file;
+  try {
+    const { parts, name: fname } = splitPath(fullKey);
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(fname);
+    file = await handle.getFile();
+  } catch (e) {
+    addMsg('err', `Could not open ${fullKey}: ${e.message}`);
+    return;
+  }
+  _openFilePath = fullKey;
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const overlay = document.createElement('div');
+  overlay.className = 'file-viewer';
+  overlay.setAttribute('data-chrome', '');
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  const header = document.createElement('header');
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = '/' + fullKey;
+  const meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.textContent = `${file.size.toLocaleString()} bytes`;
+
+
+  const mdBtn = document.createElement('button');
+  mdBtn.className = 'mode';
+  mdBtn.style.display = 'none';
+  const pencilBtn = document.createElement('button');
+  pencilBtn.className = 'mode';
+  pencilBtn.textContent = '✎';
+  pencilBtn.title = 'Edit';
+  pencilBtn.style.display = 'none';
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'mode';
+  saveBtn.textContent = '💾';
+  saveBtn.title = 'Save (Ctrl+S)';
+  saveBtn.style.display = 'none';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close (Esc)';
+  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
+  const body = document.createElement('div');
+  body.className = 'body';
+  panel.append(header, body);
+  overlay.appendChild(panel);
+
+
+  const finalize = (closeFn) => {
+    closeBtn.onclick = closeFn;
+    overlay._close = closeFn;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
+    document.body.appendChild(overlay);
+  };
+  if (IMAGE_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const img = document.createElement('img'); img.src = url; body.appendChild(img);
+    finalize(closeFileViewer); return;
+  }
+  if (VIDEO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const v = document.createElement('video'); v.src = url; v.controls = true; body.appendChild(v);
+    finalize(closeFileViewer); return;
+  }
+  if (AUDIO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const a = document.createElement('audio'); a.src = url; a.controls = true; body.appendChild(a);
+    finalize(closeFileViewer); return;
+  }
+  if (ext === 'pdf') {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const f = document.createElement('iframe');
+    f.setAttribute('data-chrome', '');
+    f.src = url;
+    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
+    body.appendChild(f);
+    finalize(closeFileViewer); return;
+  }
+
+
+  const text = await file.text();
+  const sample = text.slice(0, 4000);
+  const repl = (sample.match(/�/g) || []).length;
+  const looksBinary = repl > 50 && repl / Math.max(sample.length, 1) > 0.01;
+  if (looksBinary) {
+    const pre = document.createElement('pre');
+    pre.textContent = '(binary file — preview unavailable)';
+    body.appendChild(pre);
+    finalize(closeFileViewer); return;
+  }
+  const isMd = ext === 'md' || ext === 'markdown';
+  const editable = text.length <= TEXT_PREVIEW_CAP;
+
+
+  let mode = isMd ? 'rendered' : 'raw';
+  let current = text;
+  let textareaEl = null;
+  const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
+  const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
+  function refreshButtons() {
+    mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
+    mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
+    mdBtn.title = mode === 'rendered' ? 'Show raw markdown' : 'Render markdown';
+    pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
+    saveBtn.style.display = mode === 'edit' ? '' : 'none';
+  }
+  async function render() {
+    body.innerHTML = '';
+    textareaEl = null;
+    if (mode === 'edit') {
+      const ta = document.createElement('textarea');
+      ta.className = 'editor';
+      ta.spellcheck = false;
+      ta.value = current;
+      ta.addEventListener('input', refreshTitle);
+      ta.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault(); doSave();
+        }
+      });
+      body.appendChild(ta);
+      textareaEl = ta;
+      ta.focus();
+    } else if (mode === 'rendered') {
+      const div = document.createElement('div');
+      div.className = 'md-preview';
+      div.textContent = 'Loading preview…';
+      body.appendChild(div);
+      try {
+        const marked = await getMarked();
+        div.innerHTML = marked.parse(current);
+      } catch (e) {
+        div.textContent = '(failed to load markdown renderer — showing raw)\n\n' + current;
+      }
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = current.length > TEXT_PREVIEW_CAP
+        ? current.slice(0, TEXT_PREVIEW_CAP) + `\n…[truncated, full size ${current.length.toLocaleString()} chars]`
+        : current;
+      body.appendChild(pre);
+    }
+    refreshButtons();
+    refreshTitle();
+  }
+  mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
+  pencilBtn.onclick = () => { mode = 'edit'; render(); };
+  async function doSave() {
+    if (!textareaEl) return;
+    const newContent = textareaEl.value;
+    try {
+      await opfs.write(fullKey, newContent);
+      current = newContent;
+      meta.textContent = `${new Blob([newContent]).size.toLocaleString()} bytes`;
+      refreshTitle();
+      await refreshFileList();
+    } catch (e) {
+      addMsg('err', `Could not save ${fullKey}: ${e.message}`);
+    }
+  }
+  saveBtn.onclick = doSave;
+  function attemptClose() {
+    if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
+    closeFileViewer();
+  }
+  closeBtn.onclick = attemptClose;
+  overlay._close = attemptClose;
+  overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
+  document.body.appendChild(overlay);
+  await render();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const v = document.querySelector('.file-viewer');
+    if (v) (v._close || closeFileViewer)();
+  }
+});
+function opfsUp() {
+  const cur = ($('opfsPath').value || '').trim() || '/';
+  if (cur === '/' || cur === '') return;
+  $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
+  refreshFileList();
+}
+$('opfsPath').addEventListener('change', refreshFileList);
+$('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
+async function uploadEntry(entry, dirPath) {
+  if (entry.isFile) {
+    const file = await new Promise(r => entry.file(r));
+    const destPath = opfsJoin(dirPath, entry.name);
+    await opfs.write(destPath, file);
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
+  } else if (entry.isDirectory) {
+    const sub = opfsJoin(dirPath, entry.name);
+    const reader = entry.createReader();
+    while (true) {
+      const batch = await new Promise(r => reader.readEntries(r));
+      if (!batch.length) break;
+      for (const child of batch) await uploadEntry(child, sub);
+    }
+  }
+}
+(() => {
+  const list = $('fileList');
+  list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
+  list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
+  list.addEventListener('drop', async e => {
+    e.preventDefault();
+    list.classList.remove('drag-over');
+    const path = opfsCurrentPath();
+    const items = Array.from(e.dataTransfer.items || []);
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) await uploadEntry(entry, path);
+    }
+
+
+    if (!items.length) {
+      for (const f of e.dataTransfer.files) {
+        const destPath = opfsJoin(path, f.name);
+        await opfs.write(destPath, f);
+        const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+        if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
+      }
+    }
+    await refreshFileList();
+  });
+})();
+refreshFileList();
+class SidePanel {
+  constructor() {
+    this.left = $('messages');
+    this.right = $('messagesSide');
+    this.wrap = $('messagesWrap');
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    this._wireEvents();
+  }
+
+
+  get isOpen() { return this._sideId !== null; }
+  get sideId() { return this._sideId; }
+  get activeIsRight() { return this._activeIsRight; }
+
+
+
+
+
+
+  activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
+
+
+  async open(id) {
+    if (!id) return;
+    if (id === activeConvId) return;
+    if (id === this._sideId) return;
+    if (this._activeIsRight) return;
+
+
+    closeArtifactPanel();
+
+
+    if (this._sideId) {
+      const prev = convStreams.get(this._sideId);
+      prev?.host?.parentNode?.removeChild(prev.host);
+    }
+    await this._lazyLoad(id);
+    this._sideId = id;
+    const s = convStreams.get(id);
+    if (s?.host) this.right.appendChild(s.host);
+    this._render();
+
+
+
+
+    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
+    refreshConversationList();
+  }
+  close() {
+    if (!this.isOpen) return;
+    if (this._activeIsRight) this.flip();
+    const s = convStreams.get(this._sideId);
+    s?.host?.parentNode?.removeChild(s.host);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshConversationList();
+  }
+  flip() {
+    if (!this.isOpen) return;
+
+
+
+
+    [activeConvId, this._sideId] = [this._sideId, activeConvId];
+    this._activeIsRight = !this._activeIsRight;
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    const s = convStreams.get(activeConvId);
+    messages = s?.messages || [];
+    this._render();
+    refreshSendButtonForActive();
+    refreshConversationList();
+  }
+
+
+
+
+
+
+  notifyDeleted(id) {
+    if (id === this._sideId) {
+      this._sideId = null;
+      this._activeIsRight = false;
+      this._render();
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  promoteSideToActive() {
+    if (!this.isOpen) return false;
+    const sId = this._sideId;
+    const s = convStreams.get(sId);
+    if (s && s.host) {
+
+
+
+
+      if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
+      this.left.appendChild(s.host);
+    }
+    activeConvId = sId;
+    messages = (s && s.messages) || [];
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    this._sideId = null;
+    this._activeIsRight = false;
+    this._render();
+    refreshSendButtonForActive();
+    return true;
+  }
+
+
+
+
+
+
+  async _lazyLoad(id) {
+    if (convStreams.has(id)) return;
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    for (const m of s.messages) renderHistoricalMessage(m, s.host);
+  }
+
+
+
+
+  _render() {
+    const b = document.body.classList;
+    b.toggle('side-open',     this.isOpen);
+    b.toggle('active-left',   this.isOpen && !this._activeIsRight);
+    b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
+
+
+    if (this.isOpen) {
+      b.remove('artifact-side-open');
+      this.right.classList.remove('artifact-mode');
+    }
+  }
+
+
+  _wireEvents() {
+    if (!this.wrap || !this.left || !this.right) return;
+
+
+
+
+    const onPanelClick = (targetIsRight) => (ev) => {
+      if (!this.isOpen) return;
+      if (targetIsRight === this._activeIsRight) return;
+      const sel = window.getSelection?.().toString();
+      if (sel && sel.length > 0) return;
+      if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
+      this.flip();
+    };
+    this.left.addEventListener('click',  onPanelClick(false));
+    this.right.addEventListener('click', onPanelClick(true));
+
+
+
+
+
+
+    this.wrap.addEventListener('dragover', (ev) => {
+      if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'copy';
+      this.wrap.classList.add('drop-target');
+    });
+    this.wrap.addEventListener('dragleave', (ev) => {
+      if (ev.target === this.wrap) this.wrap.classList.remove('drop-target');
+    });
+    this.wrap.addEventListener('drop', (ev) => {
+      this.wrap.classList.remove('drop-target');
+      if (isMobileViewport()) return;
+      const id = ev.dataTransfer?.getData('text/sandpie-conv-id');
+      if (!id) return;
+      ev.preventDefault();
+      this.open(id);
+    });
+  }
+}
+function isMobileViewport() {
+  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+}
+let sidePanel = null;
+sidePanel = new SidePanel();
+(function () {
+  const resizer = $('sideResizer');
+  const panel   = $('messagesSide');
+  if (!resizer || !panel) return;
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panel.offsetWidth;
+    panel.style.flex  = 'none';
+    panel.style.width = startW + 'px';
+    resizer.classList.add('dragging');
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+
+    const frame = $('artifactPanelFrame');
+    if (frame) frame.style.pointerEvents = 'none';
+    function onMove(ev) {
+      const wrap = $('messagesWrap');
+      const minW = 200;
+      const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
+
+
+      const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
+      panel.style.width = newW + 'px';
+    }
+    function onUp() {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor     = '';
+      document.body.style.userSelect = '';
+      const frame = $('artifactPanelFrame');
+      if (frame) frame.style.pointerEvents = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+})();
+(async () => {
+  await refreshConversationList();
+  if (activeConvId) {
+
+
+
+
+    const restoreId = activeConvId;
+    activeConvId = null;
+    const s = ensureStream(restoreId);
+    try {
+      const data = JSON.parse(await opfs.read(convPath(restoreId)));
+      s.messages = (data.messages || []).slice();
+    } catch {  }
+    mountConv(restoreId);
+    for (const m of s.messages) renderHistoricalMessage(m);
+  }
+
+  const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
+  requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
+  document.querySelectorAll('#messages img').forEach(img => {
+    if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
+  });
+})();
+function saveConfig() {
+  // Provider config is managed by modules/providers.js
+  // This function only saves non-provider (Dropbox) config
+  localStorage.setItem('opencode-config', JSON.stringify({
+    dbxAppKey: $('dbxAppKey').value,
+  }));
+}
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (e) {  }
+}
+function releaseWakeLock() {
+  if (wakeLock) {
+    try { wakeLock.release(); } catch (e) {}
+    wakeLock = null;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  for (const s of convStreams.values()) {
+    if (s.generating) { requestWakeLock(); break; }
+  }
+});
+const TOOL_RESULT_MAX = 30000;
+function capToolResult(s) {
+  s = String(s ?? '');
+  if (s.length <= TOOL_RESULT_MAX) {
+    return { content: s, truncated: false, original: s.length, kept: s.length };
+  }
+
+
+
+
+
+
+  const reserve = 180;
+  const budget = TOOL_RESULT_MAX - reserve;
+  const headLen = Math.floor(budget * 0.7);
+  const tailLen = budget - headLen;
+  const head = s.slice(0, headLen);
+  const tail = s.slice(-tailLen);
+  const dropped = s.length - headLen - tailLen;
+  const marker = `\n\n[… truncated by sandpie: dropped ${dropped.toLocaleString()} bytes from the middle; kept first ${headLen.toLocaleString()} + last ${tailLen.toLocaleString()} of ${s.length.toLocaleString()}]\n\n`;
+  return { content: head + marker + tail, truncated: true, original: s.length, kept: headLen + tailLen };
+}
+function humanBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+function addMsg(role, text = '', host = null) {
+
+
+
+
+
+
+
+
+  const target = host || (activeStream() && activeStream().host) || $('messages');
+
+
+
+
+
+
+  let scrollHost = target;
+  while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
+    scrollHost = scrollHost.parentNode;
+  }
+  const visible = !!scrollHost;
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  if (role === 'tool-call') {
+
+
+
+
+    const expanded = document.createElement('span');
+    expanded.className = 'tc-expanded';
+    expanded.textContent = text;
+    const collapsed = document.createElement('span');
+    collapsed.className = 'tc-collapsed';
+    div.appendChild(expanded);
+    div.appendChild(collapsed);
+  } else {
+    const bubble = document.createElement('span');
+    bubble.className = 'bubble';
+    if (Array.isArray(text)) {
+
+
+      for (const part of text) {
+        if (part.type === 'text' && part.text) {
+          const span = document.createElement('span');
+          span.textContent = part.text;
+          span.style.display = 'block';
+          span.style.marginBottom = '0.5rem';
+          bubble.appendChild(span);
+        } else if (part.type === 'image_url') {
+          const img = document.createElement('img');
+          const url = part.image_url.url;
+          if (url.startsWith('opfs://')) {
+
+
+            img.src = '';
+            img.alt = '(loading image...)';
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '150px';
+            img.style.borderRadius = '4px';
+            img.style.display = 'block';
+            SandpieImages.dataUrlFromPath(url.slice(7)).then(dataUrl => {
+              if (dataUrl) { img.src = dataUrl; img.alt = ''; }
+              else { img.alt = '(image not found)'; }
+            });
+          } else {
+            img.src = url;
+          }
+          img.style.maxWidth = '200px';
+          img.style.maxHeight = '150px';
+          img.style.borderRadius = '4px';
+          img.style.display = 'block';
+          bubble.appendChild(img);
+        }
+      }
+    } else {
+      bubble.textContent = text;
+    }
+    div.appendChild(bubble);
+  }
+  target.appendChild(div);
+
+
+
+
+
+
+
+
+
+
+  const timer = target.querySelector(':scope > .msg-timer:not(.done)');
+  if (timer) target.appendChild(timer);
+  if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
+  return div;
+}
+function applyToolsMinimized() {
+
+
+
+
+
+
+  document.body.classList.toggle('tools-minimized', toolsMinimized);
+}
+const LP_DELAY = 500;
+const LP_SLOP = 30;
+function attachLongPress(el, handler) {
+  el.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    el._lp = {
+      timer: setTimeout(() => {
+        el._lp.timer = null;
+        el.classList.remove('lp-active');
+        handler({
+          currentTarget: el, target: el,
+          clientX: el._lp.x, clientY: el._lp.y,
+          preventDefault() {}, stopPropagation() {}
+        });
+
+
+
+
+        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
+        document.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 350);
+      }, LP_DELAY),
+      x: t.clientX,
+      y: t.clientY,
+    };
+    el.classList.add('lp-active');
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (!el._lp || !el._lp.timer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - el._lp.x) > LP_SLOP || Math.abs(t.clientY - el._lp.y) > LP_SLOP) {
+      clearTimeout(el._lp.timer);
+      el._lp = null;
+      el.classList.remove('lp-active');
+    }
+  }, { passive: true });
+  el.addEventListener('touchend', () => {
+    if (el._lp) {
+      if (el._lp.timer) clearTimeout(el._lp.timer);
+      el._lp = null;
+    }
+    el.classList.remove('lp-active');
+  });
+  el.addEventListener('touchcancel', () => {
+    if (el._lp) {
+      if (el._lp.timer) clearTimeout(el._lp.timer);
+      el._lp = null;
+    }
+    el.classList.remove('lp-active');
+  });
+}
+function bindBubble(div, msgRef) {
+  if (!div) return div;
+
+
+
+
+
+
+
+
+  if (!div._listenersAttached) {
+    div._listenersAttached = true;
+
+
+    div.addEventListener('contextmenu', onBubbleContextMenu);
+  }
+  if (msgRef) div._msg = msgRef;
+  return div;
+}
+let _bubbleMenuTarget = null;
+function onBubbleContextMenu(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  _bubbleMenuTarget = e.currentTarget;
+  $('bubbleToggleToolsItem').textContent = toolsMinimized ? 'Show tool calls' : 'Hide tool calls';
+  const menu = $('bubbleContextMenu');
+  menu.style.display = '';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+}
+function hideBubbleMenu() {
+  $('bubbleContextMenu').style.display = 'none';
+  _bubbleMenuTarget = null;
+}
+document.addEventListener('click', hideBubbleMenu);
+async function rewindFromMenu() {
+  const target = _bubbleMenuTarget;
+  hideBubbleMenu();
+  if (!target) return;
+
+
+
+
+
+
+  if (!target._msg) {
+    const s = activeStream();
+    addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
+    return;
+  }
+  const idx = messages.indexOf(target._msg);
+  if (idx < 0) return;
+  const after = messages.length - idx - 1;
+  const msg = after === 0
+    ? 'Remove this message?'
+    : `Remove this message and ${after} message(s) after it?`;
+  if (!confirm(msg)) return;
+
+
+
+
+  const s = activeStream();
+  if (s) {
+    if (s.abort) { s.queueAborted = true; s.abort.abort(); }
+    s.queue.length = 0;
+    updateQueueCount(s);
+  }
+  messages.length = idx;
+  clearActiveConvUI();
+  for (const m of messages) renderHistoricalMessage(m);
+
+
+
+
+
+
+  const messagesEl = $('messages');
+  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
+  await saveActiveConv();
+}
+function toggleToolsMinimizedFromMenu() {
+  toolsMinimized = !toolsMinimized;
+  localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
+  applyToolsMinimized();
+  hideBubbleMenu();
+}
+async function copyFromMenu() {
+  const target = _bubbleMenuTarget;
+  hideBubbleMenu();
+  if (!target) return;
+  let text;
+
+
+
+
+  const expanded = target.querySelector && target.querySelector('.tc-expanded');
+  if (expanded && expanded.textContent) {
+    text = expanded.textContent;
+  } else if (target._msg && typeof target._msg.content === 'string') {
+    text = target._msg.content;
+  } else {
+    text = target.innerText || target.textContent || '';
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+
+
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+}
+function tcSetExpanded(div, text) {
+  const el = div && div.querySelector && div.querySelector('.tc-expanded');
+  if (el) el.textContent = text;
+}
+function tcAppendExpanded(div, text) {
+  const el = div && div.querySelector && div.querySelector('.tc-expanded');
+  if (el) el.textContent += text;
+}
+function tcEscape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+function appendToolResult(tcId, result) {
+  const toolCalls = document.querySelectorAll('.msg.tool-call');
+  let toolCallDiv = null;
+  for (const div of toolCalls) {
+    if (div.dataset.tcId === tcId) {
+      toolCallDiv = div;
+      break;
+    }
+  }
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+
+
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+
+
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'tool-result';
+  resultDiv.textContent = result;
+  box.appendChild(sep);
+  box.appendChild(resultDiv);
+}
+function buildToolBox(args, toolName) {
+  let code = '';
+  try {
+    const parsed = JSON.parse(args);
+    if (parsed.code) code = parsed.code;
+    else if (parsed.cmd) code = parsed.cmd;
+    else if (parsed.path) code = `run_python(path="${parsed.path}", args=${JSON.stringify(parsed.args || [])})`;
+    else code = JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    code = args;
+  }
+  const lines = code.split('\n').filter(l => l.trim());
+  const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
+  const name = toolName || 'tool';
+  const box = document.createElement('div');
+  box.className = 'tool-box';
+  box.innerHTML = `<div class="tool-header">${tcEscape(name)}</div><div class="tool-code">${codeHtml}</div>`;
+  return box;
+}
+function renderTcPreparing(div, fname, args) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+
+
+
+
+
+
+  const tok = Math.ceil((args ? String(args).length : 0) / 4);
+
+
+  if (!el.querySelector('.tc-spinner')) {
+    el.innerHTML =
+      '<span class="tc-spinner tc-dim"></span>' +
+      `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
+      '<span class="tc-meta"></span>';
+  }
+  const meta = el.querySelector('.tc-meta');
+  if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
+}
+function renderTcRunning(div, fname) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+  if (!el.querySelector('.tc-spinner')) {
+    el.innerHTML =
+      '<span class="tc-spinner"></span>' +
+      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>`;
+  }
+}
+function renderTcDone(div, fname) {
+  const el = div && div.querySelector && div.querySelector('.tc-collapsed');
+  if (!el) return;
+  el.innerHTML =
+    '<span class="tc-check">✓</span>' +
+    `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>`;
+}
+class RoundRenderer {
+  constructor(host, convMessages) {
+    this.host = host;
+    this.convMessages = convMessages;
+
+
+
+
+    this.reply = null;
+    this.cursor = null;
+
+
+
+
+
+
+    this.content = '';
+    this.displayed = '';
+    this.pending = '';
+    this.toolCalls = [];
+    this.toolCallEls = [];
+    this.toolDisplayed = [];
+    this.toolPending = [];
+    this.toolsShouldClose = false;
+    this.drainTimer = null;
+    this.pendingToolResultDiv = null;
+    this.reasoning = '';
+    this.thinkEl = null;
+    this.thinkBody = null;
+    this.thinkSummary = null;
+    this.thinkStart = 0;
+    this._thinkDone = false;
+  }
+
+
+  startRound() {
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this._flushAllPending();
+    this.reply = addMsg('assistant', '', this.host);
+    this.cursor = document.createElement('span');
+    this.cursor.className = 'cursor';
+    this.reply.appendChild(this.cursor);
+    this.content = '';
+    this.displayed = '';
+    this.pending = '';
+    this.toolCalls.length = 0;
+    this.toolCallEls.length = 0;
+    this.toolDisplayed.length = 0;
+    this.toolPending.length = 0;
+    this.toolsShouldClose = false;
+    this.reasoning = '';
+    this.thinkEl = null;
+    this.thinkBody = null;
+    this.thinkSummary = null;
+    this.thinkStart = 0;
+    this._thinkDone = false;
+  }
+  applyDelta(delta) {
+    if (!delta) return;
+    // Intrinsic reasoners (DeepSeek/Kimi/GLM via OpenRouter) stream their chain
+    // of thought as reasoning_content (or reasoning). Render it live, but never
+    // fold it into this.content — it must not be replayed back to the model.
+    const r = (typeof delta.reasoning_content === 'string' && delta.reasoning_content)
+           || (typeof delta.reasoning === 'string' && delta.reasoning);
+    if (r) this._appendReasoning(r);
+    if (delta.content) {
+      this._finishThinking();
+      this._appendContent(delta.content);
+    }
+    if (delta.tool_calls) {
+      for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
+    }
+  }
+  endRound(finalContent) {
+    this._finishThinking();
+    // The SW may rewrite this round's content — e.g. stripping a model's leaked
+    // native tool-call tokens after recovering them into structured calls. When
+    // the authoritative final content differs from what we live-typed, reconcile
+    // so those raw tokens don't linger on screen. No-op in the normal case.
+    if (typeof finalContent === 'string' && finalContent !== this.content) {
+      this.content = finalContent;
+      this.displayed = finalContent;
+      this.pending = '';
+      this._paintContent();
+    }
+    this.toolsShouldClose = true;
+    this._scheduleDrain();
+
+
+
+
+
+
+
+
+    if (this.reply && (!this.content || !this.content.trim())) {
+      this.reply.remove();
+      this.reply = null;
+      this.cursor = null;
+    }
+  }
+  bindMessage(msg) {
+    this.convMessages.push(msg);
+    if (msg.role === 'assistant') {
+      if (this.reply) bindBubble(this.reply, msg);
+      for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
+    } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
+      bindBubble(this.pendingToolResultDiv, msg);
+      this.pendingToolResultDiv = null;
+    }
+  }
+  markToolStarted(tc) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
+    if (idx < 0 || !this.toolCallEls[idx]) return;
+    this.toolCallEls[idx].classList.add('in-flight');
+    renderTcRunning(this.toolCallEls[idx], tc.function.name);
+  }
+  markToolDone(tcId, result) {
+    const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
+    if (idx >= 0 && this.toolCallEls[idx]) {
+      this.toolCallEls[idx].classList.remove('in-flight');
+      renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
+    }
+    const text = String(result || '');
+
+
+    if (text.startsWith('artifact:')) {
+      const path = text.slice('artifact:'.length);
+      if (path) renderArtifact(this.host, path);
+      return;
+    }
+
+
+    if (text.startsWith('image:')) {
+      const path = text.slice('image:'.length);
+      if (path) {
+        SandpieImages.dataUrlFromPath(path).then(dataUrl => {
+          if (dataUrl) {
+            SandpieImages.setState({ dataUrl, file: { name: path.split('/').pop() }, opfsPath: path });
+            const preview = $('imagePreview');
+            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
+            preview.style.display = '';
+          }
+        });
+      }
+      return;
+    }
+    const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
+    if (idx >= 0 && this.toolCallEls[idx]) {
+      appendToolResult(tcId, display);
+    }
+  }
+  finalize() {
+
+
+
+
+
+
+    if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+    this.toolsShouldClose = true;
+    this._flushAllPending();
+    this._finishThinking();
+    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
+  }
+
+  _appendReasoning(chunk) {
+    if (!this.thinkEl) this._createThinkBox();
+    this.reasoning += chunk;
+    this.thinkBody.textContent = this.reasoning;
+    const sh = this._scrollHost();
+    if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
+  }
+  _createThinkBox() {
+    this.thinkStart = performance.now();
+    const det = document.createElement('details');
+    det.className = 'msg think';
+    det.open = true;
+    const sum = document.createElement('summary');
+    sum.textContent = 'Thinking';
+    const body = document.createElement('div');
+    body.className = 'think-body';
+    det.appendChild(sum);
+    det.appendChild(body);
+    // Sit the box just above this round's reply bubble so thinking reads first.
+    if (this.reply && this.reply.parentNode) {
+      this.reply.parentNode.insertBefore(det, this.reply);
+    } else {
+      (this.host || $('messages')).appendChild(det);
+    }
+    this.thinkEl = det;
+    this.thinkBody = body;
+    this.thinkSummary = sum;
+  }
+  _finishThinking() {
+    if (!this.thinkEl || this._thinkDone) return;
+    this._thinkDone = true;
+    const secs = Math.round((performance.now() - this.thinkStart) / 1000);
+    this.thinkSummary.textContent = secs > 0 ? ('Thought for ' + secs + 's') : 'Thought';
+    this.thinkEl.classList.add('done');
+    this.thinkEl.open = false;
+  }
+
+  _appendContent(chunk) {
+
+
+
+
+
+
+    this.content += chunk;
+    this.pending += chunk;
+    this._scheduleDrain();
+  }
+  _paintContent() {
+    if (!this.reply) return;
+    this.reply.innerHTML = renderMd(this.displayed);
+    if (this.cursor) this.reply.appendChild(this.cursor);
+  }
+  _applyToolCallDelta(tc) {
+    const i = tc.index || 0;
+    if (!this.toolCalls[i]) {
+      this.toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+    }
+    if (tc.id) this.toolCalls[i].id = tc.id;
+    if (tc.function?.name) this.toolCalls[i].function.name += tc.function.name;
+    if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
+    if (!this.toolCalls[i].function.name) return;
+    if (!this.toolCallEls[i]) {
+
+
+
+
+
+
+      this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
+      this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
+      this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
+      this.toolDisplayed[i] = '';
+      this.toolPending[i] = '';
+    }
+    if (tc.function?.arguments) {
+      this.toolPending[i] = (this.toolPending[i] || '') + tc.function.arguments;
+      this._scheduleDrain();
+    }
+    if (!this.toolCallEls[i].classList.contains('in-flight')) {
+      renderTcPreparing(this.toolCallEls[i], this.toolCalls[i].function.name, this.toolCalls[i].function.arguments);
+    }
+  }
+  _scheduleDrain() {
+    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
+  }
+  _drainTick() {
+    this.drainTimer = null;
+    let anyPending = false;
+
+
+
+
+
+
+
+
+
+
+
+
+    const scrollHost = this._scrollHost();
+    const stick = shouldAutoScroll(scrollHost);
+
+
+
+
+    if (this.pending.length > 0) {
+      const n = Math.max(1, Math.ceil(this.pending.length / 30));
+      this.displayed += this.pending.slice(0, n);
+      this.pending = this.pending.slice(n);
+      this._paintContent();
+      if (this.pending.length > 0) anyPending = true;
+    }
+
+
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i];
+      if (!buf || buf.length === 0) continue;
+      const n = Math.max(1, Math.ceil(buf.length / 30));
+      this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf.slice(0, n);
+      this.toolPending[i] = buf.slice(n);
+      this._paintTool(i);
+      if (this.toolPending[i].length > 0) anyPending = true;
+    }
+    this._appendCloseParensIfReady();
+
+
+
+
+
+
+    if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
+      this.cursor.remove();
+      this.cursor = null;
+    }
+    if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
+    if (anyPending) this._scheduleDrain();
+  }
+
+
+
+
+
+
+  _scrollHost() {
+    let el = this.reply || this.host;
+    while (el && el.id !== 'messages' && el.id !== 'messagesSide') {
+      el = el.parentNode;
+    }
+    return el;
+  }
+
+
+
+
+
+
+
+
+  _flushAllPending() {
+
+
+    if (this.pending.length > 0) {
+      this.displayed += this.pending;
+      this.pending = '';
+      this._paintContent();
+    }
+
+
+    for (let i = 0; i < this.toolPending.length; i++) {
+      const buf = this.toolPending[i] || '';
+      if (buf.length > 0) {
+        this.toolDisplayed[i] = (this.toolDisplayed[i] || '') + buf;
+        this.toolPending[i] = '';
+        this._paintTool(i);
+      }
+    }
+    this._appendCloseParensIfReady();
+  }
+  _paintTool(i) {
+    if (!this.toolCallEls[i] || !this.toolCalls[i]) return;
+    const tc = this.toolCalls[i];
+    const box = buildToolBox(tc.function.arguments, tc.function.name);
+    const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
+    if (expanded) {
+
+
+      const existingBox = expanded.querySelector('.tool-box');
+      const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
+      const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
+      expanded.innerHTML = '';
+      expanded.appendChild(box);
+      if (existingSep) box.appendChild(existingSep);
+      if (existingResult) box.appendChild(existingResult);
+    }
+  }
+  _appendCloseParensIfReady() {
+    if (!this.toolsShouldClose) return;
+    for (let i = 0; i < this.toolCallEls.length; i++) {
+      const el = this.toolCallEls[i];
+      if (!el || el._tcClosed) continue;
+      if ((this.toolPending[i] || '').length === 0) {
+        el._tcClosed = true;
+      }
+    }
+  }
+}
+function startTotalTimer(stream) {
+  if (!stream || stream.timerEl) return;
+  stream.timerStart = Date.now();
+  const el = document.createElement('div');
+  el.className = 'msg-timer';
+  el.innerHTML = '0s' + (stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '');
+  stream.host.appendChild(el);
+  stream.timerEl = el;
+  stream.timerInterval = setInterval(() => {
+    if (!stream.timerEl) return;
+    const sec = Math.floor((Date.now() - stream.timerStart) / 1000);
+    const queueBadge = stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '';
+    stream.timerEl.innerHTML = `${sec}s${queueBadge}`;
+  }, 1000);
+}
+function endTotalTimer(stream, label) {
+  if (!stream || !stream.timerEl) return;
+  clearInterval(stream.timerInterval);
+  stream.timerInterval = null;
+  if (label === null) {
+    stream.timerEl.remove();
+  } else {
+    const sec = (Date.now() - stream.timerStart) / 1000;
+    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
+    stream.timerEl.textContent = `${label} · ${fmt}`;
+    stream.timerEl.classList.add('done');
+  }
+  stream.timerEl = null;
+}
+const CONV_DIR = '_conversations';
+function newConvId() {
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+}
+function convPath(id) { return `${CONV_DIR}/${id}.json`; }
+async function ensureActiveConv() {
+  if (activeConvId) return;
+  activeConvId = newConvId();
+  localStorage.setItem('sandpie-active-conv', activeConvId);
+}
+async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
+async function saveConv(convId, { touchUpdated = true } = {}) {
+  if (!convId) return;
+  const s = convStreams.get(convId);
+  const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
+  if (!msgs || !msgs.length) return;
+
+
+
+
+  let prev = {};
+  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
+  const firstUser = msgs.find(m => m.role === 'user');
+  let derived = 'Untitled';
+  if (firstUser && firstUser.content) {
+    const text = typeof firstUser.content === 'string'
+      ? firstUser.content
+      : firstUser.content.filter(p => p.type === 'text').map(p => p.text).join('');
+    derived = text.slice(0, 60);
+  }
+  const data = {
+    ...prev,
+    id: convId,
+    title: prev.title || derived,
+    updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
+    messages: msgs,
+  };
+  await opfs.write(convPath(convId), JSON.stringify(data));
+  await refreshConversationList();
+}
+function renderHistoricalMessage(m, host = null) {
+  if (m.role === 'user') {
+    bindBubble(addMsg('user', m.content, host), m);
+  } else if (m.role === 'assistant') {
+    const contentStr = typeof m.content === 'string' ? m.content :
+      m.content.filter(p => p.type === 'text').map(p => p.text).join('');
+    if (contentStr && contentStr.trim()) {
+      const div = addMsg('assistant', '', host);
+      div.innerHTML = renderMd(contentStr);
+      bindBubble(div, m);
+    }
+    if (m.tool_calls) {
+      for (const tc of m.tool_calls) {
+        if (tc.function.name === 'show_artifact') {
+          try {
+            const { path } = JSON.parse(tc.function.arguments || '{}');
+            if (path) renderArtifact(host, path);
+          } catch (_) {}
+        } else {
+          const tcDiv = addMsg('tool-call', '', host);
+          tcDiv.dataset.fname = tc.function.name;
+          tcDiv.dataset.tcId = tc.id;
+          const box = buildToolBox(tc.function.arguments || '{}', tc.function.name);
+          const expanded = tcDiv.querySelector('.tc-expanded');
+          if (expanded) {
+            expanded.innerHTML = '';
+            expanded.appendChild(box);
+          }
+          renderTcDone(tcDiv, tc.function.name);
+          bindBubble(tcDiv, m);
+        }
+      }
+    }
+  } else if (m.role === 'tool') {
+    const content = String(m.content || '');
+    if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
+      const t = content;
+      const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
+
+
+      const target = host || $('messages');
+      const toolCalls = target.querySelectorAll('.msg.tool-call');
+      if (toolCalls.length > 0) {
+        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
+      }
+    }
+
+
+  }
+}
+function clearActiveConvUI() {
+
+
+
+
+  const s = activeStream();
+  if (s && s.host) s.host.innerHTML = '';
+}
+function parkActiveConv() {
+  const s = activeStream();
+  if (!s) return;
+  s.messages = messages;
+  if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
+}
+function mountConv(convId) {
+  activeConvId = convId;
+  if (convId) {
+    localStorage.setItem('sandpie-active-conv', convId);
+    const s = ensureStream(convId);
+    messages = s.messages;
+
+
+
+
+
+
+    const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
+    if (s.host.parentNode !== target) target.appendChild(s.host);
+  } else {
+    localStorage.removeItem('sandpie-active-conv');
+    messages = [];
+  }
+  refreshSendButtonForActive();
+}
+async function loadConv(id) {
+  if (id === activeConvId) return;
+
+
+
+
+  if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
+
+
+
+
+  await saveActiveConv();
+
+
+
+
+  parkActiveConv();
+  if (convStreams.has(id)) {
+
+
+
+
+    mountConv(id);
+  } else {
+
+
+
+
+    let data;
+    try { data = JSON.parse(await opfs.read(convPath(id))); }
+    catch (e) {
+      if (activeConvId) mountConv(activeConvId);
+      addMsg('err', 'Failed to load conversation: ' + e.message);
+      return;
+    }
+    const s = ensureStream(id);
+    s.messages = (data.messages || []).slice();
+    mountConv(id);
+    for (const m of s.messages) renderHistoricalMessage(m);
+  }
+  convLastViewed.set(id, new Date().toISOString());
+  await refreshConversationList();
+  document.body.classList.remove('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = '☰';
+  const mEl = $('messages');
+  mEl.scrollTop = mEl.scrollHeight;
+}
+async function newConversation() {
+  await saveActiveConv();
+  parkActiveConv();
+  const id = newConvId();
+  ensureStream(id);
+  mountConv(id);
+  convLastViewed.set(id, new Date().toISOString());
+  await refreshConversationList();
+}
+async function listConversations() {
+  let entries = [];
+  try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
+
+
+
+
+
+
+
+
+
+
+
+
+  const searchActive = !!($('convSearch')?.value.trim());
+
+
+
+
+
+
+  const reads = entries
+    .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
+    .map(async (e) => {
+      const id = e.name.slice(0, -5);
+      try {
+        const data = JSON.parse(await opfs.read(convPath(id)));
+        const row = {
+          id: data.id || id,
+          title: data.title || '(no title)',
+          updated: data.updated || '',
+          pinned: !!data.pinned,
+          archived: !!data.archived,
+        };
+        if (searchActive) {
+          const messages = data.messages || [];
+          row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
+        }
+        return row;
+      } catch { return null; }
+    });
+  const out = (await Promise.all(reads)).filter(Boolean);
+
+
+
+
+  for (const c of out) {
+    if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
+  }
+  return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+}
+function refreshNewChatButton() {
+  const btn = $('newChatBtn');
+  if (!btn) return;
+  const empty = messages.length === 0;
+  btn.disabled = empty;
+  btn.title = empty ? "Already a fresh chat — just start typing below." : '';
+}
+let archivedExpanded = false;
+async function updateConvFile(id, patch) {
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); }
+  catch { return; }
+  Object.assign(data, patch);
+  await opfs.write(convPath(id), JSON.stringify(data));
+}
+async function renameConv(id, current) {
+  const next = prompt('Rename conversation', current);
+  if (next == null) return;
+  const trimmed = next.trim();
+  if (!trimmed || trimmed === current) return;
+  await updateConvFile(id, { title: trimmed });
+  await refreshConversationList();
+}
+async function togglePinConv(id, currentlyPinned) {
+  await updateConvFile(id, { pinned: !currentlyPinned });
+  await refreshConversationList();
+}
+async function toggleArchiveConv(id, currentlyArchived) {
+  await updateConvFile(id, { archived: !currentlyArchived });
+  await refreshConversationList();
+}
+async function duplicateConv(id, title) {
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); }
+  catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
+  const newId = newConvId();
+  data.id = newId;
+  data.title = (data.title || title || '(no title)') + ' (copy)';
+  data.pinned = false;
+  data.archived = false;
+  data.updated = new Date().toISOString();
+  await opfs.write(convPath(newId), JSON.stringify(data));
+  await refreshConversationList();
+}
+async function deleteConv(id, title) {
+  const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
+  if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
+  const path = convPath(id);
+  try { await opfs.remove(path); } catch {}
+
+
+
+
+  if (dbxTokens()) {
+    try { await dbxDelete('/' + path); } catch {}
+  }
+  const lk = path.toLowerCase();
+  const sync = syncState(); let sChanged = false;
+  for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
+  if (sChanged) setSyncState(sync);
+
+
+  const stream = convStreams.get(id);
+  if (stream) {
+    if (stream.abort) stream.abort.abort();
+    if (stream.timerInterval) clearInterval(stream.timerInterval);
+    if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
+    convStreams.delete(id);
+  }
+
+
+
+
+  if (sidePanel) sidePanel.notifyDeleted(id);
+  if (id === activeConvId) {
+    activeConvId = null;
+    localStorage.removeItem('sandpie-active-conv');
+    messages = [];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    const promoted = sidePanel?.promoteSideToActive();
+    if (!promoted) {
+      refreshSendButtonForActive();
+    } else {
+
+
+
+
+    }
+  }
+  await refreshConversationList();
+}
+function fmtRelTime(iso) {
+  if (!iso) return '';
+  const then = new Date(iso);
+  const now = new Date();
+  const sec = Math.floor((now - then) / 1000);
+  if (sec < 60) return 'now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return min + 'm';
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + 'h';
+  const day = Math.floor(hr / 24);
+  if (day < 7) return day + 'd';
+  const wk = Math.floor(day / 7);
+  if (wk < 4) return wk + 'w';
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return mo + 'mo';
+  return Math.floor(day / 365) + 'y';
+}
+function buildConvLi(c, idx) {
+  const li = document.createElement('li');
+  if (c.id === activeConvId) li.classList.add('active');
+  if (c.archived) li.classList.add('archived');
+  const num = document.createElement('span');
+  num.className = 'conv-num';
+  num.textContent = String(idx).padStart(2, '0');
+  const span = document.createElement('span');
+  span.className = 'name';
+  span.textContent = (c.pinned ? '* ' : '') + c.title;
+  span.title = c.updated || '';
+  span.onclick = () => loadConv(c.id);
+  li.appendChild(num);
+  li.appendChild(span);
+
+
+  const meta = document.createElement('span');
+  meta.className = 'conv-meta';
+  const stream = convStreams.get(c.id);
+  if (stream && stream.generating) {
+    meta.classList.add('gen-dot');
+    meta.title = 'Still generating…';
+  } else {
+    meta.textContent = fmtRelTime(c.updated);
+    const lastViewed = convLastViewed.get(c.id);
+    const hasNew = c.updated && (!lastViewed || new Date(c.updated) > new Date(lastViewed));
+    if (hasNew && c.id !== activeConvId) meta.classList.add('unseen');
+  }
+  li.appendChild(meta);
+  const _openConvMenu = (ev) => {
+    const items = [
+      { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
+      { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
+      { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
+      { label: 'Duplicate',                          action: () => duplicateConv(c.id, c.title) },
+    ];
+    const sideOpen = sidePanel?.isOpen;
+    const inActive = c.id === activeConvId;
+    const inSide   = sideOpen && c.id === sidePanel.sideId;
+    if (!isMobileViewport() && !inActive && !inSide) {
+      items.push({ label: 'View in side panel', action: () => sidePanel.open(c.id) });
+    }
+    if (inSide) {
+      items.push({ label: 'Close side panel', action: () => sidePanel.close() });
+    }
+    items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
+    showContextMenu(ev.clientX, ev.clientY, items);
+  };
+  li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
+  attachLongPress(li, _openConvMenu);
+
+
+
+
+
+
+
+
+  li.draggable = true;
+  li.addEventListener('dragstart', (ev) => {
+    ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
+    ev.dataTransfer.effectAllowed = 'copy';
+  });
+  return li;
+}
+async function refreshConversationList() {
+  refreshNewChatButton();
+  const ul = $('convList');
+  if (!ul) return;
+  let list = await listConversations();
+
+
+  const searchInput = $('convSearch');
+  if (searchInput && searchInput.value.trim()) {
+    const query = searchInput.value.trim().toLowerCase();
+    list = list.filter(c =>
+      c.title.toLowerCase().includes(query) ||
+      (c.messageContent && c.messageContent.includes(query))
+    );
+  }
+
+
+  const pinned   = list.filter(c => c.pinned && !c.archived);
+  const regular  = list.filter(c => !c.pinned && !c.archived);
+  const archived = list.filter(c => c.archived);
+
+
+  const visible = pinned.length + regular.length;
+  $('convCount').textContent = visible ? `${visible}` : '';
+  const frag = document.createDocumentFragment();
+  if (!list.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = initialSyncDone ? '(no chats yet)' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+  pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
+  if (pinned.length && regular.length) {
+    const sep = document.createElement('li');
+    sep.style.cssText = 'height:6px; margin:0; cursor:default; pointer-events:none;';
+    sep.setAttribute('aria-hidden', 'true');
+    frag.appendChild(sep);
+  }
+  regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
+  if (archived.length) {
+    const header = document.createElement('li');
+    header.className = 'archived-toggle';
+    header.textContent = `${archivedExpanded ? '▾' : '▸'} Archived (${archived.length})`;
+    header.onclick = () => { archivedExpanded = !archivedExpanded; refreshConversationList(); };
+    frag.appendChild(header);
+    if (archivedExpanded) archived.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + regular.length + i)));
+  }
+  ul.replaceChildren(frag);
+}
+let wakeLock = null;
+function refreshSendButtonForActive() {
+  const btn = $('sendBtn');
+  if (!btn) return;
+  const s = activeStream();
+  if (s && s.generating) {
+    btn.textContent = '■';
+    btn.title = 'Stop';
+    btn.classList.add('sending');
+    btn.disabled = false;
+  } else {
+    btn.textContent = '▶';
+    btn.title = 'Send';
+    btn.classList.remove('sending');
+    btn.disabled = false;
+  }
+}
+function setStreamSending(stream, sending) {
+  if (!stream) return;
+  if (sending) {
+    stream.abort = new AbortController();
+    stream.queueAborted = false;
+    stream.generating = true;
+  } else {
+    stream.abort = null;
+    stream.generating = false;
+
+
+
+
+
+
+
+
+
+
+    for (const el of stream.host.querySelectorAll('.tool-call')) {
+      if (el.querySelector('.tc-check')) continue;
+      el.classList.remove('in-flight');
+      renderTcDone(el, el.dataset.fname);
+    }
+  }
+  if (stream === activeStream()) refreshSendButtonForActive();
+
+
+  refreshConversationList();
+}
+async function handleSubmit() {
+  const text = $('input').value.trim();
+  if (!text && !SandpieImages.hasImage()) return;
+  $('input').value = '';
+
+
+  const content = await SandpieImages.buildContent(text);
+
+
+  if (SandpieImages.hasImage()) {
+    SandpieImages.clear();
+  }
+  const m = $('messages');
+  lockScroll(m);
+  m.scrollTop = m.scrollHeight;
+  enqueueForActive(content);
+
+
+  const ta = $('input');
+  if (ta) {
+    ta.style.height = 'auto';
+  }
+}
+async function enqueueForActive(content) {
+  await ensureActiveConv();
+  const s = ensureStream(activeConvId);
+
+
+
+
+
+
+  if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+  s.queue.push(content);
+  updateQueueCount(s);
+  processQueueFor(s);
+}
+function handleButtonClick() {
+  const btn = $('sendBtn');
+  const s = activeStream();
+  if (btn.classList.contains('sending') && s) {
+
+
+    s.queueAborted = true;
+    if (s.abort) s.abort.abort();
+    s.queue.length = 0;
+    updateQueueCount(s);
+  } else {
+    handleSubmit();
+  }
+}
+function updateQueueCount(stream) {
+
+
+  const s = stream || activeStream();
+  if (!s || !s.timerEl) return;
+  const sec = Math.floor((Date.now() - s.timerStart) / 1000);
+  const queueBadge = s.queue.length > 0 ? ` <span class="queue-pill">${s.queue.length} queued</span>` : '';
+  s.timerEl.innerHTML = `${sec}s${queueBadge}`;
+}
+async function processQueueFor(stream) {
+  if (!stream || stream.isProcessing || stream.queue.length === 0) return;
+  stream.isProcessing = true;
+  stream.queueAborted = false;
+  updateQueueCount(stream);
+  try {
+    while (stream.queue.length > 0) {
+      const text = stream.queue.shift();
+      updateQueueCount(stream);
+      await sendSingle(text, stream);
+      if (stream.queueAborted) break;
+    }
+  } finally {
+    stream.isProcessing = false;
+    updateQueueCount(stream);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  if (stream.queue.length > 0) processQueueFor(stream);
+}
+const SW_STREAM_PATH = './sandpie-stream';
+let _swReady = (async () => {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
+  }
+
+
+
+
+  const regs = await navigator.serviceWorker.getRegistrations();
+  for (const r of regs) {
+    const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
+    if (/\/sandpie-sw\.js$/.test(url)) {
+      await r.unregister();
+      console.log('[sandpie] unregistered stale SW:', url);
+    }
+  }
+
+
+
+
+
+
+  let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
+  await navigator.serviceWorker.ready;
+
+
+
+
+
+
+
+
+  if (!navigator.serviceWorker.controller) {
+    console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
+    await reg.unregister();
+    reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise(resolve => {
+        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+      });
+    }
+  }
+  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
+  return reg;
+})();
+_swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
+async function sendSingle(text, stream) {
+
+
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
+    return;
+  }
+  const { id: convId, messages: convMessages, host } = stream;
+
+
+  const userMsg = { role: 'user', content: text };
+  convMessages.push(userMsg);
+  bindBubble(addMsg('user', text, host), userMsg);
+  saveConv(convId).catch(() => {});
+  requestWakeLock();
+  setStreamSending(stream, true);
+  startTotalTimer(stream);
+  let wasAborted = false;
+
+
+  const config = await buildAgentConfig(convMessages);
+
+
+  await _swReady;
+  const ctrl = new AbortController();
+  stream.requestId = ctrl;
+  const onAbort = () => ctrl.abort();
+  if (stream.abort?.signal) {
+    if (stream.abort.signal.aborted) onAbort();
+    else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+
+  const renderer = new RoundRenderer(host, convMessages);
+
+
+
+
+
+
+
+
+
+
+  let agentDoneSeen = false;
+  let errorSeen = false;
+  let lastInFlightTool = null;
+  const dispatch = (ev) => {
+    if (ev.type === 'agent_done')  agentDoneSeen = true;
+    if (ev.type === 'error')        errorSeen = true;
+    if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
+    if (ev.type === 'tool_result')  lastInFlightTool = null;
+    dispatchAgentEvent(ev, renderer, host);
+  };
+  try {
+
+
+    const res = await fetch('./sandpie-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
+      return;
+    }
+
+
+    await readAgentEvents(res.body, dispatch);
+
+
+
+
+
+
+
+
+
+
+    if (!agentDoneSeen && !wasAborted && !errorSeen) {
+      const trigger = lastInFlightTool
+        ? ` while running \`${lastInFlightTool}\``
+        : '';
+      addMsg('err',
+        `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
+        host,
+      );
+    }
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
+      wasAborted = true;
+      addMsg('info', 'Stopped.', host);
+    } else {
+      console.error('[sandpie] agent fetch error:', e);
+      addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
+    }
+  } finally {
+
+
+    if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
+    stream.requestId = null;
+
+
+
+
+    renderer.finalize();
+
+
+    releaseWakeLock();
+    endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
+    setStreamSending(stream, false);
+    await saveConv(convId);
+
+
+
+
+
+
+    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
+    try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+  }
+}
+async function buildAgentConfig(convMessages) {
+  const endpoint = $('endpoint').value.replace(/\/$/, '');
+  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
+  const resolvedMessages = [];
+  for (const msg of convMessages) {
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      const resolvedContent = [];
+      for (const part of msg.content) {
+        if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
+          const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
+          if (dataUrl) {
+            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl } });
+          }
+        } else {
+          resolvedContent.push(part);
+        }
+      }
+      resolvedMessages.push({ ...msg, content: resolvedContent });
+    } else {
+      resolvedMessages.push(msg);
+    }
+  }
+  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+  return {
+    url,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    model: $('model').value,
+    systemPrompt: await buildSystemPrompt(),
+    messages: resolvedMessages,
+    tools: toolDefs(),
+    maxTokens: (active && active.maxTokens) || 8192,
+    temperature: (active && active.temperature != null) ? active.temperature : null,
+    origin: location.origin,
+  };
+}
+async function readAgentEvents(body, onEvent) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let lineBuf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    lineBuf += decoder.decode(value, { stream: true });
+    const lines = lineBuf.split('\n');
+    lineBuf = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try { onEvent(JSON.parse(line)); }
+      catch (e) { console.warn('[sandpie] bad event line:', line, e); }
+    }
+  }
+}
+function dispatchAgentEvent(ev, renderer, host) {
+  switch (ev.type) {
+    case 'round_start':   return renderer.startRound();
+    case 'delta':         return renderer.applyDelta(ev.delta);
+    case 'round_end':     return renderer.endRound(ev.content);
+    case 'message_added': return renderer.bindMessage(ev.message);
+    case 'tool_started':  return renderer.markToolStarted(ev.tc);
+    case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
+    case 'agent_done':    return;
+    case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
+    case 'info': {
+      if (ev.message) {
+        if (!renderer._retryNotice) renderer._retryNotice = addMsg('info', ev.message, host);
+        else renderer._retryNotice.textContent = ev.message;
+      } else if (renderer._retryNotice) {
+        renderer._retryNotice.remove();
+        renderer._retryNotice = null;
+      }
+      return;
+    }
+  }
+}
+(function() {
+  const messages = document.getElementById('messages');
+  if (!messages) return;
+  const state = new Map();
+  let animating = false;
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+  function updateTargets() {
+    const parallaxMsgs = messages.querySelectorAll('.msg.user');
+    const vh = window.innerHeight;
+    const center = vh / 2;
+    for (const msg of parallaxMsgs) {
+      const rect = msg.getBoundingClientRect();
+      const msgCenter = rect.top + rect.height / 2;
+      const ny = (msgCenter - center) / (vh / 2);
+      const target = clamp(ny, -0.6, 0.6);
+      if (!state.has(msg)) {
+        state.set(msg, { current: target, target: target });
+      } else {
+        state.get(msg).target = target;
+      }
+    }
+  }
+  function tick() {
+    let moving = false;
+    for (const [msg, s] of state) {
+
+
+      const diff = s.target - s.current;
+      if (Math.abs(diff) > 0.001) {
+        s.current += diff * 0.12;
+        moving = true;
+      } else {
+        s.current = s.target;
+      }
+      msg.style.setProperty('--py', s.current.toFixed(3));
+    }
+    if (moving) {
+      requestAnimationFrame(tick);
+    } else {
+      animating = false;
+    }
+  }
+  function onScroll() {
+    updateTargets();
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(tick);
+    }
+  }
+  messages.addEventListener('scroll', onScroll, { passive: true });
+
+
+  updateTargets();
+  tick();
+})();
+</script></script>
+<script>
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  console.log('[sandpie] PWA install prompt suppressed (available via menu)');
+});
+</script>
+  <script type="module" src="modules/themes.js"></script>
+  <script type="module" src="modules/agents.js"></script>
+  <script type="module" src="modules/context.js"></script>
+  <script type="module" src="modules/artifacts.js"></script>
+<script>
+// Load version from version.txt
+fetch('version.txt')
+  .then(r => r.text())
+  .then(v => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = v.trim();
+  })
+  .catch(() => {
+    const el = document.getElementById('versionDisplay');
+    if (el) el.textContent = 'dev';
+  });
+
+
+  /* Sidebar scroll hints — shadow + chevron */
+  (function() {
+    const SIDEBAR = document.querySelector('aside');
+    if (!SIDEBAR) return;
+    // Create hint elements
+    const topHint = document.createElement('div');
+    topHint.className = 'scroll-hint top';
+    topHint.textContent = '▲';
+    const bottomHint = document.createElement('div');
+    bottomHint.className = 'scroll-hint bottom';
+    bottomHint.textContent = '▼';
+    SIDEBAR.prepend(topHint);
+    SIDEBAR.appendChild(bottomHint);
+    function updateHints() {
+      const hasTop = SIDEBAR.scrollTop > 6;
+      const hasBottom = SIDEBAR.scrollTop + SIDEBAR.clientHeight < SIDEBAR.scrollHeight - 6;
+      topHint.classList.toggle('visible', hasTop);
+      bottomHint.classList.toggle('visible', hasBottom);
+    }
+    SIDEBAR.addEventListener('scroll', updateHints, { passive: true });
+    updateHints();
+    // Re-check when sidebar content changes
+    new MutationObserver(updateHints).observe(SIDEBAR, { childList: true, subtree: true });
+  })();
+
+</script>
+</body>
+</html>
