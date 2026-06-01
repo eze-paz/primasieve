@@ -1750,9 +1750,6 @@ if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
 
 
-// Only dbxAppKey triggers saveConfig (provider inputs managed by module)
-$('dbxAppKey').addEventListener('input', saveConfig);
-
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
@@ -3078,8 +3075,9 @@ refreshWelcome();
 function saveConfig() {
   // Provider config is managed by modules/providers.js
   // This function only saves non-provider (Dropbox) config
+  const appKeyEl = $('dbxAppKey');
   localStorage.setItem('opencode-config', JSON.stringify({
-    dbxAppKey: $('dbxAppKey').value,
+    dbxAppKey: appKeyEl ? appKeyEl.value : '',
   }));
 }
 
