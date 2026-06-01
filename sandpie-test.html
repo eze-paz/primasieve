@@ -11,6 +11,55 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <link rel="stylesheet" href="sandpie.css">
+<style>
+  /* Streamed reasoning ("thinking") box — test-page only for now. */
+  .msg.think {
+    margin: 0.25rem 0 0.5rem;
+    border: 1px solid var(--sp-border);
+    border-radius: 6px;
+    background: var(--sp-surface);
+    font-size: 0.8rem;
+    overflow: hidden;
+  }
+  .msg.think > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.35rem 0.6rem;
+    color: var(--sp-text-dim);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .msg.think > summary::-webkit-details-marker { display: none; }
+  .msg.think > summary::before {
+    content: '▸';
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+  }
+  .msg.think[open] > summary::before { transform: rotate(90deg); }
+  .msg.think:not(.done) > summary { color: var(--sp-accent); }
+  .msg.think:not(.done) > summary::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sp-accent);
+    animation: think-pulse 1s ease-in-out infinite;
+  }
+  @keyframes think-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+  .msg.think .think-body {
+    padding: 0.5rem 0.7rem;
+    border-top: 1px solid var(--sp-border);
+    color: var(--sp-text-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Space Mono', monospace;
+    line-height: 1.45;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+</style>
 <script>
 window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
@@ -2620,6 +2669,12 @@ class RoundRenderer {
     this.toolsShouldClose = false;
     this.drainTimer = null;
     this.pendingToolResultDiv = null;
+    this.reasoning = '';
+    this.thinkEl = null;
+    this.thinkBody = null;
+    this.thinkSummary = null;
+    this.thinkStart = 0;
+    this._thinkDone = false;
   }
 
 
@@ -2638,21 +2693,31 @@ class RoundRenderer {
     this.toolDisplayed.length = 0;
     this.toolPending.length = 0;
     this.toolsShouldClose = false;
+    this.reasoning = '';
+    this.thinkEl = null;
+    this.thinkBody = null;
+    this.thinkSummary = null;
+    this.thinkStart = 0;
+    this._thinkDone = false;
   }
   applyDelta(delta) {
     if (!delta) return;
-    if (delta.content) this._appendContent(delta.content);
+    // Intrinsic reasoners (DeepSeek/Kimi/GLM via OpenRouter) stream their chain
+    // of thought as reasoning_content (or reasoning). Render it live, but never
+    // fold it into this.content — it must not be replayed back to the model.
+    const r = (typeof delta.reasoning_content === 'string' && delta.reasoning_content)
+           || (typeof delta.reasoning === 'string' && delta.reasoning);
+    if (r) this._appendReasoning(r);
+    if (delta.content) {
+      this._finishThinking();
+      this._appendContent(delta.content);
+    }
     if (delta.tool_calls) {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
     }
   }
   endRound() {
-
-
-
-
-
-
+    this._finishThinking();
     this.toolsShouldClose = true;
     this._scheduleDrain();
 
@@ -2730,9 +2795,46 @@ class RoundRenderer {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
     this._flushAllPending();
+    this._finishThinking();
     if (this.cursor) { this.cursor.remove(); this.cursor = null; }
   }
 
+  _appendReasoning(chunk) {
+    if (!this.thinkEl) this._createThinkBox();
+    this.reasoning += chunk;
+    this.thinkBody.textContent = this.reasoning;
+    const sh = this._scrollHost();
+    if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
+  }
+  _createThinkBox() {
+    this.thinkStart = performance.now();
+    const det = document.createElement('details');
+    det.className = 'msg think';
+    det.open = true;
+    const sum = document.createElement('summary');
+    sum.textContent = 'Thinking';
+    const body = document.createElement('div');
+    body.className = 'think-body';
+    det.appendChild(sum);
+    det.appendChild(body);
+    // Sit the box just above this round's reply bubble so thinking reads first.
+    if (this.reply && this.reply.parentNode) {
+      this.reply.parentNode.insertBefore(det, this.reply);
+    } else {
+      (this.host || $('messages')).appendChild(det);
+    }
+    this.thinkEl = det;
+    this.thinkBody = body;
+    this.thinkSummary = sum;
+  }
+  _finishThinking() {
+    if (!this.thinkEl || this._thinkDone) return;
+    this._thinkDone = true;
+    const secs = Math.round((performance.now() - this.thinkStart) / 1000);
+    this.thinkSummary.textContent = secs > 0 ? ('Thought for ' + secs + 's') : 'Thought';
+    this.thinkEl.classList.add('done');
+    this.thinkEl.open = false;
+  }
 
   _appendContent(chunk) {
 
