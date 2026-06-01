@@ -14,7 +14,7 @@ function b64url(buf) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function pkceChallenge() {
+async function pkceChallenge() {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   return { verifier, challenge: b64url(hash) };
@@ -24,7 +24,7 @@ function dbxTokens() {
   return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
 }
 
-function dbxAccessToken() {
+async function dbxAccessToken() {
   const stored = dbxTokens();
   if (!stored) throw new Error('Dropbox not connected');
   if (Date.now() < stored.expires_at - 60000) return stored.access_token;
@@ -48,7 +48,7 @@ function dbxAccessToken() {
   return data.access_token;
 }
 
-function dbxApi(path, body) {
+async function dbxApi(path, body) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
     method: 'POST',
@@ -59,7 +59,7 @@ function dbxApi(path, body) {
   return await res.json();
 }
 
-function dbxListFull(folderPath, { recursive = false } = {}) {
+async function dbxListFull(folderPath, { recursive = false } = {}) {
   let data = await dbxApi('/2/files/list_folder', {
     path: folderPath === '/' ? '' : folderPath,
     recursive,
@@ -86,7 +86,7 @@ function dbxListFull(folderPath, { recursive = false } = {}) {
   };
 }
 
-function dbxListContinue(cursor) {
+async function dbxListContinue(cursor) {
   let data = await dbxApi('/2/files/list_folder/continue', { cursor });
   let entries = data.entries.slice();
   let pageCount = 1;
@@ -109,7 +109,7 @@ function dbxListContinue(cursor) {
   };
 }
 
-function dbxDownload(path, signal) {
+async function dbxDownload(path, signal) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
     method: 'POST',
@@ -128,7 +128,7 @@ function dbxDownload(path, signal) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-function dbxUpload(path, content) {
+async function dbxUpload(path, content) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
     method: 'POST',
@@ -145,7 +145,7 @@ function dbxUpload(path, content) {
   return await res.json();
 }
 
-function dbxUploadSessionStart(content, close = true) {
+async function dbxUploadSessionStart(content, close = true) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
     method: 'POST',
@@ -160,7 +160,7 @@ function dbxUploadSessionStart(content, close = true) {
   return await res.json();
 }
 
-function dbxUploadSessionFinishBatch(entries) {
+async function dbxUploadSessionFinishBatch(entries) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
     method: 'POST',
@@ -174,7 +174,7 @@ function dbxUploadSessionFinishBatch(entries) {
   return await res.json();
 }
 
-function dbxUploadBatch(files) {
+async function dbxUploadBatch(files) {
 
 
   const CONCURRENCY = 5;
@@ -212,7 +212,7 @@ function dbxUploadBatch(files) {
   return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
 }
 
-function dbxDelete(path) {
+async function dbxDelete(path) {
 
 
 

@@ -603,7 +603,6 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 const DBX_REDIRECT = location.origin + location.pathname;
-async
 function dbxStatus(text, kind) {
   const el = $('dbxStatus');
   el.textContent = text;
@@ -631,7 +630,6 @@ function dbxToggleConnection() {
   if (dbxTokens()) dbxDisconnect();
   else dbxConnect();
 }
-async
 async function dbxConnect() {
   const appKey = $('dbxAppKey').value.trim();
   if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
@@ -692,15 +690,6 @@ async function dbxExchangeCode(code) {
   }));
   localStorage.removeItem('dbx-pkce');
 }
-async
-async
-async
-async
-async
-async
-async
-async
-async
 const SYNC_STATE_KEY = 'sandpie-sync-state';
 const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
 const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
