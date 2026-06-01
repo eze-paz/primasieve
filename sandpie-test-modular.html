@@ -1998,6 +1998,15 @@ function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s
 function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
 function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
 
+async function opfsLastModified(relPath) {
+  try {
+    const { parts, name } = splitPath(relPath);
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    return (await handle.getFile()).lastModified;
+  } catch { return 0; }
+}
+
 // --- Dropbox module import ---
 // --- Dropbox module (loaded dynamically) ---
 let createDropboxSync = null;
