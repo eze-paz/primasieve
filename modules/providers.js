@@ -31,6 +31,7 @@ function init() {
     `,
     onRender(bodyEl) {
       loadProviders();
+      _bindProviderListeners();
       renderChips();
       updateRoutingHint();
       refreshAiDot();
@@ -110,6 +111,21 @@ function applyActiveProvider() {
   if (pu) pu.value = p ? p.proxyUrl : '';
   updateRoutingHint();
   refreshAiDot();
+}
+
+function _bindProviderListeners() {
+  const pu = document.getElementById('proxyUrl');
+  if (pu && !pu._spBound) {
+    pu.addEventListener('input', updateRoutingHint);
+    pu._spBound = true;
+  }
+  ['endpoint', 'apiKey'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._spBound) {
+      el.addEventListener('input', refreshAiDot);
+      el._spBound = true;
+    }
+  });
 }
 
 // ============================================================

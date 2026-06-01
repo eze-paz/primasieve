@@ -11,55 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <link rel="stylesheet" href="sandpie.css">
-<style>
-  /* Streamed reasoning ("thinking") box — test-page only for now. */
-  .msg.think {
-    margin: 0.25rem 0 0.5rem;
-    border: 1px solid var(--sp-border);
-    border-radius: 6px;
-    background: var(--sp-surface);
-    font-size: 0.8rem;
-    overflow: hidden;
-  }
-  .msg.think > summary {
-    cursor: pointer;
-    list-style: none;
-    padding: 0.35rem 0.6rem;
-    color: var(--sp-text-dim);
-    user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .msg.think > summary::-webkit-details-marker { display: none; }
-  .msg.think > summary::before {
-    content: '▸';
-    font-size: 0.7rem;
-    transition: transform 0.15s ease;
-  }
-  .msg.think[open] > summary::before { transform: rotate(90deg); }
-  .msg.think:not(.done) > summary { color: var(--sp-accent); }
-  .msg.think:not(.done) > summary::after {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--sp-accent);
-    animation: think-pulse 1s ease-in-out infinite;
-  }
-  @keyframes think-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
-  .msg.think .think-body {
-    padding: 0.5rem 0.7rem;
-    border-top: 1px solid var(--sp-border);
-    color: var(--sp-text-dim);
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: 'Space Mono', monospace;
-    line-height: 1.45;
-    max-height: 40vh;
-    overflow-y: auto;
-  }
-</style>
+
 <script>
 window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
@@ -443,32 +395,14 @@ function dbxRoute(url) {
   const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
   return (remote || '') + '/proxy/' + stripped;
 }
-function updateRoutingHint() {
-  const remote = ($('proxyUrl').value || '').trim();
-  const hint = $('routingHint');
-  if (remote) hint.textContent = `Routing via ${remote.replace(/^https?:\/\//, '')}`;
-  else if (isLocalhost) hint.textContent = 'Routing via local /proxy/';
-  else hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
-}
-$('proxyUrl').addEventListener('input', () => { if (typeof SandpieProviders !== "undefined") SandpieProviders.updateHint(); if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot(); });
-if (typeof SandpieProviders !== "undefined") SandpieProviders.updateHint();
+
 function setDot(id, state) {
   const dot = $(id);
   if (!dot) return;
   dot.classList.remove('ok', 'warn', 'err');
   if (state) dot.classList.add(state);
 }
-function refreshAiDot() {
-  const ok = $('endpoint').value.trim() && $('apiKey').value.trim();
-  setDot('aiDot', ok ? 'ok' : null);
-}
-function refreshProxyDot() {
-  if ($('proxyUrl').value.trim()) return setDot('proxyDot', 'ok');
-  setDot('proxyDot', null);
-}
-['endpoint', 'apiKey'].forEach(id => $(id).addEventListener('input', refreshAiDot));
-if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
-if (typeof SandpieProviders !== "undefined") SandpieProviders.refreshDot();
+
 // Only dbxAppKey triggers saveConfig (provider inputs managed by module)
 $('dbxAppKey').addEventListener('input', saveConfig);
 const _scrollLocked = new Set();

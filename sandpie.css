@@ -1231,3 +1231,51 @@
     .welcome-rotating span { animation: none; }
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
+
+  /* Streamed reasoning ("thinking") box — test-page only for now. */
+  .msg.think {
+    margin: 0.25rem 0 0.5rem;
+    border: 1px solid var(--sp-border);
+    border-radius: 6px;
+    background: var(--sp-surface);
+    font-size: 0.8rem;
+    overflow: hidden;
+  }
+  .msg.think > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.35rem 0.6rem;
+    color: var(--sp-text-dim);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .msg.think > summary::-webkit-details-marker { display: none; }
+  .msg.think > summary::before {
+    content: '▸';
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+  }
+  .msg.think[open] > summary::before { transform: rotate(90deg); }
+  .msg.think:not(.done) > summary { color: var(--sp-accent); }
+  .msg.think:not(.done) > summary::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sp-accent);
+    animation: think-pulse 1s ease-in-out infinite;
+  }
+  @keyframes think-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+  .msg.think .think-body {
+    padding: 0.5rem 0.7rem;
+    border-top: 1px solid var(--sp-border);
+    color: var(--sp-text-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Space Mono', monospace;
+    line-height: 1.45;
+    max-height: 40vh;
+    overflow-y: auto;
+  }
