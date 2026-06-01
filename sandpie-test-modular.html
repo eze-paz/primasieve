@@ -1989,6 +1989,15 @@ function setDbxBusy(busy) {
 }
 
 
+// --- Sync state helpers (shared between main app and Dropbox module) ---
+const SYNC_STATE_KEY = 'sandpie-sync-state';
+const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
+
+function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
+function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
+function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
+function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
+
 // --- Dropbox module import ---
 // --- Dropbox module (loaded dynamically) ---
 let createDropboxSync = null;
