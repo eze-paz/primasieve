@@ -37,7 +37,6 @@
     </div>
   </details>
 
-
   <input id="endpoint" type="hidden">
   <input id="model" type="hidden">
   <input id="apiKey" type="hidden">
@@ -61,13 +60,11 @@
     </div>
   </div>
 
-
   <div id="chipContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="SandpieProviders.editFromMenu()">Edit</div>
     <div class="context-item" onclick="SandpieProviders.duplicateFromMenu()">Duplicate</div>
     <div class="context-item context-delete" onclick="SandpieProviders.deleteFromMenu()">Delete</div>
   </div>
-
 
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
@@ -122,7 +119,6 @@
 </aside>
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
-
 
   <div id="messagesWrap">
     <div id="messages">
@@ -420,7 +416,6 @@ function rgbaToHex(rgba) {
   return '#' + [+m[1], +m[2], +m[3]].map(function (x) { return x.toString(16).padStart(2, '0'); }).join('');
 }
 
-
 function computeAccentNeg() {
   var root = document.documentElement;
   var accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
@@ -550,21 +545,11 @@ if ('serviceWorker' in navigator) {
     if (!d) return;
     if (d.type === 'sandpie-sw-log') {
 
-
       const fn = console[d.level] || console.log;
       fn.call(console, '[sw]', d.text);
       return;
     }
     if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-
-
-
-
-
-
-
-
-
 
       (async () => {
         if (!dbxTokens()) return;
@@ -604,11 +589,6 @@ if ('serviceWorker' in navigator) {
         return;
       }
     });
-
-
-
-
-
 
   const flush = () => {
     const c = navigator.serviceWorker.controller;
@@ -725,7 +705,6 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   }
   ta.addEventListener('input', autosize);
 
-
   const searchInput = $('convSearch');
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
@@ -748,10 +727,8 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
     }
   });
 
-
   const observer = new MutationObserver(autosize);
   observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
-
 
   ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
   autosize();
@@ -780,7 +757,6 @@ function splitPath(path) {
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
-
   async resolveDir(parts, { create = false } = {}) {
     let dir = await this.root();
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
@@ -792,7 +768,6 @@ const opfs = {
     const handle = await dir.getFileHandle(name);
     return await (await handle.getFile()).text();
   },
-
 
   async readBytes(path) {
     const { parts, name } = splitPath(path);
@@ -814,23 +789,11 @@ const opfs = {
     const dir = await this.resolveDir(parts);
     await dir.removeEntry(name, { recursive: true });
 
-
-
-
-
-
-
-
     try {
       const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
       if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
     } catch (_) {}
   },
-
-
-
-
-
 
   async exists(path) {
     try {
@@ -845,7 +808,6 @@ const opfs = {
     await this.resolveDir(parts, { create: true });
   },
 
-
   async listDir(path = '') {
     const parts = String(path).split('/').filter(Boolean);
     const dir = await this.resolveDir(parts);
@@ -853,7 +815,6 @@ const opfs = {
     for await (const [n, h] of dir.entries()) out.push({ name: n, kind: h.kind });
     return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
   },
-
 
   async list(prefix = '') {
     const out = [];
@@ -869,7 +830,6 @@ const opfs = {
     await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
     return out.sort();
   },
-
 
   async listAll(prefix = '') {
     const out = [];
@@ -888,13 +848,6 @@ const opfs = {
 };
 async function pruneOrphanDirs(cloud) {
 
-
-
-
-
-
-
-
   const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
   const cloudPaths = new Set();
   for (const k of source) {
@@ -909,7 +862,6 @@ async function pruneOrphanDirs(cloud) {
     changed = false;
     let all;
     try { all = await opfs.listAll(''); } catch { return pruned; }
-
 
     all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
     for (const e of all) {
@@ -1140,7 +1092,6 @@ async function sync() {
     const state = syncState();
     let baselined = 0;
 
-
     for (const path of Object.keys(state)) {
       if (cloud[path]) continue;
       const s = state[path];
@@ -1149,9 +1100,7 @@ async function sync() {
       try { await opfs.remove(path); } catch {}
       delete state[path];
 
-
     }
-
 
     for (const [path, e] of Object.entries(cloud)) {
       if (e.kind !== 'file') continue;
@@ -1190,7 +1139,6 @@ async function sync() {
         continue;
       }
 
-
       if (!localExists) {
         dbxProgress(`downloading… ${path}`);
         const content = await dbxDownload(e.path);
@@ -1199,7 +1147,6 @@ async function sync() {
       }
       state[path].size = e.size;
     }
-
 
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
@@ -1232,7 +1179,6 @@ async function sync() {
               size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
               syncedMtime: r.lm,
             };
-
 
           } else {
             console.warn('batch item failed:', r.rel, r.meta);
@@ -1403,7 +1349,6 @@ function formatSize(bytes) {
 }
 async function getFileSize(path) {
 
-
   try {
     const parts = path.split('/').filter(Boolean);
     const name = parts.pop();
@@ -1411,7 +1356,6 @@ async function getFileSize(path) {
     const handle = await dir.getFileHandle(name);
     return (await handle.getFile()).size;
   } catch {}
-
 
   const s = syncState()[path];
   return s && s.size || 0;
@@ -1421,16 +1365,13 @@ async function getFolderSize(path) {
   let total = 0;
   const state = syncState();
 
-
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (prefix && !kl.startsWith(prefix)) continue;
 
-
     if (prefix && kl.length <= prefix.length) continue;
     total += state[k].size || 0;
   }
-
 
   try {
     for (const f of await opfs.list(path)) {
@@ -1458,18 +1399,10 @@ async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
 
-
   let opfsList = [];
   try { opfsList = await opfs.listDir(path); } catch {}
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
-
-
-
-
-
-
-
 
   const state = syncState();
   const prefix = path ? path + '/' : '';
@@ -1487,9 +1420,6 @@ async function refreshFileList() {
     }
   }
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
-
-
-
 
   const frag = document.createDocumentFragment();
   if (!names.size) {
@@ -1521,7 +1451,6 @@ async function refreshFileList() {
     items.push({ name, kind, status, fullKey });
   }
 
-
   await Promise.all(items.map(async (it) => {
     if (it.kind === 'folder') {
       it.size = await getFolderSize(it.fullKey);
@@ -1532,12 +1461,10 @@ async function refreshFileList() {
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
 
-
   for (const it of items) {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-
 
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
@@ -1606,7 +1533,6 @@ function showContextMenu(x, y, items) {
   }
   document.body.appendChild(menu);
 
-
   const r = menu.getBoundingClientRect();
   const px = Math.min(x, window.innerWidth - r.width - 4);
   const py = Math.min(y, window.innerHeight - r.height - 4);
@@ -1641,7 +1567,6 @@ function getMarked() {
 }
 async function openFileViewer(fullKey, name) {
 
-
   let file;
   try {
     const { parts, name: fname } = splitPath(fullKey);
@@ -1667,7 +1592,6 @@ async function openFileViewer(fullKey, name) {
   meta.className = 'meta';
   meta.textContent = `${file.size.toLocaleString()} bytes`;
 
-
   const mdBtn = document.createElement('button');
   mdBtn.className = 'mode';
   mdBtn.style.display = 'none';
@@ -1689,7 +1613,6 @@ async function openFileViewer(fullKey, name) {
   body.className = 'body';
   panel.append(header, body);
   overlay.appendChild(panel);
-
 
   const finalize = (closeFn) => {
     closeBtn.onclick = closeFn;
@@ -1722,7 +1645,6 @@ async function openFileViewer(fullKey, name) {
     finalize(closeFileViewer); return;
   }
 
-
   const text = await file.text();
   const sample = text.slice(0, 4000);
   const repl = (sample.match(/�/g) || []).length;
@@ -1735,7 +1657,6 @@ async function openFileViewer(fullKey, name) {
   }
   const isMd = ext === 'md' || ext === 'markdown';
   const editable = text.length <= TEXT_PREVIEW_CAP;
-
 
   let mode = isMd ? 'rendered' : 'raw';
   let current = text;
@@ -1858,7 +1779,6 @@ async function uploadEntry(entry, dirPath) {
       if (entry) await uploadEntry(entry, path);
     }
 
-
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
         const destPath = opfsJoin(path, f.name);
@@ -1882,18 +1802,11 @@ class SidePanel {
     this._wireEvents();
   }
 
-
   get isOpen() { return this._sideId !== null; }
   get sideId() { return this._sideId; }
   get activeIsRight() { return this._activeIsRight; }
 
-
-
-
-
-
   activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
-
 
   async open(id) {
     if (!id) return;
@@ -1901,9 +1814,7 @@ class SidePanel {
     if (id === this._sideId) return;
     if (this._activeIsRight) return;
 
-
     closeArtifactPanel();
-
 
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
@@ -1914,9 +1825,6 @@ class SidePanel {
     const s = convStreams.get(id);
     if (s?.host) this.right.appendChild(s.host);
     this._render();
-
-
-
 
     requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
     refreshConversationList();
@@ -1934,9 +1842,6 @@ class SidePanel {
   flip() {
     if (!this.isOpen) return;
 
-
-
-
     [activeConvId, this._sideId] = [this._sideId, activeConvId];
     this._activeIsRight = !this._activeIsRight;
     if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
@@ -1948,11 +1853,6 @@ class SidePanel {
     if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
   }
 
-
-
-
-
-
   notifyDeleted(id) {
     if (id === this._sideId) {
       this._sideId = null;
@@ -1961,31 +1861,11 @@ class SidePanel {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   promoteSideToActive() {
     if (!this.isOpen) return false;
     const sId = this._sideId;
     const s = convStreams.get(sId);
     if (s && s.host) {
-
-
-
 
       if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
       this.left.appendChild(s.host);
@@ -2000,11 +1880,6 @@ class SidePanel {
     return true;
   }
 
-
-
-
-
-
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
     let data;
@@ -2015,15 +1890,11 @@ class SidePanel {
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
-
-
-
   _render() {
     const b = document.body.classList;
     b.toggle('side-open',     this.isOpen);
     b.toggle('active-left',   this.isOpen && !this._activeIsRight);
     b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
-
 
     if (this.isOpen) {
       b.remove('artifact-side-open');
@@ -2031,12 +1902,8 @@ class SidePanel {
     }
   }
 
-
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
-
-
-
 
     const onPanelClick = (targetIsRight) => (ev) => {
       if (!this.isOpen) return;
@@ -2048,11 +1915,6 @@ class SidePanel {
     };
     this.left.addEventListener('click',  onPanelClick(false));
     this.right.addEventListener('click', onPanelClick(true));
-
-
-
-
-
 
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
@@ -2092,14 +1954,12 @@ sidePanel = new SidePanel();
     document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
 
-
     const frame = $('artifactPanelFrame');
     if (frame) frame.style.pointerEvents = 'none';
     function onMove(ev) {
       const wrap = $('messagesWrap');
       const minW = 200;
       const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
-
 
       const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
       panel.style.width = newW + 'px';
@@ -2120,9 +1980,6 @@ sidePanel = new SidePanel();
 (async () => {
   await refreshConversationList();
   if (activeConvId) {
-
-
-
 
     const restoreId = activeConvId;
     activeConvId = null;
@@ -2175,11 +2032,6 @@ function capToolResult(s) {
     return { content: s, truncated: false, original: s.length, kept: s.length };
   }
 
-
-
-
-
-
   const reserve = 180;
   const budget = TOOL_RESULT_MAX - reserve;
   const headLen = Math.floor(budget * 0.7);
@@ -2197,19 +2049,7 @@ function humanBytes(n) {
 }
 function addMsg(role, text = '', host = null) {
 
-
-
-
-
-
-
-
   const target = host || (activeStream() && activeStream().host) || $('messages');
-
-
-
-
-
 
   let scrollHost = target;
   while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
@@ -2219,9 +2059,6 @@ function addMsg(role, text = '', host = null) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
-
-
-
 
     const expanded = document.createElement('span');
     expanded.className = 'tc-expanded';
@@ -2235,7 +2072,6 @@ function addMsg(role, text = '', host = null) {
     bubble.className = 'bubble';
     if (Array.isArray(text)) {
 
-
       for (const part of text) {
         if (part.type === 'text' && part.text) {
           const span = document.createElement('span');
@@ -2247,7 +2083,6 @@ function addMsg(role, text = '', host = null) {
           const img = document.createElement('img');
           const url = part.image_url.url;
           if (url.startsWith('opfs://')) {
-
 
             img.src = '';
             img.alt = '(loading image...)';
@@ -2276,26 +2111,12 @@ function addMsg(role, text = '', host = null) {
   }
   target.appendChild(div);
 
-
-
-
-
-
-
-
-
-
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 function applyToolsMinimized() {
-
-
-
-
-
 
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
@@ -2313,9 +2134,6 @@ function attachLongPress(el, handler) {
           clientX: el._lp.x, clientY: el._lp.y,
           preventDefault() {}, stopPropagation() {}
         });
-
-
-
 
         const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         document.addEventListener('click', swallow, { capture: true, once: true });
@@ -2353,16 +2171,8 @@ function attachLongPress(el, handler) {
 function bindBubble(div, msgRef) {
   if (!div) return div;
 
-
-
-
-
-
-
-
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-
 
     div.addEventListener('contextmenu', onBubbleContextMenu);
   }
@@ -2390,11 +2200,6 @@ async function rewindFromMenu() {
   hideBubbleMenu();
   if (!target) return;
 
-
-
-
-
-
   if (!target._msg) {
     const s = activeStream();
     addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
@@ -2408,9 +2213,6 @@ async function rewindFromMenu() {
     : `Remove this message and ${after} message(s) after it?`;
   if (!confirm(msg)) return;
 
-
-
-
   const s = activeStream();
   if (s) {
     if (s.abort) { s.queueAborted = true; s.abort.abort(); }
@@ -2420,11 +2222,6 @@ async function rewindFromMenu() {
   messages.length = idx;
   clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
-
-
-
-
-
 
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -2442,9 +2239,6 @@ async function copyFromMenu() {
   if (!target) return;
   let text;
 
-
-
-
   const expanded = target.querySelector && target.querySelector('.tc-expanded');
   if (expanded && expanded.textContent) {
     text = expanded.textContent;
@@ -2456,7 +2250,6 @@ async function copyFromMenu() {
   try {
     await navigator.clipboard.writeText(text);
   } catch (e) {
-
 
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -2501,12 +2294,10 @@ function appendToolResult(tcId, result) {
     expanded.appendChild(box);
   }
 
-
   const existingSep = box.querySelector('.tool-sep');
   const existingResult = box.querySelector('.tool-result');
   if (existingSep) existingSep.remove();
   if (existingResult) existingResult.remove();
-
 
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
@@ -2539,13 +2330,7 @@ function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
 
-
-
-
-
-
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
-
 
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
@@ -2577,16 +2362,8 @@ class RoundRenderer {
     this.host = host;
     this.convMessages = convMessages;
 
-
-
-
     this.reply = null;
     this.cursor = null;
-
-
-
-
-
 
     this.content = '';
     this.displayed = '';
@@ -2605,7 +2382,6 @@ class RoundRenderer {
     this.thinkStart = 0;
     this._thinkDone = false;
   }
-
 
   startRound() {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
@@ -2660,13 +2436,6 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._scheduleDrain();
 
-
-
-
-
-
-
-
     if (this.reply && (!this.content || !this.content.trim())) {
       this.reply.remove();
       this.reply = null;
@@ -2697,13 +2466,11 @@ class RoundRenderer {
     }
     const text = String(result || '');
 
-
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
       return;
     }
-
 
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
@@ -2725,11 +2492,6 @@ class RoundRenderer {
     }
   }
   finalize() {
-
-
-
-
-
 
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
@@ -2777,11 +2539,6 @@ class RoundRenderer {
 
   _appendContent(chunk) {
 
-
-
-
-
-
     this.content += chunk;
     this.pending += chunk;
     this._scheduleDrain();
@@ -2801,11 +2558,6 @@ class RoundRenderer {
     if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
     if (!this.toolCalls[i].function.name) return;
     if (!this.toolCallEls[i]) {
-
-
-
-
-
 
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
       this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
@@ -2828,22 +2580,8 @@ class RoundRenderer {
     this.drainTimer = null;
     let anyPending = false;
 
-
-
-
-
-
-
-
-
-
-
-
     const scrollHost = this._scrollHost();
     const stick = shouldAutoScroll(scrollHost);
-
-
-
 
     if (this.pending.length > 0) {
       const n = Math.max(1, Math.ceil(this.pending.length / 30));
@@ -2852,7 +2590,6 @@ class RoundRenderer {
       this._paintContent();
       if (this.pending.length > 0) anyPending = true;
     }
-
 
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i];
@@ -2865,11 +2602,6 @@ class RoundRenderer {
     }
     this._appendCloseParensIfReady();
 
-
-
-
-
-
     if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
       this.cursor.remove();
       this.cursor = null;
@@ -2877,11 +2609,6 @@ class RoundRenderer {
     if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
-
-
-
-
-
 
   _scrollHost() {
     let el = this.reply || this.host;
@@ -2891,22 +2618,13 @@ class RoundRenderer {
     return el;
   }
 
-
-
-
-
-
-
-
   _flushAllPending() {
-
 
     if (this.pending.length > 0) {
       this.displayed += this.pending;
       this.pending = '';
       this._paintContent();
     }
-
 
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i] || '';
@@ -2924,7 +2642,6 @@ class RoundRenderer {
     const box = buildToolBox(tc.function.arguments, tc.function.name);
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
-
 
       const existingBox = expanded.querySelector('.tool-box');
       const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
@@ -2992,9 +2709,6 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
 
-
-
-
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
@@ -3054,7 +2768,6 @@ function renderHistoricalMessage(m, host = null) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
 
-
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
@@ -3062,13 +2775,9 @@ function renderHistoricalMessage(m, host = null) {
       }
     }
 
-
   }
 }
 function clearActiveConvUI() {
-
-
-
 
   const s = activeStream();
   if (s && s.host) s.host.innerHTML = '';
@@ -3085,11 +2794,6 @@ function mountConv(convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
-
-
-
-
-
 
     const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
     if (s.host.parentNode !== target) target.appendChild(s.host);
@@ -3162,23 +2866,7 @@ async function listConversations() {
   let entries = [];
   try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
 
-
-
-
-
-
-
-
-
-
-
-
   const searchActive = !!($('convSearch')?.value.trim());
-
-
-
-
-
 
   const reads = entries
     .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
@@ -3201,9 +2889,6 @@ async function listConversations() {
       } catch { return null; }
     });
   const out = (await Promise.all(reads)).filter(Boolean);
-
-
-
 
   for (const c of out) {
     if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
@@ -3260,9 +2945,6 @@ async function deleteConv(id, title) {
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
 
-
-
-
   if (dbxTokens()) {
     try { await dbxDelete('/' + path); } catch {}
   }
@@ -3270,7 +2952,6 @@ async function deleteConv(id, title) {
   const sync = syncState(); let sChanged = false;
   for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
   if (sChanged) setSyncState(sync);
-
 
   const stream = convStreams.get(id);
   if (stream) {
@@ -3280,35 +2961,16 @@ async function deleteConv(id, title) {
     convStreams.delete(id);
   }
 
-
-
-
   if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
 
-
-
-
-
-
-
-
-
-
-
-
-
-
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
     } else {
-
-
-
 
     }
   }
@@ -3348,7 +3010,6 @@ function buildConvLi(c, idx) {
   li.appendChild(num);
   li.appendChild(span);
 
-
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
@@ -3384,13 +3045,6 @@ function buildConvLi(c, idx) {
   li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
   attachLongPress(li, _openConvMenu);
 
-
-
-
-
-
-
-
   li.draggable = true;
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
@@ -3404,7 +3058,6 @@ async function refreshConversationList() {
   if (!ul) return;
   let list = await listConversations();
 
-
   const searchInput = $('convSearch');
   if (searchInput && searchInput.value.trim()) {
     const query = searchInput.value.trim().toLowerCase();
@@ -3414,11 +3067,9 @@ async function refreshConversationList() {
     );
   }
 
-
   const pinned   = list.filter(c => c.pinned && !c.archived);
   const regular  = list.filter(c => !c.pinned && !c.archived);
   const archived = list.filter(c => c.archived);
-
 
   const visible = pinned.length + regular.length;
   $('convCount').textContent = visible ? `${visible}` : '';
@@ -3476,15 +3127,6 @@ function setStreamSending(stream, sending) {
     stream.abort = null;
     stream.generating = false;
 
-
-
-
-
-
-
-
-
-
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
@@ -3493,7 +3135,6 @@ function setStreamSending(stream, sending) {
   }
   if (stream === activeStream()) refreshSendButtonForActive();
 
-
   refreshConversationList();
 }
 async function handleSubmit() {
@@ -3501,9 +3142,7 @@ async function handleSubmit() {
   if (!text && !SandpieImages.hasImage()) return;
   $('input').value = '';
 
-
   const content = await SandpieImages.buildContent(text);
-
 
   if (SandpieImages.hasImage()) {
     SandpieImages.clear();
@@ -3513,7 +3152,6 @@ async function handleSubmit() {
   m.scrollTop = m.scrollHeight;
   enqueueForActive(content);
 
-
   const ta = $('input');
   if (ta) {
     ta.style.height = 'auto';
@@ -3522,11 +3160,6 @@ async function handleSubmit() {
 async function enqueueForActive(content) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
-
-
-
-
-
 
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
   s.queue.push(content);
@@ -3538,7 +3171,6 @@ function handleButtonClick() {
   const s = activeStream();
   if (btn.classList.contains('sending') && s) {
 
-
     s.queueAborted = true;
     if (s.abort) s.abort.abort();
     s.queue.length = 0;
@@ -3548,7 +3180,6 @@ function handleButtonClick() {
   }
 }
 function updateQueueCount(stream) {
-
 
   const s = stream || activeStream();
   if (!s || !s.timerEl) return;
@@ -3573,17 +3204,6 @@ async function processQueueFor(stream) {
     updateQueueCount(stream);
   }
 
-
-
-
-
-
-
-
-
-
-
-
   if (stream.queue.length > 0) processQueueFor(stream);
 }
 const SW_STREAM_PATH = './sandpie-stream';
@@ -3591,9 +3211,6 @@ let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
-
-
-
 
   const regs = await navigator.serviceWorker.getRegistrations();
   for (const r of regs) {
@@ -3604,20 +3221,8 @@ let _swReady = (async () => {
     }
   }
 
-
-
-
-
-
   let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
-
-
-
-
-
-
-
 
   if (!navigator.serviceWorker.controller) {
     console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
@@ -3636,13 +3241,11 @@ let _swReady = (async () => {
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 async function sendSingle(text, stream) {
 
-
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
   const { id: convId, messages: convMessages, host } = stream;
-
 
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
@@ -3653,9 +3256,7 @@ async function sendSingle(text, stream) {
   startTotalTimer(stream);
   let wasAborted = false;
 
-
   const config = await buildAgentConfig(convMessages);
-
 
   await _swReady;
   const ctrl = new AbortController();
@@ -3666,17 +3267,7 @@ async function sendSingle(text, stream) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-
   const renderer = new RoundRenderer(host, convMessages);
-
-
-
-
-
-
-
-
-
 
   let agentDoneSeen = false;
   let errorSeen = false;
@@ -3691,7 +3282,6 @@ async function sendSingle(text, stream) {
   };
   try {
 
-
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3704,17 +3294,7 @@ async function sendSingle(text, stream) {
       return;
     }
 
-
     await readAgentEvents(res.body, dispatch);
-
-
-
-
-
-
-
-
-
 
     if (!agentDoneSeen && !wasAborted && !errorSeen) {
       const trigger = lastInFlightTool
@@ -3735,25 +3315,15 @@ async function sendSingle(text, stream) {
     }
   } finally {
 
-
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
 
-
-
-
     renderer.finalize();
-
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
-
-
-
-
-
 
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
@@ -3861,7 +3431,6 @@ function dispatchAgentEvent(ev, renderer, host) {
     let moving = false;
     for (const [msg, s] of state) {
 
-
       const diff = s.target - s.current;
       if (Math.abs(diff) > 0.001) {
         s.current += diff * 0.12;
@@ -3885,7 +3454,6 @@ function dispatchAgentEvent(ev, renderer, host) {
     }
   }
   messages.addEventListener('scroll', onScroll, { passive: true });
-
 
   updateTargets();
   tick();
@@ -3914,32 +3482,6 @@ fetch('version.txt')
     const el = document.getElementById('versionDisplay');
     if (el) el.textContent = 'dev';
   });
-
-
-  /* Sidebar scroll hints — shadow + chevron */
-  (function() {
-    const SIDEBAR = document.querySelector('aside');
-    if (!SIDEBAR) return;
-    // Create hint elements
-    const topHint = document.createElement('div');
-    topHint.className = 'scroll-hint top';
-    topHint.textContent = '▲';
-    const bottomHint = document.createElement('div');
-    bottomHint.className = 'scroll-hint bottom';
-    bottomHint.textContent = '▼';
-    SIDEBAR.prepend(topHint);
-    SIDEBAR.appendChild(bottomHint);
-    function updateHints() {
-      const hasTop = SIDEBAR.scrollTop > 6;
-      const hasBottom = SIDEBAR.scrollTop + SIDEBAR.clientHeight < SIDEBAR.scrollHeight - 6;
-      topHint.classList.toggle('visible', hasTop);
-      bottomHint.classList.toggle('visible', hasBottom);
-    }
-    SIDEBAR.addEventListener('scroll', updateHints, { passive: true });
-    updateHints();
-    // Re-check when sidebar content changes
-    new MutationObserver(updateHints).observe(SIDEBAR, { childList: true, subtree: true });
-  })();
 
 </script>
 <script>
