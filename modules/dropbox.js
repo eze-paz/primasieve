@@ -79,7 +79,8 @@ async function dbxListFull(folderPath, { recursive = false } = {}) {
       kind: e['.tag'],
       path: e.path_display,
       size: e.size,
-      rev: e.content_hash,
+      rev: e.rev,
+      hash: e.content_hash,
       cloudMtime: e.server_modified,
     })),
     cursor: data.cursor,
@@ -102,7 +103,8 @@ async function dbxListContinue(cursor) {
       kind: e['.tag'],
       path: e.path_display,
       size: e.size,
-      rev: e.content_hash,
+      rev: e.rev,
+      hash: e.content_hash,
       cloudMtime: e.server_modified,
     })),
     cursor: data.cursor,
@@ -212,15 +214,18 @@ async function dbxUploadBatch(files) {
   return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
 }
 
-async function dbxDelete(path) {
-
-
-
-
+async function dbxDelete(path, rev = null) {
+  const body = { path };
+  if (rev) body.parent_rev = rev;
   try {
-    return await dbxApi('/2/files/delete_v2', { path });
+    return await dbxApi('/2/files/delete_v2', body);
   } catch (e) {
-    if (String(e.message).includes('not_found')) return null;
+    const msg = String(e.message);
+    if (msg.includes('not_found')) return null;
+    if (msg.includes('parent_rev') || msg.includes('conflict')) {
+      console.warn(`[sync] dbxDelete ${path} skipped — file modified remotely since last sync`);
+      return { _skip: true };
+    }
     throw e;
   }
 }
