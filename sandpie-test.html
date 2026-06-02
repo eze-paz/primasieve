@@ -1222,7 +1222,7 @@ async function sync() {
         for (const r of results) {
           if (r.meta && r.meta['.tag'] === 'success') {
             state[r.rel] = {
-              rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
+              rev: r.meta.rev || (r.s && r.s.rev) || '',
               size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
               syncedMtime: r.lm,
             };
