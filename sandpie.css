@@ -1313,7 +1313,7 @@
     0deg, transparent, transparent 2px,
     rgba(0,240,255,0.015) 2px, rgba(0,240,255,0.015) 4px
   );
-  pointer-events: none; z-index: 9999;
+  pointer-events: none; z-index: 2;
 }
 [data-theme="cyberpunk"] aside {
   background: linear-gradient(180deg, #0a0a0f 0%, #080810 100%);
@@ -1562,23 +1562,14 @@
 [data-theme="cyberpunk"] .input-wrap {
   background: #050505;
   border: 1px solid #1a1a2e;
-  position: relative;
 }
-[data-theme="cyberpunk"] .input-wrap::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 13px;
-  padding: 1px;
-  background: linear-gradient(135deg, #00f0ff, #ff00a0, #ffea00);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-[data-theme="cyberpunk"] .input-wrap:focus-within::before { opacity: 0.4; }
+
+
 [data-theme="cyberpunk"] .input-wrap:focus-within {
-  border-color: #00f0ff;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#050505, #050505) padding-box,
+    linear-gradient(135deg, #00f0ff, #ff00a0, #ffea00) border-box;
   box-shadow: 0 0 0 3px rgba(0,240,255,0.15), 0 0 20px rgba(0,240,255,0.1);
 }
 [data-theme="cyberpunk"] .input-wrap textarea { color: #e8f4f8; font-family: 'JetBrains Mono', monospace; }
