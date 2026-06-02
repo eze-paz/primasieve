@@ -1426,8 +1426,30 @@ async function refreshFileList() {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
-            // folder context menu items
-            // file context menu items
+
+      if (it.kind === 'file') {
+        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
+        menuItems.push({ label: 'Download', action: () => {
+          const a = document.createElement('a');
+          a.href = 'opfs/' + it.fullKey;
+          a.target = '_blank';
+          a.download = it.name || it.fullKey.split('/').pop();
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }});
+      }
+
+      menuItems.push({ label: 'Delete', danger: true, action: async () => {
+        try {
+          await opfs.remove(it.fullKey);
+          const state = syncState();
+          if (state[it.fullKey]) delete state[it.fullKey];
+          setSyncState(state);
+          await refreshFileList();
+        } catch (e) { console.warn('delete failed:', it.fullKey, e); }
+      }});
+
       showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
