@@ -2039,10 +2039,12 @@
 }
 [data-theme="electric"] aside button:disabled,
 [data-theme="electric"] aside button:disabled:hover {
-  background: #ffc400;
-  border-color: #ffc400;
-  color: #0a0a0a;
-  animation: bounce-pulse 1s ease-in-out infinite;
+  background: transparent;
+  border-color: #2a2a2a;
+  color: #555;
+  cursor: not-allowed;
+  animation: none;
+  opacity: 0.6;
 }
 @keyframes bounce-pulse {
   0%, 100% { transform: scale(1); }
