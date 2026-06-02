@@ -106,25 +106,21 @@
       <ul class="fs-list" id="fileList"></ul>
     </div>
   </details>
-  <details class="service" id="themeSection">
+    <details class="service" id="themeSection">
     <summary>Appearance</summary>
     <div class="service-body">
       <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-        <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
+        <button class="ghost theme-btn" data-t="classic-dark"  onclick="setTheme('classic-dark')"  title="Classic dark">Dark</button>
         <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
-        <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
-        <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
-        <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
+        <button class="ghost theme-btn" data-t="cyberpunk"     onclick="setTheme('cyberpunk')"      title="Neon cyberpunk">Cybr</button>
+        <button class="ghost theme-btn" data-t="aurora"        onclick="setTheme('aurora')"         title="Aurora glass">Aurora</button>
+        <button class="ghost theme-btn" data-t="electric"      onclick="setTheme('electric')"       title="Electric bold">Bold</button>
       </div>
-      <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.375rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
-        <label style="font-size:0.7rem;color:var(--sp-text-dim);text-transform:uppercase;letter-spacing:0.05em;">Accent</label>
-        <div style="display:flex;gap:0.35rem;align-items:center;">
-          <input type="color" id="themeAccentPicker" style="padding:0;width:28px;height:28px;border:none;background:transparent;cursor:pointer;" oninput="applyThemeColor(this.value)">
-          <span id="themeAccentValue" style="font-size:0.72rem;color:var(--sp-text-dim);font-family:'JetBrains Mono',monospace;"></span>
-        </div>
+      <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);max-height:320px;overflow-y:auto;">
+        <div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
         <div style="display:flex;gap:0.35rem;margin-top:0.25rem;">
           <button class="ghost" onclick="resetThemeColors()" style="font-size:0.72rem;flex:1;">Reset defaults</button>
-          <button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;flex:1;">Save colors</button>
+          <button class="ghost" onclick="saveThemeColors()"  style="font-size:0.72rem;flex:1;">Save colors</button>
         </div>
       </div>
       <p class="hint" id="themeHint" style="margin-top:0.25rem;">Pick a look. Saved locally.</p>
@@ -178,6 +174,268 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
+
+
+/* ---- Full-Palette Theme System ---- */
+const _themePalettes = {
+  'classic-dark': {
+    bg: '#0d1117', surface: '#161b22', panel: '#21262d',
+    accent: '#58a6ff', text: '#e6edf3', textDim: '#9ab0c8',
+    border: '#30363d', borderBright: '#484f58',
+    success: '#3fb950', danger: '#f85149', warn: '#d29922'
+  },
+  'classic-light': {
+    bg: '#ffffff', surface: '#f6f8fa', panel: '#eaeef2',
+    accent: '#85c4f0', text: '#1f2328', textDim: '#656d76',
+    border: '#d0d7de', borderBright: '#b0b7be',
+    success: '#1f883d', danger: '#cf222e', warn: '#9a6700'
+  },
+  'cyberpunk': {
+    bg: '#050505', surface: '#0a0a0f', panel: '#11111a',
+    accent: '#00f0ff', text: '#e8f4f8', textDim: '#7a8a9a',
+    border: '#1a1a2e', borderBright: '#2d2d44',
+    success: '#00ff88', danger: '#ff3366', warn: '#ffaa00'
+  },
+  'aurora': {
+    bg: '#070b14', surface: 'rgba(15,23,42,0.6)', panel: 'rgba(30,41,59,0.5)',
+    accent: '#38bdf8', text: '#f1f5f9', textDim: '#94a3b8',
+    border: 'rgba(148,163,184,0.12)', borderBright: 'rgba(148,163,184,0.2)',
+    success: '#34d399', danger: '#f87171', warn: '#fbbf24'
+  },
+  'electric': {
+    bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
+    accent: '#ff3b5c', text: '#fafafa', textDim: '#888',
+    border: '#2a2a2a', borderBright: '#444',
+    success: '#00e676', danger: '#ff1744', warn: '#ffc400'
+  }
+};
+
+const _paletteLabels = {
+  bg:'Background', surface:'Surface', panel:'Panel',
+  accent:'Accent', text:'Text', textDim:'Muted text',
+  border:'Border', borderBright:'Bright border',
+  success:'Success', danger:'Danger', warn:'Warning'
+};
+
+/* main entry */
+function setTheme(name) {
+  var map = { 'midnight':'classic-dark', 'light':'classic-light' };
+  name = map[name] || name;
+  if (!_themePalettes[name]) name = 'classic-dark';
+
+  // 1. set data-theme attribute  
+  if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
+  else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.setAttribute('data-theme', name);
+
+  localStorage.setItem('sandpie-theme', name);
+
+  // 2. apply palette (defaults + any saved custom overrides)
+  applyThemePalette(name);
+
+  // 3. build UI
+  buildPaletteUI(name);
+  $('themeCustomize').style.display = 'flex';
+  updateThemeButtons();
+}
+
+/* apply palette: start from defaults, layer saved custom, inject override <style> */
+function applyThemePalette(name) {
+  var palette = Object.assign({}, _themePalettes[name]);
+  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
+  if (saved) {
+    try { Object.assign(palette, JSON.parse(saved)); } catch(e) {}
+  }
+
+  // build CSS text for injected <style>
+  var css = '';
+  for (var key in palette) {
+    css += '  --sp-' + key + ': ' + palette[key] + ' !important;\n';
+  }
+
+  // accent-dim needs to be derived
+  var accent = palette.accent || '#58a6ff';
+  var hex = accent.replace('#','');
+  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  css += '  --sp-accent-dim: rgba(' + r + ',' + g + ',' + b + ',0.35) !important;\n';
+
+  var scope = '[data-theme="' + name + '"]';
+  if (name === 'classic-dark') scope = ':root, [data-theme="classic-dark"]';  
+  else if (name === 'classic-light') scope = '[data-theme="light"]';  
+
+  var style = $('themeOverride');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'themeOverride';
+    document.head.appendChild(style);
+  }
+  style.textContent = scope + ' {\n' + css + '}';
+
+  computeAccentNeg();
+}
+
+/* build dynamic color pickers */
+function buildPaletteUI(name) {
+  var container = $('themePaletteRows');
+  if (!container) return;
+  container.innerHTML = '';
+
+  var palette = Object.assign({}, _themePalettes[name]);
+  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
+  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
+
+  for (var key in palette) {
+    var label = _paletteLabels[key] || key;
+    var val = palette[key];
+    // skip non-hex / rgba values (color input can't handle them)
+    if (!val.startsWith('#') || val.length !== 7) continue;
+
+    var row = document.createElement('div');
+    row.className = 'palette-row';
+    row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
+
+    var picker = document.createElement('input');
+    picker.type = 'color';
+    picker.value = val.toUpperCase();
+    picker.dataset.key = key;
+    picker.style.cssText = 'padding:0;width:28px;height:28px;border:none;background:transparent;cursor:pointer;';
+    picker.addEventListener('input', onPaletteInput);
+
+    var span = document.createElement('span');
+    span.textContent = label;
+    span.style.cssText = 'font-size:0.75rem;color:var(--sp-text-dim);flex:1;';
+
+    var hexVal = document.createElement('span');
+    hexVal.textContent = val.toUpperCase();
+    hexVal.style.cssText = 'font-size:0.72rem;color:var(--sp-text-dim);font-family:"JetBrains Mono",monospace;min-width:5em;text-align:right;';
+    hexVal.dataset.hexFor = key;
+
+    row.appendChild(picker);
+    row.appendChild(span);
+    row.appendChild(hexVal);
+    container.appendChild(row);
+  }
+}
+
+function onPaletteInput(e) {
+  var key = e.target.dataset.key;
+  var val = e.target.value;
+  // Update hex label
+  var hexLabel = document.querySelector('[data-hex-for="' + key + '"]');
+  if (hexLabel) hexLabel.textContent = val.toUpperCase();
+  // Re-apply entire palette immediately
+  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
+  var palette = Object.assign({}, _themePalettes[name]);
+  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
+  palette[key] = val;
+
+  // Temporarily inject without saving to localStorage yet (live preview)
+  var css = '';
+  for (var k in palette) {
+    css += '  --sp-' + k + ': ' + palette[k] + ' !important;\n';
+  }
+  var hex = (palette.accent || '#58a6ff').replace('#','');
+  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  css += '  --sp-accent-dim: rgba(' + r + ',' + g + ',' + b + ',0.35) !important;\n';
+
+  var scope = '[data-theme="' + name + '"]';
+  if (name === 'classic-dark') scope = ':root, [data-theme="classic-dark"]';  
+  else if (name === 'classic-light') scope = '[data-theme="light"]';  
+
+  var style = $('themeOverride');
+  if (style) style.textContent = scope + ' {\n' + css + '}';
+  computeAccentNeg();
+}
+
+function saveThemeColors() {
+  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  var rows = document.querySelectorAll('#themePaletteRows .palette-row');
+  var palette = Object.assign({}, _themePalettes[name]);
+  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
+  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
+
+  rows.forEach(function(row) {
+    var picker = row.querySelector('input[type="color"]');
+    if (picker) palette[picker.dataset.key] = picker.value;
+  });
+  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
+
+  // Re-apply cleanly
+  applyThemePalette(name);
+
+  var hint = $('themeHint');
+  if (hint) {
+    hint.textContent = 'Saved for ' + name;
+    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
+  }
+}
+
+function resetThemeColors() {
+  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  localStorage.removeItem('sandpie-theme-palette-' + name);
+  applyThemePalette(name);
+  buildPaletteUI(name);
+
+  var hint = $('themeHint');
+  if (hint) {
+    hint.textContent = 'Reset to defaults';
+    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
+  }
+}
+
+function updateThemeButtons() {
+  var current = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  document.querySelectorAll('.theme-btn').forEach(function(btn) {
+    var active = btn.dataset.t === current;
+    btn.style.borderColor = active ? 'var(--sp-accent)' : '';
+    btn.style.color = active ? 'var(--sp-accent)' : '';
+    btn.style.background = active ? 'var(--sp-panel)' : '';
+  });
+}
+
+function computeAccentNeg() {
+  var root = document.documentElement;
+  var accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
+  if (!accent) return;
+  var hex = accent.replace('#','');
+  var r = parseInt(hex.slice(0,2),16)/255;
+  var g = parseInt(hex.slice(2,4),16)/255;
+  var b = parseInt(hex.slice(4,6),16)/255;
+  var max = Math.max(r,g,b), min = Math.min(r,g,b);
+  var h = 0, s = 0, l = (max+min)/2;
+  if (max !== min) {
+    var d = max-min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g < b ? 6 : 0))/6; break;
+      case g: h = ((b-r)/d + 2)/6; break;
+      case b: h = ((r-g)/d + 4)/6; break;
+    }
+  }
+  h = (h + 0.5) % 1;
+  var hue2rgb = function(p,q,t) {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q-p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q-p) * (2/3 - t) * 6;
+    return p;
+  };
+  var q = l < 0.5 ? l*(1+s) : l+s-l*s;
+  var p = 2*l-q;
+  var rr = Math.round(hue2rgb(p,q,h+1/3)*255);
+  var gg = Math.round(hue2rgb(p,q,h)*255);
+  var bb = Math.round(hue2rgb(p,q,h-1/3)*255);
+  var neg = '#' + [rr,gg,bb].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
+  root.style.setProperty('--sp-accent-neg', neg);
+}
+
+/* ---- Init on load ---- */
+document.addEventListener('DOMContentLoaded', function(){
+  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  setTheme(saved);
+});
 
 
 /* ---- Rich Theme System ---- */
