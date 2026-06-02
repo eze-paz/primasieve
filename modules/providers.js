@@ -182,6 +182,8 @@ function openProviderModal(providerId = null) {
   if (mt) mt.value = (p && p.maxTokens != null) ? p.maxTokens : '';
   const tp = document.getElementById('modalTemperature');
   if (tp) tp.value = (p && p.temperature != null) ? p.temperature : '';
+  const cw = document.getElementById('modalContextWindow');
+  if (cw) cw.value = (p && p.contextWindow != null) ? p.contextWindow : '';
   document.getElementById('providerModal').style.display = '';
 }
 
@@ -206,6 +208,7 @@ function saveProviderModal() {
   // them; where absent, leave any stored values untouched (don't clobber).
   const mtEl = document.getElementById('modalMaxTokens');
   const tpEl = document.getElementById('modalTemperature');
+  const cwEl = document.getElementById('modalContextWindow');
   function applyTuning(p) {
     if (mtEl) {
       const v = parseInt(mtEl.value, 10);
@@ -214,6 +217,10 @@ function saveProviderModal() {
     if (tpEl) {
       const t = parseFloat(tpEl.value);
       if (Number.isFinite(t) && t >= 0) p.temperature = t; else delete p.temperature;
+    }
+    if (cwEl) {
+      const c = parseInt(cwEl.value, 10);
+      if (Number.isFinite(c) && c > 0) p.contextWindow = c; else delete p.contextWindow;
     }
   }
 
@@ -278,6 +285,7 @@ function duplicateProviderFromMenu() {
   };
   if (p.maxTokens != null) copy.maxTokens = p.maxTokens;
   if (p.temperature != null) copy.temperature = p.temperature;
+  if (p.contextWindow != null) copy.contextWindow = p.contextWindow;
   _providers.push(copy);
   saveProviders();
   renderChips();
