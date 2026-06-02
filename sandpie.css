@@ -1653,6 +1653,7 @@
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
 }
+[data-theme="aurora"] aside details.service::before { display: none; }
 [data-theme="aurora"] aside input {
   background: rgba(0,0,0,0.2);
   border: 1px solid rgba(255,255,255,0.08);
@@ -1936,6 +1937,7 @@
   color: #fafafa;
 }
 [data-theme="electric"] aside details.service .service-body { background: #141414; }
+[data-theme="electric"] aside details.service::before { display: none; }
 [data-theme="electric"] aside input {
   background: #0a0a0a;
   border: 2px solid #2a2a2a;
