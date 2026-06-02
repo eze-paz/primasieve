@@ -1870,7 +1870,8 @@
   --sp-danger: var(--sp-danger);
   --sp-warn: #ffc400;
 
-  --sp-accent-2: #ffcc00;}
+  --sp-accent-2: #ffcc00;
+  --sp-elb-ffffff: #ffffff;}
 [data-theme="electric"] body {
   background: var(--sp-bg); color: var(--sp-text);
   font: 14px 'Space Grotesk', -apple-system, system-ui, sans-serif;
