@@ -1172,14 +1172,14 @@ const tools = {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
 REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
-PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
-Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
-HTTP: pyodide.http.pyfetch (CORS). Non-CORS: pyfetch('/proxy/host/path').
+ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it freezes the whole app) — use await asyncio.sleep(n).
+PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
+HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
 OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
 Examples:
   run      → {path: "scripts/random_numbers.py", args: ["5"]}
   with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
-  numpy    → script imports numpy as np — prebuilt, no install needed
+  async    → script ends with await main()  (NOT asyncio.run(main()))
   pypi     → script runs: import micropip; await micropip.install('feedparser')
   html out → script writes artifacts/out.html, then show_artifact({"path":"artifacts/out.html"})`,
     parameters: {
@@ -3527,9 +3527,11 @@ async function sendSingle(text, stream) {
 
 
   let agentDoneSeen = false;
+  let errorSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
     if (ev.type === 'agent_done')  agentDoneSeen = true;
+    if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
     if (ev.type === 'tool_result')  lastInFlightTool = null;
     dispatchAgentEvent(ev, renderer, host);
@@ -3561,7 +3563,7 @@ async function sendSingle(text, stream) {
 
 
 
-    if (!agentDoneSeen && !wasAborted) {
+    if (!agentDoneSeen && !wasAborted && !errorSeen) {
       const trigger = lastInFlightTool
         ? ` while running \`${lastInFlightTool}\``
         : '';
