@@ -1945,6 +1945,7 @@ class SidePanel {
     this._render();
     refreshSendButtonForActive();
     refreshConversationList();
+    if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
   }
 
 
@@ -3097,6 +3098,7 @@ function mountConv(convId) {
     messages = [];
   }
   refreshSendButtonForActive();
+  if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -3940,9 +3942,8 @@ fetch('version.txt')
 </script>
 <script>
 function _bootSandpie() {
-  if (typeof init !== 'function') { setTimeout(_bootSandpie, 50); return; }
-  if (typeof DOMPurify === 'undefined') { setTimeout(_bootSandpie, 50); return; }
-  init();
+  // applySavedCustom() restores saved theme from localStorage.
+  // If DOMPurify hasn't loaded yet, that's fine — theme can still apply.
   applySavedCustom();
 }
 if (document.readyState === 'loading') {
