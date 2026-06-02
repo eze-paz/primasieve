@@ -8,24 +8,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>
-(function(){
-  var t = localStorage.getItem('sandpie-theme');
-  if (!t) return;
-  if (t !== 'classic-dark' && t !== 'midnight') {
-    document.documentElement.setAttribute('data-theme', t === 'classic-light' || t === 'light' ? 'light' : t);
-  }
-})();
-</script>
-
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<link rel="stylesheet" href="sandpie.css">
-
-  <script src="modules/dropbox.js"></script>
-  <script src="modules/images.js"></script>
-<script>SandpieImages.init();</script>
+<script>init();
+document.addEventListener("DOMContentLoaded", applySavedCustom);</script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/notifications.js"></script>
 </head>
@@ -260,7 +244,7 @@ const SandpieTokens = (() => {
 })();
 window.SandpieTokens = SandpieTokens;
 
-/* ---- Full-Palette Theme System ---- */
+/* ========== Theme Palette System ========== */
 const _themePalettes = {
   'classic-dark': {
     bg: '#0d1117', surface: '#161b22', panel: '#21262d',
@@ -293,166 +277,112 @@ const _themePalettes = {
     success: '#00e676', danger: '#ff1744', warn: '#ffc400'
   }
 };
-
 const _paletteLabels = {
-  bg:'Background', surface:'Surface', panel:'Panel',
-  accent:'Accent', text:'Text', textDim:'Muted text',
-  border:'Border', borderBright:'Bright border',
-  success:'Success', danger:'Danger', warn:'Warning'
+  bg: 'Background', surface: 'Surface', panel: 'Panel',
+  accent: 'Accent', text: 'Text', textDim: 'Muted text',
+  border: 'Border', borderBright: 'Bright border',
+  success: 'Success', danger: 'Danger', warn: 'Warning'
 };
 
-/* main entry */
 function setTheme(name) {
-  var map = { 'midnight':'classic-dark', 'light':'classic-light' };
+  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
   name = map[name] || name;
   if (!_themePalettes[name]) name = 'classic-dark';
-
-  // 1. set data-theme attribute  
   if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
   else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
   else document.documentElement.setAttribute('data-theme', name);
-
   localStorage.setItem('sandpie-theme', name);
-
-  // 2. apply palette (defaults + any saved custom overrides)
   applyThemePalette(name);
-
-  // 3. build UI
   buildPaletteUI(name);
   $('themeCustomize').style.display = 'flex';
   updateThemeButtons();
-}
-
-/* apply palette: start from defaults, layer saved custom, inject override <style> */
-function applyThemePalette(name) {
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) {
-    try { Object.assign(palette, JSON.parse(saved)); } catch(e) {}
-  }
-
-  // build CSS text for injected <style>
-  var css = '';
-  for (var key in palette) {
-    css += '  --sp-' + key + ': ' + palette[key] + ' !important;\n';
-  }
-
-  // accent-dim needs to be derived
-  var accent = palette.accent || '#58a6ff';
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  css += '  --sp-accent-dim: rgba(' + r + ',' + g + ',' + b + ',0.35) !important;\n';
-
-  var scope = '[data-theme="' + name + '"]';
-  if (name === 'classic-dark') scope = ':root, [data-theme="classic-dark"]';  
-  else if (name === 'classic-light') scope = '[data-theme="light"]';  
-
-  var style = $('themeOverride');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = 'themeOverride';
-    document.head.appendChild(style);
-  }
-  style.textContent = scope + ' {\n' + css + '}';
-
   computeAccentNeg();
 }
 
-/* build dynamic color pickers */
+function applyThemePalette(name) {
+  var palette = Object.assign({}, _themePalettes[name]);
+  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
+  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
+  var css = ':root{ ';
+  for (var key in palette) {
+    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
+    css += prop + ':' + palette[key] + '!important; ';
+  }
+  css += '}';
+  var style = document.getElementById('themeOverride');
+  if (!style) { style = document.createElement('style'); style.id = 'themeOverride'; document.head.appendChild(style); }
+  style.textContent = css;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette.accent);
+}
+
 function buildPaletteUI(name) {
   var container = $('themePaletteRows');
   if (!container) return;
   container.innerHTML = '';
-
   var palette = Object.assign({}, _themePalettes[name]);
   var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
-
+  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
   for (var key in palette) {
     var label = _paletteLabels[key] || key;
     var val = palette[key];
-    // skip non-hex / rgba values (color input can't handle them)
-    if (!val.startsWith('#') || val.length !== 7) continue;
-
+    var hexVal = (!val.startsWith('#') || val.length !== 7) ? rgbaToHex(val) : val;
+    if (!hexVal) continue;
     var row = document.createElement('div');
     row.className = 'palette-row';
     row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
-
     var picker = document.createElement('input');
     picker.type = 'color';
-    picker.value = val.toUpperCase();
+    picker.value = hexVal.toUpperCase();
     picker.dataset.key = key;
+    picker.dataset.origVal = val;
     picker.style.cssText = 'padding:0;width:28px;height:28px;border:none;background:transparent;cursor:pointer;';
     picker.addEventListener('input', onPaletteInput);
-
-    var span = document.createElement('span');
-    span.textContent = label;
-    span.style.cssText = 'font-size:0.75rem;color:var(--sp-text-dim);flex:1;';
-
-    var hexVal = document.createElement('span');
-    hexVal.textContent = val.toUpperCase();
-    hexVal.style.cssText = 'font-size:0.72rem;color:var(--sp-text-dim);font-family:"JetBrains Mono",monospace;min-width:5em;text-align:right;';
-    hexVal.dataset.hexFor = key;
-
+    var lab = document.createElement('span');
+    lab.textContent = label;
+    lab.style.cssText = 'font-size:0.75rem;color:var(--sp-text-dim);flex:1;';
+    var hexDisp = document.createElement('span');
+    hexDisp.className = 'hex';
+    hexDisp.textContent = hexVal.toUpperCase();
+    hexDisp.style.cssText = 'font-size:0.72rem;color:var(--sp-text-dim);font-family:"JetBrains Mono",monospace;min-width:5em;text-align:right;';
+    hexDisp.dataset.hexFor = key;
     row.appendChild(picker);
-    row.appendChild(span);
-    row.appendChild(hexVal);
+    row.appendChild(lab);
+    row.appendChild(hexDisp);
     container.appendChild(row);
   }
 }
 
 function onPaletteInput(e) {
-  var key = e.target.dataset.key;
-  var val = e.target.value;
-  // Update hex label
-  var hexLabel = document.querySelector('[data-hex-for="' + key + '"]');
-  if (hexLabel) hexLabel.textContent = val.toUpperCase();
-  // Re-apply entire palette immediately
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  var palette = Object.assign({}, _themePalettes[name]);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
-  palette[key] = val;
-
-  // Temporarily inject without saving to localStorage yet (live preview)
-  var css = '';
-  for (var k in palette) {
-    css += '  --sp-' + k + ': ' + palette[k] + ' !important;\n';
+  var picker = e.target;
+  var key = picker.dataset.key;
+  var color = picker.value;
+  var hexDisp = picker.parentNode.querySelector('[data-hex-for="' + key + '"]');
+  if (hexDisp) hexDisp.textContent = color.toUpperCase();
+  var style = document.getElementById('themeOverride');
+  if (style) {
+    var css = style.textContent;
+    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
+    var re = new RegExp(prop + ':[^!;]+');
+    if (re.test(css)) {
+      css = css.replace(re, prop + ':' + color);
+    } else {
+      css = css.replace('}', ' ' + prop + ':' + color + '}');
+    }
+    style.textContent = css;
   }
-  var hex = (palette.accent || '#58a6ff').replace('#','');
-  var r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  css += '  --sp-accent-dim: rgba(' + r + ',' + g + ',' + b + ',0.35) !important;\n';
-
-  var scope = '[data-theme="' + name + '"]';
-  if (name === 'classic-dark') scope = ':root, [data-theme="classic-dark"]';  
-  else if (name === 'classic-light') scope = '[data-theme="light"]';  
-
-  var style = $('themeOverride');
-  if (style) style.textContent = scope + ' {\n' + css + '}';
-  computeAccentNeg();
 }
 
 function saveThemeColors() {
   var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  var rows = document.querySelectorAll('#themePaletteRows .palette-row');
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch(e) {} }
-
-  rows.forEach(function(row) {
-    var picker = row.querySelector('input[type="color"]');
+  var palette = {};
+  var rows = $('themePaletteRows').querySelectorAll('.palette-row');
+  for (var i = 0; i < rows.length; i++) {
+    var picker = rows[i].querySelector('input[type="color"]');
     if (picker) palette[picker.dataset.key] = picker.value;
-  });
-  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
-
-  // Re-apply cleanly
-  applyThemePalette(name);
-
-  var hint = $('themeHint');
-  if (hint) {
-    hint.textContent = 'Saved for ' + name;
-    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
   }
+  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
+  var hint = $('themeHint');
+  if (hint) { hint.textContent = 'Colors saved!'; hint.style.opacity = '1'; setTimeout(function () { hint.style.opacity = '0'; }, 1200); }
 }
 
 function resetThemeColors() {
@@ -460,23 +390,32 @@ function resetThemeColors() {
   localStorage.removeItem('sandpie-theme-palette-' + name);
   applyThemePalette(name);
   buildPaletteUI(name);
-
-  var hint = $('themeHint');
-  if (hint) {
-    hint.textContent = 'Reset to defaults';
-    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
-  }
 }
 
 function updateThemeButtons() {
-  var current = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  document.querySelectorAll('.theme-btn').forEach(function(btn) {
-    var active = btn.dataset.t === current;
-    btn.style.borderColor = active ? 'var(--sp-accent)' : '';
-    btn.style.color = active ? 'var(--sp-accent)' : '';
-    btn.style.background = active ? 'var(--sp-panel)' : '';
+  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  document.querySelectorAll('.theme-btn[data-t]').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.t === name);
   });
 }
+
+function applySavedCustom() {
+  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  if (saved && _themePalettes[saved]) {
+    setTheme(saved);
+    var pal = localStorage.getItem('sandpie-theme-palette-' + saved);
+    if (pal) { try { Object.assign(_themePalettes[saved], JSON.parse(pal)); applyThemePalette(saved); } catch (e) {} }
+  } else {
+    setTheme('classic-dark');
+  }
+}
+
+function rgbaToHex(rgba) {
+  var m = rgba.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!m) return null;
+  return '#' + [+m[1], +m[2], +m[3]].map(function (x) { return x.toString(16).padStart(2, '0'); }).join('');
+}
+
 
 function computeAccentNeg() {
   var root = document.documentElement;
