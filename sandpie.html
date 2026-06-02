@@ -305,14 +305,23 @@ function applyThemePalette(name) {
   if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
   var css = ':root{ ';
   for (var key in palette) {
+    if (key === 'accent-dim') continue; // derived, handled separately
     var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
     css += prop + ':' + palette[key] + '!important; ';
+  }
+  // Inject accent-dim if present in saved palette
+  if (palette['accent-dim']) {
+    css += '--sp-accent-dim:' + palette['accent-dim'] + '!important; ';
   }
   css += '}';
   var style = document.getElementById('themeOverride');
   if (!style) { style = document.createElement('style'); style.id = 'themeOverride'; document.head.appendChild(style); }
   style.textContent = css;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette.accent);
+  // Sync derived colors from current accent
+  if (palette.accent && palette.accent.startsWith('#')) {
+    updateDerivedColors(palette.accent);
+  }
 }
 
 function buildPaletteUI(name) {
@@ -370,6 +379,9 @@ function onPaletteInput(e) {
     }
     style.textContent = css;
   }
+  if (key === 'accent') {
+    updateDerivedColors(color);
+  }
 }
 
 function saveThemeColors() {
@@ -379,6 +391,12 @@ function saveThemeColors() {
   for (var i = 0; i < rows.length; i++) {
     var picker = rows[i].querySelector('input[type="color"]');
     if (picker) palette[picker.dataset.key] = picker.value;
+  }
+  // Also save derived accent-dim so applyThemePalette can restore it
+  var style = document.getElementById('themeOverride');
+  if (style) {
+    var m = style.textContent.match(/--sp-accent-dim:([^!;]+)/);
+    if (m) palette['accent-dim'] = m[1].trim();
   }
   localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
   var hint = $('themeHint');
@@ -390,6 +408,10 @@ function resetThemeColors() {
   localStorage.removeItem('sandpie-theme-palette-' + name);
   applyThemePalette(name);
   buildPaletteUI(name);
+  var defaultAccent = _themePalettes[name].accent;
+  if (defaultAccent && defaultAccent.startsWith('#')) {
+    updateDerivedColors(defaultAccent);
+  }
 }
 
 function updateThemeButtons() {
@@ -414,6 +436,31 @@ function rgbaToHex(rgba) {
   var m = rgba.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
   if (!m) return null;
   return '#' + [+m[1], +m[2], +m[3]].map(function (x) { return x.toString(16).padStart(2, '0'); }).join('');
+}
+
+function updateDerivedColors(accent) {
+  // Derive accent-dim from accent at 15% opacity
+  var hex = accent.replace('#','');
+  var r = parseInt(hex.slice(0,2),16);
+  var g = parseInt(hex.slice(2,4),16);
+  var b = parseInt(hex.slice(4,6),16);
+  var dim = 'rgba(' + r + ',' + g + ',' + b + ',0.15)';
+
+  // Inject into override style
+  var style = document.getElementById('themeOverride');
+  if (style) {
+    var css = style.textContent;
+    // Replace or add --sp-accent-dim
+    if (css.indexOf('--sp-accent-dim:') >= 0) {
+      css = css.replace(/--sp-accent-dim:[^!;]+/, '--sp-accent-dim:' + dim);
+    } else {
+      css = css.replace('}', ' --sp-accent-dim:' + dim + '}');
+    }
+    style.textContent = css;
+  }
+
+  // Also re-run accent-neg computation
+  computeAccentNeg();
 }
 
 function computeAccentNeg() {
