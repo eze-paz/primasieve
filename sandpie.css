@@ -1857,21 +1857,22 @@
    THEME: ELECTRIC BOLD
    ------------------------------------------------------------------------------ */
 [data-theme="electric"] {
-  --sp-bg: #0a0a0a;
-  --sp-surface: #141414;
-  --sp-border: #2a2a2a;
-  --sp-border-bright: #444;
-  --sp-panel: #1e1e1e;
-  --sp-accent: #ff3b5c;
+  --sp-bg: var(--sp-bg);
+  --sp-surface: var(--sp-surface);
+  --sp-border: var(--sp-border);
+  --sp-border-bright: var(--sp-border-bright);
+  --sp-panel: var(--sp-panel);
+  --sp-accent: var(--sp-accent);
   --sp-accent-dim: rgba(255,59,92,0.15);
-  --sp-text: #fafafa;
-  --sp-text-dim: #888;
-  --sp-success: #00e676;
-  --sp-danger: #ff1744;
+  --sp-text: var(--sp-text);
+  --sp-text-dim: var(--sp-text-dim);
+  --sp-success: var(--sp-success);
+  --sp-danger: var(--sp-danger);
   --sp-warn: #ffc400;
-}
+
+  --sp-accent-2: #ffcc00;}
 [data-theme="electric"] body {
-  background: #0a0a0a; color: #fafafa;
+  background: var(--sp-bg); color: var(--sp-text);
   font: 14px 'Space Grotesk', -apple-system, system-ui, sans-serif;
 }
 [data-theme="electric"] body::after {
@@ -1884,8 +1885,8 @@
   pointer-events: none; z-index: 0;
 }
 [data-theme="electric"] aside {
-  background: #141414;
-  border-right: 1px solid #2a2a2a;
+  background: var(--sp-surface);
+  border-right: 1px solid var(--sp-border);
   box-shadow: 4px 0 24px rgba(0,0,0,0.5);
 }
 [data-theme="electric"] .sidebar-brand,
@@ -1895,66 +1896,66 @@
   font-size: 1.35rem;
   letter-spacing: -0.02em;
 }
-[data-theme="electric"] .sidebar-brand .bracket { color: #ff3b5c; transition: color 0.2s; }
-[data-theme="electric"] .sidebar-brand:hover .bracket { color: #ffcc00; }
-[data-theme="electric"] .sidebar-brand .name { color: #fafafa; transition: color 0.2s; }
-[data-theme="electric"] .sidebar-brand:hover .name { color: #ff3b5c; }
+[data-theme="electric"] .sidebar-brand .bracket { color: var(--sp-accent); transition: color 0.2s; }
+[data-theme="electric"] .sidebar-brand:hover .bracket { color: var(--sp-accent-2); }
+[data-theme="electric"] .sidebar-brand .name { color: var(--sp-text); transition: color 0.2s; }
+[data-theme="electric"] .sidebar-brand:hover .name { color: var(--sp-accent); }
 [data-theme="electric"] .sidebar-collapse-btn {
-  background: #1e1e1e;
-  border: 2px solid #2a2a2a;
-  color: #fafafa;
+  background: var(--sp-panel);
+  border: 2px solid var(--sp-border);
+  color: var(--sp-text);
   border-radius: 10px;
   font-size: 1rem; font-weight: 700;
 }
 [data-theme="electric"] .sidebar-collapse-btn:hover {
-  background: #ff3b5c; border-color: #ff3b5c; color: #fff;
+  background: var(--sp-accent); border-color: var(--sp-accent); color: #ffffff;
   transform: rotate(-90deg);
 }
 [data-theme="electric"] aside details.service summary {
-  background: #1e1e1e;
-  border: 2px solid #2a2a2a;
+  background: var(--sp-panel);
+  border: 2px solid var(--sp-border);
   border-radius: 10px;
-  color: #888;
+  color: var(--sp-text-dim);
 }
 [data-theme="electric"] aside details.service summary::before {
   content: '+';
   font-size: 1em; font-weight: 700;
-  color: #ff3b5c;
+  color: var(--sp-accent);
   transition: transform 0.2s, color 0.2s;
   width: 1em; text-align: center;
 }
 [data-theme="electric"] aside details.service[open] summary {
-  color: #fff;
-  background: #ff3b5c;
-  border-color: #ff3b5c;
+  color: #ffffff;
+  background: var(--sp-accent);
+  border-color: var(--sp-accent);
   box-shadow: 0 2px 8px rgba(255,59,92,0.25);
 }
 [data-theme="electric"] aside details.service[open] summary::before {
   content: '\2212';
-  color: #fff;
+  color: #ffffff;
   transform: scale(1.1);
 }
 [data-theme="electric"] aside details.service summary:hover {
-  border-color: #ff3b5c;
-  color: #fafafa;
+  border-color: var(--sp-accent);
+  color: var(--sp-text);
 }
-[data-theme="electric"] aside details.service .service-body { background: #141414; }
+[data-theme="electric"] aside details.service .service-body { background: var(--sp-surface); }
 [data-theme="electric"] aside details.service::before { display: none; }
 [data-theme="electric"] aside input {
-  background: #0a0a0a;
-  border: 2px solid #2a2a2a;
-  color: #fafafa;
+  background: var(--sp-bg);
+  border: 2px solid var(--sp-border);
+  color: var(--sp-text);
   border-radius: 8px;
   font-size: 0.82rem; font-weight: 500;
 }
 [data-theme="electric"] aside input:focus {
-  border-color: #ff3b5c;
-  box-shadow: 0 0 0 4px rgba(255,59,92,0.08);
+  border-color: var(--sp-accent);
+  box-shadow: 0 0 0 4px var(--sp-elb-rgba255-59-92-008);
 }
 [data-theme="electric"] aside button {
-  background: #ff3b5c;
-  border: 2px solid #ff3b5c;
-  color: #fff;
+  background: var(--sp-accent);
+  border: 2px solid var(--sp-accent);
+  color: #ffffff;
   font-weight: 700;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -1962,27 +1963,27 @@
   border-radius: 8px;
 }
 [data-theme="electric"] aside button:hover {
-  background: #ffcc00;
-  border-color: #ffcc00;
-  color: #0a0a0a;
+  background: var(--sp-accent-2);
+  border-color: var(--sp-accent-2);
+  color: var(--sp-bg);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 [data-theme="electric"] aside button.ghost {
   background: transparent;
-  color: #ff3b5c;
-  border: 2px solid #2a2a2a;
+  color: var(--sp-accent);
+  border: 2px solid var(--sp-border);
 }
 [data-theme="electric"] aside button.ghost:hover {
-  background: rgba(255,59,92,0.08);
-  border-color: #ff3b5c;
-  color: #ff3b5c;
+  background: var(--sp-elb-rgba255-59-92-008);
+  border-color: var(--sp-accent);
+  color: var(--sp-accent);
 }
 [data-theme="electric"] aside button:disabled,
 [data-theme="electric"] aside button:disabled:hover {
   background: transparent;
-  border-color: #2a2a2a;
-  color: #555;
+  border-color: var(--sp-border);
+  color: var(--sp-text-dim);
   cursor: not-allowed;
   animation: none;
   opacity: 0.6;
@@ -1994,17 +1995,17 @@
 [data-theme="electric"] aside .status-dot {
   width: 10px; height: 10px;
   border-radius: 4px;
-  background: #2a2a2a;
+  background: var(--sp-border);
   transition: all 0.2s;
 }
 [data-theme="electric"] aside .status-dot.ok {
-  background: #00e676;
+  background: var(--sp-success);
   box-shadow: 0 0 8px rgba(0,230,118,0.5);
   border-radius: 50%;
   transform: rotate(0deg);
 }
 [data-theme="electric"] aside .status-dot.err {
-  background: #ff1744;
+  background: var(--sp-danger);
   box-shadow: 0 0 8px rgba(255,23,68,0.5);
   border-radius: 50%;
   transform: rotate(0deg);
@@ -2018,14 +2019,14 @@
   padding-right: 0.5rem;
 }
 [data-theme="electric"] ul.conv-list li:hover {
-  background: #1e1e1e;
-  border-color: #2a2a2a;
+  background: var(--sp-panel);
+  border-color: var(--sp-border);
 }
 [data-theme="electric"] ul.conv-list li.active {
-  background: #0a0a0a;
-  border-color: #ff3b5c;
+  background: var(--sp-bg);
+  border-color: var(--sp-accent);
   box-shadow: 0 2px 8px rgba(255,59,92,0.15);
-  color: #ff3b5c;
+  color: var(--sp-accent);
 }
 [data-theme="electric"] main { background: #0a0a0a; }
 [data-theme="electric"] .welcome-title {
@@ -2034,22 +2035,22 @@
   font-size: 3.5rem;
   letter-spacing: -0.03em;
 }
-[data-theme="electric"] .welcome-title .bracket { color: #ff3b5c; }
+[data-theme="electric"] .welcome-title .bracket { color: var(--sp-accent); }
 [data-theme="electric"] .welcome-title .name {
-  color: #fafafa;
+  color: var(--sp-text);
   position: relative;
 }
 [data-theme="electric"] .welcome-title .name::after {
   content: 'sandpie';
   position: absolute;
   top: 2px; left: 0;
-  color: #ff3b5c;
+  color: var(--sp-accent);
   opacity: 0.2;
   z-index: -1;
 }
 [data-theme="electric"] .welcome-by {
   font-weight: 600;
-  color: #888;
+  color: var(--sp-text-dim);
   letter-spacing: 0.15em;
   text-transform: uppercase;
   margin-top: 0.5rem;
@@ -2057,19 +2058,33 @@
 [data-theme="electric"] .welcome-rotating {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.7rem;
-  color: #888;
+  color: var(--sp-text-dim);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-top: 1.5rem;
   padding: 0.35rem 1rem;
-  border: 2px solid #2a2a2a;
+  border: 2px solid var(--sp-border);
   border-radius: 8px;
-  background: #1e1e1e;
+  background: var(--sp-panel);
 }
-[data-theme="electric"] .msg { max-width: 82%; }
+[data-theme="electric"] .msg { max-width: 82%; 
+  --sp-elb-ff3b5c: var(--sp-accent);
+  --sp-elb-fafafa: var(--sp-text);
+  --sp-elb-0a0a0a: var(--sp-bg);
+  --sp-elb-1e1e1e: var(--sp-panel);
+  --sp-elb-141414: var(--sp-surface);
+  --sp-elb-fff: #ffffff;
+  --sp-elb-888: var(--sp-text-dim);
+  --sp-elb-2a2a2a: var(--sp-border);
+  --sp-elb-ffcc00: var(--sp-accent-2);
+  --sp-elb-rgba255-59-92-008: var(--sp-elb-rgba255-59-92-008);
+  --sp-elb-555: var(--sp-text-dim);
+  --sp-elb-00e676: var(--sp-success);
+  --sp-elb-ff1744: var(--sp-danger);
+  --sp-elb-444: var(--sp-border-bright);}
 [data-theme="electric"] .user .bubble {
-  background: #fafafa;
-  color: #0a0a0a;
+  background: var(--sp-text);
+  color: var(--sp-bg);
   padding: 0.9rem 1.2rem;
   border-radius: 16px 16px 4px 16px;
   font-weight: 600;
@@ -2080,91 +2095,91 @@
 [data-theme="electric"] .user .bubble:hover { transform: translateY(-2px); }
 [data-theme="electric"] .user::before { display: none; }
 [data-theme="electric"] .assistant {
-  background: #141414;
-  border: 2px solid #2a2a2a;
+  background: var(--sp-surface);
+  border: 2px solid var(--sp-border);
   border-radius: 16px 16px 16px 4px;
-  color: #fafafa;
+  color: var(--sp-text);
   padding: 0.9rem 1.2rem;
   box-shadow: 0 1px 2px rgba(0,0,0,0.4);
   transition: all 0.2s;
   border-left: none;
 }
 [data-theme="electric"] .assistant:hover {
-  border-color: #444;
+  border-color: var(--sp-border-bright);
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 [data-theme="electric"] .assistant code {
-  background: #1e1e1e;
+  background: var(--sp-panel);
   padding: 0.15em 0.35em;
   border-radius: 4px;
-  border: 1px solid #2a2a2a;
-  color: #ff3b5c;
+  border: 1px solid var(--sp-border);
+  color: var(--sp-accent);
   font-weight: 600;
 }
 [data-theme="electric"] .assistant pre {
-  background: #1e1e1e;
-  border: 2px solid #2a2a2a;
+  background: var(--sp-panel);
+  border: 2px solid var(--sp-border);
   padding: 0.85rem;
   border-radius: 10px;
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-  color: #888;
+  color: var(--sp-text-dim);
 }
 [data-theme="electric"] form {
-  border-top: 2px solid #2a2a2a;
-  background: #141414;
+  border-top: 2px solid var(--sp-border);
+  background: var(--sp-surface);
 }
 [data-theme="electric"] .input-wrap {
-  background: #0a0a0a;
-  border: 2px solid #2a2a2a;
+  background: var(--sp-bg);
+  border: 2px solid var(--sp-border);
   border-radius: 16px;
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
 }
 [data-theme="electric"] .input-wrap:focus-within {
-  border-color: #ff3b5c;
-  box-shadow: 0 0 0 4px rgba(255,59,92,0.08), inset 0 2px 4px rgba(0,0,0,0.1);
+  border-color: var(--sp-accent);
+  box-shadow: 0 0 0 4px var(--sp-elb-rgba255-59-92-008), inset 0 2px 4px rgba(0,0,0,0.1);
 }
-[data-theme="electric"] .input-wrap textarea { color: #fafafa; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
-[data-theme="electric"] .input-bar { border-top: 2px solid #2a2a2a; min-height: 34px; }
+[data-theme="electric"] .input-wrap textarea { color: var(--sp-text); font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+[data-theme="electric"] .input-bar { border-top: 2px solid var(--sp-border); min-height: 34px; }
 [data-theme="electric"] .attach-btn {
   background: transparent !important;
-  color: #fafafa !important;
+  color: var(--sp-text) !important;
   border: 2px solid transparent !important;
   border-radius: 8px !important;
   font-size: 1.2rem !important;
   font-weight: 700 !important;
 }
-[data-theme="electric"] .attach-btn:hover { background: #1e1e1e !important; color: #ff3b5c !important; }
+[data-theme="electric"] .attach-btn:hover { background: var(--sp-panel) !important; color: var(--sp-accent) !important; }
 [data-theme="electric"] .send-btn {
   width: 36px; height: 36px;
-  background: #ff3b5c !important;
-  border: 2px solid #ff3b5c !important;
+  background: var(--sp-accent) !important;
+  border: 2px solid var(--sp-accent) !important;
   border-radius: 10px;
-  color: #fff !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 [data-theme="electric"] .send-btn:hover {
-  background: #fafafa !important;
-  border-color: #fafafa !important;
-  color: #0a0a0a !important;
+  background: var(--sp-text) !important;
+  border-color: var(--sp-text) !important;
+  color: var(--sp-bg) !important;
   transform: translateY(-2px) scale(1.08);
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
   text-shadow: none !important;
 }
 [data-theme="electric"] .send-btn:active { transform: scale(0.85); transition: transform 0.06s ease-out; }
 [data-theme="electric"] .send-btn.sending {
-  background: linear-gradient(135deg, #ffcc00, #ff3b5c) !important;
+  background: linear-gradient(135deg, var(--sp-accent-2), var(--sp-accent)) !important;
   box-shadow: 0 2px 8px rgba(255,59,92,0.35) !important;
 }
 [data-theme="electric"] .send-btn.sending:hover {
   box-shadow: 0 4px 14px rgba(255,59,92,0.45) !important;
   text-shadow: none !important;
 }
-[data-theme="electric"] .ctx-menu { background: #141414; border-color: #2a2a2a; }
-[data-theme="electric"] .ctx-menu .context-item:hover { background: #1e1e1e; }
+[data-theme="electric"] .ctx-menu { background: var(--sp-surface); border-color: var(--sp-border); }
+[data-theme="electric"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
 [data-theme="electric"] ::-webkit-scrollbar { width: 6px; height: 6px; }
-[data-theme="electric"] ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
-[data-theme="electric"] ::-webkit-scrollbar-thumb:hover { background: #888; }
+[data-theme="electric"] ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
+[data-theme="electric"] ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
 [data-theme="cyberpunk"] { --sp-accent: var(--sp-accent, #00f0ff); }
 [data-theme="aurora"]    { --sp-accent: var(--sp-accent, #38bdf8); }
-[data-theme="electric"]   { --sp-accent: var(--sp-accent, #ff3b5c); }
+[data-theme="electric"]   { --sp-accent: var(--sp-accent, var(--sp-accent)); }
