@@ -1548,6 +1548,7 @@ async function refreshFileList() {
       menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
           await opfs.remove(it.fullKey);
+          try { await dbxDelete('/' + it.fullKey); } catch (_) {}
           const state = syncState();
           if (state[it.fullKey]) delete state[it.fullKey];
           setSyncState(state);
