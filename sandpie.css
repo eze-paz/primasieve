@@ -2135,15 +2135,6 @@
 }
 [data-theme="electric"] .user .bubble:hover { transform: translateY(-2px); }
 [data-theme="electric"] .user::before { display: none; }
-[data-theme="electric"] .user .bubble::before {
-  content: '';
-  position: absolute;
-  bottom: -4px; right: 12px;
-  width: 12px; height: 12px;
-  background: #fafafa;
-  border-radius: 50%;
-  z-index: -1;
-}
 [data-theme="electric"] .assistant {
   background: #141414;
   border: 2px solid #2a2a2a;
