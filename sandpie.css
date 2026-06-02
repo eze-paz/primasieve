@@ -1406,18 +1406,20 @@
   text-shadow: 0 0 20px rgba(0,240,255,0.4), 0 0 60px rgba(0,240,255,0.2);
 }
 [data-theme="cyberpunk"] .welcome-title::before {
-  content: '[sandpie]';
-  position: absolute; inset: 0;
-  color: #ff00a0;
-  clip-path: inset(0 50% 0 0);
-  animation: hologramShift1 3.5s ease-in-out infinite;
+  /* content: '[sandpie]'; */
+  position: absolute;
+  /* inset: 0; */
+  /* color: #ff00a0; */
+  /* clip-path: inset(0 50% 0 0); */
+  /* animation: hologramShift1 3.5s ease-in-out infinite; */
 }
 [data-theme="cyberpunk"] .welcome-title::after {
-  content: '[sandpie]';
-  position: absolute; inset: 0;
-  color: #00f0ff;
-  clip-path: inset(0 0 0 50%);
-  animation: hologramShift2 3.5s ease-in-out infinite;
+  /* content: '[sandpie]'; */
+  position: absolute;
+  /* inset: 0; */
+  /* color: #00f0ff; */
+  /* clip-path: inset(0 0 0 50%); */
+  /* animation: hologramShift2 3.5s ease-in-out infinite; */
 }
 @keyframes hologramFloat {
   0%, 100% { transform: translateY(0); }
