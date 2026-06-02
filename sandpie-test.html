@@ -906,6 +906,51 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 const DBX_REDIRECT = location.origin + location.pathname;
+
+(async function handleAuthCode() {
+  const sp = new URLSearchParams(location.search);
+  if (!sp.has('code')) return;
+  const rawKeys = localStorage.getItem('dbx-pkce');
+  if (!rawKeys) return;
+  let keys;
+  try { keys = JSON.parse(rawKeys); } catch { return; }
+  if (!keys.verifier || !keys.app_key) return;
+  dbxStatus('Authenticating…');
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: keys.app_key,
+      code: sp.get('code'),
+      redirect_uri: DBX_REDIRECT,
+      code_verifier: keys.verifier,
+    });
+    const res = await fetch(window.dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    if (!res.ok) {
+      dbxStatus('Auth failed: ' + await res.text(), 'error');
+      return;
+    }
+    const data = await res.json();
+    localStorage.setItem('dbx-tokens', JSON.stringify({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      app_key: keys.app_key,
+      expires_at: Date.now() + data.expires_in * 1000,
+    }));
+    localStorage.removeItem('dbx-pkce');
+    dbxStatus('Connected ✓', 'connected');
+    setDot('dbxDot', 'ok');
+    history.replaceState(null, '', location.pathname);
+    sync();
+    try { await refreshFileList(); } catch {}
+  } catch (e) {
+    dbxStatus('Auth error: ' + e.message, 'error');
+    console.error(e);
+  }
+})();
 function dbxStatus(text, kind) {
   const el = $('dbxStatus');
   el.textContent = text;
