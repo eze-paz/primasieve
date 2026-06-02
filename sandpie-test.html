@@ -175,6 +175,134 @@
 <script>
 const $ = id => document.getElementById(id);
 
+/* =============================================================================
+   SandpieTokens — conversation + weekly token accounting
+   Real counts come from the provider's usage object (include_usage); when a
+   provider doesn't return one we fall back to a chars/4 estimate. The context
+   window denominator is looked up from OpenRouter's public /models API.
+   ============================================================================= */
+const SandpieTokens = (() => {
+  const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
+  const MODELS_KEY = 'sandpie-openrouter-models';   // {fetched, map}
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const MODELS_TTL_MS = 24 * 60 * 60 * 1000;
+  const listeners = new Set();
+  let _modelMap = null;        // { normalizedId: context_length }
+  let _modelsFetching = null;  // in-flight promise guard
+
+  function usageTotal(u) {
+    if (!u) return 0;
+    return u.total_tokens || ((u.prompt_tokens || 0) + (u.completion_tokens || 0));
+  }
+
+  // --- weekly rolling log -----------------------------------------------------
+  function loadLog() {
+    try { const v = JSON.parse(localStorage.getItem(WEEK_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch { return []; }
+  }
+  function prune(log) {
+    const cutoff = Date.now() - WEEK_MS;
+    return log.filter(e => e && typeof e.t === 'number' && e.t >= cutoff);
+  }
+  function weeklyTotal() {
+    return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
+  }
+
+  // --- token estimate fallback ------------------------------------------------
+  function textOf(content) {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
+    return '';
+  }
+  function estimateTokens(msgs) {
+    let chars = 0;
+    for (const m of (msgs || [])) {
+      chars += textOf(m.content).length;
+      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
+    }
+    return Math.ceil(chars / 4);
+  }
+
+  // --- public reads -----------------------------------------------------------
+  function conversationTokens() {
+    const s = activeStream();
+    if (s && s.usage) return usageTotal(s.usage);
+    return estimateTokens(s ? s.messages : messages);
+  }
+  function isEstimated() {
+    const s = activeStream();
+    return !(s && s.usage);
+  }
+
+  // --- context window via OpenRouter -----------------------------------------
+  function normModel(id) { return String(id || '').trim().toLowerCase(); }
+  async function ensureModels() {
+    if (_modelMap) return _modelMap;
+    try {
+      const cached = JSON.parse(localStorage.getItem(MODELS_KEY) || 'null');
+      if (cached && cached.map && (Date.now() - cached.fetched) < MODELS_TTL_MS) {
+        _modelMap = cached.map;
+        return _modelMap;
+      }
+    } catch {}
+    if (_modelsFetching) return _modelsFetching;
+    _modelsFetching = (async () => {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/models');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        const map = {};
+        for (const m of (json.data || [])) {
+          const ctx = m.context_length || m.top_provider?.context_length;
+          if (m.id && ctx) map[normModel(m.id)] = ctx;
+        }
+        _modelMap = map;
+        localStorage.setItem(MODELS_KEY, JSON.stringify({ fetched: Date.now(), map }));
+        notify();
+      } catch (e) {
+        console.warn('SandpieTokens: OpenRouter model fetch failed:', e);
+        _modelMap = _modelMap || {};
+      } finally {
+        _modelsFetching = null;
+      }
+      return _modelMap;
+    })();
+    return _modelsFetching;
+  }
+  function contextWindow() {
+    if (!_modelMap) { ensureModels(); return null; }
+    const model = normModel($('model')?.value);
+    if (!model) return null;
+    if (_modelMap[model]) return _modelMap[model];
+    // Fall back to matching on the bare model name (after the provider prefix).
+    const tail = model.split('/').pop();
+    for (const [id, ctx] of Object.entries(_modelMap)) {
+      if (id === model || id.split('/').pop() === tail) return ctx;
+    }
+    return null;
+  }
+
+  // --- mutation ---------------------------------------------------------------
+  function recordUsage(convId, usage) {
+    if (!usage) return;
+    const s = convStreams.get(convId);
+    if (s) s.usage = usage;
+    const log = prune(loadLog());
+    log.push({ t: Date.now(), tokens: usageTotal(usage) });
+    localStorage.setItem(WEEK_LOG_KEY, JSON.stringify(log));
+    notify();
+  }
+
+  // --- subscription -----------------------------------------------------------
+  function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
+  function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
+
+  return {
+    recordUsage, conversationTokens, isEstimated, weeklyTotal,
+    contextWindow, ensureModels, subscribe, notify,
+  };
+})();
+window.SandpieTokens = SandpieTokens;
 
 /* ---- Full-Palette Theme System ---- */
 const _themePalettes = {
@@ -431,178 +559,6 @@ function computeAccentNeg() {
   root.style.setProperty('--sp-accent-neg', neg);
 }
 
-/* ---- Init on load ---- */
-document.addEventListener('DOMContentLoaded', function(){
-  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  setTheme(saved);
-});
-
-
-/* ---- Rich Theme System ---- */
-const _themeDefaults = {
-  'classic-dark': { accent: '#58a6ff' },
-  'classic-light': { accent: '#85c4f0' },
-  'cyberpunk': { accent: '#00f0ff' },
-  'aurora': { accent: '#38bdf8' },
-  'electric': { accent: '#ff3b5c' }
-};
-
-function setTheme(name) {
-  var valid = { 'classic-dark':1, 'midnight':1, 'classic-light':1, 'light':1, 'cyberpunk':1, 'aurora':1, 'electric':1 };
-  name = valid[name] ? name : 'classic-dark';
-  if (name === 'midnight') name = 'classic-dark';
-  if (name === 'light') name = 'classic-light';
-
-  // Remove inline custom overrides first
-  clearCustomTheme();
-
-  // Set data-theme
-  if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
-  else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
-  else document.documentElement.setAttribute('data-theme', name);
-
-  localStorage.setItem('sandpie-theme', name);
-
-  // Apply any saved custom colors for this theme
-  applySavedCustom(name);
-
-  // Show/hide customize panel
-  var panel = $('themeCustomize');
-  if (panel) panel.style.display = 'flex';
-
-  // Set color picker to current accent
-  var def = _themeDefaults[name] || _themeDefaults['classic-dark'];
-  var accent = getComputedStyle(document.documentElement).getPropertyValue('--sp-accent').trim() || def.accent;
-  var picker = $('themeAccentPicker');
-  if (picker) picker.value = rgbToHex(accent) || def.accent;
-  var valEl = $('themeAccentValue');
-  if (valEl) valEl.textContent = (picker ? picker.value : def.accent).toUpperCase();
-
-  updateThemeButtons();
-  computeAccentNeg();
-}
-
-function applySavedCustom(name) {
-  var raw = localStorage.getItem('sandpie-theme-custom-' + name);
-  if (!raw) return;
-  try {
-    var c = JSON.parse(raw);
-    if (c.accent) {
-      var r = parseInt(c.accent.slice(1,3),16), g = parseInt(c.accent.slice(3,5),16), b = parseInt(c.accent.slice(5,7),16);
-      document.documentElement.style.setProperty('--sp-accent', c.accent);
-      document.documentElement.style.setProperty('--sp-accent-dim', 'rgba('+r+','+g+','+b+',0.35)');
-    }
-  } catch(e) {}
-}
-
-function applyThemeColor(val) {
-  var r = parseInt(val.slice(1,3),16), g = parseInt(val.slice(3,5),16), b = parseInt(val.slice(5,7),16);
-  document.documentElement.style.setProperty('--sp-accent', val);
-  document.documentElement.style.setProperty('--sp-accent-dim', 'rgba('+r+','+g+','+b+',0.35)');
-  var valEl = $('themeAccentValue');
-  if (valEl) valEl.textContent = val.toUpperCase();
-  computeAccentNeg();
-}
-
-function saveThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  var accent = document.documentElement.style.getPropertyValue('--sp-accent').trim();
-  if (!accent) {
-    accent = getComputedStyle(document.documentElement).getPropertyValue('--sp-accent').trim();
-  }
-  localStorage.setItem('sandpie-theme-custom-' + name, JSON.stringify({ accent: accent }));
-  var hint = $('themeHint');
-  if (hint) {
-    hint.textContent = 'Saved for ' + name;
-    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
-  }
-}
-
-function resetThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  localStorage.removeItem('sandpie-theme-custom-' + name);
-  clearCustomTheme();
-  var def = _themeDefaults[name] || _themeDefaults['classic-dark'];
-  applyThemeColor(def.accent);
-  var hint = $('themeHint');
-  if (hint) {
-    hint.textContent = 'Reset to defaults';
-    setTimeout(function(){ if(hint) hint.textContent = 'Pick a look. Saved locally.'; }, 2000);
-  }
-}
-
-function clearCustomTheme() {
-  document.documentElement.style.removeProperty('--sp-accent');
-  document.documentElement.style.removeProperty('--sp-accent-dim');
-}
-
-function updateThemeButtons() {
-  var current = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  if (current === 'midnight') current = 'classic-dark';
-  if (current === 'light') current = 'classic-light';
-  document.querySelectorAll('.theme-btn').forEach(function(btn) {
-    var active = btn.dataset.t === current;
-    btn.style.borderColor = active ? 'var(--sp-accent)' : '';
-    btn.style.color = active ? 'var(--sp-accent)' : '';
-    btn.style.background = active ? 'var(--sp-panel)' : '';
-  });
-}
-
-function rgbToHex(rgb) {
-  if (!rgb) return '';
-  if (rgb[0] === '#') return rgb;
-  var m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-  if (!m) return '';
-  return '#' + [m[1],m[2],m[3]].map(function(x){
-    return parseInt(x,10).toString(16).padStart(2,'0');
-  }).join('');
-}
-
-function computeAccentNeg() {
-  var root = document.documentElement;
-  var accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
-  if (!accent) return;
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16)/255;
-  var g = parseInt(hex.slice(2,4),16)/255;
-  var b = parseInt(hex.slice(4,6),16)/255;
-  var max = Math.max(r,g,b), min = Math.min(r,g,b);
-  var h = 0, s = 0, l = (max+min)/2;
-  if (max !== min) {
-    var d = max-min;
-    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max) {
-      case r: h = ((g-b)/d + (g < b ? 6 : 0))/6; break;
-      case g: h = ((b-r)/d + 2)/6; break;
-      case b: h = ((r-g)/d + 4)/6; break;
-    }
-  }
-  h = (h + 0.5) % 1;
-  var hue2rgb = function(p,q,t) {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q-p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q-p) * (2/3 - t) * 6;
-    return p;
-  };
-  var q = l < 0.5 ? l*(1+s) : l+s-l*s;
-  var p = 2*l-q;
-  var rr = Math.round(hue2rgb(p,q,h+1/3)*255);
-  var gg = Math.round(hue2rgb(p,q,h)*255);
-  var bb = Math.round(hue2rgb(p,q,h-1/3)*255);
-  var neg = '#' + [rr,gg,bb].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-  root.style.setProperty('--sp-accent-neg', neg);
-}
-
-/* ---- Initialize on load ---- */
-document.addEventListener('DOMContentLoaded', function(){
-  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  setTheme(saved);
-});
-
-
-;
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
    ============================================================================= */
@@ -3809,6 +3765,7 @@ async function sendSingle(text, stream) {
     if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
     if (ev.type === 'tool_result')  lastInFlightTool = null;
+    if (ev.type === 'usage')        SandpieTokens.recordUsage(convId, ev.usage);
     dispatchAgentEvent(ev, renderer, host);
   };
   try {

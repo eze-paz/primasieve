@@ -1454,6 +1454,8 @@ window.addEventListener('message', e => {
       <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
       <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
       <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
+      <input id="modalMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional, e.g. 8192)">
+      <input id="modalTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
       <div class="modal-actions">
         <button onclick="SandpieProviders.saveModal()">Save</button>
         <button class="ghost" onclick="SandpieProviders.closeModal()">Cancel</button>
