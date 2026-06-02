@@ -2239,3 +2239,7 @@
 [data-theme="electric"] ::-webkit-scrollbar { width: 6px; height: 6px; }
 [data-theme="electric"] ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 [data-theme="electric"] ::-webkit-scrollbar-thumb:hover { background: #888; }
+/* inline --sp-accent overrides for all themes */
+[data-theme="cyberpunk"] { --sp-accent: var(--sp-accent, #00f0ff); }
+[data-theme="aurora"]    { --sp-accent: var(--sp-accent, #38bdf8); }
+[data-theme="electric"]   { --sp-accent: var(--sp-accent, #ff3b5c); }
