@@ -1773,16 +1773,12 @@ function activeStream() { return activeConvId ? (convStreams.get(activeConvId) |
    SandpieTokens — conversation + weekly token accounting
    Real counts come from the provider's usage object (include_usage); when a
    provider doesn't return one we fall back to a chars/4 estimate. The context
-   window denominator is looked up from OpenRouter's public /models API.
+   window denominator is set per-provider (manually in the provider modal).
    ============================================================================= */
 const SandpieTokens = (() => {
   const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
-  const MODELS_KEY = 'sandpie-openrouter-models';   // {fetched, map}
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-  const MODELS_TTL_MS = 24 * 60 * 60 * 1000;
   const listeners = new Set();
-  let _modelMap = null;        // { normalizedId: context_length }
-  let _modelsFetching = null;  // in-flight promise guard
 
   function usageTotal(u) {
     if (!u) return 0;
@@ -1828,58 +1824,12 @@ const SandpieTokens = (() => {
     return !(s && s.usage);
   }
 
-  // --- context window via OpenRouter -----------------------------------------
-  function normModel(id) { return String(id || '').trim().toLowerCase(); }
-  async function ensureModels() {
-    if (_modelMap) return _modelMap;
-    try {
-      const cached = JSON.parse(localStorage.getItem(MODELS_KEY) || 'null');
-      if (cached && cached.map && (Date.now() - cached.fetched) < MODELS_TTL_MS) {
-        _modelMap = cached.map;
-        return _modelMap;
-      }
-    } catch {}
-    if (_modelsFetching) return _modelsFetching;
-    _modelsFetching = (async () => {
-      try {
-        const res = await fetch('https://openrouter.ai/api/v1/models');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        const map = {};
-        for (const m of (json.data || [])) {
-          const ctx = m.context_length || m.top_provider?.context_length;
-          if (m.id && ctx) map[normModel(m.id)] = ctx;
-        }
-        _modelMap = map;
-        localStorage.setItem(MODELS_KEY, JSON.stringify({ fetched: Date.now(), map }));
-        notify();
-      } catch (e) {
-        console.warn('SandpieTokens: OpenRouter model fetch failed:', e);
-        _modelMap = _modelMap || {};
-      } finally {
-        _modelsFetching = null;
-      }
-      return _modelMap;
-    })();
-    return _modelsFetching;
-  }
+  // --- context window (manual only) ----------------------------------------
   function contextWindow() {
-    // 1) Provider manual override (takes priority)
     const ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    if (ap && ap.contextWindow > 0) return ap.contextWindow;
-
-    // 2) OpenRouter model map
-    if (!_modelMap) { ensureModels(); return null; }
-    const model = normModel($('model')?.value);
-    if (!model) return null;
-    if (_modelMap[model]) return _modelMap[model];
-    // Fall back to matching on the bare model name (after the provider prefix).
-    const tail = model.split('/').pop();
-    for (const [id, ctx] of Object.entries(_modelMap)) {
-      if (id === model || id.split('/').pop() === tail) return ctx;
-    }
-    return null;
+    return (ap && ap.contextWindow > 0) ? ap.contextWindow : null;
   }
+  function ensureModels() { return null; }
 
   // --- mutation ---------------------------------------------------------------
   function recordUsage(convId, usage) {
