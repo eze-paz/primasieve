@@ -3485,6 +3485,7 @@ class SidePanel {
     this._render();
     refreshSendButtonForActive();
     refreshConversationList();
+    if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
   }
 
 
