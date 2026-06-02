@@ -3103,35 +3103,36 @@ function mountConv(convId) {
 async function loadConv(id) {
   if (id === activeConvId) return;
 
-
-
+  /* Instant visual feedback */
+  const oldId = activeConvId;
+  activeConvId = id;
+  localStorage.setItem('sandpie-active-conv', id);
+  const ul = $('convList');
+  if (ul) {
+    ul.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+    const newLi = ul.querySelector('li[data-cid="' + id + '"]');
+    if (newLi) newLi.classList.add('active');
+    else if (oldId) {
+      const oldLi = ul.querySelector('li[data-cid="' + oldId + '"]');
+      if (oldLi) oldLi.classList.remove('active');
+    }
+  }
 
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
 
+  _loadConvAsync(id, oldId);
+}
 
-
-
+async function _loadConvAsync(id, oldId) {
   await saveActiveConv();
-
-
-
-
   parkActiveConv();
   if (convStreams.has(id)) {
-
-
-
-
     mountConv(id);
   } else {
-
-
-
-
     let data;
     try { data = JSON.parse(await opfs.read(convPath(id))); }
     catch (e) {
-      if (activeConvId) mountConv(activeConvId);
+      if (oldId) mountConv(oldId);
       addMsg('err', 'Failed to load conversation: ' + e.message);
       return;
     }
@@ -3333,6 +3334,7 @@ function fmtRelTime(iso) {
 }
 function buildConvLi(c, idx) {
   const li = document.createElement('li');
+  li.dataset.cid = c.id;
   if (c.id === activeConvId) li.classList.add('active');
   if (c.archived) li.classList.add('archived');
   const num = document.createElement('span');
