@@ -639,7 +639,6 @@
     cursor: pointer;
     font-size: 0.85rem;
     padding: 0;
-    margin-right: 4px;
     box-shadow: 0 0 16px 2px var(--sp-accent-dim), 0 0 32px 4px var(--sp-accent-dim), 0 2px 4px rgba(0,0,0,0.5);
   }
   .sidebar-collapse-btn:hover {
