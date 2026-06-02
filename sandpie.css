@@ -1321,7 +1321,7 @@
 }
 
 [data-theme="cyberpunk"] aside details.service summary::before {
-  content: 'b8';
+  content: '\25b8';
   font-size: 0.7em;
   color: #00f0ff;
   transition: transform 0.2s;
@@ -1335,7 +1335,7 @@
   text-shadow: 0 0 20px rgba(0,240,255,0.3), 0 0 60px rgba(0,240,255,0.1);
 }
 
-[data-theme="cyberpunk"] aside details.service[open] summary::before { content: 'be'; }
+[data-theme="cyberpunk"] aside details.service[open] summary::before { content: '\25be'; }
 
 [data-theme="cyberpunk"] aside details.service summary:hover {
   border-color: #00f0ff;
