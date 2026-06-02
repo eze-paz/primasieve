@@ -7,14 +7,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<!-- init() deferred to end of body -->
-  <script type="module" src="modules/providers.js"></script>
-  <script src="modules/dropbox.js"></script>
+<link rel="stylesheet" href="sandpie.css">
+
   <script src="modules/images.js"></script>
+<script>SandpieImages.init();</script>
+  <script type="module" src="modules/providers.js"></script>
   <script src="modules/notifications.js"></script>
 </head>
 <body>
@@ -37,6 +37,7 @@
     </div>
   </details>
 
+
   <input id="endpoint" type="hidden">
   <input id="model" type="hidden">
   <input id="apiKey" type="hidden">
@@ -50,7 +51,6 @@
       <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
       <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
       <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
-      <input id="modalContextWindow" type="number" min="1" autocomplete="off" placeholder="Context window (e.g. 128000)">
       <input id="modalMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional, e.g. 8192)">
       <input id="modalTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
       <div class="modal-actions">
@@ -60,11 +60,13 @@
     </div>
   </div>
 
+
   <div id="chipContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="SandpieProviders.editFromMenu()">Edit</div>
     <div class="context-item" onclick="SandpieProviders.duplicateFromMenu()">Duplicate</div>
     <div class="context-item context-delete" onclick="SandpieProviders.deleteFromMenu()">Delete</div>
   </div>
+
 
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
@@ -92,33 +94,13 @@
       <ul class="fs-list" id="fileList"></ul>
     </div>
   </details>
-    <details class="service" id="themeSection">
-    <summary>Appearance</summary>
-    <div class="service-body">
-      <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-        <button class="ghost theme-btn" data-t="classic-dark"  onclick="setTheme('classic-dark')"  title="Classic dark">Dark</button>
-        <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
-        <button class="ghost theme-btn" data-t="cyberpunk"     onclick="setTheme('cyberpunk')"      title="Neon cyberpunk">Cybr</button>
-        <button class="ghost theme-btn" data-t="aurora"        onclick="setTheme('aurora')"         title="Aurora glass">Aurora</button>
-        <button class="ghost theme-btn" data-t="electric"      onclick="setTheme('electric')"       title="Electric bold">Bold</button>
-      </div>
-      <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
-        <div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
-        <div style="display:flex;gap:0.35rem;margin-top:0.25rem;">
-          <button class="ghost" onclick="resetThemeColors()" style="font-size:0.72rem;flex:1;">Reset defaults</button>
-          <button class="ghost" onclick="saveThemeColors()"  style="font-size:0.72rem;flex:1;">Save colors</button>
-        </div>
-      </div>
-      <p class="hint" id="themeHint" style="margin-top:0.25rem;">Pick a look. Saved locally.</p>
-    </div>
-  </details>
-
 <div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
     <div>sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
+
 
   <div id="messagesWrap">
     <div id="messages">
@@ -159,347 +141,7 @@
 </main>
 <script>
 const $ = id => document.getElementById(id);
-
-/* =============================================================================
-   SandpieTokens — conversation + weekly token accounting
-   Real counts come from the provider's usage object (include_usage); when a
-   provider doesn't return one we fall back to a chars/4 estimate. The context
-   window denominator is set per-provider (manually in the provider modal).
-   ============================================================================= */
-const SandpieTokens = (() => {
-  const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
-  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-  const listeners = new Set();
-
-  function usageTotal(u) {
-    if (!u) return 0;
-    return u.total_tokens || ((u.prompt_tokens || 0) + (u.completion_tokens || 0));
-  }
-
-  // --- weekly rolling log -----------------------------------------------------
-  function loadLog() {
-    try { const v = JSON.parse(localStorage.getItem(WEEK_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
-    catch { return []; }
-  }
-  function prune(log) {
-    const cutoff = Date.now() - WEEK_MS;
-    return log.filter(e => e && typeof e.t === 'number' && e.t >= cutoff);
-  }
-  function weeklyTotal() {
-    return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
-  }
-
-  // --- token estimate fallback ------------------------------------------------
-  function textOf(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
-    return '';
-  }
-  function estimateTokens(msgs) {
-    let chars = 0;
-    for (const m of (msgs || [])) {
-      chars += textOf(m.content).length;
-      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
-    }
-    return Math.ceil(chars / 4);
-  }
-
-  // --- public reads -----------------------------------------------------------
-  function conversationTokens() {
-    const s = activeStream();
-    if (s && s.usage) return usageTotal(s.usage);
-    return estimateTokens(s ? s.messages : messages);
-  }
-  function isEstimated() {
-    const s = activeStream();
-    return !(s && s.usage);
-  }
-
-  // --- context window (manual only) ----------------------------------------
-  function contextWindow() {
-    const ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    return (ap && ap.contextWindow > 0) ? ap.contextWindow : null;
-  }
-  function ensureModels() { return null; }
-
-  // --- mutation ---------------------------------------------------------------
-  function recordUsage(convId, usage) {
-    if (!usage) return;
-    const s = convStreams.get(convId);
-    if (s) s.usage = usage;
-    const log = prune(loadLog());
-    log.push({ t: Date.now(), tokens: usageTotal(usage) });
-    localStorage.setItem(WEEK_LOG_KEY, JSON.stringify(log));
-    notify();
-  }
-
-  // --- subscription -----------------------------------------------------------
-  function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
-  function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
-
-  return {
-    recordUsage, conversationTokens, isEstimated, weeklyTotal,
-    contextWindow, ensureModels, subscribe, notify,
-  };
-})();
-window.SandpieTokens = SandpieTokens;
-
-/* ========== Theme Palette System ========== */
-const _themePalettes = {
-  'classic-dark': {
-    bg: '#0d1117', surface: '#161b22', panel: '#21262d',
-    accent: '#58a6ff', text: '#e6edf3', textDim: '#9ab0c8',
-    border: '#30363d', borderBright: '#484f58',
-    success: '#3fb950', danger: '#f85149', warn: '#d29922'
-  },
-  'classic-light': {
-    bg: '#ffffff', surface: '#f6f8fa', panel: '#eaeef2',
-    accent: '#85c4f0', text: '#1f2328', textDim: '#656d76',
-    border: '#d0d7de', borderBright: '#b0b7be',
-    success: '#1f883d', danger: '#cf222e', warn: '#9a6700'
-  },
-  'cyberpunk': {
-    bg: '#050505', surface: '#0a0a0f', panel: '#11111a',
-    accent: '#00f0ff', text: '#e8f4f8', textDim: '#7a8a9a',
-    border: '#1a1a2e', borderBright: '#2d2d44',
-    success: '#00ff88', danger: '#ff3366', warn: '#ffaa00'
-  },
-  'aurora': {
-    bg: '#070b14', surface: 'rgba(15,23,42,0.6)', panel: 'rgba(30,41,59,0.5)',
-    accent: '#38bdf8', text: '#f1f5f9', textDim: '#94a3b8',
-    border: 'rgba(148,163,184,0.12)', borderBright: 'rgba(148,163,184,0.2)',
-    success: '#34d399', danger: '#f87171', warn: '#fbbf24'
-  },
-  'electric': {
-    bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
-    accent: '#ff3b5c', text: '#fafafa', textDim: '#888',
-    border: '#2a2a2a', borderBright: '#444',
-    success: '#00e676', danger: '#ff1744', warn: '#ffc400'
-  }
-};
-const _paletteLabels = {
-  bg: 'Background', surface: 'Surface', panel: 'Panel',
-  accent: 'Accent', text: 'Text', textDim: 'Muted text',
-  border: 'Border', borderBright: 'Bright border',
-  success: 'Success', danger: 'Danger', warn: 'Warning'
-};
-
-function setTheme(name) {
-  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
-  name = map[name] || name;
-  if (!_themePalettes[name]) name = 'classic-dark';
-  if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
-  else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
-  else document.documentElement.setAttribute('data-theme', name);
-  localStorage.setItem('sandpie-theme', name);
-  applyThemePalette(name);
-  buildPaletteUI(name);
-  $('themeCustomize').style.display = 'flex';
-  updateThemeButtons();
-  computeAccentNeg();
-}
-
-function applyThemePalette(name) {
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
-  var css = ':root{ ';
-  for (var key in palette) {
-    if (key === 'accent-dim') continue; // derived, handled separately
-    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
-    css += prop + ':' + palette[key] + '!important; ';
-  }
-  // Inject accent-dim if present in saved palette
-  if (palette['accent-dim']) {
-    css += '--sp-accent-dim:' + palette['accent-dim'] + '!important; ';
-  }
-  css += '}';
-  var style = document.getElementById('themeOverride');
-  if (!style) { style = document.createElement('style'); style.id = 'themeOverride'; document.head.appendChild(style); }
-  style.textContent = css;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette.accent);
-  // Sync derived colors from current accent
-  if (palette.accent && palette.accent.startsWith('#')) {
-    updateDerivedColors(palette.accent);
-  }
-}
-
-function buildPaletteUI(name) {
-  var container = $('themePaletteRows');
-  if (!container) return;
-  container.innerHTML = '';
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
-  for (var key in palette) {
-    var label = _paletteLabels[key] || key;
-    var val = palette[key];
-    var hexVal = (!val.startsWith('#') || val.length !== 7) ? rgbaToHex(val) : val;
-    if (!hexVal) continue;
-    var row = document.createElement('div');
-    row.className = 'palette-row';
-    row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
-    var picker = document.createElement('input');
-    picker.type = 'color';
-    picker.value = hexVal.toUpperCase();
-    picker.dataset.key = key;
-    picker.dataset.origVal = val;
-    picker.style.cssText = 'padding:0;width:28px;height:28px;border:none;background:transparent;cursor:pointer;';
-    picker.addEventListener('input', onPaletteInput);
-    var lab = document.createElement('span');
-    lab.textContent = label;
-    lab.style.cssText = 'font-size:0.75rem;color:var(--sp-text-dim);flex:1;';
-    var hexDisp = document.createElement('span');
-    hexDisp.className = 'hex';
-    hexDisp.textContent = hexVal.toUpperCase();
-    hexDisp.style.cssText = 'font-size:0.72rem;color:var(--sp-text-dim);font-family:"JetBrains Mono",monospace;min-width:5em;text-align:right;';
-    hexDisp.dataset.hexFor = key;
-    row.appendChild(picker);
-    row.appendChild(lab);
-    row.appendChild(hexDisp);
-    container.appendChild(row);
-  }
-}
-
-function onPaletteInput(e) {
-  var picker = e.target;
-  var key = picker.dataset.key;
-  var color = picker.value;
-  var hexDisp = picker.parentNode.querySelector('[data-hex-for="' + key + '"]');
-  if (hexDisp) hexDisp.textContent = color.toUpperCase();
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var css = style.textContent;
-    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
-    var re = new RegExp(prop + ':[^!;]+');
-    if (re.test(css)) {
-      css = css.replace(re, prop + ':' + color);
-    } else {
-      css = css.replace('}', ' ' + prop + ':' + color + '}');
-    }
-    style.textContent = css;
-  }
-  if (key === 'accent') {
-    updateDerivedColors(color);
-  }
-}
-
-function saveThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  var palette = {};
-  var rows = $('themePaletteRows').querySelectorAll('.palette-row');
-  for (var i = 0; i < rows.length; i++) {
-    var picker = rows[i].querySelector('input[type="color"]');
-    if (picker) palette[picker.dataset.key] = picker.value;
-  }
-  // Also save derived accent-dim so applyThemePalette can restore it
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var m = style.textContent.match(/--sp-accent-dim:([^!;]+)/);
-    if (m) palette['accent-dim'] = m[1].trim();
-  }
-  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
-  var hint = $('themeHint');
-  if (hint) { hint.textContent = 'Colors saved!'; hint.style.opacity = '1'; setTimeout(function () { hint.style.opacity = '0'; }, 1200); }
-}
-
-function resetThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  localStorage.removeItem('sandpie-theme-palette-' + name);
-  applyThemePalette(name);
-  buildPaletteUI(name);
-  var defaultAccent = _themePalettes[name].accent;
-  if (defaultAccent && defaultAccent.startsWith('#')) {
-    updateDerivedColors(defaultAccent);
-  }
-}
-
-function updateThemeButtons() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  document.querySelectorAll('.theme-btn[data-t]').forEach(function (b) {
-    b.classList.toggle('active', b.dataset.t === name);
-  });
-}
-
-function applySavedCustom() {
-  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  if (saved && _themePalettes[saved]) {
-    setTheme(saved);
-    var pal = localStorage.getItem('sandpie-theme-palette-' + saved);
-    if (pal) { try { Object.assign(_themePalettes[saved], JSON.parse(pal)); applyThemePalette(saved); } catch (e) {} }
-  } else {
-    setTheme('classic-dark');
-  }
-}
-
-function rgbaToHex(rgba) {
-  var m = rgba.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (!m) return null;
-  return '#' + [+m[1], +m[2], +m[3]].map(function (x) { return x.toString(16).padStart(2, '0'); }).join('');
-}
-
-function updateDerivedColors(accent) {
-  // Derive accent-dim from accent at 15% opacity
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16);
-  var g = parseInt(hex.slice(2,4),16);
-  var b = parseInt(hex.slice(4,6),16);
-  var dim = 'rgba(' + r + ',' + g + ',' + b + ',0.15)';
-
-  // Inject into override style
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var css = style.textContent;
-    // Replace or add --sp-accent-dim
-    if (css.indexOf('--sp-accent-dim:') >= 0) {
-      css = css.replace(/--sp-accent-dim:[^!;]+/, '--sp-accent-dim:' + dim);
-    } else {
-      css = css.replace('}', ' --sp-accent-dim:' + dim + '}');
-    }
-    style.textContent = css;
-  }
-
-  // Also re-run accent-neg computation
-  computeAccentNeg();
-}
-
-function computeAccentNeg() {
-  var root = document.documentElement;
-  var accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
-  if (!accent) return;
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16)/255;
-  var g = parseInt(hex.slice(2,4),16)/255;
-  var b = parseInt(hex.slice(4,6),16)/255;
-  var max = Math.max(r,g,b), min = Math.min(r,g,b);
-  var h = 0, s = 0, l = (max+min)/2;
-  if (max !== min) {
-    var d = max-min;
-    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max) {
-      case r: h = ((g-b)/d + (g < b ? 6 : 0))/6; break;
-      case g: h = ((b-r)/d + 2)/6; break;
-      case b: h = ((r-g)/d + 4)/6; break;
-    }
-  }
-  h = (h + 0.5) % 1;
-  var hue2rgb = function(p,q,t) {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q-p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q-p) * (2/3 - t) * 6;
-    return p;
-  };
-  var q = l < 0.5 ? l*(1+s) : l+s-l*s;
-  var p = 2*l-q;
-  var rr = Math.round(hue2rgb(p,q,h+1/3)*255);
-  var gg = Math.round(hue2rgb(p,q,h)*255);
-  var bb = Math.round(hue2rgb(p,q,h-1/3)*255);
-  var neg = '#' + [rr,gg,bb].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-  root.style.setProperty('--sp-accent-neg', neg);
-}
-
+;
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
    ============================================================================= */
@@ -592,14 +234,41 @@ if ('serviceWorker' in navigator) {
     if (!d) return;
     if (d.type === 'sandpie-sw-log') {
 
+
       const fn = console[d.level] || console.log;
       fn.call(console, '[sw]', d.text);
       return;
     }
     if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-      for (const path of d.paths) _deletions.add(path);
+
+
+
+
+
+
+
+
+
+
+      (async () => {
+        if (!dbxTokens()) return;
+        const state = syncState();
+        let changed = false;
+        for (const path of d.paths) {
+          try { await dbxDelete('/' + path); } catch {}
+          const lk = path.toLowerCase();
+          for (const k of Object.keys(state)) {
+            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
+              delete state[k];
+              changed = true;
+            }
+          }
+        }
+        if (changed) setSyncState(state);
+        try { await refreshFileList(); } catch {}
+      })();
       return;
-    }
+      }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
         console.log('[sandpie] ← SW notified:', d.paths);
         const state = syncState();
@@ -619,6 +288,11 @@ if ('serviceWorker' in navigator) {
         return;
       }
     });
+
+
+
+
+
 
   const flush = () => {
     const c = navigator.serviceWorker.controller;
@@ -670,13 +344,7 @@ function dedentPreBlocks(html) {
   }
   return wrap.innerHTML;
 }
-const renderMd = text => {
-  if (typeof DOMPurify === 'undefined' || typeof marked === 'undefined') {
-    // Defer rendering until libraries are loaded
-    return '&lt;div class="pending"&gt;Loading...&lt;/div&gt;';
-  }
-  return DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
-};
+const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
 function dedentMarkdownFences(text) {
   if (!text) return text;
   return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
@@ -705,6 +373,11 @@ function api(url) {
   if (remote) return remote + '/proxy/' + stripped;
   if (isLocalhost) return '/proxy/' + stripped;
   return url;
+}
+function dbxRoute(url) {
+  const stripped = url.replace(/^https?:\/\//, '');
+  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  return (remote || '') + '/proxy/' + stripped;
 }
 
 function setDot(id, state) {
@@ -735,6 +408,7 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   }
   ta.addEventListener('input', autosize);
 
+
   const searchInput = $('convSearch');
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
@@ -757,8 +431,10 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
     }
   });
 
+
   const observer = new MutationObserver(autosize);
   observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
+
 
   ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
   autosize();
@@ -787,6 +463,7 @@ function splitPath(path) {
 const opfs = {
   async root() { return await navigator.storage.getDirectory(); },
 
+
   async resolveDir(parts, { create = false } = {}) {
     let dir = await this.root();
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
@@ -798,6 +475,7 @@ const opfs = {
     const handle = await dir.getFileHandle(name);
     return await (await handle.getFile()).text();
   },
+
 
   async readBytes(path) {
     const { parts, name } = splitPath(path);
@@ -818,12 +496,24 @@ const opfs = {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts);
     await dir.removeEntry(name, { recursive: true });
-    _deletions.add(path);
+
+
+
+
+
+
+
+
     try {
       const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
       if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
     } catch (_) {}
   },
+
+
+
+
+
 
   async exists(path) {
     try {
@@ -838,6 +528,7 @@ const opfs = {
     await this.resolveDir(parts, { create: true });
   },
 
+
   async listDir(path = '') {
     const parts = String(path).split('/').filter(Boolean);
     const dir = await this.resolveDir(parts);
@@ -845,6 +536,7 @@ const opfs = {
     for await (const [n, h] of dir.entries()) out.push({ name: n, kind: h.kind });
     return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
   },
+
 
   async list(prefix = '') {
     const out = [];
@@ -860,6 +552,7 @@ const opfs = {
     await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
     return out.sort();
   },
+
 
   async listAll(prefix = '') {
     const out = [];
@@ -878,6 +571,13 @@ const opfs = {
 };
 async function pruneOrphanDirs(cloud) {
 
+
+
+
+
+
+
+
   const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
   const cloudPaths = new Set();
   for (const k of source) {
@@ -893,6 +593,7 @@ async function pruneOrphanDirs(cloud) {
     let all;
     try { all = await opfs.listAll(''); } catch { return pruned; }
 
+
     all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
     for (const e of all) {
       if (e.kind !== 'directory') continue;
@@ -906,51 +607,15 @@ async function pruneOrphanDirs(cloud) {
   return pruned;
 }
 const DBX_REDIRECT = location.origin + location.pathname;
-
-(async function handleAuthCode() {
-  const sp = new URLSearchParams(location.search);
-  if (!sp.has('code')) return;
-  const rawKeys = localStorage.getItem('dbx-pkce');
-  if (!rawKeys) return;
-  let keys;
-  try { keys = JSON.parse(rawKeys); } catch { return; }
-  if (!keys.verifier || !keys.app_key) return;
-  dbxStatus('Authenticating…');
-  try {
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: keys.app_key,
-      code: sp.get('code'),
-      redirect_uri: DBX_REDIRECT,
-      code_verifier: keys.verifier,
-    });
-    const res = await fetch(window.dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    });
-    if (!res.ok) {
-      dbxStatus('Auth failed: ' + await res.text(), 'error');
-      return;
-    }
-    const data = await res.json();
-    localStorage.setItem('dbx-tokens', JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      app_key: keys.app_key,
-      expires_at: Date.now() + data.expires_in * 1000,
-    }));
-    localStorage.removeItem('dbx-pkce');
-    dbxStatus('Connected ✓', 'connected');
-    setDot('dbxDot', 'ok');
-    history.replaceState(null, '', location.pathname);
-    sync();
-    try { await refreshFileList(); } catch {}
-  } catch (e) {
-    dbxStatus('Auth error: ' + e.message, 'error');
-    console.error(e);
-  }
-})();
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function pkceChallenge() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return { verifier, challenge: b64url(hash) };
+}
 function dbxStatus(text, kind) {
   const el = $('dbxStatus');
   el.textContent = text;
@@ -974,21 +639,35 @@ function setDbxBusy(busy) {
   if (dbxBusyCount > 0) dot.classList.add('busy');
   else dot.classList.remove('busy');
 }
-
-function dbxTokens() {
-  try {
-    return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
-  } catch (e) {
-    return null;
-  }
-}
-function setDbxTokens(t) {
-  localStorage.setItem('dbx-tokens', JSON.stringify(t));
-}
-
 function dbxToggleConnection() {
   if (dbxTokens()) dbxDisconnect();
   else dbxConnect();
+}
+function dbxTokens() {
+  return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+}
+async function dbxAccessToken() {
+  const stored = dbxTokens();
+  if (!stored) throw new Error('Dropbox not connected');
+  if (Date.now() < stored.expires_at - 60000) return stored.access_token;
+
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: stored.refresh_token,
+    client_id: stored.app_key,
+  });
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
+  const data = await res.json();
+  stored.access_token = data.access_token;
+  stored.expires_at = Date.now() + data.expires_in * 1000;
+  localStorage.setItem('dbx-tokens', JSON.stringify(stored));
+  return data.access_token;
 }
 async function dbxConnect() {
   const appKey = $('dbxAppKey').value.trim();
@@ -1049,6 +728,174 @@ async function dbxExchangeCode(code) {
     app_key: appKey,
   }));
   localStorage.removeItem('dbx-pkce');
+}
+async function dbxApi(path, body) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxListFull(folderPath, { recursive = false } = {}) {
+  let data = await dbxApi('/2/files/list_folder', {
+    path: folderPath === '/' ? '' : folderPath,
+    recursive,
+    include_deleted: true,
+  });
+  let entries = data.entries.slice();
+  let pageCount = 1;
+  while (data.has_more) {
+    dbxProgress(`listing… page ${pageCount}`);
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+    pageCount++;
+  }
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
+}
+async function dbxListContinue(cursor) {
+  let data = await dbxApi('/2/files/list_folder/continue', { cursor });
+  let entries = data.entries.slice();
+  let pageCount = 1;
+  while (data.has_more) {
+    dbxProgress(`checking changes… page ${pageCount}`);
+    data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
+    entries = entries.concat(data.entries);
+    pageCount++;
+  }
+  return {
+    entries: entries.map(e => ({
+      name: e.name,
+      kind: e['.tag'],
+      path: e.path_display,
+      size: e.size,
+      rev: e.content_hash,
+      cloudMtime: e.server_modified,
+    })),
+    cursor: data.cursor,
+  };
+}
+async function dbxDownload(path, signal) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Content-Type': 'text/plain',
+    },
+    signal,
+  });
+  if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
+
+
+
+
+  return new Uint8Array(await res.arrayBuffer());
+}
+async function dbxUpload(path, content) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+
+
+  return await res.json();
+}
+async function dbxUploadSessionStart(content, close = true) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/octet-stream',
+      'Dropbox-API-Arg': JSON.stringify({ close }),
+    },
+    body: content,
+  });
+  if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxUploadSessionFinishBatch(entries) {
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ entries }),
+  });
+  if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
+  return await res.json();
+}
+async function dbxUploadBatch(files) {
+
+
+  const CONCURRENCY = 5;
+  const sessions = [];
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const chunk = files.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(chunk.map(async ({ rel, content, s, lm }) => {
+      try {
+        const session = await dbxUploadSessionStart(content, true);
+        return {
+          cursor: { session_id: session.session_id, offset: content.byteLength },
+          commit: { path: '/' + rel, mode: 'overwrite', mute: true, autorename: false },
+          rel, s, lm, content
+        };
+      } catch (err) {
+        console.warn('session start failed:', rel, err);
+        return null;
+      }
+    }));
+    sessions.push(...results.filter(Boolean));
+  }
+  if (sessions.length === 0) return [];
+  const entries = sessions.map(s => ({ cursor: s.cursor, commit: s.commit }));
+  const result = await dbxUploadSessionFinishBatch(entries);
+
+
+  if (result['.tag'] === 'async_job_id') {
+    console.warn('Unexpected async_job_id from finish_batch_v2:', result.async_job_id);
+    return [];
+  }
+  if (!result.entries) {
+    console.warn('Unexpected finish_batch response:', result);
+    return [];
+  }
+  return sessions.map((s, i) => ({ ...s, meta: result.entries[i] }));
+}
+async function dbxDelete(path) {
+
+
+
+
+  try {
+    return await dbxApi('/2/files/delete_v2', { path });
+  } catch (e) {
+    if (String(e.message).includes('not_found')) return null;
+    throw e;
+  }
 }
 const SYNC_STATE_KEY = 'sandpie-sync-state';
 const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
@@ -1137,7 +984,6 @@ async function cloudListAll() {
 }
 let _syncing = false;
 let _openFilePath = null;
-const _deletions = new Set();
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
@@ -1163,22 +1009,72 @@ async function sync() {
   _syncing = true;
   setDbxBusy(true);
   try {
-    let state = syncState();
+    dbxStatus('', 'connected');
     const cloud = await cloudListAll();
-    const cloudMap = {};
-    for (const e of cloud.entries) if (e.kind === 'file') cloudMap[e.path.slice(1)] = e;
+    const state = syncState();
+    let baselined = 0;
 
-    // 1. Propagate deletions to cloud
-    for (const path of _deletions) {
+
+    for (const path of Object.keys(state)) {
+      if (cloud[path]) continue;
       const s = state[path];
-      if (s && s.rev) {
-        try { await dbxDelete('/' + path, s.rev); } catch {}
-      }
+      const lm = await opfsLastModified(path);
+      if (lm > 0 && lm > s.syncedMtime) continue;
+      try { await opfs.remove(path); } catch {}
       delete state[path];
-      _deletions.delete(path);
+
+
     }
 
-    // 2. Upload OPFS files that are new or modified
+
+    for (const [path, e] of Object.entries(cloud)) {
+      if (e.kind !== 'file') continue;
+      const s = state[path];
+      const localExists = await opfs.exists(path);
+      if (!s) {
+        if (localExists) {
+          state[path] = {
+            rev: e.rev, size: e.size,
+            syncedMtime: await opfsLastModified(path),
+          };
+          baselined++;
+        } else {
+          dbxProgress(`downloading… ${path}`);
+          const content = await dbxDownload(e.path);
+          await opfs.write(path, content);
+          state[path] = {
+            rev: e.rev, size: e.size,
+            syncedMtime: await opfsLastModified(path),
+          };
+        }
+        continue;
+      }
+      const cloudChanged = s.rev !== e.rev;
+      const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
+      if (path === _openFilePath) continue;
+      if (cloudChanged && localDirty) continue;
+      if (cloudChanged) {
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path] = {
+          rev: e.rev, size: e.size,
+          syncedMtime: await opfsLastModified(path),
+        };
+        continue;
+      }
+
+
+      if (!localExists) {
+        dbxProgress(`downloading… ${path}`);
+        const content = await dbxDownload(e.path);
+        await opfs.write(path, content);
+        state[path].syncedMtime = await opfsLastModified(path);
+      }
+      state[path].size = e.size;
+    }
+
+
     let opfsRels = [];
     try { opfsRels = await opfs.list(); } catch {}
     const dirty = [];
@@ -1186,64 +1082,180 @@ async function sync() {
       if (rel === _openFilePath) continue;
       const lm = await opfsLastModified(rel);
       const s = state[rel];
-      if (s && lm <= s.syncedMtime) continue;
-      dirty.push({ rel, lm });
+      if (s && lm <= s.syncedMtime) {
+        console.log('[sandpie] sync skip (clean):', rel);
+        continue;
+      }
+      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
+      dirty.push({ rel, lm, s });
     }
-    if (dirty.length) {
-      dbxProgress(`uploading… (${dirty.length})`);
-      const BATCH_SIZE = 50;
-      for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
-        const chunk = dirty.slice(i, i + BATCH_SIZE);
-        const files = await Promise.all(chunk.map(async ({ rel, lm }) => {
-          const content = await opfs.readBytes(rel);
-          return { rel, content, lm };
-        }));
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+      const chunk = dirty.slice(i, i + BATCH_SIZE);
+      dbxProgress(`uploading…(${i + chunk.length}/${dirty.length})`);
+      const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
+        const content = await opfs.readBytes(rel);
+        return { rel, content, s, lm };
+      }));
+      try {
         const results = await dbxUploadBatch(files);
         for (const r of results) {
           if (r.meta && r.meta['.tag'] === 'success') {
             state[r.rel] = {
-              rev: r.meta.rev || '',
-              size: r.meta.size != null ? r.meta.size : r.content.byteLength,
+              rev: (r.meta.content_hash) || (r.s && r.s.rev) || '',
+              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
               syncedMtime: r.lm,
             };
+
+
+          } else {
+            console.warn('batch item failed:', r.rel, r.meta);
           }
         }
+      } catch (err) {
+        console.warn('batch upload failed:', err);
       }
     }
-
-    // 3. Delete cloud files that don't exist in OPFS anymore
-    const opfsSet = new Set(opfsRels);
-    for (const path of Object.keys(state)) {
-      if (opfsSet.has(path)) continue;
-      const s = state[path];
-      if (s && s.rev) {
-        try { await dbxDelete('/' + path, s.rev); } catch {}
-      }
-      delete state[path];
-    }
-
-    // 4. Download cloud files that don't exist in OPFS
-    for (const path of Object.keys(cloudMap)) {
-      if (await opfs.exists(path)) continue;
-      const e = cloudMap[path];
-      dbxProgress(`downloading… ${path}`);
-      const content = await dbxDownload(e.path);
-      await opfs.write(path, content);
-      state[path] = { rev: e.rev, size: e.size, syncedMtime: Date.now() };
-    }
-
     setSyncState(state);
+    await pruneOrphanDirs(cloud);
     dbxProgress('');
     await refreshFileList();
+    await refreshConversationList();
   } catch (e) {
     dbxProgress('');
-    console.error('Sync failed:', e);
+    dbxStatus('Sync failed: ' + e.message, 'error');
+    console.warn('sync:', e);
   } finally {
-    _syncing = false;
+    dbxProgress('');
+    initialSyncDone = true;
     setDbxBusy(false);
-    refreshDbxStatus();
+    _syncing = false;
   }
 }
+setInterval(() => { if (!document.hidden) sync(); }, 60000);
+function joinPath(folder, name) {
+  if (folder === '/' || folder === '') return '/' + name;
+  return folder.replace(/\/$/, '') + '/' + name;
+}
+async function manualResync() {
+  if (!dbxTokens()) {
+    dbxStatus('Not connected', 'disconnected');
+    return;
+  }
+  const btn = $('dbxResyncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
+  try {
+    await sync();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
+  }
+}
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  if (code) {
+    try {
+      await dbxExchangeCode(code);
+      history.replaceState({}, '', location.pathname);
+      dbxStatus('', 'connected');
+      await sync();
+    } catch (e) {
+      dbxStatus('Auth failed: ' + e.message, 'error');
+    }
+  } else if (dbxTokens()) {
+    dbxStatus('', 'connected');
+    await sync();
+  }
+})();
+const tools = {
+  run_python: {
+    description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
+REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
+ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
+PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import.
+Others: await micropip.install('name') then import. No compiled C extensions, no subprocess, no sockets.
+HTTP: pyodide.http.pyfetch (CORS). Non-CORS: pyfetch('/proxy/host/path').
+OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
+Examples:
+  run      → {path: "scripts/random_numbers.py", args: ["5"]}
+  with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
+  numpy    → script imports numpy as np — prebuilt, no install needed
+  pypi     → script runs: import micropip; await micropip.install('feedparser')
+  html out → script writes artifacts/out.html, then show_artifact({"path":"artifacts/out.html"})`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
+        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
+      },
+      required: ['path'],
+    },
+  },
+  write_file: {
+  description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      content: { type: 'string', description: 'Full file content' },
+    },
+    required: ['path', 'content'],
+  },
+},
+edit_file: {
+  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      path:    { type: 'string', description: 'OPFS path relative to /files/' },
+      old_str: { type: 'string', description: 'Exact string to replace. Must match exactly once.' },
+      new_str: { type: 'string', description: 'Replacement string. Omit to delete old_str.' },
+    },
+    required: ['path', 'old_str'],
+  },
+},
+  show_artifact: {
+    description: `Render a file from OPFS as a live artifact injected directly into the chat.
+Use this whenever:
+- The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
+- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
+The file must already exist in OPFS — write it first with run_python, then call this.
+Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
+Path is OPFS-relative — do NOT include a leading slash (e.g. "artifacts/chart.html").
+Default output folder is artifacts/ — use it unless the user specifies a different path.
+Typical flow:
+  run_python: open('artifacts/chart.html', 'w').write(html)
+  show_artifact: { "path": "artifacts/chart.html" }`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "artifacts/chart.html"). No leading slash. Default folder: artifacts/.' },
+      },
+      required: ['path'],
+    },
+  },
+        load_image: {
+      description: `Load an image file from OPFS into the conversation so you can see its pixel content.
+WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
+WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
+Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Path to image file relative to /files/ (e.g. "beach.jpg" or "images/photo.png")' },
+        },
+        required: ['path'],
+      },
+    },
+};
+const toolDefs = () => Object.entries(tools)
+  .filter(([name]) => {
+    return true;
+  })
+  .map(([name, t]) => ({
+    type: 'function',
+    function: { name, description: t.description, parameters: t.parameters },
+  }));
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -1265,6 +1277,7 @@ function formatSize(bytes) {
 }
 async function getFileSize(path) {
 
+
   try {
     const parts = path.split('/').filter(Boolean);
     const name = parts.pop();
@@ -1272,6 +1285,7 @@ async function getFileSize(path) {
     const handle = await dir.getFileHandle(name);
     return (await handle.getFile()).size;
   } catch {}
+
 
   const s = syncState()[path];
   return s && s.size || 0;
@@ -1281,13 +1295,16 @@ async function getFolderSize(path) {
   let total = 0;
   const state = syncState();
 
+
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (prefix && !kl.startsWith(prefix)) continue;
 
+
     if (prefix && kl.length <= prefix.length) continue;
     total += state[k].size || 0;
   }
+
 
   try {
     for (const f of await opfs.list(path)) {
@@ -1314,31 +1331,70 @@ function opfsJoin(base, child) {
 async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
-  const state = syncState();
+
 
   let opfsList = [];
   try { opfsList = await opfs.listDir(path); } catch {}
+  const localMap = new Map();
+  for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
+
+
+
+
+
+
+
+
+  const state = syncState();
+  const prefix = path ? path + '/' : '';
+  const remoteMap = new Map();
+  for (const k of Object.keys(state)) {
+    const kl = k.toLowerCase();
+    if (!kl.startsWith(prefix.toLowerCase())) continue;
+    const rest = k.slice(prefix.length);
+    if (!rest) continue;
+    if (rest.includes('/')) {
+      const firstSeg = rest.split('/')[0];
+      if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+    } else {
+      remoteMap.set(rest, 'file');
+    }
+  }
+  const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+
+
+
 
   const frag = document.createDocumentFragment();
-  if (!opfsList.length) {
+  if (!names.size) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = '(empty)';
+    li.textContent = initialSyncDone ? '(empty)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
-    if ($('fileCount')) $('fileCount').textContent = '';
     return;
   }
-
   const items = [];
-  for (const e of opfsList) {
-    const name = e.name;
+  for (const name of names) {
+    const local = localMap.get(name);
+    const remote = remoteMap.get(name);
+    const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
     const fullKey = opfsJoin(path, name);
-    const kind = e.kind === 'directory' ? 'folder' : 'file';
-    const s = state[fullKey];
-    const synced = !!s;
-    items.push({ name, kind, synced, fullKey });
+    let status = 'synced';
+    if (kind === 'folder') {
+      status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+    } else if (!local) {
+      status = 'cloud';
+    } else if (!remote) {
+      status = 'local';
+    } else {
+      const s = state[fullKey];
+      const lastMod = await opfsLastModified(fullKey);
+      status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
+    }
+    items.push({ name, kind, status, fullKey });
   }
+
 
   await Promise.all(items.map(async (it) => {
     if (it.kind === 'folder') {
@@ -1348,15 +1404,19 @@ async function refreshFileList() {
     }
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
-  if ($('fileCount')) $('fileCount').textContent = String(items.length);
+  if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
+
 
   for (const it of items) {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    const kindIcon = it.kind === 'folder' ? '📁 ' : (it.synced ? '📄 ' : '✎ ');
+
+
+    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
+    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
     btn.textContent = kindIcon + it.name;
-    btn.title = it.synced ? `${it.kind} · synced` : `${it.kind} · not yet synced`;
+    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
     if (it.kind === 'folder') {
       btn.onclick = () => { $('opfsPath').value = '/' + it.fullKey; refreshFileList(); };
     } else {
@@ -1371,27 +1431,8 @@ async function refreshFileList() {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
-      if (it.kind === 'file') {
-        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => {
-          const a = document.createElement('a');
-          a.href = 'opfs/' + it.fullKey;
-          a.target = '_blank';
-          a.download = it.name || it.fullKey.split('/').pop();
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }});
-      }
-      menuItems.push({ label: 'Delete', danger: true, action: async () => {
-        try {
-          await opfs.remove(it.fullKey);
-          if (state[it.fullKey]) delete state[it.fullKey];
-          setSyncState(state);
-          _deletions.add(it.fullKey);
-          await refreshFileList();
-        } catch (e) { console.warn('delete failed:', it.fullKey, e); }
-      }});
+            // folder context menu items
+            // file context menu items
       showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
@@ -1416,6 +1457,7 @@ function showContextMenu(x, y, items) {
     menu.appendChild(btn);
   }
   document.body.appendChild(menu);
+
 
   const r = menu.getBoundingClientRect();
   const px = Math.min(x, window.innerWidth - r.width - 4);
@@ -1451,6 +1493,7 @@ function getMarked() {
 }
 async function openFileViewer(fullKey, name) {
 
+
   let file;
   try {
     const { parts, name: fname } = splitPath(fullKey);
@@ -1476,6 +1519,7 @@ async function openFileViewer(fullKey, name) {
   meta.className = 'meta';
   meta.textContent = `${file.size.toLocaleString()} bytes`;
 
+
   const mdBtn = document.createElement('button');
   mdBtn.className = 'mode';
   mdBtn.style.display = 'none';
@@ -1497,6 +1541,7 @@ async function openFileViewer(fullKey, name) {
   body.className = 'body';
   panel.append(header, body);
   overlay.appendChild(panel);
+
 
   const finalize = (closeFn) => {
     closeBtn.onclick = closeFn;
@@ -1529,6 +1574,7 @@ async function openFileViewer(fullKey, name) {
     finalize(closeFileViewer); return;
   }
 
+
   const text = await file.text();
   const sample = text.slice(0, 4000);
   const repl = (sample.match(/�/g) || []).length;
@@ -1541,6 +1587,7 @@ async function openFileViewer(fullKey, name) {
   }
   const isMd = ext === 'md' || ext === 'markdown';
   const editable = text.length <= TEXT_PREVIEW_CAP;
+
 
   let mode = isMd ? 'rendered' : 'raw';
   let current = text;
@@ -1663,6 +1710,7 @@ async function uploadEntry(entry, dirPath) {
       if (entry) await uploadEntry(entry, path);
     }
 
+
     if (!items.length) {
       for (const f of e.dataTransfer.files) {
         const destPath = opfsJoin(path, f.name);
@@ -1686,11 +1734,18 @@ class SidePanel {
     this._wireEvents();
   }
 
+
   get isOpen() { return this._sideId !== null; }
   get sideId() { return this._sideId; }
   get activeIsRight() { return this._activeIsRight; }
 
+
+
+
+
+
   activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
+
 
   async open(id) {
     if (!id) return;
@@ -1698,7 +1753,9 @@ class SidePanel {
     if (id === this._sideId) return;
     if (this._activeIsRight) return;
 
+
     closeArtifactPanel();
+
 
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
@@ -1709,6 +1766,9 @@ class SidePanel {
     const s = convStreams.get(id);
     if (s?.host) this.right.appendChild(s.host);
     this._render();
+
+
+
 
     requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
     refreshConversationList();
@@ -1726,6 +1786,9 @@ class SidePanel {
   flip() {
     if (!this.isOpen) return;
 
+
+
+
     [activeConvId, this._sideId] = [this._sideId, activeConvId];
     this._activeIsRight = !this._activeIsRight;
     if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
@@ -1734,8 +1797,12 @@ class SidePanel {
     this._render();
     refreshSendButtonForActive();
     refreshConversationList();
-    if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
   }
+
+
+
+
+
 
   notifyDeleted(id) {
     if (id === this._sideId) {
@@ -1745,11 +1812,31 @@ class SidePanel {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   promoteSideToActive() {
     if (!this.isOpen) return false;
     const sId = this._sideId;
     const s = convStreams.get(sId);
     if (s && s.host) {
+
+
+
 
       if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
       this.left.appendChild(s.host);
@@ -1764,6 +1851,11 @@ class SidePanel {
     return true;
   }
 
+
+
+
+
+
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
     let data;
@@ -1774,11 +1866,15 @@ class SidePanel {
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
+
+
+
   _render() {
     const b = document.body.classList;
     b.toggle('side-open',     this.isOpen);
     b.toggle('active-left',   this.isOpen && !this._activeIsRight);
     b.toggle('active-right',  this.isOpen &&  this._activeIsRight);
+
 
     if (this.isOpen) {
       b.remove('artifact-side-open');
@@ -1786,8 +1882,12 @@ class SidePanel {
     }
   }
 
+
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
+
+
+
 
     const onPanelClick = (targetIsRight) => (ev) => {
       if (!this.isOpen) return;
@@ -1799,6 +1899,11 @@ class SidePanel {
     };
     this.left.addEventListener('click',  onPanelClick(false));
     this.right.addEventListener('click', onPanelClick(true));
+
+
+
+
+
 
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
@@ -1838,12 +1943,14 @@ sidePanel = new SidePanel();
     document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
 
+
     const frame = $('artifactPanelFrame');
     if (frame) frame.style.pointerEvents = 'none';
     function onMove(ev) {
       const wrap = $('messagesWrap');
       const minW = 200;
       const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
+
 
       const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
       panel.style.width = newW + 'px';
@@ -1864,6 +1971,9 @@ sidePanel = new SidePanel();
 (async () => {
   await refreshConversationList();
   if (activeConvId) {
+
+
+
 
     const restoreId = activeConvId;
     activeConvId = null;
@@ -1916,6 +2026,11 @@ function capToolResult(s) {
     return { content: s, truncated: false, original: s.length, kept: s.length };
   }
 
+
+
+
+
+
   const reserve = 180;
   const budget = TOOL_RESULT_MAX - reserve;
   const headLen = Math.floor(budget * 0.7);
@@ -1933,7 +2048,19 @@ function humanBytes(n) {
 }
 function addMsg(role, text = '', host = null) {
 
+
+
+
+
+
+
+
   const target = host || (activeStream() && activeStream().host) || $('messages');
+
+
+
+
+
 
   let scrollHost = target;
   while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
@@ -1943,6 +2070,9 @@ function addMsg(role, text = '', host = null) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'tool-call') {
+
+
+
 
     const expanded = document.createElement('span');
     expanded.className = 'tc-expanded';
@@ -1956,6 +2086,7 @@ function addMsg(role, text = '', host = null) {
     bubble.className = 'bubble';
     if (Array.isArray(text)) {
 
+
       for (const part of text) {
         if (part.type === 'text' && part.text) {
           const span = document.createElement('span');
@@ -1967,6 +2098,7 @@ function addMsg(role, text = '', host = null) {
           const img = document.createElement('img');
           const url = part.image_url.url;
           if (url.startsWith('opfs://')) {
+
 
             img.src = '';
             img.alt = '(loading image...)';
@@ -1995,12 +2127,26 @@ function addMsg(role, text = '', host = null) {
   }
   target.appendChild(div);
 
+
+
+
+
+
+
+
+
+
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) target.appendChild(timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
 function applyToolsMinimized() {
+
+
+
+
+
 
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
@@ -2018,6 +2164,9 @@ function attachLongPress(el, handler) {
           clientX: el._lp.x, clientY: el._lp.y,
           preventDefault() {}, stopPropagation() {}
         });
+
+
+
 
         const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
         document.addEventListener('click', swallow, { capture: true, once: true });
@@ -2055,8 +2204,16 @@ function attachLongPress(el, handler) {
 function bindBubble(div, msgRef) {
   if (!div) return div;
 
+
+
+
+
+
+
+
   if (!div._listenersAttached) {
     div._listenersAttached = true;
+
 
     div.addEventListener('contextmenu', onBubbleContextMenu);
   }
@@ -2084,6 +2241,11 @@ async function rewindFromMenu() {
   hideBubbleMenu();
   if (!target) return;
 
+
+
+
+
+
   if (!target._msg) {
     const s = activeStream();
     addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
@@ -2097,6 +2259,9 @@ async function rewindFromMenu() {
     : `Remove this message and ${after} message(s) after it?`;
   if (!confirm(msg)) return;
 
+
+
+
   const s = activeStream();
   if (s) {
     if (s.abort) { s.queueAborted = true; s.abort.abort(); }
@@ -2106,6 +2271,11 @@ async function rewindFromMenu() {
   messages.length = idx;
   clearActiveConvUI();
   for (const m of messages) renderHistoricalMessage(m);
+
+
+
+
+
 
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -2123,6 +2293,9 @@ async function copyFromMenu() {
   if (!target) return;
   let text;
 
+
+
+
   const expanded = target.querySelector && target.querySelector('.tc-expanded');
   if (expanded && expanded.textContent) {
     text = expanded.textContent;
@@ -2134,6 +2307,7 @@ async function copyFromMenu() {
   try {
     await navigator.clipboard.writeText(text);
   } catch (e) {
+
 
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -2178,10 +2352,12 @@ function appendToolResult(tcId, result) {
     expanded.appendChild(box);
   }
 
+
   const existingSep = box.querySelector('.tool-sep');
   const existingResult = box.querySelector('.tool-result');
   if (existingSep) existingSep.remove();
   if (existingResult) existingResult.remove();
+
 
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
@@ -2214,7 +2390,13 @@ function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
 
+
+
+
+
+
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
+
 
   if (!el.querySelector('.tc-spinner')) {
     el.innerHTML =
@@ -2246,8 +2428,16 @@ class RoundRenderer {
     this.host = host;
     this.convMessages = convMessages;
 
+
+
+
     this.reply = null;
     this.cursor = null;
+
+
+
+
+
 
     this.content = '';
     this.displayed = '';
@@ -2266,6 +2456,7 @@ class RoundRenderer {
     this.thinkStart = 0;
     this._thinkDone = false;
   }
+
 
   startRound() {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
@@ -2320,6 +2511,13 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._scheduleDrain();
 
+
+
+
+
+
+
+
     if (this.reply && (!this.content || !this.content.trim())) {
       this.reply.remove();
       this.reply = null;
@@ -2350,11 +2548,13 @@ class RoundRenderer {
     }
     const text = String(result || '');
 
+
     if (text.startsWith('artifact:')) {
       const path = text.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
       return;
     }
+
 
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
@@ -2376,6 +2576,11 @@ class RoundRenderer {
     }
   }
   finalize() {
+
+
+
+
+
 
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
@@ -2423,6 +2628,11 @@ class RoundRenderer {
 
   _appendContent(chunk) {
 
+
+
+
+
+
     this.content += chunk;
     this.pending += chunk;
     this._scheduleDrain();
@@ -2442,6 +2652,11 @@ class RoundRenderer {
     if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
     if (!this.toolCalls[i].function.name) return;
     if (!this.toolCallEls[i]) {
+
+
+
+
+
 
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
       this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
@@ -2464,8 +2679,22 @@ class RoundRenderer {
     this.drainTimer = null;
     let anyPending = false;
 
+
+
+
+
+
+
+
+
+
+
+
     const scrollHost = this._scrollHost();
     const stick = shouldAutoScroll(scrollHost);
+
+
+
 
     if (this.pending.length > 0) {
       const n = Math.max(1, Math.ceil(this.pending.length / 30));
@@ -2474,6 +2703,7 @@ class RoundRenderer {
       this._paintContent();
       if (this.pending.length > 0) anyPending = true;
     }
+
 
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i];
@@ -2486,6 +2716,11 @@ class RoundRenderer {
     }
     this._appendCloseParensIfReady();
 
+
+
+
+
+
     if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
       this.cursor.remove();
       this.cursor = null;
@@ -2493,6 +2728,11 @@ class RoundRenderer {
     if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
+
+
+
+
+
 
   _scrollHost() {
     let el = this.reply || this.host;
@@ -2502,13 +2742,22 @@ class RoundRenderer {
     return el;
   }
 
+
+
+
+
+
+
+
   _flushAllPending() {
+
 
     if (this.pending.length > 0) {
       this.displayed += this.pending;
       this.pending = '';
       this._paintContent();
     }
+
 
     for (let i = 0; i < this.toolPending.length; i++) {
       const buf = this.toolPending[i] || '';
@@ -2526,6 +2775,7 @@ class RoundRenderer {
     const box = buildToolBox(tc.function.arguments, tc.function.name);
     const expanded = this.toolCallEls[i].querySelector('.tc-expanded');
     if (expanded) {
+
 
       const existingBox = expanded.querySelector('.tool-box');
       const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
@@ -2593,6 +2843,9 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
 
+
+
+
   let prev = {};
   try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
@@ -2652,6 +2905,7 @@ function renderHistoricalMessage(m, host = null) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
 
+
       const target = host || $('messages');
       const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
@@ -2659,9 +2913,13 @@ function renderHistoricalMessage(m, host = null) {
       }
     }
 
+
   }
 }
 function clearActiveConvUI() {
+
+
+
 
   const s = activeStream();
   if (s && s.host) s.host.innerHTML = '';
@@ -2679,6 +2937,11 @@ function mountConv(convId) {
     const s = ensureStream(convId);
     messages = s.messages;
 
+
+
+
+
+
     const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
     if (s.host.parentNode !== target) target.appendChild(s.host);
   } else {
@@ -2686,18 +2949,35 @@ function mountConv(convId) {
     messages = [];
   }
   refreshSendButtonForActive();
-  if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
 async function loadConv(id) {
   if (id === activeConvId) return;
 
+
+
+
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
 
+
+
+
   await saveActiveConv();
+
+
+
+
   parkActiveConv();
   if (convStreams.has(id)) {
+
+
+
+
     mountConv(id);
   } else {
+
+
+
+
     let data;
     try { data = JSON.parse(await opfs.read(convPath(id))); }
     catch (e) {
@@ -2710,8 +2990,6 @@ async function loadConv(id) {
     mountConv(id);
     for (const m of s.messages) renderHistoricalMessage(m);
   }
-  activeConvId = id;
-  localStorage.setItem('sandpie-active-conv', id);
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
   document.body.classList.remove('sidebar-open');
@@ -2733,7 +3011,23 @@ async function listConversations() {
   let entries = [];
   try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
 
+
+
+
+
+
+
+
+
+
+
+
   const searchActive = !!($('convSearch')?.value.trim());
+
+
+
+
+
 
   const reads = entries
     .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
@@ -2756,6 +3050,9 @@ async function listConversations() {
       } catch { return null; }
     });
   const out = (await Promise.all(reads)).filter(Boolean);
+
+
+
 
   for (const c of out) {
     if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
@@ -2812,6 +3109,9 @@ async function deleteConv(id, title) {
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
 
+
+
+
   if (dbxTokens()) {
     try { await dbxDelete('/' + path); } catch {}
   }
@@ -2819,6 +3119,7 @@ async function deleteConv(id, title) {
   const sync = syncState(); let sChanged = false;
   for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
   if (sChanged) setSyncState(sync);
+
 
   const stream = convStreams.get(id);
   if (stream) {
@@ -2828,16 +3129,35 @@ async function deleteConv(id, title) {
     convStreams.delete(id);
   }
 
+
+
+
   if (sidePanel) sidePanel.notifyDeleted(id);
   if (id === activeConvId) {
     activeConvId = null;
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
 
+
+
+
+
+
+
+
+
+
+
+
+
+
     const promoted = sidePanel?.promoteSideToActive();
     if (!promoted) {
       refreshSendButtonForActive();
     } else {
+
+
+
 
     }
   }
@@ -2863,7 +3183,6 @@ function fmtRelTime(iso) {
 }
 function buildConvLi(c, idx) {
   const li = document.createElement('li');
-  li.dataset.cid = c.id;
   if (c.id === activeConvId) li.classList.add('active');
   if (c.archived) li.classList.add('archived');
   const num = document.createElement('span');
@@ -2876,6 +3195,7 @@ function buildConvLi(c, idx) {
   span.onclick = () => loadConv(c.id);
   li.appendChild(num);
   li.appendChild(span);
+
 
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
@@ -2912,6 +3232,13 @@ function buildConvLi(c, idx) {
   li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
   attachLongPress(li, _openConvMenu);
 
+
+
+
+
+
+
+
   li.draggable = true;
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
@@ -2925,6 +3252,7 @@ async function refreshConversationList() {
   if (!ul) return;
   let list = await listConversations();
 
+
   const searchInput = $('convSearch');
   if (searchInput && searchInput.value.trim()) {
     const query = searchInput.value.trim().toLowerCase();
@@ -2934,9 +3262,11 @@ async function refreshConversationList() {
     );
   }
 
+
   const pinned   = list.filter(c => c.pinned && !c.archived);
   const regular  = list.filter(c => !c.pinned && !c.archived);
   const archived = list.filter(c => c.archived);
+
 
   const visible = pinned.length + regular.length;
   $('convCount').textContent = visible ? `${visible}` : '';
@@ -2994,6 +3324,15 @@ function setStreamSending(stream, sending) {
     stream.abort = null;
     stream.generating = false;
 
+
+
+
+
+
+
+
+
+
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-check')) continue;
       el.classList.remove('in-flight');
@@ -3002,6 +3341,7 @@ function setStreamSending(stream, sending) {
   }
   if (stream === activeStream()) refreshSendButtonForActive();
 
+
   refreshConversationList();
 }
 async function handleSubmit() {
@@ -3009,7 +3349,9 @@ async function handleSubmit() {
   if (!text && !SandpieImages.hasImage()) return;
   $('input').value = '';
 
+
   const content = await SandpieImages.buildContent(text);
+
 
   if (SandpieImages.hasImage()) {
     SandpieImages.clear();
@@ -3019,6 +3361,7 @@ async function handleSubmit() {
   m.scrollTop = m.scrollHeight;
   enqueueForActive(content);
 
+
   const ta = $('input');
   if (ta) {
     ta.style.height = 'auto';
@@ -3027,6 +3370,11 @@ async function handleSubmit() {
 async function enqueueForActive(content) {
   await ensureActiveConv();
   const s = ensureStream(activeConvId);
+
+
+
+
+
 
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
   s.queue.push(content);
@@ -3038,6 +3386,7 @@ function handleButtonClick() {
   const s = activeStream();
   if (btn.classList.contains('sending') && s) {
 
+
     s.queueAborted = true;
     if (s.abort) s.abort.abort();
     s.queue.length = 0;
@@ -3047,6 +3396,7 @@ function handleButtonClick() {
   }
 }
 function updateQueueCount(stream) {
+
 
   const s = stream || activeStream();
   if (!s || !s.timerEl) return;
@@ -3071,6 +3421,17 @@ async function processQueueFor(stream) {
     updateQueueCount(stream);
   }
 
+
+
+
+
+
+
+
+
+
+
+
   if (stream.queue.length > 0) processQueueFor(stream);
 }
 const SW_STREAM_PATH = './sandpie-stream';
@@ -3078,6 +3439,9 @@ let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
   }
+
+
+
 
   const regs = await navigator.serviceWorker.getRegistrations();
   for (const r of regs) {
@@ -3088,8 +3452,20 @@ let _swReady = (async () => {
     }
   }
 
+
+
+
+
+
   let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
+
+
+
+
+
+
+
 
   if (!navigator.serviceWorker.controller) {
     console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
@@ -3108,11 +3484,13 @@ let _swReady = (async () => {
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 async function sendSingle(text, stream) {
 
+
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
     return;
   }
   const { id: convId, messages: convMessages, host } = stream;
+
 
   const userMsg = { role: 'user', content: text };
   convMessages.push(userMsg);
@@ -3123,7 +3501,9 @@ async function sendSingle(text, stream) {
   startTotalTimer(stream);
   let wasAborted = false;
 
+
   const config = await buildAgentConfig(convMessages);
+
 
   await _swReady;
   const ctrl = new AbortController();
@@ -3134,20 +3514,28 @@ async function sendSingle(text, stream) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
+
   const renderer = new RoundRenderer(host, convMessages);
 
+
+
+
+
+
+
+
+
+
   let agentDoneSeen = false;
-  let errorSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
     if (ev.type === 'agent_done')  agentDoneSeen = true;
-    if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
     if (ev.type === 'tool_result')  lastInFlightTool = null;
-    if (ev.type === 'usage')        SandpieTokens.recordUsage(convId, ev.usage);
     dispatchAgentEvent(ev, renderer, host);
   };
   try {
+
 
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
@@ -3161,9 +3549,19 @@ async function sendSingle(text, stream) {
       return;
     }
 
+
     await readAgentEvents(res.body, dispatch);
 
-    if (!agentDoneSeen && !wasAborted && !errorSeen) {
+
+
+
+
+
+
+
+
+
+    if (!agentDoneSeen && !wasAborted) {
       const trigger = lastInFlightTool
         ? ` while running \`${lastInFlightTool}\``
         : '';
@@ -3182,15 +3580,25 @@ async function sendSingle(text, stream) {
     }
   } finally {
 
+
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
 
+
+
+
     renderer.finalize();
+
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     setStreamSending(stream, false);
     await saveConv(convId);
+
+
+
+
+
 
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
     try { await sync(); } catch (e) { console.warn('sync failed:', e); }
@@ -3298,6 +3706,7 @@ function dispatchAgentEvent(ev, renderer, host) {
     let moving = false;
     for (const [msg, s] of state) {
 
+
       const diff = s.target - s.current;
       if (Math.abs(diff) > 0.001) {
         s.current += diff * 0.12;
@@ -3322,6 +3731,7 @@ function dispatchAgentEvent(ev, renderer, host) {
   }
   messages.addEventListener('scroll', onScroll, { passive: true });
 
+
   updateTargets();
   tick();
 })();
@@ -3334,7 +3744,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
   console.log('[sandpie] PWA install prompt suppressed (available via menu)');
 });
 </script>
-<script type="module" src="modules/agents.js"></script>
+  <script type="module" src="modules/themes.js"></script>
+  <script type="module" src="modules/agents.js"></script>
   <script type="module" src="modules/context.js"></script>
   <script type="module" src="modules/artifacts.js"></script>
 <script>
@@ -3350,18 +3761,32 @@ fetch('version.txt')
     if (el) el.textContent = 'dev';
   });
 
-</script>
-<script>
-function _bootSandpie() {
-  // applySavedCustom() restores saved theme from localStorage.
-  // If DOMPurify hasn't loaded yet, that's fine — theme can still apply.
-  applySavedCustom();
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', _bootSandpie);
-} else {
-  _bootSandpie();
-}
+
+  /* Sidebar scroll hints — shadow + chevron */
+  (function() {
+    const SIDEBAR = document.querySelector('aside');
+    if (!SIDEBAR) return;
+    // Create hint elements
+    const topHint = document.createElement('div');
+    topHint.className = 'scroll-hint top';
+    topHint.textContent = '▲';
+    const bottomHint = document.createElement('div');
+    bottomHint.className = 'scroll-hint bottom';
+    bottomHint.textContent = '▼';
+    SIDEBAR.prepend(topHint);
+    SIDEBAR.appendChild(bottomHint);
+    function updateHints() {
+      const hasTop = SIDEBAR.scrollTop > 6;
+      const hasBottom = SIDEBAR.scrollTop + SIDEBAR.clientHeight < SIDEBAR.scrollHeight - 6;
+      topHint.classList.toggle('visible', hasTop);
+      bottomHint.classList.toggle('visible', hasBottom);
+    }
+    SIDEBAR.addEventListener('scroll', updateHints, { passive: true });
+    updateHints();
+    // Re-check when sidebar content changes
+    new MutationObserver(updateHints).observe(SIDEBAR, { childList: true, subtree: true });
+  })();
+
 </script>
 </body>
 </html>
