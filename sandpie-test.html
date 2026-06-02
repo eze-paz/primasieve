@@ -8,8 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>init();
-document.addEventListener("DOMContentLoaded", applySavedCustom);</script>
+<!-- init() deferred to end of body -->
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/notifications.js"></script>
 </head>
@@ -656,7 +655,13 @@ function dedentPreBlocks(html) {
   }
   return wrap.innerHTML;
 }
-const renderMd = text => DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
+const renderMd = text => {
+  if (typeof DOMPurify === 'undefined' || typeof marked === 'undefined') {
+    // Defer rendering until libraries are loaded
+    return '&lt;div class="pending"&gt;Loading...&lt;/div&gt;';
+  }
+  return DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
+};
 function dedentMarkdownFences(text) {
   if (!text) return text;
   return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
@@ -937,6 +942,18 @@ function setDbxBusy(busy) {
   if (dbxBusyCount > 0) dot.classList.add('busy');
   else dot.classList.remove('busy');
 }
+
+function dbxTokens() {
+  try {
+    return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+function setDbxTokens(t) {
+  localStorage.setItem('dbx-tokens', JSON.stringify(t));
+}
+
 function dbxToggleConnection() {
   if (dbxTokens()) dbxDisconnect();
   else dbxConnect();
@@ -3915,6 +3932,19 @@ fetch('version.txt')
     new MutationObserver(updateHints).observe(SIDEBAR, { childList: true, subtree: true });
   })();
 
+</script>
+<script>
+function _bootSandpie() {
+  if (typeof init !== 'function') { setTimeout(_bootSandpie, 50); return; }
+  if (typeof DOMPurify === 'undefined') { setTimeout(_bootSandpie, 50); return; }
+  init();
+  applySavedCustom();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _bootSandpie);
+} else {
+  _bootSandpie();
+}
 </script>
 </body>
 </html>
