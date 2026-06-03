@@ -68,7 +68,7 @@ async function dbxListFull(folderPath, { recursive = false } = {}) {
   let entries = data.entries.slice();
   let pageCount = 1;
   while (data.has_more) {
-    window.dbxProgress(`listing… page ${pageCount}`);
+
     data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
     entries = entries.concat(data.entries);
     pageCount++;
@@ -92,7 +92,7 @@ async function dbxListContinue(cursor) {
   let entries = data.entries.slice();
   let pageCount = 1;
   while (data.has_more) {
-    window.dbxProgress(`checking changes… page ${pageCount}`);
+
     data = await dbxApi('/2/files/list_folder/continue', { cursor: data.cursor });
     entries = entries.concat(data.entries);
     pageCount++;
@@ -255,7 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
   SandpieMenu.add('cloudSection', {
     title: 'Cloud sync',
     dot: 'dbxDot',
-    open: true,
     html: `
       <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
       <div class="row">

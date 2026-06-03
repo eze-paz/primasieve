@@ -645,7 +645,7 @@ function dbxStatus(text, kind) {
   const btn = sec?.querySelector('#dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
 }
-function dbxProgress(text) {
+
   // No-op: busy state shown via setDbxBusy, text updates removed per UX request
 }
 let dbxBusyCount = 0;
