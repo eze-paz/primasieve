@@ -73,17 +73,6 @@
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
     <div class="context-item" id="bubbleToggleThoughtsItem" onclick="toggleThoughtsFromMenu()">Show thoughts</div>
   </div>
-  <details class="service" id="cloudSection">
-    <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
-    <div class="service-body">
-      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
-      <div class="row">
-        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
-        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
-      </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
-    </div>
-  </details>
     <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -479,8 +468,29 @@ function setDot(id, state) {
   if (state) dot.classList.add(state);
 }
 
+  /* ========== Cloud Section (registered via SandpieMenu) ========== */
+  SandpieMenu.add('cloudSection', {
+    title: 'Cloud sync',
+    dot: 'dbxDot',
+    open: true,
+    html: `
+      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+      <div class="row">
+        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
+      </div>
+      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    `,
+    onRender(body) {
+      const input = body.querySelector('#dbxAppKey');
+      if (input) input.addEventListener('input', saveConfig);
+      // Seed saved value
+      const saved = JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+      if (saved?.app_key && input) input.value = saved.app_key;
+    }
+  });
+
 // Only dbxAppKey triggers saveConfig (provider inputs managed by module)
-$('dbxAppKey').addEventListener('input', saveConfig);
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
@@ -672,24 +682,23 @@ async function pruneOrphanDirs(cloud) {
 }
 const DBX_REDIRECT = location.origin + location.pathname;
 function dbxStatus(text, kind) {
-  const el = $('dbxStatus');
-  el.textContent = text;
-  el.className = 'dbx-status ' + kind;
-  el.style.display = text ? '' : 'none';
+  const sec = SandpieMenu.get('cloudSection');
+  const el = sec?.querySelector('#dbxStatus');
+  if (el) { el.textContent = text; el.className = 'dbx-status ' + kind; el.style.display = text ? '' : 'none'; }
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
-  const btn = $('dbxToggleBtn');
+  const btn = sec?.querySelector('#dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
 }
 function dbxProgress(text) {
-  const el = $('dbxProgress');
-  const title = $('dbxTitle');
+  const sec = SandpieMenu.get('cloudSection');
+  const el = sec?.querySelector('#dbxProgress');
   if (el) el.textContent = text || '';
-  if (title) title.style.display = text ? 'none' : '';
 }
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {
   dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
-  const dot = $('dbxDot');
+  const sec = SandpieMenu.get('cloudSection');
+  const dot = sec?.querySelector('#dbxDot');
   if (!dot) return;
   if (dbxBusyCount > 0) dot.classList.add('busy');
   else dot.classList.remove('busy');
