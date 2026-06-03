@@ -862,7 +862,7 @@ async function sync() {
           };
           baselined++;
         } else {
-          dbxProgress(`downloading… ${path}`);
+
           const content = await dbxDownload(e.path);
           await opfs.write(path, content);
           state[path] = {
@@ -877,7 +877,7 @@ async function sync() {
       if (path === _openFilePath) continue;
       if (cloudChanged && localDirty) continue;
       if (cloudChanged) {
-        dbxProgress(`downloading… ${path}`);
+
         const content = await dbxDownload(e.path);
         await opfs.write(path, content);
         state[path] = {
@@ -888,7 +888,7 @@ async function sync() {
       }
 
       if (!localExists) {
-        dbxProgress(`downloading… ${path}`);
+
         const content = await dbxDownload(e.path);
         await opfs.write(path, content);
         state[path].syncedMtime = await opfsLastModified(path);
@@ -913,7 +913,7 @@ async function sync() {
     const BATCH_SIZE = 50;
     for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
       const chunk = dirty.slice(i, i + BATCH_SIZE);
-      dbxProgress(`uploading…(${i + chunk.length}/${dirty.length})`);
+
       const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
         const content = await opfs.readBytes(rel);
         return { rel, content, s, lm };
@@ -938,15 +938,15 @@ async function sync() {
     }
     setSyncState(state);
     await pruneOrphanDirs(cloud);
-    dbxProgress('');
+
     await refreshFileList();
     await refreshConversationList();
   } catch (e) {
-    dbxProgress('');
+
     dbxStatus('Sync failed: ' + e.message, 'error');
     console.warn('sync:', e);
   } finally {
-    dbxProgress('');
+
     initialSyncDone = true;
     setDbxBusy(false);
     _syncing = false;
