@@ -300,11 +300,13 @@
     color: var(--sp-text);
     font: inherit;
     resize: none;
-    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-y: hidden;
     line-height: 1.4;
     min-height: calc(1.4em + 0.8rem);
     max-height: 12em;
     outline: none;
+    field-sizing: content;
   }
   .input-bar {
     display: flex;
@@ -1169,11 +1171,11 @@
     .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
   }
 
-  /* Streamed reasoning ("thinking") box — test-page only for now. */
+  /* Streamed reasoning ("thinking") box */
   .msg.think {
     margin: 0.25rem 0 0.5rem;
-    border: 1px solid var(--sp-border);
-    border-radius: 6px;
+    border-left: 3px solid var(--sp-accent);
+    border-radius: 0 6px 6px 0;
     background: var(--sp-surface);
     font-size: 0.8rem;
     overflow: hidden;
@@ -1181,7 +1183,7 @@
   .msg.think > summary {
     cursor: pointer;
     list-style: none;
-    padding: 0.35rem 0.6rem;
+    padding: 0.5rem 0.75rem;
     color: var(--sp-text-dim);
     user-select: none;
     display: flex;
@@ -1205,17 +1207,21 @@
     animation: think-pulse 1s ease-in-out infinite;
   }
   @keyframes think-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
-  .msg.think .think-body {
-    padding: 0.5rem 0.7rem;
+    .msg.think .think-body {
+    padding: 0.5rem 0.75rem;
     border-top: 1px solid var(--sp-border);
     color: var(--sp-text-dim);
     white-space: pre-wrap;
     word-break: break-word;
     font-family: 'Space Mono', monospace;
     line-height: 1.45;
-    max-height: 40vh;
-    overflow-y: auto;
   }
+  .msg.think .think-body::-webkit-scrollbar { display: none; }
+  .msg.think .think-body { scrollbar-width: none; -ms-overflow-style: none; }
+  .msg.think[data-collapsed] .think-body { display: none; }
+  /* Hide scrollbar */
+  .msg.think .think-body::-webkit-scrollbar { display: none; }
+  .msg.think .think-body { scrollbar-width: none; }
 /* ==============================================================================
    RICH THEME SYSTEM — Cyberpunk / Aurora / Electric
    Appended to sandpie.css. Base CSS above is "classic-dark".

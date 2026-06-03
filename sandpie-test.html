@@ -70,6 +70,7 @@
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
+    <div class="context-item" id="bubbleToggleThoughtsItem" onclick="toggleThoughtsFromMenu()">Show thoughts</div>
   </div>
   <details class="service" id="cloudSection">
     <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
@@ -2232,6 +2233,7 @@ function onBubbleContextMenu(e) {
   e.preventDefault();
   e.stopPropagation();
   _bubbleMenuTarget = e.currentTarget;
+  updateThoughtsMenuLabel();
   $('bubbleToggleToolsItem').textContent = toolsMinimized ? 'Show tool calls' : 'Hide tool calls';
   const menu = $('bubbleContextMenu');
   menu.style.display = '';
@@ -2281,6 +2283,26 @@ function toggleToolsMinimizedFromMenu() {
   applyToolsMinimized();
   hideBubbleMenu();
 }
+
+  // Toggle all thoughts via context menu
+  var thoughtsVisible = true;
+  function toggleThoughtsFromMenu() {
+    thoughtsVisible = !thoughtsVisible;
+    var el = document.getElementById('bubbleToggleThoughtsItem');
+    if (el) el.textContent = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
+    document.querySelectorAll('.msg.think').forEach(function(t) {
+      t[thoughtsVisible ? 'removeAttribute' : 'setAttribute']('data-collapsed', '');
+    });
+  }
+  function updateThoughtsMenuLabel() {
+    var el = document.getElementById('bubbleToggleThoughtsItem');
+    if (!el) return;
+    var total = document.querySelectorAll('.msg.think').length;
+    if (!total) { el.textContent = 'Show thoughts'; thoughtsVisible = true; return; }
+    var open = document.querySelectorAll('.msg.think:not([data-collapsed])').length;
+    el.textContent = (open === total) ? 'Hide thoughts' : 'Show thoughts';
+    thoughtsVisible = (open === total);
+  }
 async function copyFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
