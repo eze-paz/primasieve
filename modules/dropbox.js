@@ -270,4 +270,24 @@ document.addEventListener('DOMContentLoaded', function() {
       if (saved?.app_key && input) input.value = saved.app_key;
     }
   });
+
+  // Boot: set cloud sync dot/button state based on stored tokens
+  const tokens = (function() {
+    try { return JSON.parse(localStorage.getItem('dbx-tokens') || 'null'); } catch(e) { return null; }
+  })();
+
+  const urlParams = new URLSearchParams(location.search);
+  const code = urlParams.get('code');
+  if (code && typeof dbxExchangeCode === 'function') {
+    dbxExchangeCode(code).then(function() {
+      history.replaceState({}, '', location.pathname);
+      dbxStatus('', 'connected');
+      if (typeof sync === 'function') sync();
+    }).catch(function(e) {
+      dbxStatus('Auth failed: ' + e.message, 'error');
+    });
+  } else if (tokens) {
+    dbxStatus('', 'connected');
+    if (typeof sync === 'function') sync();
+  }
 });

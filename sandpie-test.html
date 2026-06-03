@@ -980,23 +980,7 @@ async function manualResync() {
     if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
   }
 }
-(async () => {
-  const params = new URLSearchParams(location.search);
-  const code = params.get('code');
-  if (code) {
-    try {
-      await dbxExchangeCode(code);
-      history.replaceState({}, '', location.pathname);
-      dbxStatus('', 'connected');
-      await sync();
-    } catch (e) {
-      dbxStatus('Auth failed: ' + e.message, 'error');
-    }
-  } else if (dbxTokens()) {
-    dbxStatus('', 'connected');
-    await sync();
-  }
-})();
+// Initial sync boot is handled by modules/dropbox.js on DOMContentLoaded
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
