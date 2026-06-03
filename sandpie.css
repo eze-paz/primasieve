@@ -268,7 +268,7 @@
   .assistant > *:first-child { margin-top: 0; }
   .assistant > *:last-child { margin-bottom: 0; }
   .assistant p { margin: 0.5em 0; }
-  .assistant code { background: var(--sp-accent-dim); padding: 0.1em 0.3em; border-radius: 3px; font: 0.9em 'JetBrains Mono', Consolas, monospace; }
+  .assistant code { padding: 0.1em 0.3em; border-radius: 3px; font: 0.9em 'JetBrains Mono', Consolas, monospace; }
   .assistant pre { background: transparent; border: 1px solid var(--sp-border); padding: 0.75rem; border-radius: 5px; margin: 0.5em 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sp-text-dim); font: 0.85em 'Space Mono', 'JetBrains Mono', monospace; }
   .assistant pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
   .assistant ul, .assistant ol { padding-left: 1.5em; margin: 0.5em 0; }
@@ -1174,6 +1174,7 @@
   /* Streamed reasoning ("thinking") box */
   .msg.think {
     margin: 0.25rem 0 0.5rem;
+    max-width: 85%;
     border-left: 3px solid var(--sp-accent);
     border-radius: 0 6px 6px 0;
     background: var(--sp-surface);
@@ -1485,7 +1486,6 @@
 }
 
 [data-theme="cyberpunk"] .assistant code {
-  background: rgba(0,240,255,0.1);
   border: 1px solid rgba(0,240,255,0.15);
   color: #00f0ff;
 }
@@ -1672,7 +1672,7 @@
 [data-theme="aurora"] .user::before { background: rgba(56,189,248,0.1); transform: translate(3px, 3px); }
 [data-theme="aurora"] .assistant { color: #f1f5f9; border-left: 2px solid rgba(129,140,248,0.3); background: rgba(15,23,42,0.55); }
 [data-theme="aurora"] .assistant::before { background: linear-gradient(180deg, #38bdf8, #c084fc); box-shadow: 0 0 12px rgba(56,189,248,0.2); }
-[data-theme="aurora"] .assistant code { background: rgba(56,189,248,0.08); color: #38bdf8; }
+[data-theme="aurora"] .assistant code { color: #38bdf8; }
 [data-theme="aurora"] .assistant pre { background: rgba(15,23,42,0.8); border-left: 2px solid #38bdf8; }
 [data-theme="aurora"] .assistant pre code { background: transparent; color: #94a3b8; }
 
@@ -1946,7 +1946,6 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 [data-theme="electric"] .assistant code {
-  background: var(--sp-panel);
   padding: 0.15em 0.35em;
   border-radius: 4px;
   border: 1px solid var(--sp-border);
