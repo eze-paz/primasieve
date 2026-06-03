@@ -640,17 +640,13 @@ async function pruneOrphanDirs(cloud) {
 }
 const DBX_REDIRECT = location.origin + location.pathname;
 function dbxStatus(text, kind) {
-  const sec = SandpieMenu.get('cloudSection');
-  const el = sec?.querySelector('#dbxStatus');
-  if (el) { el.textContent = text; el.className = 'dbx-status ' + kind; el.style.display = text ? '' : 'none'; }
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
+  const sec = SandpieMenu.get('cloudSection');
   const btn = sec?.querySelector('#dbxToggleBtn');
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
 }
 function dbxProgress(text) {
-  const sec = SandpieMenu.get('cloudSection');
-  const el = sec?.querySelector('#dbxProgress');
-  if (el) el.textContent = text || '';
+  // No-op: busy state shown via setDbxBusy, text updates removed per UX request
 }
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {

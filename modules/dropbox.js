@@ -262,7 +262,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
         <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
       </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
     `,
     onRender(body) {
       const input = body.querySelector('#dbxAppKey');
