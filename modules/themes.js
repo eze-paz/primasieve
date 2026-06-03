@@ -255,10 +255,11 @@ function computeAccentNeg() {
 }
 
 
+
+
 /* ─── SandpieMenu registration for Appearance section ─── */
 function injectAppearanceMenu() {
   if (typeof SandpieMenu === 'undefined') {
-    // Retry after scripts load
     if (typeof window !== 'undefined') {
       setTimeout(injectAppearanceMenu, 50);
     }
@@ -267,21 +268,21 @@ function injectAppearanceMenu() {
   if (SandpieMenu.get('themeSection')) return;
   SandpieMenu.add('themeSection', {
     title: 'Appearance',
-    html: '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
-      '<button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>' +
-      '<button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>' +
-      '<button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>' +
-      '<button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>' +
-      '<button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>' +
-      '</div>' +
-      '<div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">' +
-        '<div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>' +
-        '<div style="display:flex;gap:0.35rem;margin-top:0.25rem;">' +
-          '<button class="ghost" onclick="resetThemeColors()" style="font-size:0.72rem;">Reset defaults</button>' +
-          '<button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;">Save colors</button>' +
-        '</div>' +
-      '</div>' +
-      '<div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look. Saved locally.</div>',
+    html: `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+      <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
+      <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
+      <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
+      <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
+      <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
+    </div>
+    <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
+      <div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+      <div style="display:flex;gap:0.35rem;margin-top:0.25rem;">
+        <button class="ghost" onclick="resetThemeColors()" style="font-size:0.72rem;">Reset defaults</button>
+        <button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;">Save colors</button>
+      </div>
+    </div>
+    <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look. Saved locally.</div>`,
     onRender: function(body) {
       var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
       if (_themePalettes[saved]) {
@@ -292,7 +293,6 @@ function injectAppearanceMenu() {
   });
 }
 
-// Auto-init: wait for DOM + SandpieMenu availability
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
     injectAppearanceMenu();
