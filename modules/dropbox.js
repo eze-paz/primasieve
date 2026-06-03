@@ -245,3 +245,30 @@ window.dbxUploadSessionStart = dbxUploadSessionStart;
 window.dbxUploadSessionFinishBatch = dbxUploadSessionFinishBatch;
 window.dbxUploadBatch = dbxUploadBatch;
 window.dbxDelete = dbxDelete;
+
+/* ------------------------------------------------------------------
+   Cloud section registration via SandpieMenu
+   Runs after DOMContentLoaded so SandpieMenu (inline) is defined.
+   ------------------------------------------------------------------ */
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof SandpieMenu === 'undefined') return;
+  SandpieMenu.add('cloudSection', {
+    title: 'Cloud sync',
+    dot: 'dbxDot',
+    open: true,
+    html: `
+      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+      <div class="row">
+        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
+        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
+      </div>
+      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
+    `,
+    onRender(body) {
+      const input = body.querySelector('#dbxAppKey');
+      if (input) input.addEventListener('input', saveConfig);
+      const saved = JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
+      if (saved?.app_key && input) input.value = saved.app_key;
+    }
+  });
+});
