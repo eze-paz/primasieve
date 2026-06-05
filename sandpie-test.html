@@ -1218,15 +1218,7 @@ async function refreshFileList() {
 
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => {
-          const a = document.createElement('a');
-          a.href = 'opfs/' + it.fullKey;
-          a.target = '_blank';
-          a.download = it.name || it.fullKey.split('/').pop();
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }});
+        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
       }
 
       menuItems.push({ label: 'Delete', danger: true, action: async () => {
