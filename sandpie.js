@@ -896,7 +896,10 @@ async function handlePy(req) {
 // Serve an OPFS file over HTTP. HTML files get the postMessage resize script
 // injected so the page-side resize listener can autosize the artifact iframe.
 async function handleOpfs(path) {
-  const opfsPath = decodeURIComponent(path.slice(path.indexOf('/opfs/') + '/opfs/'.length));
+  // Strip query string before parsing path, but keep it for checking download flag
+  const [pathOnly, query] = path.split('?');
+  const opfsPath = decodeURIComponent(pathOnly.slice(pathOnly.indexOf('/opfs/') + '/opfs/'.length));
+  const forceDownload = query && new URLSearchParams(query).get('download') === '1';
   try {
     const bytes = await opfsReadBytes(opfsPath);
     const ext = (opfsPath.split('.').pop() || '').toLowerCase();
@@ -921,7 +924,9 @@ async function handleOpfs(path) {
       else text += script;
       return new Response(text, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
     }
-    return new Response(bytes, { headers: { 'Content-Type': ct, 'Content-Disposition': 'attachment', 'Cache-Control': 'no-store' } });
+    const headers = { 'Content-Type': ct, 'Cache-Control': 'no-store' };
+    if (forceDownload) headers['Content-Disposition'] = 'attachment';
+    return new Response(bytes, { headers });
   } catch (e) {
     return new Response('Not found: ' + opfsPath, { status: 404, headers: { 'Content-Type': 'text/plain' } });
   }
