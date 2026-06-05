@@ -458,7 +458,7 @@ async function tool_run_python({ path, args }, ctx) {
         self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
           .then(clients => {
             for (const c of clients) {
-              try { c.postMessage({ type: 'sw-opfs-removed', paths: removedPaths }); } catch (_) {}
+              try { c.postMessage({ type: 'opfs-deleted-by-python', paths: removedPaths }); } catch (_) {}
             }
           }).catch(() => {});
       }

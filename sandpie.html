@@ -617,19 +617,6 @@ if ('serviceWorker' in navigator) {
       })();
       return;
       }
-      if (d.type === 'sw-opfs-removed' && Array.isArray(d.paths)) {
-        console.log('[sandpie] ← SW deleted:', d.paths);
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          if (state[path]) {
-            console.log('[sandpie] removing from syncState:', path);
-            delete state[path];
-            changed = true;
-          }
-        }
-        if (changed) setSyncState(state);
-      }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
         console.log('[sandpie] ← SW notified:', d.paths);
         const state = syncState();
