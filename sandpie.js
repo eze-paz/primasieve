@@ -158,7 +158,7 @@ async function swOpfsDelete(relPath, isDir) {
 
 
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-const SW_VERSION = '1.6.1-OPFS-deletions';
+const SW_VERSION = '1.6.2-debug';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -440,15 +440,17 @@ async function tool_run_python({ path, args }, ctx) {
       const afterFiles = new Set();
       const afterDirs = new Set();
       try { swFsSnapshot(afterFiles, afterDirs, '/files'); } catch (_) {}
-      for (const rel of beforeFiles) {
-        if (!afterFiles.has(rel)) {
-          try { await swOpfsDelete(rel, false); } catch (_) {}
-        }
+      console.log('[sandpie-sw] MEMFS before run — files:', beforeFiles.size, 'dirs:', beforeDirs.size);
+      console.log('[sandpie-sw] MEMFS after  run — files:', afterFiles.size, 'dirs:', afterDirs.size);
+      const deletedFiles = [...beforeFiles].filter(r => !afterFiles.has(r));
+      const deletedDirs  = [...beforeDirs].filter(r => !afterDirs.has(r));
+      console.log('[sandpie-sw] deleted files:', deletedFiles);
+      console.log('[sandpie-sw] deleted dirs:', deletedDirs);
+      for (const rel of deletedFiles) {
+        try { await swOpfsDelete(rel, false); } catch (_) {}
       }
-      for (const rel of [...beforeDirs].sort((a, b) => b.length - a.length)) {
-        if (!afterDirs.has(rel)) {
-          try { await swOpfsDelete(rel, true); } catch (_) {}
-        }
+      for (const rel of deletedDirs.sort((a, b) => b.length - a.length)) {
+        try { await swOpfsDelete(rel, true); } catch (_) {}
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
