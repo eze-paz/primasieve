@@ -617,6 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
     _syncing = true;
     setDbxBusy(true);
     _syncCount++;
+    const firstSync = !initialSyncDone;   // very first sync after load (see refresh gate)
     const opfs = Sandpie.opfs;
     const openFilePath = Sandpie.openFilePath();
     try {
@@ -646,10 +647,13 @@ document.addEventListener('DOMContentLoaded', function() {
         removedAny = true;
       }
 
-      // Pull: only evaluate cloud entries that changed this cycle (the cursor
-      // delta), or every entry on a full listing. Downloads are deferred into
-      // `toDownload` and fetched by the bounded-parallel pool. See bulkDownload().
-      const toConsider = delta === null ? Object.entries(cloud) : delta;
+      // Pull: normally evaluate only the cloud entries that changed this cycle (the
+      // cursor delta). On a full pass (first sync / every Nth / full re-list) walk
+      // the entire index instead — the pull-side safety net that re-fetches files
+      // present in the cloud but missing locally (cleared OPFS, fresh profile with
+      // stale localStorage, a failed earlier download), which a delta-only pass
+      // would never notice. Downloads are deferred to the bounded-parallel pool.
+      const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
       const toDownload = [];
       for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
@@ -734,11 +738,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       setSyncState(state);
 
-      // Only prune empty dirs after a deletion or full reconcile, and only rebuild
-      // the file/conversation lists when something actually changed — idle cycles
-      // do neither.
+      // Only prune empty dirs after a deletion or full reconcile. Rebuild the
+      // file/conversation lists when something changed — and always on the first
+      // sync, so the initial "Loading…" placeholder is replaced with the real list
+      // (or "no chats yet") once the baseline exists, even if nothing downloaded.
       if (removedAny || fullScan) await pruneOrphanDirs(cloud);
-      if (toDownload.length || dirty.length || removedAny) {
+      if (firstSync || toDownload.length || dirty.length || removedAny) {
         await Sandpie.refreshFiles();
         await Sandpie.refreshConversations();
       }
