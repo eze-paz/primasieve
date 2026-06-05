@@ -230,6 +230,32 @@ async function dbxDelete(path, rev = null) {
   }
 }
 
+// Batch delete via Dropbox /2/files/delete_batch — one request for many paths
+// instead of N delete_v2 calls. Tolerant of not_found per entry. delete_batch
+// may return a result synchronously or hand back an async job we must poll.
+async function dbxDeleteBatch(paths) {
+  const entries = paths
+    .map(p => (String(p).startsWith('/') ? String(p) : '/' + p))
+    .map(path => ({ path }));
+  if (!entries.length) return;
+  let res;
+  try { res = await dbxApi('/2/files/delete_batch', { entries }); }
+  catch (e) { console.warn('[sync] dbxDeleteBatch failed:', e.message); return; }
+  if (res && res['.tag'] === 'async_job_id') {
+    const async_job_id = res.async_job_id;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 600));
+      let chk;
+      try { chk = await dbxApi('/2/files/delete_batch/check', { async_job_id }); }
+      catch (e) { console.warn('[sync] delete_batch/check failed:', e.message); return; }
+      if (chk['.tag'] === 'complete') return;
+      if (chk['.tag'] === 'failed') { console.warn('[sync] delete_batch failed:', chk.failed); return; }
+      // '.tag' === 'in_progress' → keep polling
+    }
+    console.warn('[sync] delete_batch still in progress after polling window');
+  }
+}
+
 /* expose to global scope for inline callers during migration */
 window.dbxRoute = dbxRoute;
 window.b64url = b64url;
@@ -245,6 +271,7 @@ window.dbxUploadSessionStart = dbxUploadSessionStart;
 window.dbxUploadSessionFinishBatch = dbxUploadSessionFinishBatch;
 window.dbxUploadBatch = dbxUploadBatch;
 window.dbxDelete = dbxDelete;
+window.dbxDeleteBatch = dbxDeleteBatch;
 
 /* ------------------------------------------------------------------
    Cloud section registration via SandpieMenu

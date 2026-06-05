@@ -396,10 +396,17 @@
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
         (async () => {
           if (!dbxTokens()) return;
+          // Delete the cloud copies: one batched delete_batch for many paths,
+          // a single delete_v2 for one.
+          if (d.paths.length > 1) {
+            try { await dbxDeleteBatch(d.paths.map(p => '/' + p)); } catch {}
+          } else if (d.paths.length === 1) {
+            try { await dbxDelete('/' + d.paths[0]); } catch {}
+          }
+          // Drop the deleted paths (and any children) from sync state.
           const state = syncState();
           let changed = false;
           for (const path of d.paths) {
-            try { await dbxDelete('/' + path); } catch {}
             const lk = path.toLowerCase();
             for (const k of Object.keys(state)) {
               if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {

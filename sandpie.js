@@ -122,43 +122,26 @@ function _swRmTree(full) {
   try { py.FS.rmdir(full); } catch (_) {}
 }
 
-function swFsSnapshot(filesSet, dirsSet, fullPath) {
-  let entries = [];
-  try { entries = py.FS.readdir(fullPath); } catch (_) { return; }
-  for (const name of entries) {
-    if (name === '.' || name === '..') continue;
-    const child = fullPath + '/' + name;
-    try {
-      const st = py.FS.stat(child);
-      const rel = child.replace(/^\/files\//, '');
-      if (py.FS.isDir(st.mode)) {
-        dirsSet.add(rel);
-        swFsSnapshot(filesSet, dirsSet, child);
-      } else {
-        filesSet.add(rel);
-      }
-    } catch (_) {}
-  }
-}
-
 async function swOpfsDelete(relPath, isDir) {
   const parts = String(relPath).split('/').filter(Boolean);
   const name = parts.pop();
-  if (!name) return;
+  if (!name) return false;
   try {
     const dir = await opfsResolveDir(parts);
     await dir.removeEntry(name, { recursive: !!isDir });
     console.log('[sandpie-sw] deleted from OPFS:', relPath);
+    return true;
   } catch (e) {
     if (e.name !== 'NotFoundError') {
       console.warn('[sandpie-sw] failed to delete from OPFS:', relPath, e);
     }
+    return false;
   }
 }
 
 
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-const SW_VERSION = '1.6.4-opfs-removed';
+const SW_VERSION = '1.6.5-event-driven';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -181,7 +164,7 @@ console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 // returns a clear error if Pyodide didn't load. console.log lines confirm
 // which step reached us (visible in DevTools → Application → Service workers
 // → click the SW link to open its console).
-const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/';
 let _pyodideJsLoaded = false;
 try {
   console.log('[sandpie-sw] importing pyodide.js…');
@@ -255,19 +238,22 @@ async function initPyodide() {
   pyInitPromise = (async () => {
     try {
       const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
-      // Lazy OPFS mount at /files. mountNativeFS gives Python a view onto
-      // the user's OPFS via Pyodide's NATIVEFS — reads and writes translate
-      // through to OPFS on demand. No upfront walk, no rmTree, no per-call
-      // sync. tool_run_python calls nativefs.syncfs() after each run to
-      // push pending writes back. If OPFS is unreachable (privacy mode,
-      // permissions, older browser) we log and continue — Python runs
-      // without /files; user code that touches it gets a normal Python
-      // FileNotFoundError.
+      // OPFS mount at /files. mountNativeFS populates MEMFS from OPFS at mount
+      // time, then Python reads/writes against that in-memory view. We do NOT
+      // use syncfs() to flush (its reconcile stat()s every OPFS file and drops
+      // deletes — pyodide#3881/#3456). Instead FS.trackingDelegate records what
+      // Python changes under /files and flushCaptureToOpfs() applies it with
+      // targeted writes/removeEntry after each run. If OPFS is unreachable
+      // (privacy mode, permissions) we log and continue — Python runs without
+      // /files; touching it raises FileNotFoundError.
       try {
         const opfsRoot = await navigator.storage.getDirectory();
         _nativefs = await p.mountNativeFS('/files', opfsRoot);
         p.runPython('import os; os.chdir("/files")');
-        console.log('[sandpie-sw] OPFS mounted at /files (cwd)');
+        // Hook FS mutations so run_python writes just the changed paths back to
+        // OPFS (armed only during a run via _capActive).
+        p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
+        console.log('[sandpie-sw] OPFS mounted at /files (cwd); FS tracking installed');
       } catch (e) {
         _nativefs = null;
         console.warn('[sandpie-sw] OPFS mount failed (Python /files unavailable):', e);
@@ -365,6 +351,75 @@ async function opfsWriteBytes(path, bytes) {
   await w.close();
 }
 
+// ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
+// Replaces both the syncfs() flush (which stat()s every OPFS file and silently
+// drops deletes) and the before/after MEMFS snapshot diff (two full-tree walks
+// per run). Emscripten's FS.trackingDelegate reports exactly which paths Python
+// creates/writes/deletes under /files during a run; we then apply just those to
+// OPFS via opfsWriteBytes / swOpfsDelete. O(changed files), and deletions are
+// deterministic. Capture is armed only around runPythonAsync (_capActive) so
+// page-side py.FS edits aren't echoed back.
+let _capActive = false;
+const _capTouched = new Set();   // OPFS-relative paths written, or dirs created
+const _capDeleted = new Set();   // OPFS-relative paths unlinked / rmdir'd
+function _capReset() { _capActive = false; _capTouched.clear(); _capDeleted.clear(); }
+
+// Absolute Emscripten FS path -> OPFS-relative path, or null when outside the
+// /files mount (/tmp, site-packages, …) and therefore not persisted.
+function _opfsRelFromFs(fsPath) {
+  const p = String(fsPath);
+  if (p === '/files' || p === '/files/') return null;
+  if (p.startsWith('/files/')) return p.slice('/files/'.length);
+  return null;
+}
+
+// FS.trackingDelegate handlers (installed once after mount). No-ops unless
+// _capActive. Names/args match Emscripten 4.0.9 (Pyodide 0.29.x).
+function _fsTrackingDelegate() {
+  const touch = (fsPath) => {
+    if (!_capActive) return;
+    const rel = _opfsRelFromFs(fsPath);
+    if (rel == null) return;
+    _capTouched.add(rel); _capDeleted.delete(rel);
+  };
+  const drop = (fsPath) => {
+    if (!_capActive) return;
+    const rel = _opfsRelFromFs(fsPath);
+    if (rel == null) return;
+    _capDeleted.add(rel); _capTouched.delete(rel);
+  };
+  return {
+    onWriteToFile:   (path) => touch(path),
+    onMakeDirectory: (path) => touch(path),
+    onDeletePath:    (path) => drop(path),
+    onMovePath:      (oldPath, newPath) => { drop(oldPath); touch(newPath); },
+  };
+}
+
+// Apply the run's captured mutations to OPFS. Returns the OPFS-relative paths
+// that actually existed and were deleted, so the page only fires cloud deletes
+// for real files — not temp files a script created and removed in the same run.
+async function flushCaptureToOpfs() {
+  const removed = [];
+  // Deletes first. rmtree records children before parents (insertion order),
+  // and swOpfsDelete is recursive, so any stragglers go too.
+  for (const rel of _capDeleted) {
+    if (await swOpfsDelete(rel, true)) removed.push(rel);
+  }
+  // Writes / new dirs. stat() picks file vs dir and skips paths gone by end of
+  // the run (created then deleted within the same run).
+  for (const rel of _capTouched) {
+    const full = '/files/' + rel;
+    let st;
+    try { st = py.FS.stat(full); } catch (_) { continue; }
+    try {
+      if (py.FS.isDir(st.mode)) await opfsResolveDir(rel.split('/').filter(Boolean), true);
+      else await opfsWriteBytes(rel, py.FS.readFile(full));
+    } catch (e) { console.warn('[sandpie-sw] OPFS write-back failed:', rel, e); }
+  }
+  return removed;
+}
+
 // ============================================================
 // Tool implementations (run inside the SW).
 // ============================================================
@@ -413,47 +468,32 @@ async function tool_run_python({ path, args }, ctx) {
       p.setStdout({ batched: s => { stdout += s + '\n'; } });
       p.setStderr({ batched: s => { stderr += s + '\n'; } });
       // Python environment: stdout/stderr capture + optional argv for `path:` mode.
-      // /files is mounted lazily via mountNativeFS at init — Python can use plain
-      // open()/os.listdir/glob and it reads OPFS on demand. Files not hydrated
-      // Files not in OPFS must be created with run_python first.
+      // /files is the OPFS mount (MEMFS populated from OPFS at mount); Python
+      // uses plain open()/os.listdir/glob against it.
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
 
-      // Snapshot MEMFS tree before run so we can detect deletions Python makes.
-      const beforeFiles = new Set();
-      const beforeDirs = new Set();
-      try { swFsSnapshot(beforeFiles, beforeDirs, '/files'); } catch (_) {}
-
       try { await p.loadPackagesFromImports(code); } catch (_) {}
+      // Arm FS-mutation capture for the user's code, then write the changes back
+      // to OPFS with targeted ops — replaces the syncfs() flush and the
+      // before/after snapshot diff. flushCaptureToOpfs returns the paths that
+      // were really deleted (existed in OPFS) so we only fire cloud deletes for those.
+      _capReset();
+      _capActive = true;
       await p.runPythonAsync(code);
+      _capActive = false;
 
-      // Flush writes from MEMFS to OPFS. syncfs pushes new/modified files
-      // but does NOT propagate deletions from MEMFS; we handle that below.
+      let removedPaths = [];
       if (_nativefs) {
-        try { await _nativefs.syncfs(); }
-        catch (e) { console.warn('[sandpie-sw] syncfs after run_python failed:', e); }
+        try { removedPaths = await flushCaptureToOpfs(); }
+        catch (e) { console.warn('[sandpie-sw] OPFS write-back after run_python failed:', e); }
       }
 
-      // Detect what Python deleted and propagate those deletions to OPFS.
-      const afterFiles = new Set();
-      const afterDirs = new Set();
-      try { swFsSnapshot(afterFiles, afterDirs, '/files'); } catch (_) {}
-      const removedPaths = [];
-      for (const rel of beforeFiles) {
-        if (!afterFiles.has(rel)) {
-          try { await swOpfsDelete(rel, false); } catch (_) {}
-          removedPaths.push(rel);
-        }
-      }
-      for (const rel of [...beforeDirs].sort((a, b) => b.length - a.length)) {
-        if (!afterDirs.has(rel)) {
-          try { await swOpfsDelete(rel, true); } catch (_) {}
-          removedPaths.push(rel);
-        }
-      }
-      // Notify the page so it can update syncState / Dropbox.
+      // Notify the page so it can delete the cloud (Dropbox) copies immediately
+      // (batched into one delete_batch by cloud-sync.js) instead of waiting for
+      // the next periodic sync.
       if (removedPaths.length) {
         self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
           .then(clients => {
@@ -488,6 +528,7 @@ async function tool_run_python({ path, args }, ctx) {
       }
       return { result: 'Error: ' + (msg || 'unknown (no message)') + tail };
     } finally {
+      _capActive = false;
       try { p && p.setStdout({}); } catch (_) {}
       try { p && p.setStderr({}); } catch (_) {}
     }
