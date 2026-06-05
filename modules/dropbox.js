@@ -521,6 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
               break;
             }
           }
+          if (rel.toLowerCase().startsWith(BULK_TMP_NAME)) continue;  // ignore staging folder
           if (e.kind === 'deleted') {
             delete existingIndex[rel];
           } else {
@@ -547,6 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
           break;
         }
       }
+      if (rel.toLowerCase().startsWith(BULK_TMP_NAME)) continue;  // ignore staging folder
       if (e.kind !== 'deleted') {
         out[rel] = e;
       }
@@ -593,7 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // only), download that whole folder as ONE zip, unzip locally, then delete the
   // temp folder: ~O(1) round-trips for any N up to the zip cap. Small batches and
   // any failure fall back to bounded-parallel per-file downloads.
-  const BULK_TMP_FOLDER = '/.sandpie-sync-tmp';
+  const BULK_TMP_NAME = 'sandpie-sync-tmp';
   const BULK_ZIP_THRESHOLD = 20;   // files; below this, parallel per-file is simpler
   const BULK_COPY_MAX = 1000;      // max entries per copy_batch_v2 call
   const BULK_ZIP_FILE_MAX = 9000;  // max files per download_zip (Dropbox caps at 10k / 20GB)
@@ -638,25 +640,32 @@ document.addEventListener('DOMContentLoaded', function() {
   // Copy one chunk of files into the temp folder, download it as a zip, unzip, and
   // map each entry back to its relative path. Adds rel -> Uint8Array to `out`.
   async function bulkZipChunk(chunk, out) {
-    try { await dbxDelete(BULK_TMP_FOLDER); } catch (e) {}   // clear any crashed-run leftover
-    for (let i = 0; i < chunk.length; i += BULK_COPY_MAX) {
-      const entries = chunk.slice(i, i + BULK_COPY_MAX).map((it) => ({
-        from_path: it.cloudPath,
-        to_path: BULK_TMP_FOLDER + '/' + it.rel,
-      }));
-      await waitForCopyBatch(await dbxCopyBatch(entries));
+    // Derive temp folder within the app's actual Dropbox scope (e.g. /Apps/sandpie/sandpie-sync-tmp)
+    // rather than using a hardcoded root path that may be outside the app's permission scope.
+    const firstItem = chunk[0];
+    const base = firstItem.cloudPath.slice(0, firstItem.cloudPath.length - firstItem.rel.length);
+    const tmpPath = base.replace(/\/+$/, '') + '/' + BULK_TMP_NAME;
+    try { await dbxDelete(tmpPath); } catch (e) {}   // clear any crashed-run leftover
+    try {
+      for (let i = 0; i < chunk.length; i += BULK_COPY_MAX) {
+        const entries = chunk.slice(i, i + BULK_COPY_MAX).map((it) => ({
+          from_path: it.cloudPath,
+          to_path: tmpPath + '/' + it.rel,
+        }));
+        await waitForCopyBatch(await dbxCopyBatch(entries));
+      }
+      const files = await unzipBulk(await dbxDownloadZip(tmpPath));
+      const byRel = new Map(chunk.map((it) => [it.rel.toLowerCase(), it]));
+      for (const [name, bytes] of Object.entries(files)) {
+        if (name.endsWith('/')) continue;                              // directory entry
+        let rel = name;
+        if (rel.startsWith(BULK_TMP_NAME + '/')) rel = rel.slice(BULK_TMP_NAME.length + 1);
+        const it = byRel.get(rel.toLowerCase());
+        if (it) out.set(it.rel, bytes);
+      }
+    } finally {
+      try { await dbxDelete(tmpPath); } catch (e) {}
     }
-    const files = await unzipBulk(await dbxDownloadZip(BULK_TMP_FOLDER));
-    const root = BULK_TMP_FOLDER.split('/').filter(Boolean).pop();   // temp-folder leaf name
-    const byRel = new Map(chunk.map((it) => [it.rel.toLowerCase(), it]));
-    for (const [name, bytes] of Object.entries(files)) {
-      if (name.endsWith('/')) continue;                              // directory entry
-      let rel = name;
-      if (rel.startsWith(root + '/')) rel = rel.slice(root.length + 1);
-      const it = byRel.get(rel.toLowerCase());
-      if (it) out.set(it.rel, bytes);
-    }
-    try { await dbxDelete(BULK_TMP_FOLDER); } catch (e) {}
   }
 
   async function bulkDownloadViaZip(items) {
