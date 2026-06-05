@@ -399,7 +399,6 @@ let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
       if (!convMeta.has(id)) convMeta.set(id, { files: new Set(), scripts: new Set() });
       return convMeta.get(id);
     }
-
 // ═══════════════════════════════════════════════════════════════
 //  TF-IDF Conversation Relevance Engine  (language-agnostic)
 // ═══════════════════════════════════════════════════════════════
@@ -451,14 +450,22 @@ function cosine(a,b) {
   return d < 1e-12 ? 0 : dot/d;
 }
 
-function indexKey() {
+async function indexKey() {
   const k = [];
-  for (const c of conversations.values()) k.push(`${c.id}:${c.messages?.length||0}`);
+  try {
+    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
+    for await (const [_,h] of d.entries()) {
+      try {
+        const data = JSON.parse(await (await h.getFile()).text());
+        k.push(`${h.name}:${data.messages?.length||0}`);
+      } catch(e) {}
+    }
+  } catch(e) {}
   return k.sort().join('|');
 }
 
 async function showRelevance(queryText) {
-  const ck = indexKey();
+  const ck = await indexKey();
   if (!_tfidfIndex || _tfidfKey !== ck) await buildTfidfIndex();
   if (!_tfidfIndex || _tfidfIndex.vecs.length < 2) {
     console.log('[sandpie] relevance: not enough convs yet'); return;
@@ -477,7 +484,13 @@ async function showRelevance(queryText) {
   const scriptCounts = new Map();
   const rows = [];
   for (const {id, score} of top3) {
-    const c = conversations.get(id), m = convMeta.get(id);
+    const m = convMeta.get(id);
+    let c = null;
+    try {
+      const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
+      const h = await d.getFileHandle(id + '.json');
+      c = JSON.parse(await (await h.getFile()).text());
+    } catch(e) {}
     const sc = m ? [...m.scripts] : [], fi = m ? [...m.files] : [];
     rows.push({ title: c?.title?.slice(0,40)||id, score: score.toFixed(2), scripts: sc, files: fi });
     for (const s of sc) scriptCounts.set(s, (scriptCounts.get(s)||0)+1);
@@ -495,6 +508,7 @@ async function showRelevance(queryText) {
   console.groupEnd();
 }
 // ═══════════════════════════════════════════════════════════════
+
 
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
