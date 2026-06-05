@@ -256,6 +256,40 @@ async function dbxDeleteBatch(paths) {
   }
 }
 
+/* --------------------------------------------------------------------------
+   Bulk download primitives (copy_batch_v2 → download_zip → delete_v2)
+   Used by modules/cloud-sync.js to pull many changed files in ~O(1) round-trips
+   instead of one /files/download per file. See bulkDownload() in the sync engine below.
+   -------------------------------------------------------------------------- */
+
+async function dbxCopyBatch(entries) {
+  // entries: [{ from_path, to_path }, ...]  — keep each call ≤ 1000 entries.
+  // Returns a launch result: { '.tag': 'complete', entries } or
+  // { '.tag': 'async_job_id', async_job_id }.
+  return await dbxApi('/2/files/copy_batch_v2', { entries, autorename: false });
+}
+
+async function dbxCopyBatchCheck(asyncJobId) {
+  // Returns { '.tag': 'in_progress' } or { '.tag': 'complete', entries }.
+  return await dbxApi('/2/files/copy_batch/check_v2', { async_job_id: asyncJobId });
+}
+
+async function dbxDownloadZip(path, signal) {
+  // Downloads a whole folder as one zip. Dropbox caps this at 20 GB / 10,000 files.
+  const token = await dbxAccessToken();
+  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download_zip'), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Content-Type': 'text/plain',
+    },
+    signal,
+  });
+  if (!res.ok) throw new Error(`Download zip ${path}: ${res.status} ${await res.text()}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 /* expose to global scope for inline callers during migration */
 window.dbxRoute = dbxRoute;
 window.b64url = b64url;
@@ -272,6 +306,9 @@ window.dbxUploadSessionFinishBatch = dbxUploadSessionFinishBatch;
 window.dbxUploadBatch = dbxUploadBatch;
 window.dbxDelete = dbxDelete;
 window.dbxDeleteBatch = dbxDeleteBatch;
+window.dbxCopyBatch = dbxCopyBatch;
+window.dbxCopyBatchCheck = dbxCopyBatchCheck;
+window.dbxDownloadZip = dbxDownloadZip;
 
 /* ------------------------------------------------------------------
    Cloud section registration via SandpieMenu
@@ -549,6 +586,139 @@ document.addEventListener('DOMContentLoaded', function() {
     return pruned;
   }
 
+  // ---- bulk download (staged-zip + parallel fallback) -----------------------
+  // Pulling changed files one /files/download at a time is O(N) network round-
+  // trips — a 1000-file first sync on a new device can take ~an hour. Instead we
+  // copy the exact changed files into a temp Dropbox folder (server-side, metadata
+  // only), download that whole folder as ONE zip, unzip locally, then delete the
+  // temp folder: ~O(1) round-trips for any N up to the zip cap. Small batches and
+  // any failure fall back to bounded-parallel per-file downloads.
+  const BULK_TMP_FOLDER = '/.sandpie-sync-tmp';
+  const BULK_ZIP_THRESHOLD = 20;   // files; below this, parallel per-file is simpler
+  const BULK_COPY_MAX = 1000;      // max entries per copy_batch_v2 call
+  const BULK_ZIP_FILE_MAX = 9000;  // max files per download_zip (Dropbox caps at 10k / 20GB)
+  const BULK_DL_CONCURRENCY = 12;  // parallel per-file workers
+
+  function bulkSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  // Only attempt the staged-zip path if every primitive it needs is present
+  // (transport helpers + the fflate unzip lib loaded by the host page).
+  function zipBulkAvailable() {
+    return typeof dbxCopyBatch === 'function'
+        && typeof dbxCopyBatchCheck === 'function'
+        && typeof dbxDownloadZip === 'function'
+        && typeof dbxDelete === 'function'
+        && !!(window.fflate && window.fflate.unzip);
+  }
+
+  // Resolve a copy_batch_v2 launch result, polling check_v2 until the async job
+  // completes. Per-entry failures are tolerated by the caller (missing files just
+  // fall through to the per-file path), so we only wait for overall completion.
+  async function waitForCopyBatch(res) {
+    if (res && res['.tag'] === 'complete') return;
+    if (!res || res['.tag'] !== 'async_job_id') {
+      throw new Error('copy_batch: unexpected response ' + JSON.stringify(res));
+    }
+    const jobId = res.async_job_id;
+    for (let i = 0; i < 120; i++) {
+      await bulkSleep(Math.min(750 + i * 250, 3000));
+      const chk = await dbxCopyBatchCheck(jobId);
+      if (chk['.tag'] === 'complete') return;
+      // '.tag' === 'in_progress' → keep polling
+    }
+    throw new Error('copy_batch: timed out waiting for async job');
+  }
+
+  function unzipBulk(u8) {
+    return new Promise((resolve, reject) => {
+      window.fflate.unzip(u8, (err, files) => (err ? reject(err) : resolve(files)));
+    });
+  }
+
+  // Copy one chunk of files into the temp folder, download it as a zip, unzip, and
+  // map each entry back to its relative path. Adds rel -> Uint8Array to `out`.
+  async function bulkZipChunk(chunk, out) {
+    try { await dbxDelete(BULK_TMP_FOLDER); } catch (e) {}   // clear any crashed-run leftover
+    for (let i = 0; i < chunk.length; i += BULK_COPY_MAX) {
+      const entries = chunk.slice(i, i + BULK_COPY_MAX).map((it) => ({
+        from_path: it.cloudPath,
+        to_path: BULK_TMP_FOLDER + '/' + it.rel,
+      }));
+      await waitForCopyBatch(await dbxCopyBatch(entries));
+    }
+    const files = await unzipBulk(await dbxDownloadZip(BULK_TMP_FOLDER));
+    const root = BULK_TMP_FOLDER.split('/').filter(Boolean).pop();   // temp-folder leaf name
+    const byRel = new Map(chunk.map((it) => [it.rel.toLowerCase(), it]));
+    for (const [name, bytes] of Object.entries(files)) {
+      if (name.endsWith('/')) continue;                              // directory entry
+      let rel = name;
+      if (rel.startsWith(root + '/')) rel = rel.slice(root.length + 1);
+      const it = byRel.get(rel.toLowerCase());
+      if (it) out.set(it.rel, bytes);
+    }
+    try { await dbxDelete(BULK_TMP_FOLDER); } catch (e) {}
+  }
+
+  async function bulkDownloadViaZip(items) {
+    const out = new Map();
+    for (let i = 0; i < items.length; i += BULK_ZIP_FILE_MAX) {
+      await bulkZipChunk(items.slice(i, i + BULK_ZIP_FILE_MAX), out);
+    }
+    return out;
+  }
+
+  // Bounded-parallel per-file download. Failures are logged and omitted (left for
+  // the next sync), matching the resilience of the old serial loop.
+  async function bulkParallelDownload(items) {
+    const out = new Map();
+    let idx = 0;
+    async function worker() {
+      while (idx < items.length) {
+        const it = items[idx++];
+        try { out.set(it.rel, await dbxDownload(it.cloudPath)); }
+        catch (err) { console.warn('[sync] download failed:', it.rel, err); }
+      }
+    }
+    const n = Math.min(BULK_DL_CONCURRENCY, items.length);
+    await Promise.all(Array.from({ length: n }, worker));
+    return out;
+  }
+
+  // Fetch every file in `items`, then write to OPFS and advance sync state. Uses
+  // the staged-zip path for large batches (falling back to per-file on any error)
+  // and bounded-parallel per-file for the remainder.
+  //   item = { rel, cloudPath, e, mode: 'full' | 'mtimeOnly' }
+  async function bulkDownload(items, state, opfs) {
+    if (!items.length) return;
+    let contents = new Map();
+    if (items.length >= BULK_ZIP_THRESHOLD && zipBulkAvailable()) {
+      try {
+        contents = await bulkDownloadViaZip(items);
+      } catch (err) {
+        console.warn('[sync] staged-zip bulk download failed — falling back to per-file:', err);
+        contents = new Map();
+      }
+    }
+    const remaining = items.filter((it) => !contents.has(it.rel));
+    if (remaining.length) {
+      const perFile = await bulkParallelDownload(remaining);
+      for (const [rel, bytes] of perFile) contents.set(rel, bytes);
+    }
+    for (const it of items) {
+      const content = contents.get(it.rel);
+      if (!content) continue;                          // failed this round; retried next sync
+      await opfs.write(it.rel, content);
+      const mtime = await Sandpie.opfsMtime(it.rel);
+      if (it.mode === 'full' || !state[it.rel]) {
+        state[it.rel] = { rev: it.e.rev, size: it.e.size, syncedMtime: mtime };
+      } else {
+        state[it.rel].syncedMtime = mtime;
+        state[it.rel].size = it.e.size;
+      }
+      contents.delete(it.rel);                         // release memory as we go
+    }
+  }
+
   // ---- the sync engine ------------------------------------------------------
   async function sync() {
     if (!dbxTokens()) return;
@@ -572,6 +742,10 @@ document.addEventListener('DOMContentLoaded', function() {
         delete state[path];
       }
 
+      // Decide per file what to pull (unchanged policy), but defer the actual
+      // downloads into `toDownload` so they can be fetched in bulk rather than
+      // one blocking round-trip at a time. See bulkDownload() above.
+      const toDownload = [];
       for (const [path, e] of Object.entries(cloud)) {
         if (e.kind !== 'file') continue;
         const s = state[path];
@@ -583,12 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
               syncedMtime: await Sandpie.opfsMtime(path),
             };
           } else {
-            const content = await dbxDownload(e.path);
-            await opfs.write(path, content);
-            state[path] = {
-              rev: e.rev, size: e.size,
-              syncedMtime: await Sandpie.opfsMtime(path),
-            };
+            toDownload.push({ rel: path, cloudPath: e.path, e, mode: 'full' });
           }
           continue;
         }
@@ -597,22 +766,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (path === openFilePath) continue;
         if (cloudChanged && localDirty) continue;
         if (cloudChanged) {
-          const content = await dbxDownload(e.path);
-          await opfs.write(path, content);
-          state[path] = {
-            rev: e.rev, size: e.size,
-            syncedMtime: await Sandpie.opfsMtime(path),
-          };
+          toDownload.push({ rel: path, cloudPath: e.path, e, mode: 'full' });
           continue;
         }
-
         if (!localExists) {
-          const content = await dbxDownload(e.path);
-          await opfs.write(path, content);
-          state[path].syncedMtime = await Sandpie.opfsMtime(path);
+          toDownload.push({ rel: path, cloudPath: e.path, e, mode: 'mtimeOnly' });
+          continue;
         }
         state[path].size = e.size;
       }
+      await bulkDownload(toDownload, state, opfs);
 
       let opfsRels = [];
       try { opfsRels = await opfs.list(); } catch {}
