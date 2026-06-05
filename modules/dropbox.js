@@ -251,6 +251,11 @@ window.dbxDelete = dbxDelete;
    Runs after DOMContentLoaded so SandpieMenu (inline) is defined.
    ------------------------------------------------------------------ */
 document.addEventListener('DOMContentLoaded', function() {
+  // If the host page ships the Sandpie sync architecture (modules/cloud-sync.js
+  // registers a SyncProvider and owns the cloud section), defer entirely to it.
+  // This legacy glue only runs on pages that still drive sync via inline globals
+  // (e.g. sandpie.html). dropbox.js itself remains a pure transport library.
+  if (window.Sandpie) return;
   if (typeof SandpieMenu === 'undefined') return;
   SandpieMenu.add('cloudSection', {
     title: 'Cloud sync',

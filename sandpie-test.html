@@ -15,6 +15,7 @@
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/dropbox.js"></script>
+  <script src="modules/cloud-sync.js"></script>
   <script src="modules/images.js"></script>
   <script src="modules/notifications.js"></script>
   <script src="modules/tools.js"></script>
@@ -314,45 +315,8 @@ if ('serviceWorker' in navigator) {
       fn.call(console, '[sw]', d.text);
       return;
     }
-    if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-
-      (async () => {
-        if (!dbxTokens()) return;
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          try { await dbxDelete('/' + path); } catch {}
-          const lk = path.toLowerCase();
-          for (const k of Object.keys(state)) {
-            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
-              delete state[k];
-              changed = true;
-            }
-          }
-        }
-        if (changed) setSyncState(state);
-        try { await refreshFileList(); } catch {}
-      })();
-      return;
-      }
-      if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
-        console.log('[sandpie] ← SW notified:', d.paths);
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          if (!state[path]) {
-            console.log('[sandpie] adding to syncState:', path);
-            state[path] = { rev: '', size: 0, syncedMtime: 0 };
-            changed = true;
-          } else {
-            console.log('[sandpie] marking dirty:', path);
-            state[path].syncedMtime = 0;
-            changed = true;
-          }
-        }
-        if (changed) setSyncState(state);
-        return;
-      }
+    // OPFS-change branches (opfs-deleted-by-python / sw-opfs-changed) live in
+    // modules/cloud-sync.js, which registers its own SW message listener.
     });
 
   const flush = () => {
@@ -429,7 +393,6 @@ function dedentMarkdownFences(text) {
     return lead + open + dedented + close;
   });
 }
-let initialSyncDone = !localStorage.getItem('dbx-tokens');
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -449,7 +412,6 @@ function setDot(id, state) {
   if (state) dot.classList.add(state);
 }
 
-// Only dbxAppKey triggers saveConfig (provider inputs managed by module)
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
@@ -610,205 +572,76 @@ const opfs = {
     return out;
   },
 };
-async function pruneOrphanDirs(cloud) {
 
-  const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
-  const cloudPaths = new Set();
-  for (const k of source) {
-    const lower = k.toLowerCase();
-    cloudPaths.add(lower);
-    const segs = lower.split('/');
-    for (let i = 1; i < segs.length; i++) cloudPaths.add(segs.slice(0, i).join('/'));
-  }
-  let pruned = 0;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    let all;
-    try { all = await opfs.listAll(''); } catch { return pruned; }
-
-    all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
-    for (const e of all) {
-      if (e.kind !== 'directory') continue;
-      if (cloudPaths.has(e.path.toLowerCase())) continue;
-      let children;
-      try { children = await opfs.listDir(e.path); } catch { continue; }
-      if (children.length) continue;
-      try { await opfs.remove(e.path); pruned++; changed = true; } catch {}
-    }
-  }
-  return pruned;
-}
-  
-const DBX_REDIRECT = location.origin + location.pathname;
-function dbxStatus(text, kind) {
-  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
-  const sec = SandpieMenu.get('cloudSection');
-  const btn = sec?.querySelector('#dbxToggleBtn');
-  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-}
-
-let dbxBusyCount = 0;
-function setDbxBusy(busy) {
-  dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
-  const sec = SandpieMenu.get('cloudSection');
-  const dot = sec?.querySelector('#dbxDot');
-  if (!dot) return;
-  if (dbxBusyCount > 0) dot.classList.add('busy');
-  else dot.classList.remove('busy');
-}
-
-
-function dbxToggleConnection() {
-  if (dbxTokens()) dbxDisconnect();
-  else dbxConnect();
-}
-async function dbxConnect() {
-  const appKey = $('dbxAppKey').value.trim();
-  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
-  saveConfig();
-  const { verifier, challenge } = await pkceChallenge();
-  localStorage.setItem('dbx-pkce', JSON.stringify({
-    verifier,
-    app_key: appKey,
-    ts: Date.now(),
-  }));
-  const params = new URLSearchParams({
-    client_id: appKey,
-    response_type: 'code',
-    redirect_uri: DBX_REDIRECT,
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
-    token_access_type: 'offline',
-  });
-  location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
-}
-function dbxDisconnect() {
-  localStorage.removeItem('dbx-tokens');
-  localStorage.removeItem(SYNC_STATE_KEY);
-  localStorage.removeItem('dbx-index');
-  localStorage.removeItem('opfs-sync-manifest');
-  localStorage.removeItem(CLOUD_INDEX_KEY);
-  localStorage.removeItem(DBX_CURSOR_KEY);
-  dbxStatus('Not connected', 'disconnected');
-  refreshFileList();
-}
-async function dbxExchangeCode(code) {
-  const stashed = JSON.parse(localStorage.getItem('dbx-pkce') || 'null');
-  if (!stashed) throw new Error('Missing PKCE state');
-  if (Date.now() - stashed.ts > 10 * 60 * 1000) {
-    localStorage.removeItem('dbx-pkce');
-    throw new Error('PKCE state expired — please reconnect');
-  }
-  const { verifier, app_key: appKey } = stashed;
-  const body = new URLSearchParams({
-    code,
-    grant_type: 'authorization_code',
-    client_id: appKey,
-    code_verifier: verifier,
-    redirect_uri: DBX_REDIRECT,
-  });
-  const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) throw new Error('Code exchange failed: ' + await res.text());
-  const data = await res.json();
-  localStorage.setItem('dbx-tokens', JSON.stringify({
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + data.expires_in * 1000,
-    app_key: appKey,
-  }));
-  localStorage.removeItem('dbx-pkce');
-}
-const SYNC_STATE_KEY = 'sandpie-sync-state';
-const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
-const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
-function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
-function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
-function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
-function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
-function dbxCursor() { return localStorage.getItem(DBX_CURSOR_KEY) || null; }
-function setDbxCursor(cursor) {
-  if (cursor) localStorage.setItem(DBX_CURSOR_KEY, cursor);
-  else localStorage.removeItem(DBX_CURSOR_KEY);
-}
-(function migrateLegacyState() {
-  if (localStorage.getItem(SYNC_STATE_KEY)) return;
-  const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
-  const oldIndex = JSON.parse(localStorage.getItem('dbx-index') || '{}');
-  const s = {};
-  for (const [path, info] of Object.entries(oldIndex)) {
-    if (info.kind !== 'file') continue;
-    s[path] = {
-      rev: info.rev,
-      size: info.size,
-      
-      syncedMtime: oldManifest[path] || 0,
-    };
-  }
-  setSyncState(s);
-})();
-(function validateCloudState() {
-  const idx = cloudIndex();
-  const cursor = dbxCursor();
-  if (Object.keys(idx).length > 0 && !cursor) {
-    setCloudIndex({});
-  }
-})();
-async function cloudListAll() {
-  const storedCursor = dbxCursor();
-  const existingIndex = cloudIndex();
-  if (storedCursor && Object.keys(existingIndex).length > 0) {
-    try {
-      const result = await dbxListContinue(storedCursor);
-      for (const e of result.entries) {
-        let rel = e.path.replace(/^\/+/, '');
-        if (!rel) continue;
-        const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
-        for (const p of prefixes) {
-          if (rel.toLowerCase().startsWith(p.toLowerCase())) {
-            rel = rel.slice(p.length);
-            break;
-          }
-        }
-        if (e.kind === 'deleted') {
-          delete existingIndex[rel];
-        } else {
-          existingIndex[rel] = e;
-        }
+/* =============================================================================
+   Sandpie — core contract / host API.
+   The single integration surface a module may touch. Dependencies flow ONE way:
+   modules depend on Sandpie; Sandpie never names a specific module. Optional
+   capabilities (e.g. cloud sync) are plugged in through a registry, so when a
+   module is absent its slot is simply empty and the calls degrade to no-ops —
+   the page boots and core chat works with any module removed.
+   ============================================================================= */
+const Sandpie = (() => {
+  // --- event bus -------------------------------------------------------------
+  const _bus = new Map(); // event name -> Set<callback>
+  const events = {
+    on(evt, cb) {
+      let s = _bus.get(evt);
+      if (!s) _bus.set(evt, s = new Set());
+      s.add(cb);
+      return () => events.off(evt, cb);
+    },
+    off(evt, cb) { _bus.get(evt)?.delete(cb); },
+    emit(evt, payload) {
+      for (const cb of (_bus.get(evt) || [])) {
+        try { cb(payload); } catch (e) { console.warn('[Sandpie] listener error for', evt, e); }
       }
-      setDbxCursor(result.cursor);
-      setCloudIndex(existingIndex);
-      return existingIndex;
-    } catch (err) {
-      console.warn('Cursor sync failed, falling back to full sync:', err.message);
-      setDbxCursor(null);
-    }
+    },
+  };
+
+  // --- sync provider registry (cloud sync is an optional capability) ---------
+  // A provider implements: { sync(), fileStatus(path, opfsMtime), getState(),
+  // initialSyncDone }. With no provider registered every call below is a no-op
+  // and the file browser falls back to a local-only view.
+  let _sync = null;
+  function registerSyncProvider(impl) {
+    _sync = impl;
+    events.emit('sync:provider-changed', impl);
+    return () => { if (_sync === impl) { _sync = null; events.emit('sync:provider-changed', null); } };
   }
-  const result = await dbxListFull('/', { recursive: true });
-  const out = {};
-  for (const e of result.entries) {
-    let rel = e.path.replace(/^\/+/, '');
-    if (!rel) continue;
-    const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
-    for (const p of prefixes) {
-      if (rel.toLowerCase().startsWith(p.toLowerCase())) {
-        rel = rel.slice(p.length);
-        break;
-      }
-    }
-    if (e.kind !== 'deleted') {
-      out[rel] = e;
-    }
-  }
-  setDbxCursor(result.cursor);
-  setCloudIndex(out);
-  return out;
-}
-let _syncing = false;
+
+  return {
+    events,
+
+    // primitives the page owns and modules are allowed to use
+    $,
+    api,
+    addMsg,
+    setDot,
+    get opfs()   { return opfs; },
+    get menu()   { return SandpieMenu; },
+    get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
+    opfsMtime(path)        { return opfsLastModified(path); },
+    isGenerating()         { return anyStreamGenerating(); },
+    openFilePath()         { return _openFilePath; },
+    refreshFiles()         { return refreshFileList(); },
+    refreshConversations() { return refreshConversationList(); },
+
+    // sync capability
+    registerSyncProvider,
+    syncProvider() { return _sync; },
+    sync()         { return _sync?.sync?.(); },
+    fileSyncStatus(path, opfsMtime) { return _sync?.fileStatus?.(path, opfsMtime) ?? null; },
+    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : true; },
+  };
+})();
+window.Sandpie = Sandpie;
+
+/* Cloud sync (Dropbox transport glue, OAuth, sync state, cloud index, and the
+   sync engine) now lives in modules/cloud-sync.js, registered with the page via
+   Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
+   anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
+   facts the provider reads through the Sandpie host API. */
 let _openFilePath = null;
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
@@ -828,149 +661,10 @@ async function opfsLastModified(path) {
     return 0;
   }
 }
-async function sync() {
-  if (!dbxTokens()) return;
-  if (_syncing) return;
-  if (anyStreamGenerating()) return;
-  _syncing = true;
-  setDbxBusy(true);
-  try {
-    dbxStatus('', 'connected');
-    const cloud = await cloudListAll();
-    const state = syncState();
-    let baselined = 0;
-
-    for (const path of Object.keys(state)) {
-      if (cloud[path]) continue;
-      const s = state[path];
-      const lm = await opfsLastModified(path);
-      if (lm > 0 && lm > s.syncedMtime) continue;
-      try { await opfs.remove(path); } catch {}
-      delete state[path];
-
-    }
-
-    for (const [path, e] of Object.entries(cloud)) {
-      if (e.kind !== 'file') continue;
-      const s = state[path];
-      const localExists = await opfs.exists(path);
-      if (!s) {
-        if (localExists) {
-          state[path] = {
-            rev: e.rev, size: e.size,
-            syncedMtime: await opfsLastModified(path),
-          };
-          baselined++;
-        } else {
-
-          const content = await dbxDownload(e.path);
-          await opfs.write(path, content);
-          state[path] = {
-            rev: e.rev, size: e.size,
-            syncedMtime: await opfsLastModified(path),
-          };
-        }
-        continue;
-      }
-      const cloudChanged = s.rev !== e.rev;
-      const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
-      if (path === _openFilePath) continue;
-      if (cloudChanged && localDirty) continue;
-      if (cloudChanged) {
-
-        const content = await dbxDownload(e.path);
-        await opfs.write(path, content);
-        state[path] = {
-          rev: e.rev, size: e.size,
-          syncedMtime: await opfsLastModified(path),
-        };
-        continue;
-      }
-
-      if (!localExists) {
-
-        const content = await dbxDownload(e.path);
-        await opfs.write(path, content);
-        state[path].syncedMtime = await opfsLastModified(path);
-      }
-      state[path].size = e.size;
-    }
-
-    let opfsRels = [];
-    try { opfsRels = await opfs.list(); } catch {}
-    const dirty = [];
-    for (const rel of opfsRels) {
-      if (rel === _openFilePath) continue;
-      const lm = await opfsLastModified(rel);
-      const s = state[rel];
-      if (s && lm <= s.syncedMtime) {
-        console.log('[sandpie] sync skip (clean):', rel);
-        continue;
-      }
-      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
-      dirty.push({ rel, lm, s });
-    }
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
-      const chunk = dirty.slice(i, i + BATCH_SIZE);
-
-      const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
-        const content = await opfs.readBytes(rel);
-        return { rel, content, s, lm };
-      }));
-      try {
-        const results = await dbxUploadBatch(files);
-        for (const r of results) {
-          if (r.meta && r.meta['.tag'] === 'success') {
-            state[r.rel] = {
-              rev: r.meta.rev || (r.s && r.s.rev) || '',
-              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
-              syncedMtime: r.lm,
-            };
-
-          } else {
-            console.warn('batch item failed:', r.rel, r.meta);
-          }
-        }
-      } catch (err) {
-        console.warn('batch upload failed:', err);
-      }
-    }
-    setSyncState(state);
-    await pruneOrphanDirs(cloud);
-
-    await refreshFileList();
-    await refreshConversationList();
-  } catch (e) {
-
-    dbxStatus('Sync failed: ' + e.message, 'error');
-    console.warn('sync:', e);
-  } finally {
-
-    initialSyncDone = true;
-    setDbxBusy(false);
-    _syncing = false;
-  }
-}
-setInterval(() => { if (!document.hidden) sync(); }, 60000);
 function joinPath(folder, name) {
   if (folder === '/' || folder === '') return '/' + name;
   return folder.replace(/\/$/, '') + '/' + name;
 }
-async function manualResync() {
-  if (!dbxTokens()) {
-    dbxStatus('Not connected', 'disconnected');
-    return;
-  }
-  const btn = $('dbxResyncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
-  try {
-    await sync();
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
-  }
-}
-// Initial sync boot is handled by modules/dropbox.js on DOMContentLoaded
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -1000,13 +694,13 @@ async function getFileSize(path) {
     return (await handle.getFile()).size;
   } catch {}
 
-  const s = syncState()[path];
+  const s = (Sandpie.syncProvider()?.getState?.() || {})[path];
   return s && s.size || 0;
 }
 async function getFolderSize(path) {
   const prefix = path ? path.toLowerCase() + '/' : '';
   let total = 0;
-  const state = syncState();
+  const state = Sandpie.syncProvider()?.getState?.() || {};
 
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
@@ -1047,7 +741,7 @@ async function refreshFileList() {
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
-  const state = syncState();
+  const state = Sandpie.syncProvider()?.getState?.() || {};
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
   for (const k of Object.keys(state)) {
@@ -1068,7 +762,7 @@ async function refreshFileList() {
   if (!names.size) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = initialSyncDone ? '(empty)' : 'Loading…';
+    li.textContent = Sandpie.initialSyncDone() ? '(empty)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
     return;
@@ -1136,10 +830,7 @@ async function refreshFileList() {
       menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
           await opfs.remove(it.fullKey);
-          try { await dbxDelete('/' + it.fullKey); } catch (_) {}
-          const state = syncState();
-          if (state[it.fullKey]) delete state[it.fullKey];
-          setSyncState(state);
+          Sandpie.events.emit('file:deleted', it.fullKey);
           await refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
       }});
@@ -1634,13 +1325,6 @@ sidePanel = new SidePanel();
     if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
   });
 })();
-function saveConfig() {
-  // Provider config is managed by modules/providers.js
-  // This function only saves non-provider (Dropbox) config
-  localStorage.setItem('opencode-config', JSON.stringify({
-    dbxAppKey: $('dbxAppKey').value,
-  }));
-}
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
@@ -2580,18 +2264,11 @@ async function duplicateConv(id, title) {
   await refreshConversationList();
 }
 async function deleteConv(id, title) {
-  const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
+  const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
-
-  if (dbxTokens()) {
-    try { await dbxDelete('/' + path); } catch {}
-  }
-  const lk = path.toLowerCase();
-  const sync = syncState(); let sChanged = false;
-  for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
-  if (sChanged) setSyncState(sync);
+  Sandpie.events.emit('file:deleted', path);
 
   const stream = convStreams.get(id);
   if (stream) {
@@ -2717,7 +2394,7 @@ async function refreshConversationList() {
   if (!list.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = initialSyncDone ? '(no chats yet)' : 'Loading…';
+    li.textContent = Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
     return;
@@ -2966,7 +2643,7 @@ async function sendSingle(text, stream) {
     await saveConv(convId);
 
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
-    try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+    try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 async function buildAgentConfig(convMessages) {
