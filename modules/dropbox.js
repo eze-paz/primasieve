@@ -256,40 +256,6 @@ async function dbxDeleteBatch(paths) {
   }
 }
 
-/* --------------------------------------------------------------------------
-   Bulk download primitives (copy_batch_v2 → download_zip → delete_v2)
-   Used by modules/cloud-sync.js to pull many changed files in ~O(1) round-trips
-   instead of one /files/download per file. See bulkDownload() in the sync engine below.
-   -------------------------------------------------------------------------- */
-
-async function dbxCopyBatch(entries) {
-  // entries: [{ from_path, to_path }, ...]  — keep each call ≤ 1000 entries.
-  // Returns a launch result: { '.tag': 'complete', entries } or
-  // { '.tag': 'async_job_id', async_job_id }.
-  return await dbxApi('/2/files/copy_batch_v2', { entries, autorename: false });
-}
-
-async function dbxCopyBatchCheck(asyncJobId) {
-  // Returns { '.tag': 'in_progress' } or { '.tag': 'complete', entries }.
-  return await dbxApi('/2/files/copy_batch/check_v2', { async_job_id: asyncJobId });
-}
-
-async function dbxDownloadZip(path, signal) {
-  // Downloads a whole folder as one zip. Dropbox caps this at 20 GB / 10,000 files.
-  const token = await dbxAccessToken();
-  const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download_zip'), {
-    method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + token,
-      'Dropbox-API-Arg': JSON.stringify({ path }),
-      'Content-Type': 'text/plain',
-    },
-    signal,
-  });
-  if (!res.ok) throw new Error(`Download zip ${path}: ${res.status} ${await res.text()}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
 /* expose to global scope for inline callers during migration */
 window.dbxRoute = dbxRoute;
 window.b64url = b64url;
@@ -306,9 +272,6 @@ window.dbxUploadSessionFinishBatch = dbxUploadSessionFinishBatch;
 window.dbxUploadBatch = dbxUploadBatch;
 window.dbxDelete = dbxDelete;
 window.dbxDeleteBatch = dbxDeleteBatch;
-window.dbxCopyBatch = dbxCopyBatch;
-window.dbxCopyBatchCheck = dbxCopyBatchCheck;
-window.dbxDownloadZip = dbxDownloadZip;
 
 /* ------------------------------------------------------------------
    Cloud section registration via SandpieMenu
@@ -588,93 +551,20 @@ document.addEventListener('DOMContentLoaded', function() {
     return pruned;
   }
 
-  // ---- bulk download (staged-zip + parallel fallback) -----------------------
-  // Pulling changed files one /files/download at a time is O(N) network round-
-  // trips — a 1000-file first sync on a new device can take ~an hour. Instead we
-  // copy the exact changed files into a temp Dropbox folder (server-side, metadata
-  // only), download that whole folder as ONE zip, unzip locally, then delete the
-  // temp folder: ~O(1) round-trips for any N up to the zip cap. Small batches and
-  // any failure fall back to bounded-parallel per-file downloads.
+  // ---- bulk download (bounded-parallel per-file) ----------------------------
+  // Pulling changed files one /files/download at a time, serially, is O(N)
+  // blocking round-trips — a 1000-file first sync can take ~an hour. We instead
+  // fetch them through a bounded worker pool: still O(N) requests, but the wall
+  // clock is ~N/CONCURRENCY. This path is strictly READ-ONLY — we never copy or
+  // stage files inside the user's Dropbox to perform a download. (An earlier
+  // copy_batch→download_zip "staging" approach was removed: it duplicated the
+  // user's data into their own synced tree, which propagated to every device and
+  // could leave a full duplicate behind on any interruption.)
+  const BULK_DL_CONCURRENCY = 32;  // parallel per-file download workers
+  // Legacy staging-folder name from that removed approach. Kept ONLY so any folder
+  // still left behind in a user's Dropbox is ignored by cloudListAll (see the
+  // filters there) instead of being synced down as if it were real content.
   const BULK_TMP_NAME = 'sandpie-sync-tmp';
-  const BULK_ZIP_THRESHOLD = 20;   // files; below this, parallel per-file is simpler
-  const BULK_COPY_MAX = 1000;      // max entries per copy_batch_v2 call
-  const BULK_ZIP_FILE_MAX = 9000;  // max files per download_zip (Dropbox caps at 10k / 20GB)
-  const BULK_DL_CONCURRENCY = 12;  // parallel per-file workers
-
-  function bulkSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
-  // Only attempt the staged-zip path if every primitive it needs is present
-  // (transport helpers + the fflate unzip lib loaded by the host page).
-  function zipBulkAvailable() {
-    return typeof dbxCopyBatch === 'function'
-        && typeof dbxCopyBatchCheck === 'function'
-        && typeof dbxDownloadZip === 'function'
-        && typeof dbxDelete === 'function'
-        && !!(window.fflate && window.fflate.unzip);
-  }
-
-  // Resolve a copy_batch_v2 launch result, polling check_v2 until the async job
-  // completes. Per-entry failures are tolerated by the caller (missing files just
-  // fall through to the per-file path), so we only wait for overall completion.
-  async function waitForCopyBatch(res) {
-    if (res && res['.tag'] === 'complete') return;
-    if (!res || res['.tag'] !== 'async_job_id') {
-      throw new Error('copy_batch: unexpected response ' + JSON.stringify(res));
-    }
-    const jobId = res.async_job_id;
-    for (let i = 0; i < 120; i++) {
-      await bulkSleep(Math.min(750 + i * 250, 3000));
-      const chk = await dbxCopyBatchCheck(jobId);
-      if (chk['.tag'] === 'complete') return;
-      // '.tag' === 'in_progress' → keep polling
-    }
-    throw new Error('copy_batch: timed out waiting for async job');
-  }
-
-  function unzipBulk(u8) {
-    return new Promise((resolve, reject) => {
-      window.fflate.unzip(u8, (err, files) => (err ? reject(err) : resolve(files)));
-    });
-  }
-
-  // Copy one chunk of files into the temp folder, download it as a zip, unzip, and
-  // map each entry back to its relative path. Adds rel -> Uint8Array to `out`.
-  async function bulkZipChunk(chunk, out) {
-    // Derive temp folder within the app's actual Dropbox scope (e.g. /Apps/sandpie/sandpie-sync-tmp)
-    // rather than using a hardcoded root path that may be outside the app's permission scope.
-    const firstItem = chunk[0];
-    const base = firstItem.cloudPath.slice(0, firstItem.cloudPath.length - firstItem.rel.length);
-    const tmpPath = base.replace(/\/+$/, '') + '/' + BULK_TMP_NAME;
-    try { await dbxDelete(tmpPath); } catch (e) {}   // clear any crashed-run leftover
-    try {
-      for (let i = 0; i < chunk.length; i += BULK_COPY_MAX) {
-        const entries = chunk.slice(i, i + BULK_COPY_MAX).map((it) => ({
-          from_path: it.cloudPath,
-          to_path: tmpPath + '/' + it.rel,
-        }));
-        await waitForCopyBatch(await dbxCopyBatch(entries));
-      }
-      const files = await unzipBulk(await dbxDownloadZip(tmpPath));
-      const byRel = new Map(chunk.map((it) => [it.rel.toLowerCase(), it]));
-      for (const [name, bytes] of Object.entries(files)) {
-        if (name.endsWith('/')) continue;                              // directory entry
-        let rel = name;
-        if (rel.startsWith(BULK_TMP_NAME + '/')) rel = rel.slice(BULK_TMP_NAME.length + 1);
-        const it = byRel.get(rel.toLowerCase());
-        if (it) out.set(it.rel, bytes);
-      }
-    } finally {
-      try { await dbxDelete(tmpPath); } catch (e) {}
-    }
-  }
-
-  async function bulkDownloadViaZip(items) {
-    const out = new Map();
-    for (let i = 0; i < items.length; i += BULK_ZIP_FILE_MAX) {
-      await bulkZipChunk(items.slice(i, i + BULK_ZIP_FILE_MAX), out);
-    }
-    return out;
-  }
 
   // Bounded-parallel per-file download. Failures are logged and omitted (left for
   // the next sync), matching the resilience of the old serial loop.
@@ -693,26 +583,12 @@ document.addEventListener('DOMContentLoaded', function() {
     return out;
   }
 
-  // Fetch every file in `items`, then write to OPFS and advance sync state. Uses
-  // the staged-zip path for large batches (falling back to per-file on any error)
-  // and bounded-parallel per-file for the remainder.
+  // Fetch every file in `items` through the parallel pool, then write to OPFS and
+  // advance sync state. Files that fail this round are simply retried next sync.
   //   item = { rel, cloudPath, e, mode: 'full' | 'mtimeOnly' }
   async function bulkDownload(items, state, opfs) {
     if (!items.length) return;
-    let contents = new Map();
-    if (items.length >= BULK_ZIP_THRESHOLD && zipBulkAvailable()) {
-      try {
-        contents = await bulkDownloadViaZip(items);
-      } catch (err) {
-        console.warn('[sync] staged-zip bulk download failed — falling back to per-file:', err);
-        contents = new Map();
-      }
-    }
-    const remaining = items.filter((it) => !contents.has(it.rel));
-    if (remaining.length) {
-      const perFile = await bulkParallelDownload(remaining);
-      for (const [rel, bytes] of perFile) contents.set(rel, bytes);
-    }
+    const contents = await bulkParallelDownload(items);
     for (const it of items) {
       const content = contents.get(it.rel);
       if (!content) continue;                          // failed this round; retried next sync
