@@ -1041,6 +1041,7 @@ async function openFileViewer(fullKey, name) {
     const newContent = textareaEl.value;
     try {
       await opfs.write(fullKey, newContent);
+      Sandpie.events.emit('file:changed', fullKey);
       current = newContent;
       meta.textContent = `${new Blob([newContent]).size.toLocaleString()} bytes`;
       refreshTitle();
@@ -1079,6 +1080,7 @@ async function uploadEntry(entry, dirPath) {
     const file = await new Promise(r => entry.file(r));
     const destPath = opfsJoin(dirPath, entry.name);
     await opfs.write(destPath, file);
+    Sandpie.events.emit('file:changed', destPath);
     const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
     if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
   } else if (entry.isDirectory) {
@@ -1109,6 +1111,7 @@ async function uploadEntry(entry, dirPath) {
       for (const f of e.dataTransfer.files) {
         const destPath = opfsJoin(path, f.name);
         await opfs.write(destPath, f);
+        Sandpie.events.emit('file:changed', destPath);
         const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
         if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
       }
@@ -2067,6 +2070,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     messages: msgs,
   };
   await opfs.write(convPath(convId), JSON.stringify(data));
+  Sandpie.events.emit('file:changed', convPath(convId));
   await refreshConversationList();
 }
 function renderHistoricalMessage(m, host = null) {
@@ -2232,6 +2236,7 @@ async function updateConvFile(id, patch) {
   catch { return; }
   Object.assign(data, patch);
   await opfs.write(convPath(id), JSON.stringify(data));
+  Sandpie.events.emit('file:changed', convPath(id));
 }
 async function renameConv(id, current) {
   const next = prompt('Rename conversation', current);
@@ -2260,6 +2265,7 @@ async function duplicateConv(id, title) {
   data.archived = false;
   data.updated = new Date().toISOString();
   await opfs.write(convPath(newId), JSON.stringify(data));
+  Sandpie.events.emit('file:changed', convPath(newId));
   await refreshConversationList();
 }
 async function deleteConv(id, title) {

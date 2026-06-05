@@ -341,6 +341,8 @@ document.addEventListener('DOMContentLoaded', function() {
   let _syncing = false;
   let initialSyncDone = !localStorage.getItem('dbx-tokens');
   let dbxBusyCount = 0;
+  let _syncCount = 0;             // periodic full-scan cadence counter (see sync())
+  const FULL_SCAN_EVERY = 10;     // safety-net: full local opfs.list() reconcile every Nth sync
 
   function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
   function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
@@ -474,6 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (storedCursor && Object.keys(existingIndex).length > 0) {
       try {
         const result = await dbxListContinue(storedCursor);
+        const delta = [];   // [rel, entry] for entries that changed this cycle
         for (const e of result.entries) {
           let rel = e.path.replace(/^\/+/, '');
           if (!rel) continue;
@@ -489,11 +492,12 @@ document.addEventListener('DOMContentLoaded', function() {
             delete existingIndex[rel];
           } else {
             existingIndex[rel] = e;
+            delta.push([rel, e]);
           }
         }
         setDbxCursor(result.cursor);
         setCloudIndex(existingIndex);
-        return existingIndex;
+        return { index: existingIndex, delta };
       } catch (err) {
         console.warn('Cursor sync failed, falling back to full sync:', err.message);
         setDbxCursor(null);
@@ -518,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     setDbxCursor(result.cursor);
     setCloudIndex(out);
-    return out;
+    return { index: out, delta: null };   // delta === null => full listing, treat all entries as changed
   }
 
   async function pruneOrphanDirs(cloud) {
@@ -605,19 +609,33 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ---- the sync engine ------------------------------------------------------
-  async function sync() {
+  //   opts.full — force a full local reconcile (used by manualResync / initial sync).
+  async function sync(opts = {}) {
     if (!dbxTokens()) return;
     if (_syncing) return;
     if (Sandpie.isGenerating()) return;
     _syncing = true;
     setDbxBusy(true);
+    _syncCount++;
     const opfs = Sandpie.opfs;
     const openFilePath = Sandpie.openFilePath();
     try {
       dbxStatus('', 'connected');
-      const cloud = await cloudListAll();
+      const { index: cloud, delta } = await cloudListAll();
       const state = syncState();
 
+      // A "full" pass walks every local file to catch writes that never emitted a
+      // dirty signal. Otherwise the push side is event-driven (files marked dirty
+      // via file:changed / sw-opfs-changed → syncedMtime === 0). We force it on the
+      // first sync, on manual resync, every Nth cycle, and whenever the remote was
+      // re-listed in full (delta === null).
+      const fullScan = !!opts.full || !initialSyncDone || delta === null
+        || (_syncCount % FULL_SCAN_EVERY === 0);
+
+      // Reconcile remote deletions: anything tracked but no longer in the cloud
+      // index was deleted remotely (the cursor reported it). Drop the clean local
+      // copy; keep it if it was modified locally since the last sync.
+      let removedAny = false;
       for (const path of Object.keys(state)) {
         if (cloud[path]) continue;
         const s = state[path];
@@ -625,13 +643,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lm > 0 && lm > s.syncedMtime) continue;
         try { await opfs.remove(path); } catch {}
         delete state[path];
+        removedAny = true;
       }
 
-      // Decide per file what to pull (unchanged policy), but defer the actual
-      // downloads into `toDownload` so they can be fetched in bulk rather than
-      // one blocking round-trip at a time. See bulkDownload() above.
+      // Pull: only evaluate cloud entries that changed this cycle (the cursor
+      // delta), or every entry on a full listing. Downloads are deferred into
+      // `toDownload` and fetched by the bounded-parallel pool. See bulkDownload().
+      const toConsider = delta === null ? Object.entries(cloud) : delta;
       const toDownload = [];
-      for (const [path, e] of Object.entries(cloud)) {
+      for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
         const s = state[path];
         const localExists = await opfs.exists(path);
@@ -662,20 +682,31 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       await bulkDownload(toDownload, state, opfs);
 
-      let opfsRels = [];
-      try { opfsRels = await opfs.list(); } catch {}
+      // Push: collect dirty files. Fast path = files an event marked dirty
+      // (syncedMtime === 0) — no per-file OPFS walk. Safety-net full scan walks
+      // every local file and compares mtime, catching any write that slipped
+      // through without an event.
       const dirty = [];
-      for (const rel of opfsRels) {
-        if (rel === openFilePath) continue;
-        const lm = await Sandpie.opfsMtime(rel);
-        const s = state[rel];
-        if (s && lm <= s.syncedMtime) {
-          console.log('[sandpie] sync skip (clean):', rel);
-          continue;
+      if (fullScan) {
+        let opfsRels = [];
+        try { opfsRels = await opfs.list(); } catch {}
+        for (const rel of opfsRels) {
+          if (rel === openFilePath) continue;
+          const lm = await Sandpie.opfsMtime(rel);
+          const s = state[rel];
+          if (s && lm <= s.syncedMtime) continue;
+          dirty.push({ rel, lm, s });
         }
-        console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
-        dirty.push({ rel, lm, s });
+      } else {
+        for (const rel of Object.keys(state)) {
+          if (rel === openFilePath) continue;
+          if (state[rel].syncedMtime !== 0) continue;       // not event-marked dirty
+          if (!(await opfs.exists(rel))) continue;          // marked dirty, then deleted
+          dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
+        }
       }
+      if (dirty.length) console.log('[sandpie] sync: uploading', dirty.length, 'changed file(s)');
+
       const BATCH_SIZE = 50;
       for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
         const chunk = dirty.slice(i, i + BATCH_SIZE);
@@ -702,10 +733,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       setSyncState(state);
-      await pruneOrphanDirs(cloud);
 
-      await Sandpie.refreshFiles();
-      await Sandpie.refreshConversations();
+      // Only prune empty dirs after a deletion or full reconcile, and only rebuild
+      // the file/conversation lists when something actually changed — idle cycles
+      // do neither.
+      if (removedAny || fullScan) await pruneOrphanDirs(cloud);
+      if (toDownload.length || dirty.length || removedAny) {
+        await Sandpie.refreshFiles();
+        await Sandpie.refreshConversations();
+      }
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
       console.warn('sync:', e);
@@ -724,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const btn = document.getElementById('dbxResyncBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
     try {
-      await sync();
+      await sync({ full: true });   // manual resync always does a full local reconcile
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
     }
@@ -737,6 +773,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const s = syncState()[path];
     if (!s) return null;
     return opfsMtime <= s.syncedMtime ? 'synced' : 'modified';
+  }
+
+  // React to a file the page wrote (saveConv, file edits, imports): mark it dirty
+  // so the next sync uploads it via the fast path — no full opfs.list() scan
+  // needed. Mirrors the sw-opfs-changed handler used for Python writes.
+  function onFileChanged(path) {
+    const rel = String(path).replace(/^\/+/, '');
+    if (!rel) return;
+    const state = syncState();
+    if (state[rel]) state[rel].syncedMtime = 0;
+    else state[rel] = { rev: '', size: 0, syncedMtime: 0 };
+    setSyncState(state);
   }
 
   // React to a file the page deleted: drop it (and any children) from sync state
@@ -853,6 +901,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     Sandpie.events.on('file:deleted', onFileDeleted);
+    Sandpie.events.on('file:changed', onFileChanged);
     wireServiceWorker();
     setInterval(() => { if (!document.hidden) sync(); }, 60000);
 

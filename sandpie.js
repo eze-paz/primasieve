@@ -401,6 +401,7 @@ function _fsTrackingDelegate() {
 // for real files — not temp files a script created and removed in the same run.
 async function flushCaptureToOpfs() {
   const removed = [];
+  const written = [];   // OPFS-relative files actually written back (for cloud-sync)
   // Deletes first. rmtree records children before parents (insertion order),
   // and swOpfsDelete is recursive, so any stragglers go too.
   for (const rel of _capDeleted) {
@@ -414,10 +415,10 @@ async function flushCaptureToOpfs() {
     try { st = py.FS.stat(full); } catch (_) { continue; }
     try {
       if (py.FS.isDir(st.mode)) await opfsResolveDir(rel.split('/').filter(Boolean), true);
-      else await opfsWriteBytes(rel, py.FS.readFile(full));
+      else { await opfsWriteBytes(rel, py.FS.readFile(full)); written.push(rel); }
     } catch (e) { console.warn('[sandpie-sw] OPFS write-back failed:', rel, e); }
   }
-  return removed;
+  return { removed, written };
 }
 
 // ============================================================
@@ -516,20 +517,23 @@ async function tool_run_python({ path, args }, ctx) {
       await p.runPythonAsync(code);
       _capActive = false;
 
-      let removedPaths = [];
+      let removedPaths = [], writtenPaths = [];
       if (_nativefs) {
-        try { removedPaths = await flushCaptureToOpfs(); }
+        try { ({ removed: removedPaths, written: writtenPaths } = await flushCaptureToOpfs()); }
         catch (e) { console.warn('[sandpie-sw] OPFS write-back after run_python failed:', e); }
       }
 
-      // Notify the page so it can delete the cloud (Dropbox) copies immediately
-      // (batched into one delete_batch by cloud-sync.js) instead of waiting for
-      // the next periodic sync.
-      if (removedPaths.length) {
+      // Notify the page so cloud-sync can act immediately instead of waiting for the
+      // next periodic full scan: delete the cloud copies of removed files (batched),
+      // and mark written files dirty (sw-opfs-changed → fast-path upload next sync).
+      if (removedPaths.length || writtenPaths.length) {
         self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
           .then(clients => {
             for (const c of clients) {
-              try { c.postMessage({ type: 'opfs-deleted-by-python', paths: removedPaths }); } catch (_) {}
+              try {
+                if (removedPaths.length) c.postMessage({ type: 'opfs-deleted-by-python', paths: removedPaths });
+                if (writtenPaths.length) c.postMessage({ type: 'sw-opfs-changed', paths: writtenPaths });
+              } catch (_) {}
             }
           }).catch(() => {});
       }
