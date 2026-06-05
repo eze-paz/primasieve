@@ -12,10 +12,13 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- init() deferred to end of body -->
+  <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/dropbox.js"></script>
+  <script src="modules/cloud-sync.js"></script>
   <script src="modules/images.js"></script>
   <script src="modules/notifications.js"></script>
+  <script src="modules/tools.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -70,18 +73,8 @@
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
     <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
     <div class="context-item" id="bubbleToggleToolsItem" onclick="toggleToolsMinimizedFromMenu()">Hide tool calls</div>
+    <div class="context-item" id="bubbleToggleThoughtsItem" onclick="toggleThoughtsFromMenu()">Show thoughts</div>
   </div>
-  <details class="service" id="cloudSection">
-    <summary><span id="dbxTitle">Cloud sync</span><span id="dbxProgress" class="dbx-progress"></span><span class="status-dot" id="dbxDot"></span></summary>
-    <div class="service-body">
-      <input id="dbxAppKey" autocomplete="off" placeholder="Dropbox app key">
-      <div class="row">
-        <button id="dbxToggleBtn" onclick="dbxToggleConnection()">Connect</button>
-        <button class="ghost" id="dbxResyncBtn" onclick="manualResync()" title="Re-pull from Dropbox and reconcile cross-device deletes now">Resync</button>
-      </div>
-      <div id="dbxStatus" class="dbx-status disconnected">Not connected</div>
-    </div>
-  </details>
     <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem; color:#8b949e;"></span></summary>
     <div class="service-body">
@@ -90,26 +83,6 @@
         <input id="opfsPath" value="/">
       </div>
       <ul class="fs-list" id="fileList"></ul>
-    </div>
-  </details>
-    <details class="service" id="themeSection">
-    <summary>Appearance</summary>
-    <div class="service-body">
-      <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-        <button class="ghost theme-btn" data-t="classic-dark"  onclick="setTheme('classic-dark')"  title="Classic dark">Dark</button>
-        <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
-        <button class="ghost theme-btn" data-t="cyberpunk"     onclick="setTheme('cyberpunk')"      title="Neon cyberpunk">Cybr</button>
-        <button class="ghost theme-btn" data-t="aurora"        onclick="setTheme('aurora')"         title="Aurora glass">Aurora</button>
-        <button class="ghost theme-btn" data-t="electric"      onclick="setTheme('electric')"       title="Electric bold">Bold</button>
-      </div>
-      <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
-        <div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
-        <div style="display:flex;gap:0.35rem;margin-top:0.25rem;">
-          <button class="ghost" onclick="resetThemeColors()" style="font-size:0.72rem;flex:1;">Reset defaults</button>
-          <button class="ghost" onclick="saveThemeColors()"  style="font-size:0.72rem;flex:1;">Save colors</button>
-        </div>
-      </div>
-      <p class="hint" id="themeHint" style="margin-top:0.25rem;">Pick a look. Saved locally.</p>
     </div>
   </details>
 
@@ -244,261 +217,7 @@ const SandpieTokens = (() => {
 })();
 window.SandpieTokens = SandpieTokens;
 
-/* ========== Theme Palette System ========== */
-const _themePalettes = {
-  'classic-dark': {
-    bg: '#0d1117', surface: '#161b22', panel: '#21262d',
-    accent: '#58a6ff', text: '#e6edf3', textDim: '#9ab0c8',
-    border: '#30363d', borderBright: '#484f58',
-    success: '#3fb950', danger: '#f85149', warn: '#d29922'
-  },
-  'classic-light': {
-    bg: '#ffffff', surface: '#f6f8fa', panel: '#eaeef2',
-    accent: '#85c4f0', text: '#1f2328', textDim: '#656d76',
-    border: '#d0d7de', borderBright: '#b0b7be',
-    success: '#1f883d', danger: '#cf222e', warn: '#9a6700'
-  },
-  'cyberpunk': {
-    bg: '#050505', surface: '#0a0a0f', panel: '#11111a',
-    accent: '#00f0ff', text: '#e8f4f8', textDim: '#7a8a9a',
-    border: '#1a1a2e', borderBright: '#2d2d44',
-    success: '#00ff88', danger: '#ff3366', warn: '#ffaa00'
-  },
-  'aurora': {
-    bg: '#070b14', surface: 'rgba(15,23,42,0.6)', panel: 'rgba(30,41,59,0.5)',
-    accent: '#38bdf8', text: '#f1f5f9', textDim: '#94a3b8',
-    border: 'rgba(148,163,184,0.12)', borderBright: 'rgba(148,163,184,0.2)',
-    success: '#34d399', danger: '#f87171', warn: '#fbbf24'
-  },
-  'electric': {
-    bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
-    accent: '#ff3b5c', text: '#fafafa', textDim: '#888',
-    border: '#2a2a2a', borderBright: '#444',
-    success: '#00e676', danger: '#ff1744', warn: '#ffc400'
-  }
-};
-const _paletteLabels = {
-  bg: 'Background', surface: 'Surface', panel: 'Panel',
-  accent: 'Accent', text: 'Text', textDim: 'Muted text',
-  border: 'Border', borderBright: 'Bright border',
-  success: 'Success', danger: 'Danger', warn: 'Warning'
-};
 
-function setTheme(name) {
-  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
-  name = map[name] || name;
-  if (!_themePalettes[name]) name = 'classic-dark';
-  if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
-  else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
-  else document.documentElement.setAttribute('data-theme', name);
-  localStorage.setItem('sandpie-theme', name);
-  applyThemePalette(name);
-  buildPaletteUI(name);
-  $('themeCustomize').style.display = 'flex';
-  updateThemeButtons();
-  computeAccentNeg();
-}
-
-function applyThemePalette(name) {
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
-  var css = ':root{ ';
-  for (var key in palette) {
-    if (key === 'accent-dim') continue; // derived, handled separately
-    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
-    css += prop + ':' + palette[key] + '!important; ';
-  }
-  // Inject accent-dim if present in saved palette
-  if (palette['accent-dim']) {
-    css += '--sp-accent-dim:' + palette['accent-dim'] + '!important; ';
-  }
-  css += '}';
-  var style = document.getElementById('themeOverride');
-  if (!style) { style = document.createElement('style'); style.id = 'themeOverride'; document.head.appendChild(style); }
-  style.textContent = css;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette.accent);
-  // Sync derived colors from current accent
-  if (palette.accent && palette.accent.startsWith('#')) {
-    updateDerivedColors(palette.accent);
-  }
-}
-
-function buildPaletteUI(name) {
-  var container = $('themePaletteRows');
-  if (!container) return;
-  container.innerHTML = '';
-  var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
-  for (var key in palette) {
-    var label = _paletteLabels[key] || key;
-    var val = palette[key];
-    var hexVal = (!val.startsWith('#') || val.length !== 7) ? rgbaToHex(val) : val;
-    if (!hexVal) continue;
-    var row = document.createElement('div');
-    row.className = 'palette-row';
-    row.style.cssText = 'display:flex;align-items:center;gap:0.5rem;';
-    var picker = document.createElement('input');
-    picker.type = 'color';
-    picker.value = hexVal.toUpperCase();
-    picker.dataset.key = key;
-    picker.dataset.origVal = val;
-    picker.style.cssText = 'padding:0;width:28px;height:28px;border:none;background:transparent;cursor:pointer;';
-    picker.addEventListener('input', onPaletteInput);
-    var lab = document.createElement('span');
-    lab.textContent = label;
-    lab.style.cssText = 'font-size:0.75rem;color:var(--sp-text-dim);flex:1;';
-    var hexDisp = document.createElement('span');
-    hexDisp.className = 'hex';
-    hexDisp.textContent = hexVal.toUpperCase();
-    hexDisp.style.cssText = 'font-size:0.72rem;color:var(--sp-text-dim);font-family:"JetBrains Mono",monospace;min-width:5em;text-align:right;';
-    hexDisp.dataset.hexFor = key;
-    row.appendChild(picker);
-    row.appendChild(lab);
-    row.appendChild(hexDisp);
-    container.appendChild(row);
-  }
-}
-
-function onPaletteInput(e) {
-  var picker = e.target;
-  var key = picker.dataset.key;
-  var color = picker.value;
-  var hexDisp = picker.parentNode.querySelector('[data-hex-for="' + key + '"]');
-  if (hexDisp) hexDisp.textContent = color.toUpperCase();
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var css = style.textContent;
-    var prop = key === 'bg' ? '--sp-bg' : '--sp-' + key;
-    var re = new RegExp(prop + ':[^!;]+');
-    if (re.test(css)) {
-      css = css.replace(re, prop + ':' + color);
-    } else {
-      css = css.replace('}', ' ' + prop + ':' + color + '}');
-    }
-    style.textContent = css;
-  }
-  if (key === 'accent') {
-    updateDerivedColors(color);
-  }
-}
-
-function saveThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  var palette = {};
-  var rows = $('themePaletteRows').querySelectorAll('.palette-row');
-  for (var i = 0; i < rows.length; i++) {
-    var picker = rows[i].querySelector('input[type="color"]');
-    if (picker) palette[picker.dataset.key] = picker.value;
-  }
-  // Also save derived accent-dim so applyThemePalette can restore it
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var m = style.textContent.match(/--sp-accent-dim:([^!;]+)/);
-    if (m) palette['accent-dim'] = m[1].trim();
-  }
-  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
-  var hint = $('themeHint');
-  if (hint) { hint.textContent = 'Colors saved!'; hint.style.opacity = '1'; setTimeout(function () { hint.style.opacity = '0'; }, 1200); }
-}
-
-function resetThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  localStorage.removeItem('sandpie-theme-palette-' + name);
-  applyThemePalette(name);
-  buildPaletteUI(name);
-  var defaultAccent = _themePalettes[name].accent;
-  if (defaultAccent && defaultAccent.startsWith('#')) {
-    updateDerivedColors(defaultAccent);
-  }
-}
-
-function updateThemeButtons() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  document.querySelectorAll('.theme-btn[data-t]').forEach(function (b) {
-    b.classList.toggle('active', b.dataset.t === name);
-  });
-}
-
-function applySavedCustom() {
-  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  if (saved && _themePalettes[saved]) {
-    setTheme(saved);
-    var pal = localStorage.getItem('sandpie-theme-palette-' + saved);
-    if (pal) { try { Object.assign(_themePalettes[saved], JSON.parse(pal)); applyThemePalette(saved); } catch (e) {} }
-  } else {
-    setTheme('classic-dark');
-  }
-}
-
-function rgbaToHex(rgba) {
-  var m = rgba.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (!m) return null;
-  return '#' + [+m[1], +m[2], +m[3]].map(function (x) { return x.toString(16).padStart(2, '0'); }).join('');
-}
-
-function updateDerivedColors(accent) {
-  // Derive accent-dim from accent at 15% opacity
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16);
-  var g = parseInt(hex.slice(2,4),16);
-  var b = parseInt(hex.slice(4,6),16);
-  var dim = 'rgba(' + r + ',' + g + ',' + b + ',0.15)';
-
-  // Inject into override style
-  var style = document.getElementById('themeOverride');
-  if (style) {
-    var css = style.textContent;
-    // Replace or add --sp-accent-dim
-    if (css.indexOf('--sp-accent-dim:') >= 0) {
-      css = css.replace(/--sp-accent-dim:[^!;]+/, '--sp-accent-dim:' + dim);
-    } else {
-      css = css.replace('}', ' --sp-accent-dim:' + dim + '}');
-    }
-    style.textContent = css;
-  }
-
-  // Also re-run accent-neg computation
-  computeAccentNeg();
-}
-
-function computeAccentNeg() {
-  var root = document.documentElement;
-  var accent = getComputedStyle(root).getPropertyValue('--sp-accent').trim();
-  if (!accent) return;
-  var hex = accent.replace('#','');
-  var r = parseInt(hex.slice(0,2),16)/255;
-  var g = parseInt(hex.slice(2,4),16)/255;
-  var b = parseInt(hex.slice(4,6),16)/255;
-  var max = Math.max(r,g,b), min = Math.min(r,g,b);
-  var h = 0, s = 0, l = (max+min)/2;
-  if (max !== min) {
-    var d = max-min;
-    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max) {
-      case r: h = ((g-b)/d + (g < b ? 6 : 0))/6; break;
-      case g: h = ((b-r)/d + 2)/6; break;
-      case b: h = ((r-g)/d + 4)/6; break;
-    }
-  }
-  h = (h + 0.5) % 1;
-  var hue2rgb = function(p,q,t) {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q-p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q-p) * (2/3 - t) * 6;
-    return p;
-  };
-  var q = l < 0.5 ? l*(1+s) : l+s-l*s;
-  var p = 2*l-q;
-  var rr = Math.round(hue2rgb(p,q,h+1/3)*255);
-  var gg = Math.round(hue2rgb(p,q,h)*255);
-  var bb = Math.round(hue2rgb(p,q,h-1/3)*255);
-  var neg = '#' + [rr,gg,bb].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-  root.style.setProperty('--sp-accent-neg', neg);
-}
 
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
@@ -596,45 +315,8 @@ if ('serviceWorker' in navigator) {
       fn.call(console, '[sw]', d.text);
       return;
     }
-    if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-
-      (async () => {
-        if (!dbxTokens()) return;
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          try { await dbxDelete('/' + path); } catch {}
-          const lk = path.toLowerCase();
-          for (const k of Object.keys(state)) {
-            if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) {
-              delete state[k];
-              changed = true;
-            }
-          }
-        }
-        if (changed) setSyncState(state);
-        try { await refreshFileList(); } catch {}
-      })();
-      return;
-      }
-      if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {
-        console.log('[sandpie] ← SW notified:', d.paths);
-        const state = syncState();
-        let changed = false;
-        for (const path of d.paths) {
-          if (!state[path]) {
-            console.log('[sandpie] adding to syncState:', path);
-            state[path] = { rev: '', size: 0, syncedMtime: 0 };
-            changed = true;
-          } else {
-            console.log('[sandpie] marking dirty:', path);
-            state[path].syncedMtime = 0;
-            changed = true;
-          }
-        }
-        if (changed) setSyncState(state);
-        return;
-      }
+    // OPFS-change branches (opfs-deleted-by-python / sw-opfs-changed) live in
+    // modules/cloud-sync.js, which registers its own SW message listener.
     });
 
   const flush = () => {
@@ -711,7 +393,6 @@ function dedentMarkdownFences(text) {
     return lead + open + dedented + close;
   });
 }
-let initialSyncDone = !localStorage.getItem('dbx-tokens');
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
@@ -731,8 +412,6 @@ function setDot(id, state) {
   if (state) dot.classList.add(state);
 }
 
-// Only dbxAppKey triggers saveConfig (provider inputs managed by module)
-$('dbxAppKey').addEventListener('input', saveConfig);
 const _scrollLocked = new Set();
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
@@ -893,221 +572,76 @@ const opfs = {
     return out;
   },
 };
-async function pruneOrphanDirs(cloud) {
 
-  const source = cloud ? Object.keys(cloud) : Object.keys(syncState());
-  const cloudPaths = new Set();
-  for (const k of source) {
-    const lower = k.toLowerCase();
-    cloudPaths.add(lower);
-    const segs = lower.split('/');
-    for (let i = 1; i < segs.length; i++) cloudPaths.add(segs.slice(0, i).join('/'));
-  }
-  let pruned = 0;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    let all;
-    try { all = await opfs.listAll(''); } catch { return pruned; }
-
-    all.sort((a, b) => b.path.split('/').length - a.path.split('/').length);
-    for (const e of all) {
-      if (e.kind !== 'directory') continue;
-      if (cloudPaths.has(e.path.toLowerCase())) continue;
-      let children;
-      try { children = await opfs.listDir(e.path); } catch { continue; }
-      if (children.length) continue;
-      try { await opfs.remove(e.path); pruned++; changed = true; } catch {}
-    }
-  }
-  return pruned;
-}
-const DBX_REDIRECT = location.origin + location.pathname;
-function dbxStatus(text, kind) {
-  const el = $('dbxStatus');
-  el.textContent = text;
-  el.className = 'dbx-status ' + kind;
-  el.style.display = text ? '' : 'none';
-  setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
-  const btn = $('dbxToggleBtn');
-  if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
-}
-function dbxProgress(text) {
-  const el = $('dbxProgress');
-  const title = $('dbxTitle');
-  if (el) el.textContent = text || '';
-  if (title) title.style.display = text ? 'none' : '';
-}
-let dbxBusyCount = 0;
-function setDbxBusy(busy) {
-  dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
-  const dot = $('dbxDot');
-  if (!dot) return;
-  if (dbxBusyCount > 0) dot.classList.add('busy');
-  else dot.classList.remove('busy');
-}
-
-function dbxTokens() {
-  try {
-    return JSON.parse(localStorage.getItem('dbx-tokens') || 'null');
-  } catch (e) {
-    return null;
-  }
-}
-function setDbxTokens(t) {
-  localStorage.setItem('dbx-tokens', JSON.stringify(t));
-}
-
-function dbxToggleConnection() {
-  if (dbxTokens()) dbxDisconnect();
-  else dbxConnect();
-}
-async function dbxConnect() {
-  const appKey = $('dbxAppKey').value.trim();
-  if (!appKey) { dbxStatus('Enter your app key first', 'error'); return; }
-  saveConfig();
-  const { verifier, challenge } = await pkceChallenge();
-  localStorage.setItem('dbx-pkce', JSON.stringify({
-    verifier,
-    app_key: appKey,
-    ts: Date.now(),
-  }));
-  const params = new URLSearchParams({
-    client_id: appKey,
-    response_type: 'code',
-    redirect_uri: DBX_REDIRECT,
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
-    token_access_type: 'offline',
-  });
-  location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
-}
-function dbxDisconnect() {
-  localStorage.removeItem('dbx-tokens');
-  localStorage.removeItem(SYNC_STATE_KEY);
-  localStorage.removeItem('dbx-index');
-  localStorage.removeItem('opfs-sync-manifest');
-  localStorage.removeItem(CLOUD_INDEX_KEY);
-  localStorage.removeItem(DBX_CURSOR_KEY);
-  dbxStatus('Not connected', 'disconnected');
-  refreshFileList();
-}
-async function dbxExchangeCode(code) {
-  const stashed = JSON.parse(localStorage.getItem('dbx-pkce') || 'null');
-  if (!stashed) throw new Error('Missing PKCE state');
-  if (Date.now() - stashed.ts > 10 * 60 * 1000) {
-    localStorage.removeItem('dbx-pkce');
-    throw new Error('PKCE state expired — please reconnect');
-  }
-  const { verifier, app_key: appKey } = stashed;
-  const body = new URLSearchParams({
-    code,
-    grant_type: 'authorization_code',
-    client_id: appKey,
-    code_verifier: verifier,
-    redirect_uri: DBX_REDIRECT,
-  });
-  const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) throw new Error('Code exchange failed: ' + await res.text());
-  const data = await res.json();
-  localStorage.setItem('dbx-tokens', JSON.stringify({
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + data.expires_in * 1000,
-    app_key: appKey,
-  }));
-  localStorage.removeItem('dbx-pkce');
-}
-const SYNC_STATE_KEY = 'sandpie-sync-state';
-const CLOUD_INDEX_KEY = 'sandpie-cloud-index';
-const DBX_CURSOR_KEY = 'sandpie-dbx-cursor';
-function syncState() { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}'); }
-function setSyncState(s) { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(s)); }
-function cloudIndex() { return JSON.parse(localStorage.getItem(CLOUD_INDEX_KEY) || '{}'); }
-function setCloudIndex(idx) { localStorage.setItem(CLOUD_INDEX_KEY, JSON.stringify(idx)); }
-function dbxCursor() { return localStorage.getItem(DBX_CURSOR_KEY) || null; }
-function setDbxCursor(cursor) {
-  if (cursor) localStorage.setItem(DBX_CURSOR_KEY, cursor);
-  else localStorage.removeItem(DBX_CURSOR_KEY);
-}
-(function migrateLegacyState() {
-  if (localStorage.getItem(SYNC_STATE_KEY)) return;
-  const oldManifest = JSON.parse(localStorage.getItem('opfs-sync-manifest') || '{}');
-  const oldIndex = JSON.parse(localStorage.getItem('dbx-index') || '{}');
-  const s = {};
-  for (const [path, info] of Object.entries(oldIndex)) {
-    if (info.kind !== 'file') continue;
-    s[path] = {
-      rev: info.rev,
-      size: info.size,
-      
-      syncedMtime: oldManifest[path] || 0,
-    };
-  }
-  setSyncState(s);
-})();
-(function validateCloudState() {
-  const idx = cloudIndex();
-  const cursor = dbxCursor();
-  if (Object.keys(idx).length > 0 && !cursor) {
-    setCloudIndex({});
-  }
-})();
-async function cloudListAll() {
-  const storedCursor = dbxCursor();
-  const existingIndex = cloudIndex();
-  if (storedCursor && Object.keys(existingIndex).length > 0) {
-    try {
-      const result = await dbxListContinue(storedCursor);
-      for (const e of result.entries) {
-        let rel = e.path.replace(/^\/+/, '');
-        if (!rel) continue;
-        const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
-        for (const p of prefixes) {
-          if (rel.toLowerCase().startsWith(p.toLowerCase())) {
-            rel = rel.slice(p.length);
-            break;
-          }
-        }
-        if (e.kind === 'deleted') {
-          delete existingIndex[rel];
-        } else {
-          existingIndex[rel] = e;
-        }
+/* =============================================================================
+   Sandpie — core contract / host API.
+   The single integration surface a module may touch. Dependencies flow ONE way:
+   modules depend on Sandpie; Sandpie never names a specific module. Optional
+   capabilities (e.g. cloud sync) are plugged in through a registry, so when a
+   module is absent its slot is simply empty and the calls degrade to no-ops —
+   the page boots and core chat works with any module removed.
+   ============================================================================= */
+const Sandpie = (() => {
+  // --- event bus -------------------------------------------------------------
+  const _bus = new Map(); // event name -> Set<callback>
+  const events = {
+    on(evt, cb) {
+      let s = _bus.get(evt);
+      if (!s) _bus.set(evt, s = new Set());
+      s.add(cb);
+      return () => events.off(evt, cb);
+    },
+    off(evt, cb) { _bus.get(evt)?.delete(cb); },
+    emit(evt, payload) {
+      for (const cb of (_bus.get(evt) || [])) {
+        try { cb(payload); } catch (e) { console.warn('[Sandpie] listener error for', evt, e); }
       }
-      setDbxCursor(result.cursor);
-      setCloudIndex(existingIndex);
-      return existingIndex;
-    } catch (err) {
-      console.warn('Cursor sync failed, falling back to full sync:', err.message);
-      setDbxCursor(null);
-    }
+    },
+  };
+
+  // --- sync provider registry (cloud sync is an optional capability) ---------
+  // A provider implements: { sync(), fileStatus(path, opfsMtime), getState(),
+  // initialSyncDone }. With no provider registered every call below is a no-op
+  // and the file browser falls back to a local-only view.
+  let _sync = null;
+  function registerSyncProvider(impl) {
+    _sync = impl;
+    events.emit('sync:provider-changed', impl);
+    return () => { if (_sync === impl) { _sync = null; events.emit('sync:provider-changed', null); } };
   }
-  const result = await dbxListFull('/', { recursive: true });
-  const out = {};
-  for (const e of result.entries) {
-    let rel = e.path.replace(/^\/+/, '');
-    if (!rel) continue;
-    const prefixes = ['files/', 'Apps/sandpie/', 'App/'];
-    for (const p of prefixes) {
-      if (rel.toLowerCase().startsWith(p.toLowerCase())) {
-        rel = rel.slice(p.length);
-        break;
-      }
-    }
-    if (e.kind !== 'deleted') {
-      out[rel] = e;
-    }
-  }
-  setDbxCursor(result.cursor);
-  setCloudIndex(out);
-  return out;
-}
-let _syncing = false;
+
+  return {
+    events,
+
+    // primitives the page owns and modules are allowed to use
+    $,
+    api,
+    addMsg,
+    setDot,
+    get opfs()   { return opfs; },
+    get menu()   { return SandpieMenu; },
+    get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
+    opfsMtime(path)        { return opfsLastModified(path); },
+    isGenerating()         { return anyStreamGenerating(); },
+    openFilePath()         { return _openFilePath; },
+    refreshFiles()         { return refreshFileList(); },
+    refreshConversations() { return refreshConversationList(); },
+
+    // sync capability
+    registerSyncProvider,
+    syncProvider() { return _sync; },
+    sync()         { return _sync?.sync?.(); },
+    fileSyncStatus(path, opfsMtime) { return _sync?.fileStatus?.(path, opfsMtime) ?? null; },
+    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : true; },
+  };
+})();
+window.Sandpie = Sandpie;
+
+/* Cloud sync (Dropbox transport glue, OAuth, sync state, cloud index, and the
+   sync engine) now lives in modules/cloud-sync.js, registered with the page via
+   Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
+   anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
+   facts the provider reads through the Sandpie host API. */
 let _openFilePath = null;
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
@@ -1127,254 +661,10 @@ async function opfsLastModified(path) {
     return 0;
   }
 }
-async function sync() {
-  if (!dbxTokens()) return;
-  if (_syncing) return;
-  if (anyStreamGenerating()) return;
-  _syncing = true;
-  setDbxBusy(true);
-  try {
-    dbxStatus('', 'connected');
-    const cloud = await cloudListAll();
-    const state = syncState();
-    let baselined = 0;
-
-    for (const path of Object.keys(state)) {
-      if (cloud[path]) continue;
-      const s = state[path];
-      const lm = await opfsLastModified(path);
-      if (lm > 0 && lm > s.syncedMtime) continue;
-      try { await opfs.remove(path); } catch {}
-      delete state[path];
-
-    }
-
-    for (const [path, e] of Object.entries(cloud)) {
-      if (e.kind !== 'file') continue;
-      const s = state[path];
-      const localExists = await opfs.exists(path);
-      if (!s) {
-        if (localExists) {
-          state[path] = {
-            rev: e.rev, size: e.size,
-            syncedMtime: await opfsLastModified(path),
-          };
-          baselined++;
-        } else {
-          dbxProgress(`downloading… ${path}`);
-          const content = await dbxDownload(e.path);
-          await opfs.write(path, content);
-          state[path] = {
-            rev: e.rev, size: e.size,
-            syncedMtime: await opfsLastModified(path),
-          };
-        }
-        continue;
-      }
-      const cloudChanged = s.rev !== e.rev;
-      const localDirty = localExists && (await opfsLastModified(path)) > s.syncedMtime;
-      if (path === _openFilePath) continue;
-      if (cloudChanged && localDirty) continue;
-      if (cloudChanged) {
-        dbxProgress(`downloading… ${path}`);
-        const content = await dbxDownload(e.path);
-        await opfs.write(path, content);
-        state[path] = {
-          rev: e.rev, size: e.size,
-          syncedMtime: await opfsLastModified(path),
-        };
-        continue;
-      }
-
-      if (!localExists) {
-        dbxProgress(`downloading… ${path}`);
-        const content = await dbxDownload(e.path);
-        await opfs.write(path, content);
-        state[path].syncedMtime = await opfsLastModified(path);
-      }
-      state[path].size = e.size;
-    }
-
-    let opfsRels = [];
-    try { opfsRels = await opfs.list(); } catch {}
-    const dirty = [];
-    for (const rel of opfsRels) {
-      if (rel === _openFilePath) continue;
-      const lm = await opfsLastModified(rel);
-      const s = state[rel];
-      if (s && lm <= s.syncedMtime) {
-        console.log('[sandpie] sync skip (clean):', rel);
-        continue;
-      }
-      console.log('[sandpie] sync dirty:', rel, 'lm=', lm, 'synced=', s?.syncedMtime);
-      dirty.push({ rel, lm, s });
-    }
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
-      const chunk = dirty.slice(i, i + BATCH_SIZE);
-      dbxProgress(`uploading…(${i + chunk.length}/${dirty.length})`);
-      const files = await Promise.all(chunk.map(async ({ rel, s, lm }) => {
-        const content = await opfs.readBytes(rel);
-        return { rel, content, s, lm };
-      }));
-      try {
-        const results = await dbxUploadBatch(files);
-        for (const r of results) {
-          if (r.meta && r.meta['.tag'] === 'success') {
-            state[r.rel] = {
-              rev: r.meta.rev || (r.s && r.s.rev) || '',
-              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
-              syncedMtime: r.lm,
-            };
-
-          } else {
-            console.warn('batch item failed:', r.rel, r.meta);
-          }
-        }
-      } catch (err) {
-        console.warn('batch upload failed:', err);
-      }
-    }
-    setSyncState(state);
-    await pruneOrphanDirs(cloud);
-    dbxProgress('');
-    await refreshFileList();
-    await refreshConversationList();
-  } catch (e) {
-    dbxProgress('');
-    dbxStatus('Sync failed: ' + e.message, 'error');
-    console.warn('sync:', e);
-  } finally {
-    dbxProgress('');
-    initialSyncDone = true;
-    setDbxBusy(false);
-    _syncing = false;
-  }
-}
-setInterval(() => { if (!document.hidden) sync(); }, 60000);
 function joinPath(folder, name) {
   if (folder === '/' || folder === '') return '/' + name;
   return folder.replace(/\/$/, '') + '/' + name;
 }
-async function manualResync() {
-  if (!dbxTokens()) {
-    dbxStatus('Not connected', 'disconnected');
-    return;
-  }
-  const btn = $('dbxResyncBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
-  try {
-    await sync();
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Resync'; }
-  }
-}
-(async () => {
-  const params = new URLSearchParams(location.search);
-  const code = params.get('code');
-  if (code) {
-    try {
-      await dbxExchangeCode(code);
-      history.replaceState({}, '', location.pathname);
-      dbxStatus('', 'connected');
-      await sync();
-    } catch (e) {
-      dbxStatus('Auth failed: ' + e.message, 'error');
-    }
-  } else if (dbxTokens()) {
-    dbxStatus('', 'connected');
-    await sync();
-  }
-})();
-const tools = {
-  run_python: {
-    description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
-REQUIRED: path must point to a script already saved in OPFS (typically under scripts/). Use write_file to create a script first, then call run_python with its path.
-ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
-ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it freezes the whole app) — use await asyncio.sleep(n).
-PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
-HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
-OUTPUT: write to artifacts/, then call show_artifact({"path":"artifacts/file.html"}).
-Examples:
-  run      → {path: "scripts/random_numbers.py", args: ["5"]}
-  with arg → {path: "scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
-  async    → script ends with await main()  (NOT asyncio.run(main()))
-  pypi     → script runs: import micropip; await micropip.install('feedparser')
-  html out → script writes artifacts/out.html, then show_artifact({"path":"artifacts/out.html"})`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
-        args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
-      },
-      required: ['path'],
-    },
-  },
-  write_file: {
-  description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
-  parameters: {
-    type: 'object',
-    properties: {
-      path:    { type: 'string', description: 'OPFS path relative to /files/' },
-      content: { type: 'string', description: 'Full file content' },
-    },
-    required: ['path', 'content'],
-  },
-},
-edit_file: {
-  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
-  parameters: {
-    type: 'object',
-    properties: {
-      path:    { type: 'string', description: 'OPFS path relative to /files/' },
-      old_str: { type: 'string', description: 'Exact string to replace. Must match exactly once.' },
-      new_str: { type: 'string', description: 'Replacement string. Omit to delete old_str.' },
-    },
-    required: ['path', 'old_str'],
-  },
-},
-  show_artifact: {
-    description: `Render a file from OPFS as a live artifact injected directly into the chat.
-Use this whenever:
-- The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
-- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
-The file must already exist in OPFS — write it first with run_python, then call this.
-Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
-Path is OPFS-relative — do NOT include a leading slash (e.g. "artifacts/chart.html").
-Default output folder is artifacts/ — use it unless the user specifies a different path.
-Typical flow:
-  run_python: open('artifacts/chart.html', 'w').write(html)
-  show_artifact: { "path": "artifacts/chart.html" }`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'OPFS path to the file (e.g. "artifacts/chart.html"). No leading slash. Default folder: artifacts/.' },
-      },
-      required: ['path'],
-    },
-  },
-        load_image: {
-      description: `Load an image file from OPFS into the conversation so you can see its pixel content.
-WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
-WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
-Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path to image file relative to /files/ (e.g. "beach.jpg" or "images/photo.png")' },
-        },
-        required: ['path'],
-      },
-    },
-};
-const toolDefs = () => Object.entries(tools)
-  .filter(([name]) => {
-    return true;
-  })
-  .map(([name, t]) => ({
-    type: 'function',
-    function: { name, description: t.description, parameters: t.parameters },
-  }));
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -1404,13 +694,13 @@ async function getFileSize(path) {
     return (await handle.getFile()).size;
   } catch {}
 
-  const s = syncState()[path];
+  const s = (Sandpie.syncProvider()?.getState?.() || {})[path];
   return s && s.size || 0;
 }
 async function getFolderSize(path) {
   const prefix = path ? path.toLowerCase() + '/' : '';
   let total = 0;
-  const state = syncState();
+  const state = Sandpie.syncProvider()?.getState?.() || {};
 
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
@@ -1451,7 +741,7 @@ async function refreshFileList() {
   const localMap = new Map();
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
-  const state = syncState();
+  const state = Sandpie.syncProvider()?.getState?.() || {};
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
   for (const k of Object.keys(state)) {
@@ -1472,7 +762,7 @@ async function refreshFileList() {
   if (!names.size) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = initialSyncDone ? '(empty)' : 'Loading…';
+    li.textContent = Sandpie.initialSyncDone() ? '(empty)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
     return;
@@ -1534,24 +824,13 @@ async function refreshFileList() {
 
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => {
-          const a = document.createElement('a');
-          a.href = 'opfs/' + it.fullKey;
-          a.target = '_blank';
-          a.download = it.name || it.fullKey.split('/').pop();
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }});
+        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
       }
 
       menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
           await opfs.remove(it.fullKey);
-          try { await dbxDelete('/' + it.fullKey); } catch (_) {}
-          const state = syncState();
-          if (state[it.fullKey]) delete state[it.fullKey];
-          setSyncState(state);
+          Sandpie.events.emit('file:deleted', it.fullKey);
           await refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
       }});
@@ -2046,13 +1325,6 @@ sidePanel = new SidePanel();
     if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
   });
 })();
-function saveConfig() {
-  // Provider config is managed by modules/providers.js
-  // This function only saves non-provider (Dropbox) config
-  localStorage.setItem('opencode-config', JSON.stringify({
-    dbxAppKey: $('dbxAppKey').value,
-  }));
-}
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
@@ -2232,6 +1504,7 @@ function onBubbleContextMenu(e) {
   e.preventDefault();
   e.stopPropagation();
   _bubbleMenuTarget = e.currentTarget;
+  updateThoughtsMenuLabel();
   $('bubbleToggleToolsItem').textContent = toolsMinimized ? 'Show tool calls' : 'Hide tool calls';
   const menu = $('bubbleContextMenu');
   menu.style.display = '';
@@ -2281,6 +1554,26 @@ function toggleToolsMinimizedFromMenu() {
   applyToolsMinimized();
   hideBubbleMenu();
 }
+
+  // Toggle all thoughts via context menu
+  var thoughtsVisible = true;
+  function toggleThoughtsFromMenu() {
+    thoughtsVisible = !thoughtsVisible;
+    var el = document.getElementById('bubbleToggleThoughtsItem');
+    if (el) el.textContent = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
+    document.querySelectorAll('.msg.think').forEach(function(t) {
+      t[thoughtsVisible ? 'removeAttribute' : 'setAttribute']('data-collapsed', '');
+    });
+  }
+  function updateThoughtsMenuLabel() {
+    var el = document.getElementById('bubbleToggleThoughtsItem');
+    if (!el) return;
+    var total = document.querySelectorAll('.msg.think').length;
+    if (!total) { el.textContent = 'Show thoughts'; thoughtsVisible = true; return; }
+    var open = document.querySelectorAll('.msg.think:not([data-collapsed])').length;
+    el.textContent = (open === total) ? 'Hide thoughts' : 'Show thoughts';
+    thoughtsVisible = (open === total);
+  }
 async function copyFromMenu() {
   const target = _bubbleMenuTarget;
   hideBubbleMenu();
@@ -2971,18 +2264,11 @@ async function duplicateConv(id, title) {
   await refreshConversationList();
 }
 async function deleteConv(id, title) {
-  const dbxNote = dbxTokens() ? ' This will also remove the Dropbox copy.' : '';
+  const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
   const path = convPath(id);
   try { await opfs.remove(path); } catch {}
-
-  if (dbxTokens()) {
-    try { await dbxDelete('/' + path); } catch {}
-  }
-  const lk = path.toLowerCase();
-  const sync = syncState(); let sChanged = false;
-  for (const k of Object.keys(sync)) if (k.toLowerCase() === lk) { delete sync[k]; sChanged = true; }
-  if (sChanged) setSyncState(sync);
+  Sandpie.events.emit('file:deleted', path);
 
   const stream = convStreams.get(id);
   if (stream) {
@@ -3108,7 +2394,7 @@ async function refreshConversationList() {
   if (!list.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = initialSyncDone ? '(no chats yet)' : 'Loading…';
+    li.textContent = Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
     return;
@@ -3357,7 +2643,7 @@ async function sendSingle(text, stream) {
     await saveConv(convId);
 
     if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
-    try { await sync(); } catch (e) { console.warn('sync failed:', e); }
+    try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
 async function buildAgentConfig(convMessages) {
