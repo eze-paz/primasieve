@@ -638,7 +638,6 @@ async function pruneOrphanDirs(cloud) {
   }
   return pruned;
 }
-  
 const DBX_REDIRECT = location.origin + location.pathname;
 function dbxStatus(text, kind) {
   setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
@@ -647,6 +646,8 @@ function dbxStatus(text, kind) {
   if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
 }
 
+  // No-op: busy state shown via setDbxBusy, text updates removed per UX request
+}
 let dbxBusyCount = 0;
 function setDbxBusy(busy) {
   dbxBusyCount = Math.max(0, dbxBusyCount + (busy ? 1 : -1));
@@ -1217,11 +1218,10 @@ async function refreshFileList() {
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
 
       if (it.kind === 'file') {
-        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
+        menuItems.push({ label: 'Open in new tab', action: () => window.open('./opfs/' + it.fullKey, '_blank') });
         menuItems.push({ label: 'Download', action: () => {
           const a = document.createElement('a');
-          a.href = 'opfs/' + it.fullKey;
-          a.target = '_blank';
+          a.href = './opfs/' + it.fullKey;
           a.download = it.name || it.fullKey.split('/').pop();
           document.body.appendChild(a);
           a.click();
