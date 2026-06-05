@@ -158,7 +158,7 @@ async function swOpfsDelete(relPath, isDir) {
 
 
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-const SW_VERSION = '1.6.3';
+const SW_VERSION = '1.6.4-opfs-removed';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -440,15 +440,27 @@ async function tool_run_python({ path, args }, ctx) {
       const afterFiles = new Set();
       const afterDirs = new Set();
       try { swFsSnapshot(afterFiles, afterDirs, '/files'); } catch (_) {}
+      const removedPaths = [];
       for (const rel of beforeFiles) {
         if (!afterFiles.has(rel)) {
           try { await swOpfsDelete(rel, false); } catch (_) {}
+          removedPaths.push(rel);
         }
       }
       for (const rel of [...beforeDirs].sort((a, b) => b.length - a.length)) {
         if (!afterDirs.has(rel)) {
           try { await swOpfsDelete(rel, true); } catch (_) {}
+          removedPaths.push(rel);
         }
+      }
+      // Notify the page so it can update syncState / Dropbox.
+      if (removedPaths.length) {
+        self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+          .then(clients => {
+            for (const c of clients) {
+              try { c.postMessage({ type: 'sw-opfs-removed', paths: removedPaths }); } catch (_) {}
+            }
+          }).catch(() => {});
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
