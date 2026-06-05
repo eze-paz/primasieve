@@ -150,7 +150,22 @@ const SandpieNotifications = (function() {
   // INIT
   // ============================================================
 
+  // Decoupling: the page announces completion via the Sandpie event bus instead
+  // of calling us directly, so this module is an optional LISTENER — absent
+  // module ⇒ no subscriber ⇒ the page's emit is a silent no-op. Idempotent and
+  // guarded so it's safe on pages without a Sandpie host. notifyComplete stays
+  // exported for sandpie.html / variants that still invoke it directly.
+  let _wired = false;
+  function wireEvents() {
+    if (_wired || !(window.Sandpie && window.Sandpie.events)) return;
+    _wired = true;
+    Sandpie.events.on('generation:complete', (p) => {
+      if (p && !p.aborted) notifyComplete(p.convId);
+    });
+  }
+
   function init() {
+    wireEvents();
     if (typeof SandpieMenu === 'undefined') {
       console.warn('Notifications module: SandpieMenu not found, retrying in 500ms...');
       setTimeout(init, 500);

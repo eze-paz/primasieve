@@ -2641,7 +2641,10 @@ async function sendSingle(text, stream) {
     setStreamSending(stream, false);
     await saveConv(convId);
 
-    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
+    // Optional capability: notifications.js (if loaded) listens for this and
+    // fires a system toast. No listener ⇒ no-op. saveConv ran first so the
+    // listener can read the canonical (possibly renamed) conv title.
+    Sandpie.events.emit('generation:complete', { convId, aborted: wasAborted });
     try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
