@@ -15,7 +15,6 @@
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/dropbox.js"></script>
-  <script src="modules/cloud-sync.js"></script>
   <script src="modules/images.js"></script>
   <script src="modules/notifications.js"></script>
   <script src="modules/tools.js"></script>
@@ -316,7 +315,7 @@ if ('serviceWorker' in navigator) {
       return;
     }
     // OPFS-change branches (opfs-deleted-by-python / sw-opfs-changed) live in
-    // modules/cloud-sync.js, which registers its own SW message listener.
+    // modules/dropbox.js (cloud sync engine), which registers its own SW message listener.
     });
 
   const flush = () => {
@@ -638,7 +637,7 @@ const Sandpie = (() => {
 window.Sandpie = Sandpie;
 
 /* Cloud sync (Dropbox transport glue, OAuth, sync state, cloud index, and the
-   sync engine) now lives in modules/cloud-sync.js, registered with the page via
+   sync engine) now lives in modules/dropbox.js, registered with the page via
    Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
    anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
    facts the provider reads through the Sandpie host API. */
