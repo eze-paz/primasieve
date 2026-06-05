@@ -446,10 +446,41 @@ function truncateToolResult(result) {
   return text + "\n\n[truncated: tool result exceeded 30kB]";
 }
 
+// ── script-usage tracker ─────────────────────────────────────────
+// Accumulates {path: {count, firstUsed, lastUsed}} in OPFS root.
+async function trackScriptRun(scriptPath, success, stderr) {
+  try {
+    const key = 'script_usage_index.json';
+    const root = await navigator.storage.getDirectory();
+    let data = {};
+    try {
+      const fh = await root.getFileHandle(key);
+      const file = await fh.getFile();
+      data = JSON.parse(await file.text());
+    } catch (_) {}
+    if (!data[scriptPath]) {
+      data[scriptPath] = { count: 0, errors: 0, firstUsed: Date.now() };
+    }
+    data[scriptPath].count += 1;
+    data[scriptPath].lastUsed = Date.now();
+    if (!success) {
+      data[scriptPath].errors += 1;
+      data[scriptPath].lastError = (stderr || '').trim().slice(0, 500);
+    }
+    const fh = await root.getFileHandle(key, { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(data, null, 2));
+    await w.close();
+  } catch (e) {
+    console.warn('[sandpie-sw] usage tracking failed:', e);
+  }
+}
+
 async function tool_run_python({ path, args }, ctx) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
   const normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+
   let code;
   try {
     code = new TextDecoder().decode(await opfsReadBytes(normPath));
@@ -504,6 +535,7 @@ async function tool_run_python({ path, args }, ctx) {
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
+      trackScriptRun(normPath, true, stderr);
       return { result: out || '(no output)' };
     } catch (e) {
       let msg = '';
@@ -520,12 +552,14 @@ async function tool_run_python({ path, args }, ctx) {
       // interpreter instead of repeatedly failing in the wedged one.
       if (isPyodideFatal(e, msg, stderr)) {
         resetPyodide(msg || stderr.trim() || 'empty exception');
+        trackScriptRun(normPath, false, stderr);
         return {
           result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.'
             + (msg ? '\n--- crash signal ---\n' + msg : '')
             + tail,
         };
       }
+      trackScriptRun(normPath, false, stderr);
       return { result: 'Error: ' + (msg || 'unknown (no message)') + tail };
     } finally {
       _capActive = false;
