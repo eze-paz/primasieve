@@ -600,11 +600,12 @@ async function tool_load_image({ path }, ctx) {
 }
 
 async function runTool(name, args, ctx) {
+  const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
-    case 'run_python':    return tool_run_python(args, ctx);
+    case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
-    case 'write_file':    return tool_write_file(args, ctx);   // ← add
+    case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);   // ← add
     case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
     default:              return { result: 'Error: unknown tool ' + name };
   }
@@ -832,6 +833,8 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
 // Agent loop: stream → check for tool_calls → run them → repeat.
 // ============================================================
 async function runAgent(config, ctx) {
+  const convFileName = config.conversation_file_name || 'unknown';
+  ctx._conversation_file_name = convFileName;
   const messages = config.messages.slice();
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
@@ -1085,7 +1088,7 @@ function jsonErr(status, message) {
   });
 }
 
-async function tool_write_file({ path, content }) {
+async function tool_write_file({ path, content, _conv }) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
 
@@ -1132,6 +1135,22 @@ async function tool_write_file({ path, content }) {
         catch (e) { console.warn('[sandpie-sw] syncfs after write_file failed:', e); resolve(); }
       }));
     }
+    // Track provenance: which conversation created this file
+    try {
+      const root = await navigator.storage.getDirectory();
+      let fh;
+      try { fh = await root.getFileHandle('conv2file_index.json'); }
+      catch (_) { fh = await root.getFileHandle('conv2file_index.json', { create: true }); }
+      const writable = await fh.createWritable({ keepExistingData: true });
+      let map = {};
+      try { map = JSON.parse(await (await fh.getFile()).text()); } catch (_) {}
+      if (!map[norm]) map[norm] = { conversations: [], count: 0 };
+      if (_conv && !map[norm].conversations.includes(_conv)) map[norm].conversations.push(_conv);
+      map[norm].count++;
+      await writable.write(JSON.stringify(map, null, 2));
+      await writable.close();
+    } catch (_) {}
+
     return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
 }
