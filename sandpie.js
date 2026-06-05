@@ -122,8 +122,43 @@ function _swRmTree(full) {
   try { py.FS.rmdir(full); } catch (_) {}
 }
 
+function swFsSnapshot(filesSet, dirsSet, fullPath) {
+  let entries = [];
+  try { entries = py.FS.readdir(fullPath); } catch (_) { return; }
+  for (const name of entries) {
+    if (name === '.' || name === '..') continue;
+    const child = fullPath + '/' + name;
+    try {
+      const st = py.FS.stat(child);
+      const rel = child.replace(/^\/files\//, '');
+      if (py.FS.isDir(st.mode)) {
+        dirsSet.add(rel);
+        swFsSnapshot(filesSet, dirsSet, child);
+      } else {
+        filesSet.add(rel);
+      }
+    } catch (_) {}
+  }
+}
+
+async function swOpfsDelete(relPath, isDir) {
+  const parts = String(relPath).split('/').filter(Boolean);
+  const name = parts.pop();
+  if (!name) return;
+  try {
+    const dir = await opfsResolveDir(parts);
+    await dir.removeEntry(name, { recursive: !!isDir });
+    console.log('[sandpie-sw] deleted from OPFS:', relPath);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      console.warn('[sandpie-sw] failed to delete from OPFS:', relPath, e);
+    }
+  }
+}
+
+
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-const SW_VERSION = '1.6.0';
+const SW_VERSION = '1.6.1-OPFS-deletions';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -386,14 +421,34 @@ async function tool_run_python({ path, args }, ctx) {
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
       }
 
+      // Snapshot MEMFS tree before run so we can detect deletions Python makes.
+      const beforeFiles = new Set();
+      const beforeDirs = new Set();
+      try { swFsSnapshot(beforeFiles, beforeDirs, '/files'); } catch (_) {}
+
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       await p.runPythonAsync(code);
-      // Flush any writes Python made into /files back to OPFS. No-op when
-      // Python didn't touch the FS. Skipped (with a warning) if the mount
-      // failed at init — Python had no /files to write to, nothing to flush.
+
+      // Flush writes from MEMFS to OPFS. syncfs pushes new/modified files
+      // but does NOT propagate deletions from MEMFS; we handle that below.
       if (_nativefs) {
         try { await _nativefs.syncfs(); }
         catch (e) { console.warn('[sandpie-sw] syncfs after run_python failed:', e); }
+      }
+
+      // Detect what Python deleted and propagate those deletions to OPFS.
+      const afterFiles = new Set();
+      const afterDirs = new Set();
+      try { swFsSnapshot(afterFiles, afterDirs, '/files'); } catch (_) {}
+      for (const rel of beforeFiles) {
+        if (!afterFiles.has(rel)) {
+          try { await swOpfsDelete(rel, false); } catch (_) {}
+        }
+      }
+      for (const rel of [...beforeDirs].sort((a, b) => b.length - a.length)) {
+        if (!afterDirs.has(rel)) {
+          try { await swOpfsDelete(rel, true); } catch (_) {}
+        }
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
