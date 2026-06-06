@@ -1125,13 +1125,16 @@
     color: var(--sp-text-dim);
     margin-top: 0.6rem;
     letter-spacing: 0.04em;
-    min-width: 18ch;
+    width: 100%;
+    text-align: center;
   }
   .welcome-rotating span {
     position: absolute;
-    left: 50%;
+    left: 0;
     top: 0;
-    transform: translateX(-50%) translateY(6px);
+    width: 100%;
+    text-align: center;
+    transform: translateY(6px);
     opacity: 0;
     white-space: nowrap;
     animation: welcome-tag-cycle 20s ease-in-out infinite;
@@ -1145,11 +1148,11 @@
     to   { opacity: 1; }
   }
   @keyframes welcome-tag-cycle {
-    0%    { opacity: 0; transform: translateX(-50%) translateY(6px); }
-    2.5%  { opacity: 1; transform: translateX(-50%) translateY(0); }
-    22.5% { opacity: 1; transform: translateX(-50%) translateY(0); }
-    25%   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-    100%  { opacity: 0; transform: translateX(-50%) translateY(6px); }
+    0%    { opacity: 0; transform: translateY(6px); }
+    2.5%  { opacity: 1; transform: translateY(0); }
+    22.5% { opacity: 1; transform: translateY(0); }
+    25%   { opacity: 0; transform: translateY(-6px); }
+    100%  { opacity: 0; transform: translateY(6px); }
   }
   @keyframes chromaShiftWelcome {
     0%        { opacity: 0;   transform: translateX(0); }
@@ -1167,7 +1170,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .welcome-rotating span { animation: none; }
-    .welcome-rotating span:nth-child(1) { opacity: 1; transform: translateX(-50%); }
+    .welcome-rotating span:nth-child(1) { opacity: 1; transform: none; }
   }
 
   /* Streamed reasoning ("thinking") box */
