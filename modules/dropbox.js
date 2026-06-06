@@ -383,6 +383,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   })();
 
+  // ---- sidebar progress helper -----------------------------------------------
+  // Shows a mini progress bar inside the conversations list while the first sync
+  // is downloading. Replaces the "(no chats yet)" / "Loading…" placeholder.
+  function _updateConvProgress(done, total) {
+    const ul = document.getElementById('convList');
+    if (!ul) return;
+    if (!total) {
+      // Remove our progress placeholder if it is still the only child.
+      const only = ul.querySelector(':scope > li[data-sync-progress]');
+      if (only && ul.children.length === 1) only.remove();
+      return;
+    }
+    const pct = Math.min(100, Math.round((done / total) * 100));
+    let li = ul.querySelector(':scope > li[data-sync-progress]');
+    if (!li) {
+      li = document.createElement('li');
+      li.className = 'empty';
+      li.dataset.syncProgress = '1';
+      li.style.cssText = 'flex-direction:column;align-items:stretch;padding:0.5rem;gap:0.25rem;font-style:normal;';
+      ul.replaceChildren(li);
+    }
+    li.innerHTML = `
+      <span style="font-size:0.75rem;color:var(--sp-text-dim);">Syncing…</span>
+      <span style="font-size:0.65rem;color:var(--sp-text-dim);">${done} / ${total}</span>
+      <div style="width:100%;height:3px;background:var(--sp-border);border-radius:2px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:var(--sp-accent);border-radius:2px;transition:width 0.15s;"></div>
+      </div>
+    `;
+  }
+
   // ---- status dot / busy indicator ------------------------------------------
   function dbxStatus(text, kind) {
     Sandpie.setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
@@ -572,13 +602,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Bounded-parallel per-file download. Failures are logged and omitted (left for
   // the next sync), matching the resilience of the old serial loop.
-  async function bulkParallelDownload(items) {
+  async function bulkParallelDownload(items, onProgress) {
     const out = new Map();
     let idx = 0;
     async function worker() {
       while (idx < items.length) {
         const it = items[idx++];
-        try { out.set(it.rel, await dbxDownload(it.cloudPath)); }
+        try {
+          out.set(it.rel, await dbxDownload(it.cloudPath));
+          if (onProgress) onProgress(out.size, items.length);
+        }
         catch (err) { console.warn('[sync] download failed:', it.rel, err); }
       }
     }
@@ -590,9 +623,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Fetch every file in `items` through the parallel pool, then write to OPFS and
   // advance sync state. Files that fail this round are simply retried next sync.
   //   item = { rel, cloudPath, e, mode: 'full' | 'mtimeOnly' }
-  async function bulkDownload(items, state, opfs) {
+  async function bulkDownload(items, state, opfs, onProgress) {
     if (!items.length) return;
-    const contents = await bulkParallelDownload(items);
+    const contents = await bulkParallelDownload(items, onProgress);
     for (const it of items) {
       const content = contents.get(it.rel);
       if (!content) continue;                          // failed this round; retried next sync
@@ -684,7 +717,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         state[path].size = e.size;
       }
-      await bulkDownload(toDownload, state, opfs);
+      if (firstSync && toDownload.length) _updateConvProgress(0, toDownload.length);
+      await bulkDownload(toDownload, state, opfs, (done, total) => {
+        if (firstSync) _updateConvProgress(done, total);
+      });
 
       // Push: collect dirty files. Fast path = files an event marked dirty
       // (syncedMtime === 0) — no per-file OPFS walk. Safety-net full scan walks
@@ -752,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function() {
       console.warn('sync:', e);
     } finally {
       initialSyncDone = true;
+      _updateConvProgress(0, 0);
       setDbxBusy(false);
       _syncing = false;
     }
