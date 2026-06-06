@@ -690,6 +690,35 @@ const opfs = {
 };
 
 /* =============================================================================
+   Resume-on-refresh — flight checkpointing
+   ============================================================================= */
+const SP_FLIGHT_KEY = (id) => 'sp-flight-' + id;
+function flightWrite(id, text) {
+  try { localStorage.setItem(SP_FLIGHT_KEY(id), JSON.stringify({t: Date.now(), text})); } catch(_) {}
+}
+function flightRead(id) {
+  try { const v = localStorage.getItem(SP_FLIGHT_KEY(id)); return v ? JSON.parse(v) : null; } catch(_) { return null; }
+}
+function flightClear(id) { try { localStorage.removeItem(SP_FLIGHT_KEY(id)); } catch(_) {} }
+async function maybeResumeFlight(id) {
+  if (!id) return;
+  const ck = flightRead(id);
+  if (!ck) return;
+  if (Date.now() - ck.t > 5 * 60 * 1000) { flightClear(id); return; }
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); } catch { flightClear(id); return; }
+  const s = ensureStream(id);
+  s.messages = (data.messages || []).slice();
+  if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
+    flightClear(id); return;
+  }
+  mountConv(id);
+  for (const m of s.messages) renderHistoricalMessage(m);
+  addMsg('info', 'Resuming generation…', s.host);
+  sendSingle(ck.text, s, { resume: true });
+}
+
+/* =============================================================================
    Sandpie — core contract / host API.
    The single integration surface a module may touch. Dependencies flow ONE way:
    modules depend on Sandpie; Sandpie never names a specific module. Optional
@@ -2679,7 +2708,7 @@ let _swReady = (async () => {
   return reg;
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
-async function sendSingle(text, stream) {
+async function sendSingle(text, stream, opts = {}) {
 
   if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
     addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
@@ -2687,14 +2716,17 @@ async function sendSingle(text, stream) {
   }
   const { id: convId, messages: convMessages, host } = stream;
 
-  const userMsg = { role: 'user', content: text };
-  convMessages.push(userMsg);
-  bindBubble(addMsg('user', text, host), userMsg);
-  saveConv(convId).catch(() => {});
+  let wasAborted = false;
+  if (!opts?.resume) {
+    const userMsg = { role: 'user', content: text };
+    convMessages.push(userMsg);
+    bindBubble(addMsg('user', text, host), userMsg);
+    saveConv(convId).catch(() => {});
+  }
   requestWakeLock();
   setStreamSending(stream, true);
   startTotalTimer(stream);
-  let wasAborted = false;
+  flightWrite(convId, text);
 
   const config = await buildAgentConfig(convMessages);
 
@@ -2763,6 +2795,7 @@ async function sendSingle(text, stream) {
 
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
+    flightClear(convId);
 
     renderer.finalize();
 
@@ -2939,6 +2972,8 @@ function _bootSandpie() {
   // applySavedCustom() restores saved theme from localStorage.
   // If DOMPurify hasn't loaded yet, that's fine — theme can still apply.
   applySavedCustom();
+  // Resume any in-flight generation after a tab refresh.
+  setTimeout(() => { if (activeConvId) maybeResumeFlight(activeConvId); }, 300);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _bootSandpie);
