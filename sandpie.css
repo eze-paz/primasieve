@@ -1694,21 +1694,8 @@
 [data-theme="aurora"] ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
 
 [data-theme="electric"] {
-  --sp-bg: var(--sp-bg);
-  --sp-surface: var(--sp-surface);
-  --sp-border: var(--sp-border);
-  --sp-border-bright: var(--sp-border-bright);
-  --sp-panel: var(--sp-panel);
-  --sp-accent: var(--sp-accent);
-  --sp-accent-dim: rgba(255,59,92,0.15);
-  --sp-text: var(--sp-text);
-  --sp-text-dim: var(--sp-text-dim);
-  --sp-success: var(--sp-success);
-  --sp-danger: var(--sp-danger);
-  --sp-warn: #ffc400;
-
   --sp-accent-2: #ffcc00;
-  --sp-elb-ffffff: #ffffff;}
+}
 [data-theme="electric"] body {
   background: var(--sp-bg); color: var(--sp-text);
   font: 14px 'Space Grotesk', -apple-system, system-ui, sans-serif;
@@ -1717,8 +1704,8 @@
   content: '';
   position: fixed; inset: 0;
   background-image:
-    linear-gradient(rgba(255,59,92,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,59,92,0.03) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--sp-accent) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--sp-accent) 3%, transparent) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none; z-index: 0;
 }
@@ -1746,7 +1733,7 @@
   font-size: 1rem; font-weight: 700;
 }
 [data-theme="electric"] .sidebar-collapse-btn:hover {
-  background: var(--sp-accent); border-color: var(--sp-accent); color: #ffffff;
+  background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
   transform: rotate(-90deg);
 }
 [data-theme="electric"] aside details.service summary {
@@ -1763,14 +1750,14 @@
   width: 1em; text-align: center;
 }
 [data-theme="electric"] aside details.service[open] summary {
-  color: #ffffff;
+  color: var(--sp-bg);
   background: var(--sp-accent);
   border-color: var(--sp-accent);
-  box-shadow: 0 2px 8px rgba(255,59,92,0.25);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 25%, transparent);
 }
 [data-theme="electric"] aside details.service[open] summary::before {
   content: '\2212';
-  color: #ffffff;
+  color: var(--sp-bg);
   transform: scale(1.1);
 }
 [data-theme="electric"] aside details.service summary:hover {
@@ -1788,12 +1775,12 @@
 }
 [data-theme="electric"] aside input:focus {
   border-color: var(--sp-accent);
-  box-shadow: 0 0 0 4px var(--sp-elb-rgba255-59-92-008);
+  box-shadow: 0 0 0 4px var(--sp-accent-dim);
 }
 [data-theme="electric"] aside button {
   background: var(--sp-accent);
   border: 2px solid var(--sp-accent);
-  color: #ffffff;
+  color: var(--sp-bg);
   font-weight: 700;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -1813,7 +1800,7 @@
   border: 2px solid var(--sp-border);
 }
 [data-theme="electric"] aside button.ghost:hover {
-  background: var(--sp-elb-rgba255-59-92-008);
+  background: var(--sp-accent-dim);
   border-color: var(--sp-accent);
   color: var(--sp-accent);
 }
@@ -1861,10 +1848,10 @@
 [data-theme="electric"] ul.conv-list li.active {
   background: var(--sp-bg);
   border-color: var(--sp-accent);
-  box-shadow: 0 2px 8px rgba(255,59,92,0.15);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 15%, transparent);
   color: var(--sp-accent);
 }
-[data-theme="electric"] main { background: #0a0a0a; }
+[data-theme="electric"] main { background: var(--sp-bg); }
 [data-theme="electric"] .welcome-title {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -1905,11 +1892,11 @@
   --sp-elb-0a0a0a: var(--sp-bg);
   --sp-elb-1e1e1e: var(--sp-panel);
   --sp-elb-141414: var(--sp-surface);
-  --sp-elb-fff: #ffffff;
+  --sp-elb-fff: var(--sp-bg);
   --sp-elb-888: var(--sp-text-dim);
   --sp-elb-2a2a2a: var(--sp-border);
   --sp-elb-ffcc00: var(--sp-accent-2);
-  --sp-elb-rgba255-59-92-008: var(--sp-elb-rgba255-59-92-008);
+  --sp-elb-rgba255-59-92-008: var(--sp-accent-dim);
   --sp-elb-555: var(--sp-text-dim);
   --sp-elb-00e676: var(--sp-success);
   --sp-elb-ff1744: var(--sp-danger);
@@ -1965,7 +1952,7 @@
 }
 [data-theme="electric"] .input-wrap:focus-within {
   border-color: var(--sp-accent);
-  box-shadow: 0 0 0 4px var(--sp-elb-rgba255-59-92-008), inset 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 0 0 4px var(--sp-accent-dim), inset 0 2px 4px rgba(0,0,0,0.1);
 }
 [data-theme="electric"] .input-wrap textarea { color: var(--sp-text); font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
 [data-theme="electric"] .input-bar { min-height: 34px; }
@@ -1983,7 +1970,7 @@
   background: var(--sp-accent) !important;
   border: 2px solid var(--sp-accent) !important;
   border-radius: 10px;
-  color: #ffffff !important;
+  color: var(--sp-bg) !important;
   font-weight: 700 !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
@@ -1998,10 +1985,10 @@
 [data-theme="electric"] .send-btn:active { transform: scale(0.85); transition: transform 0.06s ease-out; }
 [data-theme="electric"] .send-btn.sending {
   background: linear-gradient(135deg, var(--sp-accent-2), var(--sp-accent)) !important;
-  box-shadow: 0 2px 8px rgba(255,59,92,0.35) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 35%, transparent) !important;
 }
 [data-theme="electric"] .send-btn.sending:hover {
-  box-shadow: 0 4px 14px rgba(255,59,92,0.45) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--sp-accent) 45%, transparent) !important;
   text-shadow: none !important;
 }
 [data-theme="electric"] .ctx-menu { background: var(--sp-surface); border-color: var(--sp-border); }
