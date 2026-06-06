@@ -141,7 +141,7 @@ async function swOpfsDelete(relPath, isDir) {
 
 
 // Version stamp logged on every SW boot — confirms a fresh build is running.
-const SW_VERSION = 'v1.0.186-resume-on-refresh';
+const SW_VERSION = '1.6.5-event-driven';
 console.log('[sandpie-sw] boot — version=' + SW_VERSION);
 
 // --- Pyodide bootstrap ------------------------------------------------------
@@ -730,14 +730,13 @@ function normalizeToolArgs(raw) {
 // ============================================================
 async function streamOneRound(reqUrl, headers, body, ctx) {
   
-  const timeout = AbortSignal.timeout(120000);
-  const sig = ctx.signal ? (AbortSignal.any ? AbortSignal.any([ctx.signal, timeout]) : ctx.signal) : timeout;
+  const timeoutSignal = AbortSignal.timeout(120000);
 
   const res = await fetch(reqUrl, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: sig,
+    signal: ctx.signal,
   });
   
   if (!res.ok) {
