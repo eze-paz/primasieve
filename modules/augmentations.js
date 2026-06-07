@@ -6,6 +6,14 @@ if (!window.SandpieAugmentations) {
 }
 const A = window.SandpieAugmentations;
 
+/* conv provenance */
+const convMeta = new Map();
+function getConvMeta(id) {
+  if (!convMeta.has(id)) convMeta.set(id, { files: new Set(), scripts: new Set() });
+  return convMeta.get(id);
+}
+A.getConvMeta = getConvMeta;
+
 /* TF-IDF state */
 let _tfidfIndex = null, _tfidfKey = '';
 
@@ -69,7 +77,7 @@ async function indexKey() {
   return k.sort().join('|');
 }
 
-async function showRelevance(queryText, activeConvId, convMeta) {
+async function showRelevance(queryText, activeConvId) {
   const ck = await indexKey();
   if (!_tfidfIndex || _tfidfKey !== ck) await buildTfidfIndex();
   if (!_tfidfIndex || _tfidfIndex.vecs.length < 2) {
@@ -89,7 +97,7 @@ async function showRelevance(queryText, activeConvId, convMeta) {
   const scriptCounts = new Map();
   const rows = [];
   for (const {id, score} of top3) {
-    const m = convMeta ? convMeta.get(id) : null;
+    const m = getConvMeta(id);
     let c = null;
     try {
       const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
