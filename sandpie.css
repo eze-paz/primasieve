@@ -700,7 +700,6 @@
     margin-left: 48px;
   }
 
-  }
   @keyframes chromaShift {
     0% { opacity: 0; transform: translateX(0); }
     15% { opacity: 0.9; transform: translateX(-3px); }
