@@ -13,6 +13,9 @@
     --sp-danger: #f85149;
     --sp-warn: #d29922;
   }
+  [data-theme="light"] .sidebar-brand .bracket,
+  [data-theme="light"] .mobile-header .brand .bracket,
+  [data-theme="light"] .welcome-title .sidebar-brand .bracket { color: var(--sp-accent); }
   [data-theme="light"] {
     --sp-bg: #ffffff;
     --sp-surface: #f6f8fa;
@@ -626,6 +629,12 @@
     clip-path: inset(0 0 0 40%);
     animation: chromaShift2 1.2s ease-out 1 forwards;
   }
+  .sidebar-brand .bracket,
+  .mobile-header .brand .bracket,
+  .welcome-title .sidebar-brand .bracket { color: var(--sp-accent); transition: color 0.15s; }
+  .sidebar-brand .name,
+  .mobile-header .brand .name,
+  .welcome-title .sidebar-brand .name { transition: color 0.15s; }
   .sidebar-collapse-btn {
     background: var(--sp-panel);
     border: none;
@@ -1303,6 +1312,9 @@
 
 [data-theme="cyberpunk"] .sidebar-brand::before { color: #00f0ff; clip-path: inset(0 45% 0 0); text-shadow: 0 0 20px rgba(0,240,255,0.4); }
 [data-theme="cyberpunk"] .sidebar-brand::after { color: #ff00a0; clip-path: inset(0 0 0 45%); text-shadow: 0 0 20px rgba(255,0,160,0.4); }
+[data-theme="cyberpunk"] .sidebar-brand .bracket,
+[data-theme="cyberpunk"] .mobile-header .brand .bracket,
+[data-theme="cyberpunk"] .welcome-title .sidebar-brand .bracket { color: var(--sp-accent); }
 
 [data-theme="cyberpunk"] .sidebar-collapse-btn {
   background: #11111a;
@@ -1606,6 +1618,9 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
+[data-theme="aurora"] .sidebar-brand .bracket,
+[data-theme="aurora"] .mobile-header .brand .bracket,
+[data-theme="aurora"] .welcome-title .sidebar-brand .bracket { color: var(--sp-accent); }
 [data-theme="aurora"] .sidebar-brand,
 [data-theme="aurora"] .mobile-header .brand {
   font-family: 'Outfit', sans-serif;
