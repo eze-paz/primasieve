@@ -2908,6 +2908,7 @@ if (document.readyState === 'loading') {
       return k.sort().join('|');
     }
 
+    async function showRelevance(queryText) {
       const qTf = buildTf(tokenize(queryText));
       const qVec = new Map();
       for (const [t,f] of qTf) { const i=_tfidfIndex.idf.get(t); if(i) qVec.set(t,f*i); }
