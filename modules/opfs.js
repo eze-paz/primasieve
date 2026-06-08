@@ -479,6 +479,150 @@ opfs.getSharedSet = async function() {
   } catch { return new Set(); }
 };
 
+let sharedExpanded = false;
+
+opfs.refreshFileList = async function() {
+  const ul = document.getElementById('fileList');
+  const path = opfs.currentPath();
+
+  let opfsList = [];
+  try { opfsList = await opfs.listDir(path); } catch {}
+  const localMap = new Map();
+  for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
+
+  const state = (window.Sandpie && Sandpie.syncProvider()?.getState?.()) || {};
+  const prefix = path ? path + '/' : '';
+  const remoteMap = new Map();
+  for (const k of Object.keys(state)) {
+    const kl = k.toLowerCase();
+    if (!kl.startsWith(prefix.toLowerCase())) continue;
+    const rest = k.slice(prefix.length);
+    if (!rest) continue;
+    if (rest.includes('/')) {
+      const firstSeg = rest.split('/')[0];
+      if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+    } else {
+      remoteMap.set(rest, 'file');
+    }
+  }
+  const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+
+  const frag = document.createDocumentFragment();
+  if (!names.size) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = (window.Sandpie && Sandpie.initialSyncDone()) ? '(empty)' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+  const items = [];
+  for (const name of names) {
+    const local = localMap.get(name);
+    const remote = remoteMap.get(name);
+    const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
+    const fullKey = joinPath(path, name);
+    let status = 'synced';
+    if (kind === 'folder') {
+      status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+    } else if (!local) {
+      status = 'cloud';
+    } else if (!remote) {
+      status = 'local';
+    } else {
+      const s = state[fullKey];
+      const lastMod = await opfs.lastModified(fullKey);
+      status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
+    }
+    items.push({ name, kind, status, fullKey });
+  }
+
+  await Promise.all(items.map(async (it) => {
+    if (it.kind === 'folder') {
+      it.size = await opfs.getFolderSize(it.fullKey);
+    } else {
+      it.size = await opfs.getFileSize(it.fullKey);
+    }
+  }));
+  items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+  const fcEl = document.getElementById('fileCount');
+  if (fcEl) fcEl.textContent = items.length ? `${items.length}` : '';
+
+  const sharedSet = await opfs.getSharedSet();
+  const renderItem = (it) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('span');
+    btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+
+    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
+    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
+    btn.textContent = kindIcon + it.name;
+    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
+    if (it.kind === 'folder') {
+      btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
+    } else {
+      btn.onclick = () => opfs.openFile(it.fullKey, it.name);
+    }
+    li.append(btn);
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'file-size';
+    sizeSpan.textContent = opfs.formatSize(it.size);
+    li.append(sizeSpan);
+    if (sharedSet.has(it.fullKey.toLowerCase())) li.classList.add('shared');
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      const menuItems = [];
+      menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
+      menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
+      menuItems.push({ label: 'New file', action: () => opfs.createFile() });
+      menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => opfs.toggleSharedFile(it.fullKey) });
+
+      if (it.kind === 'file') {
+        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
+        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
+      }
+
+      menuItems.push({ label: 'Delete', danger: true, action: async () => {
+        try {
+          await opfs.remove(it.fullKey);
+          if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
+          await opfs.refreshFileList();
+        } catch (e) { console.warn('delete failed:', it.fullKey, e); }
+      }});
+
+      opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
+    });
+    frag.appendChild(li);
+  };
+
+  const regular = items.filter(it => !sharedSet.has(it.fullKey.toLowerCase()));
+  const shared = items.filter(it => sharedSet.has(it.fullKey.toLowerCase()));
+
+  for (const it of regular) renderItem(it);
+
+  if (shared.length) {
+    const header = document.createElement('li');
+    header.className = 'shared-toggle';
+    header.textContent = `${sharedExpanded ? '▾' : '▸'} Shared (${shared.length})`;
+    header.onclick = () => { sharedExpanded = !sharedExpanded; opfs.refreshFileList(); };
+    frag.appendChild(header);
+    if (sharedExpanded) shared.forEach(renderItem);
+  }
+
+  ul.replaceChildren(frag);
+};
+
+opfs.toggleSharedFile = async function(path) {
+  let data = {};
+  try { data = JSON.parse(await opfs.read('shared_index.json')); } catch {}
+  if (data[path]) {
+    delete data[path];
+  } else {
+    data[path] = { t: Date.now() };
+  }
+  await opfs.write('shared_index.json', JSON.stringify(data));
+};
+
 /* --- backward compat shims for browser/viewer/editor --- */
 window.getSharedSet = function() { return opfs.getSharedSet(); };
 window.closeCtxMenu = function() { return opfs.closeCtxMenu(); };
@@ -504,6 +648,7 @@ window.getFolderSize = function(path) { return opfs.getFolderSize(path); };
 window.formatSize = function(bytes) { return opfs.formatSize(bytes); };
 window.opfsCurrentPath = function() { return opfs.currentPath(); };
 window.opfsJoin = function(base, child) { return base ? base + '/' + child : child; };
+window.refreshFileList = function() { return opfs.refreshFileList(); };
 
 
 window.opfs = opfs;

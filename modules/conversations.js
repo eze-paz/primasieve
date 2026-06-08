@@ -197,7 +197,6 @@ function refreshNewChatButton() {
   btn.title = empty ? "Already a fresh chat — just start typing below." : '';
 }
 let archivedExpanded = false;
-let sharedExpanded = false;
 async function updateConvFile(id, patch) {
   let data;
   try { data = JSON.parse(await opfs.read(convPath(id))); }
