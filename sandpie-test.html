@@ -82,6 +82,7 @@
       <div class="navbar">
         <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
         <input id="opfsPath" value="/">
+        <button class="ghost" onclick="createNewFolder()" title="New folder">＋</button>
       </div>
       <ul class="fs-list" id="fileList"></ul>
     </div>
@@ -1006,6 +1007,23 @@ function opfsUp() {
   if (cur === '/' || cur === '') return;
   $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
   refreshFileList();
+}
+
+async function createNewFolder() {
+  const name = prompt('Folder name:');
+  if (!name || !name.trim()) return;
+  const clean = name.trim().replace(/[\\/:*?"<>|]/g, '_');
+  if (!clean) return;
+  const path = opfsCurrentPath();
+  const fullPath = opfsJoin(path, clean);
+  try {
+    await opfs.mkdir(fullPath);
+    Sandpie.events.emit('file:changed', fullPath);
+    await refreshFileList();
+  } catch (e) {
+    console.warn('mkdir failed:', fullPath, e);
+    alert('Could not create folder: ' + e.message);
+  }
 }
 $('opfsPath').addEventListener('change', refreshFileList);
 $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
