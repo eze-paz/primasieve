@@ -147,7 +147,7 @@ function init() {
 
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     Sandpie.events.on('tokens:record', ({convId, usage}) => {
-      recordUsage(convId, usage);
+      SandpieTokens.recordUsage(convId, usage);
     });
   }
 
