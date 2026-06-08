@@ -10,7 +10,6 @@ import { spawnSync } from 'node:child_process';
 const ROOT = process.cwd();
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.github']);
 let errors = 0;
-let checked = 0;
 
 function* walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -28,29 +27,24 @@ function checkJs(code, label) {
   const file = join(tmpRoot, `s${tmpCounter++}.js`);
   writeFileSync(file, code);
   const r = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
-  checked++;
   if (r.status !== 0) {
+    // node prints the temp path in errors; replace it with the real label
     const msg = (r.stderr || r.stdout || '').replaceAll(file, label);
-    console.error(`\n╭─ FAIL: ${label}`);
-    console.error(`│`);
-    msg.split('\n').forEach(line => console.error(`│ ${line}`));
-    console.error(`╰─`);
+    console.error(`FAIL ${label}\n${msg.trim()}\n`);
     errors++;
   }
 }
 
 function checkJson(code, label) {
-  checked++;
   try {
     JSON.parse(code);
   } catch (e) {
-    console.error(`\n╭─ FAIL: ${label}`);
-    console.error(`│ JSON parse error: ${e.message}`);
-    console.error(`╰─`);
+    console.error(`FAIL ${label}: ${e.message}\n`);
     errors++;
   }
 }
 
+// Extract inline <script> blocks. Skips external (src=) and non-JS types.
 function extractScripts(html) {
   const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   const out = [];
@@ -75,6 +69,7 @@ try {
     } else if (ext === '.html' || ext === '.htm') {
       const html = readFileSync(abs, 'utf8');
       for (const { body, lineOffset } of extractScripts(html)) {
+        // Pad with newlines so error line numbers match the HTML source.
         const padded = '\n'.repeat(lineOffset - 1) + body;
         checkJs(padded, `${file} (inline <script>)`);
       }
@@ -87,14 +82,7 @@ try {
 }
 
 if (errors > 0) {
-  console.error(`\n═══════════════════════════════════════════════════════════`);
-  console.error(`  SYNTAX CHECK FAILED: ${errors} error(s) in ${checked} file(s)`);
-  console.error(`═══════════════════════════════════════════════════════════`);
-  console.error(`\n  Fix the errors above, then run again:`);
-  console.error(`    node scripts/check-syntax.mjs`);
-  console.error(`\n  To bypass (not recommended): git push --no-verify`);
-  console.error(`═══════════════════════════════════════════════════════════\n`);
+  console.error(`${errors} syntax error(s) found.`);
   process.exit(1);
 }
-
-console.log(`✓ Syntax check passed (${checked} file(s) checked).`);
+console.log('Syntax check passed.');
