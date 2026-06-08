@@ -567,7 +567,7 @@ const Sandpie = (() => {
     syncProvider() { return _sync; },
     sync()         { return _sync?.sync?.(); },
     fileSyncStatus(path, opfsMtime) { return _sync?.fileStatus?.(path, opfsMtime) ?? null; },
-    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : true; },
+    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : window._sandpieBootDone; },
   };
 })();
 window.Sandpie = Sandpie;
@@ -1303,6 +1303,7 @@ sidePanel = new SidePanel();
   document.querySelectorAll('#messages img').forEach(img => {
     if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
   });
+  window._sandpieBootDone = true;
 })();
 async function requestWakeLock() {
   try {
@@ -2066,7 +2067,11 @@ function renderHistoricalMessage(m, host = null) {
         if (tc.function.name === 'show_artifact') {
           try {
             const { path } = JSON.parse(tc.function.arguments || '{}');
-            if (path) renderArtifact(host, path);
+            if (path) {
+              const target = host || $('messages');
+              const existing = target.querySelector('.artifact-wrap[data-artifact-path="' + path + '"]');
+              if (!existing) renderArtifact(host, path);
+            }
           } catch (_) {}
         } else {
           const tcDiv = addMsg('tool-call', '', host);
