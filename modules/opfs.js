@@ -532,7 +532,7 @@ opfs.refreshFileList = async function() {
     } else {
       const s = state[fullKey];
       const lastMod = await opfs.lastModified(fullKey);
-      status = lastMod <= s.syncedMtime ? 'synced' : 'modified';
+      status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
     }
     items.push({ name, kind, status, fullKey });
   }
