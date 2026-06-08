@@ -140,83 +140,7 @@ const $ = id => document.getElementById(id);
    provider doesn't return one we fall back to a chars/4 estimate. The context
    window denominator is set per-provider (manually in the provider modal).
    ============================================================================= */
-const SandpieTokens = (() => {
-  const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
-  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-  const listeners = new Set();
 
-  function usageTotal(u) {
-    if (!u) return 0;
-    return u.total_tokens || ((u.prompt_tokens || 0) + (u.completion_tokens || 0));
-  }
-
-  // --- weekly rolling log -----------------------------------------------------
-  function loadLog() {
-    try { const v = JSON.parse(localStorage.getItem(WEEK_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
-    catch { return []; }
-  }
-  function prune(log) {
-    const cutoff = Date.now() - WEEK_MS;
-    return log.filter(e => e && typeof e.t === 'number' && e.t >= cutoff);
-  }
-  function weeklyTotal() {
-    return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
-  }
-
-  // --- token estimate fallback ------------------------------------------------
-  function textOf(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
-    return '';
-  }
-  function estimateTokens(msgs) {
-    let chars = 0;
-    for (const m of (msgs || [])) {
-      chars += textOf(m.content).length;
-      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
-    }
-    return Math.ceil(chars / 4);
-  }
-
-  // --- public reads -----------------------------------------------------------
-  function conversationTokens() {
-    const s = activeStream();
-    if (s && s.usage) return usageTotal(s.usage);
-    return estimateTokens(s ? s.messages : messages);
-  }
-  function isEstimated() {
-    const s = activeStream();
-    return !(s && s.usage);
-  }
-
-  // --- context window (manual only) ----------------------------------------
-  function contextWindow() {
-    const ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    return (ap && ap.contextWindow > 0) ? ap.contextWindow : null;
-  }
-  function ensureModels() { return null; }
-
-  // --- mutation ---------------------------------------------------------------
-  function recordUsage(convId, usage) {
-    if (!usage) return;
-    const s = convStreams.get(convId);
-    if (s) s.usage = usage;
-    const log = prune(loadLog());
-    log.push({ t: Date.now(), tokens: usageTotal(usage) });
-    localStorage.setItem(WEEK_LOG_KEY, JSON.stringify(log));
-    notify();
-  }
-
-  // --- subscription -----------------------------------------------------------
-  function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
-  function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
-
-  return {
-    recordUsage, conversationTokens, isEstimated, weeklyTotal,
-    contextWindow, ensureModels, subscribe, notify,
-  };
-})();
-window.SandpieTokens = SandpieTokens;
 
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
@@ -2274,7 +2198,7 @@ async function sendSingle(text, stream, opts = {}) {
       lastInFlightTool = null;
       try { const m = String(ev.result || '').match(/Created:\s*([^\s]+)/); if (m) SandpieAugmentations.SandpieAugmentations.SandpieAugmentations.SandpieAugmentations.getConvMeta(activeConvId).files.add(m[1]); } catch (_) {}
     }
-    if (ev.type === 'usage')        SandpieTokens.recordUsage(convId, ev.usage);
+    if (ev.type === 'usage') Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
     dispatchAgentEvent(ev, renderer, host);
   };
   try {
