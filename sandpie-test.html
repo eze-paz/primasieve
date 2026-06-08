@@ -559,7 +559,7 @@ const Sandpie = (() => {
     opfsMtime(path)        { return opfs.lastModified(path); },
     isGenerating()         { return anyStreamGenerating(); },
     openFilePath()         { return window._openFilePath; },
-    refreshFiles()         { return opfs.refreshFileList(); },
+    refreshFiles()         { return refreshFileList(); },
     refreshConversations() { return refreshConversationList(); },
 
     // sync capability
