@@ -521,7 +521,7 @@ opfs.refreshFileList = async function() {
     const local = localMap.get(name);
     const remote = remoteMap.get(name);
     const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
-    const fullKey = joinPath(path, name);
+    const fullKey = opfsJoin(path, name);
     let status = 'synced';
     if (kind === 'folder') {
       status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
