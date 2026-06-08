@@ -26,7 +26,7 @@ const _themePalettes = {
   },
   'electric': {
     bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
-    accent: '#ff3b5c', text: '#fafafa', textDim: '#888',
+    accent: '#77C078', text: '#fafafa', textDim: '#888',
     border: '#2a2a2a', borderBright: '#444',
     success: '#00e676', danger: '#ff1744', warn: '#ffc400'
   }
@@ -41,7 +41,7 @@ const _paletteLabels = {
 function setTheme(name) {
   var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
   name = map[name] || name;
-  if (!_themePalettes[name]) name = 'classic-dark';
+  if (!_themePalettes[name]) name = 'electric';
   if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
   else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
   else document.documentElement.setAttribute('data-theme', name);
@@ -176,13 +176,13 @@ function updateThemeButtons() {
 }
 
 function applySavedCustom() {
-  var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  var saved = localStorage.getItem('sandpie-theme') || 'electric';
   if (saved && _themePalettes[saved]) {
     setTheme(saved);
     var pal = localStorage.getItem('sandpie-theme-palette-' + saved);
     if (pal) { try { Object.assign(_themePalettes[saved], JSON.parse(pal)); applyThemePalette(saved); } catch (e) {} }
   } else {
-    setTheme('classic-dark');
+    setTheme('electric');
   }
 }
 
