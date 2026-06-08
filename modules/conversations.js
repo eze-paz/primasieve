@@ -390,7 +390,6 @@ async function refreshConversationList() {
   }
   ul.replaceChildren(frag);
 }
-let wakeLock = null;
 function refreshSendButtonForActive() {
   const btn = $('sendBtn');
   if (!btn) return;
