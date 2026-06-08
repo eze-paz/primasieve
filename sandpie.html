@@ -19,6 +19,9 @@
   <script src="modules/images.js"></script>
   <script src="modules/notifications.js"></script>
   <script src="modules/tools.js"></script>
+  <script src="modules/opfs.js"></script>
+  <script type="module" src="modules/mobile.js"></script>
+  <script type="module" src="modules/conversations.js"></script>
 </head>
 <body>
 <header class="mobile-header">
@@ -139,84 +142,6 @@ const $ = id => document.getElementById(id);
    provider doesn't return one we fall back to a chars/4 estimate. The context
    window denominator is set per-provider (manually in the provider modal).
    ============================================================================= */
-const SandpieTokens = (() => {
-  const WEEK_LOG_KEY = 'sandpie-token-weeklog';     // [{t, tokens}]
-  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-  const listeners = new Set();
-
-  function usageTotal(u) {
-    if (!u) return 0;
-    return u.total_tokens || ((u.prompt_tokens || 0) + (u.completion_tokens || 0));
-  }
-
-  // --- weekly rolling log -----------------------------------------------------
-  function loadLog() {
-    try { const v = JSON.parse(localStorage.getItem(WEEK_LOG_KEY) || '[]'); return Array.isArray(v) ? v : []; }
-    catch { return []; }
-  }
-  function prune(log) {
-    const cutoff = Date.now() - WEEK_MS;
-    return log.filter(e => e && typeof e.t === 'number' && e.t >= cutoff);
-  }
-  function weeklyTotal() {
-    return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
-  }
-
-  // --- token estimate fallback ------------------------------------------------
-  function textOf(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
-    return '';
-  }
-  function estimateTokens(msgs) {
-    let chars = 0;
-    for (const m of (msgs || [])) {
-      chars += textOf(m.content).length;
-      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
-    }
-    return Math.ceil(chars / 4);
-  }
-
-  // --- public reads -----------------------------------------------------------
-  function conversationTokens() {
-    const s = activeStream();
-    if (s && s.usage) return usageTotal(s.usage);
-    return estimateTokens(s ? s.messages : messages);
-  }
-  function isEstimated() {
-    const s = activeStream();
-    return !(s && s.usage);
-  }
-
-  // --- context window (manual only) ----------------------------------------
-  function contextWindow() {
-    const ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    return (ap && ap.contextWindow > 0) ? ap.contextWindow : null;
-  }
-  function ensureModels() { return null; }
-
-  // --- mutation ---------------------------------------------------------------
-  function recordUsage(convId, usage) {
-    if (!usage) return;
-    const s = convStreams.get(convId);
-    if (s) s.usage = usage;
-    const log = prune(loadLog());
-    log.push({ t: Date.now(), tokens: usageTotal(usage) });
-    localStorage.setItem(WEEK_LOG_KEY, JSON.stringify(log));
-    notify();
-  }
-
-  // --- subscription -----------------------------------------------------------
-  function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
-  function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
-
-  return {
-    recordUsage, conversationTokens, isEstimated, weeklyTotal,
-    contextWindow, ensureModels, subscribe, notify,
-  };
-})();
-window.SandpieTokens = SandpieTokens;
-
 
 
 /* =============================================================================
@@ -394,6 +319,7 @@ function dedentMarkdownFences(text) {
   });
 }
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -459,119 +385,34 @@ function shouldAutoScroll(el) { return _scrollLocked.has(el); }
   ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
   autosize();
 })();
-function toggleSidebar() {
-  const open = document.body.classList.toggle('sidebar-open');
-  const btn = document.querySelector('.hamburger');
-  if (btn) btn.textContent = open ? '✕' : '☰';
+/* =============================================================================
+   Resume-on-refresh — flight checkpointing
+   ============================================================================= */
+const SP_FLIGHT_KEY = (id) => 'sp-flight-' + id;
+function flightWrite(id, text) {
+  try { localStorage.setItem(SP_FLIGHT_KEY(id), JSON.stringify({t: Date.now(), text})); } catch(_) {}
 }
-function toggleSidebarCollapse() {
-  const aside = document.querySelector('aside');
-  const isCollapsed = aside.classList.toggle('collapsed');
-  document.body.classList.toggle('sidebar-collapsed', isCollapsed);
-  localStorage.setItem('sandpie-sidebar-collapsed', isCollapsed ? '1' : '');
+function flightRead(id) {
+  try { const v = localStorage.getItem(SP_FLIGHT_KEY(id)); return v ? JSON.parse(v) : null; } catch(_) { return null; }
 }
-document.addEventListener('submit', () => {
-  document.body.classList.remove('sidebar-open');
-  const btn = document.querySelector('.hamburger');
-  if (btn) btn.textContent = '☰';
-});
-function splitPath(path) {
-  const parts = String(path).split('/').filter(Boolean);
-  const name = parts.pop();
-  return { parts, name };
+function flightClear(id) { try { localStorage.removeItem(SP_FLIGHT_KEY(id)); } catch(_) {} }
+async function maybeResumeFlight(id) {
+  if (!id) return;
+  const ck = flightRead(id);
+  if (!ck) return;
+  if (Date.now() - ck.t > 5 * 60 * 1000) { flightClear(id); return; }
+  let data;
+  try { data = JSON.parse(await opfs.read(convPath(id))); } catch { flightClear(id); return; }
+  const s = ensureStream(id);
+  s.messages = (data.messages || []).slice();
+  if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
+    flightClear(id); return;
+  }
+  mountConv(id);
+  for (const m of s.messages) renderHistoricalMessage(m);
+  addMsg('info', 'Resuming generation…', s.host);
+  sendSingle(ck.text, s, { resume: true });
 }
-const opfs = {
-  async root() { return await navigator.storage.getDirectory(); },
-
-  async resolveDir(parts, { create = false } = {}) {
-    let dir = await this.root();
-    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
-    return dir;
-  },
-  async read(path) {
-    const { parts, name } = splitPath(path);
-    const dir = await this.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    return await (await handle.getFile()).text();
-  },
-
-  async readBytes(path) {
-    const { parts, name } = splitPath(path);
-    const dir = await this.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    const file = await handle.getFile();
-    return new Uint8Array(await file.arrayBuffer());
-  },
-  async write(path, content) {
-    const { parts, name } = splitPath(path);
-    const dir = await this.resolveDir(parts, { create: true });
-    const handle = await dir.getFileHandle(name, { create: true });
-    const w = await handle.createWritable();
-    await w.write(content);
-    await w.close();
-  },
-  async remove(path) {
-    const { parts, name } = splitPath(path);
-    const dir = await this.resolveDir(parts);
-    await dir.removeEntry(name, { recursive: true });
-
-    try {
-      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-      if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
-    } catch (_) {}
-  },
-
-  async exists(path) {
-    try {
-      const { parts, name } = splitPath(path);
-      const dir = await this.resolveDir(parts);
-      await dir.getFileHandle(name);
-      return true;
-    } catch { return false; }
-  },
-  async mkdir(path) {
-    const parts = String(path).split('/').filter(Boolean);
-    await this.resolveDir(parts, { create: true });
-  },
-
-  async listDir(path = '') {
-    const parts = String(path).split('/').filter(Boolean);
-    const dir = await this.resolveDir(parts);
-    const out = [];
-    for await (const [n, h] of dir.entries()) out.push({ name: n, kind: h.kind });
-    return out.sort((a, b) => a.kind !== b.kind ? (a.kind === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
-  },
-
-  async list(prefix = '') {
-    const out = [];
-    const walk = async (dir, p) => {
-      for await (const [n, h] of dir.entries()) {
-        const full = p ? `${p}/${n}` : n;
-        if (h.kind === 'file') out.push(full);
-        else await walk(h, full);
-      }
-    };
-    const startParts = String(prefix).split('/').filter(Boolean);
-    const start = await this.resolveDir(startParts);
-    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
-    return out.sort();
-  },
-
-  async listAll(prefix = '') {
-    const out = [];
-    const walk = async (dir, p) => {
-      for await (const [n, h] of dir.entries()) {
-        const full = p ? `${p}/${n}` : n;
-        out.push({ path: full, kind: h.kind });
-        if (h.kind === 'directory') await walk(h, full);
-      }
-    };
-    const startParts = String(prefix).split('/').filter(Boolean);
-    const start = await this.resolveDir(startParts);
-    await walk(start, prefix.replace(/^\/+|\/+$/g, ''));
-    return out;
-  },
-};
 
 /* =============================================================================
    Sandpie — core contract / host API.
@@ -621,9 +462,9 @@ const Sandpie = (() => {
     get opfs()   { return opfs; },
     get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
-    opfsMtime(path)        { return opfsLastModified(path); },
+    opfsMtime(path)        { return opfs.lastModified(path); },
     isGenerating()         { return anyStreamGenerating(); },
-    openFilePath()         { return _openFilePath; },
+    openFilePath()         { return window._openFilePath; },
     refreshFiles()         { return refreshFileList(); },
     refreshConversations() { return refreshConversationList(); },
 
@@ -632,7 +473,7 @@ const Sandpie = (() => {
     syncProvider() { return _sync; },
     sync()         { return _sync?.sync?.(); },
     fileSyncStatus(path, opfsMtime) { return _sync?.fileStatus?.(path, opfsMtime) ?? null; },
-    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : true; },
+    initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : window._sandpieBootDone; },
   };
 })();
 window.Sandpie = Sandpie;
@@ -642,29 +483,12 @@ window.Sandpie = Sandpie;
    Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
    anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
    facts the provider reads through the Sandpie host API. */
-let _openFilePath = null;
+
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
 }
-async function opfsLastModified(path) {
-  try {
-    const { parts, name } = splitPath(path);
-    let dir = await navigator.storage.getDirectory();
-    for (const p of parts) {
-      dir = await dir.getDirectoryHandle(p);
-    }
-    const handle = await dir.getFileHandle(name);
-    const file = await handle.getFile();
-    return file.lastModified;
-  } catch (e) {
-    return 0;
-  }
-}
-function joinPath(folder, name) {
-  if (folder === '/' || folder === '') return '/' + name;
-  return folder.replace(/\/$/, '') + '/' + name;
-}
+
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -677,61 +501,7 @@ async function buildSystemPrompt() {
     return { role: 'system', content: basic };
   }
 }
-function formatSize(bytes) {
-  if (!bytes || bytes < 0) return '';
-  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
-  let u = 0;
-  while (bytes >= 1024 && u < units.length - 1) { bytes /= 1024; u++; }
-  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
-}
-async function getFileSize(path) {
 
-  try {
-    const parts = path.split('/').filter(Boolean);
-    const name = parts.pop();
-    const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    return (await handle.getFile()).size;
-  } catch {}
-
-  const s = (Sandpie.syncProvider()?.getState?.() || {})[path];
-  return s && s.size || 0;
-}
-async function getFolderSize(path) {
-  const prefix = path ? path.toLowerCase() + '/' : '';
-  let total = 0;
-  const state = Sandpie.syncProvider()?.getState?.() || {};
-
-  for (const k of Object.keys(state)) {
-    const kl = k.toLowerCase();
-    if (prefix && !kl.startsWith(prefix)) continue;
-
-    if (prefix && kl.length <= prefix.length) continue;
-    total += state[k].size || 0;
-  }
-
-  try {
-    for (const f of await opfs.list(path)) {
-      const full = (path ? path + '/' : '') + f;
-      if (!state[full]) {
-        try {
-          const parts = full.split('/').filter(Boolean);
-          const name = parts.pop();
-          const dir = await opfs.resolveDir(parts);
-          const handle = await dir.getFileHandle(name);
-          total += (await handle.getFile()).size;
-        } catch {}
-      }
-    }
-  } catch {}
-  return total;
-}
-function opfsCurrentPath() {
-  return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
-}
-function opfsJoin(base, child) {
-  return base ? base + '/' + child : child;
-}
 async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
@@ -798,7 +568,8 @@ async function refreshFileList() {
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
 
-  for (const it of items) {
+  const sharedSet = await getSharedSet();
+  const renderItem = (it) => {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
@@ -817,10 +588,14 @@ async function refreshFileList() {
     sizeSpan.className = 'file-size';
     sizeSpan.textContent = formatSize(it.size);
     li.append(sizeSpan);
+    if (sharedSet.has(it.fullKey.toLowerCase())) li.classList.add('shared');
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
+      menuItems.push({ label: 'New folder', action: () => createNewFolder() });
+      menuItems.push({ label: 'New file', action: () => createNewFile() });
+      menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => toggleSharedFile(it.fullKey) });
 
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
@@ -838,260 +613,54 @@ async function refreshFileList() {
       showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
+  };
+
+  const regular = items.filter(it => !sharedSet.has(it.fullKey.toLowerCase()));
+  const shared = items.filter(it => sharedSet.has(it.fullKey.toLowerCase()));
+
+  for (const it of regular) renderItem(it);
+
+  if (shared.length) {
+    const header = document.createElement('li');
+    header.className = 'shared-toggle';
+    header.textContent = `${sharedExpanded ? '▾' : '▸'} Shared (${shared.length})`;
+    header.onclick = () => { sharedExpanded = !sharedExpanded; refreshFileList(); };
+    frag.appendChild(header);
+    if (sharedExpanded) shared.forEach(renderItem);
   }
+
   ul.replaceChildren(frag);
 }
-let activeCtxMenu = null;
-function closeCtxMenu() { activeCtxMenu?.remove(); activeCtxMenu = null; }
+
 document.addEventListener('click', closeCtxMenu);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
 window.addEventListener('blur', closeCtxMenu);
-function showContextMenu(x, y, items) {
-  closeCtxMenu();
-  const menu = document.createElement('div');
-  menu.className = 'ctx-menu';
-  menu.setAttribute('data-chrome', '');
-  for (const item of items) {
-    const btn = document.createElement('button');
-    btn.textContent = item.label;
-    if (item.danger) btn.className = 'danger';
-    btn.onclick = (e) => { e.stopPropagation(); closeCtxMenu(); item.action(); };
-    menu.appendChild(btn);
-  }
-  document.body.appendChild(menu);
+$('fileList').addEventListener('contextmenu', (ev) => {
+  if (ev.target.closest('li')) return;
+  ev.preventDefault();
+  showContextMenu(ev.clientX, ev.clientY, [
+    { label: 'New folder', action: () => createNewFolder() },
+    { label: 'New file', action: () => createNewFile() },
+  ]);
+});
 
-  const r = menu.getBoundingClientRect();
-  const px = Math.min(x, window.innerWidth - r.width - 4);
-  const py = Math.min(y, window.innerHeight - r.height - 4);
-  menu.style.left = Math.max(0, px) + 'px';
-  menu.style.top = Math.max(0, py) + 'px';
-  activeCtxMenu = menu;
-}
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
 const TEXT_PREVIEW_CAP = 200_000;
-function closeFileViewer() {
-  _openFilePath = null;
-  document.querySelectorAll('.file-viewer').forEach(el => {
-    const url = el.dataset.blobUrl;
-    if (url) URL.revokeObjectURL(url);
-    el.remove();
-  });
-}
+
 let markedPromise = null;
-function getMarked() {
-  if (!markedPromise) {
-    markedPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/marked@13/marked.min.js';
-      s.onload = () => resolve(window.marked);
-      s.onerror = () => reject(new Error('failed to load marked'));
-      document.head.appendChild(s);
-    });
-  }
-  return markedPromise;
-}
-async function openFileViewer(fullKey, name) {
 
-  let file;
-  try {
-    const { parts, name: fname } = splitPath(fullKey);
-    const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(fname);
-    file = await handle.getFile();
-  } catch (e) {
-    addMsg('err', `Could not open ${fullKey}: ${e.message}`);
-    return;
-  }
-  _openFilePath = fullKey;
-  const ext = (name.split('.').pop() || '').toLowerCase();
-  const overlay = document.createElement('div');
-  overlay.className = 'file-viewer';
-  overlay.setAttribute('data-chrome', '');
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  const header = document.createElement('header');
-  const title = document.createElement('span');
-  title.className = 'title';
-  title.textContent = '/' + fullKey;
-  const meta = document.createElement('span');
-  meta.className = 'meta';
-  meta.textContent = `${file.size.toLocaleString()} bytes`;
-
-  const mdBtn = document.createElement('button');
-  mdBtn.className = 'mode';
-  mdBtn.style.display = 'none';
-  const pencilBtn = document.createElement('button');
-  pencilBtn.className = 'mode';
-  pencilBtn.textContent = '✎';
-  pencilBtn.title = 'Edit';
-  pencilBtn.style.display = 'none';
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'mode';
-  saveBtn.textContent = '💾';
-  saveBtn.title = 'Save (Ctrl+S)';
-  saveBtn.style.display = 'none';
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '✕';
-  closeBtn.title = 'Close (Esc)';
-  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
-  const body = document.createElement('div');
-  body.className = 'body';
-  panel.append(header, body);
-  overlay.appendChild(panel);
-
-  const finalize = (closeFn) => {
-    closeBtn.onclick = closeFn;
-    overlay._close = closeFn;
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
-    document.body.appendChild(overlay);
-  };
-  if (IMAGE_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
-    const img = document.createElement('img'); img.src = url; body.appendChild(img);
-    finalize(closeFileViewer); return;
-  }
-  if (VIDEO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
-    const v = document.createElement('video'); v.src = url; v.controls = true; body.appendChild(v);
-    finalize(closeFileViewer); return;
-  }
-  if (AUDIO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
-    const a = document.createElement('audio'); a.src = url; a.controls = true; body.appendChild(a);
-    finalize(closeFileViewer); return;
-  }
-  if (ext === 'pdf') {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
-    const f = document.createElement('iframe');
-    f.setAttribute('data-chrome', '');
-    f.src = url;
-    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
-    body.appendChild(f);
-    finalize(closeFileViewer); return;
-  }
-
-  const text = await file.text();
-  const sample = text.slice(0, 4000);
-  const repl = (sample.match(/�/g) || []).length;
-  const looksBinary = repl > 50 && repl / Math.max(sample.length, 1) > 0.01;
-  if (looksBinary) {
-    const pre = document.createElement('pre');
-    pre.textContent = '(binary file — preview unavailable)';
-    body.appendChild(pre);
-    finalize(closeFileViewer); return;
-  }
-  const isMd = ext === 'md' || ext === 'markdown';
-  const editable = text.length <= TEXT_PREVIEW_CAP;
-
-  let mode = isMd ? 'rendered' : 'raw';
-  let current = text;
-  let textareaEl = null;
-  const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
-  const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
-  function refreshButtons() {
-    mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
-    mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
-    mdBtn.title = mode === 'rendered' ? 'Show raw markdown' : 'Render markdown';
-    pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
-    saveBtn.style.display = mode === 'edit' ? '' : 'none';
-  }
-  async function render() {
-    body.innerHTML = '';
-    textareaEl = null;
-    if (mode === 'edit') {
-      const ta = document.createElement('textarea');
-      ta.className = 'editor';
-      ta.spellcheck = false;
-      ta.value = current;
-      ta.addEventListener('input', refreshTitle);
-      ta.addEventListener('keydown', e => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-          e.preventDefault(); doSave();
-        }
-      });
-      body.appendChild(ta);
-      textareaEl = ta;
-      ta.focus();
-    } else if (mode === 'rendered') {
-      const div = document.createElement('div');
-      div.className = 'md-preview';
-      div.textContent = 'Loading preview…';
-      body.appendChild(div);
-      try {
-        const marked = await getMarked();
-        div.innerHTML = marked.parse(current);
-      } catch (e) {
-        div.textContent = '(failed to load markdown renderer — showing raw)\n\n' + current;
-      }
-    } else {
-      const pre = document.createElement('pre');
-      pre.textContent = current.length > TEXT_PREVIEW_CAP
-        ? current.slice(0, TEXT_PREVIEW_CAP) + `\n…[truncated, full size ${current.length.toLocaleString()} chars]`
-        : current;
-      body.appendChild(pre);
-    }
-    refreshButtons();
-    refreshTitle();
-  }
-  mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
-  pencilBtn.onclick = () => { mode = 'edit'; render(); };
-  async function doSave() {
-    if (!textareaEl) return;
-    const newContent = textareaEl.value;
-    try {
-      await opfs.write(fullKey, newContent);
-      current = newContent;
-      meta.textContent = `${new Blob([newContent]).size.toLocaleString()} bytes`;
-      refreshTitle();
-      await refreshFileList();
-    } catch (e) {
-      addMsg('err', `Could not save ${fullKey}: ${e.message}`);
-    }
-  }
-  saveBtn.onclick = doSave;
-  function attemptClose() {
-    if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
-    closeFileViewer();
-  }
-  closeBtn.onclick = attemptClose;
-  overlay._close = attemptClose;
-  overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
-  document.body.appendChild(overlay);
-  await render();
-}
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const v = document.querySelector('.file-viewer');
     if (v) (v._close || closeFileViewer)();
   }
 });
-function opfsUp() {
-  const cur = ($('opfsPath').value || '').trim() || '/';
-  if (cur === '/' || cur === '') return;
-  $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
-  refreshFileList();
-}
+
 $('opfsPath').addEventListener('change', refreshFileList);
 $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
-async function uploadEntry(entry, dirPath) {
-  if (entry.isFile) {
-    const file = await new Promise(r => entry.file(r));
-    const destPath = opfsJoin(dirPath, entry.name);
-    await opfs.write(destPath, file);
-    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
-  } else if (entry.isDirectory) {
-    const sub = opfsJoin(dirPath, entry.name);
-    const reader = entry.createReader();
-    while (true) {
-      const batch = await new Promise(r => reader.readEntries(r));
-      if (!batch.length) break;
-      for (const child of batch) await uploadEntry(child, sub);
-    }
-  }
-}
+
 (() => {
   const list = $('fileList');
   list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
@@ -1110,6 +679,7 @@ async function uploadEntry(entry, dirPath) {
       for (const f of e.dataTransfer.files) {
         const destPath = opfsJoin(path, f.name);
         await opfs.write(destPath, f);
+        Sandpie.events.emit('file:changed', destPath);
         const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
         if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
       }
@@ -1262,9 +832,6 @@ class SidePanel {
     });
   }
 }
-function isMobileViewport() {
-  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-}
 let sidePanel = null;
 sidePanel = new SidePanel();
 (function () {
@@ -1304,47 +871,7 @@ sidePanel = new SidePanel();
     document.addEventListener('mouseup',   onUp);
   });
 })();
-(async () => {
-  await refreshConversationList();
-  if (activeConvId) {
-
-    const restoreId = activeConvId;
-    activeConvId = null;
-    const s = ensureStream(restoreId);
-    try {
-      const data = JSON.parse(await opfs.read(convPath(restoreId)));
-      s.messages = (data.messages || []).slice();
-    } catch {  }
-    mountConv(restoreId);
-    for (const m of s.messages) renderHistoricalMessage(m);
-  }
-
-  const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
-  requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
-  document.querySelectorAll('#messages img').forEach(img => {
-    if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
-  });
-})();
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    }
-  } catch (e) {  }
-}
-function releaseWakeLock() {
-  if (wakeLock) {
-    try { wakeLock.release(); } catch (e) {}
-    wakeLock = null;
-  }
-}
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
-  for (const s of convStreams.values()) {
-    if (s.generating) { requestWakeLock(); break; }
-  }
-});
+  window._sandpieBootDone = true;  /* moved to _bootSandpie */
 const TOOL_RESULT_MAX = 30000;
 function capToolResult(s) {
   s = String(s ?? '');
@@ -1439,54 +966,6 @@ function addMsg(role, text = '', host = null) {
 function applyToolsMinimized() {
 
   document.body.classList.toggle('tools-minimized', toolsMinimized);
-}
-const LP_DELAY = 500;
-const LP_SLOP = 30;
-function attachLongPress(el, handler) {
-  el.addEventListener('touchstart', (e) => {
-    const t = e.touches[0];
-    el._lp = {
-      timer: setTimeout(() => {
-        el._lp.timer = null;
-        el.classList.remove('lp-active');
-        handler({
-          currentTarget: el, target: el,
-          clientX: el._lp.x, clientY: el._lp.y,
-          preventDefault() {}, stopPropagation() {}
-        });
-
-        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
-        document.addEventListener('click', swallow, { capture: true, once: true });
-        setTimeout(() => document.removeEventListener('click', swallow, { capture: true }), 350);
-      }, LP_DELAY),
-      x: t.clientX,
-      y: t.clientY,
-    };
-    el.classList.add('lp-active');
-  }, { passive: true });
-  el.addEventListener('touchmove', (e) => {
-    if (!el._lp || !el._lp.timer) return;
-    const t = e.touches[0];
-    if (Math.abs(t.clientX - el._lp.x) > LP_SLOP || Math.abs(t.clientY - el._lp.y) > LP_SLOP) {
-      clearTimeout(el._lp.timer);
-      el._lp = null;
-      el.classList.remove('lp-active');
-    }
-  }, { passive: true });
-  el.addEventListener('touchend', () => {
-    if (el._lp) {
-      if (el._lp.timer) clearTimeout(el._lp.timer);
-      el._lp = null;
-    }
-    el.classList.remove('lp-active');
-  });
-  el.addEventListener('touchcancel', () => {
-    if (el._lp) {
-      if (el._lp.timer) clearTimeout(el._lp.timer);
-      el._lp = null;
-    }
-    el.classList.remove('lp-active');
-  });
 }
 function bindBubble(div, msgRef) {
   if (!div) return div;
@@ -2033,693 +1512,6 @@ function endTotalTimer(stream, label) {
   }
   stream.timerEl = null;
 }
-const CONV_DIR = '_conversations';
-function newConvId() {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-}
-function convPath(id) { return `${CONV_DIR}/${id}.json`; }
-async function ensureActiveConv() {
-  if (activeConvId) return;
-  activeConvId = newConvId();
-  localStorage.setItem('sandpie-active-conv', activeConvId);
-}
-async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
-async function saveConv(convId, { touchUpdated = true } = {}) {
-  if (!convId) return;
-  const s = convStreams.get(convId);
-  const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
-  if (!msgs || !msgs.length) return;
-
-  let prev = {};
-  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
-  const firstUser = msgs.find(m => m.role === 'user');
-  let derived = 'Untitled';
-  if (firstUser && firstUser.content) {
-    const text = typeof firstUser.content === 'string'
-      ? firstUser.content
-      : firstUser.content.filter(p => p.type === 'text').map(p => p.text).join('');
-    derived = text.slice(0, 60);
-  }
-  const data = {
-    ...prev,
-    id: convId,
-    title: prev.title || derived,
-    updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
-    messages: msgs,
-  };
-  await opfs.write(convPath(convId), JSON.stringify(data));
-  await refreshConversationList();
-}
-function renderHistoricalMessage(m, host = null) {
-  if (m.role === 'user') {
-    bindBubble(addMsg('user', m.content, host), m);
-  } else if (m.role === 'assistant') {
-    const contentStr = typeof m.content === 'string' ? m.content :
-      m.content.filter(p => p.type === 'text').map(p => p.text).join('');
-    if (contentStr && contentStr.trim()) {
-      const div = addMsg('assistant', '', host);
-      div.innerHTML = renderMd(contentStr);
-      bindBubble(div, m);
-    }
-    if (m.tool_calls) {
-      for (const tc of m.tool_calls) {
-        if (tc.function.name === 'show_artifact') {
-          try {
-            const { path } = JSON.parse(tc.function.arguments || '{}');
-            if (path) renderArtifact(host, path);
-          } catch (_) {}
-        } else {
-          const tcDiv = addMsg('tool-call', '', host);
-          tcDiv.dataset.fname = tc.function.name;
-          tcDiv.dataset.tcId = tc.id;
-          const box = buildToolBox(tc.function.arguments || '{}', tc.function.name);
-          const expanded = tcDiv.querySelector('.tc-expanded');
-          if (expanded) {
-            expanded.innerHTML = '';
-            expanded.appendChild(box);
-          }
-          renderTcDone(tcDiv, tc.function.name);
-          bindBubble(tcDiv, m);
-        }
-      }
-    }
-  } else if (m.role === 'tool') {
-    const content = String(m.content || '');
-    if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
-      const t = content;
-      const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
-
-      const target = host || $('messages');
-      const toolCalls = target.querySelectorAll('.msg.tool-call');
-      if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
-      }
-    }
-
-  }
-}
-function clearActiveConvUI() {
-
-  const s = activeStream();
-  if (s && s.host) s.host.innerHTML = '';
-}
-function parkActiveConv() {
-  const s = activeStream();
-  if (!s) return;
-  s.messages = messages;
-  if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
-}
-function mountConv(convId) {
-  activeConvId = convId;
-  if (convId) {
-    localStorage.setItem('sandpie-active-conv', convId);
-    const s = ensureStream(convId);
-    messages = s.messages;
-
-    const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
-    if (s.host.parentNode !== target) target.appendChild(s.host);
-  } else {
-    localStorage.removeItem('sandpie-active-conv');
-    messages = [];
-  }
-  refreshSendButtonForActive();
-  if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
-}
-async function loadConv(id) {
-  if (id === activeConvId) return;
-
-  if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
-
-  await saveActiveConv();
-  parkActiveConv();
-  if (convStreams.has(id)) {
-    mountConv(id);
-  } else {
-    let data;
-    try { data = JSON.parse(await opfs.read(convPath(id))); }
-    catch (e) {
-      if (activeConvId) mountConv(activeConvId);
-      addMsg('err', 'Failed to load conversation: ' + e.message);
-      return;
-    }
-    const s = ensureStream(id);
-    s.messages = (data.messages || []).slice();
-    mountConv(id);
-    for (const m of s.messages) renderHistoricalMessage(m);
-  }
-  activeConvId = id;
-  localStorage.setItem('sandpie-active-conv', id);
-  convLastViewed.set(id, new Date().toISOString());
-  await refreshConversationList();
-  document.body.classList.remove('sidebar-open');
-  const btn = document.querySelector('.hamburger');
-  if (btn) btn.textContent = '☰';
-  const mEl = $('messages');
-  mEl.scrollTop = mEl.scrollHeight;
-}
-async function newConversation() {
-  await saveActiveConv();
-  parkActiveConv();
-  const id = newConvId();
-  ensureStream(id);
-  mountConv(id);
-  convLastViewed.set(id, new Date().toISOString());
-  await refreshConversationList();
-}
-async function listConversations() {
-  let entries = [];
-  try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
-
-  const searchActive = !!($('convSearch')?.value.trim());
-
-  const reads = entries
-    .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
-    .map(async (e) => {
-      const id = e.name.slice(0, -5);
-      try {
-        const data = JSON.parse(await opfs.read(convPath(id)));
-        const row = {
-          id: data.id || id,
-          title: data.title || '(no title)',
-          updated: data.updated || '',
-          pinned: !!data.pinned,
-          archived: !!data.archived,
-        };
-        if (searchActive) {
-          const messages = data.messages || [];
-          row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
-        }
-        return row;
-      } catch { return null; }
-    });
-  const out = (await Promise.all(reads)).filter(Boolean);
-
-  for (const c of out) {
-    if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
-  }
-  return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
-}
-function refreshNewChatButton() {
-  const btn = $('newChatBtn');
-  if (!btn) return;
-  const empty = messages.length === 0;
-  btn.disabled = empty;
-  btn.title = empty ? "Already a fresh chat — just start typing below." : '';
-}
-let archivedExpanded = false;
-async function updateConvFile(id, patch) {
-  let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); }
-  catch { return; }
-  Object.assign(data, patch);
-  await opfs.write(convPath(id), JSON.stringify(data));
-}
-async function renameConv(id, current) {
-  const next = prompt('Rename conversation', current);
-  if (next == null) return;
-  const trimmed = next.trim();
-  if (!trimmed || trimmed === current) return;
-  await updateConvFile(id, { title: trimmed });
-  await refreshConversationList();
-}
-async function togglePinConv(id, currentlyPinned) {
-  await updateConvFile(id, { pinned: !currentlyPinned });
-  await refreshConversationList();
-}
-async function toggleArchiveConv(id, currentlyArchived) {
-  await updateConvFile(id, { archived: !currentlyArchived });
-  await refreshConversationList();
-}
-async function duplicateConv(id, title) {
-  let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); }
-  catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
-  const newId = newConvId();
-  data.id = newId;
-  data.title = (data.title || title || '(no title)') + ' (copy)';
-  data.pinned = false;
-  data.archived = false;
-  data.updated = new Date().toISOString();
-  await opfs.write(convPath(newId), JSON.stringify(data));
-  await refreshConversationList();
-}
-async function deleteConv(id, title) {
-  const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
-  if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
-  const path = convPath(id);
-  try { await opfs.remove(path); } catch {}
-  Sandpie.events.emit('file:deleted', path);
-
-  const stream = convStreams.get(id);
-  if (stream) {
-    if (stream.abort) stream.abort.abort();
-    if (stream.timerInterval) clearInterval(stream.timerInterval);
-    if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
-    convStreams.delete(id);
-  }
-
-  if (sidePanel) sidePanel.notifyDeleted(id);
-  if (id === activeConvId) {
-    activeConvId = null;
-    localStorage.removeItem('sandpie-active-conv');
-    messages = [];
-
-    const promoted = sidePanel?.promoteSideToActive();
-    if (!promoted) {
-      refreshSendButtonForActive();
-    } else {
-
-    }
-  }
-  await refreshConversationList();
-}
-function fmtRelTime(iso) {
-  if (!iso) return '';
-  const then = new Date(iso);
-  const now = new Date();
-  const sec = Math.floor((now - then) / 1000);
-  if (sec < 60) return 'now';
-  const min = Math.floor(sec / 60);
-  if (min < 60) return min + 'm';
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return hr + 'h';
-  const day = Math.floor(hr / 24);
-  if (day < 7) return day + 'd';
-  const wk = Math.floor(day / 7);
-  if (wk < 4) return wk + 'w';
-  const mo = Math.floor(day / 30);
-  if (mo < 12) return mo + 'mo';
-  return Math.floor(day / 365) + 'y';
-}
-function buildConvLi(c, idx) {
-  const li = document.createElement('li');
-  li.dataset.cid = c.id;
-  if (c.id === activeConvId) li.classList.add('active');
-  if (c.archived) li.classList.add('archived');
-  const num = document.createElement('span');
-  num.className = 'conv-num';
-  num.textContent = String(idx).padStart(2, '0');
-  const span = document.createElement('span');
-  span.className = 'name';
-  span.textContent = (c.pinned ? '* ' : '') + c.title;
-  span.title = c.updated || '';
-  span.onclick = () => loadConv(c.id);
-  li.appendChild(num);
-  li.appendChild(span);
-
-  const meta = document.createElement('span');
-  meta.className = 'conv-meta';
-  const stream = convStreams.get(c.id);
-  if (stream && stream.generating) {
-    meta.classList.add('gen-dot');
-    meta.title = 'Still generating…';
-  } else {
-    meta.textContent = fmtRelTime(c.updated);
-    const lastViewed = convLastViewed.get(c.id);
-    const hasNew = c.updated && (!lastViewed || new Date(c.updated) > new Date(lastViewed));
-    if (hasNew && c.id !== activeConvId) meta.classList.add('unseen');
-  }
-  li.appendChild(meta);
-  const _openConvMenu = (ev) => {
-    const items = [
-      { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
-      { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
-      { label: c.archived ? 'Unarchive' : 'Archive', action: () => toggleArchiveConv(c.id, c.archived) },
-      { label: 'Duplicate',                          action: () => duplicateConv(c.id, c.title) },
-    ];
-    const sideOpen = sidePanel?.isOpen;
-    const inActive = c.id === activeConvId;
-    const inSide   = sideOpen && c.id === sidePanel.sideId;
-    if (!isMobileViewport() && !inActive && !inSide) {
-      items.push({ label: 'View in side panel', action: () => sidePanel.open(c.id) });
-    }
-    if (inSide) {
-      items.push({ label: 'Close side panel', action: () => sidePanel.close() });
-    }
-    items.push({ label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) });
-    showContextMenu(ev.clientX, ev.clientY, items);
-  };
-  li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); _openConvMenu(ev); });
-  attachLongPress(li, _openConvMenu);
-
-  li.draggable = true;
-  li.addEventListener('dragstart', (ev) => {
-    ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
-    ev.dataTransfer.effectAllowed = 'copy';
-  });
-  return li;
-}
-async function refreshConversationList() {
-  refreshNewChatButton();
-  const ul = $('convList');
-  if (!ul) return;
-  let list = await listConversations();
-
-  const searchInput = $('convSearch');
-  if (searchInput && searchInput.value.trim()) {
-    const query = searchInput.value.trim().toLowerCase();
-    list = list.filter(c =>
-      c.title.toLowerCase().includes(query) ||
-      (c.messageContent && c.messageContent.includes(query))
-    );
-  }
-
-  const pinned   = list.filter(c => c.pinned && !c.archived);
-  const regular  = list.filter(c => !c.pinned && !c.archived);
-  const archived = list.filter(c => c.archived);
-
-  const visible = pinned.length + regular.length;
-  $('convCount').textContent = visible ? `${visible}` : '';
-  const frag = document.createDocumentFragment();
-  if (!list.length) {
-    const li = document.createElement('li');
-    li.className = 'empty';
-    li.textContent = Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…';
-    frag.appendChild(li);
-    ul.replaceChildren(frag);
-    return;
-  }
-  pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
-  if (pinned.length && regular.length) {
-    const sep = document.createElement('li');
-    sep.style.cssText = 'height:6px; margin:0; cursor:default; pointer-events:none;';
-    sep.setAttribute('aria-hidden', 'true');
-    frag.appendChild(sep);
-  }
-  regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
-  if (archived.length) {
-    const header = document.createElement('li');
-    header.className = 'archived-toggle';
-    header.textContent = `${archivedExpanded ? '▾' : '▸'} Archived (${archived.length})`;
-    header.onclick = () => { archivedExpanded = !archivedExpanded; refreshConversationList(); };
-    frag.appendChild(header);
-    if (archivedExpanded) archived.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + regular.length + i)));
-  }
-  ul.replaceChildren(frag);
-}
-let wakeLock = null;
-function refreshSendButtonForActive() {
-  const btn = $('sendBtn');
-  if (!btn) return;
-  const s = activeStream();
-  if (s && s.generating) {
-    btn.textContent = '■';
-    btn.title = 'Stop';
-    btn.classList.add('sending');
-    btn.disabled = false;
-  } else {
-    btn.textContent = '▶';
-    btn.title = 'Send';
-    btn.classList.remove('sending');
-    btn.disabled = false;
-  }
-}
-function setStreamSending(stream, sending) {
-  if (!stream) return;
-  if (sending) {
-    stream.abort = new AbortController();
-    stream.queueAborted = false;
-    stream.generating = true;
-  } else {
-    stream.abort = null;
-    stream.generating = false;
-
-    for (const el of stream.host.querySelectorAll('.tool-call')) {
-      if (el.querySelector('.tc-check')) continue;
-      el.classList.remove('in-flight');
-      renderTcDone(el, el.dataset.fname);
-    }
-  }
-  if (stream === activeStream()) refreshSendButtonForActive();
-
-  refreshConversationList();
-}
-async function handleSubmit() {
-  const text = $('input').value.trim();
-  if (!text && !SandpieImages.hasImage()) return;
-  $('input').value = '';
-
-  const content = await SandpieImages.buildContent(text);
-
-  if (SandpieImages.hasImage()) {
-    SandpieImages.clear();
-  }
-  const m = $('messages');
-  lockScroll(m);
-  m.scrollTop = m.scrollHeight;
-  enqueueForActive(content);
-
-  const ta = $('input');
-  if (ta) {
-    ta.style.height = 'auto';
-  }
-}
-async function enqueueForActive(content) {
-  await ensureActiveConv();
-  const s = ensureStream(activeConvId);
-
-  if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
-  s.queue.push(content);
-  updateQueueCount(s);
-  processQueueFor(s);
-}
-function handleButtonClick() {
-  const btn = $('sendBtn');
-  const s = activeStream();
-  if (btn.classList.contains('sending') && s) {
-
-    s.queueAborted = true;
-    if (s.abort) s.abort.abort();
-    s.queue.length = 0;
-    updateQueueCount(s);
-  } else {
-    handleSubmit();
-  }
-}
-function updateQueueCount(stream) {
-
-  const s = stream || activeStream();
-  if (!s || !s.timerEl) return;
-  const sec = Math.floor((Date.now() - s.timerStart) / 1000);
-  const queueBadge = s.queue.length > 0 ? ` <span class="queue-pill">${s.queue.length} queued</span>` : '';
-  s.timerEl.innerHTML = `${sec}s${queueBadge}`;
-}
-async function processQueueFor(stream) {
-  if (!stream || stream.isProcessing || stream.queue.length === 0) return;
-  stream.isProcessing = true;
-  stream.queueAborted = false;
-  updateQueueCount(stream);
-  try {
-    while (stream.queue.length > 0) {
-      const text = stream.queue.shift();
-      updateQueueCount(stream);
-      await sendSingle(text, stream);
-      if (stream.queueAborted) break;
-    }
-  } finally {
-    stream.isProcessing = false;
-    updateQueueCount(stream);
-  }
-
-  if (stream.queue.length > 0) processQueueFor(stream);
-}
-const SW_STREAM_PATH = './sandpie-stream';
-let _swReady = (async () => {
-  if (!('serviceWorker' in navigator)) {
-    throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
-  }
-
-  const regs = await navigator.serviceWorker.getRegistrations();
-  for (const r of regs) {
-    const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
-    if (/\/sandpie-sw\.js$/.test(url)) {
-      await r.unregister();
-      console.log('[sandpie] unregistered stale SW:', url);
-    }
-  }
-
-  let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
-  await navigator.serviceWorker.ready;
-
-  if (!navigator.serviceWorker.controller) {
-    console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
-    await reg.unregister();
-    reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) {
-      await new Promise(resolve => {
-        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-      });
-    }
-  }
-  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
-  return reg;
-})();
-_swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
-async function sendSingle(text, stream) {
-
-  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
-    return;
-  }
-  const { id: convId, messages: convMessages, host } = stream;
-
-  const userMsg = { role: 'user', content: text };
-  convMessages.push(userMsg);
-  bindBubble(addMsg('user', text, host), userMsg);
-  saveConv(convId).catch(() => {});
-  requestWakeLock();
-  setStreamSending(stream, true);
-  startTotalTimer(stream);
-  let wasAborted = false;
-
-  const config = await buildAgentConfig(convMessages);
-
-  await _swReady;
-  const ctrl = new AbortController();
-  stream.requestId = ctrl;
-  const onAbort = () => ctrl.abort();
-  if (stream.abort?.signal) {
-    if (stream.abort.signal.aborted) onAbort();
-    else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
-  }
-
-  const renderer = new RoundRenderer(host, convMessages);
-
-  let agentDoneSeen = false;
-  let errorSeen = false;
-  let lastInFlightTool = null;
-  const dispatch = (ev) => {
-    if (ev.type === 'agent_done')  agentDoneSeen = true;
-    if (ev.type === 'error')        errorSeen = true;
-    if (ev.type === 'tool_started') lastInFlightTool = ev.tc?.function?.name || 'unknown';
-    if (ev.type === 'tool_result')  lastInFlightTool = null;
-    if (ev.type === 'usage')        SandpieTokens.recordUsage(convId, ev.usage);
-    dispatchAgentEvent(ev, renderer, host);
-  };
-  try {
-
-    const res = await fetch('./sandpie-agent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
-      return;
-    }
-
-    await readAgentEvents(res.body, dispatch);
-
-    if (!agentDoneSeen && !wasAborted && !errorSeen) {
-      const trigger = lastInFlightTool
-        ? ` while running \`${lastInFlightTool}\``
-        : '';
-      addMsg('err',
-        `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
-        host,
-      );
-    }
-  } catch (e) {
-    if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
-      wasAborted = true;
-      addMsg('info', 'Stopped.', host);
-    } else {
-      console.error('[sandpie] agent fetch error:', e);
-      addMsg('err', 'Error: ' + ((e && (e.message || String(e))) || 'unknown'), host);
-    }
-  } finally {
-
-    if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
-    stream.requestId = null;
-
-    renderer.finalize();
-
-    releaseWakeLock();
-    endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
-    setStreamSending(stream, false);
-    await saveConv(convId);
-
-    if (!wasAborted) await SandpieNotifications.notifyComplete(convId);
-    try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
-  }
-}
-async function buildAgentConfig(convMessages) {
-  const endpoint = $('endpoint').value.replace(/\/$/, '');
-  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
-  const resolvedMessages = [];
-  for (const msg of convMessages) {
-    if (msg.role === 'user' && Array.isArray(msg.content)) {
-      const resolvedContent = [];
-      for (const part of msg.content) {
-        if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
-          const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
-          if (dataUrl) {
-            resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl } });
-          }
-        } else {
-          resolvedContent.push(part);
-        }
-      }
-      resolvedMessages.push({ ...msg, content: resolvedContent });
-    } else {
-      resolvedMessages.push(msg);
-    }
-  }
-  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-  return {
-    url,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
-    model: $('model').value,
-    systemPrompt: await buildSystemPrompt(),
-    messages: resolvedMessages,
-    tools: toolDefs(),
-    maxTokens: (active && active.maxTokens) || 8192,
-    temperature: (active && active.temperature != null) ? active.temperature : null,
-    origin: location.origin,
-  };
-}
-async function readAgentEvents(body, onEvent) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let lineBuf = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    lineBuf += decoder.decode(value, { stream: true });
-    const lines = lineBuf.split('\n');
-    lineBuf = lines.pop() || '';
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try { onEvent(JSON.parse(line)); }
-      catch (e) { console.warn('[sandpie] bad event line:', line, e); }
-    }
-  }
-}
-function dispatchAgentEvent(ev, renderer, host) {
-  switch (ev.type) {
-    case 'round_start':   return renderer.startRound();
-    case 'delta':         return renderer.applyDelta(ev.delta);
-    case 'round_end':     return renderer.endRound(ev.content);
-    case 'message_added': return renderer.bindMessage(ev.message);
-    case 'tool_started':  return renderer.markToolStarted(ev.tc);
-    case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
-    case 'agent_done':    return;
-    case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
-    case 'info': {
-      if (ev.message) {
-        if (!renderer._retryNotice) renderer._retryNotice = addMsg('info', ev.message, host);
-        else renderer._retryNotice.textContent = ev.message;
-      } else if (renderer._retryNotice) {
-        renderer._retryNotice.remove();
-        renderer._retryNotice = null;
-      }
-      return;
-    }
-  }
-}
 (function() {
   const messages = document.getElementById('messages');
   if (!messages) return;
@@ -2806,12 +1598,39 @@ function _bootSandpie() {
   // applySavedCustom() restores saved theme from localStorage.
   // If DOMPurify hasn't loaded yet, that's fine — theme can still apply.
   applySavedCustom();
+  // Init conversations (now safe because modules/conversations.js has loaded)
+  (async () => {
+    await refreshConversationList();
+    if (activeConvId) {
+    
+      const restoreId = activeConvId;
+      activeConvId = null;
+      const s = ensureStream(restoreId);
+      try {
+        const data = JSON.parse(await opfs.read(convPath(restoreId)));
+        s.messages = (data.messages || []).slice();
+      } catch {  }
+      mountConv(restoreId);
+      for (const m of s.messages) renderHistoricalMessage(m);
+    }
+    
+    const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
+    requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
+    document.querySelectorAll('#messages img').forEach(img => {
+      if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
+    });
+    window._sandpieBootDone = true;
+  })();
+  // Resume any in-flight generation after a tab refresh.
+  setTimeout(() => { if (activeConvId) maybeResumeFlight(activeConvId); }, 300);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _bootSandpie);
 } else {
   _bootSandpie();
 }
+
 </script>
-</body>
+    <script defer src="modules/augmentations.js?v=2"></script>
+  </body>
 </html>
