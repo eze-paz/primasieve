@@ -556,10 +556,10 @@ const Sandpie = (() => {
     get opfs()   { return opfs; },
     get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
-    opfsMtime(path)        { return opfsLastModified(path); },
+    opfsMtime(path)        { return opfs.lastModified(path); },
     isGenerating()         { return anyStreamGenerating(); },
-    openFilePath()         { return _openFilePath; },
-    refreshFiles()         { return refreshFileList(); },
+    openFilePath()         { return window._openFilePath; },
+    refreshFiles()         { return opfs.refreshFileList(); },
     refreshConversations() { return refreshConversationList(); },
 
     // sync capability
@@ -577,25 +577,12 @@ window.Sandpie = Sandpie;
    Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
    anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
    facts the provider reads through the Sandpie host API. */
-let _openFilePath = null;
+
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
 }
-async function opfsLastModified(path) {
-  try {
-    const { parts, name } = splitPath(path);
-    let dir = await navigator.storage.getDirectory();
-    for (const p of parts) {
-      dir = await dir.getDirectoryHandle(p);
-    }
-    const handle = await dir.getFileHandle(name);
-    const file = await handle.getFile();
-    return file.lastModified;
-  } catch (e) {
-    return 0;
-  }
-}
+
 async function buildSystemPrompt() {
   try {
     const text = await opfs.read('sandpie_memory.md');
@@ -608,61 +595,11 @@ async function buildSystemPrompt() {
     return { role: 'system', content: basic };
   }
 }
-function formatSize(bytes) {
-  if (!bytes || bytes < 0) return '';
-  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
-  let u = 0;
-  while (bytes >= 1024 && u < units.length - 1) { bytes /= 1024; u++; }
-  return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
-}
-async function getFileSize(path) {
 
-  try {
-    const parts = path.split('/').filter(Boolean);
-    const name = parts.pop();
-    const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(name);
-    return (await handle.getFile()).size;
-  } catch {}
 
-  const s = (Sandpie.syncProvider()?.getState?.() || {})[path];
-  return s && s.size || 0;
-}
-async function getFolderSize(path) {
-  const prefix = path ? path.toLowerCase() + '/' : '';
-  let total = 0;
-  const state = Sandpie.syncProvider()?.getState?.() || {};
 
-  for (const k of Object.keys(state)) {
-    const kl = k.toLowerCase();
-    if (prefix && !kl.startsWith(prefix)) continue;
 
-    if (prefix && kl.length <= prefix.length) continue;
-    total += state[k].size || 0;
-  }
 
-  try {
-    for (const f of await opfs.list(path)) {
-      const full = (path ? path + '/' : '') + f;
-      if (!state[full]) {
-        try {
-          const parts = full.split('/').filter(Boolean);
-          const name = parts.pop();
-          const dir = await opfs.resolveDir(parts);
-          const handle = await dir.getFileHandle(name);
-          total += (await handle.getFile()).size;
-        } catch {}
-      }
-    }
-  } catch {}
-  return total;
-}
-function opfsCurrentPath() {
-  return ($('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
-}
-function opfsJoin(base, child) {
-  return base ? base + '/' + child : child;
-}
 async function refreshFileList() {
   const ul = $('fileList');
   const path = opfsCurrentPath();
@@ -792,8 +729,8 @@ async function refreshFileList() {
 
   ul.replaceChildren(frag);
 }
-let activeCtxMenu = null;
-function closeCtxMenu() { activeCtxMenu?.remove(); activeCtxMenu = null; }
+
+
 document.addEventListener('click', closeCtxMenu);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
 window.addEventListener('blur', closeCtxMenu);
@@ -805,52 +742,14 @@ $('fileList').addEventListener('contextmenu', (ev) => {
     { label: 'New file', action: () => createNewFile() },
   ]);
 });
-function showContextMenu(x, y, items) {
-  closeCtxMenu();
-  const menu = document.createElement('div');
-  menu.className = 'ctx-menu';
-  menu.setAttribute('data-chrome', '');
-  for (const item of items) {
-    const btn = document.createElement('button');
-    btn.textContent = item.label;
-    if (item.danger) btn.className = 'danger';
-    btn.onclick = (e) => { e.stopPropagation(); closeCtxMenu(); item.action(); };
-    menu.appendChild(btn);
-  }
-  document.body.appendChild(menu);
 
-  const r = menu.getBoundingClientRect();
-  const px = Math.min(x, window.innerWidth - r.width - 4);
-  const py = Math.min(y, window.innerHeight - r.height - 4);
-  menu.style.left = Math.max(0, px) + 'px';
-  menu.style.top = Math.max(0, py) + 'px';
-  activeCtxMenu = menu;
-}
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
 const TEXT_PREVIEW_CAP = 200_000;
-function closeFileViewer() {
-  _openFilePath = null;
-  document.querySelectorAll('.file-viewer').forEach(el => {
-    const url = el.dataset.blobUrl;
-    if (url) URL.revokeObjectURL(url);
-    el.remove();
-  });
-}
+
 let markedPromise = null;
-function getMarked() {
-  if (!markedPromise) {
-    markedPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/marked@13/marked.min.js';
-      s.onload = () => resolve(window.marked);
-      s.onerror = () => reject(new Error('failed to load marked'));
-      document.head.appendChild(s);
-    });
-  }
-  return markedPromise;
-}
+
 async function openFileViewer(fullKey, name) {
 
   let file;
@@ -1027,83 +926,15 @@ document.addEventListener('keydown', e => {
     if (v) (v._close || closeFileViewer)();
   }
 });
-function opfsUp() {
-  const cur = ($('opfsPath').value || '').trim() || '/';
-  if (cur === '/' || cur === '') return;
-  $('opfsPath').value = cur.replace(/\/[^/]+\/?$/, '') || '/';
-  refreshFileList();
-}
 
-async function createNewFolder() {
-  const name = prompt('Folder name:');
-  if (!name || !name.trim()) return;
-  const clean = name.trim().replace(/[\\/:*?"<>|]/g, '_');
-  if (!clean) return;
-  const path = opfsCurrentPath();
-  const fullPath = opfsJoin(path, clean);
-  try {
-    await opfs.mkdir(fullPath);
-    Sandpie.events.emit('file:changed', fullPath);
-    await refreshFileList();
-  } catch (e) {
-    console.warn('mkdir failed:', fullPath, e);
-    alert('Could not create folder: ' + e.message);
-  }
-}
 
-async function createNewFile() {
-  const name = prompt('File name:');
-  if (!name || !name.trim()) return;
-  const clean = name.trim().replace(/[\\/:*?"<>|]/g, '_');
-  if (!clean) return;
-  const path = opfsCurrentPath();
-  const fullPath = opfsJoin(path, clean);
-  try {
-    await opfs.write(fullPath, '');
-    Sandpie.events.emit('file:changed', fullPath);
-    await refreshFileList();
-  } catch (e) {
-    console.warn('create file failed:', fullPath, e);
-    alert('Could not create file: ' + e.message);
-  }
 
-async function getSharedSet() {
-  try {
-    const data = JSON.parse(await opfs.read('shared_index.json'));
-    return new Set(Object.keys(data).map(k => k.toLowerCase()));
-  } catch { return new Set(); }
-}
-async function toggleSharedFile(fullKey) {
-  let data = {};
-  try { data = JSON.parse(await opfs.read('shared_index.json')); } catch {}
-  const key = fullKey.toLowerCase();
-  if (data[key]) delete data[key]; else data[key] = true;
-  await opfs.write('shared_index.json', JSON.stringify(data, null, 2));
-  Sandpie.events.emit('file:changed', 'shared_index.json');
-  await refreshFileList();
-}
-}
+
+
 
 $('opfsPath').addEventListener('change', refreshFileList);
 $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
-async function uploadEntry(entry, dirPath) {
-  if (entry.isFile) {
-    const file = await new Promise(r => entry.file(r));
-    const destPath = opfsJoin(dirPath, entry.name);
-    await opfs.write(destPath, file);
-    Sandpie.events.emit('file:changed', destPath);
-    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
-  } else if (entry.isDirectory) {
-    const sub = opfsJoin(dirPath, entry.name);
-    const reader = entry.createReader();
-    while (true) {
-      const batch = await new Promise(r => reader.readEntries(r));
-      if (!batch.length) break;
-      for (const child of batch) await uploadEntry(child, sub);
-    }
-  }
-}
+
 (() => {
   const list = $('fileList');
   list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
