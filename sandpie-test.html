@@ -729,7 +729,8 @@ async function refreshFileList() {
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   if ($('fileCount')) $('fileCount').textContent = items.length ? `${items.length}` : '';
 
-  for (const it of items) {
+  const sharedSet = await getSharedSet();
+  const renderItem = (it) => {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
@@ -748,12 +749,14 @@ async function refreshFileList() {
     sizeSpan.className = 'file-size';
     sizeSpan.textContent = formatSize(it.size);
     li.append(sizeSpan);
+    if (sharedSet.has(it.fullKey.toLowerCase())) li.classList.add('shared');
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
       menuItems.push({ label: 'New folder', action: () => createNewFolder() });
       menuItems.push({ label: 'New file', action: () => createNewFile() });
+      menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => toggleSharedFile(it.fullKey) });
 
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
@@ -771,7 +774,22 @@ async function refreshFileList() {
       showContextMenu(ev.clientX, ev.clientY, menuItems);
     });
     frag.appendChild(li);
+  };
+
+  const regular = items.filter(it => !sharedSet.has(it.fullKey.toLowerCase()));
+  const shared = items.filter(it => sharedSet.has(it.fullKey.toLowerCase()));
+
+  for (const it of regular) renderItem(it);
+
+  if (shared.length) {
+    const header = document.createElement('li');
+    header.className = 'shared-toggle';
+    header.textContent = `${sharedExpanded ? '▾' : '▸'} Shared (${shared.length})`;
+    header.onclick = () => { sharedExpanded = !sharedExpanded; refreshFileList(); };
+    frag.appendChild(header);
+    if (sharedExpanded) shared.forEach(renderItem);
   }
+
   ul.replaceChildren(frag);
 }
 let activeCtxMenu = null;
@@ -1048,6 +1066,22 @@ async function createNewFile() {
     console.warn('create file failed:', fullPath, e);
     alert('Could not create file: ' + e.message);
   }
+
+async function getSharedSet() {
+  try {
+    const data = JSON.parse(await opfs.read('shared_index.json'));
+    return new Set(Object.keys(data).map(k => k.toLowerCase()));
+  } catch { return new Set(); }
+}
+async function toggleSharedFile(fullKey) {
+  let data = {};
+  try { data = JSON.parse(await opfs.read('shared_index.json')); } catch {}
+  const key = fullKey.toLowerCase();
+  if (data[key]) delete data[key]; else data[key] = true;
+  await opfs.write('shared_index.json', JSON.stringify(data, null, 2));
+  Sandpie.events.emit('file:changed', 'shared_index.json');
+  await refreshFileList();
+}
 }
 
 $('opfsPath').addEventListener('change', refreshFileList);
@@ -2212,6 +2246,7 @@ function refreshNewChatButton() {
   btn.title = empty ? "Already a fresh chat — just start typing below." : '';
 }
 let archivedExpanded = false;
+let sharedExpanded = false;
 async function updateConvFile(id, patch) {
   let data;
   try { data = JSON.parse(await opfs.read(convPath(id))); }
