@@ -483,12 +483,6 @@ const Sandpie = (() => {
 })();
 window.Sandpie = Sandpie;
 
-/* Cloud sync (Dropbox transport glue, OAuth, sync state, cloud index, and the
-   sync engine) now lives in modules/dropbox.js, registered with the page via
-   Sandpie.registerSyncProvider(). The helpers just below (_openFilePath,
-   anyStreamGenerating, opfsLastModified) stay here: they are page/file-browser
-   facts the provider reads through the Sandpie host API. */
-
 function anyStreamGenerating() {
   for (const s of convStreams.values()) if (s.generating) return true;
   return false;
@@ -1707,6 +1701,6 @@ if (document.readyState === 'loading') {
 }
 
 </script>
-    <script defer src="modules/augmentations.js?v=2"></script>
+    <script defer src="modules/augmentations.js"></script>
   </body>
 </html>
