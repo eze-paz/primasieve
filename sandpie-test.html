@@ -135,17 +135,6 @@
 <script>
 const $ = id => document.getElementById(id);
 
-/* =============================================================================
-   SandpieTokens — conversation + weekly token accounting
-   Real counts come from the provider's usage object (include_usage); when a
-   provider doesn't return one we fall back to a chars/4 estimate. The context
-   window denominator is set per-provider (manually in the provider modal).
-   ============================================================================= */
-
-
-/* =============================================================================
-   SandpieMenu — Sidebar Section Registry
-   ============================================================================= */
 const SandpieMenu = (() => {
   const sections = new Map();
   let sidebarEl = null;
