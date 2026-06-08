@@ -297,7 +297,17 @@ opfs.uploadEntry = async function(entry, dirPath) {
   }
 };
 
+
+/* shared files index (used by file browser for shared-folder badges) */
+opfs.getSharedSet = async function() {
+  try {
+    const data = JSON.parse(await opfs.read('shared_index.json'));
+    return new Set(Object.keys(data).map(k => k.toLowerCase()));
+  } catch { return new Set(); }
+};
+
 /* --- backward compat shims for browser/viewer/editor --- */
+window.getSharedSet = function() { return opfs.getSharedSet(); };
 window.closeCtxMenu = function() { return opfs.closeCtxMenu(); };
 window.showContextMenu = function(x, y, items) { return opfs.showContextMenu(x, y, items); };
 window.closeFileViewer = function() { return opfs.closeFile(); };
