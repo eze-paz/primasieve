@@ -209,6 +209,179 @@ opfs.showContextMenu = function(x, y, items) {
   _activeCtxMenu = menu;
 };
 
+
+
+/* Open file viewer/editor */
+opfs.openFile = async function(fullKey, name) {
+
+  let file;
+  try {
+    const { parts, name: fname } = splitPath(fullKey);
+    const dir = await opfs.resolveDir(parts);
+    const handle = await dir.getFileHandle(fname);
+    file = await handle.getFile();
+  } catch (e) {
+    Sandpie.Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`);
+    return;
+  }
+  window._openFilePath = fullKey;
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const overlay = document.createElement('div');
+  overlay.className = 'file-viewer';
+  overlay.setAttribute('data-chrome', '');
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  const header = document.createElement('header');
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = '/' + fullKey;
+  const meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.textContent = `${file.size.toLocaleString()} bytes`;
+
+  const mdBtn = document.createElement('button');
+  mdBtn.className = 'mode';
+  mdBtn.style.display = 'none';
+  const pencilBtn = document.createElement('button');
+  pencilBtn.className = 'mode';
+  pencilBtn.textContent = '✎';
+  pencilBtn.title = 'Edit';
+  pencilBtn.style.display = 'none';
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'mode';
+  saveBtn.textContent = '💾';
+  saveBtn.title = 'Save (Ctrl+S)';
+  saveBtn.style.display = 'none';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close (Esc)';
+  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
+  const body = document.createElement('div');
+  body.className = 'body';
+  panel.append(header, body);
+  overlay.appendChild(panel);
+
+  const finalize = (closeFn) => {
+    closeBtn.onclick = closeFn;
+    overlay._close = closeFn;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
+    document.body.appendChild(overlay);
+  };
+  if (IMAGE_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const img = document.createElement('img'); img.src = url; body.appendChild(img);
+    finalize(opfs.closeFile); return;
+  }
+  if (VIDEO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const v = document.createElement('video'); v.src = url; v.controls = true; body.appendChild(v);
+    finalize(opfs.closeFile); return;
+  }
+  if (AUDIO_EXTS.has(ext)) {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const a = document.createElement('audio'); a.src = url; a.controls = true; body.appendChild(a);
+    finalize(opfs.closeFile); return;
+  }
+  if (ext === 'pdf') {
+    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const f = document.createElement('iframe');
+    f.setAttribute('data-chrome', '');
+    f.src = url;
+    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
+    body.appendChild(f);
+    finalize(opfs.closeFile); return;
+  }
+
+  const text = await file.text();
+  const sample = text.slice(0, 4000);
+  const repl = (sample.match(/�/g) || []).length;
+  const looksBinary = repl > 50 && repl / Math.max(sample.length, 1) > 0.01;
+  if (looksBinary) {
+    const pre = document.createElement('pre');
+    pre.textContent = '(binary file — preview unavailable)';
+    body.appendChild(pre);
+    finalize(opfs.closeFile); return;
+  }
+  const isMd = ext === 'md' || ext === 'markdown';
+  const editable = text.length <= TEXT_PREVIEW_CAP;
+
+  let mode = isMd ? 'rendered' : 'raw';
+  let current = text;
+  let textareaEl = null;
+  const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
+  const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
+  function refreshButtons() {
+    mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
+    mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
+    mdBtn.title = mode === 'rendered' ? 'Show raw markdown' : 'Render markdown';
+    pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
+    saveBtn.style.display = mode === 'edit' ? '' : 'none';
+  }
+  async function render() {
+    body.innerHTML = '';
+    textareaEl = null;
+    if (mode === 'edit') {
+      const ta = document.createElement('textarea');
+      ta.className = 'editor';
+      ta.spellcheck = false;
+      ta.value = current;
+      ta.addEventListener('input', refreshTitle);
+      ta.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault(); doSave();
+        }
+      });
+      body.appendChild(ta);
+      textareaEl = ta;
+      ta.focus();
+    } else if (mode === 'rendered') {
+      const div = document.createElement('div');
+      div.className = 'md-preview';
+      div.textContent = 'Loading preview…';
+      body.appendChild(div);
+      try {
+        const marked = await opfs.opfs.getMarked();
+        div.innerHTML = window.marked.parse(current);
+      } catch (e) {
+        div.textContent = '(failed to load markdown renderer — showing raw)\n\n' + current;
+      }
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = current.length > TEXT_PREVIEW_CAP
+        ? current.slice(0, TEXT_PREVIEW_CAP) + `\n…[truncated, full size ${current.length.toLocaleString()} chars]`
+        : current;
+      body.appendChild(pre);
+    }
+    refreshButtons();
+    refreshTitle();
+  }
+  mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
+  pencilBtn.onclick = () => { mode = 'edit'; render(); };
+  async function doSave() {
+    if (!textareaEl) return;
+    const newContent = textareaEl.value;
+    try {
+      await opfs.write(fullKey, newContent);
+      Sandpie.events.emit('file:changed', fullKey);
+      current = newContent;
+      meta.textContent = `${new Blob([newContent]).size.toLocaleString()} bytes`;
+      refreshTitle();
+      await window.refreshFileList();
+    } catch (e) {
+      Sandpie.Sandpie.addMsg('err', `Could not save ${fullKey}: ${e.message}`);
+    }
+  }
+  saveBtn.onclick = doSave;
+  function attemptClose() {
+    if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
+    opfs.closeFile();
+  }
+  closeBtn.onclick = attemptClose;
+  overlay._close = attemptClose;
+  overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
+  document.body.appendChild(overlay);
+  await render();
+}
 opfs.closeFile = function() {
   window._openFilePath = null;
   document.querySelectorAll('.file-viewer').forEach(el => {
@@ -310,6 +483,8 @@ opfs.getSharedSet = async function() {
 window.getSharedSet = function() { return opfs.getSharedSet(); };
 window.closeCtxMenu = function() { return opfs.closeCtxMenu(); };
 window.showContextMenu = function(x, y, items) { return opfs.showContextMenu(x, y, items); };
+
+window.openFileViewer = function(fullKey, name) { return opfs.openFile(fullKey, name); };
 window.closeFileViewer = function() { return opfs.closeFile(); };
 window.getMarked = function() { return opfs.getMarked(); };
 window.opfsUp = function() { return opfs.up(); };
