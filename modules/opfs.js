@@ -1,4 +1,11 @@
 // sandpie OPFS core — filesystem primitives and path utilities
+
+// File-viewer preview type sets + text-preview size cap (used by openFile below).
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
+const TEXT_PREVIEW_CAP = 200_000;
+
 function splitPath(path) {
   const parts = String(path).split('/').filter(Boolean);
   const name = parts.pop();

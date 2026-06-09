@@ -11,7 +11,6 @@
 <link rel="stylesheet" href="sandpie.css">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<!-- init() deferred to end of body -->
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/console.js"></script>
@@ -137,14 +136,6 @@
 const $ = id => document.getElementById(id);
 
 /* =============================================================================
-   SandpieTokens — conversation + weekly token accounting
-   Real counts come from the provider's usage object (include_usage); when a
-   provider doesn't return one we fall back to a chars/4 estimate. The context
-   window denominator is set per-provider (manually in the provider modal).
-   ============================================================================= */
-
-
-/* =============================================================================
    SandpieMenu — Sidebar Section Registry
    ============================================================================= */
 const SandpieMenu = (() => {
@@ -257,9 +248,6 @@ const convStreams = new Map();
 const convLastViewed = new Map();
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 
-/* renderMd/dedentPreBlocks, scroll tracking, ensureStream/activeStream, and the
-   tools-minimized toggle now live in modules/conversations.js. */
-
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 function api(url) {
   const stripped = url.replace(/^https?:\/\//, '');
@@ -268,12 +256,6 @@ function api(url) {
   if (isLocalhost) return '/proxy/' + stripped;
   return url;
 }
-
-/* setDot was removed — each module now toggles its own section status dot
-   directly (it owns the dot id it passed to SandpieMenu.add).
-
-   The chat input wiring (setupInput) and resume-on-refresh flight checkpointing
-   (maybeResumeFlight) now live in modules/conversations.js. */
 
 /* =============================================================================
    Sandpie — core contract / host API.
@@ -338,12 +320,6 @@ const Sandpie = (() => {
 })();
 window.Sandpie = Sandpie;
 
-/* Cloud sync (Dropbox transport glue, OAuth, sync state, cloud index, and the
-   sync engine) lives in modules/dropbox.js, registered with the page via
-   Sandpie.registerSyncProvider(). Conversation/stream helpers the host contract
-   exposes (addMsg, anyStreamGenerating, buildSystemPrompt, …) now live in
-   modules/conversations.js; the page reaches them lazily via Sandpie / window. */
-
 document.addEventListener('click', closeCtxMenu);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
 window.addEventListener('blur', closeCtxMenu);
@@ -355,11 +331,6 @@ $('fileList').addEventListener('contextmenu', (ev) => {
     { label: 'New file', action: () => createNewFile() },
   ]);
 });
-
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif']);
-const VIDEO_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
-const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac']);
-const TEXT_PREVIEW_CAP = 200_000;
 
 let markedPromise = null;
 
@@ -400,12 +371,7 @@ $('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshF
   });
 })();
 refreshFileList();
-/* SidePanel (side-by-side conversation view) + the side-resizer drag handler now
-   live in modules/conversations.js. */
-  window._sandpieBootDone = true;  /* moved to _bootSandpie */
-/* addMsg, bindBubble, and applyToolsMinimized now live in modules/conversations.js. */
-/* Message bubble context menu (rewind/copy/tools/thoughts) and the message-user
-   parallax scroll effect now live in modules/conversations.js. */
+window._sandpieBootDone = true;
 </script>
 <script>
 let _deferredInstallPrompt = null;
@@ -419,7 +385,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   <script type="module" src="modules/context.js"></script>
   <script type="module" src="modules/artifacts.js"></script>
 <script>
-// Load version from version.txt
 fetch('version.txt')
   .then(r => r.text())
   .then(v => {
