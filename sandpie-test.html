@@ -301,23 +301,6 @@ const renderMd = text => {
   }
   return DOMPurify.sanitize(dedentPreBlocks(marked.parse(text)));
 };
-function dedentMarkdownFences(text) {
-  if (!text) return text;
-  return text.replace(/(^|\n)(```[^\n]*\n)([\s\S]*?)(\n[ \t]*```)/g, (_, lead, open, body, close) => {
-    const lines = body.split('\n');
-    let minIndent = Infinity;
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const m = line.match(/^[ \t]*/);
-      if (m && m[0].length < minIndent) minIndent = m[0].length;
-    }
-    if (!isFinite(minIndent) || minIndent === 0) return lead + open + body + close;
-    const dedented = lines.map(
-      l => l.length >= minIndent ? l.slice(minIndent) : l,
-    ).join('\n');
-    return lead + open + dedented + close;
-  });
-}
 let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
@@ -743,27 +726,6 @@ sidePanel = new SidePanel();
 })();
   window._sandpieBootDone = true;  /* moved to _bootSandpie */
 const TOOL_RESULT_MAX = 30000;
-function capToolResult(s) {
-  s = String(s ?? '');
-  if (s.length <= TOOL_RESULT_MAX) {
-    return { content: s, truncated: false, original: s.length, kept: s.length };
-  }
-
-  const reserve = 180;
-  const budget = TOOL_RESULT_MAX - reserve;
-  const headLen = Math.floor(budget * 0.7);
-  const tailLen = budget - headLen;
-  const head = s.slice(0, headLen);
-  const tail = s.slice(-tailLen);
-  const dropped = s.length - headLen - tailLen;
-  const marker = `\n\n[… truncated by sandpie: dropped ${dropped.toLocaleString()} bytes from the middle; kept first ${headLen.toLocaleString()} + last ${tailLen.toLocaleString()} of ${s.length.toLocaleString()}]\n\n`;
-  return { content: head + marker + tail, truncated: true, original: s.length, kept: headLen + tailLen };
-}
-function humanBytes(n) {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-}
 function addMsg(role, text = '', host = null) {
 
   const target = host || (activeStream() && activeStream().host) || $('messages');
@@ -950,14 +912,6 @@ async function copyFromMenu() {
     try { document.execCommand('copy'); } catch {}
     ta.remove();
   }
-}
-function tcSetExpanded(div, text) {
-  const el = div && div.querySelector && div.querySelector('.tc-expanded');
-  if (el) el.textContent = text;
-}
-function tcAppendExpanded(div, text) {
-  const el = div && div.querySelector && div.querySelector('.tc-expanded');
-  if (el) el.textContent += text;
 }
 function tcEscape(s) {
   return String(s).replace(/[&<>"']/g, c => ({
