@@ -221,7 +221,7 @@ opfs.openFile = async function(fullKey, name) {
     const handle = await dir.getFileHandle(fname);
     file = await handle.getFile();
   } catch (e) {
-    Sandpie.Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`);
+    Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`);
     return;
   }
   window._openFilePath = fullKey;
@@ -368,7 +368,7 @@ opfs.openFile = async function(fullKey, name) {
       refreshTitle();
       await window.refreshFileList();
     } catch (e) {
-      Sandpie.Sandpie.addMsg('err', `Could not save ${fullKey}: ${e.message}`);
+      Sandpie.addMsg('err', `Could not save ${fullKey}: ${e.message}`);
     }
   }
   saveBtn.onclick = doSave;

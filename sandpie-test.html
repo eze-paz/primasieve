@@ -269,14 +269,10 @@ function api(url) {
   return url;
 }
 
-function setDot(id, state) {
-  const dot = $(id);
-  if (!dot) return;
-  dot.classList.remove('ok', 'warn', 'err');
-  if (state) dot.classList.add(state);
-}
+/* setDot was removed — each module now toggles its own section status dot
+   directly (it owns the dot id it passed to SandpieMenu.add).
 
-/* The chat input wiring (setupInput) and resume-on-refresh flight checkpointing
+   The chat input wiring (setupInput) and resume-on-refresh flight checkpointing
    (maybeResumeFlight) now live in modules/conversations.js. */
 
 /* =============================================================================
@@ -323,7 +319,6 @@ const Sandpie = (() => {
     $,
     api,
     get addMsg() { return window.addMsg; },   // defined in modules/conversations.js
-    setDot,
     get opfs()   { return opfs; },
     get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },

@@ -324,7 +324,8 @@ function updateRoutingHint() {
 
 function refreshAiDot() {
   const ok = document.getElementById('endpoint')?.value.trim() && document.getElementById('apiKey')?.value.trim();
-  if (typeof setDot === 'function') setDot('aiDot', ok ? 'ok' : null);
+  const dot = document.getElementById('aiDot');
+  if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
 }
 
 // ============================================================

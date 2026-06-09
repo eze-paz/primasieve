@@ -43,7 +43,8 @@ const SandpieNotifications = (function() {
   function refreshStatus() {
     // Status dot mirrors effectivelyOn — lit only when notifications will
     // actually fire (browser permission granted AND local pref on).
-    if (typeof setDot === 'function') setDot('notifDot', effectivelyOn() ? 'ok' : null);
+    const _notifDot = document.getElementById('notifDot');
+    if (_notifDot) { _notifDot.classList.remove('ok', 'warn', 'err'); if (effectivelyOn()) _notifDot.classList.add('ok'); }
     if (!btnEl || !statusEl) return;
     if (!('Notification' in self)) {
       btnEl.disabled = true;

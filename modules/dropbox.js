@@ -415,7 +415,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ---- status dot / busy indicator ------------------------------------------
   function dbxStatus(text, kind) {
-    Sandpie.setDot('dbxDot', kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null);
+    const st = kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null;
+    const dot = document.getElementById('dbxDot');
+    if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (st) dot.classList.add(st); }
     const sec = Sandpie.menu.get('cloudSection');
     const btn = sec?.querySelector('#dbxToggleBtn');
     if (btn) btn.textContent = kind === 'connected' ? 'Disconnect' : 'Connect';
