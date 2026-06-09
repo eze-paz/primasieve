@@ -1816,6 +1816,42 @@ function endTotalTimer(stream, label) {
 window.startTotalTimer = startTotalTimer;
 window.endTotalTimer = endTotalTimer;
 
+/* =============================================================================
+   Boot — render the conversation list and restore the last-open chat. Runs on
+   DOMContentLoaded (NOT at module-eval) so artifacts.js has loaded before a
+   restored message can call renderArtifact(). The saved theme is restored
+   separately by themes.js.
+   ============================================================================= */
+function bootConversations() {
+  (async () => {
+    await refreshConversationList();
+    if (activeConvId) {
+      const restoreId = activeConvId;
+      activeConvId = null;
+      const s = ensureStream(restoreId);
+      try {
+        const data = JSON.parse(await opfs.read(convPath(restoreId)));
+        s.messages = (data.messages || []).slice();
+      } catch {  }
+      mountConv(restoreId);
+      for (const m of s.messages) renderHistoricalMessage(m);
+    }
+    const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
+    requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
+    document.querySelectorAll('#messages img').forEach(img => {
+      if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
+    });
+    window._sandpieBootDone = true;
+  })();
+  // Resume any in-flight generation after a tab refresh.
+  setTimeout(() => { if (activeConvId) maybeResumeFlight(activeConvId); }, 300);
+}
+if (document.readyState === 'complete') {
+  bootConversations();
+} else {
+  document.addEventListener('DOMContentLoaded', bootConversations, { once: true });
+}
+
 export {
   newConvId,
   convPath,

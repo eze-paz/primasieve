@@ -325,44 +325,6 @@ fetch('version.txt')
   });
 
 </script>
-<script>
-function _bootSandpie() {
-  // applySavedCustom() restores saved theme from localStorage.
-  // If DOMPurify hasn't loaded yet, that's fine — theme can still apply.
-  applySavedCustom();
-  // Init conversations (now safe because modules/conversations.js has loaded)
-  (async () => {
-    await refreshConversationList();
-    if (activeConvId) {
-    
-      const restoreId = activeConvId;
-      activeConvId = null;
-      const s = ensureStream(restoreId);
-      try {
-        const data = JSON.parse(await opfs.read(convPath(restoreId)));
-        s.messages = (data.messages || []).slice();
-      } catch {  }
-      mountConv(restoreId);
-      for (const m of s.messages) renderHistoricalMessage(m);
-    }
-    
-    const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
-    requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
-    document.querySelectorAll('#messages img').forEach(img => {
-      if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
-    });
-    window._sandpieBootDone = true;
-  })();
-  // Resume any in-flight generation after a tab refresh.
-  setTimeout(() => { if (activeConvId) maybeResumeFlight(activeConvId); }, 300);
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', _bootSandpie);
-} else {
-  _bootSandpie();
-}
-
-</script>
     <script defer src="modules/augmentations.js?v=2"></script>
   </body>
 </html>
