@@ -731,17 +731,6 @@ function ensureStream(id) {
 }
 
 function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
-
-const _scrollLocked = new Set();
-
-function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
-
-function lockScroll(el) { if (el) _scrollLocked.add(el); }
-
-function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
-
-function shouldAutoScroll(el) { return _scrollLocked.has(el); }
-
 function flightWrite(id, text) {
   try { localStorage.setItem(SP_FLIGHT_KEY(id), JSON.stringify({t: Date.now(), text})); } catch(_) {}
 }
@@ -1239,10 +1228,6 @@ class RoundRenderer {
 /* expose on window for inline script compatibility */
 window.ensureStream = ensureStream;
 window.activeStream = activeStream;
-window.isAtBottom = isAtBottom;
-window.lockScroll = lockScroll;
-window.unlockScroll = unlockScroll;
-window.shouldAutoScroll = shouldAutoScroll;
 window.flightWrite = flightWrite;
 window.flightRead = flightRead;
 window.flightClear = flightClear;
