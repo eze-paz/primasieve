@@ -142,6 +142,26 @@
   });
 
   // ---------------------------------------------------------------------------
+  // Relay service-worker logs into the (hijacked) console so [sw] output is
+  // captured here too. OPFS-change SW messages are handled separately in
+  // modules/dropbox.js.
+  // ---------------------------------------------------------------------------
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (ev) => {
+      const d = ev.data;
+      if (!d || d.type !== 'sandpie-sw-log') return;
+      const fn = console[d.level] || console.log;
+      fn.call(console, '[sw]', d.text);
+    });
+    const flushSwLogs = () => {
+      const c = navigator.serviceWorker.controller;
+      if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
+    };
+    flushSwLogs();
+    navigator.serviceWorker.addEventListener('controllerchange', flushSwLogs);
+  }
+
+  // ---------------------------------------------------------------------------
   // Build sidebar panel HTML
   // ---------------------------------------------------------------------------
   const panelHtml = `

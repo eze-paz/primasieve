@@ -222,27 +222,6 @@ const SandpieMenu = (() => {
   };
 })();
 window.SandpieMenu = SandpieMenu;
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (ev) => {
-    const d = ev.data;
-    if (!d) return;
-    if (d.type === 'sandpie-sw-log') {
-
-      const fn = console[d.level] || console.log;
-      fn.call(console, '[sw]', d.text);
-      return;
-    }
-    // OPFS-change branches (opfs-deleted-by-python / sw-opfs-changed) live in
-    // modules/dropbox.js (cloud sync engine), which registers its own SW message listener.
-    });
-
-  const flush = () => {
-    const c = navigator.serviceWorker.controller;
-    if (c) try { c.postMessage({ type: 'sandpie-sw-flush-logs' }); } catch (_) {}
-  };
-  flush();
-  navigator.serviceWorker.addEventListener('controllerchange', flush);
-}
 let messages = [];
 const convStreams = new Map();
 const convLastViewed = new Map();
@@ -320,57 +299,6 @@ const Sandpie = (() => {
 })();
 window.Sandpie = Sandpie;
 
-document.addEventListener('click', closeCtxMenu);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
-window.addEventListener('blur', closeCtxMenu);
-$('fileList').addEventListener('contextmenu', (ev) => {
-  if (ev.target.closest('li')) return;
-  ev.preventDefault();
-  showContextMenu(ev.clientX, ev.clientY, [
-    { label: 'New folder', action: () => createNewFolder() },
-    { label: 'New file', action: () => createNewFile() },
-  ]);
-});
-
-let markedPromise = null;
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    const v = document.querySelector('.file-viewer');
-    if (v) (v._close || closeFileViewer)();
-  }
-});
-
-$('opfsPath').addEventListener('change', refreshFileList);
-$('opfsPath').addEventListener('keydown', e => { if (e.key === 'Enter') refreshFileList(); });
-
-(() => {
-  const list = $('fileList');
-  list.addEventListener('dragover', e => { e.preventDefault(); list.classList.add('drag-over'); });
-  list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
-  list.addEventListener('drop', async e => {
-    e.preventDefault();
-    list.classList.remove('drag-over');
-    const path = opfsCurrentPath();
-    const items = Array.from(e.dataTransfer.items || []);
-    for (const item of items) {
-      const entry = item.webkitGetAsEntry?.();
-      if (entry) await uploadEntry(entry, path);
-    }
-
-    if (!items.length) {
-      for (const f of e.dataTransfer.files) {
-        const destPath = opfsJoin(path, f.name);
-        await opfs.write(destPath, f);
-        Sandpie.events.emit('file:changed', destPath);
-        const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-        if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
-      }
-    }
-    await refreshFileList();
-  });
-})();
-refreshFileList();
 window._sandpieBootDone = true;
 </script>
 <script>

@@ -661,3 +661,67 @@ window.refreshFileList = function() { return opfs.refreshFileList(); };
 window.opfs = opfs;
 window.splitPath = splitPath;
 window.joinPath = joinPath;
+
+/* File-browser UI wiring (moved from sandpie-test.html). Deferred to
+   DOMContentLoaded because opfs.js loads in <head>, before #fileList/#opfsPath
+   exist in the body. */
+function initFileBrowser() {
+  document.addEventListener('click', closeCtxMenu);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCtxMenu(); });
+  window.addEventListener('blur', closeCtxMenu);
+
+  // Esc closes an open file viewer
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const v = document.querySelector('.file-viewer');
+      if (v) (v._close || closeFileViewer)();
+    }
+  });
+
+  const opfsPathEl = document.getElementById('opfsPath');
+  if (opfsPathEl) {
+    opfsPathEl.addEventListener('change', refreshFileList);
+    opfsPathEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') refreshFileList(); });
+  }
+
+  const list = document.getElementById('fileList');
+  if (list) {
+    list.addEventListener('contextmenu', (ev) => {
+      if (ev.target.closest('li')) return;
+      ev.preventDefault();
+      showContextMenu(ev.clientX, ev.clientY, [
+        { label: 'New folder', action: () => createNewFolder() },
+        { label: 'New file', action: () => createNewFile() },
+      ]);
+    });
+    list.addEventListener('dragover', (e) => { e.preventDefault(); list.classList.add('drag-over'); });
+    list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
+    list.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      list.classList.remove('drag-over');
+      const path = opfsCurrentPath();
+      const items = Array.from(e.dataTransfer.items || []);
+      for (const item of items) {
+        const entry = item.webkitGetAsEntry?.();
+        if (entry) await uploadEntry(entry, path);
+      }
+      if (!items.length) {
+        for (const f of e.dataTransfer.files) {
+          const destPath = opfsJoin(path, f.name);
+          await opfs.write(destPath, f);
+          Sandpie.events.emit('file:changed', destPath);
+          const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+          if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
+        }
+      }
+      await refreshFileList();
+    });
+  }
+
+  refreshFileList();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFileBrowser);
+} else {
+  initFileBrowser();
+}
