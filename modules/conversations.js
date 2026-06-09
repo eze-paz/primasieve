@@ -742,6 +742,47 @@ window.buildAgentConfig = buildAgentConfig;
 window.readAgentEvents = readAgentEvents;
 window.dispatchAgentEvent = dispatchAgentEvent;
 
+/* =============================================================================
+   Total-interaction timer (covers all rounds + tool execution)
+   Per-stream: each conversation's timer lives on its stream record so a
+   background conv keeps ticking against its own bubble host without colliding
+   with whichever conv is currently visible.
+   ============================================================================= */
+function startTotalTimer(stream) {
+  if (!stream || stream.timerEl) return;
+  stream.timerStart = Date.now();
+  const el = document.createElement('div');
+  el.className = 'msg-timer';
+  el.innerHTML = '0s' + (stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '');
+  stream.host.appendChild(el);
+  stream.timerEl = el;
+  stream.timerInterval = setInterval(() => {
+    if (!stream.timerEl) return;
+    const sec = Math.floor((Date.now() - stream.timerStart) / 1000);
+    const queueBadge = stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '';
+    stream.timerEl.innerHTML = `${sec}s${queueBadge}`;
+  }, 1000);
+}
+
+function endTotalTimer(stream, label) {
+  if (!stream || !stream.timerEl) return;
+  clearInterval(stream.timerInterval);
+  stream.timerInterval = null;
+  if (label === null) {
+    stream.timerEl.remove();
+  } else {
+    const sec = (Date.now() - stream.timerStart) / 1000;
+    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
+    stream.timerEl.textContent = `${label} · ${fmt}`;
+    stream.timerEl.classList.add('done');
+  }
+  stream.timerEl = null;
+}
+
+/* expose timer globals for sandpie-test.html inline scripts */
+window.startTotalTimer = startTotalTimer;
+window.endTotalTimer = endTotalTimer;
+
 export {
   newConvId,
   convPath,
