@@ -229,7 +229,9 @@ const SandpieMenu = (() => {
       return Array.from(sections.keys());
     }
   };
-})();
+})
+});
+window.SandpieMenu = SandpieMenu;
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (ev) => {
     const d = ev.data;
@@ -286,6 +288,12 @@ let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
 
 let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
 applyToolsMinimized();
+const _scrollLocked = new Set();
+function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
+function lockScroll(el) { if (el) _scrollLocked.add(el); }
+function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
+function shouldAutoScroll(el) { return _scrollLocked.has(el); }
+
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 function api(url) {
   const stripped = url.replace(/^https?:\/\//, '');
@@ -654,8 +662,8 @@ class SidePanel {
     });
   }
 }
-let sidePanel = null;
-sidePanel = new SidePanel();
+let sidePanel = null;  window.sidePanel = sidePanel;
+sidePanel = new SidePanel();  window.sidePanel = sidePanel;
 (function () {
   const resizer = $('sideResizer');
   const panel   = $('messagesSide');
