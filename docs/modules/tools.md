@@ -16,11 +16,12 @@
   `load_image`, `load_skill`.
 
 ## Tools
-- `load_skill(name)` — loads a skill's `SKILL.md` so the **model** decides when a
+- `load_skill(name)` — loads a skill's instructions so the **model** decides when a
   skill applies (see `context.js`). Defined here, executed in the service worker
-  (`sandpie.js → tool_load_skill`, dispatched from `runTool`), which resolves
-  `name → path` from `skills/index.md` (convention fallback `skills/<name>/`) and
-  returns the file contents as the tool result. The schema only matters for the
+  (`sandpie.js → tool_load_skill`, dispatched from `runTool`), which reads
+  `skills/<name>/SKILL.md` directly (the folder name *is* the skill name — no index
+  lookup), strips the frontmatter, and returns the body as the tool result. The
+  name is validated (also blocks path traversal). The schema only matters for the
   model's *decision*; resolution + read happen SW-side.
 
 ## Events

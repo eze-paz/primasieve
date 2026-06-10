@@ -599,39 +599,23 @@ async function tool_load_image({ path }, ctx) {
   }
 }
 
-// Load a skill's SKILL.md on the model's request. The enforced index
-// (skills/index.md) is the source of truth for name→path; we do a minimal
-// lookup (the full validator lives client-side in context.js) and fall back to
-// the skills/<name>/ convention so a correct name resolves even if the row's
-// Path column is wrong. The agent loop caps the returned text (truncateToolResult).
-function normSkillPathSW(p) {
-  let s = String(p).replace(/^[\s`*\[]+|[\s`*\]]+$/g, '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  if (/^files\//i.test(s)) s = s.slice(6);
-  return s;
-}
+// Load a skill's instructions on the model's request. Skills are folders under
+// skills/, so the name maps straight to skills/<name>/SKILL.md — no index to
+// consult. The name is validated (also blocks path traversal). We strip the
+// leading frontmatter (the model already has name/description from the Skills
+// section of the prompt) and return the body; the agent loop caps it
+// (truncateToolResult).
 async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) {
-    return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills index.' };
+    return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
   }
-  let path = 'skills/' + n; // convention fallback
-  try {
-    const idx = new TextDecoder().decode(await opfsReadBytes('skills/index.md'));
-    for (const line of idx.split('\n')) {
-      const t = line.trim();
-      if (!t.startsWith('|')) continue;
-      const cells = t.replace(/^\|/, '').replace(/\|+$/, '').split('|').map(s => s.trim());
-      if (cells.length !== 3) continue;
-      const rowName = cells[0].replace(/^[\s`*\[]+|[\s`*\]]+$/g, '').toLowerCase();
-      if (rowName === n) { const p = normSkillPathSW(cells[2]); if (p) path = p; break; }
-    }
-  } catch (_) {} // no/unreadable index → convention fallback
-  const file = path.replace(/\/+$/, '') + '/SKILL.md';
-  try {
-    return { result: new TextDecoder().decode(await opfsReadBytes(file)) };
-  } catch (e) {
-    return { result: 'Error: could not read ' + file + ' — check the skill\'s Path in skills/index.md, or create the file.' };
-  }
+  const file = 'skills/' + n + '/SKILL.md';
+  let text;
+  try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
+  catch (e) { return { result: 'Error: could not read ' + file + ' — no such skill, or its ' + file + ' is missing.' }; }
+  const body = text.replace(/^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '').trim();
+  return { result: body || text };
 }
 
 async function runTool(name, args, ctx) {

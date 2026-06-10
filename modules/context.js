@@ -82,76 +82,85 @@ const SandpieTokens = (() => {
 window.SandpieTokens = SandpieTokens;
 
 /* =============================================================================
-   SandpieContext — skills: enforced index + model-driven loading
+   SandpieContext — skills: filesystem-derived index + model-driven loading
 
-   OPFS layout:
-     skills/index.md          enforced index: one table | Skill | When to use | Path |
-     skills/<name>/SKILL.md   the skill's instructions (folder may hold support files)
+   OPFS layout (the filesystem IS the index — nothing to hand-maintain):
+     skills/<name>/SKILL.md   a skill. <name> (the folder) is the skill's name.
+                              The folder may also hold support files.
 
-   Selection is the MODEL's decision, not a keyword match. Every send injects the
-   index (skill name + a "when to use" description + path) into the system prompt;
-   when a request matches a description — by intent, not exact words — the model
-   calls the `load_skill` tool, which returns that skill's SKILL.md as a tool
-   result. This routes relevance through comprehension, so synonyms ("ship it to
-   prod") and intent expressed in an assistant turn both work, which literal tag
-   matching could never cover reliably.
+   Each SKILL.md self-describes via YAML-style frontmatter at the very top:
+     ---
+     name: sandpie_deploy            (optional; defaults to the folder name)
+     description: When to use this…  (REQUIRED — how the model decides to load it)
+     ---
+     # instructions…
 
-   The index is read from OPFS fresh on every send (no cache to invalidate). The
-   tool runs in the service worker (sandpie.js → tool_load_skill); this module
-   owns the index format, the system-prompt block, and the sidebar view.
+   Every send, scanSkills() walks skills/*/SKILL.md, parses frontmatter, and
+   builds the index in memory. Malformed skills (no SKILL.md, no frontmatter, no
+   description) are flagged deterministically — surfaced in the sidebar and the
+   prompt — and are NOT offered to the model (without a description it can't know
+   when to use them). No registry to keep in sync; drop a folder and it appears.
+
+   Selection stays the MODEL's decision: the prompt lists each valid skill's name
+   + description and instructs the model to call `load_skill` (executed in the SW,
+   sandpie.js → tool_load_skill) when a request matches — by intent, not keywords.
    ============================================================================= */
 const SandpieContext = (() => {
-  const INDEX_PATH = 'skills/index.md';
+  const SKILLS_DIR = 'skills';
   const SKILL_FILE = 'SKILL.md';
-  const DESC_CAP = 300;           // chars of description shown in the index row
+  const DESC_CAP = 400;           // chars of description shown per skill in the prompt
   const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
   const listeners = new Set();
 
   // Last computed state, for the sidebar: {exists, skills, errors, loaded}
   let last = { exists: false, skills: [], errors: [], loaded: [] };
 
-  const stripCell = c => String(c).replace(/^[\s`*\[]+|[\s`*\]]+$/g, '');
-
-  function normSkillPath(p) {
-    let s = stripCell(p).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    if (/^files\//i.test(s)) s = s.slice(6); // tolerate the model-visible /files/ prefix
-    return s;
+  // Parse leading YAML-ish frontmatter (--- … ---). Deterministic and
+  // dependency-free: only scalar `key: value` lines (name, description). Returns
+  // null when there's no frontmatter block at all.
+  function parseFrontmatter(text) {
+    const m = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+    if (!m) return null;
+    const fm = {};
+    for (const line of m[1].split(/\r?\n/)) {
+      const kv = /^([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*)$/.exec(line);
+      if (!kv) continue;
+      let v = kv[2].trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      fm[kv[1].toLowerCase()] = v;
+    }
+    return fm;
   }
 
-  // Enforced parse: rows are ignored until the | Skill | When to use | Path |
-  // header; every malformed row is skipped and reported, never silently accepted.
-  function parseIndex(text) {
+  // Walk skills/*/ and derive the index from each folder's SKILL.md frontmatter.
+  // Every problem is reported in `errors`; only fully-valid skills reach `skills`.
+  async function scanSkills() {
+    let entries;
+    try { entries = await opfs.listDir(SKILLS_DIR); }
+    catch { return { exists: false, skills: [], errors: [] }; } // no skills/ dir yet
     const skills = [], errors = [];
-    const seen = new Set();
-    let headerSeen = false;
-    const lines = String(text).split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const raw = lines[i].trim();
-      if (!raw.startsWith('|')) continue;
-      const cells = raw.replace(/^\|/, '').replace(/\|+$/, '').split('|').map(s => s.trim());
-      if (cells.every(c => /^:?-+:?$/.test(c))) continue; // table separator row
-      if (!headerSeen) {
-        const h = cells.map(c => c.toLowerCase());
-        if (cells.length === 3 && h[0].includes('skill') && (h[1].includes('use') || h[1].includes('desc')) && h[2].includes('path')) {
-          headerSeen = true;
-        } else {
-          errors.push(`line ${i + 1}: ignored — rows only count after the header | Skill | When to use | Path |`);
-        }
-        continue;
+    for (const e of entries) {
+      if (e.kind !== 'directory') continue; // stray files under skills/ are ignored
+      const folder = e.name;                // the folder name IS the skill name
+      const path = `${SKILLS_DIR}/${folder}`;
+      const file = `${path}/${SKILL_FILE}`;
+      let text;
+      try { text = await opfs.read(file); }
+      catch { errors.push(`${path}/ — no ${SKILL_FILE} (add one, or remove the folder)`); continue; }
+      // load_skill resolves skills/<folder>/SKILL.md, so the folder must be a
+      // valid (lowercase) name; otherwise it could be advertised but not loadable.
+      if (!NAME_RE.test(folder)) { errors.push(`${path}/ — folder name "${folder}" isn't a valid skill name (lowercase a-z, 0-9, _ or -); rename it`); continue; }
+      const fm = parseFrontmatter(text);
+      if (!fm) { errors.push(`${file} — no frontmatter; add a "---" block with name + description at the very top`); continue; }
+      if (fm.name && fm.name.toLowerCase() !== folder) {
+        errors.push(`${file} — frontmatter name "${fm.name}" ≠ folder "${folder}"; load_skill uses the folder name "${folder}"`);
       }
-      if (cells.length !== 3) { errors.push(`line ${i + 1}: expected 3 columns, got ${cells.length}`); continue; }
-      const name = stripCell(cells[0]).toLowerCase();
-      if (!NAME_RE.test(name)) { errors.push(`line ${i + 1}: invalid skill name "${stripCell(cells[0])}" (use a-z 0-9 _ -)`); continue; }
-      if (seen.has(name)) { errors.push(`line ${i + 1}: duplicate skill "${name}"`); continue; }
-      const desc = stripCell(cells[1]).replace(/\s+/g, ' ');
-      if (!desc) { errors.push(`line ${i + 1}: skill "${name}" has no "when to use" description — the model needs it to decide when to load`); continue; }
-      const path = normSkillPath(cells[2]);
-      if (!path) { errors.push(`line ${i + 1}: skill "${name}" has no path`); continue; }
-      seen.add(name);
-      skills.push({ name, desc, path, line: i + 1 });
+      const desc = (fm.description || '').replace(/\s+/g, ' ').trim();
+      if (!desc) { errors.push(`${file} — missing "description"; the model needs it to decide when to load this skill`); continue; }
+      skills.push({ name: folder, desc, path, file });
     }
-    if (!headerSeen) errors.push(`no header row | Skill | When to use | Path | found in ${INDEX_PATH}`);
-    return { skills, errors };
+    skills.sort((a, b) => a.name.localeCompare(b.name));
+    return { exists: true, skills, errors };
   }
 
   // Names of skills the model already pulled in this conversation — so the index
@@ -170,19 +179,12 @@ const SandpieContext = (() => {
     return out;
   }
 
-  async function readIndex() {
-    let text;
-    try { text = await opfs.read(INDEX_PATH); }
-    catch { return { exists: false, skills: [], errors: [] }; }
-    return { exists: true, ...parseIndex(text) };
-  }
-
   const clip = s => s.length > DESC_CAP ? s.slice(0, DESC_CAP) + '…' : s;
 
   // The block conversations.js appends to the system prompt on every send.
-  // Returns '' (zero tokens) when skills/index.md doesn't exist.
+  // Returns '' (zero tokens) when there's no skills/ directory.
   async function skillBlock(convMessages) {
-    const idx = await readIndex();
+    const idx = await scanSkills();
     const loaded = idx.exists ? loadedSkillNames(convMessages) : new Set();
     last = { ...idx, loaded: [...loaded] };
     notify();
@@ -190,55 +192,49 @@ const SandpieContext = (() => {
 
     const lines = ['', '', '# Skills'];
     lines.push(
-      `\`${INDEX_PATH}\` lists saved playbooks for specific tasks. Each row is a skill, ` +
-      `when to use it, and where its full instructions live. ` +
-      `**When the user's request matches a skill's "when to use" — by intent, not exact wording — call the \`load_skill\` tool with that skill's name BEFORE you start, then follow the instructions it returns.** ` +
+      `Skills are saved playbooks for specific tasks, auto-discovered from \`${SKILLS_DIR}/*/${SKILL_FILE}\`. ` +
+      `**When the user's request matches a skill's description — by intent, not exact wording — call the \`load_skill\` tool with that skill's name BEFORE you start, then follow the instructions it returns.** ` +
       `If several could apply, load the best match; if none clearly fit, just proceed. ` +
-      `To add a skill: create \`<path>/${SKILL_FILE}\` and append a row to ${INDEX_PATH} (name = [a-z0-9_-], unique; a "when to use" description; a folder path).`,
+      `To add a skill, create \`${SKILLS_DIR}/<name>/${SKILL_FILE}\` with frontmatter (a "---" block holding name + description) — it's discovered automatically, no registry to update.`,
     );
-    lines.push('', '| Skill | When to use | Path |', '|---|---|---|');
+    lines.push('', '| Skill | When to use |', '|---|---|');
     for (const s of idx.skills) {
       const mark = loaded.has(s.name) ? ' _(already loaded above)_' : '';
-      lines.push(`| ${s.name} | ${clip(s.desc)}${mark} | ${s.path} |`);
+      lines.push(`| ${s.name} | ${clip(s.desc)}${mark} |`);
     }
-    if (!idx.skills.length) lines.push('| _none yet_ | — | — |');
+    if (!idx.skills.length) lines.push('| _none yet_ | — |');
     if (idx.errors.length) {
-      lines.push('', `Index problems (${idx.errors.length}) — fix ${INDEX_PATH} if the user asks about skills:`);
-      for (const e of idx.errors.slice(0, 3)) lines.push(`- ${e}`);
+      lines.push('', `Skill problems (${idx.errors.length}) — these folders are NOT loadable until fixed:`);
+      for (const e of idx.errors.slice(0, 5)) lines.push(`- ${e}`);
     }
     return lines.join('\n');
   }
 
-  // Sidebar view: fresh read + SKILL.md existence checks + which skills the
-  // active conversation has already loaded.
+  // Sidebar view: same scan + which skills the active conversation has loaded.
   async function inspect(convMessages) {
-    const idx = await readIndex();
-    for (const s of idx.skills) {
-      s.missing = !(await opfs.exists(s.path + '/' + SKILL_FILE));
-      if (s.missing) idx.errors.push(`skill "${s.name}": ${s.path}/${SKILL_FILE} not found`);
-    }
+    const idx = await scanSkills();
     last = { ...idx, loaded: idx.exists ? [...loadedSkillNames(convMessages)] : [] };
     return last;
   }
 
-  const SCAFFOLD = `# Sandpie skills index
+  // Scaffold one well-formed example skill so the frontmatter format is obvious.
+  const EXAMPLE_NAME = 'example_skill';
+  const EXAMPLE = `---
+name: ${EXAMPLE_NAME}
+description: Describe in plain language when this skill applies — the task it handles. The model reads this to decide when to load the skill, so write it the way you'd brief a teammate (e.g. "Deploying the app to production: bump version, commit, push, verify CI").
+---
 
-Enforced format: one markdown table, header exactly | Skill | When to use | Path |.
-- Skill: lowercase identifier (a-z, 0-9, _ or -), unique.
-- When to use: a plain-language description of the tasks this skill covers. The
-  model reads this to decide when to call load_skill — write it the way you'd
-  describe the job to a teammate ("Deploying the app to production: bump the
-  version, commit, push, verify the CI run").
-- Path: folder relative to /files/ that contains SKILL.md, e.g. skills/my_skill
+# ${EXAMPLE_NAME}
 
-| Skill | When to use | Path |
-|---|---|---|
+Replace this with the step-by-step instructions for the task. The whole file is
+returned to the model when it calls load_skill on this skill.
 `;
 
   async function scaffold() {
-    if (await opfs.exists(INDEX_PATH)) return;
-    await opfs.write(INDEX_PATH, SCAFFOLD);
-    if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', INDEX_PATH);
+    const file = `${SKILLS_DIR}/${EXAMPLE_NAME}/${SKILL_FILE}`;
+    if (await opfs.exists(file)) return;
+    await opfs.write(file, EXAMPLE);
+    if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', file);
     try { Sandpie.refreshFiles(); } catch {}
   }
 
@@ -246,7 +242,7 @@ Enforced format: one markdown table, header exactly | Skill | When to use | Path
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    INDEX_PATH, skillBlock, inspect, scaffold, subscribe,
+    SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
     lastState: () => last,
   };
 })();
@@ -294,7 +290,7 @@ async function renderSkills() {
 
   if (!st.exists) {
     countEl.textContent = '—';
-    listEl.innerHTML = `<span style="color:var(--sp-text-dim);">No ${escHtml(SandpieContext.INDEX_PATH)} yet.</span>`;
+    listEl.innerHTML = `<span style="color:var(--sp-text-dim);">No ${escHtml(SandpieContext.SKILLS_DIR)}/ folder yet.</span>`;
     errEl.innerHTML = '';
     createBtn.style.display = '';
     return;
@@ -308,13 +304,10 @@ async function renderSkills() {
         const mark = loaded.has(s.name)
           ? ' <span style="color:var(--sp-accent);" title="The model loaded this skill in this conversation">● loaded</span>'
           : '';
-        const miss = s.missing
-          ? ' <span style="color:var(--sp-accent-neg, #e06c75);" title="SKILL.md not found at this path">missing</span>'
-          : '';
-        return `<div title="${escHtml(s.desc)}">${escHtml(s.name)}${mark}${miss}<div style="color:var(--sp-text-dim); font-size:0.95em; padding-left:0.4rem;">${escHtml(s.desc.length > 70 ? s.desc.slice(0, 70) + '…' : s.desc)}</div></div>`;
+        return `<div title="${escHtml(s.desc)}">${escHtml(s.name)}${mark}<div style="color:var(--sp-text-dim); font-size:0.95em; padding-left:0.4rem;">${escHtml(s.desc.length > 70 ? s.desc.slice(0, 70) + '…' : s.desc)}</div></div>`;
       }).join('')
-    : `<span style="color:var(--sp-text-dim);">Index is empty — add rows to ${escHtml(SandpieContext.INDEX_PATH)}.</span>`;
-  errEl.innerHTML = st.errors.map(e => `<div>⚠ ${escHtml(e)}</div>`).join('');
+    : `<span style="color:var(--sp-text-dim);">No valid skills — add ${escHtml(SandpieContext.SKILLS_DIR)}/&lt;name&gt;/SKILL.md with frontmatter.</span>`;
+  errEl.innerHTML = st.errors.map(e => `<div title="Flagged automatically — not loadable until fixed">⚠ ${escHtml(e)}</div>`).join('');
 }
 
 async function render() {
@@ -391,7 +384,7 @@ function init() {
         </div>
         <div id="ctxSkillList" style="font-size:0.72rem; line-height:1.6; margin-top:0.25rem;"></div>
         <div id="ctxSkillErrors" style="font-size:0.7rem; color:var(--sp-accent-neg, #e06c75); margin-top:0.25rem;"></div>
-        <button id="ctxSkillCreate" style="display:none; margin-top:0.4rem; font-size:0.7rem; padding:0.2rem 0.5rem; background:transparent; color:var(--sp-text-dim); border:1px solid var(--sp-border); border-radius:4px; cursor:pointer;">Create skills/index.md</button>
+        <button id="ctxSkillCreate" style="display:none; margin-top:0.4rem; font-size:0.7rem; padding:0.2rem 0.5rem; background:transparent; color:var(--sp-text-dim); border:1px solid var(--sp-border); border-radius:4px; cursor:pointer;">Create example skill
       </div>
     `,
     onRender(bodyEl) {
