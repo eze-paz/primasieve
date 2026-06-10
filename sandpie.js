@@ -599,12 +599,48 @@ async function tool_load_image({ path }, ctx) {
   }
 }
 
+// Load a skill's SKILL.md on the model's request. The enforced index
+// (skills/index.md) is the source of truth for name→path; we do a minimal
+// lookup (the full validator lives client-side in context.js) and fall back to
+// the skills/<name>/ convention so a correct name resolves even if the row's
+// Path column is wrong. The agent loop caps the returned text (truncateToolResult).
+function normSkillPathSW(p) {
+  let s = String(p).replace(/^[\s`*\[]+|[\s`*\]]+$/g, '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (/^files\//i.test(s)) s = s.slice(6);
+  return s;
+}
+async function tool_load_skill({ name }, ctx) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) {
+    return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills index.' };
+  }
+  let path = 'skills/' + n; // convention fallback
+  try {
+    const idx = new TextDecoder().decode(await opfsReadBytes('skills/index.md'));
+    for (const line of idx.split('\n')) {
+      const t = line.trim();
+      if (!t.startsWith('|')) continue;
+      const cells = t.replace(/^\|/, '').replace(/\|+$/, '').split('|').map(s => s.trim());
+      if (cells.length !== 3) continue;
+      const rowName = cells[0].replace(/^[\s`*\[]+|[\s`*\]]+$/g, '').toLowerCase();
+      if (rowName === n) { const p = normSkillPathSW(cells[2]); if (p) path = p; break; }
+    }
+  } catch (_) {} // no/unreadable index → convention fallback
+  const file = path.replace(/\/+$/, '') + '/SKILL.md';
+  try {
+    return { result: new TextDecoder().decode(await opfsReadBytes(file)) };
+  } catch (e) {
+    return { result: 'Error: could not read ' + file + ' — check the skill\'s Path in skills/index.md, or create the file.' };
+  }
+}
+
 async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
+    case 'load_skill':    return tool_load_skill(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);   // ← add
     case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
     default:              return { result: 'Error: unknown tool ' + name };

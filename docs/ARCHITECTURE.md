@@ -41,6 +41,7 @@ flowchart TD
     conversations -. uses .-> tools
     conversations -. uses .-> artifacts
     conversations -. uses .-> augmentations
+    conversations -. uses .-> context
     dropbox -. registerSyncProvider .-> S
 ```
 
@@ -83,7 +84,7 @@ without referencing each other. Full catalog:
 
 | Event | Payload | Emitted by | Consumed by |
 |---|---|---|---|
-| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload) | dropbox.js (sync engine) |
+| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload), context.js (skills scaffold) | dropbox.js (sync engine) |
 | `file:deleted` | `path` (string) | conversations.js (delete), opfs.js (delete) | dropbox.js |
 | `tokens:record` | `{ convId, usage }` | conversations.js (on a usage event) | context.js (`SandpieTokens`) |
 | `generation:complete` | `{ convId, aborted }` | conversations.js (round `finally`) | notifications.js (system toast) |

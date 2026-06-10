@@ -32,7 +32,7 @@ screen, and all message bubbles + the "thinking" / tool-call elements.
 
 ## Depends on
 - **Host:** `Sandpie.opfs`, `Sandpie.events`, `Sandpie.sync()` / `syncProvider()`, `Sandpie.$`, shared state (`messages`, `convStreams`, `activeConvId`).
-- **Other modules (runtime):** `SandpieImages` (attachments), `SandpieAugmentations` (relevance + conv metadata), `toolDefs()` (tools.js), `renderArtifact` / `buildToolBox` (artifacts.js), `SandpieTokens.notify()` (context.js).
+- **Other modules (runtime):** `SandpieImages` (attachments), `SandpieAugmentations` (relevance + conv metadata), `toolDefs()` (tools.js), `renderArtifact` / `buildToolBox` (artifacts.js), `SandpieTokens.notify()` / `SandpieContext.skillBlock(convMessages)` (context.js — skills block appended to the system prompt).
 
 ## Notes / gotchas
 - **Boots on `DOMContentLoaded`**, not at module-eval — a restored message may call

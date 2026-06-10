@@ -658,7 +658,7 @@ async function buildAgentConfig(convMessages) {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
     model: $('model').value,
-    systemPrompt: await buildSystemPrompt(),
+    systemPrompt: await buildSystemPrompt(convMessages),
     messages: resolvedMessages,
     tools: toolDefs(),
     maxTokens: (active && active.maxTokens) || 8192,
@@ -1282,16 +1282,23 @@ function applyToolsMinimized() {
   document.body.classList.toggle('tools-minimized', toolsMinimized);
 }
 
-/* ---- system prompt (read from OPFS sandpie_memory.md) ---- */
-async function buildSystemPrompt() {
+/* ---- system prompt (OPFS sandpie_memory.md + optional skills block) ---- */
+async function buildSystemPrompt(convMessages) {
+  let content;
   try {
-    const text = await opfs.read('sandpie_memory.md');
-    return { role: 'system', content: text };
+    content = await opfs.read('sandpie_memory.md');
   } catch (e) {
-    const basic = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-    await opfs.write('sandpie_memory.md', basic);
-    return { role: 'system', content: basic };
+    content = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+    await opfs.write('sandpie_memory.md', content);
   }
+  // Optional capability: context.js appends the skills block (enforced skill
+  // index + an instruction telling the model to fetch a skill via the load_skill
+  // tool when relevant). Module absent ⇒ plain memory prompt.
+  if (typeof SandpieContext !== 'undefined' && SandpieContext.skillBlock) {
+    try { content += await SandpieContext.skillBlock(convMessages); }
+    catch (e) { console.warn('[sandpie] skills block failed:', e); }
+  }
+  return { role: 'system', content };
 }
 
 /* ---- "is any conversation generating right now" (backs Sandpie.isGenerating) ---- */

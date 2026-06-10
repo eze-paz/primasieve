@@ -67,6 +67,18 @@ Typical flow:
       required: ['path'],
     },
   },
+    load_skill: {
+      description: `Load a skill's full instructions. Skills are saved playbooks for specific tasks, listed in the "# Skills" section of the system prompt (from skills/index.md) as: skill name, "when to use" description, and path.
+WHEN TO USE: As soon as the user's request matches a skill's "when to use" — judged by intent, not exact wording (e.g. "ship it to prod" matches a deploy skill). Call this BEFORE you start the task, then follow the returned SKILL.md instructions for the rest of the turn.
+Pass the skill's name exactly as it appears in the index. Returns the SKILL.md contents (or an error if the skill/index is missing). Don't reload a skill already marked "(already loaded above)" in the index — its instructions are already in this conversation. If no skill fits the request, don't call this.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'The skill name from the Skills index (e.g. "sandpie_deploy").' },
+        },
+        required: ['name'],
+      },
+    },
         load_image: {
       description: `Load an image file from OPFS into the conversation so you can see its pixel content.
 WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
