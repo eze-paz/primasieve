@@ -90,6 +90,14 @@
     const ns = localStorage.getItem(NS_KEY);
     return ns ? { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'root', root: ns }) } : {};
   }
+  // Dropbox-API-Arg travels in an HTTP header, which must be ASCII. Escape every
+  // non-ASCII char as \uXXXX (Dropbox un-escapes server-side) — otherwise a path
+  // with accents (e.g. "DOCUMENTACIÓ", "Pràctiques") is sent as raw Latin-1 and
+  // the request is rejected (empty 401 at the proxy). Paths in JSON *bodies* are
+  // unaffected, which is why upload/list worked and only download broke.
+  function apiArg(obj) {
+    return JSON.stringify(obj).replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  }
   async function api(path, body, { pathRoot = true } = {}) {
     const token = await accessToken();
     const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
@@ -117,7 +125,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': JSON.stringify({ path }), 'Content-Type': 'text/plain', ...pathRootHeaderObj() },
+      headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': apiArg({ path }), 'Content-Type': 'text/plain', ...pathRootHeaderObj() },
       signal,
     });
     if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
@@ -127,7 +135,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ close }), ...pathRootHeaderObj() },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': apiArg({ close }), ...pathRootHeaderObj() },
       body: content,
     });
     if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
