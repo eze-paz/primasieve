@@ -12,15 +12,20 @@
    Model
    -----
    - The user's OWN working files (the OPFS root: conversations, scripts, …) sync
-     TWO-WAY into a per-account working folder: /sandpie/<email-local-part>/.
-     That is the ONLY place this module ever writes.
+     TWO-WAY into a per-user working folder: <parent>/<email-local-part>/, where
+     <parent> is set in the Cloud sync section (default /sandpie). That folder is
+     the ONLY place this module ever writes.
+   - On a Dropbox **team space**, the API is pointed at the team-space ROOT
+     namespace (via the Dropbox-API-Path-Root header) so team/department folders
+     are reachable — e.g. set the parent to /R+D+I/sandpie to sync into a shared
+     department folder, with each user landing in their own /<email> subfolder.
    - NOTHING else syncs by default (full Dropbox can be 100s of GB). Subscribing
      to other Dropbox folders — read-only, pulled into OPFS /_shared/ — is a
      follow-up slice; the data model (dbxfull-subscriptions) is stubbed here.
 
-   This file is the FOUNDATION slice: connect + working-dir two-way sync. The
-   browse/subscribe UI, size/quota gating, /_shared/ read-only pull, and the
-   Personal/Shared Files split are not wired yet.
+   FOUNDATION slice: connect + working-dir two-way sync. The browse/subscribe UI,
+   size/quota gating, /_shared/ read-only pull, and the Personal/Shared Files
+   split are not wired yet.
    ============================================================================= */
 (function () {
   'use strict';
@@ -35,6 +40,10 @@
   const CURSOR_KEY = 'dbxfull-cursor';
   const SUBS_KEY   = 'dbxfull-subscriptions';   // [{path,label}] — read-only, not yet synced
   const APPKEY_CFG = 'dbxfull-appkey';
+  const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
+  const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' for non-team)
+  const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
+  const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -70,11 +79,19 @@
     localStorage.setItem(TOKENS_KEY, JSON.stringify(stored));
     return data.access_token;
   }
-  async function api(path, body) {
+  // On a team space we operate relative to the team-space ROOT namespace so team
+  // folders (e.g. /R+D+I) are reachable; default API behavior is the member's home
+  // namespace. The namespace id comes from get_current_account (team accounts only).
+  function pathRootHeaderObj() {
+    const ns = localStorage.getItem(NS_KEY);
+    return ns ? { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'root', root: ns }) } : {};
+  }
+  async function api(path, body, { pathRoot = true } = {}) {
     const token = await accessToken();
+    const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+    if (pathRoot) Object.assign(headers, pathRootHeaderObj());
     const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
-      method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method: 'POST', headers, body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
     return await res.json();
@@ -96,7 +113,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': JSON.stringify({ path }), 'Content-Type': 'text/plain' },
+      headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': JSON.stringify({ path }), 'Content-Type': 'text/plain', ...pathRootHeaderObj() },
       signal,
     });
     if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
@@ -106,7 +123,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ close }) },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ close }), ...pathRootHeaderObj() },
       body: content,
     });
     if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
@@ -116,7 +133,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...pathRootHeaderObj() },
       body: JSON.stringify({ entries }),
     });
     if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
@@ -154,22 +171,51 @@
     try { return await api('/2/files/delete_v2', { path }); }
     catch (e) { if (String(e.message).includes('not_found')) return null; throw e; }
   }
-  async function getCurrentAccount() { return await api('/2/users/get_current_account', null); }
+  async function getCurrentAccount() { return await api('/2/users/get_current_account', null, { pathRoot: false }); }
 
   // ===========================================================================
-  //  Working root  (/sandpie/<email-local-part>/)
+  //  Working root  (<parent>/<email-local-part>/)
   // ===========================================================================
   function workingRoot() { return localStorage.getItem(ROOT_KEY) || ''; }
   function sanitizeSeg(s) { return String(s).replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^_+|_+$/g, '') || 'user'; }
   async function ensureWorkingRoot() {
-    if (workingRoot()) return workingRoot();
-    const acct = await getCurrentAccount();
-    const local = (acct.email || acct.account_id || 'user').split('@')[0];
-    const root = '/sandpie/' + sanitizeSeg(local);
+    // Account fetched once (cached): the team-space root namespace (team accounts
+    // only) + the email used for the per-user subfolder.
+    let ns = localStorage.getItem(NS_KEY);
+    let email = localStorage.getItem(EMAIL_KEY);
+    if (ns === null || !email) {
+      const acct = await getCurrentAccount();
+      const ri = acct.root_info || {};
+      ns = (ri['.tag'] === 'team' && ri.root_namespace_id) ? ri.root_namespace_id : '';
+      email = acct.email || acct.account_id || 'user';
+      localStorage.setItem(NS_KEY, ns);          // '' for non-team accounts ⇒ home namespace
+      localStorage.setItem(EMAIL_KEY, email);
+    }
+    // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
+    // section (default /sandpie; e.g. /R+D+I/sandpie for a department folder).
+    const local = sanitizeSeg(String(email).split('@')[0]);
+    let parent = (localStorage.getItem(PARENT_KEY) || '/sandpie').trim() || '/sandpie';
+    if (!parent.startsWith('/')) parent = '/' + parent;
+    parent = parent.replace(/\/+$/, '');
+    const root = parent + '/' + local;
+    // Relocate guard. The sync target is (namespace + path): the SAME path string
+    // resolves to DIFFERENT folders under different path-roots (home namespace vs
+    // team space), so the namespace MUST be part of the signature — otherwise
+    // switching roots reuses stale state and wrongly deletes local files as
+    // "removed remotely". When the signature changes (parent edit, or first run
+    // under a new namespace) drop the old sync state so the new location starts
+    // fresh: re-pull there + re-push the local working dir, deleting nothing.
+    const sig = (ns || 'home') + '|' + root;
+    if (localStorage.getItem(SIG_KEY) !== sig) {
+      localStorage.setItem(SIG_KEY, sig);
+      localStorage.removeItem(STATE_KEY);
+      localStorage.removeItem(INDEX_KEY);
+      localStorage.removeItem(CURSOR_KEY);
+    }
     localStorage.setItem(ROOT_KEY, root);
     return root;
   }
-  // OPFS rel "foo/bar.json"  <->  Dropbox "/sandpie/<user>/foo/bar.json"
+  // OPFS rel "foo/bar.json"  <->  Dropbox "<workingRoot>/foo/bar.json"
   function relToCloud(rel) { return workingRoot() + '/' + String(rel).replace(/^\/+/, ''); }
   function cloudToRel(p) {
     const rp = workingRoot().replace(/^\/+/, '').toLowerCase();
@@ -426,7 +472,8 @@
     location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
   }
   function disconnect() {
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY].forEach(k => localStorage.removeItem(k));
+    // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, EMAIL_KEY, SIG_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
@@ -461,7 +508,7 @@
     const btn = sec?.querySelector('#dbxfullToggleBtn');
     if (btn) btn.textContent = tokens() ? 'Disconnect' : 'Connect';
     const root = sec?.querySelector('#dbxfullRoot');
-    if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : '';
+    if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
   }
   let _busy = 0;
   function setBusy(b) {
@@ -475,9 +522,10 @@
       dot: 'dbxfullDot',
       html: `
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+        <input id="dbxfullParent" autocomplete="off" placeholder="Sync folder, e.g. /R+D+I/sandpie" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <div class="row">
           <button id="dbxfullToggleBtn">Connect</button>
-          <button class="ghost" id="dbxfullResyncBtn" title="Re-pull the working dir and reconcile now">Resync</button>
+          <button class="ghost" id="dbxfullResyncBtn" title="Re-pull the working dir and reconcile now (also applies a changed sync folder)">Resync</button>
         </div>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
       `,
@@ -487,10 +535,16 @@
           input.addEventListener('input', saveConfig);
           input.value = tokens()?.app_key || localStorage.getItem(APPKEY_CFG) || '';
         }
+        const parent = body.querySelector('#dbxfullParent');
+        if (parent) {
+          parent.value = localStorage.getItem(PARENT_KEY) || '/sandpie';
+          // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
+          parent.addEventListener('change', () => localStorage.setItem(PARENT_KEY, parent.value.trim() || '/sandpie'));
+        }
         body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
         body.querySelector('#dbxfullResyncBtn')?.addEventListener('click', manualResync);
         const root = body.querySelector('#dbxfullRoot');
-        if (root && workingRoot()) root.textContent = 'working dir: ' + workingRoot();
+        if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
       },
     });
   }
