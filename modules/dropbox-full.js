@@ -102,15 +102,53 @@
     if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
     return new Uint8Array(await res.arrayBuffer());
   }
-  async function upload(path, content) {
+  async function uploadSessionStart(content, close = true) {
     const token = await accessToken();
-    const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
+    const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }) },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': JSON.stringify({ close }) },
       body: content,
     });
-    if (!res.ok) throw new Error(`Upload ${path}: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
     return await res.json();
+  }
+  async function uploadSessionFinishBatch(entries) {
+    const token = await accessToken();
+    const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+    });
+    if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
+    return await res.json();
+  }
+  // Bounded-parallel upload_session/start (5 at a time), then ONE finish_batch_v2
+  // commit for the whole batch — far fewer commit round-trips than per-file
+  // uploads, and avoids too_many_write_operations throttling on a large first
+  // sync. Adapted from dropbox.js; commit path is prefixed with the working root.
+  async function uploadBatch(files) {
+    const CONCURRENCY = 5;
+    const sessions = [];
+    for (let i = 0; i < files.length; i += CONCURRENCY) {
+      const chunk = files.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(chunk.map(async ({ rel, content, lm, s }) => {
+        try {
+          const session = await uploadSessionStart(content, true);
+          return {
+            cursor: { session_id: session.session_id, offset: content.byteLength },
+            commit: { path: relToCloud(rel), mode: 'overwrite', mute: true, autorename: false },
+            rel, lm, s, content,
+          };
+        } catch (err) { console.warn('[dropbox-full] session start failed:', rel, err); return null; }
+      }));
+      sessions.push(...results.filter(Boolean));
+    }
+    if (!sessions.length) return [];
+    const entries = sessions.map(x => ({ cursor: x.cursor, commit: x.commit }));
+    const result = await uploadSessionFinishBatch(entries);
+    if (result['.tag'] === 'async_job_id') { console.warn('[dropbox-full] finish_batch returned async_job_id — skipped, will retry next sync'); return []; }
+    if (!result.entries) { console.warn('[dropbox-full] unexpected finish_batch response:', result); return []; }
+    return sessions.map((x, i) => ({ ...x, meta: result.entries[i] }));
   }
   async function del(path) {
     try { return await api('/2/files/delete_v2', { path }); }
@@ -263,7 +301,11 @@
       }
       await bulkDownload(toDownload, state, opfs);
 
-      // push: dirty = event-marked (syncedMtime===0); full scan walks all local files
+      // push: dirty = event-marked (syncedMtime===0); full scan walks all local
+      // files. Uploaded via upload_session + finish_batch_v2 (one commit call per
+      // batch) — minimizes round-trips and avoids too_many_write_operations
+      // throttling on a large first sync. syncedMtime is the mtime captured at
+      // collection time, so a write that lands mid-upload re-uploads next cycle.
       const dirty = [];
       if (fullScan) {
         let rels = []; try { rels = await opfs.list(); } catch {}
@@ -272,22 +314,34 @@
           const s = state[rel];
           const lm = await Sandpie.opfsMtime(rel);
           if (s && lm <= s.syncedMtime) continue;
-          dirty.push(rel);
+          dirty.push({ rel, lm, s });
         }
       } else {
         for (const rel of Object.keys(state)) {
           if (rel === openFilePath) continue;
           if (state[rel].syncedMtime !== 0) continue;
           if (!(await opfs.exists(rel))) continue;
-          dirty.push(rel);
+          dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
         }
       }
-      for (const rel of dirty) {
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+        const chunk = dirty.slice(i, i + BATCH_SIZE);
+        const files = await Promise.all(chunk.map(async ({ rel, lm, s }) => ({ rel, lm, s, content: await opfs.readBytes(rel) })));
         try {
-          const content = await opfs.readBytes(rel);
-          const meta = await upload(relToCloud(rel), content);
-          state[rel] = { rev: meta.rev, size: meta.size, syncedMtime: await Sandpie.opfsMtime(rel) };
-        } catch (err) { console.warn('[dropbox-full] upload failed:', rel, err); }
+          const results = await uploadBatch(files);
+          for (const r of results) {
+            if (r.meta && r.meta['.tag'] === 'success') {
+              state[r.rel] = {
+                rev: r.meta.rev || (r.s && r.s.rev) || '',
+                size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
+                syncedMtime: r.lm,
+              };
+            } else {
+              console.warn('[dropbox-full] batch item failed:', r.rel, r.meta);
+            }
+          }
+        } catch (err) { console.warn('[dropbox-full] batch upload failed:', err); }
       }
       setSyncState(state);
 
