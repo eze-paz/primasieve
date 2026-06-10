@@ -41,9 +41,11 @@
   const SUBS_KEY   = 'dbxfull-subscriptions';   // [{path,label}] — read-only, not yet synced
   const APPKEY_CFG = 'dbxfull-appkey';
   const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
-  const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' for non-team)
+  const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
+  const NS_VER_KEY = 'dbxfull-ns-ver';          // detection-logic version; bump ⇒ force a one-time re-fetch
   const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
+  const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -183,13 +185,20 @@
     // only) + the email used for the per-user subfolder.
     let ns = localStorage.getItem(NS_KEY);
     let email = localStorage.getItem(EMAIL_KEY);
-    if (ns === null || !email) {
+    if (ns === null || !email || localStorage.getItem(NS_VER_KEY) !== NS_DETECT_VER) {
       const acct = await getCurrentAccount();
       const ri = acct.root_info || {};
-      ns = (ri['.tag'] === 'team' && ri.root_namespace_id) ? ri.root_namespace_id : '';
+      // Team space ⇔ the root namespace differs from the home namespace. Do NOT gate on
+      // root_info['.tag']: an account sitting in a team space can still report '.tag' ===
+      // 'user' while having a distinct root_namespace_id (confirmed in the field). Gating on
+      // the tag left the path-root header off, so team paths like /R+D+I resolved against the
+      // personal home folder instead of the team space. '' ⇒ no header ⇒ home namespace.
+      ns = (ri.root_namespace_id && ri.root_namespace_id !== ri.home_namespace_id) ? ri.root_namespace_id : '';
       email = acct.email || acct.account_id || 'user';
-      localStorage.setItem(NS_KEY, ns);          // '' for non-team accounts ⇒ home namespace
+      localStorage.setItem(NS_KEY, ns);
       localStorage.setItem(EMAIL_KEY, email);
+      localStorage.setItem(NS_VER_KEY, NS_DETECT_VER);
+      console.info('[dropbox-full] path-root', ns ? ('→ team root ' + ns) : '→ home', '(root=' + ri.root_namespace_id + ', home=' + ri.home_namespace_id + ')');
     }
     // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
     // section (default /sandpie; e.g. /R+D+I/sandpie for a department folder).
@@ -473,7 +482,7 @@
   }
   function disconnect() {
     // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, EMAIL_KEY, SIG_KEY].forEach(k => localStorage.removeItem(k));
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
