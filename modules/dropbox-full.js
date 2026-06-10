@@ -38,7 +38,7 @@
   const STATE_KEY  = 'dbxfull-sync-state';
   const INDEX_KEY  = 'dbxfull-cloud-index';
   const CURSOR_KEY = 'dbxfull-cursor';
-  const SUBS_KEY   = 'dbxfull-subscriptions';   // [{path,label}] — read-only, not yet synced
+  const SUBS_KEY   = 'dbxfull-subscriptions';   // [{path,label,addedAt,bytes}] — read-only team/shared folder mirrors
   const APPKEY_CFG = 'dbxfull-appkey';
   const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
@@ -46,6 +46,8 @@
   const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
+  const SUBSTATE_KEY  = 'dbxfull-subs-state';   // { localRel: {rev,size} } for subscription mirrors — rev-based pull, no mtime/dirty tracking (read-only)
+  const SUBS_PREFIX   = '_subs';                // reserved OPFS top-level dir holding read-only subscription mirrors; fenced out of push
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -233,6 +235,24 @@
     if (s.toLowerCase() === rp) return '';
     return null;   // outside the working root — ignore
   }
+  // ----- subscription mirrors (read-only) ------------------------------------
+  // A subscribed cloud folder is mirrored into OPFS under "_subs/<label>/…". This
+  // prefix is fenced out of the push (see sync()) so mirrored files are NEVER
+  // uploaded — that fence is what makes "read-only" actually true.
+  function isUnderSubs(rel) {
+    const r = String(rel).replace(/^\/+/, '').toLowerCase();
+    return r === SUBS_PREFIX || r.startsWith(SUBS_PREFIX + '/');
+  }
+  function subLocalRoot(sub) { return SUBS_PREFIX + '/' + sanitizeSeg(sub.label); }
+  // Path of `p` relative to `basePath` (case-insensitive), or null if outside it.
+  function relUnder(basePath, p) {
+    const bp = String(basePath).replace(/^\/+/, '').toLowerCase();
+    let s = String(p).replace(/^\/+/, '');
+    if (!bp) return s;                                     // base is the namespace root
+    if (s.toLowerCase().startsWith(bp + '/')) return s.slice(bp.length + 1);
+    if (s.toLowerCase() === bp) return '';
+    return null;
+  }
 
   // ===========================================================================
   //  Sync state
@@ -243,6 +263,10 @@
   function setCloudIndex(i) { localStorage.setItem(INDEX_KEY, JSON.stringify(i)); }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
+  function subscriptions() { try { return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); } catch { return []; } }
+  function setSubscriptions(s) { localStorage.setItem(SUBS_KEY, JSON.stringify(s)); }
+  function subsState() { try { return JSON.parse(localStorage.getItem(SUBSTATE_KEY) || '{}'); } catch { return {}; } }
+  function setSubsState(s) { localStorage.setItem(SUBSTATE_KEY, JSON.stringify(s)); }
 
   let _syncing = false;
   let initialSyncDone = !tokens();
@@ -366,6 +390,7 @@
         let rels = []; try { rels = await opfs.list(); } catch {}
         for (const rel of rels) {
           if (rel === openFilePath) continue;
+          if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
           const s = state[rel];
           const lm = await Sandpie.opfsMtime(rel);
           if (s && lm <= s.syncedMtime) continue;
@@ -374,6 +399,7 @@
       } else {
         for (const rel of Object.keys(state)) {
           if (rel === openFilePath) continue;
+          if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
           if (state[rel].syncedMtime !== 0) continue;
           if (!(await opfs.exists(rel))) continue;
           dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
@@ -418,6 +444,236 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
     try { await sync({ full: true }); }
     finally { if (btn) { btn.disabled = false; btn.textContent = 'Resync'; } }
+  }
+
+  // ===========================================================================
+  //  Subscriptions  (read-only mirrors of other Dropbox folders)
+  // ===========================================================================
+  function fmtBytes(b) {
+    if (!b || b < 0) return '0 B';
+    const u = ['B', 'kB', 'MB', 'GB', 'TB']; let i = 0;
+    while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+    return (i ? b.toFixed(1).replace(/\.0$/, '') : b) + ' ' + u[i];
+  }
+  async function storageHeadroom() {
+    try { const { quota = 0, usage = 0 } = await navigator.storage.estimate(); return Math.max(0, quota - usage); }
+    catch { return Infinity; }
+  }
+  // Dropbox has no folder-size call, so estimate by summing file sizes from a
+  // bounded recursive listing — enough to warn before mirroring a giant folder.
+  async function estimateFolderSize(folderPath, { maxFiles = 8000 } = {}) {
+    let bytes = 0, files = 0, capped = false;
+    const consume = (entries) => {
+      for (const e of entries) {
+        if (e['.tag'] === 'file') { bytes += e.size || 0; files++; }
+        if (files >= maxFiles) { capped = true; break; }
+      }
+    };
+    let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive: true });
+    consume(data.entries);
+    while (data.has_more && !capped) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }); consume(data.entries); }
+    return { bytes, files, capped };
+  }
+
+  function isSubscribed(cloudPath) {
+    const p = String(cloudPath).toLowerCase();
+    return subscriptions().some(s => s.path.toLowerCase() === p);
+  }
+  function subscribe(cloudPath, label) {
+    if (isSubscribed(cloudPath)) return;
+    const subs = subscriptions();
+    const base = sanitizeSeg(label || cloudPath.split('/').filter(Boolean).pop() || 'folder');
+    let lab = base, n = 2;
+    while (subs.some(s => sanitizeSeg(s.label) === lab)) lab = base + '_' + (n++);   // keep _subs/<label> unique
+    subs.push({ path: cloudPath, label: lab, addedAt: Date.now(), bytes: 0 });
+    setSubscriptions(subs);
+  }
+  async function unsubscribe(cloudPath) {
+    const p = String(cloudPath).toLowerCase();
+    const subs = subscriptions();
+    const sub = subs.find(s => s.path.toLowerCase() === p);
+    if (!sub) return;
+    setSubscriptions(subs.filter(s => s !== sub));
+    const root = subLocalRoot(sub);
+    try { await Sandpie.opfs.remove(root); } catch {}
+    const st = subsState();
+    for (const k of Object.keys(st)) { if (k === root || k.startsWith(root + '/')) delete st[k]; }
+    setSubsState(st);
+    await Sandpie.refreshFiles();
+  }
+
+  // Pull every subscribed folder into its OPFS mirror. rev-based: skip unchanged
+  // files, download new/changed, drop local files that vanished from the cloud.
+  // Never uploads — _subs/ is fenced out of push().
+  let _subsSyncing = false;
+  async function refreshSubscriptions() {
+    if (!tokens() || _subsSyncing) return;
+    _subsSyncing = true;
+    const opfs = Sandpie.opfs;
+    const st = subsState();
+    const subs = subscriptions();
+    let touched = false;
+    try {
+      for (const sub of subs) {
+        const localRoot = subLocalRoot(sub);
+        let entries;
+        try { ({ entries } = await listFolder(sub.path, { recursive: true })); }
+        catch (err) { console.warn('[dropbox-full] subscription list failed:', sub.path, err.message); continue; }
+
+        const want = new Map();    // localRel -> cloud entry
+        let subBytes = 0;
+        for (const e of entries) {
+          if (e.kind !== 'file') continue;
+          const r = relUnder(sub.path, e.path);
+          if (r == null || r === '') continue;
+          want.set(localRoot + '/' + r, e);
+          subBytes += e.size || 0;
+        }
+        sub.bytes = subBytes;
+
+        // drop local files that no longer exist remotely
+        let existing = []; try { existing = await opfs.list(localRoot); } catch {}
+        for (const rel of existing) {
+          if (!want.has(rel)) { try { await opfs.remove(rel); } catch {} delete st[rel]; touched = true; }
+        }
+        // download new / changed (by rev)
+        const toDl = [];
+        for (const [rel, e] of want) {
+          if (st[rel] && st[rel].rev === e.rev && await opfs.exists(rel)) continue;
+          toDl.push({ rel, cloudPath: e.path, e });
+        }
+        let i = 0, stop = false;
+        const worker = async () => {
+          while (i < toDl.length && !stop) {
+            const it = toDl[i++];
+            try {
+              const bytes = await download(it.cloudPath);
+              await opfs.write(it.rel, bytes);
+              st[it.rel] = { rev: it.e.rev, size: it.e.size };
+              touched = true;
+            } catch (err) {
+              console.warn('[dropbox-full] subscription download failed:', it.rel, err && err.message);
+              if (/quota/i.test(String(err && err.message))) { stop = true; dbxStatus('Out of local storage — subscription only partly mirrored', 'error'); }
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(8, toDl.length) }, worker));
+      }
+      setSubsState(st);
+      setSubscriptions(subs);    // persist measured byte counts
+    } finally { _subsSyncing = false; }
+    if (touched) await Sandpie.refreshFiles();
+  }
+
+  // Folder browser + subscribe/unsubscribe modal (launched from Cloud sync).
+  function openSubscriptionManager() {
+    if (!tokens()) { alert('Connect to Dropbox first.'); return; }
+    const overlay = document.createElement('div');
+    overlay.className = 'modal';
+    overlay.style.display = 'flex';
+    overlay.setAttribute('data-chrome', '');
+    overlay.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-content" style="max-width:560px; width:92%;">
+        <h3>Subscriptions <span style="font-weight:400; font-size:0.78rem; color:var(--sp-text-dim);">· read-only</span></h3>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:0.4rem;">
+          <button class="ghost" id="subsUp" title="Up">←</button>
+          <input id="subsPath" readonly style="flex:1; padding:0.35rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.8rem;">
+        </div>
+        <ul class="fs-list" id="subsBrowse" style="max-height:34vh; overflow:auto; margin:0 0 0.6rem;"></ul>
+        <div style="font-size:0.72rem; color:var(--sp-text-dim); margin-bottom:0.25rem; display:flex; justify-content:space-between; align-items:center;">
+          <span>Subscribed folders</span>
+          <button class="ghost" id="subsRefresh" title="Re-pull all subscriptions now" style="font-size:0.7rem; padding:0.2rem 0.5rem;">Refresh all</button>
+        </div>
+        <ul class="fs-list" id="subsCurrent" style="max-height:22vh; overflow:auto; margin:0;"></ul>
+        <div class="modal-actions"><button class="ghost" id="subsClose">Close</button></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const $ = s => overlay.querySelector(s);
+    let browsePath = '';
+    const close = () => overlay.remove();
+    $('.modal-backdrop').onclick = close;
+    $('#subsClose').onclick = close;
+
+    async function renderBrowse() {
+      $('#subsPath').value = browsePath || '/';
+      const ul = $('#subsBrowse');
+      ul.innerHTML = '<li class="empty">Loading…</li>';
+      let entries;
+      try { ({ entries } = await listFolder(browsePath || '', { recursive: false })); }
+      catch (err) { ul.innerHTML = ''; const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Failed: ' + err.message; ul.appendChild(li); return; }
+      const folders = entries.filter(e => e.kind === 'folder').sort((a, b) => a.name.localeCompare(b.name));
+      ul.innerHTML = '';
+      if (!folders.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = '(no subfolders here)'; ul.appendChild(li); }
+      for (const f of folders) {
+        const li = document.createElement('li');
+        const name = document.createElement('span');
+        name.className = 'name folder';
+        name.textContent = '📁 ' + f.name;
+        name.style.cursor = 'pointer';
+        name.onclick = () => { browsePath = f.path; renderBrowse(); };
+        li.appendChild(name);
+        const btn = document.createElement('button');
+        btn.className = 'ghost';
+        btn.style.cssText = 'margin-left:auto; font-size:0.7rem; padding:0.2rem 0.5rem;';
+        if (isSubscribed(f.path)) { btn.textContent = 'Subscribed ✓'; btn.disabled = true; }
+        else { btn.textContent = 'Subscribe'; btn.onclick = () => doSubscribe(f.path, f.name, btn); }
+        li.appendChild(btn);
+        ul.appendChild(li);
+      }
+    }
+    async function doSubscribe(cloudPath, name, btn) {
+      btn.disabled = true; btn.textContent = 'Checking…';
+      let est;
+      try { est = await estimateFolderSize(cloudPath); }
+      catch (err) { btn.disabled = false; btn.textContent = 'Subscribe'; dbxStatus('Size check failed: ' + err.message, 'error'); return; }
+      const headroom = await storageHeadroom();
+      const sizeStr = (est.capped ? '>' : '≈') + fmtBytes(est.bytes) + ' across ' + (est.capped ? '>' : '') + est.files + ' files';
+      if (est.bytes > headroom) {
+        alert(`"${name}" is ${sizeStr}, but only ${fmtBytes(headroom)} of browser storage is free.\nFree up space or pick a smaller folder.`);
+        btn.disabled = false; btn.textContent = 'Subscribe'; return;
+      }
+      if ((est.bytes > 200 * 1024 * 1024 || est.capped) && !confirm(`Mirror "${name}" (${sizeStr}) into local storage, read-only?`)) {
+        btn.disabled = false; btn.textContent = 'Subscribe'; return;
+      }
+      subscribe(cloudPath, name);
+      btn.textContent = 'Subscribed ✓';
+      renderCurrent();
+      dbxStatus('Mirroring ' + name + '…', 'connected');
+      await refreshSubscriptions();
+      dbxStatus('', 'connected');
+      renderCurrent();
+    }
+    function renderCurrent() {
+      const ul = $('#subsCurrent');
+      ul.innerHTML = '';
+      const subs = subscriptions();
+      if (!subs.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = '(none yet — browse above to subscribe)'; ul.appendChild(li); return; }
+      for (const sub of subs) {
+        const li = document.createElement('li');
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = '📡 ' + sub.label;
+        name.title = sub.path;
+        li.appendChild(name);
+        const size = document.createElement('span');
+        size.className = 'file-size';
+        size.textContent = sub.bytes ? fmtBytes(sub.bytes) : '';
+        li.appendChild(size);
+        const btn = document.createElement('button');
+        btn.className = 'ghost';
+        btn.style.cssText = 'margin-left:6px; font-size:0.7rem; padding:0.2rem 0.5rem;';
+        btn.textContent = 'Unsubscribe';
+        btn.onclick = async () => { if (!confirm('Remove "' + sub.label + '" and delete its local copy?')) return; await unsubscribe(sub.path); renderCurrent(); renderBrowse(); };
+        li.appendChild(btn);
+        ul.appendChild(li);
+      }
+    }
+    $('#subsUp').onclick = () => { if (!browsePath) return; const parts = browsePath.split('/').filter(Boolean); parts.pop(); browsePath = parts.length ? '/' + parts.join('/') : ''; renderBrowse(); };
+    $('#subsRefresh').onclick = async () => { const b = $('#subsRefresh'); b.disabled = true; b.textContent = 'Refreshing…'; try { await refreshSubscriptions(); } finally { b.disabled = false; b.textContent = 'Refresh all'; renderCurrent(); } };
+
+    renderBrowse();
+    renderCurrent();
   }
 
   // ---- file-browser status + event reactions --------------------------------
@@ -481,8 +737,11 @@
     location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
   }
   function disconnect() {
-    // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY].forEach(k => localStorage.removeItem(k));
+    // Keep PARENT_KEY + APPKEY_CFG + SUBS_KEY so a reconnect reuses the configured
+    // folder/key and re-mirrors the same subscriptions. Drop the local mirror +
+    // its pull-state (stale once disconnected; re-pulled on reconnect).
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, SUBSTATE_KEY].forEach(k => localStorage.removeItem(k));
+    try { Sandpie.opfs.remove(SUBS_PREFIX).catch(() => {}); } catch {}
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
@@ -537,6 +796,7 @@
           <button class="ghost" id="dbxfullResyncBtn" title="Re-pull the working dir and reconcile now (also applies a changed sync folder)">Resync</button>
         </div>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
+        <button class="ghost" id="dbxfullSubsBtn" title="Browse Dropbox and mirror folders read-only" style="margin-top:0.5rem; width:100%;">📡 Subscriptions…</button>
       `,
       onRender(body) {
         const input = body.querySelector('#dbxfullAppKey');
@@ -552,6 +812,7 @@
         }
         body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
         body.querySelector('#dbxfullResyncBtn')?.addEventListener('click', manualResync);
+        body.querySelector('#dbxfullSubsBtn')?.addEventListener('click', openSubscriptionManager);
         const root = body.querySelector('#dbxfullRoot');
         if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
       },
@@ -566,6 +827,8 @@
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),
+      isReadOnlyPath: (rel) => isUnderSubs(rel),   // subscription mirrors are read-only
+      subscriptionsDir: () => SUBS_PREFIX,
       get initialSyncDone() { return initialSyncDone; },
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
@@ -579,11 +842,11 @@
         history.replaceState({}, '', location.pathname);
         await ensureWorkingRoot();
         dbxStatus('', 'connected');
-        sync();
+        sync().then(refreshSubscriptions);
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
       dbxStatus('', 'connected');
-      sync();
+      sync().then(refreshSubscriptions);
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

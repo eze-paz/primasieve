@@ -181,6 +181,14 @@ opfs.currentPath = function() {
   return (document.getElementById('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
 };
 
+/* Read-only fence. Subscription mirrors are owned by the sync provider, which
+   declares which paths are read-only and the reserved dir name. Falls back to
+   "everything writable" when the provider doesn't implement it (e.g. the
+   app-folder dropbox.js used by sandpie.html). */
+opfs._roProvider = function() { try { return window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); } catch { return null; } };
+opfs.isReadOnly = function(path) { const p = opfs._roProvider(); try { return !!(p && p.isReadOnlyPath && p.isReadOnlyPath(path)); } catch { return false; } };
+opfs.subsDirName = function() { const p = opfs._roProvider(); try { return (p && p.subscriptionsDir && p.subscriptionsDir()) || null; } catch { return null; } };
+
 
 
 /* ---------------------------------------------------------------------------
@@ -310,7 +318,7 @@ opfs.openFile = async function(fullKey, name) {
     finalize(opfs.closeFile); return;
   }
   const isMd = ext === 'md' || ext === 'markdown';
-  const editable = text.length <= TEXT_PREVIEW_CAP;
+  const editable = text.length <= TEXT_PREVIEW_CAP && !opfs.isReadOnly(fullKey);   // subscription mirrors are view-only
 
   let mode = isMd ? 'rendered' : 'raw';
   let current = text;
@@ -426,6 +434,7 @@ opfs.createFolder = async function() {
   const clean = name.trim().replace(/[\\/:*?"<>|]/g, '_');
   if (!clean) return;
   const path = opfs.currentPath();
+  if (opfs.isReadOnly(path)) { alert('Read-only subscription folder — cannot create here.'); return; }
   const fullPath = window.opfsJoin(path, clean);
   try {
     await opfs.mkdir(fullPath);
@@ -444,6 +453,7 @@ opfs.createFile = async function() {
   const clean = name.trim().replace(/[\\/:*?"<>|]/g, '_');
   if (!clean) return;
   const path = opfs.currentPath();
+  if (opfs.isReadOnly(path)) { alert('Read-only subscription folder — cannot create here.'); return; }
   const fullPath = window.opfsJoin(path, clean);
   try {
     await opfs.write(fullPath, '');
@@ -562,9 +572,11 @@ opfs.refreshFileList = async function() {
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
 
     const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
-    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
-    btn.textContent = kindIcon + it.name;
-    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}`;
+    const isSubsRoot = path === '' && it.kind === 'folder' && it.name === opfs.subsDirName();
+    const ro = opfs.isReadOnly(it.fullKey);
+    const kindIcon = isSubsRoot ? '📡 ' : (it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 '));
+    btn.textContent = kindIcon + (isSubsRoot ? 'Subscriptions' : it.name);
+    btn.title = isSubsRoot ? 'read-only subscriptions' : (isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}${ro ? ' · read-only' : ''}`);
     if (it.kind === 'folder') {
       btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
     } else {
@@ -580,16 +592,18 @@ opfs.refreshFileList = async function() {
       ev.preventDefault();
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
-      menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
-      menuItems.push({ label: 'New file', action: () => opfs.createFile() });
-      menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => opfs.toggleSharedFile(it.fullKey) });
+      if (!ro) {
+        menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
+        menuItems.push({ label: 'New file', action: () => opfs.createFile() });
+        menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => opfs.toggleSharedFile(it.fullKey) });
+      }
 
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
         menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
       }
 
-      menuItems.push({ label: 'Delete', danger: true, action: async () => {
+      if (!ro) menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
           await opfs.remove(it.fullKey);
           if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
@@ -689,6 +703,7 @@ function initFileBrowser() {
     list.addEventListener('contextmenu', (ev) => {
       if (ev.target.closest('li')) return;
       ev.preventDefault();
+      if (opfs.isReadOnly(opfsCurrentPath())) return;   // read-only subscription area — no create
       showContextMenu(ev.clientX, ev.clientY, [
         { label: 'New folder', action: () => createNewFolder() },
         { label: 'New file', action: () => createNewFile() },
@@ -700,6 +715,7 @@ function initFileBrowser() {
       e.preventDefault();
       list.classList.remove('drag-over');
       const path = opfsCurrentPath();
+      if (opfs.isReadOnly(path)) { alert('This is a read-only subscription folder — uploads are disabled here.'); return; }
       const items = Array.from(e.dataTransfer.items || []);
       for (const item of items) {
         const entry = item.webkitGetAsEntry?.();
