@@ -488,15 +488,7 @@ opfs.uploadEntry = async function(entry, dirPath) {
 };
 
 
-/* shared files index (used by file browser for shared-folder badges) */
-opfs.getSharedSet = async function() {
-  try {
-    const data = JSON.parse(await opfs.read('shared_index.json'));
-    return new Set(Object.keys(data).map(k => k.toLowerCase()));
-  } catch { return new Set(); }
-};
-
-let sharedExpanded = false;
+let subsExpanded = false;
 
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
@@ -523,16 +515,57 @@ opfs.refreshFileList = async function() {
     }
   }
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const SUBS = opfs.subsDirName();   // reserved subscription-mirror dir (null if the provider has none)
+  // At root the subscription mirror is surfaced as its own "Subscriptions"
+  // group (below), not as a regular inline folder.
+  if (path === '' && SUBS) names.delete(SUBS);
 
   const frag = document.createDocumentFragment();
-  if (!names.size) {
+
+  const renderItem = (it) => {
     const li = document.createElement('li');
-    li.className = 'empty';
-    li.textContent = (window.Sandpie && Sandpie.initialSyncDone()) ? '(empty)' : 'Loading…';
+    const btn = document.createElement('span');
+    btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
+    const ro = opfs.isReadOnly(it.fullKey);
+    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
+    btn.textContent = kindIcon + it.name;
+    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}${ro ? ' · read-only' : ''}`;
+    if (it.kind === 'folder') {
+      btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
+    } else {
+      btn.onclick = () => opfs.openFile(it.fullKey, it.name);
+    }
+    li.append(btn);
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'file-size';
+    sizeSpan.textContent = opfs.formatSize(it.size);
+    li.append(sizeSpan);
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      const menuItems = [];
+      menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
+      if (!ro) {
+        menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
+        menuItems.push({ label: 'New file', action: () => opfs.createFile() });
+      }
+      if (it.kind === 'file') {
+        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
+        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
+      }
+      if (!ro) menuItems.push({ label: 'Delete', danger: true, action: async () => {
+        try {
+          await opfs.remove(it.fullKey);
+          if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
+          await opfs.refreshFileList();
+        } catch (e) { console.warn('delete failed:', it.fullKey, e); }
+      }});
+      opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
+    });
     frag.appendChild(li);
-    ul.replaceChildren(frag);
-    return;
-  }
+  };
+
+  // Regular entries in the current directory
   const items = [];
   for (const name of names) {
     const local = localMap.get(name);
@@ -553,99 +586,51 @@ opfs.refreshFileList = async function() {
     }
     items.push({ name, kind, status, fullKey });
   }
-
   await Promise.all(items.map(async (it) => {
-    if (it.kind === 'folder') {
-      it.size = await opfs.getFolderSize(it.fullKey);
-    } else {
-      it.size = await opfs.getFileSize(it.fullKey);
-    }
+    it.size = it.kind === 'folder' ? await opfs.getFolderSize(it.fullKey) : await opfs.getFileSize(it.fullKey);
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+
+  // Subscriptions (read-only Dropbox mirrors) — shown at root only, as a
+  // collapsible group instead of an inline folder.
+  let subItems = [];
+  if (path === '' && SUBS) {
+    let subDirs = [];
+    try { subDirs = (await opfs.listDir(SUBS)).filter(e => e.kind === 'directory'); } catch {}
+    subItems = await Promise.all(subDirs.map(async (e) => {
+      const fullKey = SUBS + '/' + e.name;
+      return { name: e.name, kind: 'folder', status: 'synced', fullKey, size: await opfs.getFolderSize(fullKey) };
+    }));
+    subItems.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   const fcEl = document.getElementById('fileCount');
   if (fcEl) fcEl.textContent = items.length ? `${items.length}` : '';
 
-  const sharedSet = await opfs.getSharedSet();
-  const renderItem = (it) => {
+  if (!items.length && !subItems.length) {
     const li = document.createElement('li');
-    const btn = document.createElement('span');
-    btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+    li.className = 'empty';
+    li.textContent = (window.Sandpie && Sandpie.initialSyncDone()) ? '(empty)' : 'Loading…';
+    ul.replaceChildren(li);
+    return;
+  }
 
-    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
-    const isSubsRoot = path === '' && it.kind === 'folder' && it.name === opfs.subsDirName();
-    const ro = opfs.isReadOnly(it.fullKey);
-    const kindIcon = isSubsRoot ? '📡 ' : (it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 '));
-    btn.textContent = kindIcon + (isSubsRoot ? 'Subscriptions' : it.name);
-    btn.title = isSubsRoot ? 'read-only subscriptions' : (isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}${ro ? ' · read-only' : ''}`);
-    if (it.kind === 'folder') {
-      btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
-    } else {
-      btn.onclick = () => opfs.openFile(it.fullKey, it.name);
-    }
-    li.append(btn);
-    const sizeSpan = document.createElement('span');
-    sizeSpan.className = 'file-size';
-    sizeSpan.textContent = opfs.formatSize(it.size);
-    li.append(sizeSpan);
-    if (sharedSet.has(it.fullKey.toLowerCase())) li.classList.add('shared');
-    li.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
-      const menuItems = [];
-      menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
-      if (!ro) {
-        menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
-        menuItems.push({ label: 'New file', action: () => opfs.createFile() });
-        menuItems.push({ label: sharedSet.has(it.fullKey.toLowerCase()) ? 'Unshare' : 'Share', action: () => opfs.toggleSharedFile(it.fullKey) });
-      }
+  for (const it of items) renderItem(it);
 
-      if (it.kind === 'file') {
-        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
-      }
-
-      if (!ro) menuItems.push({ label: 'Delete', danger: true, action: async () => {
-        try {
-          await opfs.remove(it.fullKey);
-          if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
-          await opfs.refreshFileList();
-        } catch (e) { console.warn('delete failed:', it.fullKey, e); }
-      }});
-
-      opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
-    });
-    frag.appendChild(li);
-  };
-
-  const regular = items.filter(it => !sharedSet.has(it.fullKey.toLowerCase()));
-  const shared = items.filter(it => sharedSet.has(it.fullKey.toLowerCase()));
-
-  for (const it of regular) renderItem(it);
-
-  if (shared.length) {
+  if (subItems.length) {
     const header = document.createElement('li');
     header.className = 'shared-toggle';
-    header.textContent = `${sharedExpanded ? '▾' : '▸'} Shared (${shared.length})`;
-    header.onclick = () => { sharedExpanded = !sharedExpanded; opfs.refreshFileList(); };
+    header.textContent = `${subsExpanded ? '▾' : '▸'} Subscriptions (${subItems.length})`;
+    header.title = 'Read-only Dropbox folder mirrors';
+    header.onclick = () => { subsExpanded = !subsExpanded; opfs.refreshFileList(); };
     frag.appendChild(header);
-    if (sharedExpanded) shared.forEach(renderItem);
+    if (subsExpanded) subItems.forEach(renderItem);
   }
 
   ul.replaceChildren(frag);
 };
 
-opfs.toggleSharedFile = async function(path) {
-  let data = {};
-  try { data = JSON.parse(await opfs.read('shared_index.json')); } catch {}
-  if (data[path]) {
-    delete data[path];
-  } else {
-    data[path] = { t: Date.now() };
-  }
-  await opfs.write('shared_index.json', JSON.stringify(data));
-};
-
 /* --- backward compat shims for browser/viewer/editor --- */
-window.getSharedSet = function() { return opfs.getSharedSet(); };
 window.closeCtxMenu = function() { return opfs.closeCtxMenu(); };
 window.showContextMenu = function(x, y, items) { return opfs.showContextMenu(x, y, items); };
 
