@@ -36,7 +36,7 @@ Examples:
   },
 },
 edit_file: {
-  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with run_python first to verify exact content before editing.`,
+  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with read_file first to verify exact content (do NOT include read_file's line-number prefixes in old_str).`,
   parameters: {
     type: 'object',
     properties: {
@@ -47,6 +47,44 @@ edit_file: {
     required: ['path', 'old_str'],
   },
 },
+  read_file: {
+    description: `Read a UTF-8 text file from OPFS (/files/). PREFER THIS over run_python for reading — it's instant and can't crash the runtime. Output is line-numbered as "<n>\\t<line>"; the numbers are for reference only — never include them when calling write_file/edit_file. Reports total lines + byte size. For large files or head/tail, page with offset (1-based start line) + limit. For images use load_image instead.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:   { type: 'string', description: 'OPFS path relative to /files/ (e.g. "scripts/foo.py").' },
+        offset: { type: 'integer', description: '1-based line to start at (default 1). Use for paging / tail.' },
+        limit:  { type: 'integer', description: 'Max lines to return (default 2000).' },
+      },
+      required: ['path'],
+    },
+  },
+  list_files: {
+    description: `List files and folders in OPFS (/files/) with size + modified time. PREFER THIS over run_python for browsing. Default lists the immediate contents of "path" (like ls). To find files BY NAME, set a glob "pattern" (e.g. "*.py", "**/*.md") and usually recursive:true. To find files BY CONTENT, use search instead.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:      { type: 'string', description: 'Directory relative to /files/ (default: root).' },
+        pattern:   { type: 'string', description: 'Glob to filter names/paths: * (within a segment), ** (across folders), ? (one char). E.g. "**/*.json".' },
+        recursive: { type: 'boolean', description: 'Walk subfolders (default false). Set true when using a "**" pattern.' },
+      },
+      required: [],
+    },
+  },
+  search: {
+    description: `Search file CONTENTS by regular expression across OPFS (/files/), returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path" (a subtree) and/or "include" (a name glob like "*.js"). Set files_only:true to get just the list of matching files. Case-insensitive unless ignore_case:false. (To find files by NAME, use list_files.) Skips /_conversations unless "path" points inside it.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        pattern:     { type: 'string', description: 'JavaScript regular expression matched per line (e.g. "function\\\\s+\\\\w+", "TODO").' },
+        path:        { type: 'string', description: 'Subtree to search, relative to /files/ (default: everything).' },
+        include:     { type: 'string', description: 'Only search files whose name/path matches this glob (e.g. "*.py").' },
+        files_only:  { type: 'boolean', description: 'Return just matching file paths instead of per-line matches.' },
+        ignore_case: { type: 'boolean', description: 'Case-insensitive (default true).' },
+      },
+      required: ['pattern'],
+    },
+  },
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
 Use this whenever:

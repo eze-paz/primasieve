@@ -618,6 +618,175 @@ async function tool_load_skill({ name }, ctx) {
   return { result: body || text };
 }
 
+// ============================================================
+// read_file / list_files / search — plain-JS file tools over OPFS.
+// These run without Pyodide, so they're instant and can't crash the interpreter
+// the way run_python can. Reading / browsing / grepping should go through these;
+// run_python is for actual computation, data libraries and HTTP.
+// ============================================================
+const FILE_TOOL_CAP = 28 * 1024;        // chars of tool output before we truncate + tell the model to page
+const FILE_TEXT_MAX = 2 * 1024 * 1024;  // skip files larger than this for text read/search
+const SEARCH_SKIP_TOP = '_conversations'; // app-internal chat logs; only searched if explicitly targeted
+
+function normFilesPath(p) {
+  // strip a leading slash and an optional /files/ prefix and any trailing slash
+  return String(p == null ? '' : p).replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '');
+}
+
+// Anchored glob -> RegExp over a relative path: '*' = run within one segment,
+// '**' = run across segments, '?' = one non-slash char; everything else literal.
+function globToRegExp(glob) {
+  const g = String(glob);
+  let re = '';
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i];
+    if (c === '*') {
+      if (g[i + 1] === '*') { re += '.*'; i++; if (g[i + 1] === '/') i++; }
+      else re += '[^/]*';
+    } else if (c === '?') {
+      re += '[^/]';
+    } else {
+      re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return new RegExp('^' + re + '$', 'i');
+}
+
+// Collect entries under a relative dir. Files carry their handle; dirs are
+// included only when includeDirs. Caps how many entries we walk. Returns null
+// when startRel isn't a directory.
+async function opfsCollect(startRel, { recursive = false, includeDirs = false, max = 5000, skipTop = null } = {}) {
+  const startParts = startRel ? startRel.split('/').filter(Boolean) : [];
+  let startDir;
+  try { startDir = await opfsResolveDir(startParts); }
+  catch { return null; }
+  const out = [];
+  async function walk(dir, prefix) {
+    const items = [];
+    for await (const [nm, h] of dir.entries()) items.push([nm, h]);
+    items.sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [nm, h] of items) {
+      if (out.length >= max) return;
+      const full = prefix ? prefix + '/' + nm : nm;
+      if (h.kind === 'directory') {
+        if (includeDirs) out.push({ path: full, kind: 'directory' });
+        if (recursive && !(skipTop && skipTop === full)) await walk(h, full);
+      } else {
+        out.push({ path: full, kind: 'file', handle: h });
+      }
+    }
+  }
+  await walk(startDir, startRel);
+  return out;
+}
+
+async function tool_read_file({ path, offset, limit }) {
+  const norm = normFilesPath(path);
+  if (!norm) return { result: 'Error: path is required.' };
+  let file;
+  try {
+    const { parts, name } = splitPath(norm);
+    const dir = await opfsResolveDir(parts);
+    file = await (await dir.getFileHandle(name)).getFile();
+  } catch { return { result: 'Error: file not found: ' + norm }; }
+  if (file.size > FILE_TEXT_MAX) {
+    return { result: `Error: ${norm} is ${file.size} bytes — too large to read as text. Process it with run_python instead.` };
+  }
+  const text = await file.text();
+  if (/\x00/.test(text.slice(0, 4096))) {
+    return { result: `Error: ${norm} looks binary. Use load_image (images) or run_python.` };
+  }
+  const lines = text.split('\n');
+  const total = lines.length;
+  let start = Number.isInteger(offset) && offset > 0 ? offset : 1;
+  if (start > total) start = total;
+  const lim = Number.isInteger(limit) && limit > 0 ? limit : 2000;
+  const end = Math.min(total, start - 1 + lim);
+  const header = `${norm} — ${total} line${total === 1 ? '' : 's'}, ${file.size} bytes`
+    + (start > 1 || end < total ? ` (showing ${start}-${end})` : '');
+  let buf = header + '\n';
+  let lastShown = start - 1, truncated = false;
+  for (let i = start; i <= end; i++) {
+    const row = i + '\t' + lines[i - 1] + '\n';
+    if (buf.length + row.length > FILE_TOOL_CAP) { truncated = true; break; }
+    buf += row; lastShown = i;
+  }
+  if (truncated) buf += `…[truncated at line ${lastShown}; call again with offset=${lastShown + 1} for more]`;
+  return { result: buf.replace(/\n$/, '') };
+}
+
+async function tool_list_files({ path, pattern, recursive }) {
+  const norm = normFilesPath(path);
+  const rx = pattern ? globToRegExp(pattern) : null;
+  const entries = await opfsCollect(norm, { recursive: !!recursive, includeDirs: !recursive, max: 4000 });
+  if (entries === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+  const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
+  if (!rows.length) {
+    return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} under /${norm || ''}.` };
+  }
+  let buf = `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} under /${norm || ''}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
+  let shown = 0, truncated = false;
+  for (const e of rows) {
+    let line;
+    if (e.kind === 'directory') {
+      line = e.path + '/\n';
+    } else {
+      let size = '?', mtime = '';
+      try { const f = await e.handle.getFile(); size = f.size + 'b'; mtime = '  ' + new Date(f.lastModified).toISOString().slice(0, 16).replace('T', ' '); }
+      catch {}
+      line = `${e.path}\t${size}${mtime}\n`;
+    }
+    if (buf.length + line.length > FILE_TOOL_CAP) { truncated = true; break; }
+    buf += line; shown++;
+  }
+  if (truncated) buf += `…[${rows.length - shown} more not shown; narrow with path/pattern]`;
+  return { result: buf.replace(/\n$/, '') };
+}
+
+async function tool_search({ pattern, path, include, files_only, ignore_case }) {
+  if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
+  let rx;
+  try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
+  catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
+  const norm = normFilesPath(path);
+  const inc = include ? globToRegExp(include) : null;
+  const skipTop = norm.startsWith(SEARCH_SKIP_TOP) ? null : SEARCH_SKIP_TOP;
+  const files = await opfsCollect(norm, { recursive: true, includeDirs: false, max: 6000, skipTop });
+  if (files === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+
+  let buf = '', matches = 0, scanned = 0, truncated = false;
+  const hitFiles = new Set();
+  for (const f of files) {
+    if (inc && !(inc.test(f.path) || inc.test(f.path.split('/').pop()))) continue;
+    let text;
+    try {
+      const file = await f.handle.getFile();
+      if (file.size > FILE_TEXT_MAX) continue;
+      text = await file.text();
+    } catch { continue; }
+    if (/\x00/.test(text.slice(0, 4096))) continue; // binary
+    scanned++;
+    const fl = text.split('\n');
+    for (let i = 0; i < fl.length; i++) {
+      if (!rx.test(fl[i])) continue;
+      matches++; hitFiles.add(f.path);
+      if (files_only) break;
+      const row = `${f.path}:${i + 1}: ${fl[i].trim().slice(0, 300)}\n`;
+      if (buf.length + row.length > FILE_TOOL_CAP) { truncated = true; break; }
+      buf += row;
+    }
+    if (truncated) break;
+  }
+  const where = norm ? '/' + norm : '/files/';
+  if (files_only) {
+    if (!hitFiles.size) return { result: `No files contain /${pattern}/ in ${where}. Scanned ${scanned}.` };
+    return { result: `${hitFiles.size} file(s) match (scanned ${scanned}):\n` + [...hitFiles].sort().join('\n') };
+  }
+  if (!matches) return { result: `No matches for /${pattern}/ in ${where}${inc ? ' (include ' + include + ')' : ''}. Scanned ${scanned} files.` };
+  const head = `${matches} match${matches === 1 ? '' : 'es'} in ${hitFiles.size} file${hitFiles.size === 1 ? '' : 's'} (scanned ${scanned})${truncated ? ' — truncated; narrow the pattern or path' : ''}:\n`;
+  return { result: head + buf.replace(/\n$/, '') };
+}
+
 async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
@@ -625,6 +794,9 @@ async function runTool(name, args, ctx) {
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
+    case 'read_file':     return tool_read_file(args, ctx);
+    case 'list_files':    return tool_list_files(args, ctx);
+    case 'search':        return tool_search(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);   // ← add
     case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
     default:              return { result: 'Error: unknown tool ' + name };
