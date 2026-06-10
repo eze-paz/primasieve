@@ -536,8 +536,9 @@
     background: transparent; border: none; color: var(--sp-text-dim);
     font: 0.7rem inherit; padding: 0.45rem 0.4rem 0.15rem; justify-content: flex-start;
     letter-spacing: 0.04em; text-transform: uppercase;
+    cursor: pointer; margin-top: 0.6rem;
   }
-.shared-toggle:hover { color: var(--sp-text-dim); background: transparent; border: none; }
+.shared-toggle:hover { color: var(--sp-text); background: transparent; border: none; }
 .shared { opacity: 0.55; }
   ul.conv-list li.archived-toggle {
     background: transparent; border: none; color: var(--sp-text-dim);
