@@ -111,13 +111,20 @@ async function dbxListContinue(cursor) {
   };
 }
 
+// Dropbox-API-Arg travels in an HTTP header (ASCII-only). Escape non-ASCII as
+// \uXXXX (Dropbox un-escapes server-side); a path with accented/non-ASCII chars
+// otherwise makes the header malformed and the request is rejected (empty-body
+// 401 at the proxy). Paths in JSON request bodies are unaffected.
+function apiArg(obj) {
+  return JSON.stringify(obj).replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
 async function dbxDownload(path, signal) {
   const token = await dbxAccessToken();
   const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + token,
-      'Dropbox-API-Arg': JSON.stringify({ path }),
+      'Dropbox-API-Arg': apiArg({ path }),
       'Content-Type': 'text/plain',
     },
     signal,
@@ -137,7 +144,7 @@ async function dbxUpload(path, content) {
     headers: {
       Authorization: 'Bearer ' + token,
       'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true, autorename: false }),
+      'Dropbox-API-Arg': apiArg({ path, mode: 'overwrite', mute: true, autorename: false }),
     },
     body: content,
   });
@@ -154,7 +161,7 @@ async function dbxUploadSessionStart(content, close = true) {
     headers: {
       Authorization: 'Bearer ' + token,
       'Content-Type': 'application/octet-stream',
-      'Dropbox-API-Arg': JSON.stringify({ close }),
+      'Dropbox-API-Arg': apiArg({ close }),
     },
     body: content,
   });
