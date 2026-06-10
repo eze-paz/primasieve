@@ -95,8 +95,8 @@ window.SandpieTokens = SandpieTokens;
      ---
      # instructions…
 
-   Every send, scanSkills() walks skills/*/SKILL.md, parses frontmatter, and
-   builds the index in memory. Malformed skills (no SKILL.md, no frontmatter, no
+   Every send, scanSkills() walks each skills/<name>/SKILL.md, parses frontmatter,
+   and builds the index in memory. Malformed skills (no SKILL.md, no frontmatter, no
    description) are flagged deterministically — surfaced in the sidebar and the
    prompt — and are NOT offered to the model (without a description it can't know
    when to use them). No registry to keep in sync; drop a folder and it appears.
