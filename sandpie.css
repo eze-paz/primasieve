@@ -161,6 +161,25 @@
   .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid var(--sp-border); padding: 0.3rem 0.6rem; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
   ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
+
+  /* Subscriptions modal (dropbox-full). Own list class so its text buttons are
+     NOT crushed by the 18px icon-button rule above (ul.fs-list button), and own
+     button styling since .ghost is scoped to aside (the modal lives on body). */
+  .subs-modal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
+  .subs-modal button.ghost:hover:not(:disabled) { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
+  .subs-modal button.ghost:disabled { opacity: 0.6; cursor: default; }
+  .subs-modal .subs-pick { width: 100%; margin-bottom: 0.6rem; background: var(--sp-accent-dim); border: 1px solid var(--sp-accent); color: var(--sp-text); border-radius: 6px; padding: 0.45rem; font: inherit; font-size: 0.82rem; cursor: pointer; }
+  .subs-modal .subs-pick:hover:not(:disabled) { background: var(--sp-accent); color: #0b0f14; }
+  .subs-modal .subs-pick:disabled { opacity: 0.5; cursor: default; }
+  .subs-modal .subs-list { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; margin: 0; padding: 0; }
+  .subs-modal .subs-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.2rem; font: 0.8rem 'JetBrains Mono', Consolas, monospace; }
+  .subs-modal .subs-list li.empty { justify-content: center; color: var(--sp-text-dim); font-style: italic; font-family: inherit; }
+  .subs-modal .subs-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subs-modal .subs-list .name:hover { text-decoration: underline; }
+  .subs-modal .subs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; }
+  .subs-modal .subs-list button { flex: none; width: auto; height: auto; padding: 0.2rem 0.55rem; font: inherit; font-size: 0.72rem; line-height: 1.4; border-radius: 5px; background: var(--sp-panel); color: var(--sp-text); border: 1px solid var(--sp-border); cursor: pointer; white-space: nowrap; }
+  .subs-modal .subs-list button:hover:not(:disabled) { background: var(--sp-surface); border-color: var(--sp-border-bright); color: var(--sp-text); }
+  .subs-modal .subs-list button:disabled { opacity: 0.6; cursor: default; }
   .dbx-status { font-size: 0.72rem; padding: 0.3rem 0.4rem; border-radius: 4px; }
   .dbx-status.disconnected { background: rgba(139,148,158,0.1); color: var(--sp-text-dim); }
   .dbx-status.connected { background: var(--sp-success-dim); color: var(--sp-success); }

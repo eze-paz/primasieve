@@ -574,18 +574,20 @@
     overlay.setAttribute('data-chrome', '');
     overlay.innerHTML = `
       <div class="modal-backdrop"></div>
-      <div class="modal-content" style="max-width:560px; width:92%;">
+      <div class="modal-content subs-modal" style="max-width:560px; width:92%;">
         <h3>Subscriptions <span style="font-weight:400; font-size:0.78rem; color:var(--sp-text-dim);">· read-only</span></h3>
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:0.4rem;">
           <button class="ghost" id="subsUp" title="Up">←</button>
           <input id="subsPath" readonly style="flex:1; padding:0.35rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.8rem;">
         </div>
-        <ul class="fs-list" id="subsBrowse" style="max-height:34vh; overflow:auto; margin:0 0 0.6rem;"></ul>
+        <button class="subs-pick" id="subsPick" disabled>Open a folder to subscribe to it</button>
+        <div style="font-size:0.72rem; color:var(--sp-text-dim); margin-bottom:0.25rem;">Folders here — click a name to open, or use a row's Subscribe</div>
+        <ul class="subs-list" id="subsBrowse" style="max-height:30vh; overflow:auto; margin:0 0 0.6rem;"></ul>
         <div style="font-size:0.72rem; color:var(--sp-text-dim); margin-bottom:0.25rem; display:flex; justify-content:space-between; align-items:center;">
           <span>Subscribed folders</span>
           <button class="ghost" id="subsRefresh" title="Re-pull all subscriptions now" style="font-size:0.7rem; padding:0.2rem 0.5rem;">Refresh all</button>
         </div>
-        <ul class="fs-list" id="subsCurrent" style="max-height:22vh; overflow:auto; margin:0;"></ul>
+        <ul class="subs-list" id="subsCurrent" style="max-height:22vh; overflow:auto; margin:0;"></ul>
         <div class="modal-actions"><button class="ghost" id="subsClose">Close</button></div>
       </div>`;
     document.body.appendChild(overlay);
@@ -597,6 +599,13 @@
 
     async function renderBrowse() {
       $('#subsPath').value = browsePath || '/';
+      // Primary action: subscribe to the folder you're currently inside.
+      const pick = $('#subsPick');
+      const here = browsePath.split('/').filter(Boolean).pop();
+      if (!browsePath) { pick.disabled = true; pick.textContent = 'Open a folder to subscribe to it'; pick.onclick = null; }
+      else if (isSubscribed(browsePath)) { pick.disabled = true; pick.textContent = `Subscribed ✓  ·  ${here}`; pick.onclick = null; }
+      else { pick.disabled = false; pick.textContent = `＋ Subscribe to “${here}”`; pick.onclick = () => doSubscribe(browsePath, here, pick); }
+
       const ul = $('#subsBrowse');
       ul.innerHTML = '<li class="empty">Loading…</li>';
       let entries;
@@ -604,18 +613,16 @@
       catch (err) { ul.innerHTML = ''; const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Failed: ' + err.message; ul.appendChild(li); return; }
       const folders = entries.filter(e => e.kind === 'folder').sort((a, b) => a.name.localeCompare(b.name));
       ul.innerHTML = '';
-      if (!folders.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = '(no subfolders here)'; ul.appendChild(li); }
+      if (!folders.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = '(no subfolders — use the button above to subscribe here)'; ul.appendChild(li); }
       for (const f of folders) {
         const li = document.createElement('li');
         const name = document.createElement('span');
         name.className = 'name folder';
         name.textContent = '📁 ' + f.name;
-        name.style.cursor = 'pointer';
+        name.title = 'Open';
         name.onclick = () => { browsePath = f.path; renderBrowse(); };
         li.appendChild(name);
         const btn = document.createElement('button');
-        btn.className = 'ghost';
-        btn.style.cssText = 'margin-left:auto; font-size:0.7rem; padding:0.2rem 0.5rem;';
         if (isSubscribed(f.path)) { btn.textContent = 'Subscribed ✓'; btn.disabled = true; }
         else { btn.textContent = 'Subscribe'; btn.onclick = () => doSubscribe(f.path, f.name, btn); }
         li.appendChild(btn);
@@ -626,19 +633,18 @@
       btn.disabled = true; btn.textContent = 'Checking…';
       let est;
       try { est = await estimateFolderSize(cloudPath); }
-      catch (err) { btn.disabled = false; btn.textContent = 'Subscribe'; dbxStatus('Size check failed: ' + err.message, 'error'); return; }
+      catch (err) { dbxStatus('Size check failed: ' + err.message, 'error'); renderBrowse(); return; }
       const headroom = await storageHeadroom();
       const sizeStr = (est.capped ? '>' : '≈') + fmtBytes(est.bytes) + ' across ' + (est.capped ? '>' : '') + est.files + ' files';
       if (est.bytes > headroom) {
         alert(`"${name}" is ${sizeStr}, but only ${fmtBytes(headroom)} of browser storage is free.\nFree up space or pick a smaller folder.`);
-        btn.disabled = false; btn.textContent = 'Subscribe'; return;
+        renderBrowse(); return;
       }
       if ((est.bytes > 200 * 1024 * 1024 || est.capped) && !confirm(`Mirror "${name}" (${sizeStr}) into local storage, read-only?`)) {
-        btn.disabled = false; btn.textContent = 'Subscribe'; return;
+        renderBrowse(); return;
       }
       subscribe(cloudPath, name);
-      btn.textContent = 'Subscribed ✓';
-      renderCurrent();
+      renderBrowse(); renderCurrent();
       dbxStatus('Mirroring ' + name + '…', 'connected');
       await refreshSubscriptions();
       dbxStatus('', 'connected');
