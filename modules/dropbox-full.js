@@ -54,9 +54,15 @@
   //  Transport  (own copy; full-Dropbox absolute paths)
   // ===========================================================================
   function dbxRoute(url) {
-    const stripped = url.replace(/^https?:\/\//, '');
-    const remote = (document.getElementById('proxyUrl')?.value || '').trim().replace(/\/$/, '');
-    return (remote || '') + '/proxy/' + stripped;
+    // Browser → Dropbox directly. Dropbox supports CORS across the API (the PKCE
+    // token endpoint, the RPC endpoints, and the content endpoints), so no server
+    // hop is needed. The previous build prefixed a server-side /proxy/ (shared
+    // with the LLM proxy via the AI provider's #proxyUrl field), but the thin
+    // sandpie-server has no /proxy/ route — and proxying would route the user's
+    // Dropbox access token through our server. Going direct keeps that token in
+    // the browser. If a deployment's egress truly can't reach *.dropboxapi.com,
+    // reintroduce a proxy hop here, decoupled from the AI provider's proxyUrl.
+    return url;
   }
   function b64url(buf) {
     return btoa(String.fromCharCode(...new Uint8Array(buf)))
