@@ -52,6 +52,9 @@ const SandpieAccount = (() => {
 
   async function onSignedIn() {
     paint();
+    // Announce sign-in on the shared bus so optional modules can react (e.g.
+    // dropbox-full.js auto-connects cloud sync). Loose coupling — no hard dep.
+    try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('account:signedin', _user); } catch (_) {}
     await refreshManagedProvider();
     clearInterval(_refreshTimer);
     _refreshTimer = setInterval(refreshManagedProvider, 30 * 60 * 1000);   // keep the session token fresh

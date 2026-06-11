@@ -42,6 +42,8 @@
   const APPKEY_CFG = 'dbxfull-appkey';
   const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
   const DEFAULT_PARENT = '/R+D+I/sandpie';      // default sync parent (deployment default)
+  const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
+  const AUTOCONN_TRIED  = 'dbxfull-autoconn-tried';   // sessionStorage: per-session auto-connect loop guard
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
   const NS_VER_KEY = 'dbxfull-ns-ver';          // detection-logic version; bump ⇒ force a one-time re-fetch
   const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
@@ -752,6 +754,7 @@
   }
   function toggleConnection() { if (tokens()) disconnect(); else connect(); }
   async function connect() {
+    localStorage.removeItem(AUTOCONN_OPTOUT);     // a (re)connect cancels any prior opt-out
     let appKey = (document.getElementById('dbxfullAppKey')?.value || '').trim();
     if (!appKey) appKey = await serverAppKey();   // managed deployment provides it
     if (!appKey) { dbxStatus('Enter your full-access Dropbox app key first', 'error'); return; }
@@ -765,6 +768,9 @@
     location.href = 'https://www.dropbox.com/oauth2/authorize?' + params.toString();
   }
   function disconnect() {
+    // Explicit disconnect opts out of auto-connect (see maybeAutoConnect) so a
+    // managed-login user who disconnects isn't silently reconnected on reload.
+    localStorage.setItem(AUTOCONN_OPTOUT, '1');
     // Keep PARENT_KEY + APPKEY_CFG + SUBS_KEY so a reconnect reuses the configured
     // folder/key and re-mirrors the same subscriptions. Drop the local mirror +
     // its pull-state (stale once disconnected; re-pulled on reconnect).
@@ -772,6 +778,21 @@
     try { Sandpie.opfs.remove(SUBS_PREFIX).catch(() => {}); } catch {}
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
+  }
+  // Auto-connect for managed (server-login) deployments. Triggered by the
+  // 'account:signedin' bus event (account.js): if the user signed in through the
+  // server, isn't already connected, hasn't explicitly disconnected, and the
+  // deployment provides a Dropbox app key (GET /config), start the OAuth flow
+  // automatically — seamless when Dropbox is federated to the same IdP. The
+  // per-session AUTOCONN_TRIED guard stops a cancelled/failed bounce from looping.
+  async function maybeAutoConnect() {
+    if (tokens()) return;                                 // already connected
+    if (localStorage.getItem(AUTOCONN_OPTOUT)) return;    // user opted out via Disconnect
+    if (sessionStorage.getItem(AUTOCONN_TRIED)) return;   // already tried this session
+    const key = await serverAppKey();
+    if (!key) return;                                     // no managed app key → nothing to do
+    sessionStorage.setItem(AUTOCONN_TRIED, '1');
+    connect();                                            // → Dropbox OAuth
   }
   async function exchangeCode(code) {
     const stashed = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
@@ -898,6 +919,7 @@
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);
+    Sandpie.events.on('account:signedin', maybeAutoConnect);   // managed login → auto-connect Dropbox
     wireServiceWorker();
     setInterval(() => { if (!document.hidden) sync(); }, 60000);
 
