@@ -12,10 +12,13 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="modules/core.js"></script>
+  <script src="modules/config.js"></script>
+  <script src="modules/settings.js"></script>
+  <script src="modules/account.js"></script>
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js"></script>
   <script src="modules/console.js"></script>
-  <script src="modules/dropbox.js"></script>
+  <script src="modules/dropbox-full.js"></script>
   <script src="modules/images.js"></script>
   <script src="modules/notifications.js"></script>
   <script src="modules/tools.js"></script>
@@ -47,30 +50,6 @@
   <input id="model" type="hidden">
   <input id="apiKey" type="hidden">
   <input id="proxyUrl" type="hidden">
-<div id="providerModal" class="modal" style="display:none;">
-    <div class="modal-backdrop" onclick="SandpieProviders.closeModal()"></div>
-    <div class="modal-content">
-      <h3>Edit provider</h3>
-      <input id="modalName" autocomplete="off" placeholder="Name (e.g. Main, Backup, Local proxy)">
-      <input id="modalEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-      <input id="modalModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
-      <input id="modalApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
-      <input id="modalProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
-      <input id="modalContextWindow" type="number" min="1" autocomplete="off" placeholder="Context window (e.g. 128000)">
-      <input id="modalMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional, e.g. 8192)">
-      <input id="modalTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
-      <div class="modal-actions">
-        <button onclick="SandpieProviders.saveModal()">Save</button>
-        <button class="ghost" onclick="SandpieProviders.closeModal()">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="chipContextMenu" class="context-menu" style="display:none;">
-    <div class="context-item" onclick="SandpieProviders.editFromMenu()">Edit</div>
-    <div class="context-item" onclick="SandpieProviders.duplicateFromMenu()">Duplicate</div>
-    <div class="context-item context-delete" onclick="SandpieProviders.deleteFromMenu()">Delete</div>
-  </div>
 
   <div id="bubbleContextMenu" class="context-menu" style="display:none;">
     <div class="context-item" onclick="copyFromMenu()">Copy</div>
@@ -89,8 +68,9 @@
     </div>
   </details>
 
-<div style="font-size:0.65rem; color:var(--sp-text-dim); padding:0.5rem; margin-top:auto; text-align:center;">
-    <div>sandpie <span id="versionDisplay">loading...</span></div>
+<div style="margin-top:auto; padding:0.5rem; display:flex; flex-direction:column; gap:0.45rem; align-items:stretch;">
+    <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
+    <div style="font-size:0.65rem; color:var(--sp-text-dim); text-align:center;">sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
@@ -133,6 +113,24 @@
     </div>
   </form>
 </main>
+
+<!-- Settings modal — a top-level overlay (direct child of <body>). MUST stay
+     outside <aside>: the aurora theme gives the sidebar a backdrop-filter, which
+     would otherwise become the containing block for this position:fixed modal
+     and trap it inside the sidebar. -->
+<div id="settingsModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" onclick="SandpieSettings.close()"></div>
+  <div class="modal-content" style="max-width:680px; width:90%; max-height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">
+      <h3 style="margin:0; font-size:1rem;">Settings</h3>
+      <button class="ghost" onclick="SandpieSettings.close()" title="Close (Esc)" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">✕</button>
+    </div>
+    <div style="display:flex; min-height:240px; flex:1; overflow:hidden;">
+      <nav id="settingsNav" style="flex:0 0 150px; border-right:1px solid var(--sp-border); padding:0.6rem; display:flex; flex-direction:column; gap:0.25rem; overflow-y:auto;"></nav>
+      <div id="settingsPanels" style="flex:1; padding:1rem 1.1rem; overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
 <script type="module" src="modules/agents.js"></script>
   <script type="module" src="modules/context.js"></script>
   <script type="module" src="modules/artifacts.js"></script>
