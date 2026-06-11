@@ -38,25 +38,93 @@ const _paletteLabels = {
   success: 'Success', danger: 'Danger', warn: 'Warning'
 };
 
-function setTheme(name) {
+/* ─── persistence: route theme settings through SandpieConfig's 'appearance'
+   namespace when it's loaded (so they sync across a user's devices via OPFS),
+   falling back to the original localStorage keys otherwise. Secret-free — just
+   the chosen theme + any customized palettes. ─── */
+function _cfg() { return window.SandpieConfig || null; }
+function getThemeName() {
+  var c = _cfg();
+  if (c) { var a = c.get('appearance'); if (a && a.theme) return a.theme; }
+  return localStorage.getItem('sandpie-theme') || null;
+}
+function setThemeName(name) {
+  var c = _cfg();
+  if (c) c.set('appearance', Object.assign({}, c.get('appearance', {}) || {}, { theme: name }));
+  else localStorage.setItem('sandpie-theme', name);
+}
+function getPalette(name) {
+  var c = _cfg();
+  if (c) { var a = c.get('appearance'); return (a && a.palettes && a.palettes[name]) || null; }
+  try { return JSON.parse(localStorage.getItem('sandpie-theme-palette-' + name) || 'null'); } catch (e) { return null; }
+}
+function setPalette(name, pal) {
+  var c = _cfg();
+  if (c) {
+    var a = Object.assign({}, c.get('appearance', {}) || {});
+    a.palettes = Object.assign({}, a.palettes || {}); a.palettes[name] = pal;
+    c.set('appearance', a);
+  } else localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(pal));
+}
+function clearPalette(name) {
+  var c = _cfg();
+  if (c) {
+    var a = Object.assign({}, c.get('appearance', {}) || {});
+    if (a.palettes) { a.palettes = Object.assign({}, a.palettes); delete a.palettes[name]; }
+    c.set('appearance', a);
+  } else localStorage.removeItem('sandpie-theme-palette-' + name);
+}
+// One-time import of legacy localStorage theme settings into config. Call only
+// after SandpieConfig.ready() so it can't clobber a copy synced from elsewhere.
+function _importLegacyAppearance() {
+  var c = _cfg(); if (!c) return;
+  var cur = c.get('appearance');
+  if (cur && typeof cur === 'object') return;   // already present — nothing to import
+  var appearance = {};
+  var t = localStorage.getItem('sandpie-theme'); if (t) appearance.theme = t;
+  var palettes = {};
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('sandpie-theme-palette-') === 0) {
+        try { palettes[k.slice('sandpie-theme-palette-'.length)] = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  if (Object.keys(palettes).length) appearance.palettes = palettes;
+  if (Object.keys(appearance).length) c.set('appearance', appearance);
+}
+
+// applyTheme — apply a theme to the DOM WITHOUT persisting. Used at boot and
+// when reacting to a config change (e.g. one synced from another device), so it
+// must NEVER write back to SandpieConfig — that would re-fire the 'appearance'
+// subscriber and loop.
+function applyTheme(name) {
   var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
   name = map[name] || name;
   if (!_themePalettes[name]) name = 'electric';
   if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
   else if (name === 'classic-light') document.documentElement.setAttribute('data-theme', 'light');
   else document.documentElement.setAttribute('data-theme', name);
-  localStorage.setItem('sandpie-theme', name);
   applyThemePalette(name);
   buildPaletteUI(name);
-  $('themeCustomize').style.display = 'flex';
+  var _tc = $('themeCustomize'); if (_tc) _tc.style.display = 'flex';
   updateThemeButtons();
   computeAccentNeg();
+}
+// setTheme — user action: persist the choice, then apply it.
+function setTheme(name) {
+  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
+  var resolved = map[name] || name;
+  if (!_themePalettes[resolved]) resolved = 'electric';
+  setThemeName(resolved);
+  applyTheme(resolved);
 }
 
 function applyThemePalette(name) {
   var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
+  var saved = getPalette(name);
+  if (saved) { try { Object.assign(palette, saved); } catch (e) {} }
   var css = ':root{ ';
   for (var key in palette) {
     if (key === 'accent-dim') continue; // derived, handled separately
@@ -83,8 +151,8 @@ function buildPaletteUI(name) {
   if (!container) return;
   container.innerHTML = '';
   var palette = Object.assign({}, _themePalettes[name]);
-  var saved = localStorage.getItem('sandpie-theme-palette-' + name);
-  if (saved) { try { Object.assign(palette, JSON.parse(saved)); } catch (e) {} }
+  var saved = getPalette(name);
+  if (saved) { try { Object.assign(palette, saved); } catch (e) {} }
   for (var key in palette) {
     var label = _paletteLabels[key] || key;
     var val = palette[key];
@@ -139,7 +207,7 @@ function onPaletteInput(e) {
 }
 
 function saveThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  var name = getThemeName() || 'classic-dark';
   var palette = {};
   var rows = $('themePaletteRows').querySelectorAll('.palette-row');
   for (var i = 0; i < rows.length; i++) {
@@ -152,14 +220,14 @@ function saveThemeColors() {
     var m = style.textContent.match(/--sp-accent-dim:([^!;]+)/);
     if (m) palette['accent-dim'] = m[1].trim();
   }
-  localStorage.setItem('sandpie-theme-palette-' + name, JSON.stringify(palette));
+  setPalette(name, palette);
   var hint = $('themeHint');
   if (hint) { hint.textContent = 'Colors saved!'; hint.style.opacity = '1'; setTimeout(function () { hint.style.opacity = '0'; }, 1200); }
 }
 
 function resetThemeColors() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
-  localStorage.removeItem('sandpie-theme-palette-' + name);
+  var name = getThemeName() || 'classic-dark';
+  clearPalette(name);
   applyThemePalette(name);
   buildPaletteUI(name);
   var defaultAccent = _themePalettes[name].accent;
@@ -169,20 +237,20 @@ function resetThemeColors() {
 }
 
 function updateThemeButtons() {
-  var name = localStorage.getItem('sandpie-theme') || 'classic-dark';
+  var name = getThemeName() || 'classic-dark';
   document.querySelectorAll('.theme-btn[data-t]').forEach(function (b) {
     b.classList.toggle('active', b.dataset.t === name);
   });
 }
 
 function applySavedCustom() {
-  var saved = localStorage.getItem('sandpie-theme') || 'electric';
+  var saved = getThemeName() || 'electric';
   if (saved && _themePalettes[saved]) {
-    setTheme(saved);
-    var pal = localStorage.getItem('sandpie-theme-palette-' + saved);
-    if (pal) { try { Object.assign(_themePalettes[saved], JSON.parse(pal)); applyThemePalette(saved); } catch (e) {} }
+    applyTheme(saved);
+    var pal = getPalette(saved);
+    if (pal) { try { Object.assign(_themePalettes[saved], pal); applyThemePalette(saved); } catch (e) {} }
   } else {
-    setTheme('electric');
+    applyTheme('electric');
   }
 }
 
@@ -257,18 +325,10 @@ function computeAccentNeg() {
 
 
 
-/* ─── SandpieMenu registration for Appearance section ─── */
-function injectAppearanceMenu() {
-  if (typeof SandpieMenu === 'undefined') {
-    if (typeof window !== 'undefined') {
-      setTimeout(injectAppearanceMenu, 50);
-    }
-    return;
-  }
-  if (SandpieMenu.get('themeSection')) return;
-  SandpieMenu.add('themeSection', {
-    title: 'Appearance',
-    html: `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+/* ─── Settings UI: prefer the gear modal (SandpieSettings); fall back to the
+   sidebar (SandpieMenu) so Appearance still shows when settings.js isn't loaded
+   (e.g. the stable page). Identical markup + setup either way. ─── */
+var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
       <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
       <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
@@ -282,23 +342,56 @@ function injectAppearanceMenu() {
         <button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;">Save colors</button>
       </div>
     </div>
-    <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look. Saved locally.</div>`,
-    onRender: function(body) {
-      var saved = localStorage.getItem('sandpie-theme') || 'classic-dark';
-      if (_themePalettes[saved]) {
-        updateThemeButtons();
-        buildPaletteUI(saved);
-      }
-    }
-  });
+    <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look.</div>`;
+function _setupAppearancePanel() {
+  var saved = getThemeName() || 'classic-dark';
+  if (_themePalettes[saved]) {
+    updateThemeButtons();
+    buildPaletteUI(saved);
+    // The palette pickers live inside #themeCustomize, which is hidden until a
+    // theme is applied. When this panel mounts the theme is already applied, so
+    // reveal them now instead of waiting for the user to click a theme button.
+    var tc = $('themeCustomize'); if (tc) tc.style.display = 'flex';
+  }
+}
+function injectAppearanceUI() {
+  if (window.SandpieSettings) {
+    SandpieSettings.register({
+      id: 'appearance', title: 'Appearance', order: 20,
+      render: function(panel) { panel.innerHTML = _APPEARANCE_HTML; _setupAppearancePanel(); },
+    });
+    return;
+  }
+  if (typeof SandpieMenu !== 'undefined') {
+    if (SandpieMenu.get('themeSection')) return;
+    SandpieMenu.add('themeSection', {
+      title: 'Appearance',
+      html: _APPEARANCE_HTML,
+      onRender: function(body) { _setupAppearancePanel(); },
+    });
+    return;
+  }
+  setTimeout(injectAppearanceUI, 50);   // neither host ready yet — retry
 }
 
+function _refreshAppearancePanel() {
+  var s = getThemeName();
+  if (s && _themePalettes[s]) { updateThemeButtons(); if ($('themePaletteRows')) buildPaletteUI(s); }
+}
+function _bootThemes() {
+  applySavedCustom();            // apply the theme immediately from the local mirror
+  injectAppearanceUI();          // register the gear panel (or sidebar fallback)
+  var c = window.SandpieConfig;
+  if (c) {
+    // Once the durable/synced config has been reconciled, migrate any legacy
+    // localStorage theme settings (once), then re-apply — a theme synced from
+    // another device wins. Also re-apply on any later 'appearance' change.
+    c.ready().then(function() { _importLegacyAppearance(); applySavedCustom(); _refreshAppearancePanel(); });
+    c.subscribe('appearance', function() { applySavedCustom(); _refreshAppearancePanel(); });
+  }
+}
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    injectAppearanceMenu();
-    applySavedCustom();
-  });
+  document.addEventListener('DOMContentLoaded', _bootThemes);
 } else {
-  injectAppearanceMenu();
-  applySavedCustom();
+  _bootThemes();
 }

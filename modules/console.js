@@ -65,6 +65,13 @@
     }).join(' ');
   }
 
+  /* Record a line: append to the capped tail buffer, then schedule a render. */
+  function record(level, text) {
+    _lines.push({ level, text, t: Date.now() });
+    if (_lines.length > MAX_LINES) _lines.splice(0, _lines.length - MAX_LINES);
+    scheduleFlush();
+  }
+
   /* Schedule flush of buffered lines to DOM */
   function scheduleFlush() {
     if (_flushTimer) return;
@@ -91,12 +98,10 @@
       row.textContent = `${iconFor(entry.level)} ${entry.text}`;
       frag.appendChild(row);
     }
-    panel.appendChild(frag);
-
-    // tail trim
-    while (panel.children.length > MAX_LINES) {
-      panel.removeChild(panel.firstChild);
-    }
+    // replaceChildren — NOT append — so repeated flushes never duplicate lines
+    // (the buffer is the source of truth, capped in record()), and a freshly
+    // mounted panel paints the full history on open.
+    panel.replaceChildren(frag);
 
     if (_scrolledToBottom) {
       panel.scrollTop = panel.scrollHeight;
@@ -117,8 +122,7 @@
   function hijack(level) {
     return function (...args) {
       _orig[level].apply(console, args);
-      _lines.push({ level, text: serialize(args), t: Date.now() });
-      scheduleFlush();
+      record(level, serialize(args));
     };
   }
 
@@ -131,14 +135,12 @@
   // Also catch window.onerror (uncaught exceptions)
   window.addEventListener('error', (e) => {
     const msg = e.error ? `${e.message}\n${e.error.stack || ''}` : e.message;
-    _lines.push({ level: 'error', text: msg, t: Date.now() });
-    scheduleFlush();
+    record('error', msg);
   });
   window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason;
     const text = reason instanceof Error ? `${reason.message}\n${reason.stack || ''}` : String(reason);
-    _lines.push({ level: 'error', text: `Unhandled rejection: ${text}`, t: Date.now() });
-    scheduleFlush();
+    record('error', `Unhandled rejection: ${text}`);
   });
 
   // ---------------------------------------------------------------------------
@@ -182,58 +184,50 @@
   // ---------------------------------------------------------------------------
   // Register with sidebar via SandpieMenu (fails silently if API unavailable)
   // ---------------------------------------------------------------------------
-  function init() {
-    const menu = (typeof SandpieMenu !== 'undefined') ? SandpieMenu : null;
-    if (!menu) {
-      // Defer until SandpieMenu is ready
-      setTimeout(init, 100);
-      return;
-    }
+  /* Wire a freshly-mounted console panel (its body already contains panelHtml):
+     scroll tracking + Clear/Copy, then paint the existing history. */
+  function wireConsolePanel(body) {
+    const linesEl = body.querySelector('#consoleLines');
+    if (!linesEl) return;
 
-    const wasOpen = localStorage.getItem(STORAGE_KEY) === '1';
-
-    menu.add('console', {
-      title: 'Console',
-      open: wasOpen,
-      html: panelHtml,
-      onRender(body) {
-        const linesEl = body.querySelector('#consoleLines');
-        if (!linesEl) return;
-
-        // Scroll tracking
-        linesEl.addEventListener('scroll', () => {
-          _scrolledToBottom =
-            linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight <= 4;
-        });
-
-        // Clear button
-        const btnClear = body.querySelector('#consoleClear');
-        if (btnClear) {
-          btnClear.addEventListener('click', () => {
-            _lines.length = 0;
-            linesEl.innerHTML = '';
-          });
-        }
-
-        // Copy button
-        const btnCopy = body.querySelector('#consoleCopy');
-        if (btnCopy) {
-          btnCopy.addEventListener('click', async () => {
-            const text = _lines.map(l => l.text).join('\n');
-            try { await navigator.clipboard.writeText(text); }
-            catch (_) { /* ignore */ }
-          });
-        }
-      },
+    linesEl.addEventListener('scroll', () => {
+      _scrolledToBottom =
+        linesEl.scrollHeight - linesEl.scrollTop - linesEl.clientHeight <= 4;
     });
 
-    // Persist open / collapsed state
-    const details = document.getElementById('console');
-    if (details) {
-      details.addEventListener('toggle', () => {
+    const btnClear = body.querySelector('#consoleClear');
+    if (btnClear) btnClear.addEventListener('click', () => { _lines.length = 0; linesEl.replaceChildren(); });
+
+    const btnCopy = body.querySelector('#consoleCopy');
+    if (btnCopy) btnCopy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(_lines.map(l => l.text).join('\n')); } catch (_) { /* ignore */ }
+    });
+
+    _scrolledToBottom = true;
+    flushLines();   // paint the buffered history into the just-mounted panel
+  }
+
+  /* Prefer the gear modal (SandpieSettings); fall back to the sidebar
+     (SandpieMenu) so the console still appears when settings.js isn't loaded
+     (e.g. the stable page). No debug toggle — the console is always available. */
+  function init() {
+    if (window.SandpieSettings) {
+      SandpieSettings.register({
+        id: 'console', title: 'Console', order: 90,
+        render(panel) { panel.innerHTML = panelHtml; wireConsolePanel(panel); },
+      });
+      return;
+    }
+    if (typeof SandpieMenu !== 'undefined') {
+      const wasOpen = localStorage.getItem(STORAGE_KEY) === '1';
+      SandpieMenu.add('console', { title: 'Console', open: wasOpen, html: panelHtml, onRender: wireConsolePanel });
+      const details = document.getElementById('console');
+      if (details) details.addEventListener('toggle', () => {
         localStorage.setItem(STORAGE_KEY, details.open ? '1' : '');
       });
+      return;
     }
+    setTimeout(init, 100);   // neither host ready yet — retry
   }
 
   // Boot when DOM is ready
