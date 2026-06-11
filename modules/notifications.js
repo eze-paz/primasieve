@@ -13,13 +13,29 @@ const SandpieNotifications = (function() {
   // DOM references — populated by onRender
   let btnEl = null;
   let statusEl = null;
+  let _cfgWired = false;
 
   // ============================================================
   // PREFERENCE LAYER
   // ============================================================
 
   function prefEnabled() {
+    const c = window.SandpieConfig;
+    if (c) { const n = c.get('notifications'); if (n && typeof n.enabled === 'boolean') return n.enabled; }
     return localStorage.getItem(NOTIF_PREF_KEY) !== '0';
+  }
+  function setPrefEnabled(on) {
+    const c = window.SandpieConfig;
+    if (c) c.set('notifications', Object.assign({}, c.get('notifications', {}) || {}, { enabled: !!on }));
+    else if (on) localStorage.removeItem(NOTIF_PREF_KEY);
+    else localStorage.setItem(NOTIF_PREF_KEY, '0');
+  }
+  // One-time import: preserve an explicit legacy "muted" choice into config.
+  // (Default is enabled, so only a stored '0' needs migrating.)
+  function importLegacyNotif() {
+    const c = window.SandpieConfig; if (!c) return;
+    if (c.get('notifications') !== undefined) return;
+    if (localStorage.getItem(NOTIF_PREF_KEY) === '0') c.set('notifications', { enabled: false });
   }
 
   /**
@@ -82,11 +98,10 @@ const SandpieNotifications = (function() {
     const p = Notification.permission;
     if (p === 'granted') {
       // Already authorised by the browser — just flip the sandpie-local pref.
-      if (prefEnabled()) localStorage.setItem(NOTIF_PREF_KEY, '0');
-      else localStorage.removeItem(NOTIF_PREF_KEY);
+      setPrefEnabled(!prefEnabled());
     } else if (p === 'default') {
       try { await Notification.requestPermission(); } catch (_) {}
-      localStorage.removeItem(NOTIF_PREF_KEY);
+      setPrefEnabled(true);
     }
     // 'denied' is unreachable — the button is disabled in that branch.
     refreshStatus();
@@ -165,33 +180,40 @@ const SandpieNotifications = (function() {
     });
   }
 
-  function init() {
-    wireEvents();
-    if (typeof SandpieMenu === 'undefined') {
-      console.warn('Notifications module: SandpieMenu not found, retrying in 500ms...');
-      setTimeout(init, 500);
-      return;
-    }
-
-    SandpieMenu.add('notificationsSection', {
-      title: 'Notifications',
-      dot: 'notifDot',
-      badge: null,
-      open: false,
-      html: `
+  const NOTIF_HTML = `
         <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
         <button type="button" class="ghost" id="notifEnableBtn">Enable notifications</button>
         <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
-      `,
-      onRender(bodyEl) {
-        btnEl = bodyEl.querySelector('#notifEnableBtn');
-        statusEl = bodyEl.querySelector('#notifStatus');
-        if (btnEl) btnEl.addEventListener('click', toggle);
-        refreshStatus();
-      }
-    });
+      `;
+  function wireNotifPanel(bodyEl) {
+    btnEl = bodyEl.querySelector('#notifEnableBtn');
+    statusEl = bodyEl.querySelector('#notifStatus');
+    if (btnEl) btnEl.addEventListener('click', toggle);
+    refreshStatus();
+  }
 
-    console.log('Notifications module registered');
+  // Prefer the gear modal (SandpieSettings); fall back to the sidebar
+  // (SandpieMenu) so Notifications still appears when settings.js isn't loaded.
+  function init() {
+    wireEvents();
+    if (!_cfgWired && window.SandpieConfig) {
+      _cfgWired = true;
+      SandpieConfig.ready().then(importLegacyNotif);
+      SandpieConfig.subscribe('notifications', refreshStatus);
+    }
+
+    if (window.SandpieSettings) {
+      SandpieSettings.register({
+        id: 'notifications', title: 'Notifications', order: 30,
+        render(panel) { panel.innerHTML = NOTIF_HTML; wireNotifPanel(panel); },
+      });
+      return;
+    }
+    if (typeof SandpieMenu !== 'undefined') {
+      SandpieMenu.add('notificationsSection', { title: 'Notifications', dot: 'notifDot', badge: null, open: false, html: NOTIF_HTML, onRender: wireNotifPanel });
+      return;
+    }
+    setTimeout(init, 500);   // neither host ready yet — retry
   }
 
   return {

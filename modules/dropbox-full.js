@@ -446,13 +446,6 @@
     }
   }
 
-  async function manualResync() {
-    if (!tokens()) { dbxStatus('Not connected', 'disconnected'); return; }
-    const btn = document.getElementById('dbxfullResyncBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Resyncing…'; }
-    try { await sync({ full: true }); }
-    finally { if (btn) { btn.disabled = false; btn.textContent = 'Resync'; } }
-  }
 
   // ===========================================================================
   //  Subscriptions  (read-only mirrors of other Dropbox folders)
@@ -786,10 +779,11 @@
     const st = kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null;
     const dot = document.getElementById('dbxfullDot');
     if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (st) dot.classList.add(st); }
-    const sec = Sandpie.menu.get('cloudSection');
-    const btn = sec?.querySelector('#dbxfullToggleBtn');
+    // Query by id (not via the menu section) — the panel may live in the gear
+    // modal (SandpieSettings) rather than the sidebar.
+    const btn = document.getElementById('dbxfullToggleBtn');
     if (btn) btn.textContent = tokens() ? 'Disconnect' : 'Connect';
-    const root = sec?.querySelector('#dbxfullRoot');
+    const root = document.getElementById('dbxfullRoot');
     if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
   }
   let _busy = 0;
@@ -798,39 +792,38 @@
     const dot = document.getElementById('dbxfullDot');
     if (dot) dot.classList.toggle('busy', _busy > 0);
   }
-  function addSection() {
-    Sandpie.menu.add('cloudSection', {
-      title: 'Cloud sync',
-      dot: 'dbxfullDot',
-      html: `
+  const CLOUD_HTML = `
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <input id="dbxfullParent" autocomplete="off" placeholder="Sync folder, e.g. /R+D+I/sandpie" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <div class="row">
-          <button id="dbxfullToggleBtn">Connect</button>
-          <button class="ghost" id="dbxfullResyncBtn" title="Re-pull the working dir and reconcile now (also applies a changed sync folder)">Resync</button>
-        </div>
+        <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
         <button class="ghost" id="dbxfullSubsBtn" title="Browse Dropbox and mirror folders read-only" style="margin-top:0.5rem; width:100%;">📡 Subscriptions…</button>
-      `,
-      onRender(body) {
-        const input = body.querySelector('#dbxfullAppKey');
-        if (input) {
-          input.addEventListener('input', saveConfig);
-          input.value = tokens()?.app_key || localStorage.getItem(APPKEY_CFG) || '';
-        }
-        const parent = body.querySelector('#dbxfullParent');
-        if (parent) {
-          parent.value = localStorage.getItem(PARENT_KEY) || '/sandpie';
-          // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
-          parent.addEventListener('change', () => localStorage.setItem(PARENT_KEY, parent.value.trim() || '/sandpie'));
-        }
-        body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
-        body.querySelector('#dbxfullResyncBtn')?.addEventListener('click', manualResync);
-        body.querySelector('#dbxfullSubsBtn')?.addEventListener('click', openSubscriptionManager);
-        const root = body.querySelector('#dbxfullRoot');
-        if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
-      },
-    });
+      `;
+  function wireCloudPanel(body) {
+    const input = body.querySelector('#dbxfullAppKey');
+    if (input) {
+      input.addEventListener('input', saveConfig);
+      input.value = tokens()?.app_key || localStorage.getItem(APPKEY_CFG) || '';
+    }
+    const parent = body.querySelector('#dbxfullParent');
+    if (parent) {
+      parent.value = localStorage.getItem(PARENT_KEY) || '/sandpie';
+      // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
+      parent.addEventListener('change', () => localStorage.setItem(PARENT_KEY, parent.value.trim() || '/sandpie'));
+    }
+    body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
+    body.querySelector('#dbxfullSubsBtn')?.addEventListener('click', openSubscriptionManager);
+    const root = body.querySelector('#dbxfullRoot');
+    if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
+  }
+  // Prefer the gear modal (SandpieSettings); fall back to the sidebar. The
+  // Dropbox token + app key stay in localStorage (secrets are never synced).
+  function addSection() {
+    if (window.SandpieSettings) {
+      SandpieSettings.register({ id: 'cloud', title: 'Cloud sync', order: 40, render(panel) { panel.innerHTML = CLOUD_HTML; wireCloudPanel(panel); } });
+      return;
+    }
+    Sandpie.menu.add('cloudSection', { title: 'Cloud sync', dot: 'dbxfullDot', html: CLOUD_HTML, onRender: wireCloudPanel });
   }
 
   // ===========================================================================

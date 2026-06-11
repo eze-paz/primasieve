@@ -168,6 +168,12 @@
   .subs-modal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
   .subs-modal button.ghost:hover:not(:disabled) { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
   .subs-modal button.ghost:disabled { opacity: 0.6; cursor: default; }
+  /* Settings modal also lives on <body> (so position:fixed anchors to the
+     viewport, not the aurora sidebar's backdrop-filter) — same reason .subs-modal
+     does: "aside button.ghost" can't reach a body-level modal, so restyle here. */
+  #settingsModal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
+  #settingsModal button.ghost:hover:not(:disabled) { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
+  #settingsModal button.ghost.active { background: var(--sp-accent-dim); color: var(--sp-text); border-color: var(--sp-accent); }
   .subs-modal .subs-pick { width: 100%; margin-bottom: 0.6rem; background: var(--sp-accent-dim); border: 1px solid var(--sp-accent); color: var(--sp-text); border-radius: 6px; padding: 0.45rem; font: inherit; font-size: 0.82rem; cursor: pointer; }
   .subs-modal .subs-pick:hover:not(:disabled) { background: var(--sp-accent); color: #0b0f14; }
   .subs-modal .subs-pick:disabled { opacity: 0.5; cursor: default; }

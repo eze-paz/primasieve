@@ -1,8 +1,17 @@
 /**
  * Providers Module for Sandpie
  *
- * Registers an "AI provider" section in the sidebar via SandpieMenu.
- * Usage: <script type="module" src="modules/providers.js"></script>
+ * "AI provider" settings: chips to pick the active provider, with the selected
+ * provider's fields shown inline right below — no separate popup modal. The
+ * panel lives in the gear Settings modal (SandpieSettings); falls back to the
+ * sidebar (SandpieMenu) when settings.js isn't loaded (e.g. the stable page).
+ *
+ * Storage stays in localStorage: a provider definition includes its API key (a
+ * secret), so providers are NOT synced to the SandpieConfig blob.
+ *
+ * account.js may inject a "managed" provider at runtime (on company sign-in) via
+ * setManaged(): it shows as a read-only chip, is never persisted, and is removed
+ * on sign-out.
  */
 
 const PROVIDERS_KEY = 'sandpie-providers';
@@ -10,46 +19,62 @@ const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
 
 let _providers = [];
 let _activeProviderId = null;
-let _editingProviderId = null;
-let _chipMenuTarget = null;
+let _managed = null;            // company provider injected by account.js; in-memory only, never persisted
+const MANAGED_ID = '__managed';
 
+const AI_HTML = `
+      <div class="chip-row" id="providerChips"></div>
+      <div id="providerManagedNote" style="display:none; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); font-size:0.78rem; color:var(--sp-text-dim);">This provider is provided by your company sign-in — its settings are managed for you.</div>
+      <div id="providerForm" style="display:none; flex-direction:column; gap:0.4rem; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border);">
+        <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
+        <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
+        <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
+        <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
+        <input id="spApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
+        <input id="spProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
+        <input id="spContextWindow" type="number" min="1" autocomplete="off" placeholder="Context window (e.g. 128000)">
+        <input id="spMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional)">
+        <input id="spTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
+        <div style="display:flex; gap:0.35rem;">
+          <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
+          <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
+        </div>
+      </div>
+      <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
+    `;
+
+// Prefer the gear modal (SandpieSettings); fall back to the sidebar (SandpieMenu).
 function init() {
-  if (typeof SandpieMenu === 'undefined') {
-    console.warn('Providers module: SandpieMenu not found, retrying in 500ms...');
-    setTimeout(init, 500);
+  if (window.SandpieSettings) {
+    SandpieSettings.register({
+      id: 'aiProvider', title: 'AI provider', order: 10,
+      render(panel) { panel.innerHTML = AI_HTML; _wireProviderPanel(); },
+    });
     return;
   }
+  if (typeof SandpieMenu !== 'undefined') {
+    SandpieMenu.add('aiSection', { title: 'AI provider', dot: 'aiDot', badge: null, open: false, html: AI_HTML, onRender: _wireProviderPanel });
+    return;
+  }
+  setTimeout(init, 500);   // neither host ready yet — retry
+}
 
-  SandpieMenu.add('aiSection', {
-    title: 'AI provider',
-    dot: 'aiDot',
-    badge: null,
-    open: false,
-    html: `
-      <div class="chip-row" id="providerChips"></div>
-      <div class="hint" id="routingHint" style="margin-top:0.5rem;"></div>
-    `,
-    onRender(bodyEl) {
-      loadProviders();
-      _bindProviderListeners();
-      renderChips();
-      updateRoutingHint();
-      refreshAiDot();
-      // Auto-open if credentials are missing
-      const ep = document.getElementById('endpoint');
-      const ak = document.getElementById('apiKey');
-      if ((!ep || !ep.value.trim()) || (!ak || !ak.value.trim())) {
-        const details = document.getElementById('aiSection');
-        if (details) details.open = true;
-      }
-    }
-  });
-
-  console.log('Providers module registered');
+function _wireProviderPanel() {
+  loadProviders();
+  renderChips();
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature']) {
+    const el = document.getElementById(id);
+    if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
+  }
+  document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
+  document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
+  if (_activeProviderId) loadFormFor(_activeProviderId);
+  updateRoutingHint();
+  refreshAiDot();
 }
 
 // ============================================================
-// PROVIDER MANAGEMENT
+// PROVIDER STORAGE (localStorage — secrets stay local)
 // ============================================================
 
 function loadProviders() {
@@ -80,7 +105,7 @@ function loadProviders() {
     }
   }
 
-  if (_activeProviderId && !_providers.find(p => p.id === _activeProviderId)) {
+  if (_activeProviderId && !getProviderById(_activeProviderId)) {
     _activeProviderId = _providers.length ? _providers[0].id : null;
   }
   if (!_activeProviderId && _providers.length) {
@@ -95,10 +120,18 @@ function saveProviders() {
   localStorage.setItem(ACTIVE_PROVIDER_KEY, _activeProviderId || '');
 }
 
-function getActiveProvider() {
-  return _providers.find(p => p.id === _activeProviderId) || null;
+// Resolve any id, including the in-memory managed provider.
+function getProviderById(id) {
+  if (_managed && id === MANAGED_ID) return _managed;
+  return _providers.find(p => p.id === id) || null;
 }
 
+function getActiveProvider() {
+  return getProviderById(_activeProviderId);
+}
+
+// Push the active provider's connection details into the hidden inputs that
+// conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
   const p = getActiveProvider();
   const ep = document.getElementById('endpoint');
@@ -113,198 +146,134 @@ function applyActiveProvider() {
   refreshAiDot();
 }
 
-function _bindProviderListeners() {
-  const pu = document.getElementById('proxyUrl');
-  if (pu && !pu._spBound) {
-    pu.addEventListener('input', updateRoutingHint);
-    pu._spBound = true;
-  }
-  ['endpoint', 'apiKey'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && !el._spBound) {
-      el.addEventListener('input', refreshAiDot);
-      el._spBound = true;
-    }
-  });
-}
-
 // ============================================================
-// UI RENDERING
+// CHIPS  (pick the active provider; "+ Add" creates a new one)
 // ============================================================
 
 function renderChips() {
   const row = document.getElementById('providerChips');
   if (!row) return;
   row.innerHTML = '';
-
-  for (const p of _providers) {
-    try {
-      if (!p || !p.id) continue;
-      const chip = document.createElement('div');
-      chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '');
-      chip.textContent = p.name || p.model || 'Unnamed';
-      chip.dataset.id = p.id;
-      chip.onclick = () => activateProvider(p.id);
-      chip.oncontextmenu = (e) => showChipMenu(e, p.id);
-      row.appendChild(chip);
-    } catch (e) {
-      console.warn('renderChips: skipping malformed provider:', p, e);
-    }
+  const list = _managed ? [_managed].concat(_providers) : _providers;
+  for (const p of list) {
+    if (!p || !p.id) continue;
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '') + (p.managed ? ' managed' : '');
+    chip.textContent = p.name || p.model || 'Unnamed';
+    chip.dataset.id = p.id;
+    if (p.managed) chip.title = 'Provided by your company sign-in';
+    chip.onclick = () => selectProvider(p.id);
+    row.appendChild(chip);
   }
-
   const addChip = document.createElement('div');
   addChip.className = 'chip add';
   addChip.textContent = '+ Add';
-  addChip.onclick = () => openProviderModal();
+  addChip.onclick = () => addProvider();
   row.appendChild(addChip);
 }
 
-function activateProvider(id) {
+// ============================================================
+// INLINE FORM  (settings of the selected/active provider)
+// ============================================================
+
+// Selecting a chip activates that provider AND loads it into the form below.
+function selectProvider(id) {
   _activeProviderId = id;
   saveProviders();
   applyActiveProvider();
+  loadFormFor(id);
   renderChips();
 }
 
-// ============================================================
-// MODAL
-// ============================================================
-
-function openProviderModal(providerId = null) {
-  _editingProviderId = providerId;
-  const p = providerId ? _providers.find(x => x.id === providerId) : null;
-  document.getElementById('modalName').value = p ? (p.name || p.model || '') : '';
-  document.getElementById('modalEndpoint').value = p ? p.endpoint : '';
-  document.getElementById('modalModel').value = p ? p.model : '';
-  document.getElementById('modalApiKey').value = p ? p.apiKey : '';
-  document.getElementById('modalProxyUrl').value = p ? p.proxyUrl : '';
-  const mt = document.getElementById('modalMaxTokens');
-  if (mt) mt.value = (p && p.maxTokens != null) ? p.maxTokens : '';
-  const tp = document.getElementById('modalTemperature');
-  if (tp) tp.value = (p && p.temperature != null) ? p.temperature : '';
-  const cw = document.getElementById('modalContextWindow');
-  if (cw) cw.value = (p && p.contextWindow != null) ? p.contextWindow : '';
-  document.getElementById('providerModal').style.display = '';
+function loadFormFor(id) {
+  const form = document.getElementById('providerForm');
+  const note = document.getElementById('providerManagedNote');
+  if (!form) return;
+  const p = getProviderById(id);
+  // Managed (company) providers are read-only: hide the editable form, show a note.
+  if (p && p.managed) { form.style.display = 'none'; if (note) note.style.display = 'block'; return; }
+  if (note) note.style.display = 'none';
+  if (!p) { form.style.display = 'none'; return; }
+  form.style.display = 'flex';
+  const set = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = (v != null ? v : ''); };
+  set('spName', p.name); set('spEndpoint', p.endpoint); set('spModel', p.model);
+  set('spApiKey', p.apiKey); set('spProxyUrl', p.proxyUrl);
+  set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
 }
 
-function closeProviderModal() {
-  document.getElementById('providerModal').style.display = 'none';
-  _editingProviderId = null;
-}
-
-function saveProviderModal() {
-  const name = document.getElementById('modalName').value.trim();
-  const endpoint = document.getElementById('modalEndpoint').value.trim();
-  const model = document.getElementById('modalModel').value.trim();
-  const apiKey = document.getElementById('modalApiKey').value.trim();
-  const proxyUrl = document.getElementById('modalProxyUrl').value.trim();
-
-  if (!endpoint || !model || !apiKey) {
-    alert('Endpoint, model, and API key are required.');
-    return;
-  }
-
-  // Optional per-provider tuning. The inputs only exist on pages that expose
-  // them; where absent, leave any stored values untouched (don't clobber).
-  const mtEl = document.getElementById('modalMaxTokens');
-  const tpEl = document.getElementById('modalTemperature');
-  const cwEl = document.getElementById('modalContextWindow');
-  function applyTuning(p) {
-    if (mtEl) {
-      const v = parseInt(mtEl.value, 10);
-      if (Number.isFinite(v) && v > 0) p.maxTokens = v; else delete p.maxTokens;
-    }
-    if (tpEl) {
-      const t = parseFloat(tpEl.value);
-      if (Number.isFinite(t) && t >= 0) p.temperature = t; else delete p.temperature;
-    }
-    if (cwEl) {
-      const c = parseInt(cwEl.value, 10);
-      if (Number.isFinite(c) && c > 0) p.contextWindow = c; else delete p.contextWindow;
-    }
-  }
-
-  if (_editingProviderId) {
-    const p = _providers.find(x => x.id === _editingProviderId);
-    if (p) {
-      p.name = name || model;
-      p.endpoint = endpoint;
-      p.model = model;
-      p.apiKey = apiKey;
-      p.proxyUrl = proxyUrl;
-      applyTuning(p);
-    }
-  } else {
-    const newP = {
-      id: 'provider_' + Date.now(),
-      name: name || model,
-      endpoint, model, apiKey, proxyUrl
-    };
-    applyTuning(newP);
-    _providers.push(newP);
-    _activeProviderId = newP.id;
-  }
-
+// Commit form edits to the active provider (auto-save on field change/blur).
+function commitForm() {
+  const p = getActiveProvider();
+  if (!p || p.managed) return;   // managed providers are read-only
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  const num = id => { const n = parseFloat(document.getElementById(id)?.value); return Number.isFinite(n) ? n : null; };
+  p.endpoint = val('spEndpoint');
+  p.model = val('spModel');
+  p.apiKey = val('spApiKey');
+  p.proxyUrl = val('spProxyUrl');
+  p.name = val('spName') || p.model || 'Unnamed';
+  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else delete p.contextWindow;
+  const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
+  const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   saveProviders();
   applyActiveProvider();
-  renderChips();
-  closeProviderModal();
+  renderChips();   // reflect a renamed chip / active highlight
 }
 
-// ============================================================
-// CONTEXT MENU
-// ============================================================
-
-function showChipMenu(e, providerId) {
-  e.preventDefault();
-  _chipMenuTarget = providerId;
-  const menu = document.getElementById('chipContextMenu');
-  menu.style.display = '';
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
+function addProvider() {
+  const np = { id: 'provider_' + Date.now(), name: '', endpoint: '', model: '', apiKey: '', proxyUrl: '' };
+  _providers.push(np);
+  selectProvider(np.id);   // activate + show an empty form to fill in
 }
 
-function hideChipMenu() {
-  document.getElementById('chipContextMenu').style.display = 'none';
-  _chipMenuTarget = null;
-}
-
-function editProviderFromMenu() {
-  if (_chipMenuTarget) openProviderModal(_chipMenuTarget);
-  hideChipMenu();
-}
-
-function duplicateProviderFromMenu() {
-  if (!_chipMenuTarget) return;
-  const p = _providers.find(x => x.id === _chipMenuTarget);
-  if (!p) { hideChipMenu(); return; }
-  const copy = {
-    id: 'provider_' + Date.now(),
-    name: (p.name || p.model) + ' (copy)',
-    endpoint: p.endpoint, model: p.model, apiKey: p.apiKey, proxyUrl: p.proxyUrl
-  };
-  if (p.maxTokens != null) copy.maxTokens = p.maxTokens;
-  if (p.temperature != null) copy.temperature = p.temperature;
-  if (p.contextWindow != null) copy.contextWindow = p.contextWindow;
+function duplicateSelected() {
+  const p = getActiveProvider();
+  if (!p || p.managed) return;
+  const copy = { ...p, id: 'provider_' + Date.now(), name: (p.name || p.model || 'Provider') + ' (copy)' };
   _providers.push(copy);
-  saveProviders();
-  renderChips();
-  hideChipMenu();
+  selectProvider(copy.id);
 }
 
-function deleteProviderFromMenu() {
-  if (!_chipMenuTarget) return;
-  const p = _providers.find(x => x.id === _chipMenuTarget);
-  if (p && confirm('Delete "' + (p.name || p.model) + '"?')) {
-    _providers = _providers.filter(x => x.id !== _chipMenuTarget);
-    if (_activeProviderId === _chipMenuTarget) {
-      _activeProviderId = _providers.length ? _providers[0].id : null;
-    }
+function deleteSelected() {
+  const p = getActiveProvider();
+  if (!p || p.managed) return;
+  if (!confirm('Delete "' + (p.name || p.model || 'this provider') + '"?')) return;
+  _providers = _providers.filter(x => x.id !== p.id);
+  _activeProviderId = _providers.length ? _providers[0].id : null;
+  saveProviders();
+  applyActiveProvider();
+  if (_activeProviderId) loadFormFor(_activeProviderId);
+  else { const f = document.getElementById('providerForm'); if (f) f.style.display = 'none'; }
+  renderChips();
+}
+
+// ============================================================
+// MANAGED PROVIDER  (injected by account.js on company sign-in; in-memory only)
+// ============================================================
+
+// Surface a read-only company provider as a chip. NOT persisted. Activates it
+// only if nothing else is active (sign-in shouldn't yank you off your own
+// provider mid-chat). Re-applies on each call so a refreshed token lands.
+function setManaged(def) {
+  _managed = def ? Object.assign({}, def, { id: MANAGED_ID, managed: true }) : null;
+  if (_managed && !getActiveProvider()) _activeProviderId = MANAGED_ID;
+  if (_activeProviderId === MANAGED_ID) applyActiveProvider();
+  renderChips();
+  if (_activeProviderId === MANAGED_ID) loadFormFor(MANAGED_ID);
+}
+
+// Remove the managed provider (on sign-out); fall back to a real provider/none.
+function clearManaged() {
+  const wasActive = _activeProviderId === MANAGED_ID;
+  _managed = null;
+  if (wasActive) {
+    _activeProviderId = _providers.length ? _providers[0].id : null;
     saveProviders();
     applyActiveProvider();
-    renderChips();
   }
-  hideChipMenu();
+  renderChips();
+  if (_activeProviderId) loadFormFor(_activeProviderId);
+  else { const f = document.getElementById('providerForm'); if (f) f.style.display = 'none'; }
 }
 
 // ============================================================
@@ -338,20 +307,11 @@ window.SandpieProviders = {
   apply: applyActiveProvider,
   list: () => _providers.slice(),
   get activeId() { return _activeProviderId; },
-  openModal: openProviderModal,
-  closeModal: closeProviderModal,
-  saveModal: saveProviderModal,
-  showMenu: showChipMenu,
-  hideMenu: hideChipMenu,
-  editFromMenu: editProviderFromMenu,
-  duplicateFromMenu: duplicateProviderFromMenu,
-  deleteFromMenu: deleteProviderFromMenu,
   updateHint: updateRoutingHint,
   refreshDot: refreshAiDot,
+  setManaged,
+  clearManaged,
 };
-
-// Global click handler to hide chip menu
-document.addEventListener('click', hideChipMenu);
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
