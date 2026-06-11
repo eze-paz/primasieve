@@ -41,6 +41,7 @@
   const SUBS_KEY   = 'dbxfull-subscriptions';   // [{path,label,addedAt,bytes}] — read-only team/shared folder mirrors
   const APPKEY_CFG = 'dbxfull-appkey';
   const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
+  const DEFAULT_PARENT = '/R+D+I/sandpie';      // default sync parent (deployment default)
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
   const NS_VER_KEY = 'dbxfull-ns-ver';          // detection-logic version; bump ⇒ force a one-time re-fetch
   const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
@@ -217,9 +218,9 @@
       console.info('[dropbox-full] path-root', ns ? ('→ team root ' + ns) : '→ home', '(root=' + ri.root_namespace_id + ', home=' + ri.home_namespace_id + ')');
     }
     // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
-    // section (default /sandpie; e.g. /R+D+I/sandpie for a department folder).
+    // section (default DEFAULT_PARENT = /R+D+I/sandpie, the department folder).
     const local = sanitizeSeg(String(email).split('@')[0]);
-    let parent = (localStorage.getItem(PARENT_KEY) || '/sandpie').trim() || '/sandpie';
+    let parent = (localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT).trim() || DEFAULT_PARENT;
     if (!parent.startsWith('/')) parent = '/' + parent;
     parent = parent.replace(/\/+$/, '');
     const root = parent + '/' + local;
@@ -795,26 +796,57 @@
   // ===========================================================================
   //  Sidebar "Cloud sync" section + status
   // ===========================================================================
-  function dbxStatus(text, kind) {
-    const st = kind === 'connected' ? 'ok' : kind === 'error' ? 'err' : null;
-    const dot = document.getElementById('dbxfullDot');
-    if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (st) dot.classList.add(st); }
-    // Query by id (not via the menu section) — the panel may live in the gear
-    // modal (SandpieSettings) rather than the sidebar.
-    const btn = document.getElementById('dbxfullToggleBtn');
-    if (btn) btn.textContent = tokens() ? 'Disconnect' : 'Connect';
-    const root = document.getElementById('dbxfullRoot');
-    if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
-  }
+  // Connection-state UI. dbxStatus()/setBusy() just record the latest message +
+  // busy count; renderCloudState() paints the panel from the single source of
+  // truth — tokens() (connected?), _busy (syncing?), _lastErr — so the panel is
+  // correct whenever it (re)renders, not only when an event fires. The previous
+  // bug: wireCloudPanel never repainted, so the button was frozen at "Connect".
+  // Safe when the panel isn't mounted — every element lookup is guarded.
   let _busy = 0;
+  let _lastMsg = '';
+  let _lastErr = false;
+  function dbxStatus(text, kind) {
+    _lastErr = kind === 'error';
+    _lastMsg = text || '';   // e.g. "Mirroring …"; '' falls back to "Connected"
+    renderCloudState();
+  }
   function setBusy(b) {
     _busy = Math.max(0, _busy + (b ? 1 : -1));
-    const dot = document.getElementById('dbxfullDot');
-    if (dot) dot.classList.toggle('busy', _busy > 0);
+    renderCloudState();
+  }
+  function renderCloudState() {
+    const connected = !!tokens();
+    const dot  = document.getElementById('dbxfullDot');
+    const text = document.getElementById('dbxfullStatusText');
+    const acct = document.getElementById('dbxfullAccount');
+    const btn  = document.getElementById('dbxfullToggleBtn');
+    const root = document.getElementById('dbxfullRoot');
+    const key  = document.getElementById('dbxfullAppKey');
+    let color, label, pulse = false;
+    if (_lastErr)       { color = 'var(--sp-danger)';   label = _lastMsg || 'Error'; }
+    else if (_busy)     { color = 'var(--sp-warn)';     label = 'Syncing…'; pulse = true; }
+    else if (connected) { color = 'var(--sp-success)';  label = _lastMsg || 'Connected'; }
+    else                { color = 'var(--sp-text-dim)'; label = 'Not connected'; }
+    if (dot)  { dot.style.background = color; dot.style.animation = pulse ? 'sync-pulse 1s ease-in-out infinite' : 'none'; }
+    if (text) { text.textContent = label; text.title = label; text.style.color = _lastErr ? 'var(--sp-danger)' : 'var(--sp-text)'; }
+    if (acct) { acct.textContent = connected ? (localStorage.getItem(EMAIL_KEY) || '') : ''; }
+    if (btn)  { btn.textContent = connected ? 'Disconnect' : 'Connect'; }
+    if (key)  { key.style.display = connected ? 'none' : ''; }   // app key only matters before connecting
+    if (root) {
+      root.textContent = connected
+        ? (workingRoot() ? ('Syncing to ' + workingRoot()) : 'Resolving folder…')
+        : 'Your username is appended to the sync folder automatically.';
+    }
   }
   const CLOUD_HTML = `
+        <div style="display:flex; align-items:center; gap:0.45rem; padding:0.4rem 0.55rem; margin-bottom:0.6rem; border:1px solid var(--sp-border); border-radius:6px; background:var(--sp-panel);">
+          <span id="dbxfullDot" style="width:9px; height:9px; border-radius:50%; flex:none; background:var(--sp-text-dim);"></span>
+          <span id="dbxfullStatusText" style="font-size:0.8rem; font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Not connected</span>
+          <span id="dbxfullAccount" style="font-size:0.7rem; color:var(--sp-text-dim); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:55%;"></span>
+        </div>
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <input id="dbxfullParent" autocomplete="off" placeholder="Sync folder, e.g. /R+D+I/sandpie" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Sync folder</label>
+        <input id="dbxfullParent" autocomplete="off" placeholder="${DEFAULT_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
         <button class="ghost" id="dbxfullSubsBtn" title="Browse Dropbox and mirror folders read-only" style="margin-top:0.5rem; width:100%;">📡 Subscriptions…</button>
@@ -831,14 +863,16 @@
     }
     const parent = body.querySelector('#dbxfullParent');
     if (parent) {
-      parent.value = localStorage.getItem(PARENT_KEY) || '/sandpie';
+      parent.value = localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT;
       // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
-      parent.addEventListener('change', () => localStorage.setItem(PARENT_KEY, parent.value.trim() || '/sandpie'));
+      parent.addEventListener('change', () => {
+        localStorage.setItem(PARENT_KEY, parent.value.trim() || DEFAULT_PARENT);
+        renderCloudState();
+      });
     }
     body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
     body.querySelector('#dbxfullSubsBtn')?.addEventListener('click', openSubscriptionManager);
-    const root = body.querySelector('#dbxfullRoot');
-    if (root) root.textContent = workingRoot() ? ('working dir: ' + workingRoot()) : 'Your username is appended automatically.';
+    renderCloudState();   // paint the live connection state on (re)render — the fix
   }
   // Prefer the gear modal (SandpieSettings); fall back to the sidebar. The
   // Dropbox token + app key stay in localStorage (secrets are never synced).
@@ -847,7 +881,7 @@
       SandpieSettings.register({ id: 'cloud', title: 'Cloud sync', order: 40, render(panel) { panel.innerHTML = CLOUD_HTML; wireCloudPanel(panel); } });
       return;
     }
-    Sandpie.menu.add('cloudSection', { title: 'Cloud sync', dot: 'dbxfullDot', html: CLOUD_HTML, onRender: wireCloudPanel });
+    Sandpie.menu.add('cloudSection', { title: 'Cloud sync', html: CLOUD_HTML, onRender: wireCloudPanel });
   }
 
   // ===========================================================================
