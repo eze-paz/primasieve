@@ -726,13 +726,27 @@
   // ===========================================================================
   //  OAuth
   // ===========================================================================
+  // A managed deployment (sandpie-server) can provide the company Dropbox app
+  // key via GET /config, so the panel pre-fills it and "Connect" is one click.
+  // The key is a PUBLIC PKCE client_id, not a secret. null = not fetched yet;
+  // '' = no server / unset → fall back to the user-entered or saved key. Cached.
+  let _serverAppKey = null;
+  async function serverAppKey() {
+    if (_serverAppKey !== null) return _serverAppKey;
+    try {
+      const res = await fetch('/config', { headers: { Accept: 'application/json' } });
+      _serverAppKey = res.ok ? (((await res.json()) || {}).dropboxAppKey || '') : '';
+    } catch { _serverAppKey = ''; }
+    return _serverAppKey;
+  }
   function saveConfig() {
     const el = document.getElementById('dbxfullAppKey');
     if (el) localStorage.setItem(APPKEY_CFG, el.value || '');
   }
   function toggleConnection() { if (tokens()) disconnect(); else connect(); }
   async function connect() {
-    const appKey = (document.getElementById('dbxfullAppKey')?.value || '').trim();
+    let appKey = (document.getElementById('dbxfullAppKey')?.value || '').trim();
+    if (!appKey) appKey = await serverAppKey();   // managed deployment provides it
     if (!appKey) { dbxStatus('Enter your full-access Dropbox app key first', 'error'); return; }
     saveConfig();
     const { verifier, challenge } = await pkceChallenge();
@@ -803,7 +817,11 @@
     const input = body.querySelector('#dbxfullAppKey');
     if (input) {
       input.addEventListener('input', saveConfig);
-      input.value = tokens()?.app_key || localStorage.getItem(APPKEY_CFG) || '';
+      const existing = tokens()?.app_key || localStorage.getItem(APPKEY_CFG) || '';
+      input.value = existing;
+      // No key of their own → pre-fill the deployment's company key (if any) so
+      // Connect is one click. Async; only fill if the user hasn't typed since.
+      if (!existing) serverAppKey().then(k => { if (k && !input.value) input.value = k; });
     }
     const parent = body.querySelector('#dbxfullParent');
     if (parent) {
