@@ -24,7 +24,7 @@ const MANAGED_ID = '__managed'; // id prefix — each managed provider's id is `
 function isManagedId(id) { return typeof id === 'string' && id.indexOf(MANAGED_ID + ':') === 0; }
 
 const AI_HTML = `
-      <div class="chip-row" id="providerChips"></div>
+      <div id="providerChips"></div>
       <div id="providerManagedNote" style="display:none; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); font-size:0.78rem; color:var(--sp-text-dim);">This provider is provided by your company sign-in — its settings are managed for you.</div>
       <div id="providerForm" style="display:none; flex-direction:column; gap:0.4rem; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border);">
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
@@ -154,22 +154,41 @@ function renderChips() {
   const row = document.getElementById('providerChips');
   if (!row) return;
   row.innerHTML = '';
-  const list = _managed.concat(_providers);
-  for (const p of list) {
-    if (!p || !p.id) continue;
+  const makeChip = (p) => {
     const chip = document.createElement('div');
     chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '') + (p.managed ? ' managed' : '');
     chip.textContent = p.name || p.model || 'Unnamed';
     chip.dataset.id = p.id;
     if (p.managed) chip.title = 'Provided by your company sign-in';
     chip.onclick = () => selectProvider(p.id);
-    row.appendChild(chip);
-  }
+    return chip;
+  };
+  const groupOf = (chips) => {
+    const g = document.createElement('div');
+    g.className = 'chip-row';
+    chips.forEach(c => g.appendChild(c));
+    return g;
+  };
+  const label = (text, top) => {
+    const d = document.createElement('div');
+    d.textContent = text;
+    d.style.cssText = 'font-size:0.65rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.05em; margin:' + (top ? '0.7rem' : '0') + ' 0 0.35rem;';
+    return d;
+  };
   const addChip = document.createElement('div');
   addChip.className = 'chip add';
   addChip.textContent = '+ Add';
   addChip.onclick = () => addProvider();
-  row.appendChild(addChip);
+  // Two labeled sections only when there are company-managed providers to
+  // separate; otherwise a single flat row (unchanged for anonymous users).
+  if (_managed.length) {
+    row.appendChild(label('Company', false));
+    row.appendChild(groupOf(_managed.map(makeChip)));
+    row.appendChild(label('Your providers', true));
+    row.appendChild(groupOf(_providers.map(makeChip).concat(addChip)));
+  } else {
+    row.appendChild(groupOf(_providers.map(makeChip).concat(addChip)));
+  }
 }
 
 // ============================================================
