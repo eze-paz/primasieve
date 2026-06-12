@@ -1379,6 +1379,68 @@ async function rewindFromMenu() {
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
 }
+/* ---- conversation compaction (compress older turns into a summary) -------
+   Replace messages[0..split) with ONE user-role summary message, keeping the
+   most recent `keepTail` messages verbatim, so the live context stays bounded
+   and a chat can run indefinitely. The replaced span is stored as a restore
+   point INSIDE the conversation file (data.compactions) — never a sidecar file
+   (listConversations() treats every *.json in _conversations/ as a chat, so a
+   sidecar would show up as a phantom conversation; in-file also means it
+   deletes/archives/syncs with the conversation, leaving no orphans). Mutates
+   `messages` IN PLACE so it stays the same array reference as the active
+   stream's s.messages (see mountConv) — the same way rewindFromMenu persists. */
+const SP_SUMMARY_MARKER = '[Earlier conversation auto-summarized to preserve context]';
+function safeSplitIndex(msgs, keepTail) {
+  let split = Math.max(0, msgs.length - (keepTail || 10));
+  // The head becomes one user-role summary, so the kept tail must START on an
+  // assistant message: that keeps user/assistant alternation valid (summary=user,
+  // then assistant) and never orphans a tool result (a role:'tool' message must
+  // follow its assistant tool_calls). Snap the boundary forward to the next
+  // assistant message.
+  while (split < msgs.length && (!msgs[split] || msgs[split].role !== 'assistant')) split++;
+  return split;
+}
+async function compactConversation(convId, { keepTail = 10, summary = '' } = {}) {
+  if (!convId || convId !== activeConvId) return { ok: false, reason: 'not the active conversation' };
+  const text = String(summary || '').trim();
+  if (!text) return { ok: false, reason: 'empty summary' };
+  const split = safeSplitIndex(messages, keepTail);
+  if (split <= 1 || split >= messages.length) return { ok: false, reason: 'nothing safe to compact' };
+  const removed = messages.slice(0, split).map(m => ({ ...m }));
+  const summaryMsg = { role: 'user', content: SP_SUMMARY_MARKER + '\n\n' + text };
+  // 1) persist the restore point first (file still holds the pre-compaction messages)
+  let prev = {};
+  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
+  const compactions = Array.isArray(prev.compactions) ? prev.compactions : [];
+  compactions.push({ at: new Date().toISOString(), count: split, removed });
+  while (compactions.length > 20) compactions.shift();   // bound file growth
+  await updateConvFile(convId, { compactions });
+  // 2) rewrite the live array IN PLACE (keeps the s.messages reference)
+  messages.splice(0, split, summaryMsg);
+  // 3) re-render exactly like rewind
+  clearActiveConvUI();
+  for (const m of messages) renderHistoricalMessage(m);
+  const el = $('messages');
+  if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
+  // 4) persist the compacted messages (saveConv keeps `compactions` via ...prev)
+  await saveActiveConv();
+  return { ok: true, removed: split, kept: messages.length };
+}
+async function restoreLastCompaction(convId) {
+  if (!convId || convId !== activeConvId) return { ok: false, reason: 'not the active conversation' };
+  let data = {};
+  try { data = JSON.parse(await opfs.read(convPath(convId))); } catch { return { ok: false }; }
+  const comps = Array.isArray(data.compactions) ? data.compactions.slice() : [];
+  const last = comps.pop();
+  if (!last || !Array.isArray(last.removed)) return { ok: false, reason: 'no restore point' };
+  const head = (messages[0] && typeof messages[0].content === 'string' && messages[0].content.startsWith(SP_SUMMARY_MARKER)) ? 1 : 0;
+  messages.splice(0, head, ...last.removed);
+  await updateConvFile(convId, { compactions: comps });
+  clearActiveConvUI();
+  for (const m of messages) renderHistoricalMessage(m);
+  await saveActiveConv();
+  return { ok: true, restored: last.removed.length };
+}
 function toggleToolsMinimizedFromMenu() {
   toolsMinimized = !toolsMinimized;
   localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
@@ -1756,6 +1818,7 @@ window.convPath = convPath;
 window.ensureActiveConv = ensureActiveConv;
 window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
+window.SandpieConversations = { compact: compactConversation, restoreLast: restoreLastCompaction, safeSplitIndex };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;

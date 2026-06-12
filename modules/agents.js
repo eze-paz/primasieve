@@ -9,7 +9,8 @@
  *   at_context_pct:             trigger — fire at >= P% of the context window
  *   every_minutes:              trigger — fire every M minutes (best-effort)
  *   input: since_last_run       since_last_run | conversation | last_<n>
- *   sink: memory                memory | note | append:<path>
+ *   sink: memory                memory | note | compact | append:<path>
+ *   keep_tail:                  (compact only) recent messages kept verbatim
  *   model:                      optional model override
  *   ---
  *   <the prompt body>           everything below = the zero-shot prompt
@@ -96,6 +97,7 @@ function parseAgent(id, text) {
     input: (fm.input || 'since_last_run').toLowerCase(),
     sink: (fm.sink || 'note').toLowerCase(),
     model: fm.model || '',
+    keepTail: num('keep_tail'),
     prompt: body,
     raw: text,
     errors,
@@ -105,8 +107,8 @@ function parseAgent(id, text) {
   if (a.everyMessages == null && a.atContextPct == null && a.everyMinutes == null) {
     errors.push('no trigger (set every_messages, at_context_pct, or every_minutes)');
   }
-  if (!(a.sink === 'memory' || a.sink === 'note' || a.sink.startsWith('append:'))) {
-    errors.push(`unknown sink "${a.sink}" — use memory, note, or append:<path>`);
+  if (!(a.sink === 'memory' || a.sink === 'note' || a.sink === 'compact' || a.sink.startsWith('append:'))) {
+    errors.push(`unknown sink "${a.sink}" — use memory, note, compact, or append:<path>`);
   }
   return a;
 }
@@ -163,6 +165,29 @@ sink: memory
 ${DISTILLER_PROMPT}
 `;
 
+const COMPACTOR_PROMPT = [
+  "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Produce a dense briefing that REPLACES those earlier turns in the live context, so the conversation can continue indefinitely without losing the thread.",
+  "",
+  "Preserve, compactly:",
+  "- The original goal/task and any stated constraints or requirements.",
+  "- Decisions made and why; conclusions reached.",
+  "- Key facts, names, file paths, commands, IDs, and values referenced.",
+  "- Open threads — what is still in progress or unresolved.",
+  "- The user's stated preferences and any corrections they gave.",
+  "",
+  "Drop greetings, small talk, and anything already superseded. Write a tight briefing (headings or bullets are fine) for a future reader with NO access to the omitted turns. Do not invent anything. Output ONLY the summary text — no preamble, no JSON.",
+].join('\n');
+
+const DEFAULT_COMPACTOR = `---
+name: Conversation compactor
+enabled: false
+at_context_pct: 70
+keep_tail: 10
+sink: compact
+---
+${COMPACTOR_PROMPT}
+`;
+
 const NEW_AGENT_TEMPLATE = `---
 name: New agent
 enabled: false
@@ -179,8 +204,15 @@ sink "append:<path>" to append it to a file, or "memory" with a JSON
 async function ensureDefaults() {
   let entries = [];
   try { entries = await opfs.listDir(AGENTS_DIR); } catch {}
-  if (!entries.some(e => /\.md$/i.test(e.name))) {
+  const mdNames = new Set(entries.filter(e => /\.md$/i.test(e.name)).map(e => e.name.toLowerCase()));
+  if (mdNames.size === 0) {
     await writeAgentFile('distiller', DEFAULT_DISTILLER);
+    mdNames.add('distiller.md');
+  }
+  // Seed the compactor once (disabled). One-time flag so a user's delete sticks.
+  if (!mdNames.has('compactor.md') && !localStorage.getItem('sandpie-agent-seed-compactor')) {
+    await writeAgentFile('compactor', DEFAULT_COMPACTOR);
+    localStorage.setItem('sandpie-agent-seed-compactor', '1');
   }
 }
 
@@ -236,6 +268,13 @@ async function shouldRun(a, convId) {
 
 // ---- run + sinks -----------------------------------------------------------
 async function applySink(a, out, convId) {
+  if (a.sink === 'compact') {
+    if (typeof SandpieConversations === 'undefined' || !SandpieConversations.compact) {
+      return { status: 'compaction unavailable (conversations module not ready)' };
+    }
+    const r = await SandpieConversations.compact(convId, { keepTail: a.keepTail || 10, summary: out });
+    return { status: r.ok ? `compacted ${r.removed} → kept ${r.kept}` : 'skipped: ' + (r.reason || '') };
+  }
   if (a.sink === 'note') return { status: 'note: ' + out.trim().replace(/\s+/g, ' ').slice(0, 120) };
   if (a.sink.startsWith('append:')) {
     const path = a.sink.slice(7).trim().replace(/^\/+/, '');
@@ -261,14 +300,23 @@ async function applySink(a, out, convId) {
 
 async function runAgent(a, convId, signal) {
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
-  const upto = msgs.length;
-  let from = 0;
-  if (a.input === 'since_last_run') from = cursorOf(a.id, convId);
-  else if (/^last_\d+$/.test(a.input)) from = Math.max(0, upto - parseInt(a.input.slice(5), 10));
-  const transcript = buildTranscript(msgs, from, upto);
+  let from = 0, to = msgs.length;
+  if (a.sink === 'compact') {
+    // Summarize everything except the protected tail — the exact span the
+    // compactor will splice out, so the prompt sees what it replaces.
+    const keepTail = a.keepTail || 10;
+    to = (typeof SandpieConversations !== 'undefined' && SandpieConversations.safeSplitIndex)
+      ? SandpieConversations.safeSplitIndex(msgs, keepTail)
+      : Math.max(0, msgs.length - keepTail);
+  } else if (a.input === 'since_last_run') {
+    from = cursorOf(a.id, convId);
+  } else if (/^last_\d+$/.test(a.input)) {
+    from = Math.max(0, msgs.length - parseInt(a.input.slice(5), 10));
+  }
+  const transcript = buildTranscript(msgs, from, to);
   if (!transcript.trim()) return { status: 'nothing to process' };
-  const out = await runPrompt(a.prompt, transcript, { model: a.model || undefined, signal });
-  localStorage.setItem(cursorKey(a.id, convId), String(upto));
+  const out = await runPrompt(a.prompt, transcript, { model: a.model || undefined, signal, maxTokens: a.sink === 'compact' ? 2048 : 1024 });
+  localStorage.setItem(cursorKey(a.id, convId), String(msgs.length));
   localStorage.setItem(lastRunKey(a.id), String(Date.now()));
   return await applySink(a, out, convId);
 }
