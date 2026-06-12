@@ -438,8 +438,6 @@
   form > button.sending:hover { background: var(--sp-text-dim); }
   form > button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .cursor { display: inline-block; width: 2px; height: 1em; background: var(--sp-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1s step-end infinite; }
-
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
@@ -448,7 +446,6 @@
     user-select: none;
   }
   .msg-timer.done { color: #6e7681; }
-  @keyframes blink { 50% { opacity: 0; } }
 
   aside details.service {
     border: none;

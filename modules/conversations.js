@@ -928,7 +928,6 @@ class RoundRenderer {
     this.convMessages = convMessages;
 
     this.reply = null;
-    this.cursor = null;
 
     this.content = '';
     this.displayed = '';
@@ -952,9 +951,6 @@ class RoundRenderer {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this._flushAllPending();
     this.reply = addMsg('assistant', '', this.host);
-    this.cursor = document.createElement('span');
-    this.cursor.className = 'cursor';
-    this.reply.appendChild(this.cursor);
     this.content = '';
     this.displayed = '';
     this.pending = '';
@@ -1004,7 +1000,6 @@ class RoundRenderer {
     if (this.reply && (!this.content || !this.content.trim())) {
       this.reply.remove();
       this.reply = null;
-      this.cursor = null;
     }
   }
   bindMessage(msg) {
@@ -1062,7 +1057,6 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._flushAllPending();
     this._finishThinking();
-    if (this.cursor) { this.cursor.remove(); this.cursor = null; }
   }
 
   _appendReasoning(chunk) {
@@ -1111,7 +1105,6 @@ class RoundRenderer {
   _paintContent() {
     if (!this.reply) return;
     this.reply.innerHTML = renderMd(this.displayed);
-    if (this.cursor) this.reply.appendChild(this.cursor);
   }
   _applyToolCallDelta(tc) {
     const i = tc.index || 0;
@@ -1167,10 +1160,6 @@ class RoundRenderer {
     }
     this._appendCloseParensIfReady();
 
-    if (this.toolsShouldClose && this.pending.length === 0 && this.cursor) {
-      this.cursor.remove();
-      this.cursor = null;
-    }
     if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
