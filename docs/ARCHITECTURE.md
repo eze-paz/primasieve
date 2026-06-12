@@ -42,6 +42,7 @@ flowchart TD
     conversations -. uses .-> artifacts
     conversations -. uses .-> augmentations
     conversations -. uses .-> context
+    agents -. uses .-> opfs
     dropbox -. registerSyncProvider .-> S
 ```
 
@@ -84,10 +85,10 @@ without referencing each other. Full catalog:
 
 | Event | Payload | Emitted by | Consumed by |
 |---|---|---|---|
-| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload), context.js (skills scaffold) | dropbox.js (sync engine) |
-| `file:deleted` | `path` (string) | conversations.js (delete), opfs.js (delete) | dropbox.js |
+| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload), context.js (skills scaffold), agents.js (agent config + memory/append writes) | dropbox.js (sync engine), agents.js (re-render on external `agents/` edit) |
+| `file:deleted` | `path` (string) | conversations.js (delete), opfs.js (delete), agents.js (agent delete) | dropbox.js |
 | `tokens:record` | `{ convId, usage }` | conversations.js (on a usage event) | context.js (`SandpieTokens`) |
-| `generation:complete` | `{ convId, aborted }` | conversations.js (round `finally`) | notifications.js (system toast) |
+| `generation:complete` | `{ convId, aborted }` | conversations.js (round `finally`) | notifications.js (system toast), agents.js (background-automation trigger tick) |
 | `sync:provider-changed` | provider \| `null` | core.js (`registerSyncProvider`) | internal |
 
 ```mermaid
