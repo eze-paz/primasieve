@@ -262,30 +262,20 @@ function showArtifactError(wrap, frame, msg) {
 /*  Side panel                                                                */
 /* -------------------------------------------------------------------------- */
 
+// Both the file browser and artifacts route through the one viewer (opfs.openFile):
+// prefer:'side' opens beside the chat on desktop, and falls back to the modal on
+// mobile (where the side panel is blocked). The viewer renders html/svg live in an
+// iframe, so artifacts look the same as the old dedicated panel.
 function openArtifactPanel(path) {
   const clean = String(path).replace(/^\/+/, '');
-
   if (typeof sidePanel !== 'undefined' && sidePanel?.isOpen) sidePanel.close();
-
-  const frame = document.getElementById('artifactPanelFrame');
-  const title = document.getElementById('artifactPanelTitle');
-  const link = document.getElementById('artifactOpenLink');
-
-  if (frame) frame.src = 'opfs/' + clean;
-  if (title) title.textContent = clean.split('/').pop();
-  if (link) link.href = 'opfs/' + clean;
-
-  const side = document.getElementById('messagesSide');
-  if (side) side.classList.add('artifact-mode');
-  document.body.classList.add('artifact-side-open');
+  if (typeof opfs !== 'undefined' && opfs.openFile) {
+    opfs.openFile(clean, clean.split('/').pop(), { prefer: 'side' });
+  }
 }
 
 function closeArtifactPanel() {
-  const side = document.getElementById('messagesSide');
-  const frame = document.getElementById('artifactPanelFrame');
-  if (side) side.classList.remove('artifact-mode');
-  if (frame) frame.src = 'about:blank';
-  document.body.classList.remove('artifact-side-open');
+  if (typeof opfs !== 'undefined' && opfs.closeFile) opfs.closeFile();
 }
 
 /* -------------------------------------------------------------------------- */

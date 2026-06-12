@@ -210,8 +210,9 @@
     border-left: 1px solid var(--sp-border);
   }
 
-  body:not(.side-open):not(.artifact-side-open) #messagesSide { display: none; }
-  body.artifact-side-open #messagesSide { display: flex; flex-direction: column; }
+  body:not(.side-open):not(.artifact-side-open):not(.viewer-side-open) #messagesSide { display: none; }
+  body.artifact-side-open #messagesSide,
+  body.viewer-side-open #messagesSide { display: flex; flex-direction: column; }
   body.side-open #messages,
   body.side-open #messagesSide { transition: opacity 0.15s, filter 0.15s; }
 
@@ -233,13 +234,22 @@
   #artifactPanelClose:hover { color: var(--sp-text); }
   #artifactPanelFrame { flex: 1; border: 0; background: transparent; min-height: 0; }
 
+  /* Unified file/artifact viewer hosted in the side panel (desktop). The same
+     .file-viewer overlay is reused, restyled to fill the column instead of being
+     a centered modal — so all .file-viewer .panel internals apply unchanged. */
+  #messagesSide.viewer-mode { padding: 0; gap: 0; overflow: hidden; }
+  #messagesSide.viewer-mode > *:not(.file-viewer) { display: none !important; }
+  .file-viewer.side { position: static; inset: auto; padding: 0; background: transparent; z-index: auto; display: block; }
+  .file-viewer.side .panel { width: 100%; height: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
+  .file-viewer.side .body { flex: 1; min-height: 0; }
+
   #sideResizer {
     width: 5px; flex-shrink: 0; cursor: col-resize;
     background: var(--sp-border); transition: background 0.15s; position: relative;
   }
   #sideResizer::after { content: ''; position: absolute; inset: 0 -3px; }
   #sideResizer:hover, #sideResizer.dragging { background: var(--sp-accent); }
-  body:not(.side-open):not(.artifact-side-open) #sideResizer { display: none; }
+  body:not(.side-open):not(.artifact-side-open):not(.viewer-side-open) #sideResizer { display: none; }
   .artifact-icon-btn {
     cursor: pointer; background: var(--sp-surface); border: 1px solid var(--sp-border);
     color: var(--sp-text-dim); border-radius: 50%; width: 20px; height: 20px;
@@ -877,10 +887,10 @@
     main { flex: 1 1 auto; min-height: 0; }
 
     body.side-open #messagesSide,
-    body.artifact-side-open #messagesSide { display: none !important; }
+    body.artifact-side-open #messagesSide,
+    body.viewer-side-open #messagesSide { display: none !important; }
     body.side-open #messages { flex: 1; }
     #sideResizer { display: none !important; }
-    .artifact-panel-btn { display: none !important; }
 
     aside input, aside button {
       padding: 0.65rem 0.75rem;

@@ -227,7 +227,7 @@ opfs.showContextMenu = function(x, y, items) {
 
 
 /* Open file viewer/editor */
-opfs.openFile = async function(fullKey, name) {
+opfs.openFile = async function(fullKey, name, opts = {}) {
 
   let file;
   try {
@@ -239,13 +239,17 @@ opfs.openFile = async function(fullKey, name) {
     Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`);
     return;
   }
+  opfs.closeFile();                 // single viewer instance — close any open one first
   window._openFilePath = fullKey;
   const ext = (name.split('.').pop() || '').toLowerCase();
+  // Render beside the chat (desktop) when asked. The side panel is mobile-blocked,
+  // so on mobile we always fall back to the modal overlay (mount() handles this).
+  const side = opts.prefer === 'side' && !opfs._isMobile();
   const overlay = document.createElement('div');
   overlay.className = 'file-viewer';
   overlay.setAttribute('data-chrome', '');
   const panel = document.createElement('div');
-  panel.className = 'panel';
+  panel.className = 'panel fv-panel';
   const header = document.createElement('header');
   const title = document.createElement('span');
   title.className = 'title';
@@ -276,35 +280,47 @@ opfs.openFile = async function(fullKey, name) {
   panel.append(header, body);
   overlay.appendChild(panel);
 
-  const finalize = (closeFn) => {
+  // Mount the panel: into the side panel (desktop, prefer:'side') or the modal
+  // overlay (default, and the mobile fallback since the side panel is hidden there).
+  const mount = (closeFn) => {
     closeBtn.onclick = closeFn;
+    if (side) {
+      const host = document.getElementById('messagesSide');
+      if (host) {
+        overlay.classList.add('side');   // restyle the .file-viewer to fill the column (not a modal)
+        host.appendChild(overlay);
+        host.classList.add('viewer-mode');
+        document.body.classList.add('viewer-side-open');
+        return;
+      }
+    }
     overlay._close = closeFn;
     overlay.addEventListener('click', e => { if (e.target === overlay) closeFn(); });
     document.body.appendChild(overlay);
   };
   if (IMAGE_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
     const img = document.createElement('img'); img.src = url; body.appendChild(img);
-    finalize(opfs.closeFile); return;
+    mount(opfs.closeFile); return;
   }
   if (VIDEO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
     const v = document.createElement('video'); v.src = url; v.controls = true; body.appendChild(v);
-    finalize(opfs.closeFile); return;
+    mount(opfs.closeFile); return;
   }
   if (AUDIO_EXTS.has(ext)) {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
     const a = document.createElement('audio'); a.src = url; a.controls = true; body.appendChild(a);
-    finalize(opfs.closeFile); return;
+    mount(opfs.closeFile); return;
   }
   if (ext === 'pdf') {
-    const url = URL.createObjectURL(file); overlay.dataset.blobUrl = url;
+    const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
     const f = document.createElement('iframe');
     f.setAttribute('data-chrome', '');
     f.src = url;
     f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
     body.appendChild(f);
-    finalize(opfs.closeFile); return;
+    mount(opfs.closeFile); return;
   }
 
   const text = await file.text();
@@ -315,20 +331,22 @@ opfs.openFile = async function(fullKey, name) {
     const pre = document.createElement('pre');
     pre.textContent = '(binary file — preview unavailable)';
     body.appendChild(pre);
-    finalize(opfs.closeFile); return;
+    mount(opfs.closeFile); return;
   }
   const isMd = ext === 'md' || ext === 'markdown';
+  const isHtml = ext === 'html' || ext === 'htm' || ext === 'svg';
+  const previewable = isMd || isHtml;   // can show a rendered preview + a source toggle
   const editable = text.length <= TEXT_PREVIEW_CAP && !opfs.isReadOnly(fullKey);   // subscription mirrors are view-only
 
-  let mode = isMd ? 'rendered' : 'raw';
+  let mode = previewable ? 'preview' : 'raw';
   let current = text;
   let textareaEl = null;
   const isDirty = () => mode === 'edit' && textareaEl && textareaEl.value !== current;
   const refreshTitle = () => { title.textContent = (isDirty() ? '• ' : '') + '/' + fullKey; };
   function refreshButtons() {
-    mdBtn.style.display = (isMd && mode !== 'edit') ? '' : 'none';
-    mdBtn.textContent = mode === 'rendered' ? 'Raw' : 'MD';
-    mdBtn.title = mode === 'rendered' ? 'Show raw markdown' : 'Render markdown';
+    mdBtn.style.display = (previewable && mode !== 'edit') ? '' : 'none';
+    mdBtn.textContent = mode === 'preview' ? 'Source' : 'Preview';
+    mdBtn.title = mode === 'preview' ? 'Show raw source' : 'Show rendered preview';
     pencilBtn.style.display = (editable && mode !== 'edit') ? '' : 'none';
     saveBtn.style.display = mode === 'edit' ? '' : 'none';
   }
@@ -349,17 +367,24 @@ opfs.openFile = async function(fullKey, name) {
       body.appendChild(ta);
       textareaEl = ta;
       ta.focus();
-    } else if (mode === 'rendered') {
+    } else if (mode === 'preview' && isMd) {
       const div = document.createElement('div');
       div.className = 'md-preview';
       div.textContent = 'Loading preview…';
       body.appendChild(div);
       try {
-        const marked = await opfs.opfs.getMarked();
+        await opfs.getMarked();
         div.innerHTML = window.marked.parse(current);
       } catch (e) {
         div.textContent = '(failed to load markdown renderer — showing raw)\n\n' + current;
       }
+    } else if (mode === 'preview' && isHtml) {
+      const f = document.createElement('iframe');
+      f.className = 'fv-frame';
+      f.setAttribute('data-chrome', '');
+      f.src = 'opfs/' + fullKey;   // served live by the SW (scripts run)
+      f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff;';
+      body.appendChild(f);
     } else {
       const pre = document.createElement('pre');
       pre.textContent = current.length > TEXT_PREVIEW_CAP
@@ -370,7 +395,7 @@ opfs.openFile = async function(fullKey, name) {
     refreshButtons();
     refreshTitle();
   }
-  mdBtn.onclick = () => { mode = (mode === 'rendered') ? 'raw' : 'rendered'; render(); };
+  mdBtn.onclick = () => { mode = (mode === 'preview') ? 'raw' : 'preview'; render(); };
   pencilBtn.onclick = () => { mode = 'edit'; render(); };
   async function doSave() {
     if (!textareaEl) return;
@@ -391,19 +416,23 @@ opfs.openFile = async function(fullKey, name) {
     if (isDirty() && !confirm('Unsaved changes will be lost. Close anyway?')) return;
     opfs.closeFile();
   }
-  closeBtn.onclick = attemptClose;
-  overlay._close = attemptClose;
-  overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
-  document.body.appendChild(overlay);
+  mount(attemptClose);
   await render();
 }
+opfs._isMobile = function() {
+  try { return window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches; }
+  catch (_) { return false; }
+};
 opfs.closeFile = function() {
   window._openFilePath = null;
-  document.querySelectorAll('.file-viewer').forEach(el => {
-    const url = el.dataset.blobUrl;
-    if (url) URL.revokeObjectURL(url);
-    el.remove();
+  // revoke any blob URLs (image/video/audio/pdf), modal or side
+  document.querySelectorAll('.fv-panel[data-blob-url]').forEach(p => {
+    try { URL.revokeObjectURL(p.dataset.blobUrl); } catch (_) {}
   });
+  document.querySelectorAll('.file-viewer').forEach(el => el.remove());   // modal + side overlays
+  const host = document.getElementById('messagesSide');
+  if (host) host.classList.remove('viewer-mode');
+  document.body.classList.remove('viewer-side-open');
 };
 
 opfs.getMarked = function() {
