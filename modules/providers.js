@@ -146,6 +146,24 @@ function applyActiveProvider() {
   refreshAiDot();
 }
 
+// Ensure a model is selected before a send. If the hidden #model input is empty
+// but a configured provider has one, activate it instead of forcing the user to
+// pick (a better default than erroring). Returns true once a model is set.
+function ensureUsable() {
+  const modelSet = () => !!(document.getElementById('model')?.value || '').trim();
+  if (modelSet()) return true;
+  // The active provider may have a model that simply wasn't synced to the inputs.
+  const active = getActiveProvider();
+  if (active && (active.model || '').trim() && (active.endpoint || '').trim()) {
+    applyActiveProvider();
+    if (modelSet()) return true;
+  }
+  // Otherwise pick the first configured provider that actually has a model.
+  const candidate = [..._managed, ..._providers].find(p => (p.model || '').trim() && (p.endpoint || '').trim());
+  if (candidate) selectProvider(candidate.id);
+  return modelSet();
+}
+
 // ============================================================
 // CHIPS  (pick the active provider; "+ Add" creates a new one)
 // ============================================================
@@ -350,6 +368,7 @@ window.SandpieProviders = {
   getActive: getActiveProvider,
   load: loadProviders,
   apply: applyActiveProvider,
+  ensureUsable,
   list: () => _providers.slice(),
   get activeId() { return _activeProviderId; },
   updateHint: updateRoutingHint,

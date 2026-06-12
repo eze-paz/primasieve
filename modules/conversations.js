@@ -459,10 +459,10 @@ function handleButtonClick() {
   const btn = $('sendBtn');
   const s = activeStream();
   if (btn.classList.contains('sending') && s) {
-
-    s.queueAborted = true;
+    // Stop only the message generating right now; queued messages stay and the
+    // next one is sent immediately. To halt everything, press stop once per
+    // in-flight + queued message.
     if (s.abort) s.abort.abort();
-    s.queue.length = 0;
     updateQueueCount(s);
   } else {
     handleSubmit();
@@ -486,7 +486,8 @@ async function processQueueFor(stream) {
       const text = stream.queue.shift();
       updateQueueCount(stream);
       await sendSingle(text, stream);
-      if (stream.queueAborted) break;
+      // No break on stop: aborting the current generation advances to the next
+      // queued message. The queue is only emptied by an explicit rewind.
     }
   } finally {
     stream.isProcessing = false;
@@ -529,19 +530,27 @@ let _swReady = (async () => {
 })();
 _swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 async function sendSingle(text, stream, opts = {}) {
-
-  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Fill in endpoint, model, and API key.', stream && stream.host);
-    return;
-  }
   const { id: convId, messages: convMessages, host } = stream;
 
+  // Render the user's message FIRST so it can never be lost. Even if the provider
+  // config turns out to be incomplete, the message stays in the conversation and
+  // the error appears after it — never in place of it.
   let wasAborted = false;
   if (!opts?.resume) {
     const userMsg = { role: 'user', content: text };
     convMessages.push(userMsg);
     bindBubble(addMsg('user', text, host), userMsg);
     saveConv(convId).catch(() => {});
+  }
+
+  // If no model is selected but a configured provider has one, use it rather than
+  // erroring; then validate. On failure the message above is preserved.
+  if (typeof SandpieProviders !== 'undefined' && SandpieProviders.ensureUsable) {
+    try { SandpieProviders.ensureUsable(); } catch (_) {}
+  }
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
+    return;
   }
   requestWakeLock();
   setStreamSending(stream, true);
