@@ -1318,9 +1318,17 @@ async function tool_write_file({ path, content, _conv }) {
   
     try {
       await dir.getFileHandle(name);
-  
+      // It already exists — don't overwrite. Hand back the current content (like
+      // opening it in an editor) so the model edits in place with edit_file
+      // instead of rewriting it or saving a renamed copy.
+      let existing = '';
+      try { existing = new TextDecoder().decode(await opfsReadBytes(norm)); } catch (_) {}
+      const CAP = 12000;
+      const shown = existing.length > CAP
+        ? existing.slice(0, CAP) + `\n…(truncated; ${existing.length} bytes total — use read_file to page the rest)`
+        : existing;
       return {
-        result: `File already exists: ${norm}. Use edit_file to modify it.`,
+        result: `${norm} already exists — NOT overwritten. To change it, use edit_file (do NOT rewrite the whole file or save a renamed copy like ${name.replace(/(\.[^.]*)?$/, '_v2$1')}). Its current content:\n\n${shown}`,
       };
     } catch (e) {
       if (e.name !== 'NotFoundError') {
@@ -1365,6 +1373,65 @@ async function tool_write_file({ path, content, _conv }) {
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
 }
 
+// --- edit_file matching ----------------------------------------------------
+// Forgiving substring replacement so a tiny whitespace/line-ending drift in
+// old_str doesn't fail the edit (which is what pushes the model to rewrite the
+// whole file). Tries, in order: exact → line-ending-normalized (CRLF/CR↔LF) →
+// trailing-whitespace-tolerant whole-line match. On failure returns the match
+// count + line numbers, or the closest lines, so the model can retry precisely.
+// Pure + side-effect-free → unit-testable. Returns {updated} | {error}.
+function _matchEol(orig, lf) { return /\r\n/.test(orig) ? lf.replace(/\n/g, '\r\n') : lf; }
+function _lineNosOf(text, str) {
+  const out = []; let i = -1;
+  while (str && (i = text.indexOf(str, i + 1)) !== -1) out.push(text.slice(0, i).split('\n').length);
+  return out;
+}
+function _closestLines(fileLines, oldLines) {
+  const target = (oldLines.find(l => l.trim()) || '').trim();
+  if (!target) return [];
+  const pre = (a, b) => { let n = 0; while (n < a.length && n < b.length && a[n] === b[n]) n++; return n; };
+  const scored = [];
+  fileLines.forEach((l, i) => {
+    const t = l.trim(); if (!t) return;
+    const score = t === target ? 1e9 : (t.includes(target) || target.includes(t)) ? 1e6 : pre(t, target);
+    if (score >= 6) scored.push({ i, t, score });
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 5).map(s => `  line ${s.i + 1}: ${s.t.slice(0, 120)}`);
+}
+function applyEdit(current, oldStr, newStr) {
+  // 1) exact (function replacement so $ in newStr stays literal)
+  let nos = _lineNosOf(current, oldStr);
+  if (nos.length === 1) return { updated: current.replace(oldStr, () => newStr) };
+  if (nos.length > 1)   return { error: `old_str matches ${nos.length} times (lines ${nos.join(', ')}) — add surrounding context so it matches exactly one place.` };
+  // 2) line-ending-normalized
+  const curLF = current.replace(/\r\n?/g, '\n');
+  const oldLF = oldStr.replace(/\r\n?/g, '\n');
+  const newLF = newStr.replace(/\r\n?/g, '\n');
+  nos = _lineNosOf(curLF, oldLF);
+  if (nos.length === 1) return { updated: _matchEol(current, curLF.replace(oldLF, () => newLF)), note: 'matched ignoring line endings' };
+  if (nos.length > 1)   return { error: `old_str matches ${nos.length} times (lines ${nos.join(', ')}) — add surrounding context so it matches exactly one place.` };
+  // 3) trailing-whitespace-tolerant, whole-line anchored
+  const fileLines = curLF.split('\n'), oldLines = oldLF.split('\n');
+  const rstrip = s => s.replace(/[ \t]+$/, '');
+  const fN = fileLines.map(rstrip), oN = oldLines.map(rstrip);
+  const hits = [];
+  for (let i = 0; i + oN.length <= fN.length; i++) {
+    let ok = true;
+    for (let j = 0; j < oN.length; j++) if (fN[i + j] !== oN[j]) { ok = false; break; }
+    if (ok) hits.push(i);
+  }
+  if (hits.length === 1) {
+    const i = hits[0];
+    const merged = fileLines.slice(0, i).concat(newLF.split('\n'), fileLines.slice(i + oldLines.length)).join('\n');
+    return { updated: _matchEol(current, merged), note: 'matched ignoring trailing whitespace' };
+  }
+  if (hits.length > 1) return { error: `old_str matches ${hits.length} places (ignoring trailing whitespace), at lines ${hits.map(i => i + 1).join(', ')} — add surrounding context to disambiguate.` };
+  // 4) not found → near-miss help
+  const near = _closestLines(fileLines, oldLines);
+  return { error: 'old_str not found (tried exact, line-ending, and trailing-whitespace-tolerant matching). Read the file and copy the exact text into old_str.' + (near.length ? '\nClosest lines in the file:\n' + near.join('\n') : '') };
+}
+
 async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (!path)    return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
@@ -1372,13 +1439,11 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   let current;
   try {
     current = new TextDecoder().decode(await opfsReadBytes(norm));
-  } catch { return { result: `File not found: ${norm}` }; }
-  const count = current.split(old_str).length - 1;
-  if (count === 0) return { result: `old_str not found in ${norm}. Read the file first to verify exact content.` };
-  if (count > 1)  return { result: `old_str matches ${count} times in ${norm} — make it more specific.` };
+  } catch { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
+  const res = applyEdit(current, old_str, new_str);
+  if (res.error) return { result: res.error };
   try {
-    const updated = current.replace(old_str, new_str);
-    await opfsWriteBytes(norm, new TextEncoder().encode(updated));
+    await opfsWriteBytes(norm, new TextEncoder().encode(res.updated));
     if (py && _nativefs) {
       await withPy(() => new Promise((resolve) => {
         try { py.FS.syncfs(true, (err) => {
@@ -1388,6 +1453,6 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
         catch (e) { console.warn('[sandpie-sw] syncfs after edit_file failed:', e); resolve(); }
       }));
     }
-    return { result: `Edited: ${norm}` };
+    return { result: `Edited: ${norm}${res.note ? ' (' + res.note + ')' : ''}` };
   } catch (e) { return { result: `Edit failed: ${e.message}` }; }
 }

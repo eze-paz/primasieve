@@ -25,7 +25,7 @@ Examples:
     },
   },
   write_file: {
-  description: `Create a new file in OPFS under /files/. Fails if the file already exists — use edit_file to modify existing files. Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
+  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ (e.g. "scripts/analyze.py", "artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
   parameters: {
     type: 'object',
     properties: {
@@ -36,7 +36,7 @@ Examples:
   },
 },
 edit_file: {
-  description: `Replace an exact string in an existing OPFS file. old_str must appear exactly once — fails if zero or 2+ matches. Always read the file with read_file first to verify exact content (do NOT include read_file's line-number prefixes in old_str).`,
+  description: `Replace a string in an existing OPFS file — the PREFERRED way to change a file. Matching is forgiving: exact first, then ignoring line-ending and trailing-whitespace differences, so a small whitespace drift won't fail. old_str must still resolve to ONE place (otherwise it returns the match count + line numbers, or the closest lines, so you can retry precisely). Read the file first to copy exact content (do NOT include read_file's line-number prefixes in old_str). To FIX a script that errored, edit_file the offending lines — NEVER rewrite the whole file or save a renamed copy.`,
   parameters: {
     type: 'object',
     properties: {
