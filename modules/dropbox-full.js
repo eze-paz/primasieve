@@ -906,6 +906,72 @@
   }
 
   // ===========================================================================
+  //  ⚠️  TEMPORARY ONE-TIME MIGRATION — REMOVE AFTER ALL USERS HAVE MIGRATED.
+  //  The old site (gasn2cloud.com/sandpie) synced each user's files to their
+  //  Dropbox App folder /Apps/AI_Sandbox. The new site syncs to the team folder
+  //  /R+D+I/sandpie/<user>. On a user's first connect, if their new root doesn't
+  //  exist yet, locate the old AI_Sandbox folder (the one holding _conversations)
+  //  and COPY it to the new root. Non-destructive (copy), guarded (only when the
+  //  new root is absent → runs once), best-effort (never blocks sync).
+  //  PILOT SAFELY: MIGRATION_DRY_RUN=true LOCATES + logs only (no copy). Once the
+  //  console shows the correct source folder, set it to false to copy for real.
+  //  TO REMOVE LATER: delete this whole block + the two maybeMigrateAiSandbox()
+  //  calls in boot(). Grep token: MIGRATE_AI_SANDBOX
+  // ===========================================================================
+  const MIGRATE_AI_SANDBOX = true;        // master switch — set false / delete to disable
+  const MIGRATION_DRY_RUN  = true;        // true = locate + log only; false = actually copy
+  const OLD_APP_FOLDER     = 'AI_Sandbox';
+  const OLD_CONV_DIR       = '_conversations';
+  let _migrationChecked = false;
+  async function dbxMeta(path, pathRoot) {
+    // Metadata, or null if absent. Rethrows other errors so the caller can abort.
+    try { return await api('/2/files/get_metadata', { path }, { pathRoot }); }
+    catch (e) { if (/not_found/.test(String(e && e.message))) return null; throw e; }
+  }
+  async function findOldRoot() {
+    // /Apps/AI_Sandbox, but under a team space it sits beneath the member's folder
+    // (e.g. /Ezequiel De Paz/Apps/AI_Sandbox) whose name we can't predict — so try
+    // the canonical path in both namespaces, then scan for the _conversations dir.
+    for (const pr of [true, false]) {
+      if (await dbxMeta('/Apps/' + OLD_APP_FOLDER + '/' + OLD_CONV_DIR, pr)) return { path: '/Apps/' + OLD_APP_FOLDER, pathRoot: pr };
+    }
+    const tail = new RegExp('/' + OLD_APP_FOLDER + '/' + OLD_CONV_DIR + '$', 'i');
+    for (const pr of [true, false]) {
+      let data;
+      try { data = await api('/2/files/search_v2', { query: OLD_CONV_DIR, options: { file_status: 'active', filename_only: true, max_results: 100 } }, { pathRoot: pr }); }
+      catch { continue; }
+      for (const m of (data && data.matches) || []) {
+        const p = m.metadata && m.metadata.metadata && m.metadata.metadata.path_display;
+        if (p && tail.test(p)) return { path: p.slice(0, -(OLD_CONV_DIR.length + 1)), pathRoot: pr };
+      }
+    }
+    return null;
+  }
+  async function dbxCopyFolder(from, to, pathRoot) {
+    const parent = to.slice(0, to.lastIndexOf('/'));
+    if (parent) { try { await api('/2/files/create_folder_v2', { path: parent, autorename: false }, { pathRoot }); } catch (_) {} }
+    await api('/2/files/copy_v2', { from_path: from, to_path: to, autorename: false }, { pathRoot });
+  }
+  async function maybeMigrateAiSandbox() {
+    if (!MIGRATE_AI_SANDBOX || _migrationChecked) return;
+    _migrationChecked = true;
+    try {
+      const newRoot = workingRoot();
+      if (!newRoot) return;
+      if (await dbxMeta(newRoot, true)) return;     // new root already set up → skip (one-time guard)
+      const old = await findOldRoot();
+      if (!old) { console.info('[migrate] AI_Sandbox: nothing to migrate (no old ' + OLD_CONV_DIR + ')'); return; }
+      console.info('[migrate] AI_Sandbox: found', JSON.stringify(old), '→', newRoot, MIGRATION_DRY_RUN ? '(DRY RUN — not copying)' : '(copying…)');
+      if (MIGRATION_DRY_RUN) return;
+      if (old.pathRoot !== true) { console.warn('[migrate] AI_Sandbox: old folder is in the home namespace, not the team root — cross-namespace copy not handled; skipping. Tell the dev.'); return; }
+      await dbxCopyFolder(old.path, newRoot, true);
+      console.info('[migrate] AI_Sandbox: copied', old.path, '→', newRoot);
+    } catch (e) {
+      console.warn('[migrate] AI_Sandbox failed (non-fatal):', e && e.message);
+    }
+  }
+
+  // ===========================================================================
   //  Boot
   // ===========================================================================
   function boot() {
@@ -928,12 +994,17 @@
       exchangeCode(code).then(async () => {
         history.replaceState({}, '', location.pathname);
         await ensureWorkingRoot();
+        await maybeMigrateAiSandbox();   // MIGRATE_AI_SANDBOX (temporary)
         dbxStatus('', 'connected');
         sync().then(refreshSubscriptions);
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
-      dbxStatus('', 'connected');
-      sync().then(refreshSubscriptions);
+      (async () => {
+        try { await ensureWorkingRoot(); await maybeMigrateAiSandbox(); }   // MIGRATE_AI_SANDBOX (temporary)
+        catch (e) { console.warn('[dropbox-full] pre-sync:', e && e.message); }
+        dbxStatus('', 'connected');
+        sync().then(refreshSubscriptions);
+      })();
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
