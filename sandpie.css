@@ -1084,14 +1084,19 @@
     min-width: 0;
   }
   body.tools-minimized .tool-result { display: none; }
-  .tc-spinner {
+  .repl-loader {
     flex-shrink: 0;
-    width: 11px; height: 11px;
-    border: 2px solid var(--sp-accent);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: sp-spin 0.85s linear infinite;
+    display: inline-flex;
+    gap: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--sp-accent);
   }
+  .repl-loader > i { font-style: normal; opacity: 0.3; animation: repl-sweep 1.15s ease-in-out infinite; }
+  .repl-loader > i:nth-child(2) { animation-delay: 0.19s; }
+  .repl-loader > i:nth-child(3) { animation-delay: 0.38s; }
   .tc-title { color: var(--sp-text); white-space: nowrap; }
   .tc-title b { color: var(--sp-accent); font-weight: 600; }
   .tc-meta {
@@ -1123,7 +1128,7 @@
   }
   .artifact-show-btn:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
   .artifact-meta-info { color: var(--sp-text-dim); }
-  @keyframes sp-spin { to { transform: rotate(360deg); } }
+  @keyframes repl-sweep { 0%, 55%, 100% { opacity: 0.3; } 28% { opacity: 1; text-shadow: 0 0 6px var(--sp-accent-dim); } }
   @keyframes tc-fade {
     from { opacity: 0; transform: translateY(3px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -1244,15 +1249,7 @@
   }
   .msg.think[open] > summary::before { transform: rotate(90deg); }
   .msg.think:not(.done) > summary { color: var(--sp-accent); }
-  .msg.think:not(.done) > summary::after {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--sp-accent);
-    animation: think-pulse 1s ease-in-out infinite;
-  }
-  @keyframes think-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+  .msg.think.done .repl-loader { display: none; }
     .msg.think .think-body {
     padding: 0.5rem 0.75rem;
     border-top: 1px solid var(--sp-border);

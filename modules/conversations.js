@@ -883,15 +883,20 @@ function buildToolBox(args, toolName) {
   return box;
 }
 
+// Python-REPL "thinking" loader: three chevrons with a sweep of emphasis.
+// Replaces the old rotating-circle spinner; reused for tool calls and the
+// thinking box. Styled by .repl-loader / @keyframes repl-sweep in sandpie.css.
+const REPL_LOADER = (cls) => `<span class="repl-loader${cls ? ' ' + cls : ''}"><i>&gt;</i><i>&gt;</i><i>&gt;</i></span>`;
+
 function renderTcPreparing(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
 
   const tok = Math.ceil((args ? String(args).length : 0) / 4);
 
-  if (!el.querySelector('.tc-spinner')) {
+  if (!el.querySelector('.repl-loader')) {
     el.innerHTML =
-      '<span class="tc-spinner tc-dim"></span>' +
+      REPL_LOADER('tc-dim') +
       `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
       '<span class="tc-meta"></span>';
   }
@@ -902,9 +907,9 @@ function renderTcPreparing(div, fname, args) {
 function renderTcRunning(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
-  if (!el.querySelector('.tc-spinner')) {
+  if (!el.querySelector('.repl-loader')) {
     el.innerHTML =
-      '<span class="tc-spinner"></span>' +
+      REPL_LOADER() +
       `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>`;
   }
 }
@@ -1073,7 +1078,7 @@ class RoundRenderer {
     det.className = 'msg think';
     det.open = true;
     const sum = document.createElement('summary');
-    sum.textContent = 'Thinking';
+    sum.innerHTML = 'Thinking ' + REPL_LOADER();
     const body = document.createElement('div');
     body.className = 'think-body';
     det.appendChild(sum);
