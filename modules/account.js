@@ -108,7 +108,7 @@ const SandpieAccount = (() => {
       const name = _user.name || _user.email || 'Signed in';
       _panel.innerHTML =
         '<div style="display:flex; align-items:center; gap:0.6rem;">' +
-          '<div style="width:38px;height:38px;border-radius:50%;background:var(--sp-accent-dim);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.85rem;">' + esc(initials(name)) + '</div>' +
+          '<div style="flex:none;aspect-ratio:1;width:38px;height:38px;border-radius:50%;background:var(--sp-accent-dim);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.85rem;">' + esc(initials(name)) + '</div>' +
           '<div style="display:flex;flex-direction:column;min-width:0;">' +
             '<span style="font-size:0.9rem;">' + esc(name) + '</span>' +
             '<span style="font-size:0.72rem;color:var(--sp-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(_user.email || '') + '</span>' +
