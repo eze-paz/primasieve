@@ -787,6 +787,24 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
   return { result: head + buf.replace(/\n$/, '') };
 }
 
+// Names runTool actually dispatches. Keep in sync with the switch below.
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file',
+                     'list_files','search','show_artifact','load_skill','load_image'];
+
+// A call to a tool that doesn't exist. Return a factual, generic correction so
+// the model can self-correct next round: if the name is actually a skill, point
+// it at load_skill; otherwise just list the real tools. No domain-specific advice.
+async function unknownTool(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (/^[a-z0-9][a-z0-9_-]*$/.test(n)) {
+    try {
+      await opfsReadBytes('skills/' + n + '/SKILL.md');   // throws if it isn't a skill
+      return { result: 'Error: "' + name + '" is a skill, not a tool. Call load_skill({"name":"' + n + '"}) to use it.' };
+    } catch {}
+  }
+  return { result: 'Error: unknown tool "' + name + '". Available tools: ' + KNOWN_TOOLS.join(', ') + '.' };
+}
+
 async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
@@ -799,7 +817,7 @@ async function runTool(name, args, ctx) {
     case 'search':        return tool_search(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);   // ← add
     case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
-    default:              return { result: 'Error: unknown tool ' + name };
+    default:              return unknownTool(name);
   }
 }
 
