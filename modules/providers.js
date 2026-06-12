@@ -270,17 +270,37 @@ function deleteSelected() {
 // MANAGED PROVIDER  (injected by account.js on company sign-in; in-memory only)
 // ============================================================
 
+// Resolve the catalog's default model to a managed provider. Match by model id
+// (the canonical case), else by model/name trimmed + case-insensitively; if
+// nothing matches (usually a defaultModel typo in models.json) warn and fall back
+// to the first chip.
+function managedDefault(defaultModel) {
+  if (defaultModel != null && String(defaultModel).trim() !== '') {
+    const want = String(defaultModel).trim();
+    const byId = getProviderById(MANAGED_ID + ':' + want);
+    if (byId) return byId;
+    const lc = want.toLowerCase();
+    const byField = _managed.find(p => String(p.model).toLowerCase() === lc || String(p.name).toLowerCase() === lc);
+    if (byField) return byField;
+    console.warn('[SandpieProviders] managed defaultModel ' + JSON.stringify(defaultModel) + ' matched no model — using the first. Available models:', _managed.map(p => p.model));
+  }
+  return _managed[0];
+}
+
 // Surface read-only company providers as chips (one per managed model). NOT
-// persisted. Doesn't yank you off your own provider mid-chat: only changes the
-// active provider when the current one no longer resolves. Re-applies on each
-// call so a refreshed token (and any catalog change) lands. Accepts a single def
-// or a list; `defaultModel` (a model id) picks the initial managed chip.
+// persisted. On sign-in (the first time managed providers are injected) the
+// company *default* model is selected — even over a leftover personal/stale pick,
+// since a signed-in user should land on the company default. On later calls (e.g.
+// the 30-min token refresh) the active provider is left as-is so the user isn't
+// yanked mid-chat. Accepts a single def or a list; `defaultModel` = catalog id.
 function setManaged(defs, defaultModel) {
+  const firstInjection = _managed.length === 0;
   const list = Array.isArray(defs) ? defs : (defs ? [defs] : []);
   _managed = list.map(d => Object.assign({}, d, { id: MANAGED_ID + ':' + (d.model || d.name), managed: true }));
-  if (!getProviderById(_activeProviderId)) {   // current pick gone (or none) → choose a sensible default
-    const def = (defaultModel && getProviderById(MANAGED_ID + ':' + defaultModel)) || _managed[0] || _providers[0] || null;
-    _activeProviderId = def ? def.id : null;
+  if (_managed.length) {
+    if (firstInjection || !getProviderById(_activeProviderId)) _activeProviderId = managedDefault(defaultModel).id;
+  } else if (!getProviderById(_activeProviderId)) {
+    _activeProviderId = _providers[0] ? _providers[0].id : null;
   }
   applyActiveProvider();
   renderChips();
