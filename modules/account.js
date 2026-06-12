@@ -66,14 +66,26 @@ const SandpieAccount = (() => {
     let tok;
     try { tok = await getJSON('/auth/token'); } catch (_) { return; }
     if (!tok.ok || !tok.data || !tok.data.token) return;
-    if (window.SandpieProviders && SandpieProviders.setManaged) {
-      SandpieProviders.setManaged({
-        name: 'Company AI',
-        endpoint: location.origin,   // → the server's /chat/completions (it injects the real key + model)
-        model: '(managed)',
-        apiKey: tok.data.token,      // the session token is the "key" — server-verified
+    if (!(window.SandpieProviders && SandpieProviders.setManaged)) return;
+    const token = tok.data.token;   // the session token is the "key" — server-verified
+    // Managed model catalog (GET /models) → one read-only chip per model. The
+    // server injects the real LLM key and enforces model/temperature/max-output.
+    // Older server with no catalog (/models 404 or empty) → one "(managed)" chip.
+    let cat = null;
+    try { const r = await getJSON('/models'); if (r.ok && r.data && Array.isArray(r.data.models) && r.data.models.length) cat = r.data; } catch (_) {}
+    if (cat) {
+      SandpieProviders.setManaged(cat.models.map(m => ({
+        name: m.label || m.id,
+        endpoint: location.origin,   // → the server's /chat/completions
+        model: m.id,
+        apiKey: token,
         proxyUrl: '',
-      });
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxOutput,
+        temperature: m.temperature,
+      })), cat.defaultModel);
+    } else {
+      SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });
     }
   }
 

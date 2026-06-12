@@ -19,8 +19,9 @@ const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
 
 let _providers = [];
 let _activeProviderId = null;
-let _managed = null;            // company provider injected by account.js; in-memory only, never persisted
-const MANAGED_ID = '__managed';
+let _managed = [];              // company providers injected by account.js (one read-only chip per managed model); in-memory only, never persisted
+const MANAGED_ID = '__managed'; // id prefix — each managed provider's id is `__managed:<model>`
+function isManagedId(id) { return typeof id === 'string' && id.indexOf(MANAGED_ID + ':') === 0; }
 
 const AI_HTML = `
       <div class="chip-row" id="providerChips"></div>
@@ -122,8 +123,7 @@ function saveProviders() {
 
 // Resolve any id, including the in-memory managed provider.
 function getProviderById(id) {
-  if (_managed && id === MANAGED_ID) return _managed;
-  return _providers.find(p => p.id === id) || null;
+  return _managed.find(p => p.id === id) || _providers.find(p => p.id === id) || null;
 }
 
 function getActiveProvider() {
@@ -154,7 +154,7 @@ function renderChips() {
   const row = document.getElementById('providerChips');
   if (!row) return;
   row.innerHTML = '';
-  const list = _managed ? [_managed].concat(_providers) : _providers;
+  const list = _managed.concat(_providers);
   for (const p of list) {
     if (!p || !p.id) continue;
     const chip = document.createElement('div');
@@ -251,21 +251,27 @@ function deleteSelected() {
 // MANAGED PROVIDER  (injected by account.js on company sign-in; in-memory only)
 // ============================================================
 
-// Surface a read-only company provider as a chip. NOT persisted. Activates it
-// only if nothing else is active (sign-in shouldn't yank you off your own
-// provider mid-chat). Re-applies on each call so a refreshed token lands.
-function setManaged(def) {
-  _managed = def ? Object.assign({}, def, { id: MANAGED_ID, managed: true }) : null;
-  if (_managed && !getActiveProvider()) _activeProviderId = MANAGED_ID;
-  if (_activeProviderId === MANAGED_ID) applyActiveProvider();
+// Surface read-only company providers as chips (one per managed model). NOT
+// persisted. Doesn't yank you off your own provider mid-chat: only changes the
+// active provider when the current one no longer resolves. Re-applies on each
+// call so a refreshed token (and any catalog change) lands. Accepts a single def
+// or a list; `defaultModel` (a model id) picks the initial managed chip.
+function setManaged(defs, defaultModel) {
+  const list = Array.isArray(defs) ? defs : (defs ? [defs] : []);
+  _managed = list.map(d => Object.assign({}, d, { id: MANAGED_ID + ':' + (d.model || d.name), managed: true }));
+  if (!getProviderById(_activeProviderId)) {   // current pick gone (or none) → choose a sensible default
+    const def = (defaultModel && getProviderById(MANAGED_ID + ':' + defaultModel)) || _managed[0] || _providers[0] || null;
+    _activeProviderId = def ? def.id : null;
+  }
+  applyActiveProvider();
   renderChips();
-  if (_activeProviderId === MANAGED_ID) loadFormFor(MANAGED_ID);
+  if (isManagedId(_activeProviderId)) loadFormFor(_activeProviderId);
 }
 
 // Remove the managed provider (on sign-out); fall back to a real provider/none.
 function clearManaged() {
-  const wasActive = _activeProviderId === MANAGED_ID;
-  _managed = null;
+  const wasActive = isManagedId(_activeProviderId);
+  _managed = [];
   if (wasActive) {
     _activeProviderId = _providers.length ? _providers[0].id : null;
     saveProviders();
