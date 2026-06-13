@@ -391,9 +391,24 @@ const SandpieWllama = (function() {
       return;
     }
 
+    // systemPrompt arrives as the SW's system *message object* { role, content }
+    // (what buildAgentConfig produces), not a bare string — pull its text out.
+    const sysContent = systemPrompt
+      ? (typeof systemPrompt === 'string' ? systemPrompt : (systemPrompt.content != null ? String(systemPrompt.content) : ''))
+      : '';
+    // Clean, text-only history: string content only, no tool artifacts. A chat
+    // may have switched to wllama from a tool-using remote provider, and the
+    // text path rejects non-string content / stray tool messages.
     const msgs = [];
-    if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
-    for (const m of (messages || [])) msgs.push(m);
+    if (sysContent) msgs.push({ role: 'system', content: sysContent });
+    for (const m of (messages || [])) {
+      if (!m || !m.role || m.role === 'tool') continue;          // drop tool results
+      let c = m.content;
+      if (Array.isArray(c)) c = c.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n');
+      c = (c == null) ? '' : String(c);
+      if (m.role === 'assistant' && !c.trim()) continue;          // skip empty / tool-call-only turns
+      msgs.push({ role: m.role, content: c });
+    }
 
     emit({ type: 'round_start' });
 

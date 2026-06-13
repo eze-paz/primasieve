@@ -218,13 +218,27 @@ async function ensureDefaults() {
 
 // ---- direct (non-streaming) completion — never the SW conversation stream --
 async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {}) {
+  const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+  // Local (wllama) provider: run the completion IN-BROWSER. Its "endpoint" is a
+  // GGUF model URL, not an OpenAI server — never POST <gguf-url>/chat/completions.
+  if (active && active.type === 'wllama') {
+    if (typeof SandpieWllama === 'undefined' || !SandpieWllama.streamRound) throw new Error('wllama not loaded');
+    const r = await SandpieWllama.streamRound({
+      modelUrl: active.endpoint,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      tools: [], signal, maxTokens,
+      nCtx: (active.contextWindow | 0) || undefined,
+      temperature: active.temperature != null ? active.temperature : undefined,
+      topP: active.topP != null ? active.topP : undefined,
+    });
+    return (r && r.content) || '';
+  }
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';
   const mdl = model || document.getElementById('model')?.value || '';
   if (!endpoint || !mdl) throw new Error('no provider configured');
   const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions') : (endpoint + '/chat/completions');
   const url = new URL(route, location.href).href;
-  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
   const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: false, max_tokens: maxTokens };
   if (active && active.temperature != null) body.temperature = active.temperature;
   const res = await fetch(url, {
