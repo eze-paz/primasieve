@@ -477,6 +477,25 @@ async function trackScriptRun(scriptPath, success, stderr) {
   }
 }
 
+// Pull the failing source lines out of a Pyodide traceback so the model can make
+// a targeted edit instead of rewriting. runPythonAsync compiles the script as
+// File "<exec>", so its line numbers map 1:1 to the script source. Returns ''
+// (traceback still shown) if no script frame is found.
+function sourceFromTraceback(tb, code) {
+  if (!tb || !code) return '';
+  const lines = code.split('\n');
+  const re = /File "(?:<exec>|<string>|<unknown>)", line (\d+)/g;
+  const nums = [];
+  let m;
+  while ((m = re.exec(tb))) { const n = +m[1]; if (n >= 1 && n <= lines.length) nums.push(n); }
+  if (!nums.length) return '';
+  const focus = nums[nums.length - 1];               // deepest script frame = where it failed
+  const a = Math.max(1, focus - 3), b = Math.min(lines.length, focus + 3);
+  const out = [];
+  for (let i = a; i <= b; i++) out.push(`${i === focus ? '>' : ' '} ${String(i).padStart(4)} | ${lines[i - 1]}`);
+  return out.join('\n');
+}
+
 async function tool_run_python({ path, args }, ctx) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
@@ -564,7 +583,10 @@ async function tool_run_python({ path, args }, ctx) {
         };
       }
       trackScriptRun(normPath, false, stderr);
-      return { result: 'Error: ' + (msg || 'unknown (no message)') + tail };
+      const src = sourceFromTraceback(msg, code);
+      return { result: 'Error: ' + (msg || 'unknown (no message)')
+        + (src ? '\n\n--- ' + normPath + ' (around the error) ---\n' + src : '')
+        + tail };
     } finally {
       _capActive = false;
       try { p && p.setStdout({}); } catch (_) {}
