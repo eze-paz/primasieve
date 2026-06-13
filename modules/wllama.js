@@ -166,16 +166,32 @@ const SandpieWllama = (function() {
   // wllama holds at most one model in memory at a time. We key by URL,
   // n_ctx, and flash_attn — all are load-time parameters that require a
   // fresh model load when changed.
+  //
+  // flash_attn defaults to FALSE because wllama v3.2.3 + WebGPU crashes
+  // with RuntimeError: unreachable on several common GGUFs (Qwen 2.5,
+  // Hermes 3, etc). The crash happens inside the WASM worker, and because
+  // wllama's streaming iterator never rejects when the worker dies, the
+  // main thread's for-await loop hangs forever — the user sees "never
+  // replies" with no error.  Flash attn can be re-enabled per-provider
+  // once wllama ships a fix.
   let _instance = null;
   let _instanceUrl = null;
   let _instanceCtx = 0;
-  let _instanceFlashAttn = true;
+  let _instanceFlashAttn = false;
   let _loadingKey = null;
+
+  // Hard timeout guard for the streaming round.  If the wllama worker
+  // crashes (the "unreachable" wasm trap), the async iterator never
+  // yields another chunk and never rejects.  Without a guard the user
+  // sits on an eternal spinner.  10 min is generous even for a slow
+  // CPU-only run.
+  const STREAM_TIMEOUT_MS = 10 * 60 * 1000;
 
   async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
-    const flashAttn = (opts && opts.flashAttn !== false);
+    // default false — see _instanceFlashAttn comment above
+    const flashAttn = (opts && opts.flashAttn === true);
     const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn;
     if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
     if (_loadingKey === key) {
@@ -306,6 +322,21 @@ const SandpieWllama = (function() {
     if (seed != null) request.seed = seed;
     dbg(`→ round: ${request.messages.length} msgs, ${tools ? tools.length : 0} tools, last role: ${request.messages.length ? request.messages[request.messages.length - 1].role : '(none)'}`);
 
+    // Watchdog: if the wllama worker crashes (wasm unreachable) the async
+    // iterator simply stalls — no more chunks, no rejection.  We arm a
+    // timer that fires if no chunk arrives before STREAM_TIMEOUT_MS.  A
+    // real inference run will keep resetting the timer on every chunk.
+    let watchdog = null;
+    let watchdogFired = false;
+    const armWatchdog = () => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        watchdogFired = true;
+        aborted = true;
+      }, STREAM_TIMEOUT_MS);
+    };
+    const disarmWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
+
     try {
       const stream = await wllama.createChatCompletion({
         messages: request.messages,
@@ -321,8 +352,10 @@ const SandpieWllama = (function() {
         ...(request.tools ? { tools: request.tools } : {}),
       });
 
+      armWatchdog();
       for await (const chunk of stream) {
         if (aborted) break;
+        armWatchdog();
         const choice = chunk && chunk.choices && chunk.choices[0];
         const delta = choice && choice.delta;
         // finish_reason lands on the LAST chunk for that choice — capture
@@ -331,7 +364,7 @@ const SandpieWllama = (function() {
         if (!delta) continue;
         if (delta.content) content += delta.content;
         if (delta.tool_calls) {
-          // Accumulate by index — same approach as the SW path. Some
+          // Accumulate by index — same approach as the SW path.  Some
           // models stream the function name/arguments in multiple pieces.
           for (const tc of delta.tool_calls) {
             const i = tc.index || 0;
@@ -350,6 +383,11 @@ const SandpieWllama = (function() {
         if (delta.content || delta.tool_calls) {
           try { onDelta && onDelta(delta); } catch (_) {}
         }
+      }
+      disarmWatchdog();
+      // If the watchdog fired we broke out of the loop with no finish_reason.
+      if (watchdogFired && !finishReason && !content && !toolCalls.length) {
+        throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
       }
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
@@ -464,7 +502,7 @@ const SandpieWllama = (function() {
 
     const sample = {
       nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
-      flashAttn: provider.flashAttn !== false,
+      flashAttn: provider.flashAttn === true,
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
