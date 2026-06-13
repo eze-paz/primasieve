@@ -37,6 +37,19 @@ const SandpieWllama = (function() {
   // The dropdown also offers a "Custom" free-text option for any GGUF URL.
   const DEFAULT_MODELS = [
     {
+      id: 'qwen3-4b-instruct-2507-q4_k_m',
+      label: 'Qwen3 4B Instruct 2507 — Q4_K_M (~2.5 GB, tools, recommended)',
+      url: 'https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
+    },
+    {
+      // Qwen3.5 is a hybrid (gated-delta + MoE) vision model; its architecture
+      // postdates this pinned wllama's llama.cpp, so it very likely FAILS to load
+      // here. Listed for when wllama is bumped — labeled so nobody's surprised.
+      id: 'qwen3.5-4b-q4_k_m',
+      label: 'Qwen3.5 4B — Q4_K_M (~2.7 GB, ⚠ experimental: may not load yet)',
+      url: 'https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
+    },
+    {
       id: 'qwen2.5-1.5b-instruct-q4_k_m',
       label: 'Qwen 2.5 1.5B Instruct — Q4_K_M (~1 GB, tool-calling)',
       url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
@@ -178,6 +191,7 @@ const SandpieWllama = (function() {
   let _instanceUrl = null;
   let _instanceCtx = 0;
   let _instanceFlashAttn = false;
+  let _instanceGpuLayers = 0;
   let _loadingKey = null;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
@@ -187,16 +201,32 @@ const SandpieWllama = (function() {
   // CPU-only run.
   const STREAM_TIMEOUT_MS = 10 * 60 * 1000;
 
+  // WebGPU probe (cached) — decides the default GPU-offload layer count below.
+  // navigator.gpu.requestAdapter() is the only honest "is the GPU usable" check;
+  // navigator.gpu can exist while no adapter is grantable (headless, blocklisted).
+  let _webgpuPromise = null;
+  function webgpuAvailable() {
+    if (!_webgpuPromise) _webgpuPromise = (async () => {
+      try { return !!(typeof navigator !== 'undefined' && navigator.gpu && await navigator.gpu.requestAdapter()); }
+      catch (_) { return false; }
+    })();
+    return _webgpuPromise;
+  }
+
   async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
     // default false — see _instanceFlashAttn comment above
     const flashAttn = (opts && opts.flashAttn === true);
-    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn;
-    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
+    // GPU offload: an explicit value wins; otherwise offload all layers when a
+    // WebGPU adapter is reachable, else 0 (pure CPU/WASM). wllama falls back to
+    // CPU when there's no GPU, so a high value is safe. Load-time param ⇒ in key.
+    const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : (await webgpuAvailable() ? 999 : 0);
+    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
     if (_loadingKey === key) {
       while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
     }
     _loadingKey = key;
     try {
@@ -206,6 +236,7 @@ const SandpieWllama = (function() {
         _instanceUrl = null;
         _instanceCtx = 0;
         _instanceFlashAttn = true;
+        _instanceGpuLayers = 0;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -226,11 +257,12 @@ const SandpieWllama = (function() {
       // code is inlined into the SDK bundle so no separate worker URL
       // is needed. WebGPU is auto-enabled when supported.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn });
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: nGpuLayers });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
       _instanceFlashAttn = flashAttn;
+      _instanceGpuLayers = nGpuLayers;
       return inst;
     } finally {
       if (_loadingKey === key) _loadingKey = null;
@@ -289,8 +321,8 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
-    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn });
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     let aborted = false;
@@ -509,6 +541,7 @@ const SandpieWllama = (function() {
     const sample = {
       nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
       flashAttn: provider.flashAttn === true,
+      nGpuLayers: provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : undefined,
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
