@@ -1078,8 +1078,12 @@ async function runAgent(config, ctx) {
       stream_options: { include_usage: true },
       tools: config.tools,
     };
-    if (config.maxTokens != null) reqBody.max_tokens = config.maxTokens;
+    // Reasoning models require max_completion_tokens (it counts reasoning + answer
+    // together) and reject max_tokens — so switch ONLY when a reasoning_effort is
+    // configured, leaving plain providers / older OpenAI-compat endpoints on max_tokens.
+    if (config.maxTokens != null) reqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
+    if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     // Real token counts when the provider honors include_usage. The final

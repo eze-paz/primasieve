@@ -672,6 +672,7 @@ async function buildAgentConfig(convMessages) {
     tools: toolDefs(),
     maxTokens: (active && active.maxTokens) || 8192,
     temperature: (active && active.temperature != null) ? active.temperature : null,
+    reasoningEffort: (active && active.reasoningEffort) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
   };
