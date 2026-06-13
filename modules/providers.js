@@ -60,7 +60,6 @@ const AI_HTML = `
             <option value="false">Flash attention: off (safer)</option>
             <option value="true">Flash attention: on (faster, may crash)</option>
           </select>
-          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU; &gt;0 = WebGPU offload, experimental — may crash)">
         </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
@@ -89,7 +88,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn','spGpuLayers']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -345,7 +344,6 @@ function loadFormFor(id) {
   set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty); set('spSeed', p.seed);
   const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
-  set('spGpuLayers', p.nGpuLayers);
   const wm = document.getElementById('spWllamaModel');
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
@@ -392,7 +390,6 @@ function commitForm() {
   const sd = num('spSeed');               if (sd != null) p.seed = sd; else delete p.seed;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   const fa = (document.getElementById('spFlashAttn')?.value) || 'false'; p.flashAttn = fa === 'true';
-  const gl = num('spGpuLayers');          if (gl != null && gl >= 0) p.nGpuLayers = Math.round(gl); else delete p.nGpuLayers;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight

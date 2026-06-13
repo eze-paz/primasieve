@@ -25,30 +25,18 @@
 const SandpieWllama = (function() {
   'use strict';
 
-  // wllama is pinned by patch — esm.run/esm.sh/jsdelivr `@N` redirects
-  // currently resolve to a 404 because the package's `main` field points
-  // at index.js but only esm/index.min.js actually exists in the publish.
-  // Bumping = explicit edit here; trade-off is worth it for reliability.
-  const WLLAMA_VERSION = '3.2.3';
+  // wllama is pinned by patch and loaded via its explicit esm/index.min.js path
+  // (the package `main` field historically 404'd on CDN `@N` redirects; the
+  // explicit path stays reliable across versions). Bumping = explicit edit here.
+  // 3.4.1 is the latest release (project dormant since ~May 2025); bumped up from
+  // 3.2.3 to test whether its newer llama.cpp eases the crash / first-token speed.
+  const WLLAMA_VERSION = '3.4.1';
   const SDK_URL  = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/index.min.js`;
   const WASM_URL = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/wasm/wllama.wasm`;
 
   // Curated GGUF catalog. URLs point at HuggingFace direct downloads.
   // The dropdown also offers a "Custom" free-text option for any GGUF URL.
   const DEFAULT_MODELS = [
-    {
-      id: 'qwen3-4b-instruct-2507-q4_k_m',
-      label: 'Qwen3 4B Instruct 2507 — Q4_K_M (~2.5 GB, tools, recommended)',
-      url: 'https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
-    },
-    {
-      // Qwen3.5 is a hybrid (gated-delta + MoE) vision model; its architecture
-      // postdates this pinned wllama's llama.cpp, so it very likely FAILS to load
-      // here. Listed for when wllama is bumped — labeled so nobody's surprised.
-      id: 'qwen3.5-4b-q4_k_m',
-      label: 'Qwen3.5 4B — Q4_K_M (~2.7 GB, ⚠ experimental: may not load yet)',
-      url: 'https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
-    },
     {
       id: 'qwen2.5-1.5b-instruct-q4_k_m',
       label: 'Qwen 2.5 1.5B Instruct — Q4_K_M (~1 GB, tool-calling)',
@@ -191,7 +179,6 @@ const SandpieWllama = (function() {
   let _instanceUrl = null;
   let _instanceCtx = 0;
   let _instanceFlashAttn = false;
-  let _instanceGpuLayers = 0;
   let _loadingKey = null;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
@@ -200,36 +187,17 @@ const SandpieWllama = (function() {
   // sits on an eternal spinner.  10 min is generous even for a slow
   // CPU-only run.
   const STREAM_TIMEOUT_MS = 10 * 60 * 1000;
-  // Shorter guard until the FIRST token. The model is already loaded by the time
-  // we stream, so a crash-before-first-token (the common "unreachable" mode, which
-  // never rejects) surfaces in ~2 min instead of hanging for STREAM_TIMEOUT_MS.
-  const FIRST_TOKEN_TIMEOUT_MS = 2 * 60 * 1000;
-
-  // Drop the cached instance after a worker crash so the next call reloads fresh.
-  // A dead worker still "satisfies" getInstance's cache check below while every
-  // createChatCompletion against it fails with "Cannot find waiting task".
-  async function killInstance() {
-    const dead = _instance;
-    _instance = null; _instanceUrl = null; _instanceCtx = 0; _instanceFlashAttn = false; _instanceGpuLayers = 0;
-    if (dead) { try { await dead.exit(); } catch (_) {} }
-  }
 
   async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
     // default false — see _instanceFlashAttn comment above
     const flashAttn = (opts && opts.flashAttn === true);
-    // GPU offload is OPT-IN and defaults to 0 (pure CPU/WASM). WebGPU offload
-    // (n_gpu_layers > 0) crashes the worker with "unreachable" on wllama 3.2.3 for
-    // the common GGUFs — the same instability that forced flash_attn off — so it's
-    // never on by default; a provider can set it explicitly to experiment. wllama
-    // falls back to CPU when there's no GPU. Load-time param ⇒ part of the key.
-    const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : 0;
-    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers;
-    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
+    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
     if (_loadingKey === key) {
       while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
     }
     _loadingKey = key;
     try {
@@ -239,7 +207,6 @@ const SandpieWllama = (function() {
         _instanceUrl = null;
         _instanceCtx = 0;
         _instanceFlashAttn = true;
-        _instanceGpuLayers = 0;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -260,12 +227,11 @@ const SandpieWllama = (function() {
       // code is inlined into the SDK bundle so no separate worker URL
       // is needed. WebGPU is auto-enabled when supported.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: nGpuLayers });
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
       _instanceFlashAttn = flashAttn;
-      _instanceGpuLayers = nGpuLayers;
       return inst;
     } finally {
       if (_loadingKey === key) _loadingKey = null;
@@ -324,8 +290,8 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
-    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers });
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     let aborted = false;
@@ -363,12 +329,12 @@ const SandpieWllama = (function() {
     // real inference run will keep resetting the timer on every chunk.
     let watchdog = null;
     let watchdogFired = false;
-    const armWatchdog = (ms) => {
+    const armWatchdog = () => {
       if (watchdog) clearTimeout(watchdog);
       watchdog = setTimeout(() => {
         watchdogFired = true;
         aborted = true;
-      }, ms);
+      }, STREAM_TIMEOUT_MS);
     };
     const disarmWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
 
@@ -387,10 +353,10 @@ const SandpieWllama = (function() {
         ...(request.tools ? { tools: request.tools } : {}),
       });
 
-      armWatchdog(FIRST_TOKEN_TIMEOUT_MS);
+      armWatchdog();
       for await (const chunk of stream) {
         if (aborted) break;
-        armWatchdog(STREAM_TIMEOUT_MS);
+        armWatchdog();
         const choice = chunk && chunk.choices && chunk.choices[0];
         const delta = choice && choice.delta;
         // finish_reason lands on the LAST chunk for that choice — capture
@@ -420,22 +386,10 @@ const SandpieWllama = (function() {
         }
       }
       disarmWatchdog();
-      // watchdogFired ⇒ the worker stalled/died (a healthy stream disarms above
-      // before we reach here), so always treat it as a crash — even if a few
-      // tokens arrived before it went down. Otherwise `aborted` (set by both the
-      // watchdog AND real user aborts) would misreport a crash as a clean stop.
-      if (watchdogFired) {
-        await killInstance();
-        throw new Error('Model crashed or timed out — the inference worker died. The cached model was dropped; just send again to reload it. If it keeps crashing, set GPU layers to 0 (CPU) or pick a smaller model.');
+      // If the watchdog fired we broke out of the loop with no finish_reason.
+      if (watchdogFired && !finishReason && !content && !toolCalls.length) {
+        throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
       }
-    } catch (e) {
-      disarmWatchdog();
-      // A throw here means the wllama worker died on load/stream (wasm
-      // "unreachable"). The cached instance now wraps a dead worker, so drop it —
-      // otherwise every later message fails with "Cannot find waiting task". Real
-      // user aborts are not crashes, so leave the healthy instance alone for those.
-      if (!(e && e.name === 'AbortError')) await killInstance();
-      throw e;
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }
@@ -556,7 +510,6 @@ const SandpieWllama = (function() {
     const sample = {
       nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
       flashAttn: provider.flashAttn === true,
-      nGpuLayers: provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : undefined,
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
