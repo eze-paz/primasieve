@@ -397,13 +397,28 @@ const SandpieWllama = (function() {
 
     emit({ type: 'round_start' });
 
-    let lastPct = -1;
+    // Loading indicator. On first run the GGUF is downloaded AND then compiled
+    // into WASM before any token streams — both can take a while and the
+    // compile step has no progress callback, so we always show a status line up
+    // front, update it with download bytes/%, switch to "initializing" once the
+    // bytes are in, and clear it the moment the first token arrives.
+    const fmtMB = (b) => (b >= 10485760 ? (b / 1048576).toFixed(0) : (b / 1048576).toFixed(1)) + ' MB';
+    let firstToken = false, lastMsg = '', lastPct = -1, lastLoaded = 0;
+    const status = (msg) => { if (msg === lastMsg) return; lastMsg = msg; emit({ type: 'info', message: msg }); };
+    status('Loading local model… first run downloads it (cached after) — this can take a while.');
     const onProgress = (p) => {
-      if (!p) return;
-      const pct = p.total ? Math.round((p.progress || 0) * 100) : 0;
-      if (pct === lastPct) return;
-      lastPct = pct;
-      emit({ type: 'info', message: `Loading model… ${pct}%${p.fromCache ? ' (cache)' : ''}` });
+      if (!p || firstToken) return;
+      if (p.total && p.progress >= 0.999) {
+        status('Initializing model… (compiling into memory)');
+      } else if (p.total) {
+        const pct = Math.round(p.progress * 100);
+        if (pct === lastPct) return;                       // throttle to integer %
+        lastPct = pct;
+        status(`${p.fromCache ? 'Loading' : 'Downloading'} model… ${fmtMB(p.loaded)} / ${fmtMB(p.total)} (${pct}%)`);
+      } else if (p.loaded - lastLoaded >= 4194304) {       // no content-length: ~4 MB steps
+        lastLoaded = p.loaded;
+        status(`${p.fromCache ? 'Loading' : 'Downloading'} model… ${fmtMB(p.loaded)}`);
+      }
     };
 
     let result;
@@ -419,7 +434,10 @@ const SandpieWllama = (function() {
         maxTokens: provider.maxTokens || undefined,
         temperature: provider.temperature != null ? provider.temperature : undefined,
         topP: provider.topP != null ? provider.topP : undefined,
-        onDelta: (delta) => emit({ type: 'delta', delta }),
+        onDelta: (delta) => {
+          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }  // first token ⇒ model ready
+          emit({ type: 'delta', delta });
+        },
       });
     } catch (e) {
       if (e && e.name === 'AbortError') throw e;     // let conversations.js show "Stopped."

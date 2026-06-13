@@ -979,6 +979,18 @@
     color: var(--sp-text);
     font-size: 0.85rem;
   }
+  /* Match the provider-form dropdowns (type / wllama model) to the inputs above. */
+  #providerForm select {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--sp-bg);
+    border: 1px solid var(--sp-border);
+    border-radius: 6px;
+    color: var(--sp-text);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  #providerForm select option { background: var(--sp-surface); color: var(--sp-text); }
   .modal-actions {
     display: flex;
     gap: 0.5rem;
