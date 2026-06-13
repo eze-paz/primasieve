@@ -511,19 +511,31 @@ let _swReady = (async () => {
     }
   }
 
-  let reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
+  const reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
 
+  // A page can load UNCONTROLLED — typically a hard reload of an already-active
+  // SW: clients.claim() ran before this page existed, so it won't re-fire and
+  // navigator.serviceWorker.controller stays null. An uncontrolled page can't have
+  // /sandpie-agent intercepted, so sends would silently never dispatch. Wait
+  // briefly for a claim; if none comes, reload ONCE (a normal reload of an active,
+  // claiming SW attaches deterministically). A sessionStorage guard prevents any
+  // reload loop — worst case we proceed uncontrolled rather than thrash or hang.
   if (!navigator.serviceWorker.controller) {
-    console.log('[sandpie] no controller after .ready — forcing fresh install to attach.');
-    await reg.unregister();
-    reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
-    await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) {
-      await new Promise(resolve => {
-        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-      });
+    await new Promise((resolve) => {
+      if (navigator.serviceWorker.controller) return resolve();
+      const done = () => { clearTimeout(t); navigator.serviceWorker.removeEventListener('controllerchange', done); resolve(); };
+      navigator.serviceWorker.addEventListener('controllerchange', done);
+      const t = setTimeout(done, 1500);
+    });
+    if (!navigator.serviceWorker.controller && !sessionStorage.getItem('sandpie-sw-reattach')) {
+      sessionStorage.setItem('sandpie-sw-reattach', '1');
+      console.warn('[sandpie] SW not controlling this page — reloading once to attach.');
+      location.reload();
+      await new Promise(() => {});   // halt this load; the reload supersedes it
     }
+  } else {
+    sessionStorage.removeItem('sandpie-sw-reattach');   // healthy controlled load → reset the guard
   }
   console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
   return reg;
@@ -561,7 +573,6 @@ async function sendSingle(text, stream, opts = {}) {
 
   const config = await buildAgentConfig(convMessages);
 
-  await _swReady;
   const ctrl = new AbortController();
   stream.requestId = ctrl;
   const onAbort = () => ctrl.abort();
@@ -601,6 +612,7 @@ async function sendSingle(text, stream, opts = {}) {
         dispatch,
       );
     } else {
+    await _swReady;
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
