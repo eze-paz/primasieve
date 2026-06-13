@@ -29,12 +29,12 @@ const SandpieWllama = (function() {
   // (the package `main` field historically 404'd on CDN `@N` redirects; the
   // explicit path stays reliable across versions). Bumping = explicit edit here.
   //
-  // DO NOT BUMP off 3.2.3. 3.4.1 changed wllama's default to auto-offload ALL
-  // layers to WebGPU ("load_tensors: offloaded 37/37 layers to GPU"), whose worker
-  // crashes with "unreachable" then hangs on the common GGUFs. 3.2.3 defaults to
-  // CPU and runs smoothly. Verified the hard way: 3.4.1 broke local inference
-  // (even with n_gpu_layers:0); reverting to 3.2.3 fixed it.
-  const WLLAMA_VERSION = '3.2.3';
+  // wllama 3.4.x's loadModel defaults n_gpu_layers to 99999 — i.e. it offloads
+  // ALL layers to WebGPU when the param is omitted, which crashes the worker
+  // ("unreachable") on common GGUFs. We sidestep that by ALWAYS passing an
+  // explicit n_gpu_layers (default 0 = pure CPU; see getInstance). GPU offload
+  // is opt-in per provider via the "GPU layers" field.
+  const WLLAMA_VERSION = '3.4.1';
   const SDK_URL  = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/index.min.js`;
   const WASM_URL = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/wasm/wllama.wasm`;
 
@@ -169,10 +169,10 @@ const SandpieWllama = (function() {
   const DEFAULT_N_CTX = 8192;
 
   // wllama holds at most one model in memory at a time. We key by URL,
-  // n_ctx, and flash_attn — all are load-time parameters that require a
-  // fresh model load when changed.
+  // n_ctx, flash_attn, and n_gpu_layers — all load-time parameters that
+  // require a fresh model load when changed.
   //
-  // flash_attn defaults to FALSE because wllama v3.2.3 + WebGPU crashes
+  // flash_attn defaults to FALSE because wllama + WebGPU crashes
   // with RuntimeError: unreachable on several common GGUFs (Qwen 2.5,
   // Hermes 3, etc). The crash happens inside the WASM worker, and because
   // wllama's streaming iterator never rejects when the worker dies, the
@@ -183,6 +183,7 @@ const SandpieWllama = (function() {
   let _instanceUrl = null;
   let _instanceCtx = 0;
   let _instanceFlashAttn = false;
+  let _instanceGpuLayers = 0;
   let _loadingKey = null;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
@@ -197,11 +198,16 @@ const SandpieWllama = (function() {
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
     // default false — see _instanceFlashAttn comment above
     const flashAttn = (opts && opts.flashAttn === true);
-    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn;
-    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
+    // GPU offload layer count. Default 0 (pure CPU): we MUST pass this
+    // explicitly because wllama 3.4.x otherwise defaults to 99999 (offload
+    // every layer to WebGPU), which crashes the worker. Opt in per provider
+    // via the "GPU layers" field. Load-time param ⇒ part of the instance key.
+    const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : 0;
+    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
     if (_loadingKey === key) {
       while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn) return _instance;
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
     }
     _loadingKey = key;
     try {
@@ -211,6 +217,7 @@ const SandpieWllama = (function() {
         _instanceUrl = null;
         _instanceCtx = 0;
         _instanceFlashAttn = true;
+        _instanceGpuLayers = 0;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -228,15 +235,16 @@ const SandpieWllama = (function() {
 
       const { Wllama } = await loadSDK();
       // v3 constructor takes a single `default` WASM path; the worker
-      // code is inlined into the SDK bundle so no separate worker URL
-      // is needed. On 3.2.3 wllama defaults to CPU (no GPU layers offloaded),
-      // which is the reliable path — see the DO-NOT-BUMP note on WLLAMA_VERSION.
+      // code is inlined into the SDK bundle so no separate worker URL is
+      // needed. We pass n_gpu_layers explicitly (default 0 = CPU) to override
+      // wllama 3.4.x's offload-everything default — see the WLLAMA_VERSION note.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn });
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: nGpuLayers });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
       _instanceFlashAttn = flashAttn;
+      _instanceGpuLayers = nGpuLayers;
       return inst;
     } finally {
       if (_loadingKey === key) _loadingKey = null;
@@ -295,8 +303,8 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
-    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn });
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     let aborted = false;
@@ -495,7 +503,8 @@ const SandpieWllama = (function() {
     // flash then. Keys must match getInstance's (url + n_ctx + flash_attn).
     const _nCtxWant = (provider.contextWindow | 0) || DEFAULT_N_CTX;
     const _faWant = provider.flashAttn === true;
-    const _alreadyLoaded = _instance && _instanceUrl === modelUrl && _instanceCtx === _nCtxWant && _instanceFlashAttn === _faWant;
+    const _glWant = provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : 0;
+    const _alreadyLoaded = _instance && _instanceUrl === modelUrl && _instanceCtx === _nCtxWant && _instanceFlashAttn === _faWant && _instanceGpuLayers === _glWant;
     if (!_alreadyLoaded) status('Loading local model… first run downloads it (cached after) — this can take a while.');
     const onProgress = (p) => {
       if (!p || firstToken) return;
@@ -515,6 +524,7 @@ const SandpieWllama = (function() {
     const sample = {
       nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
       flashAttn: provider.flashAttn === true,
+      nGpuLayers: provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : undefined,
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
