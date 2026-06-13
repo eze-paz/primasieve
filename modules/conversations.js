@@ -608,7 +608,7 @@ async function sendSingle(text, stream, opts = {}) {
       // protocol, so `dispatch` + the renderer + the lifecycle below are
       // reused unchanged. The SW path is left entirely untouched.
       await SandpieWllama.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, signal: ctrl.signal },
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
     } else {

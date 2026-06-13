@@ -374,15 +374,15 @@ const SandpieWllama = (function() {
   // emits, so conversations.js can swap the event SOURCE (SW fetch ↔ this
   // page-side loop) at one seam and reuse its renderer, message
   // persistence, token accounting, abort handling, and generation:complete
-  // lifecycle unchanged. v1 is TEXT-ONLY (single round, no tool loop);
-  // page-side tool support is a documented follow-up.
+  // lifecycle unchanged. Runs an agentic tool loop — tool calls execute via the
+  // SW's /sandpie-tool endpoint, which reuses the exact tool implementations.
   //
   // onEvent receives objects shaped exactly like conversations.js's
   // dispatchAgentEvent cases:
   //   { type:'round_start' } { type:'delta', delta } { type:'round_end', content }
   //   { type:'message_added', message } { type:'info', message } (null clears it)
   //   { type:'error', message } { type:'agent_done' }
-  async function runConversation({ provider, messages, systemPrompt, signal }, onEvent) {
+  async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, onEvent) {
     const emit = (ev) => { try { onEvent && onEvent(ev); } catch (_) {} };
     const modelUrl = provider && (provider.endpoint || '').trim();
     if (!modelUrl) {
@@ -396,27 +396,28 @@ const SandpieWllama = (function() {
     const sysContent = systemPrompt
       ? (typeof systemPrompt === 'string' ? systemPrompt : (systemPrompt.content != null ? String(systemPrompt.content) : ''))
       : '';
-    // Clean, text-only history: string content only, no tool artifacts. A chat
-    // may have switched to wllama from a tool-using remote provider, and the
-    // text path rejects non-string content / stray tool messages.
-    const msgs = [];
-    if (sysContent) msgs.push({ role: 'system', content: sysContent });
-    for (const m of (messages || [])) {
-      if (!m || !m.role || m.role === 'tool') continue;          // drop tool results
+    const toolList = Array.isArray(tools) ? tools : [];
+
+    // Working history, mutated across tool rounds. Flatten content to a string
+    // (wllama rejects an object content) but KEEP tool_calls / tool results so
+    // the agentic loop can carry them.
+    const norm = (m) => {
       let c = m.content;
       if (Array.isArray(c)) c = c.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n');
-      c = (c == null) ? '' : String(c);
-      if (m.role === 'assistant' && !c.trim()) continue;          // skip empty / tool-call-only turns
-      msgs.push({ role: m.role, content: c });
-    }
+      else if (c != null && typeof c !== 'string') c = String(c);
+      const out = { role: m.role, content: c == null ? '' : c };
+      if (m.tool_calls) out.tool_calls = m.tool_calls;
+      if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+      return out;
+    };
+    const work = [];
+    if (sysContent) work.push({ role: 'system', content: sysContent });
+    for (const m of (messages || [])) { if (m && m.role) work.push(norm(m)); }
 
-    emit({ type: 'round_start' });
-
-    // Loading indicator. On first run the GGUF is downloaded AND then compiled
-    // into WASM before any token streams — both can take a while and the
-    // compile step has no progress callback, so we always show a status line up
-    // front, update it with download bytes/%, switch to "initializing" once the
-    // bytes are in, and clear it the moment the first token arrives.
+    // Loading indicator (round 0 only — the model loads on the first streamRound).
+    // Downloaded + WASM-compiled before any token streams; the compile step has no
+    // progress callback, so show a status line, update it with download bytes/%,
+    // switch to "initializing", and clear it on the first token.
     const fmtMB = (b) => (b >= 10485760 ? (b / 1048576).toFixed(0) : (b / 1048576).toFixed(1)) + ' MB';
     let firstToken = false, lastMsg = '', lastPct = -1, lastLoaded = 0;
     const status = (msg) => { if (msg === lastMsg) return; lastMsg = msg; emit({ type: 'info', message: msg }); };
@@ -427,44 +428,85 @@ const SandpieWllama = (function() {
         status('Initializing model… (compiling into memory)');
       } else if (p.total) {
         const pct = Math.round(p.progress * 100);
-        if (pct === lastPct) return;                       // throttle to integer %
+        if (pct === lastPct) return;
         lastPct = pct;
         status(`${p.fromCache ? 'Loading' : 'Downloading'} model… ${fmtMB(p.loaded)} / ${fmtMB(p.total)} (${pct}%)`);
-      } else if (p.loaded - lastLoaded >= 4194304) {       // no content-length: ~4 MB steps
+      } else if (p.loaded - lastLoaded >= 4194304) {
         lastLoaded = p.loaded;
         status(`${p.fromCache ? 'Loading' : 'Downloading'} model… ${fmtMB(p.loaded)}`);
       }
     };
 
-    let result;
-    try {
-      result = await streamRound({
-        modelUrl,
-        messages: msgs,
-        tools: [],                                   // text-only in v1
-        signal,
-        onProgress,
-        nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
-        flashAttn: provider.flashAttn !== false,
-        maxTokens: provider.maxTokens || undefined,
-        temperature: provider.temperature != null ? provider.temperature : undefined,
-        topP: provider.topP != null ? provider.topP : undefined,
-        onDelta: (delta) => {
-          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }  // first token ⇒ model ready
-          emit({ type: 'delta', delta });
-        },
-      });
-    } catch (e) {
-      if (e && e.name === 'AbortError') throw e;     // let conversations.js show "Stopped."
-      emit({ type: 'info', message: null });          // clear any "Loading…" notice
-      emit({ type: 'error', message: 'wllama: ' + ((e && e.message) || e) });
-      emit({ type: 'agent_done' });
-      return;
+    const sample = {
+      nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
+      flashAttn: provider.flashAttn !== false,
+      maxTokens: provider.maxTokens || undefined,
+      temperature: provider.temperature != null ? provider.temperature : undefined,
+      topP: provider.topP != null ? provider.topP : undefined,
+    };
+
+    // Agentic loop, mirroring the SW's runAgent: stream a round, append the
+    // assistant turn, run any tool_calls via the SW's /sandpie-tool endpoint
+    // (which reuses the exact tool implementations), append results, repeat.
+    // Capped so a confused local model can't loop forever.
+    const MAX_ROUNDS = 8;
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+      emit({ type: 'round_start' });
+      let result;
+      try {
+        result = await streamRound({
+          modelUrl, messages: work, tools: toolList, signal,
+          onProgress: round === 0 ? onProgress : undefined,
+          ...sample,
+          onDelta: (delta) => {
+            if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+            emit({ type: 'delta', delta });
+          },
+        });
+      } catch (e) {
+        if (e && e.name === 'AbortError') throw e;     // let conversations.js show "Stopped."
+        emit({ type: 'info', message: null });
+        emit({ type: 'error', message: 'wllama: ' + ((e && e.message) || e) });
+        emit({ type: 'agent_done' });
+        return;
+      }
+      emit({ type: 'info', message: null });
+      emit({ type: 'round_end', content: result.content });
+
+      const asst = { role: 'assistant', content: result.content || '' };
+      if (result.tool_calls && result.tool_calls.length) asst.tool_calls = result.tool_calls;
+      work.push(asst);
+      emit({ type: 'message_added', message: asst });
+
+      if (!result.tool_calls || !result.tool_calls.length) break;   // no tools → turn complete
+
+      for (const tc of result.tool_calls) {
+        if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+        emit({ type: 'tool_started', tc });
+        let args = {};
+        try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+        let out;
+        try {
+          const res = await fetch('./sandpie-tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: tc.function && tc.function.name, args, conversation_file_name: convId }),
+            signal,
+          });
+          out = res.ok ? await res.json() : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready (reload once).' };
+        } catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          out = { result: 'Error: ' + ((e && e.message) || e) };
+        }
+        const toolResult = (out && out.result != null) ? out.result : '';
+        emit({ type: 'tool_result', id: tc.id, result: toolResult, artifacts: out && out.artifacts });
+        const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolResult };
+        work.push(toolMsg);
+        emit({ type: 'message_added', message: toolMsg });
+      }
     }
 
-    emit({ type: 'info', message: null });            // clear the load notice
-    emit({ type: 'round_end', content: result.content });
-    emit({ type: 'message_added', message: { role: 'assistant', content: result.content } });
     emit({ type: 'agent_done' });
   }
 

@@ -203,6 +203,7 @@ self.addEventListener('fetch', (event) => {
   if (path.endsWith('/sandpie-agent'))  return event.respondWith(handleAgent(event.request));
   if (path.endsWith('/sandpie-stream')) return event.respondWith(handleStream(event.request));
   if (path.endsWith('/sandpie-py'))     return event.respondWith(handlePy(event.request));
+  if (path.endsWith('/sandpie-tool'))   return event.respondWith(handleTool(event.request));
   if (path.includes('/opfs/'))          return event.respondWith(handleOpfs(path));
   // Anything else falls through to the network.
 });
@@ -1276,6 +1277,26 @@ async function handlePy(req) {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// One-shot tool runner. Lets the page-side wllama agent loop execute ANY tool
+// through the SAME runTool() the main agent loop uses (run_python, OPFS file
+// tools, artifacts, skills, …) — so there's no second implementation to drift,
+// and run_python still gets the shared Pyodide here. Mirrors handlePy.
+async function handleTool(req) {
+  let payload;
+  try { payload = await req.json(); }
+  catch (e) { return jsonErr(400, 'bad request body: ' + e.message); }
+  const { name, args, conversation_file_name } = payload || {};
+  if (!name) return jsonErr(400, 'missing "name"');
+  const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
+  let out;
+  try { out = await runTool(name, args || {}, ctx); }
+  catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
+  return new Response(JSON.stringify({
+    result: truncateToolResult((out && out.result) || ''),
+    artifacts: (out && out.artifacts) || null,
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
 // Serve an OPFS file over HTTP. HTML files get the postMessage resize script
