@@ -168,7 +168,7 @@ const SandpieWllama = (function() {
   // n_ctx, and flash_attn — all are load-time parameters that require a
   // fresh model load when changed.
   //
-  // flash_attn defaults to FALSE because wllama v3.2.3 + WebGPU crashes
+  // flash_attn defaults to FALSE because wllama (v3.2.3 and v3.4.1) + WebGPU crashes
   // with RuntimeError: unreachable on several common GGUFs (Qwen 2.5,
   // Hermes 3, etc). The crash happens inside the WASM worker, and because
   // wllama's streaming iterator never rejects when the worker dies, the
@@ -225,9 +225,15 @@ const SandpieWllama = (function() {
       const { Wllama } = await loadSDK();
       // v3 constructor takes a single `default` WASM path; the worker
       // code is inlined into the SDK bundle so no separate worker URL
-      // is needed. WebGPU is auto-enabled when supported.
+      // is needed.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn });
+      // n_gpu_layers: 0 FORCES pure CPU/WASM. wllama auto-enables WebGPU and
+      // offloads ALL layers by default ("offloaded 37/37 layers to GPU"), but that
+      // GPU path crashes the worker with "unreachable" on BOTH 3.2.3 and 3.4.1 for
+      // the common GGUFs — and a dead worker just hangs (never rejects). CPU is the
+      // only reliable path until wllama's WebGPU is fixed; explicit 0 is the ONLY
+      // way to opt out — there is no auto-CPU fallback.
+      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: 0 });
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
