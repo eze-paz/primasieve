@@ -484,7 +484,13 @@ const SandpieWllama = (function() {
     const fmtMB = (b) => (b >= 10485760 ? (b / 1048576).toFixed(0) : (b / 1048576).toFixed(1)) + ' MB';
     let firstToken = false, lastMsg = '', lastPct = -1, lastLoaded = 0;
     const status = (msg) => { if (msg === lastMsg) return; lastMsg = msg; emit({ type: 'info', message: msg }); };
-    status('Loading local model… first run downloads it (cached after) — this can take a while.');
+    // Only announce loading when the model isn't already resident — getInstance
+    // returns the cached instance instantly on later messages, so nothing should
+    // flash then. Keys must match getInstance's (url + n_ctx + flash_attn).
+    const _nCtxWant = (provider.contextWindow | 0) || DEFAULT_N_CTX;
+    const _faWant = provider.flashAttn === true;
+    const _alreadyLoaded = _instance && _instanceUrl === modelUrl && _instanceCtx === _nCtxWant && _instanceFlashAttn === _faWant;
+    if (!_alreadyLoaded) status('Loading local model… first run downloads it (cached after) — this can take a while.');
     const onProgress = (p) => {
       if (!p || firstToken) return;
       if (p.total && p.progress >= 0.999) {
