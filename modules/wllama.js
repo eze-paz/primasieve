@@ -200,17 +200,18 @@ const SandpieWllama = (function() {
   // sits on an eternal spinner.  10 min is generous even for a slow
   // CPU-only run.
   const STREAM_TIMEOUT_MS = 10 * 60 * 1000;
+  // Shorter guard until the FIRST token. The model is already loaded by the time
+  // we stream, so a crash-before-first-token (the common "unreachable" mode, which
+  // never rejects) surfaces in ~2 min instead of hanging for STREAM_TIMEOUT_MS.
+  const FIRST_TOKEN_TIMEOUT_MS = 2 * 60 * 1000;
 
-  // WebGPU probe (cached) — decides the default GPU-offload layer count below.
-  // navigator.gpu.requestAdapter() is the only honest "is the GPU usable" check;
-  // navigator.gpu can exist while no adapter is grantable (headless, blocklisted).
-  let _webgpuPromise = null;
-  function webgpuAvailable() {
-    if (!_webgpuPromise) _webgpuPromise = (async () => {
-      try { return !!(typeof navigator !== 'undefined' && navigator.gpu && await navigator.gpu.requestAdapter()); }
-      catch (_) { return false; }
-    })();
-    return _webgpuPromise;
+  // Drop the cached instance after a worker crash so the next call reloads fresh.
+  // A dead worker still "satisfies" getInstance's cache check below while every
+  // createChatCompletion against it fails with "Cannot find waiting task".
+  async function killInstance() {
+    const dead = _instance;
+    _instance = null; _instanceUrl = null; _instanceCtx = 0; _instanceFlashAttn = false; _instanceGpuLayers = 0;
+    if (dead) { try { await dead.exit(); } catch (_) {} }
   }
 
   async function getInstance(modelUrl, onProgress, opts) {
@@ -218,10 +219,12 @@ const SandpieWllama = (function() {
     const nCtx = (opts && opts.nCtx) || DEFAULT_N_CTX;
     // default false — see _instanceFlashAttn comment above
     const flashAttn = (opts && opts.flashAttn === true);
-    // GPU offload: an explicit value wins; otherwise offload all layers when a
-    // WebGPU adapter is reachable, else 0 (pure CPU/WASM). wllama falls back to
-    // CPU when there's no GPU, so a high value is safe. Load-time param ⇒ in key.
-    const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : (await webgpuAvailable() ? 999 : 0);
+    // GPU offload is OPT-IN and defaults to 0 (pure CPU/WASM). WebGPU offload
+    // (n_gpu_layers > 0) crashes the worker with "unreachable" on wllama 3.2.3 for
+    // the common GGUFs — the same instability that forced flash_attn off — so it's
+    // never on by default; a provider can set it explicitly to experiment. wllama
+    // falls back to CPU when there's no GPU. Load-time param ⇒ part of the key.
+    const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : 0;
     const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers;
     if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
     if (_loadingKey === key) {
@@ -360,12 +363,12 @@ const SandpieWllama = (function() {
     // real inference run will keep resetting the timer on every chunk.
     let watchdog = null;
     let watchdogFired = false;
-    const armWatchdog = () => {
+    const armWatchdog = (ms) => {
       if (watchdog) clearTimeout(watchdog);
       watchdog = setTimeout(() => {
         watchdogFired = true;
         aborted = true;
-      }, STREAM_TIMEOUT_MS);
+      }, ms);
     };
     const disarmWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
 
@@ -384,10 +387,10 @@ const SandpieWllama = (function() {
         ...(request.tools ? { tools: request.tools } : {}),
       });
 
-      armWatchdog();
+      armWatchdog(FIRST_TOKEN_TIMEOUT_MS);
       for await (const chunk of stream) {
         if (aborted) break;
-        armWatchdog();
+        armWatchdog(STREAM_TIMEOUT_MS);
         const choice = chunk && chunk.choices && chunk.choices[0];
         const delta = choice && choice.delta;
         // finish_reason lands on the LAST chunk for that choice — capture
@@ -417,10 +420,22 @@ const SandpieWllama = (function() {
         }
       }
       disarmWatchdog();
-      // If the watchdog fired we broke out of the loop with no finish_reason.
-      if (watchdogFired && !finishReason && !content && !toolCalls.length) {
-        throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
+      // watchdogFired ⇒ the worker stalled/died (a healthy stream disarms above
+      // before we reach here), so always treat it as a crash — even if a few
+      // tokens arrived before it went down. Otherwise `aborted` (set by both the
+      // watchdog AND real user aborts) would misreport a crash as a clean stop.
+      if (watchdogFired) {
+        await killInstance();
+        throw new Error('Model crashed or timed out — the inference worker died. The cached model was dropped; just send again to reload it. If it keeps crashing, set GPU layers to 0 (CPU) or pick a smaller model.');
       }
+    } catch (e) {
+      disarmWatchdog();
+      // A throw here means the wllama worker died on load/stream (wasm
+      // "unreachable"). The cached instance now wraps a dead worker, so drop it —
+      // otherwise every later message fails with "Cannot find waiting task". Real
+      // user aborts are not crashes, so leave the healthy instance alone for those.
+      if (!(e && e.name === 'AbortError')) await killInstance();
+      throw e;
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }

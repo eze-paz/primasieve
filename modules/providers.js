@@ -60,7 +60,7 @@ const AI_HTML = `
             <option value="false">Flash attention: off (safer)</option>
             <option value="true">Flash attention: on (faster, may crash)</option>
           </select>
-          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank = auto, 0 = CPU only, 999 = all)">
+          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU; &gt;0 = WebGPU offload, experimental — may crash)">
         </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
