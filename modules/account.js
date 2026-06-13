@@ -83,6 +83,7 @@ const SandpieAccount = (() => {
         contextWindow: m.contextWindow,
         maxTokens: m.maxOutput,
         temperature: m.temperature,
+        reasoningEffort: m.reasoningEffort,
       })), cat.defaultModel);
     } else {
       SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });
