@@ -24,7 +24,6 @@
 ## DOM owned
 - Inserts registered sections into `<aside>` (via `SandpieMenu`).
 - Suppresses the browser's default PWA install prompt.
-- Fills the sidebar footer `#versionDisplay` from `version.txt` (on `DOMContentLoaded`).
 
 ## Depends on
 - **Host:** nothing — it *is* the base.

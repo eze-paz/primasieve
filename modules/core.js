@@ -45,14 +45,8 @@ const SandpieMenu = (() => {
   function insertBeforeFooter(el) {
     const sidebar = ensureSidebar();
     if (!sidebar) return;
-    // Find the footer: the div containing #versionDisplay, then its parent
-    const versionEl = sidebar.querySelector('#versionDisplay');
-    let footer = versionEl?.closest('div');
-    // The footer might be wrapped, so check if it's a direct child of aside
-    if (footer && footer.parentElement !== sidebar) {
-      footer = footer.closest('div[style*="margin-top:auto"]') || footer.parentElement;
-    }
-    // Ensure footer is actually inside sidebar
+    // The footer is the bottom block (margin-top:auto) holding the Settings button.
+    const footer = sidebar.querySelector('div[style*="margin-top:auto"]');
     if (footer && sidebar.contains(footer)) {
       sidebar.insertBefore(el, footer);
     } else {
@@ -191,16 +185,3 @@ window.addEventListener('beforeinstallprompt', (e) => {
   console.log('[sandpie] PWA install prompt suppressed (available via menu)');
 });
 
-// Version label in the sidebar footer. Deferred to DOMContentLoaded because this
-// runs in <head>, before #versionDisplay (in the body) is parsed.
-function loadVersion() {
-  fetch('version.txt')
-    .then(r => r.text())
-    .then(v => { const el = document.getElementById('versionDisplay'); if (el) el.textContent = v.trim(); })
-    .catch(() => { const el = document.getElementById('versionDisplay'); if (el) el.textContent = 'dev'; });
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadVersion);
-} else {
-  loadVersion();
-}

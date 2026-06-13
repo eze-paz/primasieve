@@ -191,7 +191,7 @@ Rules that fall out of this:
 ## 8. How to add a module
 
 1. Create `modules/yourthing.js`.
-2. Add a tag to **`sandpie-test.html`** (then sync to `sandpie.html`):
+2. Add a tag to **`sandpie.html`**:
    `<script src="modules/yourthing.js"></script>` (classic) or add
    `type="module"` if you need ES-module semantics. Place it after `core.js`.
 3. Talk to the rest of the app **only through `Sandpie`** — `Sandpie.events` to

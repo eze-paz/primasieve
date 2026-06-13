@@ -15,11 +15,10 @@ Pyodide to sandbox tool execution.
   it emits/consumes, the DOM it owns, and what it depends on).
   Start from **[modules/\_TEMPLATE.md](modules/_TEMPLATE.md)** when adding a new one.
 
-## The two host pages
+## The host page
 
-`sandpie.html` (stable) and `sandpie-test.html` (where edits land first) are kept
-**byte-identical** — both are pure markup that loads `modules/core.js` and the
-rest. Edit `sandpie-test.html`, verify, then sync it to `sandpie.html`.
+`sandpie.html` is the single app shell — pure markup that loads `modules/core.js`
+and the rest. Edit it directly.
 
 ## Module map
 
