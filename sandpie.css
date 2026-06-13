@@ -375,7 +375,9 @@
   .mp-label { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
   .mp-caret { color: var(--sp-text-dim); font-size: 0.6rem; line-height: 1; transition: transform 0.15s; }
   .model-picker.open .mp-caret { transform: rotate(180deg); }
-  .mp-panel { display: none; position: absolute; bottom: calc(100% + 0.4rem); left: 0; min-width: 200px; max-width: 300px; max-height: 50vh; overflow-y: auto; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); z-index: 1000; padding: 0.3rem; }
+  /* position:fixed (JS sets bottom/left from the trigger rect) so the dropup escapes
+     .input-wrap's overflow:hidden instead of being clipped above the composer. */
+  .mp-panel { display: none; position: fixed; min-width: 200px; max-width: 300px; max-height: 50vh; overflow-y: auto; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); z-index: 1000; padding: 0.3rem; }
   .model-picker.open .mp-panel { display: block; }
   .mp-hdr { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-text-dim); padding: 0.3rem 0.5rem 0.2rem; }
   .mp-sep { height: 1px; background: var(--sp-border); margin: 0.35rem 0.3rem; }

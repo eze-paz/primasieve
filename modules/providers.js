@@ -279,7 +279,7 @@ function renderModelPicker() {
   caret.className = 'mp-caret';
   caret.textContent = '▴';
   trigger.append(lbl, caret);
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); });
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); });
 
   const panel = document.createElement('div');
   panel.className = 'mp-panel';
@@ -309,6 +309,20 @@ function renderModelPicker() {
   }
 
   host.append(trigger, panel);
+  if (wasOpen) positionModelPickerPanel(host);
+}
+
+// The dropup panel is position:fixed so it escapes the composer's overflow:hidden
+// (.input-wrap clips to its rounded corners). Anchor it just above the trigger, in
+// viewport coordinates, clamped so a wide panel never spills off the screen edge.
+function positionModelPickerPanel(host) {
+  const trig = host.querySelector('.mp-trigger');
+  const panel = host.querySelector('.mp-panel');
+  if (!trig || !panel) return;
+  const r = trig.getBoundingClientRect();
+  panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+  const pw = panel.offsetWidth || 220;
+  panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
 }
 
 // ============================================================
@@ -524,10 +538,18 @@ function bootProviders() {
   // render re-loads later — idempotent). loadProviders → applyActiveProvider →
   // renderModelPicker does the initial paint.
   try { loadProviders(); } catch (_) {}
+  // If the user signed in before this module evaluated, the company catalog may
+  // have been fetched before the picker existed — inject it now (no-op otherwise).
+  try { if (window.SandpieAccount && SandpieAccount.ensureManaged) SandpieAccount.ensureManaged(); } catch (_) {}
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
     const h = document.getElementById('modelPicker');
     if (h && h.classList.contains('open') && !h.contains(e.target)) h.classList.remove('open');
+  });
+  // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
+  window.addEventListener('resize', () => {
+    const h = document.getElementById('modelPicker');
+    if (h && h.classList.contains('open')) positionModelPickerPanel(h);
   });
 }
 if (document.readyState === 'loading') {

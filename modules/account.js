@@ -18,6 +18,7 @@ const SandpieAccount = (() => {
   let _panel = null;
   let _registered = false;
   let _refreshTimer = null;
+  let _managedCache = null;       // last { token, cat } fetched — lets a late-booting picker catch up
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
   function initials(s) {
@@ -60,19 +61,32 @@ const SandpieAccount = (() => {
     _refreshTimer = setInterval(refreshManagedProvider, 30 * 60 * 1000);   // keep the session token fresh
   }
 
-  // Pull the session token and surface the company SSO as a read-only provider.
-  // Re-callable: SandpieProviders.setManaged re-applies the (refreshed) token.
+  // Pull the session token + model catalog and surface them as read-only providers.
+  // Re-callable (the 30-min token refresh re-runs it). The fetched catalog is
+  // cached (_managedCache) so a picker that booted *after* this ran can still
+  // catch up via ensureManaged() — otherwise company models silently never show
+  // when providers.js wasn't ready at fetch time.
   async function refreshManagedProvider() {
     let tok;
     try { tok = await getJSON('/auth/token'); } catch (_) { return; }
     if (!tok.ok || !tok.data || !tok.data.token) return;
-    if (!(window.SandpieProviders && SandpieProviders.setManaged)) return;
     const token = tok.data.token;   // the session token is the "key" — server-verified
     // Managed model catalog (GET /models) → one read-only chip per model. The
     // server injects the real LLM key and enforces model/temperature/max-output.
     // Older server with no catalog (/models 404 or empty) → one "(managed)" chip.
     let cat = null;
     try { const r = await getJSON('/models'); if (r.ok && r.data && Array.isArray(r.data.models) && r.data.models.length) cat = r.data; } catch (_) {}
+    _managedCache = { token, cat };
+    applyManaged();
+  }
+
+  // Inject the cached catalog into SandpieProviders. No-op until providers.js is
+  // ready, so it is safe to call before the picker exists; bootProviders re-calls
+  // it (via ensureManaged) once the picker is up.
+  function applyManaged() {
+    if (!_managedCache) return;
+    if (!(window.SandpieProviders && SandpieProviders.setManaged)) return;
+    const { token, cat } = _managedCache;
     if (cat) {
       SandpieProviders.setManaged(cat.models.map(m => ({
         name: m.label || m.id,
@@ -89,6 +103,10 @@ const SandpieAccount = (() => {
       SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });
     }
   }
+
+  // Re-apply the company catalog if it was fetched before the picker was ready.
+  // Called by providers.js bootProviders so the picker never misses the catalog.
+  function ensureManaged() { applyManaged(); }
 
   function login()  { window.location.href = '/auth/login'; }
   function logout() {
@@ -128,6 +146,6 @@ const SandpieAccount = (() => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { login, logout, isActive: () => !!_user, current: () => _user };
+  return { login, logout, isActive: () => !!_user, current: () => _user, ensureManaged };
 })();
 window.SandpieAccount = SandpieAccount;
