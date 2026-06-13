@@ -273,7 +273,7 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP }) {
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
     const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
@@ -297,6 +297,13 @@ const SandpieWllama = (function() {
       top_p: topP != null ? topP : 0.9,
       tools: tools && tools.length ? tools : undefined,
     };
+    // Optional sampling / penalty params (top-level; llama.cpp + OAI names). Only
+    // sent when set, so wllama keeps its own defaults otherwise.
+    if (topK != null) request.top_k = topK;
+    if (minP != null) request.min_p = minP;
+    if (frequencyPenalty != null) request.frequency_penalty = frequencyPenalty;
+    if (presencePenalty != null) request.presence_penalty = presencePenalty;
+    if (seed != null) request.seed = seed;
     dbg(`→ round: ${request.messages.length} msgs, ${tools ? tools.length : 0} tools, last role: ${request.messages.length ? request.messages[request.messages.length - 1].role : '(none)'}`);
 
     try {
@@ -305,6 +312,11 @@ const SandpieWllama = (function() {
         max_tokens: request.max_tokens,
         temperature: request.temperature,
         top_p: request.top_p,
+        ...(request.top_k != null ? { top_k: request.top_k } : {}),
+        ...(request.min_p != null ? { min_p: request.min_p } : {}),
+        ...(request.frequency_penalty != null ? { frequency_penalty: request.frequency_penalty } : {}),
+        ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
+        ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
         ...(request.tools ? { tools: request.tools } : {}),
       });
@@ -414,6 +426,19 @@ const SandpieWllama = (function() {
     if (sysContent) work.push({ role: 'system', content: sysContent });
     for (const m of (messages || [])) { if (m && m.role) work.push(norm(m)); }
 
+    // Reasoning ("thinking") soft switch for Qwen3-style models: append /think or
+    // /no_think to the latest user turn — in our WORKING copy only, so the shown/
+    // persisted message is untouched. 'auto' leaves the model's own default.
+    const think = provider.reasoning || 'auto';
+    if (think === 'think' || think === 'no_think') {
+      for (let i = work.length - 1; i >= 0; i--) {
+        if (work[i].role === 'user') {
+          work[i] = { ...work[i], content: ((work[i].content || '') + ' ' + (think === 'think' ? '/think' : '/no_think')).trim() };
+          break;
+        }
+      }
+    }
+
     // Loading indicator (round 0 only — the model loads on the first streamRound).
     // Downloaded + WASM-compiled before any token streams; the compile step has no
     // progress callback, so show a status line, update it with download bytes/%,
@@ -443,6 +468,11 @@ const SandpieWllama = (function() {
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
+      topK: provider.topK != null ? provider.topK : undefined,
+      minP: provider.minP != null ? provider.minP : undefined,
+      frequencyPenalty: provider.frequencyPenalty != null ? provider.frequencyPenalty : undefined,
+      presencePenalty: provider.presencePenalty != null ? provider.presencePenalty : undefined,
+      seed: provider.seed != null ? provider.seed : undefined,
     };
 
     // Agentic loop, mirroring the SW's runAgent: stream a round, append the
@@ -472,9 +502,13 @@ const SandpieWllama = (function() {
         return;
       }
       emit({ type: 'info', message: null });
-      emit({ type: 'round_end', content: result.content });
+      // Strip any <think>…</think> reasoning from the stored/displayed content so
+      // it's neither replayed to the model nor left as raw tags. (If wllama
+      // surfaced reasoning as reasoning_content instead, there's nothing here.)
+      const cleanContent = (result.content || '').replace(/<think>[\s\S]*?<\/think>\s*/gi, '').replace(/^\s+/, '');
+      emit({ type: 'round_end', content: cleanContent });
 
-      const asst = { role: 'assistant', content: result.content || '' };
+      const asst = { role: 'assistant', content: cleanContent };
       if (result.tool_calls && result.tool_calls.length) asst.tool_calls = result.tool_calls;
       work.push(asst);
       emit({ type: 'message_added', message: asst });
