@@ -233,6 +233,17 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
     });
     return (r && r.content) || '';
   }
+  if (active && active.type === 'transformersjs') {
+    if (typeof SandpieTransformersJS === 'undefined' || !SandpieTransformersJS.streamRound) throw new Error('Transformers.js not loaded');
+    const r = await SandpieTransformersJS.streamRound({
+      modelUrl: active.endpoint,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      tools: [], signal, maxTokens,
+      temperature: active.temperature != null ? active.temperature : undefined,
+      topP: active.topP != null ? active.topP : undefined,
+    });
+    return (r && r.content) || '';
+  }
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';
   const mdl = model || document.getElementById('model')?.value || '';

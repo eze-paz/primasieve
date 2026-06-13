@@ -9,16 +9,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=7">
+<link rel="stylesheet" href="sandpie.css?v=5">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="modules/core.js"></script>
   <script src="modules/config.js"></script>
   <script src="modules/settings.js"></script>
-  <script src="modules/account.js?v=2"></script>
+  <script src="modules/account.js"></script>
   <script src="modules/themes.js"></script>
-  <script src="modules/wllama.js?v=12"></script>
-  <script type="module" src="modules/providers.js?v=11"></script>
+  <script src="modules/wllama.js?v=5"></script>
+  <script src="modules/transformersjs.js?v=1"></script>
+  <script type="module" src="modules/providers.js?v=5"></script>
   <script src="modules/console.js"></script>
   <script src="modules/dropbox-full.js"></script>
   <script src="modules/images.js"></script>
@@ -72,6 +73,7 @@
 
 <div style="margin-top:auto; padding:0.5rem; display:flex; flex-direction:column; gap:0.45rem; align-items:stretch;">
     <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
+    <div style="font-size:0.65rem; color:var(--sp-text-dim); text-align:center;">sandpie <span id="versionDisplay">loading...</span></div>
   </div>
 </aside>
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
@@ -109,7 +111,6 @@
       <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
       <div class="input-bar">
         <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach image">+</button>
-        <div id="modelPicker" class="model-picker"></div>
         <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
       </div>
     </div>

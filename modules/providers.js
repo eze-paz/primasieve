@@ -31,8 +31,10 @@ const AI_HTML = `
         <select id="spType">
           <option value="openai">API (OpenAI-compatible)</option>
           <option value="wllama">Local model (wllama, in-browser)</option>
+          <option value="transformersjs">Local model (Transformers.js, in-browser)</option>
         </select>
         <select id="spWllamaModel" style="display:none;"></select>
+        <select id="spTransformersJSModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -60,7 +62,6 @@ const AI_HTML = `
             <option value="false">Flash attention: off (safer)</option>
             <option value="true">Flash attention: on (faster, may crash)</option>
           </select>
-          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU, 999 = all, may crash)">
         </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
@@ -89,7 +90,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn','spGpuLayers']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -104,13 +105,30 @@ function _wireProviderPanel() {
     }
     wmSel.addEventListener('change', () => {
       const v = wmSel.value;
-      if (!v || v === '__custom') return;   // leave the Base URL field for manual entry
+      if (!v || v === '__custom') return;
       const m = (typeof SandpieWllama !== 'undefined') ? SandpieWllama.DEFAULT_MODELS.find(x => x.url === v) : null;
       const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
       const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.label;
       commitForm();
     });
     wmSel._spBound = true;
+  }
+  const tjSel = document.getElementById('spTransformersJSModel');
+  if (tjSel && !tjSel._spBound) {
+    if (typeof SandpieTransformersJS !== 'undefined' && !tjSel.options.length) {
+      tjSel.innerHTML = '<option value="">— pick a model —</option>'
+        + SandpieTransformersJS.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
+        + '<option value="__custom">Custom HF model ID…</option>';
+    }
+    tjSel.addEventListener('change', () => {
+      const v = tjSel.value;
+      if (!v || v === '__custom') return;
+      const m = (typeof SandpieTransformersJS !== 'undefined') ? SandpieTransformersJS.DEFAULT_MODELS.find(x => x.modelId === v) : null;
+      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
+      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
+      commitForm();
+    });
+    tjSel._spBound = true;
   }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
@@ -280,7 +298,7 @@ function renderModelPicker() {
   caret.className = 'mp-caret';
   caret.textContent = '▴';
   trigger.append(lbl, caret);
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); });
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); });
 
   const panel = document.createElement('div');
   panel.className = 'mp-panel';
@@ -310,20 +328,6 @@ function renderModelPicker() {
   }
 
   host.append(trigger, panel);
-  if (wasOpen) positionModelPickerPanel(host);
-}
-
-// The dropup panel is position:fixed so it escapes the composer's overflow:hidden
-// (.input-wrap clips to its rounded corners). Anchor it just above the trigger, in
-// viewport coordinates, clamped so a wide panel never spills off the screen edge.
-function positionModelPickerPanel(host) {
-  const trig = host.querySelector('.mp-trigger');
-  const panel = host.querySelector('.mp-panel');
-  if (!trig || !panel) return;
-  const r = trig.getBoundingClientRect();
-  panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-  const pw = panel.offsetWidth || 220;
-  panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
 }
 
 // ============================================================
@@ -359,9 +363,10 @@ function loadFormFor(id) {
   set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty); set('spSeed', p.seed);
   const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
-  set('spGpuLayers', p.nGpuLayers);
   const wm = document.getElementById('spWllamaModel');
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
+  const tj = document.getElementById('spTransformersJSModel');
+  if (tj) tj.value = (p.type === 'transformersjs' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
 }
 
@@ -369,16 +374,20 @@ function loadFormFor(id) {
 function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
   const wllama = type === 'wllama';
+  const transformersjs = type === 'transformersjs';
+  const local = wllama || transformersjs;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spWllamaModel', wllama);
-  show('spApiKey', !wllama);
-  show('spProxyUrl', !wllama);
-  show('spReasoningEffort', !wllama);
-  const wp = document.getElementById('spWllamaParams'); if (wp) wp.style.display = wllama ? 'flex' : 'none';
+  show('spTransformersJSModel', transformersjs);
+  show('spApiKey', !local);
+  show('spProxyUrl', !local);
+  show('spReasoningEffort', !local);
+  const wp = document.getElementById('spWllamaParams');
+  if (wp) wp.style.display = local ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
-  if (ep) ep.placeholder = wllama ? 'GGUF model URL (or pick a model above)' : 'Base URL (e.g. https://api.openai.com/v1)';
+  if (ep) ep.placeholder = local ? 'Model URL or ID (see picker above)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
-  if (cw) cw.placeholder = wllama ? 'Context window (n_ctx, default 8192)' : 'Context window (e.g. 128000)';
+  if (cw) cw.placeholder = local ? 'Context window (n_ctx, default 8192)' : 'Context window (e.g. 128000)';
 }
 
 // Commit form edits to the active provider (auto-save on field change/blur).
@@ -393,7 +402,7 @@ function commitForm() {
   p.apiKey = val('spApiKey');
   p.proxyUrl = val('spProxyUrl');
   p.name = val('spName') || p.model || 'Unnamed';
-  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else if (p.type === 'wllama') p.contextWindow = 8192; else delete p.contextWindow;
+  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else if (p.type === 'wllama' || p.type === 'transformersjs') p.contextWindow = 8192; else delete p.contextWindow;
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
@@ -406,7 +415,6 @@ function commitForm() {
   const sd = num('spSeed');               if (sd != null) p.seed = sd; else delete p.seed;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   const fa = (document.getElementById('spFlashAttn')?.value) || 'false'; p.flashAttn = fa === 'true';
-  const gl = num('spGpuLayers');          if (gl != null && gl >= 0) p.nGpuLayers = Math.round(gl); else delete p.nGpuLayers;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight
@@ -499,20 +507,28 @@ function clearManaged() {
 // ============================================================
 
 function updateRoutingHint() {
+  const active = getActiveProvider();
   const remote = (document.getElementById('proxyUrl')?.value || '').trim();
   const hint = document.getElementById('routingHint');
   if (!hint) return;
-  if (remote) hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
-  else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  if (active?.type === 'wllama') {
+    hint.textContent = 'In-browser wllama · ' + (active.model || 'local model');
+  } else if (active?.type === 'transformersjs') {
+    hint.textContent = 'In-browser Transformers.js · ' + (active.model || 'local model');
+  } else if (remote) {
+    hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
+  } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     hint.textContent = 'Routing via local /proxy/';
-  else
+  } else {
     hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
+  }
 }
 
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const ok = ep && (active?.type === 'wllama' || document.getElementById('apiKey')?.value.trim());
+  const local = (active?.type === 'wllama' || active?.type === 'transformersjs');
+  const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
 }
@@ -541,18 +557,10 @@ function bootProviders() {
   // render re-loads later — idempotent). loadProviders → applyActiveProvider →
   // renderModelPicker does the initial paint.
   try { loadProviders(); } catch (_) {}
-  // If the user signed in before this module evaluated, the company catalog may
-  // have been fetched before the picker existed — inject it now (no-op otherwise).
-  try { if (window.SandpieAccount && SandpieAccount.ensureManaged) SandpieAccount.ensureManaged(); } catch (_) {}
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
     const h = document.getElementById('modelPicker');
     if (h && h.classList.contains('open') && !h.contains(e.target)) h.classList.remove('open');
-  });
-  // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
-  window.addEventListener('resize', () => {
-    const h = document.getElementById('modelPicker');
-    if (h && h.classList.contains('open')) positionModelPickerPanel(h);
   });
 }
 if (document.readyState === 'loading') {

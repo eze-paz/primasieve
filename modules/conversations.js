@@ -562,8 +562,13 @@ async function sendSingle(text, stream, opts = {}) {
   }
   const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
   const _isWllama = !!(_active && _active.type === 'wllama');
-  if (!$('endpoint').value || !$('model').value || (!_isWllama && !$('apiKey').value)) {
-    addMsg('err', _isWllama ? 'Pick a wllama model in Settings before sending.' : 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
+  const _isTransformersJS = !!(_active && _active.type === 'transformersjs');
+  const _isLocal = _isWllama || _isTransformersJS;
+  if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
+    addMsg('err',
+      _isWllama ? 'Pick a wllama model in Settings before sending.' :
+      _isTransformersJS ? 'Pick a Transformers.js model in Settings before sending.' :
+      'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
   }
   requestWakeLock();
@@ -606,8 +611,15 @@ async function sendSingle(text, stream, opts = {}) {
       // Local model: run the agent loop on the PAGE (wllama's WASM model
       // can't be reached from the service worker). It emits the same event
       // protocol, so `dispatch` + the renderer + the lifecycle below are
-      // reused unchanged. The SW path is left entirely untouched.
+      // reused unchanged.
       await SandpieWllama.runConversation(
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+        dispatch,
+      );
+    } else if (_isTransformersJS && typeof SandpieTransformersJS !== 'undefined' && SandpieTransformersJS.runConversation) {
+      // Local model via Transformers.js (ONNX + WebGPU).
+      // Same page-side agent loop pattern as wllama.
+      await SandpieTransformersJS.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
