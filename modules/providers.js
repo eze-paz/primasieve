@@ -43,6 +43,20 @@ const AI_HTML = `
         <input id="spTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
         <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
+        <div id="spWllamaParams" style="display:none; flex-direction:column; gap:0.4rem;">
+          <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local sampling &amp; reasoning</div>
+          <input id="spTopP" type="number" min="0" max="1" step="0.01" autocomplete="off" placeholder="top_p (e.g. 0.8)">
+          <input id="spTopK" type="number" min="0" step="1" autocomplete="off" placeholder="top_k (e.g. 20)">
+          <input id="spMinP" type="number" min="0" max="1" step="0.01" autocomplete="off" placeholder="min_p (e.g. 0)">
+          <input id="spFreqPenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="frequency_penalty (−2 to 2)">
+          <input id="spPresencePenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="presence_penalty (−2 to 2)">
+          <input id="spSeed" type="number" step="1" autocomplete="off" placeholder="seed (optional — fixed = reproducible)">
+          <select id="spReasoning">
+            <option value="auto">Thinking: auto (model default)</option>
+            <option value="think">Thinking: on (/think)</option>
+            <option value="no_think">Thinking: off (/no_think)</option>
+          </select>
+        </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
           <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
@@ -70,7 +84,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -171,6 +185,7 @@ function applyActiveProvider() {
   if (pu) pu.value = p ? p.proxyUrl : '';
   updateRoutingHint();
   refreshAiDot();
+  renderModelPicker();   // keep the composer model-picker label/selection in sync
 }
 
 // Ensure a model is selected before a send. If the hidden #model input is empty
@@ -196,6 +211,7 @@ function ensureUsable() {
 // ============================================================
 
 function renderChips() {
+  renderModelPicker();   // composer picker tracks list changes even when the gear modal is closed
   const row = document.getElementById('providerChips');
   if (!row) return;
   row.innerHTML = '';
@@ -236,6 +252,61 @@ function renderChips() {
   }
 }
 
+// Compact model selector for the composer — a "dropup" chip. Mirrors renderChips'
+// Company / Your-models split (a clean separator line between them, only when there
+// ARE company models, i.e. not anonymous). Lives in the input bar so the model is
+// switchable without opening Settings. No-op if #modelPicker isn't on the page.
+function renderModelPicker() {
+  const host = document.getElementById('modelPicker');
+  if (!host) return;
+  const wasOpen = host.classList.contains('open');
+  const active = getActiveProvider();
+  host.innerHTML = '';
+  host.classList.toggle('open', wasOpen);   // preserve open state across a re-render
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'mp-trigger';
+  trigger.title = active ? ('Model: ' + (active.model || active.name || '')) : 'Pick a model';
+  const lbl = document.createElement('span');
+  lbl.className = 'mp-label';
+  lbl.textContent = active ? (active.name || active.model || 'Model') : 'Select model';
+  const caret = document.createElement('span');
+  caret.className = 'mp-caret';
+  caret.textContent = '▴';
+  trigger.append(lbl, caret);
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); });
+
+  const panel = document.createElement('div');
+  panel.className = 'mp-panel';
+  const item = (p) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
+    b.textContent = p.name || p.model || 'Unnamed';
+    if (p.model) b.title = p.model;
+    b.addEventListener('click', () => { host.classList.remove('open'); selectProvider(p.id); });
+    return b;
+  };
+  const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
+  const empty = (t) => { const d = document.createElement('div'); d.className = 'mp-empty'; d.textContent = t; return d; };
+
+  if (_managed.length) {
+    panel.appendChild(hdr('Company'));
+    _managed.forEach(p => panel.appendChild(item(p)));
+    panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
+    panel.appendChild(hdr('Your models'));
+    if (_providers.length) _providers.forEach(p => panel.appendChild(item(p)));
+    else panel.appendChild(empty('None yet — add one in Settings'));
+  } else if (_providers.length) {
+    _providers.forEach(p => panel.appendChild(item(p)));
+  } else {
+    panel.appendChild(empty('No models — add one in Settings → AI provider'));
+  }
+
+  host.append(trigger, panel);
+}
+
 // ============================================================
 // INLINE FORM  (settings of the selected/active provider)
 // ============================================================
@@ -265,6 +336,9 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spReasoningEffort', p.reasoningEffort);
   set('spType', p.type || 'openai');
+  set('spTopP', p.topP); set('spTopK', p.topK); set('spMinP', p.minP);
+  set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty); set('spSeed', p.seed);
+  const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const wm = document.getElementById('spWllamaModel');
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
@@ -279,6 +353,7 @@ function applyTypeUI() {
   show('spApiKey', !wllama);
   show('spProxyUrl', !wllama);
   show('spReasoningEffort', !wllama);
+  const wp = document.getElementById('spWllamaParams'); if (wp) wp.style.display = wllama ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
   if (ep) ep.placeholder = wllama ? 'GGUF model URL (or pick a model above)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
@@ -301,6 +376,14 @@ function commitForm() {
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
+  // wllama-only sampling / reasoning params
+  const tpp = num('spTopP');              if (tpp != null) p.topP = tpp; else delete p.topP;
+  const tpk = num('spTopK');              if (tpk != null) p.topK = tpk; else delete p.topK;
+  const mnp = num('spMinP');              if (mnp != null) p.minP = mnp; else delete p.minP;
+  const fpen = num('spFreqPenalty');      if (fpen != null) p.frequencyPenalty = fpen; else delete p.frequencyPenalty;
+  const ppen = num('spPresencePenalty');  if (ppen != null) p.presencePenalty = ppen; else delete p.presencePenalty;
+  const sd = num('spSeed');               if (sd != null) p.seed = sd; else delete p.seed;
+  const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight
@@ -428,8 +511,21 @@ window.SandpieProviders = {
   clearManaged,
 };
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+function bootProviders() {
   init();
+  // Load personal providers + render the composer model-picker at app start, so it
+  // shows the user's models without first opening the gear panel (the panel's lazy
+  // render re-loads later — idempotent). loadProviders → applyActiveProvider →
+  // renderModelPicker does the initial paint.
+  try { loadProviders(); } catch (_) {}
+  // Close the dropup on any click outside it.
+  document.addEventListener('click', (e) => {
+    const h = document.getElementById('modelPicker');
+    if (h && h.classList.contains('open') && !h.contains(e.target)) h.classList.remove('open');
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootProviders);
+} else {
+  bootProviders();
 }
