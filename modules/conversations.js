@@ -548,8 +548,10 @@ async function sendSingle(text, stream, opts = {}) {
   if (typeof SandpieProviders !== 'undefined' && SandpieProviders.ensureUsable) {
     try { SandpieProviders.ensureUsable(); } catch (_) {}
   }
-  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
+  const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+  const _isWllama = !!(_active && _active.type === 'wllama');
+  if (!$('endpoint').value || !$('model').value || (!_isWllama && !$('apiKey').value)) {
+    addMsg('err', _isWllama ? 'Pick a wllama model in Settings before sending.' : 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
   }
   requestWakeLock();
@@ -589,6 +591,16 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
+    if (_isWllama && typeof SandpieWllama !== 'undefined' && SandpieWllama.runConversation) {
+      // Local model: run the agent loop on the PAGE (wllama's WASM model
+      // can't be reached from the service worker). It emits the same event
+      // protocol, so `dispatch` + the renderer + the lifecycle below are
+      // reused unchanged. The SW path is left entirely untouched.
+      await SandpieWllama.runConversation(
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, signal: ctrl.signal },
+        dispatch,
+      );
+    } else {
     const res = await fetch('./sandpie-agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -611,6 +623,7 @@ async function sendSingle(text, stream, opts = {}) {
         `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
         host,
       );
+    }
     }
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {

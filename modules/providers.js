@@ -28,6 +28,11 @@ const AI_HTML = `
       <div id="providerManagedNote" style="display:none; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); font-size:0.78rem; color:var(--sp-text-dim);">This provider is provided by your company sign-in — its settings are managed for you.</div>
       <div id="providerForm" style="display:none; flex-direction:column; gap:0.4rem; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border);">
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
+        <select id="spType">
+          <option value="openai">API (OpenAI-compatible)</option>
+          <option value="wllama">Local model (wllama, in-browser)</option>
+        </select>
+        <select id="spWllamaModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -69,9 +74,29 @@ function _wireProviderPanel() {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
+  const typeSel = document.getElementById('spType');
+  if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
+  const wmSel = document.getElementById('spWllamaModel');
+  if (wmSel && !wmSel._spBound) {
+    if (typeof SandpieWllama !== 'undefined' && !wmSel.options.length) {
+      wmSel.innerHTML = '<option value="">— pick a model —</option>'
+        + SandpieWllama.DEFAULT_MODELS.map(m => `<option value="${m.url}">${m.label}</option>`).join('')
+        + '<option value="__custom">Custom GGUF URL…</option>';
+    }
+    wmSel.addEventListener('change', () => {
+      const v = wmSel.value;
+      if (!v || v === '__custom') return;   // leave the Base URL field for manual entry
+      const m = (typeof SandpieWllama !== 'undefined') ? SandpieWllama.DEFAULT_MODELS.find(x => x.url === v) : null;
+      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
+      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.label;
+      commitForm();
+    });
+    wmSel._spBound = true;
+  }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
   if (_activeProviderId) loadFormFor(_activeProviderId);
+  applyTypeUI();
   updateRoutingHint();
   refreshAiDot();
 }
@@ -239,6 +264,25 @@ function loadFormFor(id) {
   set('spApiKey', p.apiKey); set('spProxyUrl', p.proxyUrl);
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spReasoningEffort', p.reasoningEffort);
+  set('spType', p.type || 'openai');
+  const wm = document.getElementById('spWllamaModel');
+  if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
+  applyTypeUI();
+}
+
+// Show/hide provider fields based on the selected backend type.
+function applyTypeUI() {
+  const type = (document.getElementById('spType')?.value) || 'openai';
+  const wllama = type === 'wllama';
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('spWllamaModel', wllama);
+  show('spApiKey', !wllama);
+  show('spProxyUrl', !wllama);
+  show('spReasoningEffort', !wllama);
+  const ep = document.getElementById('spEndpoint');
+  if (ep) ep.placeholder = wllama ? 'GGUF model URL (or pick a model above)' : 'Base URL (e.g. https://api.openai.com/v1)';
+  const cw = document.getElementById('spContextWindow');
+  if (cw) cw.placeholder = wllama ? 'Context window (n_ctx, default 8192)' : 'Context window (e.g. 128000)';
 }
 
 // Commit form edits to the active provider (auto-save on field change/blur).
@@ -247,12 +291,13 @@ function commitForm() {
   if (!p || p.managed) return;   // managed providers are read-only
   const val = id => (document.getElementById(id)?.value || '').trim();
   const num = id => { const n = parseFloat(document.getElementById(id)?.value); return Number.isFinite(n) ? n : null; };
+  p.type = (document.getElementById('spType')?.value) || 'openai';
   p.endpoint = val('spEndpoint');
   p.model = val('spModel');
   p.apiKey = val('spApiKey');
   p.proxyUrl = val('spProxyUrl');
   p.name = val('spName') || p.model || 'Unnamed';
-  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else delete p.contextWindow;
+  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else if (p.type === 'wllama') p.contextWindow = 8192; else delete p.contextWindow;
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
@@ -262,7 +307,7 @@ function commitForm() {
 }
 
 function addProvider() {
-  const np = { id: 'provider_' + Date.now(), name: '', endpoint: '', model: '', apiKey: '', proxyUrl: '' };
+  const np = { id: 'provider_' + Date.now(), name: '', endpoint: '', model: '', apiKey: '', proxyUrl: '', type: 'openai' };
   _providers.push(np);
   selectProvider(np.id);   // activate + show an empty form to fill in
 }
@@ -359,7 +404,9 @@ function updateRoutingHint() {
 }
 
 function refreshAiDot() {
-  const ok = document.getElementById('endpoint')?.value.trim() && document.getElementById('apiKey')?.value.trim();
+  const ep = document.getElementById('endpoint')?.value.trim();
+  const active = getActiveProvider();
+  const ok = ep && (active?.type === 'wllama' || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
 }

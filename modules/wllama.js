@@ -367,10 +367,81 @@ const SandpieWllama = (function() {
     return { content, tool_calls: keptToolCalls };
   }
 
+  // ============================================================
+  // Conversation driver (page-side agent loop)
+  // ============================================================
+  // Emits the SAME agent-event protocol the service worker's runAgent
+  // emits, so conversations.js can swap the event SOURCE (SW fetch ↔ this
+  // page-side loop) at one seam and reuse its renderer, message
+  // persistence, token accounting, abort handling, and generation:complete
+  // lifecycle unchanged. v1 is TEXT-ONLY (single round, no tool loop);
+  // page-side tool support is a documented follow-up.
+  //
+  // onEvent receives objects shaped exactly like conversations.js's
+  // dispatchAgentEvent cases:
+  //   { type:'round_start' } { type:'delta', delta } { type:'round_end', content }
+  //   { type:'message_added', message } { type:'info', message } (null clears it)
+  //   { type:'error', message } { type:'agent_done' }
+  async function runConversation({ provider, messages, systemPrompt, signal }, onEvent) {
+    const emit = (ev) => { try { onEvent && onEvent(ev); } catch (_) {} };
+    const modelUrl = provider && (provider.endpoint || '').trim();
+    if (!modelUrl) {
+      emit({ type: 'error', message: 'wllama: this provider has no model URL — set the GGUF URL in Settings.' });
+      emit({ type: 'agent_done' });
+      return;
+    }
+
+    const msgs = [];
+    if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
+    for (const m of (messages || [])) msgs.push(m);
+
+    emit({ type: 'round_start' });
+
+    let lastPct = -1;
+    const onProgress = (p) => {
+      if (!p) return;
+      const pct = p.total ? Math.round((p.progress || 0) * 100) : 0;
+      if (pct === lastPct) return;
+      lastPct = pct;
+      emit({ type: 'info', message: `Loading model… ${pct}%${p.fromCache ? ' (cache)' : ''}` });
+    };
+
+    let result;
+    try {
+      result = await streamRound({
+        modelUrl,
+        messages: msgs,
+        tools: [],                                   // text-only in v1
+        signal,
+        onProgress,
+        nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
+        flashAttn: provider.flashAttn !== false,
+        maxTokens: provider.maxTokens || undefined,
+        temperature: provider.temperature != null ? provider.temperature : undefined,
+        topP: provider.topP != null ? provider.topP : undefined,
+        onDelta: (delta) => emit({ type: 'delta', delta }),
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;     // let conversations.js show "Stopped."
+      emit({ type: 'info', message: null });          // clear any "Loading…" notice
+      emit({ type: 'error', message: 'wllama: ' + ((e && e.message) || e) });
+      emit({ type: 'agent_done' });
+      return;
+    }
+
+    emit({ type: 'info', message: null });            // clear the load notice
+    emit({ type: 'round_end', content: result.content });
+    emit({ type: 'message_added', message: { role: 'assistant', content: result.content } });
+    emit({ type: 'agent_done' });
+  }
+
   return {
     DEFAULT_MODELS,
     DEFAULT_N_CTX,
     getInstance,
     streamRound,
+    runConversation,
   };
 })();
+
+if (typeof window !== 'undefined') window.SandpieWllama = SandpieWllama;
