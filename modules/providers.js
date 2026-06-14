@@ -65,6 +65,7 @@ const AI_HTML = `
             <option value="false">Flash attention: off (safer)</option>
             <option value="true">Flash attention: on (faster, may crash)</option>
           </select>
+          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU, 999 = all, may crash)">
         </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
@@ -93,7 +94,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn','spGpuLayers']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -108,7 +109,7 @@ function _wireProviderPanel() {
     }
     wmSel.addEventListener('change', () => {
       const v = wmSel.value;
-      if (!v || v === '__custom') return;
+      if (!v || v === '__custom') return;   // leave the Base URL field for manual entry
       const m = (typeof SandpieWllama !== 'undefined') ? SandpieWllama.DEFAULT_MODELS.find(x => x.url === v) : null;
       const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
       const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.label;
@@ -301,7 +302,7 @@ function renderModelPicker() {
   caret.className = 'mp-caret';
   caret.textContent = '▴';
   trigger.append(lbl, caret);
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); });
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); });
 
   const panel = document.createElement('div');
   panel.className = 'mp-panel';
@@ -331,6 +332,20 @@ function renderModelPicker() {
   }
 
   host.append(trigger, panel);
+  if (wasOpen) positionModelPickerPanel(host);
+}
+
+// The dropup panel is position:fixed so it escapes the composer's overflow:hidden
+// (.input-wrap clips to its rounded corners). Anchor it just above the trigger, in
+// viewport coordinates, clamped so a wide panel never spills off the screen edge.
+function positionModelPickerPanel(host) {
+  const trig = host.querySelector('.mp-trigger');
+  const panel = host.querySelector('.mp-panel');
+  if (!trig || !panel) return;
+  const r = trig.getBoundingClientRect();
+  panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+  const pw = panel.offsetWidth || 220;
+  panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
 }
 
 // ============================================================
@@ -366,6 +381,7 @@ function loadFormFor(id) {
   set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty); set('spSeed', p.seed);
   const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
+  set('spGpuLayers', p.nGpuLayers);
   const wm = document.getElementById('spWllamaModel');
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
   const tj = document.getElementById('spTransformersJSModel');
@@ -419,6 +435,7 @@ function commitForm() {
   const sd = num('spSeed');               if (sd != null) p.seed = sd; else delete p.seed;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   const fa = (document.getElementById('spFlashAttn')?.value) || 'false'; p.flashAttn = fa === 'true';
+  const gl = num('spGpuLayers');          if (gl != null && gl >= 0) p.nGpuLayers = Math.round(gl); else delete p.nGpuLayers;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight
@@ -561,10 +578,18 @@ function bootProviders() {
   // render re-loads later — idempotent). loadProviders → applyActiveProvider →
   // renderModelPicker does the initial paint.
   try { loadProviders(); } catch (_) {}
+  // If the user signed in before this module evaluated, the company catalog may
+  // have been fetched before the picker existed — inject it now (no-op otherwise).
+  try { if (window.SandpieAccount && SandpieAccount.ensureManaged) SandpieAccount.ensureManaged(); } catch (_) {}
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
     const h = document.getElementById('modelPicker');
     if (h && h.classList.contains('open') && !h.contains(e.target)) h.classList.remove('open');
+  });
+  // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
+  window.addEventListener('resize', () => {
+    const h = document.getElementById('modelPicker');
+    if (h && h.classList.contains('open')) positionModelPickerPanel(h);
   });
 }
 if (document.readyState === 'loading') {
