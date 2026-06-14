@@ -230,6 +230,9 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
       nCtx: (active.contextWindow | 0) || undefined,
       temperature: active.temperature != null ? active.temperature : undefined,
       topP: active.topP != null ? active.topP : undefined,
+      // Utility prompts (titles, distill, etc.) want a fast direct answer — for
+      // RWKV that means the no_think prefill. Ignored by non-RWKV models.
+      reasoning: 'no_think',
     });
     return (r && r.content) || '';
   }

@@ -66,7 +66,26 @@ const SandpieWllama = (function() {
       label: 'TinyLlama 1.1B Chat — Q4_K_M (~700 MB, fast, no tools)',
       url: 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf',
     },
+    {
+      // RWKV-7 "G1" is a recurrent (RNN-style) reasoning model, NOT a transformer.
+      // It takes a dedicated code path (see isRwkvUrl / streamRoundRwkv): raw
+      // completion with a hand-built "User:/Assistant:" prompt and a `<think`
+      // prefill, because G1 only reasons when its reply is seeded with `<think`
+      // and it is not an OpenAI-style tool-caller. Detection is by URL substring
+      // 'rwkv', so any custom RWKV GGUF URL also gets this path.
+      id: 'rwkv7-g1g-1.5b-q4_k_m',
+      label: 'RWKV7 G1g 1.5B — Q4_K_M (~1 GB, reasoning, no tools)',
+      url: 'https://huggingface.co/shoumenchougou/RWKV7-G1g-1.5B-GGUF/resolve/main/rwkv7-g1g-1.5b-Q4_K_M.gguf',
+    },
   ];
+
+  // RWKV models (recurrent architecture) need the dedicated raw-completion path
+  // below rather than createChatCompletion. RWKV GGUFs always carry 'rwkv' in
+  // the filename, so a URL substring test covers both the catalog entry and any
+  // custom RWKV GGUF URL the user pastes in.
+  function isRwkvUrl(url) {
+    return /rwkv/i.test(String(url || ''));
+  }
 
   // ============================================================
   // Debug logging
@@ -303,9 +322,16 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed, reasoning }) {
     const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+
+    // RWKV is a recurrent reasoning model, not a transformer chat model. Route it
+    // to the raw-completion path (manual prompt + `<think` prefill, reasoning split
+    // out as reasoning_content, no tools). `tools` is intentionally ignored here.
+    if (isRwkvUrl(modelUrl)) {
+      return streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed });
+    }
 
     let aborted = false;
     const onAbort = () => { aborted = true; };
@@ -442,6 +468,170 @@ const SandpieWllama = (function() {
   }
 
   // ============================================================
+  // RWKV raw-completion path (recurrent reasoning models)
+  // ============================================================
+  // RWKV-7 "G1" doesn't speak the OpenAI chat-completion format and doesn't emit
+  // <think> on its own — its reasoning is triggered by PREFILLING the assistant
+  // turn with `<think` (BlinkDL's official template). So we bypass
+  // createChatCompletion and build the prompt by hand:
+  //
+  //   System: …\n\nUser: …\n\nAssistant: <think>
+  //
+  // then stream raw tokens via createCompletion. Everything the model writes
+  // inside <think>…</think> is forwarded as reasoning_content (the page renders a
+  // Thinking box and never replays it to the model); everything after </think> is
+  // the answer (content). We stop at the next "\n\nUser:" because RWKV will
+  // otherwise happily hallucinate the user's next turn.
+
+  // Flatten the working history into RWKV's "Role: text" turn format (turns joined
+  // by \n\n). tool messages are dropped — RWKV G1 isn't a tool-caller. promptPrefill
+  // seeds the new assistant turn (e.g. ' <think>').
+  function buildRwkvPrompt(messages, promptPrefill) {
+    const turns = [];
+    for (const m of (messages || [])) {
+      if (!m || !m.role) continue;
+      let c = m.content;
+      if (Array.isArray(c)) c = c.filter(p => p && p.type === 'text').map(p => p.text || '').join('\n');
+      c = (c == null ? '' : String(c)).trim();
+      if (m.role === 'system') turns.push('System: ' + c);
+      else if (m.role === 'user') turns.push('User: ' + c);
+      else if (m.role === 'assistant') turns.push('Assistant: ' + c);
+      // role 'tool' → skipped: RWKV has no tools.
+    }
+    return turns.join('\n\n') + '\n\nAssistant:' + promptPrefill;
+  }
+
+  async function streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+    // Reasoning toggle → assistant prefill:
+    //   no_think → seed a closed, empty block ("fake thinking, fast" per BlinkDL)
+    //   think / auto → seed an open `<think>` so the model reasons (G1's default).
+    // We seed the full `<think>` (with '>') rather than BlinkDL's shorthand `<think`
+    // so the splitter never depends on the model emitting the closing '>' itself.
+    const mode = (reasoning === 'no_think') ? 'no_think' : 'think';
+    const promptPrefill = mode === 'no_think' ? ' <think>\n</think>' : ' <think>';
+    const parsePrefill = promptPrefill.slice(1); // same text minus the leading space, for the splitter
+    const prompt = buildRwkvPrompt(messages, promptPrefill);
+
+    let aborted = false;
+    const onAbort = () => { aborted = true; };
+    if (signal) {
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    // Incremental <think>…</think> splitter. We recompute over the full buffer each
+    // token (reasoning output is tiny relative to inference cost) and emit only the
+    // newly-grown tail, holding back the last few chars while still inside the block
+    // so a partial "</think>" never leaks into the Thinking box.
+    let gen = '';
+    let emittedReasoning = '';
+    let emittedContent = '';
+    const CLOSE = '</think>';
+    const RESERVE = CLOSE.length;
+    const split = (isFinal) => {
+      const combined = parsePrefill + gen;
+      const openIdx = combined.indexOf('<think');
+      const gtIdx = openIdx >= 0 ? combined.indexOf('>', openIdx) : -1;
+      const rStart = gtIdx >= 0 ? gtIdx + 1 : -1;            // first char of reasoning
+      const closeIdx = rStart >= 0 ? combined.indexOf(CLOSE, rStart) : -1;
+      // Reasoning (inside the think block). The leading-whitespace trim is stable
+      // as the string grows, so emittedReasoning stays a prefix of disp.
+      if (rStart >= 0) {
+        let raw = closeIdx >= 0 ? combined.slice(rStart, closeIdx) : combined.slice(rStart);
+        if (closeIdx < 0 && !isFinal) raw = raw.slice(0, Math.max(0, raw.length - RESERVE));
+        const disp = raw.replace(/^\s+/, '');
+        if (disp.length > emittedReasoning.length && disp.startsWith(emittedReasoning)) {
+          const tail = disp.slice(emittedReasoning.length);
+          emittedReasoning = disp;
+          if (tail) { try { onDelta && onDelta({ reasoning_content: tail }); } catch (_) {} }
+        }
+      }
+      // Answer (after </think>). The first content delta collapses the Thinking box.
+      if (closeIdx >= 0) {
+        const disp = combined.slice(closeIdx + CLOSE.length).replace(/^\s+/, '');
+        if (disp.length > emittedContent.length && disp.startsWith(emittedContent)) {
+          const tail = disp.slice(emittedContent.length);
+          emittedContent = disp;
+          if (tail) { try { onDelta && onDelta({ content: tail }); } catch (_) {} }
+        }
+      }
+    };
+
+    // Watchdog: a crashed worker stalls the iterator without rejecting (same trap
+    // the chat path guards against).
+    let watchdog = null, watchdogFired = false;
+    const armWatchdog = () => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => { watchdogFired = true; aborted = true; }, STREAM_TIMEOUT_MS);
+    };
+    const disarmWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
+
+    let finishReason = null;
+    let lastTimings = null;
+    const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+    // BlinkDL's recommended G1 reasoning sampling (temp 1.0, top_p 0.3, presence/
+    // frequency penalty 0.5 to curb RWKV repetition) unless the provider overrides.
+    // cache_prompt:false re-prefills each round — same correctness trade-off as the
+    // chat path (avoids the recurrent-state rewind crash). It isn't in the public
+    // RawCompletionParams type but is read by the shared completion impl; harmless
+    // if ignored. Abort is handled by the `aborted` flag + break, matching the chat
+    // path (no abortSignal, to avoid the iterator throwing mid-stream).
+    const params = {
+      prompt,
+      stream: true,
+      cache_prompt: false,
+      max_tokens: maxTokens || 2048,
+      temperature: temperature != null ? temperature : 1.0,
+      top_p: topP != null ? topP : 0.3,
+      presence_penalty: presencePenalty != null ? presencePenalty : 0.5,
+      frequency_penalty: frequencyPenalty != null ? frequencyPenalty : 0.5,
+      stop: ['\n\nUser:'],
+    };
+    if (topK != null) params.top_k = topK;
+    if (minP != null) params.min_p = minP;
+    if (seed != null) params.seed = seed;
+
+    dbg(`→ rwkv round (${mode}): prompt ${prompt.length} chars`);
+
+    try {
+      const stream = await wllama.createCompletion(params);
+      armWatchdog();
+      for await (const chunk of stream) {
+        if (aborted) break;
+        armWatchdog();
+        const choice = chunk && chunk.choices && chunk.choices[0];
+        if (chunk && chunk.timings) lastTimings = chunk.timings;
+        if (!choice) continue;
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        if (choice.text) { gen += choice.text; split(false); }
+      }
+      disarmWatchdog();
+      split(true); // flush the held-back reserve + any trailing tail
+      if (watchdogFired && !finishReason && !emittedContent && !emittedReasoning) {
+        throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
+      }
+    } finally {
+      if (signal) signal.removeEventListener('abort', onAbort);
+    }
+
+    if (aborted) throw new DOMException('aborted', 'AbortError');
+
+    const dtMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+    try {
+      self.__wllamaLastRound = {
+        ts: new Date().toISOString(),
+        request: { rwkv: true, mode, prompt, max_tokens: params.max_tokens, temperature: params.temperature, top_p: params.top_p },
+        response: { content: emittedContent, reasoning: emittedReasoning, finish_reason: finishReason, duration_ms: dtMs, timings: lastTimings },
+      };
+    } catch (_) {}
+    dbg(`← rwkv finish: ${finishReason || '(none)'} · reasoning ${emittedReasoning.length} · content ${emittedContent.length} · ${dtMs}ms${lastTimings ? ' · ' + (lastTimings.predicted_per_second || 0).toFixed(1) + ' tok/s' : ''}`);
+
+    // No tool_calls — RWKV G1 isn't a tool-caller; the agent loop ends this turn.
+    return { content: emittedContent, tool_calls: [] };
+  }
+
+  // ============================================================
   // Conversation driver (page-side agent loop)
   // ============================================================
   // Emits the SAME agent-event protocol the service worker's runAgent
@@ -464,6 +654,7 @@ const SandpieWllama = (function() {
       emit({ type: 'agent_done' });
       return;
     }
+    const isRwkv = isRwkvUrl(modelUrl);
 
     // systemPrompt arrives as the SW's system *message object* { role, content }
     // (what buildAgentConfig produces), not a bare string — pull its text out.
@@ -492,7 +683,9 @@ const SandpieWllama = (function() {
     // /no_think to the latest user turn — in our WORKING copy only, so the shown/
     // persisted message is untouched. 'auto' leaves the model's own default.
     const think = provider.reasoning || 'auto';
-    if (think === 'think' || think === 'no_think') {
+    // RWKV gets its reasoning from the <think> prefill in streamRoundRwkv, so the
+    // Qwen3 /think soft-switch (which RWKV wouldn't understand) is skipped for it.
+    if (!isRwkv && (think === 'think' || think === 'no_think')) {
       for (let i = work.length - 1; i >= 0; i--) {
         if (work[i].role === 'user') {
           work[i] = { ...work[i], content: ((work[i].content || '') + ' ' + (think === 'think' ? '/think' : '/no_think')).trim() };
@@ -556,7 +749,7 @@ const SandpieWllama = (function() {
       let result;
       try {
         result = await streamRound({
-          modelUrl, messages: work, tools: toolList, signal,
+          modelUrl, messages: work, tools: isRwkv ? [] : toolList, signal, reasoning: think,
           onProgress: round === 0 ? onProgress : undefined,
           ...sample,
           onDelta: (delta) => {
