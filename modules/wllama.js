@@ -568,6 +568,8 @@ const SandpieWllama = (function() {
 
     let finishReason = null;
     let lastTimings = null;
+    let genTokens = 0;
+    const maxOut = maxTokens || 2048;
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
     // BlinkDL's recommended G1 reasoning sampling (temp 1.0, top_p 0.3, presence/
@@ -581,7 +583,7 @@ const SandpieWllama = (function() {
       prompt,
       stream: true,
       cache_prompt: false,
-      max_tokens: maxTokens || 2048,
+      max_tokens: maxOut,
       temperature: temperature != null ? temperature : 1.0,
       top_p: topP != null ? topP : 0.3,
       presence_penalty: presencePenalty != null ? presencePenalty : 0.5,
@@ -604,7 +606,16 @@ const SandpieWllama = (function() {
         if (chunk && chunk.timings) lastTimings = chunk.timings;
         if (!choice) continue;
         if (choice.finish_reason) finishReason = choice.finish_reason;
-        if (choice.text) { gen += choice.text; split(false); }
+        if (choice.text) { gen += choice.text; genTokens++; split(false); }
+        // Hard output-token cap. wllama's raw createCompletion doesn't reliably
+        // honor max_tokens on this path, so enforce the configured limit here —
+        // otherwise a reasoning model like G1 generates until EOS / context-full,
+        // ignoring the "max output tokens" setting. Prefer wllama's own
+        // predicted-token counter; fall back to counting streamed chunks.
+        if (((lastTimings && lastTimings.predicted_n) || genTokens) >= maxOut) {
+          finishReason = finishReason || 'length';
+          break;
+        }
       }
       disarmWatchdog();
       split(true); // flush the held-back reserve + any trailing tail
