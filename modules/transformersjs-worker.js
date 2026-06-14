@@ -64,6 +64,20 @@ async function ensureModel(modelId) {
   _tokenizer = tokenizer;
   _model = model;
   _currentModelId = modelId;
+
+  // WARMUP — the safety the working demos have and we were missing. Compile the
+  // WebGPU shaders with a TINY dummy generation FIRST. Without it, the first real
+  // generate compiles every shader AND runs a long generation in one sustained GPU
+  // burst, which trips the OS GPU watchdog (TDR) → driver reset → whole-machine
+  // freeze/crash. A 1-token run compiles the shaders cheaply; the real run reuses
+  // them. (Mirrors transformers.js-examples/qwen3-webgpu load().) Best-effort: the
+  // shaders are compiled during the attempt even if it errors at the very end.
+  try {
+    const warm = await _tokenizer('a');
+    await _model.generate({ ...warm, max_new_tokens: 1 });
+  } catch (err) {
+    console.warn('[transformersjs-worker] warmup failed (continuing):', (err && err.message) || err);
+  }
 }
 
 // Build the prompt with the tokenizer's chat template (tools when supported),
