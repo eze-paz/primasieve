@@ -332,6 +332,20 @@ const SandpieLiteRTLM = (function () {
         dbg('raw model output:', full);
 
         const { content, tool_calls } = splitToolCalls(full);
+        // Gemma emits tool calls as TEXT we parse post-hoc, so — unlike wllama's native
+        // streaming — the renderer never saw a tool_calls delta and never built the
+        // tool-call bubbles, leaving tool_started/tool_result with nothing to update
+        // (they look the bubble up by id and bail). Synthesize the OAI-streaming delta
+        // here so conversations.js creates the bubbles before we run the tools. The
+        // renderer appends name/arguments, so one complete chunk per call is correct.
+        if (tool_calls.length) {
+          emit({ type: 'delta', delta: { tool_calls: tool_calls.map((tc, i) => ({
+            index: tc.index != null ? tc.index : i,
+            id: tc.id,
+            type: 'function',
+            function: { name: (tc.function && tc.function.name) || '', arguments: (tc.function && tc.function.arguments) || '' },
+          })) } });
+        }
         emit({ type: 'round_end', content });
         const asst = { role: 'assistant', content };
         if (tool_calls.length) asst.tool_calls = tool_calls;

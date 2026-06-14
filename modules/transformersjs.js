@@ -290,6 +290,17 @@ const SandpieTransformersJS = (function () {
       }
 
       emit({ type: 'info', message: null });
+      // Parsed (non-streamed) tool calls need a synthetic OAI-streaming delta so the
+      // renderer builds the tool-call bubbles; without it tool_started/tool_result
+      // no-op (they find the bubble by id and bail). Same fix as litertlm.js.
+      if (result.tool_calls && result.tool_calls.length) {
+        emit({ type: 'delta', delta: { tool_calls: result.tool_calls.map((tc, i) => ({
+          index: tc.index != null ? tc.index : i,
+          id: tc.id,
+          type: 'function',
+          function: { name: (tc.function && tc.function.name) || '', arguments: (tc.function && tc.function.arguments) || '' },
+        })) } });
+      }
       emit({ type: 'round_end', content: result.content });
 
       const asst = { role: 'assistant', content: result.content };
