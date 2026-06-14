@@ -22,23 +22,39 @@ const SandpieTransformersJS = (function () {
 
   const DEFAULT_N_CTX = 8192;
 
-  // Curated ONNX models from Hugging Face Hub (onnx-community exports).
-  // All are quantized for WebGPU; ~1-2GB downloads on first run.
+  // Curated ONNX models from Hugging Face Hub. Some are gated — an HF access
+  // token (free account) is needed. Generate one at https://hf.co/settings/tokens
+  // and store it in localStorage as 'sandpie-hf-token'.
   const DEFAULT_MODELS = [
     {
+      id: 'tinyllama-1.1b-chat-v1.0',
+      label: 'TinyLlama 1.1B Chat (~700 MB, public, no tools)',
+      modelId: 'Xenova/TinyLlama-1.1B-Chat-v1.0',
+      gated: false,
+    },
+    {
+      id: 'lamini-flan-t5-248m',
+      label: 'LaMini Flan-T5 248M (~100 MB, public, no tools)',
+      modelId: 'Xenova/LaMini-Flan-T5-248M',
+      gated: false,
+    },
+    {
       id: 'qwen2.5-1.5b-instruct-q4',
-      label: 'Qwen 2.5 1.5B Instruct — q4 (~1 GB, tool-calling)',
+      label: 'Qwen 2.5 1.5B Instruct — q4 (~1 GB, tool-calling, gated)',
       modelId: 'onnx-community/Qwen2.5-1.5B-Instruct-q4f16',
+      gated: true,
     },
     {
       id: 'qwen2.5-3b-instruct-q4',
-      label: 'Qwen 2.5 3B Instruct — q4 (~2 GB, tool-calling)',
+      label: 'Qwen 2.5 3B Instruct — q4 (~2 GB, tool-calling, gated)',
       modelId: 'onnx-community/Qwen2.5-3B-Instruct-q4f16',
+      gated: true,
     },
     {
       id: 'llama-3.2-3b-instruct-q4',
-      label: 'Llama 3.2 3B Instruct — q4 (~2 GB)',
+      label: 'Llama 3.2 3B Instruct — q4 (~2 GB, gated)',
       modelId: 'onnx-community/Llama-3.2-3B-Instruct-q4f16',
+      gated: true,
     },
   ];
 
@@ -63,12 +79,29 @@ const SandpieTransformersJS = (function () {
   }
 
   // ============================================================
+  // HF Token (for gated models)
+  // Generate at https://hf.co/settings/tokens, store in localStorage as
+  // 'sandpie-hf-token'. Free account; read-only access is enough.
+  // ============================================================
+  const HF_TOKEN_KEY = 'sandpie-hf-token';
+  function getHFToken() {
+    try { return localStorage.getItem(HF_TOKEN_KEY); }
+    catch (_) { return null; }
+  }
+
+  // ============================================================
   // Library import
   // ============================================================
   async function loadTransformers() {
     if (_transformers) return _transformers;
     try {
       _transformers = await import(ESM_URL);
+      const token = getHFToken();
+      if (token && _transformers.env) {
+        _transformers.env.useCustomCache = true;
+        // v4 stores tokens in the env object for gated model access
+        _transformers.env.hfToken = token;
+      }
     } catch (e) {
       console.error('[transformersjs] failed to import Transformers.js from', ESM_URL, e);
       throw new Error('Failed to load Transformers.js library: ' + (e.message || e));
@@ -92,36 +125,49 @@ const SandpieTransformersJS = (function () {
       _currentModelId = null;
     }
 
-    const { AutoTokenizer, AutoModelForCausalLM } = await loadTransformers();
+    try {
+      const { AutoTokenizer, AutoModelForCausalLM } = await loadTransformers();
 
-    const progress_callback = (data) => {
-      if (!data) return;
-      // Map Transformers.js progress shape to wllama-compatible shape
-      const p = {
-        loaded: data.loaded || 0,
-        total: data.total || 0,
-        progress: data.progress || (data.total ? data.loaded / data.total : 0),
-        fromCache: data.status === 'done' || (data.loaded > 0 && data.loaded === data.total),
+      const progress_callback = (data) => {
+        if (!data) return;
+        const p = {
+          loaded: data.loaded || 0,
+          total: data.total || 0,
+          progress: data.progress || (data.total ? data.loaded / data.total : 0),
+          fromCache: data.status === 'done' || (data.loaded > 0 && data.loaded === data.total),
+        };
+        onDownloadProgress && onDownloadProgress(p);
       };
-      onDownloadProgress && onDownloadProgress(p);
-    };
 
-    dbg('loading tokenizer for', modelId);
-    const tokenizer = await AutoTokenizer.from_pretrained(modelId, { progress_callback });
+      dbg('loading tokenizer for', modelId);
+      const tokenizer = await AutoTokenizer.from_pretrained(modelId, { progress_callback });
 
-    dbg('loading model for', modelId);
-    const model = await AutoModelForCausalLM.from_pretrained(modelId, {
-      dtype: 'q4f16',
-      device: 'webgpu',
-      progress_callback,
-    });
+      dbg('loading model for', modelId);
+      const model = await AutoModelForCausalLM.from_pretrained(modelId, {
+        dtype: 'q4f16',
+        device: 'webgpu',
+        progress_callback,
+      });
 
-    _tokenizer = tokenizer;
-    _model = model;
-    _currentModelId = modelId;
+      _tokenizer = tokenizer;
+      _model = model;
+      _currentModelId = modelId;
 
-    dbg('model ready', modelId);
-    return { tokenizer, model };
+      dbg('model ready', modelId);
+      return { tokenizer, model };
+    } catch (e) {
+      const msg = String(e?.message || e || '');
+      if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('gated') || msg.includes('access')) {
+        const isGated = DEFAULT_MODELS.find(m => m.modelId === modelId)?.gated;
+        const errText = isGated
+          ? 'Model "' + modelId + '" is gated on HuggingFace. Get a free token at hf.co/settings/tokens then store it with: localStorage.setItem("sandpie-hf-token", "your_token")'
+          : 'Model "' + modelId + '" is not accessible (401). It may require authentication or the repo may have moved.';
+        const wrappedErr = new Error(errText);
+        wrappedErr.original = e;
+        throw wrappedErr;
+      }
+      throw e;
+    }
   }
 
   // ============================================================

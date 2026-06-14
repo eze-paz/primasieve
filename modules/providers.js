@@ -35,6 +35,9 @@ const AI_HTML = `
         </select>
         <select id="spWllamaModel" style="display:none;"></select>
         <select id="spTransformersJSModel" style="display:none;"></select>
+        <div id="spTransformersJSHelp" style="display:none; font-size:0.7rem; color:var(--sp-text-dim); margin-top:0.2rem;">
+          Gated models need a free Hugging Face token — generate at <a href="https://hf.co/settings/tokens" target="_blank">hf.co/settings/tokens</a>, then store it with <code style="background:var(--sp-panel); padding:0.05rem 0.2rem; border-radius:3px;">localStorage.setItem('sandpie-hf-token','your_token')</code> in DevTools.
+        </div>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -379,13 +382,14 @@ function applyTypeUI() {
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spWllamaModel', wllama);
   show('spTransformersJSModel', transformersjs);
+  show('spTransformersJSHelp', transformersjs);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
   const wp = document.getElementById('spWllamaParams');
   if (wp) wp.style.display = local ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
-  if (ep) ep.placeholder = local ? 'Model URL or ID (see picker above)' : 'Base URL (e.g. https://api.openai.com/v1)';
+  if (ep) ep.placeholder = local ? 'Model ID (picker above; gated models need HF token)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
   if (cw) cw.placeholder = local ? 'Context window (n_ctx, default 8192)' : 'Context window (e.g. 128000)';
 }
