@@ -98,8 +98,6 @@ const SandpieTransformersJS = (function () {
       _transformers = await import(ESM_URL);
       const token = getHFToken();
       if (token && _transformers.env) {
-        _transformers.env.useCustomCache = true;
-        // v4 stores tokens in the env object for gated model access
         _transformers.env.hfToken = token;
       }
     } catch (e) {
