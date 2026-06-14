@@ -22,29 +22,27 @@ const SandpieTransformersJS = (function () {
 
   const DEFAULT_N_CTX = 8192;
 
-  // Curated ONNX models from Hugging Face Hub. Some are gated — an HF access
-  // token (free account) is needed. Generate one at https://hf.co/settings/tokens
-  // and store it in localStorage as 'sandpie-hf-token'.
-  // All PUBLIC (no HF token needed). modelId is the BASE repo id — the q4f16 ONNX
-  // is chosen via the dtype param at load, NOT a repo-name suffix. ("…-q4f16"
-  // repos don't exist and return 401.) Transformers.js can't load gated/private
-  // models in the browser regardless (tokens are server-side only), so we curate
-  // only public ones.
+  // All PUBLIC (no HF token needed). modelId is the BASE repo id; the quant is
+  // picked via the dtype param at load (we use q4 on CPU), NOT a repo-name suffix
+  // ("…-q4f16" repos don't exist and 401). Models must fit the WASM heap (~2 GB):
+  // ~1B and under are safe; 1.5B+ (q4 ≈ 1.8 GB) can hit std::bad_alloc on CPU.
+  // Gated/private models can't load in the browser anyway (tokens are server-side
+  // only), so we curate small, public ones.
   const DEFAULT_MODELS = [
     {
+      id: 'qwen2.5-0.5b-instruct',
+      label: 'Qwen 2.5 0.5B Instruct (~0.8 GB, tools, fits CPU — recommended)',
+      modelId: 'onnx-community/Qwen2.5-0.5B-Instruct',
+    },
+    {
       id: 'tinyllama-1.1b-chat-v1.0',
-      label: 'TinyLlama 1.1B Chat (~700 MB, no tools)',
+      label: 'TinyLlama 1.1B Chat (~0.7 GB, fits CPU, no tools)',
       modelId: 'Xenova/TinyLlama-1.1B-Chat-v1.0',
     },
     {
       id: 'qwen2.5-1.5b-instruct',
-      label: 'Qwen 2.5 1.5B Instruct — q4f16 (~1.2 GB, tool-calling)',
+      label: 'Qwen 2.5 1.5B Instruct (~1.8 GB, tools — large, may exceed browser memory)',
       modelId: 'onnx-community/Qwen2.5-1.5B-Instruct',
-    },
-    {
-      id: 'qwen2.5-3b-instruct',
-      label: 'Qwen 2.5 3B Instruct — q4f16 (~2 GB, tool-calling)',
-      modelId: 'onnx-community/Qwen2.5-3B-Instruct',
     },
   ];
 
