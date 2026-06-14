@@ -363,7 +363,10 @@ const SandpieWllama = (function() {
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
-        ...(request.tools ? { tools: request.tools } : {}),
+        // tool_choice:'auto' is REQUIRED for wllama to render the tools into the chat
+        // template — passing `tools` alone leaves them out of the prompt, so the model
+        // reports having no tools. (Matches wllama's own tools example.)
+        ...(request.tools ? { tools: request.tools, tool_choice: 'auto' } : {}),
       });
 
       armWatchdog();
