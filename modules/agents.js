@@ -244,6 +244,16 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
     });
     return (r && r.content) || '';
   }
+  if (active && active.type === 'litertlm') {
+    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.streamRound) throw new Error('LiteRT-LM not loaded');
+    const r = await SandpieLiteRTLM.streamRound({
+      modelUrl: active.endpoint,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      tools: [], signal,
+      nCtx: (active.contextWindow | 0) || undefined,
+    });
+    return (r && r.content) || '';
+  }
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';
   const mdl = model || document.getElementById('model')?.value || '';

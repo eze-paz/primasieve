@@ -32,9 +32,11 @@ const AI_HTML = `
           <option value="openai">API (OpenAI-compatible)</option>
           <option value="wllama">Local model (wllama, in-browser)</option>
           <option value="transformersjs">Local model (Transformers.js, in-browser)</option>
+          <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
         </select>
         <select id="spWllamaModel" style="display:none;"></select>
         <select id="spTransformersJSModel" style="display:none;"></select>
+        <select id="spLiteRTLMModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -130,6 +132,23 @@ function _wireProviderPanel() {
       commitForm();
     });
     tjSel._spBound = true;
+  }
+  const lrSel = document.getElementById('spLiteRTLMModel');
+  if (lrSel && !lrSel._spBound) {
+    if (typeof SandpieLiteRTLM !== 'undefined' && !lrSel.options.length) {
+      lrSel.innerHTML = '<option value="">— pick a model —</option>'
+        + SandpieLiteRTLM.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
+        + '<option value="__custom">Custom .litertlm URL…</option>';
+    }
+    lrSel.addEventListener('change', () => {
+      const v = lrSel.value;
+      if (!v || v === '__custom') return;
+      const m = (typeof SandpieLiteRTLM !== 'undefined') ? SandpieLiteRTLM.DEFAULT_MODELS.find(x => x.modelId === v) : null;
+      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
+      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
+      commitForm();
+    });
+    lrSel._spBound = true;
   }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
@@ -383,6 +402,8 @@ function loadFormFor(id) {
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
   const tj = document.getElementById('spTransformersJSModel');
   if (tj) tj.value = (p.type === 'transformersjs' && p.endpoint) ? p.endpoint : '';
+  const lr = document.getElementById('spLiteRTLMModel');
+  if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
 }
 
@@ -391,10 +412,12 @@ function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
   const wllama = type === 'wllama';
   const transformersjs = type === 'transformersjs';
-  const local = wllama || transformersjs;
+  const litertlm = type === 'litertlm';
+  const local = wllama || transformersjs || litertlm;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spWllamaModel', wllama);
   show('spTransformersJSModel', transformersjs);
+  show('spLiteRTLMModel', litertlm);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
