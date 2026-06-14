@@ -33,12 +33,6 @@ const SandpieTransformersJS = (function () {
       gated: false,
     },
     {
-      id: 'lamini-flan-t5-248m',
-      label: 'LaMini Flan-T5 248M (~100 MB, public, no tools)',
-      modelId: 'Xenova/LaMini-Flan-T5-248M',
-      gated: false,
-    },
-    {
       id: 'qwen2.5-1.5b-instruct-q4',
       label: 'Qwen 2.5 1.5B Instruct — q4 (~1 GB, tool-calling, gated)',
       modelId: 'onnx-community/Qwen2.5-1.5B-Instruct-q4f16',
@@ -141,11 +135,20 @@ const SandpieTransformersJS = (function () {
       const tokenizer = await AutoTokenizer.from_pretrained(modelId, { progress_callback });
 
       dbg('loading model for', modelId);
-      const model = await AutoModelForCausalLM.from_pretrained(modelId, {
-        dtype: 'q4f16',
-        device: 'webgpu',
-        progress_callback,
-      });
+      // Prefer WebGPU (q4f16); fall back to CPU/WASM (q4) on devices without a
+      // usable WebGPU adapter so it degrades instead of hard-failing. A 401 on the
+      // fallback re-throws to the gated-model handler below.
+      let model;
+      try {
+        model = await AutoModelForCausalLM.from_pretrained(modelId, {
+          dtype: 'q4f16', device: 'webgpu', progress_callback,
+        });
+      } catch (gpuErr) {
+        dbg('webgpu load failed, falling back to wasm:', gpuErr && gpuErr.message);
+        model = await AutoModelForCausalLM.from_pretrained(modelId, {
+          dtype: 'q4', device: 'wasm', progress_callback,
+        });
+      }
 
       _tokenizer = tokenizer;
       _model = model;
@@ -350,7 +353,6 @@ const SandpieTransformersJS = (function () {
     seed,
   }) {
     const { tokenizer, model } = await ensureModel(modelUrl, onProgress);
-    const { TextStreamer } = await loadTransformers();
 
     const promptText = await buildPrompt(tokenizer, messages, tools);
     dbg('prompt length (chars):', promptText.length);
@@ -364,6 +366,7 @@ const SandpieTransformersJS = (function () {
       inputs = await tokenizer(promptText, { return_tensors: true });
     }
 
+    let content = '';
     let firstTokenSeen = false;
 
     // Best-effort streaming: TextStreamer may not be available in all ESM builds.
@@ -436,7 +439,8 @@ const SandpieTransformersJS = (function () {
     const MAX_ROUNDS = 8;
     const work = [];
 
-    if (systemPrompt) work.push({ role: 'system', content: systemPrompt });
+    const sysText = systemPrompt && typeof systemPrompt === 'object' ? (systemPrompt.content || '') : systemPrompt;
+    if (sysText) work.push({ role: 'system', content: sysText });
     work.push(...messages);
 
     const toolList = (tools || []).filter(t => t && t.type === 'function');
