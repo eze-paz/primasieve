@@ -97,10 +97,11 @@ const SandpieLiteRTLM = (function () {
     const fns = (tools || []).filter(t => t && t.type === 'function').map(t => t.function).filter(Boolean);
     if (!fns.length) return '';
     const specs = fns.map(f => `- ${f.name}: ${f.description || ''}\n  arguments (JSON schema): ${JSON.stringify(f.parameters || {})}`).join('\n');
+    // Gemma 4 has a trained function-calling format (<|tool_call>call:name{...}<tool_call|>)
+    // and emits it when it knows the tools — so we just describe them and let it use its
+    // native format. parseGemmaToolCalls() reads that format (JSON/<tool_call> is the fallback).
     return [
-      'You have tools. To call one, output EXACTLY one line and nothing else:',
-      '<tool_call>{"name": "<tool_name>", "arguments": { ... }}</tool_call>',
-      'Then stop; you will receive the result and may continue. If no tool is needed, just answer normally.',
+      'You can call tools using your function-calling format when one is needed; otherwise just answer normally.',
       'Available tools:',
       specs,
     ].join('\n');
@@ -162,10 +163,54 @@ const SandpieLiteRTLM = (function () {
     };
   }
 
+  // Gemma 4's NATIVE function-calling format (read from the model's own metadata):
+  //   <|tool_call>call:NAME{key:<|"|>value<|"|>, ...}<tool_call|>
+  // String values are wrapped in the <|"|> quote token so embedded quotes/commas/newlines
+  // (e.g. file content) don't break parsing. The start fence is sometimes stripped from the
+  // streamed text, so we anchor on `call:NAME{...}` + the end fence.
+  function parseGemmaToolCalls(text) {
+    const calls = [];
+    const rx = /(?:<\|tool_call>)?\s*call:\s*([A-Za-z_][\w.]*)\s*\{([\s\S]*?)\}\s*<tool_call\|>/g;
+    let m;
+    while ((m = rx.exec(text)) !== null) {
+      calls.push({
+        id: 'call_' + Math.random().toString(36).slice(2, 11),
+        type: 'function',
+        function: { name: m[1], arguments: JSON.stringify(parseGemmaArgs(m[2])) },
+      });
+    }
+    return calls.map((tc, idx) => ({ ...tc, index: idx }));
+  }
+
+  function parseGemmaArgs(body) {
+    const args = {};
+    let m, any = false;
+    // Preferred: Gemma's <|"|> string delimiter — robust to embedded quotes/commas.
+    const rxTok = /([A-Za-z_][\w.]*)\s*:\s*<\|"\|>([\s\S]*?)<\|"\|>/g;
+    while ((m = rxTok.exec(body)) !== null) { args[m[1]] = m[2]; any = true; }
+    if (any) return args;
+    // Fallback: plain "double quotes" (closing quote = the one before ", nextKey:" or end —
+    // tolerates quotes inside the value, e.g. code).
+    const rxStr = /([A-Za-z_][\w.]*)\s*:\s*"([\s\S]*?)"\s*(?=,\s*[A-Za-z_][\w.]*\s*:|\}?\s*$)/g;
+    while ((m = rxStr.exec(body)) !== null) { args[m[1]] = m[2]; any = true; }
+    if (any) return args;
+    // Last resort: bare scalars (numbers / booleans) — key: value
+    const rxScalar = /([A-Za-z_][\w.]*)\s*:\s*([^,{}]+?)\s*(?=,|\}?\s*$)/g;
+    while ((m = rxScalar.exec(body)) !== null) {
+      let v = m[2].trim();
+      if (/^-?\d+(?:\.\d+)?$/.test(v)) v = Number(v);
+      else if (v === 'true' || v === 'false') v = (v === 'true');
+      args[m[1]] = v;
+    }
+    return args;
+  }
+
   function cleanContent(text) {
     return (text || '')
+      .replace(/<\|tool_call>[\s\S]*?<tool_call\|>/g, '')   // Gemma 4 fenced tool call
       .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
       .replace(/```json\s*[\s\S]*?```/g, '')
+      .replace(/<tool_call\|>|<\|tool_call>|<\|"\|>/g, '')   // stray Gemma tokens
       .replace(/<\|.*?>\n?/g, '')
       .trim()
       .replace(/^Assistant:\s*/i, '');
@@ -217,7 +262,11 @@ const SandpieLiteRTLM = (function () {
       try { if (conv && conv.delete) await conv.delete(); } catch (_) {}
     }
 
-    return { content: cleanContent(full), tool_calls: parseToolCalls(full) };
+    dbg('raw model output:', full);
+    // Gemma 4's native FC format first; generic JSON / <tool_call> parser as fallback.
+    let tool_calls = parseGemmaToolCalls(full);
+    if (!tool_calls.length) tool_calls = parseToolCalls(full);
+    return { content: cleanContent(full), tool_calls };
   }
 
   // ============================================================
