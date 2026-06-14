@@ -116,20 +116,15 @@ const SandpieTransformersJS = (function () {
       const tokenizer = await AutoTokenizer.from_pretrained(modelId, { progress_callback });
 
       dbg('loading model for', modelId);
-      // Prefer WebGPU (q4f16); fall back to CPU/WASM (q4) on devices without a
-      // usable WebGPU adapter so it degrades instead of hard-failing. A 401 on the
-      // fallback re-throws to the gated-model handler below.
-      let model;
-      try {
-        model = await AutoModelForCausalLM.from_pretrained(modelId, {
-          dtype: 'q4f16', device: 'webgpu', progress_callback,
-        });
-      } catch (gpuErr) {
-        dbg('webgpu load failed, falling back to wasm:', gpuErr && gpuErr.message);
-        model = await AutoModelForCausalLM.from_pretrained(modelId, {
-          dtype: 'q4', device: 'wasm', progress_callback,
-        });
-      }
+      // CPU/WASM ONLY by default. WebGPU is faster but loads the whole model into
+      // GPU VRAM — a multi-GB model on a VRAM-limited GPU overflows the driver,
+      // which can FREEZE OR CRASH THE WHOLE MACHINE (not just the tab — it crashed
+      // a real PC). Never default in-browser inference to the GPU. (A per-provider
+      // WebGPU opt-in with a VRAM warning could be added later, like wllama's
+      // GPU-layers field — but it must be opt-in, never the default.)
+      const model = await AutoModelForCausalLM.from_pretrained(modelId, {
+        dtype: 'q4', device: 'wasm', progress_callback,
+      });
 
       _tokenizer = tokenizer;
       _model = model;
