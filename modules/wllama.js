@@ -363,6 +363,13 @@ const SandpieWllama = (function() {
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
+        // cache_prompt:false re-prefills the whole prompt each call instead of reusing
+        // the persistent KV cache. We keep ONE wllama instance across turns, so on a
+        // rewind/edit the new prompt is SHORTER than what's cached — wllama then dies
+        // with "inconsistent sequence positions" (KV at X, batch starts at Y < X) and
+        // takes the worker down. Re-prefilling is the price of correctness; we re-send
+        // the full history every round anyway, so cache reuse bought us little.
+        cache_prompt: false,
         // tool_choice:'auto' is REQUIRED for wllama to render the tools into the chat
         // template — passing `tools` alone leaves them out of the prompt, so the model
         // reports having no tools. (Matches wllama's own tools example.)
