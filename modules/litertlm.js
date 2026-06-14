@@ -225,9 +225,31 @@ const SandpieLiteRTLM = (function () {
   }
 
   // ============================================================
-  // One generation round — stateless: full message history in, {content, tool_calls}
-  // out (tool calls parsed from the text). Mirrors transformersjs.js streamRound so
-  // runConversation below can stay identical.
+  // Low-level: stream one send over an ALREADY-created Conversation. Accumulates the
+  // text, relays each chunk to onText, honors abort (cancels the stream).
+  // ============================================================
+  async function streamInto(conv, input, signal, onText) {
+    let full = '';
+    const stream = conv.sendMessageStreaming(input || '');
+    for await (const chunk of stream) {
+      if (signal && signal.aborted) { try { conv.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
+      for (const item of (chunk && chunk.content) || []) {
+        if (item && item.type === 'text' && item.text) { full += item.text; try { onText && onText(item.text); } catch (_) {} }
+      }
+    }
+    return full;
+  }
+
+  // Gemma 4's native FC format first; generic JSON / <tool_call> parser as fallback.
+  function splitToolCalls(full) {
+    let tool_calls = parseGemmaToolCalls(full);
+    if (!tool_calls.length) tool_calls = parseToolCalls(full);
+    return { content: cleanContent(full), tool_calls };
+  }
+
+  // ============================================================
+  // One-shot completion (used by agents.js runPrompt). Stateless: a throwaway
+  // conversation seeded with the messages, single send. Returns {content, tool_calls}.
   // ============================================================
   async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx }) {
     const engine = await ensureEngine(modelUrl, nCtx, onProgress);
@@ -240,118 +262,114 @@ const SandpieLiteRTLM = (function () {
       if (sys) sys.content += '\n\n' + preamble;
       else mapped.unshift({ role: 'system', content: preamble });
     }
-
-    // preface = everything before the final turn; the final turn is what we send.
     const last = mapped.length ? mapped[mapped.length - 1] : { content: '' };
     const preface = mapped.slice(0, -1);
 
     const conv = await engine.createConversation(preface.length ? { preface: { messages: preface } } : undefined);
     let full = '';
     try {
-      const stream = conv.sendMessageStreaming(last.content || '');
-      for await (const chunk of stream) {
-        if (signal && signal.aborted) { try { conv.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
-        for (const item of (chunk && chunk.content) || []) {
-          if (item && item.type === 'text' && item.text) {
-            full += item.text;
-            try { onDelta && onDelta({ content: item.text }); } catch (_) {}
-          }
-        }
-      }
+      full = await streamInto(conv, last.content, signal, (t) => { try { onDelta && onDelta({ content: t }); } catch (_) {} });
     } finally {
       try { if (conv && conv.delete) await conv.delete(); } catch (_) {}
     }
-
     dbg('raw model output:', full);
-    // Gemma 4's native FC format first; generic JSON / <tool_call> parser as fallback.
-    let tool_calls = parseGemmaToolCalls(full);
-    if (!tool_calls.length) tool_calls = parseToolCalls(full);
-    return { content: cleanContent(full), tool_calls };
+    return splitToolCalls(full);
   }
 
   // ============================================================
   // Agentic conversation loop — emits the SAME event protocol conversations.js
   // expects (identical to wllama / transformersjs); tool calls run via /sandpie-tool.
+  //
+  // Reuses ONE Conversation across all rounds (the LiteRT-LM-recommended pattern): the
+  // engine keeps its environment + accelerators + KV cache, so each round only prefills
+  // the NEW turn (the tool results) instead of re-creating the conversation and
+  // re-prefilling the whole history every round.
   // ============================================================
   async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, emit) {
     const MAX_ROUNDS = 8;
-    const work = [];
-
-    const sysText = systemPrompt && typeof systemPrompt === 'object' ? (systemPrompt.content || '') : systemPrompt;
-    if (sysText) work.push({ role: 'system', content: sysText });
-    work.push(...messages);
-
     const toolList = (tools || []).filter(t => t && t.type === 'function');
     const nCtx = (provider.contextWindow | 0) || DEFAULT_N_CTX;
 
-    let firstToken = false, announced = false;
-    const onDownloadProgress = () => {
-      if (firstToken || announced) return;
-      announced = true;
+    // System text + tool descriptions (Gemma emits its native FC format from these).
+    let sysText = (systemPrompt && typeof systemPrompt === 'object') ? (systemPrompt.content || '') : (systemPrompt || '');
+    const preamble = buildToolPreamble(toolList);
+    if (preamble) sysText = sysText ? (sysText + '\n\n' + preamble) : preamble;
+
+    // Seed the conversation with system + all prior turns; the latest user turn is the
+    // first thing we actually send. Later rounds send ONLY the new content (tool
+    // results) — the conversation's own history/KV cache carries the rest.
+    const hist = (messages || []).slice();
+    let lastUserIdx = -1;
+    for (let i = hist.length - 1; i >= 0; i--) { if (hist[i].role === 'user') { lastUserIdx = i; break; } }
+    const preface = [];
+    if (sysText) preface.push({ role: 'system', content: sysText });
+    hist.forEach((m, i) => { if (i !== lastUserIdx) preface.push({ role: mapRole(m.role), content: mapContent(m) }); });
+    let input = lastUserIdx >= 0 ? (hist[lastUserIdx].content || '') : '';
+
+    let firstToken = false, engine, conv;
+    try {
       emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… the first run downloads the model (cached after) — this can take a while.' });
-    };
-
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
-      emit({ type: 'round_start' });
-
-      let result;
-      try {
-        result = await streamRound({
-          modelUrl: provider.endpoint,
-          messages: work,
-          tools: toolList,
-          signal,
-          nCtx,
-          onProgress: round === 0 ? onDownloadProgress : undefined,
-          onDelta: (delta) => {
-            if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
-            emit({ type: 'delta', delta });
-          },
-        });
-      } catch (e) {
-        if (e && e.name === 'AbortError') throw e;
-        emit({ type: 'info', message: null });
-        emit({ type: 'error', message: 'litertlm: ' + ((e && e.message) || e) });
-        emit({ type: 'agent_done' });
-        return;
-      }
-
+      engine = await ensureEngine(provider.endpoint, nCtx);
+      conv = await engine.createConversation(preface.length ? { preface: { messages: preface } } : undefined);
+    } catch (e) {
       emit({ type: 'info', message: null });
-      emit({ type: 'round_end', content: result.content });
+      if (e && e.name === 'AbortError') throw e;
+      emit({ type: 'error', message: 'litertlm: ' + ((e && e.message) || e) });
+      emit({ type: 'agent_done' });
+      return;
+    }
 
-      const asst = { role: 'assistant', content: result.content };
-      if (result.tool_calls && result.tool_calls.length) asst.tool_calls = result.tool_calls;
-      work.push(asst);
-      emit({ type: 'message_added', message: asst });
-
-      if (!result.tool_calls || !result.tool_calls.length) break;
-
-      for (const tc of result.tool_calls) {
+    try {
+      for (let round = 0; round < MAX_ROUNDS; round++) {
         if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
-        emit({ type: 'tool_started', tc });
+        emit({ type: 'round_start' });
 
-        let args = {};
-        try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
-        let out;
-        try {
-          const res = await fetch('./sandpie-tool', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: tc.function && tc.function.name, args, conversation_file_name: convId }),
-            signal,
-          });
-          out = res.ok ? await res.json() : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready.' };
-        } catch (e) {
-          if (e && e.name === 'AbortError') throw e;
-          out = { result: 'Error: ' + ((e && e.message) || e) };
+        const full = await streamInto(conv, input, signal, (t) => {
+          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+          emit({ type: 'delta', delta: { content: t } });
+        });
+        emit({ type: 'info', message: null });
+        dbg('raw model output:', full);
+
+        const { content, tool_calls } = splitToolCalls(full);
+        emit({ type: 'round_end', content });
+        const asst = { role: 'assistant', content };
+        if (tool_calls.length) asst.tool_calls = tool_calls;
+        emit({ type: 'message_added', message: asst });
+        if (!tool_calls.length) break;
+
+        let feedback = '';
+        for (const tc of tool_calls) {
+          if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+          emit({ type: 'tool_started', tc });
+          let args = {};
+          try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+          let out;
+          try {
+            const res = await fetch('./sandpie-tool', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: tc.function && tc.function.name, args, conversation_file_name: convId }),
+              signal,
+            });
+            out = res.ok ? await res.json() : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready.' };
+          } catch (e) {
+            if (e && e.name === 'AbortError') throw e;
+            out = { result: 'Error: ' + ((e && e.message) || e) };
+          }
+          const toolResult = (out && out.result != null) ? out.result : '';
+          emit({ type: 'tool_result', id: tc.id, result: toolResult, artifacts: out && out.artifacts });
+          emit({ type: 'message_added', message: { role: 'tool', tool_call_id: tc.id, content: toolResult } });
+          feedback += (tc.function && tc.function.name ? tc.function.name : 'tool') + ' result: ' + toolResult + '\n';
         }
-        const toolResult = (out && out.result != null) ? out.result : '';
-        emit({ type: 'tool_result', id: tc.id, result: toolResult, artifacts: out && out.artifacts });
-        const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolResult };
-        work.push(toolMsg);
-        emit({ type: 'message_added', message: toolMsg });
+        input = feedback;   // continue the SAME conversation with the tool output
       }
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;   // finally cleans up; conversations.js handles abort
+      emit({ type: 'info', message: null });
+      emit({ type: 'error', message: 'litertlm: ' + ((e && e.message) || e) });
+    } finally {
+      try { if (conv && conv.delete) await conv.delete(); } catch (_) {}
     }
     emit({ type: 'agent_done' });
   }
