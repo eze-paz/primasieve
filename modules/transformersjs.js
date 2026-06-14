@@ -40,6 +40,15 @@ const SandpieTransformersJS = (function () {
       label: 'Qwen 2.5 1.5B Instruct (~1.2 GB on WebGPU, tools)',
       modelId: 'onnx-community/Qwen2.5-1.5B-Instruct',
     },
+    {
+      // 1-bit (ternary) model — needs dtype 'q1', which is WebGPU-only (there's no
+      // CPU/WASM q1 kernel), so it won't run on the WASM fallback. It's a base
+      // model, so it completes text rather than chatting/tool-calling cleanly.
+      id: 'bonsai-1.7b',
+      label: 'Bonsai 1.7B — 1-bit (WebGPU only, experimental, base model)',
+      modelId: 'onnx-community/Bonsai-1.7B-ONNX',
+      dtype: 'q1',
+    },
   ];
 
   // ============================================================
@@ -59,7 +68,7 @@ const SandpieTransformersJS = (function () {
   // ============================================================
   // Bump ?v when editing the worker file so the browser refetches it (it isn't a
   // <script> in the HTML, so the page cache-buster doesn't cover it).
-  const WORKER_URL = 'modules/transformersjs-worker.js?v=2';
+  const WORKER_URL = 'modules/transformersjs-worker.js?v=3';
   let _worker = null;
   let _reqSeq = 0;
   function getWorker() {
@@ -195,8 +204,9 @@ const SandpieTransformersJS = (function () {
 
       dbg('→ generate round', id, 'model', modelUrl, 'msgs', (messages || []).length, 'tools', (tools || []).length);
       try {
+        const _dtype = (DEFAULT_MODELS.find(m => m.modelId === modelUrl) || {}).dtype;
         worker.postMessage({
-          type: 'generate', id, modelId: modelUrl,
+          type: 'generate', id, modelId: modelUrl, dtype: _dtype,
           messages: messages, tools: (tools || []),
           params: { maxTokens, temperature, topP, topK, frequencyPenalty, seed },
         });

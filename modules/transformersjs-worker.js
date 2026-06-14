@@ -42,7 +42,7 @@ function postProgress(d) {
 // Load (and cache) the tokenizer + model. WebGPU first (model → VRAM, fits the
 // bigger models, fast); fall back to CPU/WASM for devices without a usable
 // WebGPU adapter. Switching models tears down the previous to free memory.
-async function ensureModel(modelId) {
+async function ensureModel(modelId, dtype) {
   if (_currentModelId === modelId && _model && _tokenizer) return;
   if (_model) { try { await _model.dispose?.(); } catch (_) {} _model = null; _tokenizer = null; _currentModelId = null; }
 
@@ -53,7 +53,8 @@ async function ensureModel(modelId) {
 
   let model;
   try {
-    model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: 'q4f16', device: 'webgpu', progress_callback });
+    // dtype is per-model (e.g. Bonsai needs 'q1'); default to q4f16 on WebGPU.
+    model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: dtype || 'q4f16', device: 'webgpu', progress_callback });
   } catch (gpuErr) {
     // No usable WebGPU adapter — fall back to CPU/WASM (q4). Note the WASM heap
     // caps ~2 GB, so big models can still std::bad_alloc here; that's a device
@@ -175,7 +176,7 @@ self.addEventListener('message', async (e) => {
   if (msg.type !== 'generate') return;
   const { id, modelId } = msg;
   try {
-    await ensureModel(modelId);
+    await ensureModel(modelId, msg.dtype);
     const content = await generate(id, msg);
     self.postMessage({ type: 'complete', id, content });
   } catch (err) {
