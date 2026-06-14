@@ -207,6 +207,9 @@ const SandpieLiteRTLM = (function () {
 
   function cleanContent(text) {
     return (text || '')
+      .replace(/<\|channel>thought[\s\S]*?<channel\|>/gi, '')  // Gemma 4 reasoning ("thought") channel
+      .replace(/<\|channel>[a-z]*\r?\n?/gi, '')                // stray channel headers (e.g. final)
+      .replace(/<channel\|>/g, '')                             // stray channel close
       .replace(/<\|tool_call>[\s\S]*?<tool_call\|>/g, '')   // Gemma 4 fenced tool call
       .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
       .replace(/```json\s*[\s\S]*?```/g, '')
@@ -222,6 +225,96 @@ const SandpieLiteRTLM = (function () {
   function mapContent(m) {
     if (m.role === 'tool') return 'Tool result' + (m.tool_call_id ? ' (' + m.tool_call_id + ')' : '') + ': ' + (m.content || '');
     return m.content || '';
+  }
+
+  // ============================================================
+  // Sampling + conversation config. The LiteRT-LM Web SDK takes sampling on the
+  // SessionConfig (samplerParams: {temperature, k, p, seed}) and the per-response cap
+  // as sessionConfig.maxOutputTokens — NOT on sendMessage. We read the same provider
+  // fields the other local backends use (providers.js "Local sampling & reasoning").
+  // ============================================================
+  function buildSamplerParams(provider) {
+    const p = provider || {};
+    const sp = {};
+    if (p.temperature != null && p.temperature >= 0) sp.temperature = p.temperature;
+    if (p.topK != null) sp.k = p.topK | 0;
+    if (p.topP != null) sp.p = p.topP;
+    if (p.seed != null) sp.seed = p.seed | 0;
+    return Object.keys(sp).length ? sp : null;
+  }
+
+  function buildConvConfig(provider, prefaceMsgs, wantThink) {
+    const cfg = {};
+    if (prefaceMsgs && prefaceMsgs.length) cfg.preface = { messages: prefaceMsgs };
+    const sampler = buildSamplerParams(provider);
+    const maxOut = ((provider && provider.maxTokens) | 0) || 0;
+    const sess = {};
+    if (sampler) sess.samplerParams = sampler;
+    if (maxOut > 0) sess.maxOutputTokens = maxOut;
+    if (Object.keys(sess).length) cfg.sessionConfig = sess;
+    // Gemma 4 multi-turn rule: prior turns' thoughts must NOT precede the next user
+    // turn. filterChannelContentFromKvCache drops the thought channel from the KV
+    // cache between sends, so reasoning never leaks into later rounds.
+    if (wantThink) cfg.filterChannelContentFromKvCache = true;
+    return Object.keys(cfg).length ? cfg : undefined;
+  }
+
+  // ============================================================
+  // Gemma 4 streams its reasoning in a "thought" channel:
+  //   <|channel>thought\n  …reasoning…  <channel|>  …final answer…
+  // (Thinking is enabled by a <|think|> token at the start of the system prompt; when
+  // off the thought channel is empty.) The Web SDK relays these channel tokens as
+  // plain text, so we split the stream live: thought-channel text → onReasoning (the
+  // live "Thinking…" box), everything else → onContent (the answer). Markers can
+  // straddle streamed chunks, so we hold back a short tail until a marker is
+  // unambiguous. If no markers ever appear, everything is content — i.e. it degrades
+  // safely to the old raw passthrough.
+  // ============================================================
+  function makeThoughtSplitter(onReasoning, onContent) {
+    const OPEN = '<|channel>thought', CLOSE = '<channel|>', HOLD = OPEN.length - 1;
+    const stripStray = (s) => s.replace(/<\|channel>[a-z]*\r?\n?/gi, '').replace(/<channel\|>/g, '');
+    let buf = '', mode = 'pre';
+    const self = { answer: '', reasoning: '' };
+    function out(text, reasoning) {
+      const t = stripStray(text);
+      if (!t) return;
+      if (reasoning) { self.reasoning += t; try { onReasoning && onReasoning(t); } catch (_) {} }
+      else { self.answer += t; try { onContent && onContent(t); } catch (_) {} }
+    }
+    function run(final) {
+      for (;;) {
+        if (mode === 'pre') {
+          const i = buf.indexOf(OPEN);
+          if (i === -1) {
+            const safe = final ? buf.length : Math.max(0, buf.length - HOLD);
+            if (safe > 0) { out(buf.slice(0, safe), false); buf = buf.slice(safe); }
+            return;
+          }
+          if (i > 0) out(buf.slice(0, i), false);
+          buf = buf.slice(i + OPEN.length).replace(/^\r?\n/, '');
+          mode = 'thought';
+          continue;
+        }
+        if (mode === 'thought') {
+          const i = buf.indexOf(CLOSE);
+          if (i === -1) {
+            const safe = final ? buf.length : Math.max(0, buf.length - HOLD);
+            if (safe > 0) { out(buf.slice(0, safe), true); buf = buf.slice(safe); }
+            return;
+          }
+          if (i > 0) out(buf.slice(0, i), true);
+          buf = buf.slice(i + CLOSE.length);
+          mode = 'answer';
+          continue;
+        }
+        const safe = final ? buf.length : Math.max(0, buf.length - HOLD);
+        if (safe > 0) { out(buf.slice(0, safe), false); buf = buf.slice(safe); }
+        return;
+      }
+    }
+    self.push = (t) => { if (t) { buf += t; run(false); } };
+    self.flush = () => run(true);
+    return self;
   }
 
   // ============================================================
@@ -295,6 +388,13 @@ const SandpieLiteRTLM = (function () {
     const preamble = buildToolPreamble(toolList);
     if (preamble) sysText = sysText ? (sysText + '\n\n' + preamble) : preamble;
 
+    // Gemma 4 reasoning: a <|think|> token at the START of the system prompt turns on
+    // step-by-step thinking (the model then emits a <|channel>thought…<channel|> trace
+    // we surface in the live "Thinking…" box). On by default for these reasoning
+    // models; the provider's Thinking dropdown set to "off" opts out.
+    const wantThink = (provider.reasoning !== 'no_think');
+    if (wantThink) sysText = '<|think|>' + (sysText ? '\n' + sysText : '');
+
     // Seed the conversation with system + all prior turns; the latest user turn is the
     // first thing we actually send. Later rounds send ONLY the new content (tool
     // results) — the conversation's own history/KV cache carries the rest.
@@ -310,7 +410,7 @@ const SandpieLiteRTLM = (function () {
     try {
       emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… the first run downloads the model (cached after) — this can take a while.' });
       engine = await ensureEngine(provider.endpoint, nCtx);
-      conv = await engine.createConversation(preface.length ? { preface: { messages: preface } } : undefined);
+      conv = await engine.createConversation(buildConvConfig(provider, preface, wantThink));
     } catch (e) {
       emit({ type: 'info', message: null });
       if (e && e.name === 'AbortError') throw e;
@@ -324,14 +424,21 @@ const SandpieLiteRTLM = (function () {
         if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
         emit({ type: 'round_start' });
 
+        // Split the stream: thought-channel text → live "Thinking…" box (delta.reasoning,
+        // which the renderer shows but never replays to the model), the rest → the answer.
+        const splitter = makeThoughtSplitter(
+          (rz) => emit({ type: 'delta', delta: { reasoning: rz } }),
+          (ct) => emit({ type: 'delta', delta: { content: ct } })
+        );
         const full = await streamInto(conv, input, signal, (t) => {
           if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
-          emit({ type: 'delta', delta: { content: t } });
+          splitter.push(t);
         });
+        splitter.flush();
         emit({ type: 'info', message: null });
         dbg('raw model output:', full);
 
-        const { content, tool_calls } = splitToolCalls(full);
+        const { content, tool_calls } = splitToolCalls(splitter.answer);
         // Gemma emits tool calls as TEXT we parse post-hoc, so — unlike wllama's native
         // streaming — the renderer never saw a tool_calls delta and never built the
         // tool-call bubbles, leaving tool_started/tool_result with nothing to update
