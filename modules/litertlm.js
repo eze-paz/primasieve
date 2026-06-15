@@ -437,6 +437,57 @@ const SandpieLiteRTLM = (function () {
   }
 
   // ============================================================
+  // Pyodide in a dedicated PAGE-OWNED worker (EXPERIMENTAL, LiteRT-only).
+  // ============================================================
+  // run_python is routed here instead of the service worker. The SW hard-aborts on
+  // Pyodide — a WASM abort terminates the SW thread (uncatchable; sandpie.js:37) and
+  // OPFS sync access handles are fragile there — so the page's awaited tool fetch
+  // never resolves and the UI freezes. A dedicated worker is isolated, has reliable
+  // sync access handles, and the timeout below turns a hung/crashed worker into a
+  // recoverable error instead of a freeze. See modules/pyodide-worker.js.
+  const PY_WORKER_URL = 'modules/pyodide-worker.js?v=1';
+  const PY_TIMEOUT_MS = 5 * 60 * 1000;
+  let _pyWorker = null, _pyReqSeq = 0;
+  function _getPyWorker() { if (!_pyWorker) _pyWorker = new Worker(PY_WORKER_URL); return _pyWorker; }
+  function _killPyWorker() { try { _pyWorker && _pyWorker.terminate(); } catch (_) {} _pyWorker = null; }
+
+  // args = the parsed run_python arguments ({ path, args }). Resolves the tool-result
+  // shape ({ result }); rejects AbortError on user stop. Never hangs — a dead or stuck
+  // worker resolves to an error result (and is terminated so the next call respawns).
+  function runPythonViaWorker(args, signal) {
+    const worker = _getPyWorker();
+    const id = ++_pyReqSeq;
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (fn, v) => { if (settled) return; settled = true; cleanup(); fn(v); };
+      const onMsg = (e) => {
+        const m = e.data || {};
+        if (m.id !== id) return;
+        if (m.type === 'result') {
+          // Best-effort: nudge cloud-sync about files the script wrote (the worker
+          // already persisted them to OPFS; this just triggers the fast-path push).
+          try { (m.written || []).forEach(p => { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', p); }); } catch (_) {}
+          finish(resolve, { result: m.result });
+        } else if (m.type === 'error') {
+          finish(resolve, { result: 'Error: python worker — ' + (m.message || 'unknown') });
+        }
+      };
+      const onErr = () => { _killPyWorker(); finish(resolve, { result: 'Error: the Python worker crashed and was reset — retry (it starts a clean interpreter).' }); };
+      const onAbort = () => finish(reject, new DOMException('aborted', 'AbortError'));
+      const timer = setTimeout(() => {
+        _killPyWorker();  // hung run / dead runtime — kill so the next call respawns
+        finish(resolve, { result: 'Error: run_python timed out after ' + (PY_TIMEOUT_MS / 1000) + 's and the worker was reset. The script may be stuck (infinite loop / blocking call) or the runtime crashed.' });
+      }, PY_TIMEOUT_MS);
+      function cleanup() { clearTimeout(timer); worker.removeEventListener('message', onMsg); worker.removeEventListener('error', onErr); if (signal) signal.removeEventListener('abort', onAbort); }
+      worker.addEventListener('message', onMsg);
+      worker.addEventListener('error', onErr);
+      if (signal) { if (signal.aborted) { onAbort(); return; } signal.addEventListener('abort', onAbort, { once: true }); }
+      try { worker.postMessage({ type: 'run', id, path: args && args.path, args: args && args.args }); }
+      catch (e) { finish(resolve, { result: 'Error: could not start Python worker — ' + ((e && e.message) || e) }); }
+    });
+  }
+
+  // ============================================================
   // Agentic conversation loop — emits the SAME event protocol conversations.js
   // expects (identical to wllama / transformersjs); tool calls run via /sandpie-tool.
   //
@@ -550,13 +601,20 @@ const SandpieLiteRTLM = (function () {
           try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
           let out;
           try {
-            const res = await fetch('./sandpie-tool', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: tc.function && tc.function.name, args, conversation_file_name: convId }),
-              signal,
-            });
-            out = res.ok ? await res.json() : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready.' };
+            if (tc.function && tc.function.name === 'run_python') {
+              // EXPERIMENTAL (LiteRT-only): run Python in the page-owned worker
+              // instead of the service worker, which hard-aborts on Pyodide and
+              // freezes the UI. Other tools still go through the SW.
+              out = await runPythonViaWorker(args, signal);
+            } else {
+              const res = await fetch('./sandpie-tool', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: tc.function && tc.function.name, args, conversation_file_name: convId }),
+                signal,
+              });
+              out = res.ok ? await res.json() : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready.' };
+            }
           } catch (e) {
             if (e && e.name === 'AbortError') throw e;
             out = { result: 'Error: ' + ((e && e.message) || e) };
