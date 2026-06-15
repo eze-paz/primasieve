@@ -257,6 +257,20 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
     });
     return (r && r.content) || '';
   }
+  if (active && active.type === 'webllm') {
+    if (typeof SandpieWebLLM === 'undefined' || !SandpieWebLLM.streamRound) throw new Error('WebLLM not loaded');
+    const r = await SandpieWebLLM.streamRound({
+      modelUrl: active.endpoint,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      tools: [], signal, maxTokens,
+      nCtx: (active.contextWindow | 0) || undefined,
+      temperature: active.temperature != null ? active.temperature : undefined,
+      topP: active.topP != null ? active.topP : undefined,
+      // Utility prompts want a fast, non-thinking answer.
+      reasoning: 'no_think',
+    });
+    return (r && r.content) || '';
+  }
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';
   const mdl = model || document.getElementById('model')?.value || '';
