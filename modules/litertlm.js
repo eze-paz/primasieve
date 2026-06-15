@@ -239,6 +239,20 @@ const SandpieLiteRTLM = (function () {
   }
 
   function parseGemmaArgs(body) {
+    // FIRST: treat the body as a JS-object body and JSON-parse it. This is the ONLY path
+    // that handles array/object values — e.g. run_python's args: ["query","10"]. The
+    // regex tiers below only do flat string/scalar values and silently DROP an array arg
+    // (the model emits the call correctly, but the parsed arguments lose `args`, so
+    // run_python runs with no query). Quote bare keys + convert Gemma's <|"|>…<|"|> string
+    // token to a JSON string, then JSON.parse({…}). Falls back to the tiers on any failure.
+    try {
+      const j = body
+        .replace(/<\|"\|>([\s\S]*?)<\|"\|>/g, (_, s) => JSON.stringify(s))
+        .replace(/(^|[,{]\s*)([A-Za-z_][\w.]*)\s*:/g, '$1"$2":');
+      const obj = JSON.parse('{' + j + '}');
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+    } catch (_) { /* not clean JSON — fall back to the tolerant regex tiers below */ }
+
     const args = {};
     let m, any = false;
     // Preferred: Gemma's <|"|> string delimiter — robust to embedded quotes/commas.
@@ -292,8 +306,11 @@ const SandpieLiteRTLM = (function () {
     try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
     const body = Object.keys(args || {}).map(k => {
       const v = args[k];
-      if (typeof v === 'number' || typeof v === 'boolean') return `${k}: ${v}`;
-      return `${k}: <|"|>${typeof v === 'string' ? v : JSON.stringify(v)}<|"|>`;
+      // Strings → Gemma's <|"|> delimiter (robust to embedded quotes/commas). Everything
+      // else (number, boolean, array, object) → bare JSON, matching the shape the model
+      // itself emits for arrays (e.g. args: ["q","10"]) so the reconstruction round-trips.
+      if (typeof v === 'string') return `${k}: <|"|>${v}<|"|>`;
+      return `${k}: ${JSON.stringify(v)}`;
     }).join(', ');
     return `<|tool_call>call:${name}{${body}}<tool_call|>`;
   }
