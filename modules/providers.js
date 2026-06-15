@@ -67,6 +67,8 @@ const AI_HTML = `
             <option value="true">Flash attention: on (faster, may crash)</option>
           </select>
           <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU, 999 = all, may crash)">
+          <input id="spThreads" type="number" min="1" step="1" autocomplete="off" placeholder="CPU threads (wllama; blank = all cores; needs COOP/COEP to multi-thread)">
+          <input id="spBatch" type="number" min="1" step="1" autocomplete="off" placeholder="n_batch (wllama; blank = default; bigger = faster prefill, more RAM)">
         </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
@@ -95,7 +97,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn','spGpuLayers']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spMinP','spFreqPenalty','spPresencePenalty','spSeed','spReasoning','spFlashAttn','spGpuLayers','spThreads','spBatch']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -417,6 +419,7 @@ function loadFormFor(id) {
   const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
   set('spGpuLayers', p.nGpuLayers);
+  set('spThreads', p.nThreads); set('spBatch', p.nBatch);
   const wm = document.getElementById('spWllamaModel');
   if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
   const tj = document.getElementById('spTransformersJSModel');
@@ -478,6 +481,8 @@ function commitForm() {
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   const fa = (document.getElementById('spFlashAttn')?.value) || 'false'; p.flashAttn = fa === 'true';
   const gl = num('spGpuLayers');          if (gl != null && gl >= 0) p.nGpuLayers = Math.round(gl); else delete p.nGpuLayers;
+  const th = num('spThreads');            if (th != null && th >= 1) p.nThreads = Math.round(th); else delete p.nThreads;
+  const nb = num('spBatch');              if (nb != null && nb >= 1) p.nBatch = Math.round(nb); else delete p.nBatch;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight

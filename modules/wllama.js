@@ -203,6 +203,8 @@ const SandpieWllama = (function() {
   let _instanceCtx = 0;
   let _instanceFlashAttn = false;
   let _instanceGpuLayers = 0;
+  let _instanceThreads = 0;
+  let _instanceBatch = 0;
   let _loadingKey = null;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
@@ -211,6 +213,16 @@ const SandpieWllama = (function() {
   // sits on an eternal spinner.  10 min is generous even for a slow
   // CPU-only run.
   const STREAM_TIMEOUT_MS = 10 * 60 * 1000;
+
+  // Default CPU thread count when the provider doesn't set one: ALL logical cores.
+  // This only has an effect where the page is cross-origin isolated (COOP/COEP →
+  // SharedArrayBuffer); otherwise wllama runs single-threaded regardless and the
+  // value is ignored. wllama's own default is ~half the cores, so passing the full
+  // count is the "use everything" choice — lower it per provider if it regresses
+  // (on hybrid P/E-core CPUs the physical-core count can beat all logical threads).
+  function defaultThreads() {
+    return (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? (navigator.hardwareConcurrency | 0) : 4;
+  }
 
   async function getInstance(modelUrl, onProgress, opts) {
     if (!modelUrl) throw new Error('wllama: modelUrl is required');
@@ -222,11 +234,17 @@ const SandpieWllama = (function() {
     // every layer to WebGPU), which crashes the worker. Opt in per provider
     // via the "GPU layers" field. Load-time param ⇒ part of the instance key.
     const nGpuLayers = (opts && opts.nGpuLayers != null) ? (opts.nGpuLayers | 0) : 0;
-    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers;
-    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
+    // CPU threads (load-time). Default = all logical cores; effective only when
+    // cross-origin isolated (else wllama is single-threaded and ignores it).
+    const nThreads = (opts && opts.nThreads != null) ? (opts.nThreads | 0) : defaultThreads();
+    // Prefill batch size (load-time). 0 = leave wllama's default; a bigger value
+    // speeds prompt processing at some memory cost. Opt-in per provider.
+    const nBatch = (opts && opts.nBatch != null) ? (opts.nBatch | 0) : 0;
+    const key = modelUrl + '|' + nCtx + '|fa:' + flashAttn + '|gpu:' + nGpuLayers + '|th:' + nThreads + '|nb:' + nBatch;
+    if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers && _instanceThreads === nThreads && _instanceBatch === nBatch) return _instance;
     if (_loadingKey === key) {
       while (_loadingKey === key) await new Promise(r => setTimeout(r, 50));
-      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers) return _instance;
+      if (_instance && _instanceUrl === modelUrl && _instanceCtx === nCtx && _instanceFlashAttn === flashAttn && _instanceGpuLayers === nGpuLayers && _instanceThreads === nThreads && _instanceBatch === nBatch) return _instance;
     }
     _loadingKey = key;
     try {
@@ -237,6 +255,8 @@ const SandpieWllama = (function() {
         _instanceCtx = 0;
         _instanceFlashAttn = true;
         _instanceGpuLayers = 0;
+        _instanceThreads = 0;
+        _instanceBatch = 0;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -258,12 +278,19 @@ const SandpieWllama = (function() {
       // needed. We pass n_gpu_layers explicitly (default 0 = CPU) to override
       // wllama 3.4.x's offload-everything default — see the WLLAMA_VERSION note.
       const inst = new Wllama({ default: WASM_URL });
-      await inst.loadModel([ggufBlob], { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: nGpuLayers });
+      // n_threads is effective only when cross-origin isolated (COOP/COEP); it's
+      // harmless otherwise (wllama stays single-threaded). n_batch only sent when
+      // overridden (>0), else wllama keeps its own default.
+      const loadOpts = { n_ctx: nCtx, flash_attn: flashAttn, n_gpu_layers: nGpuLayers, n_threads: nThreads };
+      if (nBatch > 0) loadOpts.n_batch = nBatch;
+      await inst.loadModel([ggufBlob], loadOpts);
       _instance = inst;
       _instanceUrl = modelUrl;
       _instanceCtx = nCtx;
       _instanceFlashAttn = flashAttn;
       _instanceGpuLayers = nGpuLayers;
+      _instanceThreads = nThreads;
+      _instanceBatch = nBatch;
       return inst;
     } finally {
       if (_loadingKey === key) _loadingKey = null;
@@ -322,8 +349,8 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed, reasoning }) {
-    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers });
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, nThreads, nBatch, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed, reasoning }) {
+    const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers, nThreads, nBatch });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     // RWKV is a recurrent reasoning model, not a transformer chat model. Route it
@@ -718,7 +745,9 @@ const SandpieWllama = (function() {
     const _nCtxWant = (provider.contextWindow | 0) || DEFAULT_N_CTX;
     const _faWant = provider.flashAttn === true;
     const _glWant = provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : 0;
-    const _alreadyLoaded = _instance && _instanceUrl === modelUrl && _instanceCtx === _nCtxWant && _instanceFlashAttn === _faWant && _instanceGpuLayers === _glWant;
+    const _thrWant = provider.nThreads != null ? (provider.nThreads | 0) : defaultThreads();
+    const _nbWant = provider.nBatch != null ? (provider.nBatch | 0) : 0;
+    const _alreadyLoaded = _instance && _instanceUrl === modelUrl && _instanceCtx === _nCtxWant && _instanceFlashAttn === _faWant && _instanceGpuLayers === _glWant && _instanceThreads === _thrWant && _instanceBatch === _nbWant;
     if (!_alreadyLoaded) status('Loading local model… first run downloads it (cached after) — this can take a while.');
     const onProgress = (p) => {
       if (!p || firstToken) return;
@@ -739,6 +768,8 @@ const SandpieWllama = (function() {
       nCtx: (provider.contextWindow | 0) || DEFAULT_N_CTX,
       flashAttn: provider.flashAttn === true,
       nGpuLayers: provider.nGpuLayers != null ? (provider.nGpuLayers | 0) : undefined,
+      nThreads: provider.nThreads != null ? (provider.nThreads | 0) : undefined,
+      nBatch: provider.nBatch != null ? (provider.nBatch | 0) : undefined,
       maxTokens: provider.maxTokens || undefined,
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
