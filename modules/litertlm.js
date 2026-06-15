@@ -297,7 +297,7 @@ const SandpieLiteRTLM = (function () {
     return Object.keys(sp).length ? sp : null;
   }
 
-  function buildConvConfig(provider, prefaceMsgs, wantThink) {
+  function buildConvConfig(provider, prefaceMsgs) {
     const cfg = {};
     if (prefaceMsgs && prefaceMsgs.length) cfg.preface = { messages: prefaceMsgs };
     const sampler = buildSamplerParams(provider);
@@ -306,10 +306,12 @@ const SandpieLiteRTLM = (function () {
     if (sampler) sess.samplerParams = sampler;
     if (maxOut > 0) sess.maxOutputTokens = maxOut;
     if (Object.keys(sess).length) cfg.sessionConfig = sess;
-    // Gemma 4 multi-turn rule: prior turns' thoughts must NOT precede the next user
-    // turn. filterChannelContentFromKvCache drops the thought channel from the KV
-    // cache between sends, so reasoning never leaks into later rounds.
-    if (wantThink) cfg.filterChannelContentFromKvCache = true;
+    // NOTE: filterChannelContentFromKvCache is intentionally NOT set. It asks the SDK to
+    // excise the thought-channel span from the LIVE KV cache between sends — an in-place
+    // GPU-cache mutation that hard-crashes the tab in the v0.12 web-preview SDK. We don't
+    // need it: runConversation rebuilds a fresh conversation from thought-free history
+    // each round (cleanContent already strips thoughts), so Gemma 4's "thoughts must not
+    // precede the next turn" rule holds without ever editing a live cache.
     return Object.keys(cfg).length ? cfg : undefined;
   }
 
@@ -494,10 +496,16 @@ const SandpieLiteRTLM = (function () {
   // Agentic conversation loop — emits the SAME event protocol conversations.js
   // expects (identical to wllama / transformersjs); tool calls run via /sandpie-tool.
   //
-  // Reuses ONE Conversation across all rounds (the LiteRT-LM-recommended pattern): the
-  // engine keeps its environment + accelerators + KV cache, so each round only prefills
-  // the NEW turn (the tool results) instead of re-creating the conversation and
-  // re-prefilling the whole history every round.
+  // Creates a FRESH Conversation every round, re-prefilling the full history each time —
+  // we deliberately do NOT reuse one Conversation across rounds. The old reuse approach
+  // sent a SECOND time into a live KV cache after the first tool call; that path is
+  // fragile in the v0.12 web-preview SDK (and with thinking it forces an in-place
+  // filterChannelContentFromKvCache excision of the thought span — an uncatchable
+  // WASM/WebGPU abort that takes the tab down). Re-prefilling clean history each round
+  // (wllama/transformersjs and the MediaPipe LlmInference chat samples do the same) never
+  // edits a live cache. cleanContent already strips prior thoughts from stored content,
+  // so Gemma 4's "thoughts must not precede the next turn" rule holds with no KV surgery
+  // and no need for filterChannelContentFromKvCache.
   // ============================================================
   async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, emit) {
     const MAX_ROUNDS = 8;
@@ -521,18 +529,14 @@ const SandpieLiteRTLM = (function () {
     const wantThink = (provider.reasoning === 'think');
     if (wantThink) sysText = '<|think|>' + (sysText ? '\n' + sysText : '');
 
-    // Seed the conversation with system + all prior turns; the latest user turn is the
-    // first thing we actually send. Later rounds send ONLY the new content (tool
-    // results) — the conversation's own history/KV cache carries the rest.
-    const hist = (messages || []).slice();
-    let lastUserIdx = -1;
-    for (let i = hist.length - 1; i >= 0; i--) { if (hist[i].role === 'user') { lastUserIdx = i; break; } }
-    const preface = [];
-    if (sysText) preface.push({ role: 'system', content: sysText });
-    hist.forEach((m, i) => { if (i !== lastUserIdx) preface.push({ role: mapRole(m.role), content: mapContent(m) }); });
-    let input = lastUserIdx >= 0 ? (hist[lastUserIdx].content || '') : '';
+    // Working history, re-mapped into a FRESH conversation each round (see header). Grows
+    // by the assistant turn + each tool result; the last mapped turn is the one we send,
+    // everything before it is the preface.
+    const work = [];
+    if (sysText) work.push({ role: 'system', content: sysText });
+    for (const m of (messages || [])) { if (m && m.role) work.push(m); }
 
-    let firstToken = false, engine, conv;
+    let firstToken = false, engine;
     try {
       emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… first run downloads the model (cached after).' });
       let _lastPct = -1, _lastLoaded = 0;
@@ -547,7 +551,6 @@ const SandpieLiteRTLM = (function () {
           emit({ type: 'info', message: `${p.fromCache ? 'Loading cached' : 'Downloading'} Gemma… ${fmtMB(p.loaded)}` });
         }
       });
-      conv = await engine.createConversation(buildConvConfig(provider, preface, wantThink));
     } catch (e) {
       emit({ type: 'info', message: null });
       if (e && e.name === 'AbortError') throw e;
@@ -561,21 +564,33 @@ const SandpieLiteRTLM = (function () {
         if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
         emit({ type: 'round_start' });
 
+        // Fresh conversation seeded with the full history; the last turn is the send,
+        // everything before it is the (thought-free) preface. Deleted right after the
+        // stream so no live KV cache is ever carried into the next round.
+        const mapped = work.map(m => ({ role: mapRole(m.role), content: mapContent(m) }));
+        const last = mapped.length ? mapped[mapped.length - 1] : { content: '' };
+        const conv = await engine.createConversation(buildConvConfig(provider, mapped.slice(0, -1)));
+
         // Split the stream: thought-channel text → live "Thinking…" box (delta.reasoning,
         // which the renderer shows but never replays to the model), the rest → the answer.
         const splitter = makeThoughtSplitter(
           (rz) => emit({ type: 'delta', delta: { reasoning: rz } }),
           (ct) => emit({ type: 'delta', delta: { content: ct } })
         );
-        const full = await streamInto(conv, input, signal, (t) => {
-          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
-          splitter.push(t);
-        }, (rz) => {
-          // Structured thought channel → live "Thinking…" box (delta.reasoning, which
-          // conversations.js renders but never replays to the model).
-          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
-          emit({ type: 'delta', delta: { reasoning: rz } });
-        });
+        let full = '';
+        try {
+          full = await streamInto(conv, last.content, signal, (t) => {
+            if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+            splitter.push(t);
+          }, (rz) => {
+            // Structured thought channel → live "Thinking…" box (delta.reasoning, which
+            // conversations.js renders but never replays to the model).
+            if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+            emit({ type: 'delta', delta: { reasoning: rz } });
+          });
+        } finally {
+          try { if (conv && conv.delete) await conv.delete(); } catch (_) {}
+        }
         splitter.flush();
         emit({ type: 'info', message: null });
         dbg('raw model output:', full);
@@ -598,10 +613,10 @@ const SandpieLiteRTLM = (function () {
         emit({ type: 'round_end', content });
         const asst = { role: 'assistant', content };
         if (tool_calls.length) asst.tool_calls = tool_calls;
+        work.push(asst);
         emit({ type: 'message_added', message: asst });
         if (!tool_calls.length) break;
 
-        let feedback = '';
         for (const tc of tool_calls) {
           if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
           emit({ type: 'tool_started', tc });
@@ -629,17 +644,15 @@ const SandpieLiteRTLM = (function () {
           }
           const toolResult = (out && out.result != null) ? out.result : '';
           emit({ type: 'tool_result', id: tc.id, result: toolResult, artifacts: out && out.artifacts });
-          emit({ type: 'message_added', message: { role: 'tool', tool_call_id: tc.id, content: toolResult } });
-          feedback += (tc.function && tc.function.name ? tc.function.name : 'tool') + ' result: ' + toolResult + '\n';
+          const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolResult };
+          work.push(toolMsg);
+          emit({ type: 'message_added', message: toolMsg });
         }
-        input = feedback;   // continue the SAME conversation with the tool output
       }
     } catch (e) {
-      if (e && e.name === 'AbortError') throw e;   // finally cleans up; conversations.js handles abort
+      if (e && e.name === 'AbortError') throw e;   // each round deletes its own conv; conversations.js handles abort
       emit({ type: 'info', message: null });
       emit({ type: 'error', message: 'litertlm: ' + ((e && e.message) || e) });
-    } finally {
-      try { if (conv && conv.delete) await conv.delete(); } catch (_) {}
     }
     emit({ type: 'agent_done' });
   }
