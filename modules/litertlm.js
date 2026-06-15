@@ -507,10 +507,15 @@ const SandpieLiteRTLM = (function () {
     if (preamble) sysText = sysText ? (sysText + '\n\n' + preamble) : preamble;
 
     // Gemma 4 reasoning: a <|think|> token at the START of the system prompt turns on
-    // step-by-step thinking (the model then emits a <|channel>thought…<channel|> trace
-    // we surface in the live "Thinking…" box). On by default for these reasoning
-    // models; the provider's Thinking dropdown set to "off" opts out.
-    const wantThink = (provider.reasoning !== 'no_think');
+    // step-by-step thinking. DISABLED BY DEFAULT: enabling it crashes LiteRT-LM's
+    // WebGPU/WASM runtime mid-generation — a known, still-OPEN upstream bug ("memory
+    // access out of bounds" / delegate buffer overflow: google-ai-edge/gallery#703,
+    // mediapipe#6270). The crash is an uncatchable WASM abort, so sendMessageStreaming
+    // never resolves → the agent loop hangs → UI freeze (and run_python never reaches
+    // its worker, since the crash is in round-0 generation, before the tool loop). So
+    // thinking is OPT-IN now: only the provider's Thinking dropdown set to "on (/think)"
+    // injects <|think|>. Re-enable by default once upstream ships a fix (try SDK 0.13.1+).
+    const wantThink = (provider.reasoning === 'think');
     if (wantThink) sysText = '<|think|>' + (sysText ? '\n' + sysText : '');
 
     // Seed the conversation with system + all prior turns; the latest user turn is the
