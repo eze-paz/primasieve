@@ -555,6 +555,14 @@ const SandpieLiteRTLM = (function () {
     if (sysText) work.push({ role: 'system', content: sysText });
     for (const m of (messages || [])) { if (m && m.role) work.push(m); }
 
+    // DEBUG: expose the EXACT prompt the model sees each round — `system` is the full
+    // system prompt WITH the tool descriptions (buildToolPreamble is folded into sysText
+    // above), plus the mapped `preface` history, the `sent` turn, and the raw output.
+    // Reset per send so it holds just this turn's rounds. Inspect from DevTools:
+    //   copy(window.__litertlmPrompts)   — every round of this turn
+    //   copy(window.__litertlmPrompt)    — the latest round only
+    try { self.__litertlmPrompts = []; } catch (_) {}
+
     let firstToken = false, engine;
     try {
       emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… first run downloads the model (cached after).' });
@@ -588,7 +596,11 @@ const SandpieLiteRTLM = (function () {
         // stream so no live KV cache is ever carried into the next round.
         const mapped = work.map(m => ({ role: mapRole(m.role), content: mapContent(m) }));
         const last = mapped.length ? mapped[mapped.length - 1] : { content: '' };
-        const conv = await engine.createConversation(buildConvConfig(provider, mapped.slice(0, -1)));
+        const preface = mapped.slice(0, -1);
+        // DEBUG capture (see the __litertlmPrompts note above): the full prompt for this round.
+        const _cap = { round, system: sysText, preface, sent: last.content, rawOutput: null, answer: null, tool_calls: null };
+        try { self.__litertlmPrompts.push(_cap); self.__litertlmPrompt = _cap; } catch (_) {}
+        const conv = await engine.createConversation(buildConvConfig(provider, preface));
 
         // Split the stream: thought-channel text → live "Thinking…" box (delta.reasoning,
         // which the renderer shows but never replays to the model), the rest → the answer.
@@ -615,6 +627,7 @@ const SandpieLiteRTLM = (function () {
         dbg('raw model output:', full);
 
         const { content, tool_calls } = splitToolCalls(splitter.answer);
+        try { _cap.rawOutput = full; _cap.answer = splitter.answer; _cap.tool_calls = tool_calls; } catch (_) {}
         // Gemma emits tool calls as TEXT we parse post-hoc, so — unlike wllama's native
         // streaming — the renderer never saw a tool_calls delta and never built the
         // tool-call bubbles, leaving tool_started/tool_result with nothing to update
