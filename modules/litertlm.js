@@ -65,6 +65,53 @@ const SandpieLiteRTLM = (function () {
     return _lib;
   }
 
+  // ============================================================
+  // Model cache (Cache Storage API — NOT OPFS, so Dropbox sync can't see it).
+  // The LiteRT-LM Web SDK fetches the .litertlm URL itself with no persistent
+  // cache, so a 2–3 GB model re-downloads on every load. We fetch it through the
+  // Cache Storage API (same approach as wllama) and hand Engine.create the cached
+  // byte stream — EngineSettings.model accepts a ReadableStream<Uint8Array>.
+  // ============================================================
+  const MODEL_CACHE_NAME = 'sandpie-litertlm-models';
+  const fmtMB = (b) => (b >= 10485760 ? (b / 1048576).toFixed(0) : (b / 1048576).toFixed(1)) + ' MB';
+
+  async function fetchModelStream(url, onProgress) {
+    let cache = null;
+    try { cache = await caches.open(MODEL_CACHE_NAME); }
+    catch (e) { dbg('Cache Storage unavailable, direct fetch:', e && e.message); }
+
+    let res = null, fromCache = false;
+    if (cache) {
+      const hit = await cache.match(url);
+      if (hit) { dbg('cache hit:', url); res = hit; fromCache = true; }
+    }
+    if (!res) {
+      dbg('cache miss → fetching:', url);
+      const net = await fetch(url);
+      if (!net.ok) throw new Error(`litertlm: model fetch failed (${net.status} ${net.statusText}) for ${url}`);
+      // Stash a clone in Cache Storage in the background (clone BEFORE the body is
+      // read). Best-effort: a quota/write failure just means a re-download next time.
+      if (cache) cache.put(url, net.clone()).catch(e => console.warn('[litertlm] cache.put failed:', e && e.message));
+      res = net;
+    }
+    if (!res.body) return null;   // fall back to the URL (handled by caller)
+
+    // Wrap the body so we can report byte progress for the (multi-GB) load.
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    let loaded = 0;
+    const reader = res.body.getReader();
+    return new ReadableStream({
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        if (done) { controller.close(); return; }
+        loaded += value.byteLength;
+        try { onProgress && onProgress({ loaded, total, progress: total ? loaded / total : 0, fromCache }); } catch (_) {}
+        controller.enqueue(value);
+      },
+      cancel(reason) { try { reader.cancel(reason); } catch (_) {} },
+    });
+  }
+
   async function ensureEngine(modelUrl, nCtx, onProgress) {
     const ctx = (nCtx | 0) || DEFAULT_N_CTX;
     if (_engine && _engineModel === modelUrl && _engineCtx === ctx) return _engine;
@@ -81,7 +128,11 @@ const SandpieLiteRTLM = (function () {
     // If a future SDK build needs explicit init, the module also exports
     // loadLiteRtLm() / getOrLoadGlobalLiteRtLm() / setupDefaultWebGpuDevice().
     dbg('Engine.create', modelUrl, 'maxNumTokens', ctx);
-    _engine = await Engine.create({ model: modelUrl, mainExecutorSettings: { maxNumTokens: ctx } });
+    // Hand the SDK the CACHED byte stream (Cache Storage) instead of the URL, so the
+    // multi-GB model is downloaded once and reused across loads. Falls back to the
+    // URL if the body isn't streamable. EngineSettings.model accepts a ReadableStream.
+    const modelSource = (await fetchModelStream(modelUrl, onProgress)) || modelUrl;
+    _engine = await Engine.create({ model: modelSource, mainExecutorSettings: { maxNumTokens: ctx } });
     _engineModel = modelUrl;
     _engineCtx = ctx;
     return _engine;
@@ -321,14 +372,30 @@ const SandpieLiteRTLM = (function () {
   // Low-level: stream one send over an ALREADY-created Conversation. Accumulates the
   // text, relays each chunk to onText, honors abort (cancels the stream).
   // ============================================================
-  async function streamInto(conv, input, signal, onText) {
-    let full = '';
+  async function streamInto(conv, input, signal, onText, onThought) {
+    let full = '', thoughtAcc = '';
     const stream = conv.sendMessageStreaming(input || '');
     for await (const chunk of stream) {
       if (signal && signal.aborted) { try { conv.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
+      // Gemma 4 streams its reasoning in the STRUCTURED 'thought' channel (per the
+      // LiteRT-LM Web API: chunk.channels.thought), NOT as inline text — so the
+      // answer text never carries thought markers and we must read the channel
+      // directly. Auto-detect cumulative-vs-incremental delivery: emit only the
+      // newly-grown tail (if the new value extends what we have, send the suffix;
+      // otherwise treat it as an incremental piece and append).
+      const th = chunk && chunk.channels && chunk.channels.thought;
+      if (typeof th === 'string' && th) {
+        let delta;
+        if (th.startsWith(thoughtAcc)) { delta = th.slice(thoughtAcc.length); thoughtAcc = th; }
+        else { delta = th; thoughtAcc += th; }
+        if (delta && onThought) { try { onThought(delta); } catch (_) {} }
+      }
       for (const item of (chunk && chunk.content) || []) {
         if (item && item.type === 'text' && item.text) { full += item.text; try { onText && onText(item.text); } catch (_) {} }
       }
+      // Capture the first few raw chunks so the SDK's exact shape is inspectable
+      // from DevTools (window.__litertlmChunks) if channel/format ever drifts.
+      try { if (!self.__litertlmChunks) self.__litertlmChunks = []; if (self.__litertlmChunks.length < 5) self.__litertlmChunks.push(chunk); } catch (_) {}
     }
     return full;
   }
@@ -408,8 +475,19 @@ const SandpieLiteRTLM = (function () {
 
     let firstToken = false, engine, conv;
     try {
-      emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… the first run downloads the model (cached after) — this can take a while.' });
-      engine = await ensureEngine(provider.endpoint, nCtx);
+      emit({ type: 'info', message: 'Loading Gemma locally (WebGPU)… first run downloads the model (cached after).' });
+      let _lastPct = -1, _lastLoaded = 0;
+      engine = await ensureEngine(provider.endpoint, nCtx, (p) => {
+        if (!p || p.status === 'loading') return;
+        if (p.total) {
+          const pct = Math.round(p.progress * 100);
+          if (pct === _lastPct) return; _lastPct = pct;
+          emit({ type: 'info', message: `${p.fromCache ? 'Loading cached' : 'Downloading'} Gemma… ${fmtMB(p.loaded)} / ${fmtMB(p.total)} (${pct}%)` });
+        } else if (p.loaded - _lastLoaded >= 8388608) {
+          _lastLoaded = p.loaded;
+          emit({ type: 'info', message: `${p.fromCache ? 'Loading cached' : 'Downloading'} Gemma… ${fmtMB(p.loaded)}` });
+        }
+      });
       conv = await engine.createConversation(buildConvConfig(provider, preface, wantThink));
     } catch (e) {
       emit({ type: 'info', message: null });
@@ -433,6 +511,11 @@ const SandpieLiteRTLM = (function () {
         const full = await streamInto(conv, input, signal, (t) => {
           if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
           splitter.push(t);
+        }, (rz) => {
+          // Structured thought channel → live "Thinking…" box (delta.reasoning, which
+          // conversations.js renders but never replays to the model).
+          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+          emit({ type: 'delta', delta: { reasoning: rz } });
         });
         splitter.flush();
         emit({ type: 'info', message: null });
