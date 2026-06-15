@@ -165,8 +165,10 @@ const SandpieLiteRTLM = (function () {
     const tool_calls = [];
     const seen = new Set();
 
-    // Pattern 1: <tool_call>{"name":"...", "arguments":{...}}</tool_call>
-    const rxToolCall = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+    // Pattern 1: <tool_call>{"name":"...","arguments":{...}}</tool_call> — fences are
+    // fuzzy: small models mix the HTML-style <tool_call>…</tool_call> with Gemma's native
+    // <|tool_call>…<tool_call|>, so accept any open/close combo (incl. the hybrid).
+    const rxToolCall = /<\|?tool_call>\s*([\s\S]*?)\s*(?:<\/tool_call>|<tool_call\|>)/g;
     let m;
     while ((m = rxToolCall.exec(text)) !== null) {
       if (seen.has(m[1])) continue;
@@ -208,7 +210,7 @@ const SandpieLiteRTLM = (function () {
     if (!raw) return null;
     const name = raw.name || (raw.function && raw.function.name);
     if (!name) return null;
-    let args = raw.arguments || raw.arguments_text || (raw.function && raw.function.arguments) || raw.params || raw.parameters || {};
+    let args = raw.arguments || raw.arguments_text || (raw.function && raw.function.arguments) || raw.params || raw.parameters || raw.args || {};
     if (typeof args === 'string') { try { args = JSON.parse(args); } catch (_) { args = {}; } }
     return {
       id: 'call_' + Math.random().toString(36).slice(2, 11),
@@ -264,8 +266,7 @@ const SandpieLiteRTLM = (function () {
       .replace(/<\|channel>thought[\s\S]*?<channel\|>/gi, '')  // Gemma 4 reasoning ("thought") channel
       .replace(/<\|channel>[a-z]*\r?\n?/gi, '')                // stray channel headers (e.g. final)
       .replace(/<channel\|>/g, '')                             // stray channel close
-      .replace(/<\|tool_call>[\s\S]*?<tool_call\|>/g, '')   // Gemma 4 fenced tool call
-      .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
+      .replace(/<\|?tool_call>[\s\S]*?(?:<tool_call\|>|<\/tool_call>)/g, '')   // tool call: native, HTML, or hybrid fences
       .replace(/```json\s*[\s\S]*?```/g, '')
       .replace(/<tool_call\|>|<\|tool_call>|<\|"\|>/g, '')   // stray Gemma tokens
       .replace(/<\|.*?>\n?/g, '')
@@ -277,24 +278,30 @@ const SandpieLiteRTLM = (function () {
   // tool outputs are fed back as a plainly-labelled user turn.
   function mapRole(role) { return role === 'assistant' ? 'assistant' : role === 'system' ? 'system' : 'user'; }
   // Render a message to text for the re-prefilled history. For an assistant turn that
-  // made tool calls we MUST reconstruct them: cleanContent strips the native <|tool_call>
-  // tokens out of .content, and runConversation re-prefills a fresh conversation every
-  // round (no live KV cache carries them), so without this the model never sees its OWN
-  // calls — it sees only orphan "Tool result:" turns, mistakes them for user input, and
-  // re-issues the same call forever (the load_skill loop). The id mirrors the matching
-  // "Tool result (id)" turn so the action→result pairing is explicit. Preface-only — this
-  // is never re-parsed as a new call (splitToolCalls runs on model OUTPUT, not on this).
+  // made tool calls we MUST reconstruct them (cleanContent strips the native tokens from
+  // .content, and we re-prefill a fresh conversation every round with no live KV cache),
+  // or the model never sees its OWN calls and loops re-issuing them. CRUCIAL: reconstruct
+  // in Gemma 4's NATIVE format — the exact shape the model emits unprompted (round 0 of
+  // window.__litertlmPrompts). An earlier version used <tool_call>{json}</tool_call>; the
+  // model IMITATED that instead of its native format, then drifted into a broken hybrid
+  // (<tool_call>{json}<tool_call|>) no parser caught. Mirroring native keeps it on rails.
+  // Preface-only — never re-parsed by us (splitToolCalls runs on model OUTPUT, not this).
+  function gemmaToolCallText(tc) {
+    const name = (tc.function && tc.function.name) || '';
+    let args = {};
+    try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+    const body = Object.keys(args || {}).map(k => {
+      const v = args[k];
+      if (typeof v === 'number' || typeof v === 'boolean') return `${k}: ${v}`;
+      return `${k}: <|"|>${typeof v === 'string' ? v : JSON.stringify(v)}<|"|>`;
+    }).join(', ');
+    return `<|tool_call>call:${name}{${body}}<tool_call|>`;
+  }
   function mapContent(m) {
     if (m.role === 'tool') return 'Tool result' + (m.tool_call_id ? ' (' + m.tool_call_id + ')' : '') + ': ' + (m.content || '');
     let s = m.content || '';
     if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
-      const trace = m.tool_calls.map(tc => {
-        const name = (tc.function && tc.function.name) || '';
-        let args = (tc.function && tc.function.arguments) || '{}';
-        try { args = JSON.stringify(JSON.parse(args)); } catch (_) { args = JSON.stringify(String(args)); }
-        const id = tc.id ? `"id":"${tc.id}",` : '';
-        return `<tool_call>{${id}"name":"${name}","arguments":${args}}</tool_call>`;
-      }).join('\n');
+      const trace = m.tool_calls.map(gemmaToolCallText).join('\n');
       s = s ? (s + '\n' + trace) : trace;
     }
     return s;
