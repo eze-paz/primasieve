@@ -17,11 +17,14 @@
 const SandpieLiteRTLM = (function () {
   'use strict';
 
-  // Pinned on purpose (v0.12 is the web-preview release that added the JS API). Bump
-  // deliberately, not automatically — a silent "latest" default is what broke wllama.
-  // If this 404s on the CDN, drop the "@<ver>" to track latest, or check npm for the
-  // current web-preview version of @litert-lm/core.
-  const PACKAGE_VERSION = '0.12';
+  // Pinned on purpose. Bumped 0.12 → 0.13.1 (latest, 2026-06-03): 0.13.x brings the
+  // current Gemma 4 WASM runtime + Multi-token Prediction (~2× faster decode) and bug
+  // fixes. The web-crash threads (mediapipe#6270) point at stale/old .wasm as a cause,
+  // so the current build is the lever for getting thinking to run without aborting.
+  // API verified compatible with this module (EngineSettings.model ReadableStream,
+  // sendMessageStreaming→ReadableStream<Message> with channels, ConversationConfig/
+  // SessionConfig fields). Bump deliberately — a silent "latest" is what broke wllama.
+  const PACKAGE_VERSION = '0.13.1';
   const ESM_URL = `https://cdn.jsdelivr.net/npm/@litert-lm/core@${PACKAGE_VERSION}/+esm`;
 
   const DEFAULT_N_CTX = 4096;
