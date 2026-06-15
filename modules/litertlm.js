@@ -276,9 +276,28 @@ const SandpieLiteRTLM = (function () {
   // Map sandpie message roles → LiteRT-LM roles. The Web SDK has no 'tool' role, so
   // tool outputs are fed back as a plainly-labelled user turn.
   function mapRole(role) { return role === 'assistant' ? 'assistant' : role === 'system' ? 'system' : 'user'; }
+  // Render a message to text for the re-prefilled history. For an assistant turn that
+  // made tool calls we MUST reconstruct them: cleanContent strips the native <|tool_call>
+  // tokens out of .content, and runConversation re-prefills a fresh conversation every
+  // round (no live KV cache carries them), so without this the model never sees its OWN
+  // calls — it sees only orphan "Tool result:" turns, mistakes them for user input, and
+  // re-issues the same call forever (the load_skill loop). The id mirrors the matching
+  // "Tool result (id)" turn so the action→result pairing is explicit. Preface-only — this
+  // is never re-parsed as a new call (splitToolCalls runs on model OUTPUT, not on this).
   function mapContent(m) {
     if (m.role === 'tool') return 'Tool result' + (m.tool_call_id ? ' (' + m.tool_call_id + ')' : '') + ': ' + (m.content || '');
-    return m.content || '';
+    let s = m.content || '';
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      const trace = m.tool_calls.map(tc => {
+        const name = (tc.function && tc.function.name) || '';
+        let args = (tc.function && tc.function.arguments) || '{}';
+        try { args = JSON.stringify(JSON.parse(args)); } catch (_) { args = JSON.stringify(String(args)); }
+        const id = tc.id ? `"id":"${tc.id}",` : '';
+        return `<tool_call>{${id}"name":"${name}","arguments":${args}}</tool_call>`;
+      }).join('\n');
+      s = s ? (s + '\n' + trace) : trace;
+    }
+    return s;
   }
 
   // ============================================================
