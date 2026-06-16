@@ -1306,6 +1306,17 @@ async function handleOpfs(path) {
   const [pathOnly, query] = path.split('?');
   const opfsPath = decodeURIComponent(pathOnly.slice(pathOnly.indexOf('/opfs/') + '/opfs/'.length));
   const forceDownload = query && new URLSearchParams(query).get('download') === '1';
+  // In prod the host page is cross-origin isolated (COOP=same-origin, COEP=credentialless).
+  // A nested iframe is *blocked* unless its own response also carries COEP — credentialless
+  // gives nested navigables no relaxation — so without this every artifact dies with
+  // "NOT-SET cross-origin-embedder-policy". We synthesize these responses, so stamp the
+  // policy here. credentialless (matching the host page) lets artifacts still pull no-cors
+  // CDN images/fonts; same-origin CORP is the matching resource policy. One stamp covers
+  // the artifact iframe, the OPFS file viewer, and the side panel — they all route here.
+  const isolation = {
+    'Cross-Origin-Embedder-Policy': 'credentialless',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  };
   try {
     const bytes = await opfsReadBytes(opfsPath);
     const ext = (opfsPath.split('.').pop() || '').toLowerCase();
@@ -1328,9 +1339,9 @@ async function handleOpfs(path) {
         `})();<\/script>`;
       if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, script + '</body>');
       else text += script;
-      return new Response(text, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } });
+      return new Response(text, { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store', ...isolation } });
     }
-    const headers = { 'Content-Type': ct, 'Cache-Control': 'no-store' };
+    const headers = { 'Content-Type': ct, 'Cache-Control': 'no-store', ...isolation };
     if (forceDownload) headers['Content-Disposition'] = 'attachment';
     return new Response(bytes, { headers });
   } catch (e) {
