@@ -471,8 +471,18 @@
     padding: 0 0.25rem 0.25rem;
     margin-top: -0.25rem;
     user-select: none;
+    /* stable digit widths so the smoothly-rising token counter never reflows */
+    font-variant-numeric: tabular-nums;
   }
+  /* elapsed time leads in the accent colour; tokens + rate sit a step back */
+  .msg-timer .mt-tok,
+  .msg-timer .mt-rate { color: var(--sp-text-dim); }
+  .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }
+  /* once settled, the whole line dims to one tone */
+  .msg-timer.done .mt-tok,
+  .msg-timer.done .mt-rate,
+  .msg-timer.done .mt-sep { color: inherit; }
 
   aside details.service {
     border: none;

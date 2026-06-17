@@ -283,6 +283,22 @@ function fmtRelTime(iso) {
   if (mo < 12) return mo + 'mo';
   return Math.floor(day / 365) + 'y';
 }
+// Sibling to fmtRelTime() above. That renders a past instant as a coarse
+// "time ago" (5m, 2h); this renders an elapsed DURATION (seconds, possibly
+// fractional) as a compact h/m/s string — 45s, 1m0s, 1h10m0s. It is the single
+// home for the hour/minute/second breakdown so the live message timer and its
+// settled "done" label stay in lockstep. Pass tenths=true to keep one decimal
+// on sub-10s durations (used for the final settled time, e.g. 3.4s).
+function fmtElapsed(totalSec, tenths = false) {
+  totalSec = Math.max(0, totalSec || 0);
+  if (totalSec < 60) {
+    return (tenths && totalSec < 10) ? `${totalSec.toFixed(1)}s` : `${Math.floor(totalSec)}s`;
+  }
+  const s = Math.floor(totalSec % 60);
+  const m = Math.floor(totalSec / 60) % 60;
+  const h = Math.floor(totalSec / 3600);
+  return h > 0 ? `${h}h${m}m${s}s` : `${m}m${s}s`;
+}
 function buildConvLi(c, idx) {
   const li = document.createElement('li');
   li.dataset.cid = c.id;
@@ -596,6 +612,7 @@ async function sendSingle(text, stream, opts = {}) {
   let errorSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
+    accountStreamTokens(stream, ev);
     if (ev.type === 'agent_done')  agentDoneSeen = true;
     if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') {
@@ -787,6 +804,7 @@ function ensureStream(id) {
       queue: [], isProcessing: false, queueAborted: false,
       abort: null,
       timerEl: null, timerStart: 0, timerInterval: null,
+      genChars: 0, tokTarget: 0, tokShown: 0, rateShown: 0,
       generating: false,
     };
     convStreams.set(id, s);
@@ -1909,20 +1927,93 @@ window.dispatchAgentEvent = dispatchAgentEvent;
    background conv keeps ticking against its own bubble host without colliding
    with whichever conv is currently visible.
    ============================================================================= */
+const TIMER_TICK_MS = 66;   // ~15fps: smooth token easing at trivial cost
+const TOK_EASE = 0.2;       // fraction of the remaining gap the shown count closes per tick
+const TOK_FMT = n => Math.round(n).toLocaleString('en-US');
+const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s';
+
+// Generated-token bookkeeping for the live counter. Every backend (local
+// wllama/transformers.js/litert/webllm AND the SW/API path) funnels its stream
+// through sendSingle's `dispatch`, so counting here is universal. Local
+// backends emit no `usage` events, so a chars/4 estimate — the same heuristic
+// SandpieTokens.estimateTokens uses — is the only signal available; we use it
+// for every backend so the readout behaves identically everywhere. genChars
+// only grows, so tokTarget is monotonic. (Authoritative provider usage still
+// flows to SandpieTokens/Context untouched — this counter is a live HUD, not a
+// billing figure.)
+function accountStreamTokens(stream, ev) {
+  if (!stream || ev.type !== 'delta' || !ev.delta) return;
+  const d = ev.delta;
+  let n = 0;
+  if (typeof d.content === 'string') n += d.content.length;
+  if (typeof d.reasoning_content === 'string') n += d.reasoning_content.length;
+  else if (typeof d.reasoning === 'string') n += d.reasoning.length;
+  if (Array.isArray(d.tool_calls)) {
+    for (const tc of d.tool_calls) {
+      n += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
+    }
+  }
+  if (!n) return;
+  stream.genChars += n;
+  stream.tokTarget = Math.ceil(stream.genChars / 4);
+}
+
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
+  stream.genChars = 0;
+  stream.tokTarget = 0;
+  stream.tokShown = 0;
+  stream.rateShown = 0;
+
   const el = document.createElement('div');
   el.className = 'msg-timer';
-  el.innerHTML = '0s' + (stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '');
+  // Built once; the tick mutates the leaf <span>s in place rather than
+  // re-rendering innerHTML ~15×/s (which would thrash layout and the queue pill).
+  el.innerHTML =
+    '<span class="mt-time">0s</span>' +
+    '<span class="mt-sep">·</span><span class="mt-tok">0 tok</span>' +
+    '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
+    '<span class="mt-queue"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
-  stream.timerInterval = setInterval(() => {
+
+  const timeEl = el.querySelector('.mt-time');
+  const tokEl = el.querySelector('.mt-tok');
+  const rateEl = el.querySelector('.mt-rate');
+  const queueEl = el.querySelector('.mt-queue');
+  const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
+
+  const paint = () => {
     if (!stream.timerEl) return;
-    const sec = Math.floor((Date.now() - stream.timerStart) / 1000);
-    const queueBadge = stream.queue.length > 0 ? ` <span class="queue-pill">${stream.queue.length} queued</span>` : '';
-    stream.timerEl.innerHTML = `${sec}s${queueBadge}`;
-  }, 1000);
+    const elapsed = (Date.now() - stream.timerStart) / 1000;
+    set(timeEl, fmtElapsed(elapsed));
+
+    // Total tokens — ease the shown value up toward the target so bursty API
+    // chunks or fast local decode read as a smooth climb. Strictly monotonic:
+    // never tick backward.
+    const target = stream.tokTarget;
+    if (reduce || target <= stream.tokShown) stream.tokShown = target;
+    else stream.tokShown = Math.min(target, stream.tokShown + Math.max((target - stream.tokShown) * TOK_EASE, 1));
+    set(tokEl, TOK_FMT(stream.tokShown) + ' tok');
+
+    // tok/s — aggregate throughput over the interaction. The timer spans tool
+    // execution too, so this honestly eases down while a tool runs.
+    const inst = elapsed > 0.4 ? target / elapsed : 0;
+    stream.rateShown = reduce ? inst : stream.rateShown + (inst - stream.rateShown) * TOK_EASE;
+    set(rateEl, RATE_FMT(stream.rateShown));
+
+    const q = stream.queue.length;
+    if (queueEl.dataset.q !== String(q)) {
+      queueEl.dataset.q = String(q);
+      queueEl.className = q > 0 ? 'queue-pill' : 'mt-queue';
+      queueEl.textContent = q > 0 ? `${q} queued` : '';
+    }
+  };
+
+  paint();
+  stream.timerInterval = setInterval(paint, TIMER_TICK_MS);
 }
 
 function endTotalTimer(stream, label) {
@@ -1933,8 +2024,20 @@ function endTotalTimer(stream, label) {
     stream.timerEl.remove();
   } else {
     const sec = (Date.now() - stream.timerStart) / 1000;
-    const fmt = sec >= 10 ? `${Math.round(sec)}s` : `${sec.toFixed(1)}s`;
-    stream.timerEl.textContent = `${label} · ${fmt}`;
+    const tok = stream.tokTarget || 0;
+    const rate = sec > 0.05 ? tok / sec : 0;
+    // Settled line: label · elapsed · tokens · rate, dimmed via .done. The token
+    // pair is dropped on a pure-tool round (no text generated) — "0 tok · 0 tok/s"
+    // is noise.
+    const parts = [
+      `<span class="mt-label">${label}</span>`,
+      `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
+    ];
+    if (tok > 0) {
+      parts.push(`<span class="mt-sep">·</span><span class="mt-tok">${TOK_FMT(tok)} tok</span>`);
+      parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+    }
+    stream.timerEl.innerHTML = parts.join('');
     stream.timerEl.classList.add('done');
   }
   stream.timerEl = null;
