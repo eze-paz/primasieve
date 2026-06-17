@@ -494,14 +494,30 @@ opfs.createFile = async function() {
   }
 };
 
+// Announce a freshly uploaded/written OPFS file so it (a) shows up in the file
+// sidebar and (b) is synced into the run_python (Pyodide) MEMFS mount at /files
+// — so the model can read it the moment it replies. Every upload entry point
+// (attach button, drag-and-drop, programmatic writes) routes through here. The
+// SW only live-syncs once Pyodide has booted; before that the file is already in
+// OPFS and gets picked up when the /files mount populates. The sidebar refresh
+// is debounced so a multi-file drop refreshes the list just once.
+let _notifyRefreshT = null;
+opfs.notifyUpload = function(path) {
+  try { if (typeof Sandpie !== 'undefined') Sandpie.events.emit('file:changed', path); } catch (_) {}
+  try {
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [path] });
+  } catch (_) {}
+  clearTimeout(_notifyRefreshT);
+  _notifyRefreshT = setTimeout(() => { try { opfs.refreshFileList(); } catch (_) {} }, 60);
+};
+
 opfs.uploadEntry = async function(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
     const destPath = window.opfsJoin(dirPath, entry.name);
     await opfs.write(destPath, file);
-    if (typeof Sandpie !== 'undefined') Sandpie.events.emit('file:changed', destPath);
-    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
+    opfs.notifyUpload(destPath);
   } else if (entry.isDirectory) {
     const sub = window.opfsJoin(dirPath, entry.name);
     await opfs.mkdir(sub);
@@ -739,12 +755,9 @@ function initFileBrowser() {
         for (const f of e.dataTransfer.files) {
           const destPath = opfsJoin(path, f.name);
           await opfs.write(destPath, f);
-          Sandpie.events.emit('file:changed', destPath);
-          const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-          if (sw) sw.postMessage({ type: 'opfs-changed', paths: [destPath] });
+          opfs.notifyUpload(destPath);
         }
       }
-      await refreshFileList();
     });
   }
 

@@ -223,6 +223,8 @@ const SandpieImages = (function() {
 
     const opfsPath = await uniquePath('images', name);
     await opfs.write(opfsPath, bytes);
+    // Show it in the file sidebar + sync into the run_python /files mount.
+    opfs.notifyUpload(opfsPath);
     _attached = {
       kind: 'image', opfsPath, name,
       mime: blob.type || getMimeType(opfsPath), size: bytes.length,
@@ -236,13 +238,8 @@ const SandpieImages = (function() {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const opfsPath = await uniquePath('attachments', name);
     await opfs.write(opfsPath, bytes);
-    // Surface the file to the in-browser Python tool: the SW mounts OPFS at
-    // /files and syncs page writes into Pyodide's view on this notification.
-    try {
-      if (window.Sandpie) Sandpie.events.emit('file:changed', opfsPath);
-      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-      if (sw) sw.postMessage({ type: 'opfs-changed', paths: [opfsPath] });
-    } catch (_) {}
+    // Show it in the file sidebar + sync into the run_python /files mount.
+    opfs.notifyUpload(opfsPath);
 
     _attached = {
       kind: 'file', opfsPath, name,
@@ -250,7 +247,6 @@ const SandpieImages = (function() {
       file: { name, type: file.type || '' },
     };
     showFilePreview(_attached);
-    try { if (typeof refreshFileList === 'function') refreshFileList(); } catch (_) {}
   }
 
   /**
