@@ -1,13 +1,17 @@
 // sandpie/images.js - Attachment handling module
 // Despite the name (kept for its established public API), this owns the
-// composer's single attachment slot for ANY file type:
+// composer's attachments for ANY file type, and the app-wide drag-and-drop:
+//   • the entire window is a drop zone — dropping file(s) anywhere attaches
+//     them, exactly as the attach button does;
 //   • images (png/jpg/gif/webp/bmp/avif/svg, and HEIC/HEIF after conversion)
 //     keep the thumbnail path and are sent to the model as a vision image_url;
 //   • every other file is saved to OPFS and referenced — small text files are
 //     inlined at send time, everything else is handed to the model as a path it
-//     can open with the run_python tool (the SW mounts OPFS at /files).
-// Conversion + send-time resolution live in conversations.js (buildAgentConfig);
-// this module handles selection, OPFS storage, and the composer preview.
+//     can open with the run_python tool (the SW mounts OPFS at /files);
+//   • every attached file is uploaded to OPFS (visible in the sidebar) and
+//     synced into the run_python MEMFS mount via opfs.notifyUpload().
+// Multiple attachments are supported. Send-time resolution lives in
+// conversations.js (buildAgentConfig).
 
 const SandpieImages = (function() {
   'use strict';
@@ -18,10 +22,10 @@ const SandpieImages = (function() {
   // PRIVATE STATE
   // ============================================================
 
-  // The single attached item, or null. Shape:
-  //   { kind:'image', opfsPath, name, mime, size, file:{name,type} }
+  // The composer's attachments (in order). Each entry:
+  //   { kind:'image', opfsPath, name, mime, size, thumb, file:{name,type} }
   //   { kind:'file',  opfsPath, name, mime, size, isText, file:{name,type} }
-  let _attached = null;
+  let _attachments = [];
 
   // Browser-renderable raster/vector image extensions (re-encoded to JPEG before
   // the model sees them) and the iPhone HEIC family (decoded via heic2any).
@@ -155,55 +159,58 @@ const SandpieImages = (function() {
   }
 
   // ============================================================
-  // COMPOSER PREVIEW
+  // COMPOSER PREVIEW (multiple attachments)
   // ============================================================
 
-  function makeRemoveBtn() {
-    const rm = document.createElement('button');
-    rm.type = 'button';
-    rm.className = 'remove-btn';
-    rm.title = 'Remove';
-    rm.textContent = '✕';
-    rm.onclick = () => clear();
-    return rm;
-  }
-
-  function showImagePreview(previewUrl, name) {
+  function renderPreviews() {
     const preview = $('imagePreview');
     if (!preview) return;
     preview.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = previewUrl;
-    img.alt = '';
-    const fn = document.createElement('span');
-    fn.className = 'filename';
-    fn.textContent = name || 'Image';
-    preview.append(img, fn, makeRemoveBtn());
+    if (!_attachments.length) { preview.style.display = 'none'; return; }
+    _attachments.forEach((att, i) => {
+      const item = document.createElement('span');
+      item.className = 'attach-item';
+      if (att.kind === 'image') {
+        const img = document.createElement('img');
+        img.src = att.thumb || '';
+        img.alt = att.name || '';
+        img.title = att.name || '';
+        item.appendChild(img);
+      } else {
+        const chip = document.createElement('span');
+        chip.className = 'file-chip';
+        const icon = document.createElement('span');
+        icon.className = 'fc-icon';
+        icon.textContent = iconFor(att.name, att.mime);
+        const nm = document.createElement('span');
+        nm.className = 'fc-name';
+        nm.textContent = att.name;
+        const sz = document.createElement('span');
+        sz.className = 'fc-size';
+        sz.textContent = opfs.formatSize(att.size) || '';
+        chip.append(icon, nm, sz);
+        item.appendChild(chip);
+      }
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'remove-btn';
+      rm.title = 'Remove';
+      rm.textContent = '✕';
+      rm.onclick = () => removeAt(i);
+      item.appendChild(rm);
+      preview.appendChild(item);
+    });
     preview.style.display = '';
   }
 
-  function showFilePreview(att) {
-    const preview = $('imagePreview');
-    if (!preview) return;
-    preview.innerHTML = '';
-    const chip = document.createElement('span');
-    chip.className = 'file-chip';
-    const icon = document.createElement('span');
-    icon.className = 'fc-icon';
-    icon.textContent = iconFor(att.name, att.mime);
-    const nm = document.createElement('span');
-    nm.className = 'fc-name';
-    nm.textContent = att.name;
-    const sz = document.createElement('span');
-    sz.className = 'fc-size';
-    sz.textContent = opfs.formatSize(att.size) || '';
-    chip.append(icon, nm, sz);
-    preview.append(chip, makeRemoveBtn());
-    preview.style.display = '';
+  function removeAt(i) {
+    if (i < 0 || i >= _attachments.length) return;
+    _attachments.splice(i, 1);
+    renderPreviews();
   }
 
   // ============================================================
-  // ATTACH PATHS
+  // ATTACH PATHS (push to _attachments; caller calls renderPreviews once)
   // ============================================================
 
   async function attachImage(file) {
@@ -217,20 +224,18 @@ const SandpieImages = (function() {
     }
     const bytes = new Uint8Array(await blob.arrayBuffer());
     // Validate it actually decodes (and produce the thumbnail). Throws for
-    // formats the browser can't render → handleSelect falls back to a file attach.
+    // formats the browser can't render → addFiles falls back to a file attach.
     const img = await loadImageFromBlob(new Blob([bytes], { type: blob.type || getMimeType(name) }));
-    const previewUrl = compressImage(img, 200, 0.7);
+    const thumb = compressImage(img, 200, 0.7);
 
     const opfsPath = await uniquePath('images', name);
     await opfs.write(opfsPath, bytes);
-    // Show it in the file sidebar + sync into the run_python /files mount.
-    opfs.notifyUpload(opfsPath);
-    _attached = {
-      kind: 'image', opfsPath, name,
+    opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
+    _attachments.push({
+      kind: 'image', opfsPath, name, thumb,
       mime: blob.type || getMimeType(opfsPath), size: bytes.length,
       file: { name, type: blob.type || getMimeType(opfsPath) },
-    };
-    showImagePreview(previewUrl, name);
+    });
   }
 
   async function attachDocument(file) {
@@ -238,42 +243,94 @@ const SandpieImages = (function() {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const opfsPath = await uniquePath('attachments', name);
     await opfs.write(opfsPath, bytes);
-    // Show it in the file sidebar + sync into the run_python /files mount.
-    opfs.notifyUpload(opfsPath);
-
-    _attached = {
+    opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
+    _attachments.push({
       kind: 'file', opfsPath, name,
       mime: file.type || '', size: bytes.length, isText: looksTextual(bytes),
       file: { name, type: file.type || '' },
-    };
-    showFilePreview(_attached);
+    });
   }
 
   /**
-   * Handle file input selection — routes to the image or document path.
-   * @param {Event} e - File input change event
+   * Attach one or more File objects (from the picker or a drop). Each is routed
+   * to the image or document path, then the preview is rendered once.
+   * @param {FileList|File[]} fileList
    */
-  async function handleSelect(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
-    try {
-      if (looksImage) {
-        try {
-          await attachImage(file);
-        } catch (err) {
-          console.warn('[sandpie] image attach failed; attaching as a generic file:', err);
+  async function addFiles(fileList) {
+    const files = Array.from(fileList || []);
+    for (const file of files) {
+      const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
+      try {
+        if (looksImage) {
+          try {
+            await attachImage(file);
+          } catch (err) {
+            console.warn('[sandpie] image attach failed; attaching as a generic file:', err);
+            await attachDocument(file);
+          }
+        } else {
           await attachDocument(file);
         }
-      } else {
-        await attachDocument(file);
+      } catch (err) {
+        console.error('[sandpie] attach failed:', err);
+        alert('Could not attach "' + (file.name || 'file') + '": ' + ((err && err.message) || err));
       }
-    } catch (err) {
-      console.error('[sandpie] attach failed:', err);
-      alert('Could not attach "' + (file.name || 'file') + '": ' + ((err && err.message) || err));
-    } finally {
-      e.target.value = '';   // let the same file be picked again after removal
     }
+    renderPreviews();
+  }
+
+  /**
+   * <input type=file> change handler — accepts multiple.
+   * @param {Event} e
+   */
+  async function handleSelect(e) {
+    const files = e.target.files;
+    if (files && files.length) await addFiles(files);
+    e.target.value = '';   // let the same file be picked again after removal
+  }
+
+  // ============================================================
+  // WINDOW-WIDE DRAG & DROP
+  // ============================================================
+
+  // The whole window is a drop target: dropping file(s) anywhere attaches them
+  // (same as the button). Only FILE drags are intercepted — text/element drags
+  // (e.g. dragging a conversation in the sidebar) pass through untouched.
+  function initWindowDrop() {
+    if (document.getElementById('dropOverlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'dropOverlay';
+    overlay.className = 'drop-overlay';
+    overlay.innerHTML = '<div class="drop-overlay-inner"><span class="dz-icon">⬇</span><span>Drop files to attach</span></div>';
+    document.body.appendChild(overlay);
+
+    let depth = 0;   // dragenter/leave nest as the cursor crosses child elements
+    const isFileDrag = e => Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files');
+
+    window.addEventListener('dragenter', (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      depth++;
+      overlay.classList.add('active');
+    });
+    window.addEventListener('dragover', (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {}
+    });
+    window.addEventListener('dragleave', (e) => {
+      if (!isFileDrag(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) overlay.classList.remove('active');
+    });
+    window.addEventListener('drop', async (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      depth = 0;
+      overlay.classList.remove('active');
+      const files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
+      if (files.length) await addFiles(files);
+    });
   }
 
   // ============================================================
@@ -281,18 +338,23 @@ const SandpieImages = (function() {
   // ============================================================
 
   function getState() {
-    return _attached;
+    return _attachments;
   }
 
+  // Add an attachment that already lives in OPFS (e.g. the load_image tool
+  // result), or replace/clear the whole set. Tolerates the legacy single-object
+  // image shape ({ opfsPath, file, dataUrl }).
   function setState(att) {
-    // Tolerate the legacy image-only shape ({ opfsPath, file, dataUrl }) that the
-    // load_image tool-result handler still passes.
-    if (att && !att.kind) att.kind = 'image';
-    _attached = att;
+    if (att == null) { clear(); return; }
+    if (Array.isArray(att)) { _attachments = att; renderPreviews(); return; }
+    if (!att.kind) att.kind = 'image';
+    if (att.dataUrl && !att.thumb) att.thumb = att.dataUrl;
+    _attachments.push(att);
+    renderPreviews();
   }
 
   function clear() {
-    _attached = null;
+    _attachments = [];
     const preview = $('imagePreview');
     if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
     const input = $('imageInput');
@@ -333,14 +395,16 @@ const SandpieImages = (function() {
   }
 
   /**
-   * Compress the attached image for sending to the LLM.
-   * @returns {Promise<string|null>} Data URL, or null if the attachment isn't an image
+   * Compress the first attached image for sending to the LLM (legacy helper;
+   * the send path now resolves opfs:// image refs in buildAgentConfig).
+   * @returns {Promise<string|null>}
    */
   async function compressForLLM() {
-    if (!_attached || _attached.kind !== 'image') return null;
+    const a = _attachments.find(x => x.kind === 'image');
+    if (!a) return null;
     try {
-      const bytes = await opfs.readBytes(_attached.opfsPath);
-      const mime = (_attached.file && _attached.file.type) || getMimeType(_attached.opfsPath);
+      const bytes = await opfs.readBytes(a.opfsPath);
+      const mime = (a.file && a.file.type) || getMimeType(a.opfsPath);
       const blob = new Blob([bytes], { type: mime });
       const img = await loadImageFromBlob(blob);
       return compressImage(img, 1024, 0.75);
@@ -351,42 +415,40 @@ const SandpieImages = (function() {
   }
 
   /**
-   * Build the message content for the current attachment.
-   * Images become an opfs:// image_url (resolved + compressed at send time by
-   * buildAgentConfig); files become a { type:'file' } reference part that
-   * buildAgentConfig expands into text. Returns the plain string when nothing
-   * is attached.
+   * Build the message content for the current attachments. Images become an
+   * opfs:// image_url (resolved + compressed at send time by buildAgentConfig);
+   * files become a { type:'file' } reference part that buildAgentConfig expands
+   * into text. Returns the plain string when nothing is attached.
    * @param {string} text - User text message
    * @returns {Promise<string|Array>}
    */
   async function buildContent(text) {
-    if (!_attached) return text;
-
-    if (_attached.kind === 'file') {
-      const a = _attached;
-      const ref = { type: 'file', file: { path: a.opfsPath, name: a.name, mime: a.mime, size: a.size, text: !!a.isText } };
-      return text ? [{ type: 'text', text }, ref] : [ref];
+    if (!_attachments.length) return text;
+    const parts = [];
+    if (text) parts.push({ type: 'text', text });
+    for (const a of _attachments) {
+      if (a.kind === 'image') {
+        parts.push({ type: 'image_url', image_url: { url: 'opfs://' + a.opfsPath } });
+      } else {
+        parts.push({ type: 'file', file: { path: a.opfsPath, name: a.name, mime: a.mime, size: a.size, text: !!a.isText } });
+      }
     }
-
-    // image — keep a lightweight opfs:// reference in the stored message
-    return [
-      { type: 'text', text: text || '' },
-      { type: 'image_url', image_url: { url: 'opfs://' + _attached.opfsPath } },
-    ];
+    return parts;
   }
 
   /** @returns {boolean} whether anything is attached */
   function hasAttachment() {
-    return _attached !== null;
+    return _attachments.length > 0;
   }
 
   /** Legacy alias — true when any attachment is present. */
   function hasImage() {
-    return _attached !== null;
+    return _attachments.length > 0;
   }
 
   /**
-   * Initialize attachment handling — binds the file input + attach button.
+   * Initialize attachment handling — binds the file input + attach button and
+   * the window-wide drop zone.
    */
   function init() {
     const imageInput = $('imageInput');
@@ -401,6 +463,8 @@ const SandpieImages = (function() {
         if (imageInput) imageInput.click();
       };
     }
+
+    initWindowDrop();
   }
 
   // Export public API
@@ -408,6 +472,8 @@ const SandpieImages = (function() {
     getState,
     setState,
     handleSelect,
+    addFiles,
+    removeAt,
     clear,
     saveToOpfs,
     dataUrlFromPath,

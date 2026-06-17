@@ -1174,10 +1174,7 @@ class RoundRenderer {
       if (path) {
         SandpieImages.dataUrlFromPath(path).then(dataUrl => {
           if (dataUrl) {
-            SandpieImages.setState({ dataUrl, file: { name: path.split('/').pop() }, opfsPath: path });
-            const preview = $('imagePreview');
-            preview.innerHTML = '<img src="' + dataUrl + '"><button type="button" class="remove-btn" onclick="SandpieImages.clear()" title="Remove">✕</button>';
-            preview.style.display = '';
+            SandpieImages.setState({ kind: 'image', opfsPath: path, name: path.split('/').pop(), thumb: dataUrl });
           }
         });
       }

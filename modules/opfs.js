@@ -739,26 +739,9 @@ function initFileBrowser() {
         { label: 'New file', action: () => createNewFile() },
       ]);
     });
-    list.addEventListener('dragover', (e) => { e.preventDefault(); list.classList.add('drag-over'); });
-    list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
-    list.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      list.classList.remove('drag-over');
-      const path = opfsCurrentPath();
-      if (opfs.isReadOnly(path)) { alert('This is a read-only subscription folder — uploads are disabled here.'); return; }
-      const items = Array.from(e.dataTransfer.items || []);
-      for (const item of items) {
-        const entry = item.webkitGetAsEntry?.();
-        if (entry) await uploadEntry(entry, path);
-      }
-      if (!items.length) {
-        for (const f of e.dataTransfer.files) {
-          const destPath = opfsJoin(path, f.name);
-          await opfs.write(destPath, f);
-          opfs.notifyUpload(destPath);
-        }
-      }
-    });
+    // File drops are handled app-wide by the window-level drop zone
+    // (SandpieImages.initWindowDrop), which attaches them to the composer and
+    // uploads to OPFS + MEMFS — so the sidebar no longer has its own drop target.
   }
 
   refreshFileList();
