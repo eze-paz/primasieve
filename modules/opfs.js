@@ -512,6 +512,51 @@ opfs.notifyUpload = function(path) {
   _notifyRefreshT = setTimeout(() => { try { opfs.refreshFileList(); } catch (_) {} }, 60);
 };
 
+// Pick a non-colliding path under dir/ so an upload never clobbers an existing
+// file of the same name (foo.txt → foo-2.txt → …).
+opfs.uniquePath = async function(dir, name) {
+  const safe = String(name).replace(/[\\/:*?"<>|]/g, '_') || 'file';
+  const first = window.opfsJoin(dir, safe);
+  if (!(await opfs.exists(first))) return first;
+  const dot = safe.lastIndexOf('.');
+  const stem = dot > 0 ? safe.slice(0, dot) : safe;
+  const ext = dot > 0 ? safe.slice(dot) : '';
+  for (let i = 2; i < 1000; i++) {
+    const p = window.opfsJoin(dir, `${stem}-${i}${ext}`);
+    if (!(await opfs.exists(p))) return p;
+  }
+  return window.opfsJoin(dir, `${stem}-${Date.now()}${ext}`);
+};
+
+// Open the OS file picker and upload the chosen file(s) straight into an OPFS
+// folder (the file browser's "Upload files" action). Unlike the composer attach
+// / drag-drop, this is a pure workspace upload — files land in dirPath, show in
+// the sidebar, and sync into the run_python /files mount, without touching the
+// message composer. A single reused hidden input avoids leaking nodes on cancel.
+let _uploadInput = null;
+opfs.promptUpload = function(dirPath) {
+  if (opfs.isReadOnly(dirPath)) { alert('This is a read-only folder — uploads are disabled here.'); return; }
+  if (!_uploadInput) {
+    _uploadInput = document.createElement('input');
+    _uploadInput.type = 'file';
+    _uploadInput.multiple = true;
+    _uploadInput.style.display = 'none';
+    document.body.appendChild(_uploadInput);
+  }
+  _uploadInput.onchange = async () => {
+    const files = Array.from(_uploadInput.files || []);
+    _uploadInput.value = '';
+    for (const f of files) {
+      try {
+        const dest = await opfs.uniquePath(dirPath, f.name);
+        await opfs.write(dest, f);
+        opfs.notifyUpload(dest);   // sidebar + run_python /files mount
+      } catch (e) { console.warn('[sandpie] upload failed:', f.name, e); }
+    }
+  };
+  _uploadInput.click();
+};
+
 opfs.uploadEntry = async function(entry, dirPath) {
   if (entry.isFile) {
     const file = await new Promise(r => entry.file(r));
@@ -591,6 +636,7 @@ opfs.refreshFileList = async function() {
       const menuItems = [];
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
       if (!ro) {
+        menuItems.push({ label: 'Upload files', action: () => opfs.promptUpload(opfsCurrentPath()) });
         menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
         menuItems.push({ label: 'New file', action: () => opfs.createFile() });
       }
@@ -735,6 +781,7 @@ function initFileBrowser() {
       ev.preventDefault();
       if (opfs.isReadOnly(opfsCurrentPath())) return;   // read-only subscription area — no create
       showContextMenu(ev.clientX, ev.clientY, [
+        { label: 'Upload files', action: () => opfs.promptUpload(opfsCurrentPath()) },
         { label: 'New folder', action: () => createNewFolder() },
         { label: 'New file', action: () => createNewFile() },
       ]);
