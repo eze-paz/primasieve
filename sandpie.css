@@ -368,8 +368,14 @@
     background: var(--sp-panel) !important;
     color: var(--sp-text) !important;
   }
-  /* Mic button (speech-to-text.js) — inherits .attach-btn; only the active/busy
-     states differ. Recording pulses in the danger colour; transcribing dims. */
+  /* Mic button (speech-to-text.js) — inherits .attach-btn; holds an inline SVG
+     glyph (not an emoji). Recording pulses in the danger colour; busy dims. */
+  .mic-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .mic-btn svg { display: block; }
   .mic-btn.recording {
     color: var(--sp-danger) !important;
     animation: micPulse 1.2s ease-in-out infinite;

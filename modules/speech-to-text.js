@@ -1,17 +1,22 @@
 // sandpie/modules/speech-to-text.js — SandpieSpeech: on-device voice input.
 //
-// Adds a mic button to the composer. Click → record from the microphone; click
-// again → stop, transcribe locally with Whisper, and INSERT the text into the
-// chat input (never auto-sends — the user reviews then sends). The transcription
-// runs in a dedicated Web Worker (modules/stt-worker.js) using Transformers.js,
-// so the audio NEVER leaves the tab — true to sandpie's "nothing escapes the tab"
+// Adds a mic button to the composer. Click → start listening; the captured audio
+// is transcribed locally with Whisper and STREAMED into the chat input as you
+// speak (the text updates every ~tick, not just on stop). Click again → stop and
+// commit. It never auto-sends — the user reviews then sends. Transcription runs
+// in a dedicated Web Worker (modules/stt-worker.js) via Transformers.js, so the
+// audio NEVER leaves the tab — true to sandpie's "nothing escapes the tab"
 // promise. The only network traffic is the one-time model download (cached after).
+//
+// Whisper isn't stream-native, so "streaming" here = continuously capturing PCM
+// and re-transcribing the live window every tick, replacing the dictated region
+// in the box. For long dictation the window is periodically committed and slid so
+// per-tick cost stays bounded.
 //
 // Optional + self-wiring, like every sandpie module: this script injects its own
 // button and registers its own settings panel, so removing the <script> tag
-// removes the feature cleanly with no orphaned markup. It needs only the static
-// .input-bar (always present) and degrades to no-op on browsers without
-// getUserMedia / AudioContext / Workers (the button simply isn't shown).
+// removes the feature cleanly. It needs only the static .input-bar and degrades
+// to no-op on browsers without getUserMedia / AudioContext / Workers.
 //
 // Prefs (model + language) ride SandpieConfig under the 'speech' namespace
 // (synced, no secrets); falls back to localStorage when config.js isn't loaded.
@@ -39,7 +44,16 @@ const SandpieSpeech = (function () {
   const NS = 'speech';
   const LS_KEY = 'sandpie-speech';
   const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto' };
-  const TARGET_SR = 16000;   // Whisper expects 16 kHz mono
+
+  const TARGET_SR  = 16000;   // Whisper expects 16 kHz mono
+  const TICK_MS    = 700;     // re-transcribe cadence (+ the transcribe time itself)
+  const MIN_SEC    = 0.4;     // don't transcribe less than this (avoids silence hallucination)
+  const COMMIT_SEC = 24;      // commit + slide the window before whisper's 30s receptive field
+
+  // ── Professional mic glyph (inline SVG, inherits the button's currentColor).
+  // Outline mic for idle, filled square for the stop/recording state. ──
+  const MIC_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>';
+  const STOP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>';
 
   // ── Prefs (SandpieConfig namespace, localStorage fallback — no secrets) ──
   function cfgAll() {
@@ -58,7 +72,7 @@ const SandpieSpeech = (function () {
   const cfgLang  = () => cfgAll().lang;
 
   // ── Capability gate — Whisper itself runs on WASM if there's no WebGPU, so the
-  // only hard requirements are mic capture, audio decode, and Workers. ──
+  // only hard requirements are mic capture, audio context, and Workers. ──
   function supported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
       && !!(window.AudioContext || window.webkitAudioContext)
@@ -71,7 +85,7 @@ const SandpieSpeech = (function () {
   // page cache-buster doesn't cover it.)
   // ============================================================
   const WORKER_URL = 'modules/stt-worker.js?v=1';
-  let _worker = null, _seq = 0;
+  let _worker = null, _seq = 0, _progressCb = null;
   function getWorker() {
     if (!_worker) {
       _worker = new Worker(WORKER_URL, { type: 'module' });
@@ -80,9 +94,6 @@ const SandpieSpeech = (function () {
     return _worker;
   }
 
-  // Resolve { onProgress, onReady } so callers (transcribe, panel preload) can
-  // surface download progress without each re-attaching listeners.
-  let _progressCb = null;
   function transcribeAudio(audio) {
     const worker = getWorker();
     const id = ++_seq;
@@ -96,108 +107,166 @@ const SandpieSpeech = (function () {
         if (m.type === 'error') { cleanup(); reject(new Error(m.message || 'stt worker error')); return; }
       };
       worker.addEventListener('message', onMsg);
-      // Transfer the audio buffer (no copy).
-      try {
-        worker.postMessage({ type: 'transcribe', id, modelId: cfgModel(), lang: cfgLang(), audio }, [audio.buffer]);
-      } catch (e) { cleanup(); reject(e); }
+      // Transfer the audio buffer (no copy). Callers pass a disposable snapshot.
+      try { worker.postMessage({ type: 'transcribe', id, modelId: cfgModel(), lang: cfgLang(), audio }, [audio.buffer]); }
+      catch (e) { cleanup(); reject(e); }
     });
   }
 
   // ============================================================
-  // Audio capture → 16 kHz mono Float32 (record, then transcribe).
+  // Live audio capture (Web Audio → raw PCM) + the streaming transcription loop.
   // ============================================================
-  let _media = null, _rec = null, _chunks = [];
+  let _ctx = null, _stream = null, _src = null, _node = null, _sink = null;
+  let _srcRate = TARGET_SR;
+  let _chunks = [];          // Float32Array chunks captured since the last commit
+  let _windowLen = 0;        // samples in _chunks (at _srcRate)
+  let _committedText = '';   // dictation committed before the current window
+  let _windowText = '';      // latest transcript of the current window
+  let _prefix = '', _suffix = '';   // the composer text around the dictated region
+  // Cooperative sleep so stop() can wake the loop immediately to finalize.
+  let _loopTimer = null, _wake = null;
+  function sleep(ms) { return new Promise((r) => { _wake = r; _loopTimer = setTimeout(() => { _wake = null; r(); }, ms); }); }
+  function wake() { if (_wake) { clearTimeout(_loopTimer); const r = _wake; _wake = null; r(); } }
 
-  async function decodeToMono16k(blob) {
-    const buf = await blob.arrayBuffer();
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const tmp = new AC();
-    let decoded;
-    try { decoded = await tmp.decodeAudioData(buf); }
-    finally { try { tmp.close(); } catch (_) {} }
-    const frames = Math.ceil(decoded.duration * TARGET_SR);
-    if (!frames) return new Float32Array(0);
-    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const off = new OAC(1, frames, TARGET_SR);   // 1 channel → mono downmix + resample
-    const src = off.createBufferSource();
-    src.buffer = decoded;
-    src.connect(off.destination);
-    src.start(0);
-    const rendered = await off.startRendering();
-    return rendered.getChannelData(0);
+  function resampleLinear(data, from, to) {
+    if (from === to || !data.length) return data;
+    const ratio = from / to, n = Math.max(1, Math.floor(data.length / ratio)), out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const idx = i * ratio, i0 = Math.floor(idx), i1 = Math.min(i0 + 1, data.length - 1), f = idx - i0;
+      out[i] = data[i0] * (1 - f) + data[i1] * f;
+    }
+    return out;
+  }
+  // A fresh 16 kHz mono copy of the live window (safe to transfer to the worker).
+  function snapshotWindow() {
+    const out = new Float32Array(_windowLen);
+    let o = 0; for (const c of _chunks) { out.set(c, o); o += c.length; }
+    return _srcRate === TARGET_SR ? out : resampleLinear(out, _srcRate, TARGET_SR);
+  }
+  // Cheap energy gate — skip transcribing near-silence (whisper hallucinates text
+  // like "Thank you." on silence). Only gates BEFORE any speech is detected, so
+  // trailing pauses never blank already-dictated text.
+  function hasSpeech(a) { let peak = 0; for (let i = 0; i < a.length; i += 64) { const v = Math.abs(a[i]); if (v > peak) peak = v; } return peak > 0.01; }
+
+  function joinText(a, b) { a = (a || '').trim(); b = (b || '').trim(); if (!a) return b; if (!b) return a; return a + ' ' + b; }
+
+  // Replace the dictated region in the composer with the latest transcript and
+  // fire 'input' so conversations.js autosize runs. Does NOT steal focus mid-stream.
+  function renderLive() {
+    const ta = document.getElementById('input');
+    if (!ta) return;
+    const dict = joinText(_committedText, _windowText);
+    ta.value = _prefix + dict + _suffix;
+    const pos = (_prefix + dict).length;
+    try { ta.setSelectionRange(pos, pos); } catch (_) {}
+    if (_btn && _state === 'recording' && dict) _btn.title = 'Stop & insert';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  async function doTranscribeTick(final) {
+    const audio = snapshotWindow();
+    const secs = audio.length / TARGET_SR;
+    if (!final && secs < MIN_SEC) return;
+    if (final && secs < 0.15 && !_windowText) return;
+    const gate = (!_committedText && !_windowText);
+    if (gate && !hasSpeech(audio)) return;
+    let txt;
+    try { txt = await transcribeAudio(audio); }
+    catch (e) { if (final) flashError('Transcription failed'); console.warn('[stt] transcribe failed:', (e && e.message) || e); return; }
+    _windowText = txt;
+    renderLive();
+    // Commit + slide so the next tick re-transcribes only the trailing window.
+    if (!final && secs >= COMMIT_SEC && _windowText) {
+      _committedText = joinText(_committedText, _windowText);
+      _chunks = []; _windowLen = 0; _windowText = '';
+    }
+  }
+
+  // The ONLY thing that transcribes during a session — one pass at a time (awaited),
+  // so there's no overlap. Exits when state leaves 'recording', does a final pass.
+  async function captureLoop() {
+    try {
+      while (_state === 'recording') {
+        await sleep(TICK_MS);
+        if (_state !== 'recording') break;
+        await doTranscribeTick(false);
+      }
+      await doTranscribeTick(true);   // finalize the remaining window
+    } catch (e) {
+      console.warn('[stt] capture loop error:', (e && e.message) || e);
+    } finally {
+      resetSession();
+      setState('idle');
+      try { document.getElementById('input')?.focus(); } catch (_) {}
+    }
+  }
+
+  function teardownCapture() {
+    try { if (_node) { _node.onaudioprocess = null; _node.disconnect(); } } catch (_) {}
+    try { _sink && _sink.disconnect(); } catch (_) {}
+    try { _src && _src.disconnect(); } catch (_) {}
+    try { if (_stream) _stream.getTracks().forEach(t => t.stop()); } catch (_) {}   // clears the recording indicator
+    try { if (_ctx && _ctx.state !== 'closed') _ctx.close(); } catch (_) {}
+    _node = _sink = _src = _stream = _ctx = null;
+  }
+  function resetSession() {
+    teardownCapture();
+    _chunks = []; _windowLen = 0; _committedText = ''; _windowText = '';
+    _prefix = ''; _suffix = ''; _progressCb = null;
   }
 
   async function startRecording() {
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) {
-      flashError(e && e.name === 'NotAllowedError' ? 'Microphone permission denied' : 'No microphone available');
-      return;
-    }
-    _media = stream;
-    _chunks = [];
-    try { _rec = new MediaRecorder(stream); }
-    catch (_) { try { _rec = new MediaRecorder(stream, { mimeType: 'audio/webm' }); } catch (e2) { flashError('Recording not supported'); releaseMic(); return; } }
-    _rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) _chunks.push(ev.data); };
-    _rec.onstop = onRecordingStop;
-    _rec.start();
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) { flashError(e && e.name === 'NotAllowedError' ? 'Microphone permission denied' : 'No microphone available'); return; }
+    _stream = stream;
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    try { _ctx = new AC({ sampleRate: TARGET_SR }); }
+    catch (_) { try { _ctx = new AC(); } catch (e2) { flashError('Audio not supported'); teardownCapture(); return; } }
+    _srcRate = _ctx.sampleRate;   // browser may ignore the requested rate; we resample if so
+
+    try {
+      _src = _ctx.createMediaStreamSource(stream);
+      _node = _ctx.createScriptProcessor(4096, 1, 1);
+      _node.onaudioprocess = (e) => {
+        const ch = e.inputBuffer.getChannelData(0);
+        _chunks.push(new Float32Array(ch));   // copy — the source buffer is reused
+        _windowLen += ch.length;
+      };
+      // Route through a muted gain so the mic isn't played back; ScriptProcessor
+      // still needs a path to the destination to fire on some browsers.
+      _sink = _ctx.createGain(); _sink.gain.value = 0;
+      _src.connect(_node); _node.connect(_sink); _sink.connect(_ctx.destination);
+    } catch (e) { flashError('Could not start capture'); teardownCapture(); return; }
+
+    // Anchor the dictation region to the current caret (or the end), normalising
+    // spacing so the inserted text doesn't run into existing words.
+    const ta = document.getElementById('input');
+    const at = (ta && document.activeElement === ta && ta.selectionStart != null) ? ta.selectionStart : (ta ? ta.value.length : 0);
+    _prefix = ta ? ta.value.slice(0, at) : '';
+    _suffix = ta ? ta.value.slice(at) : '';
+    if (_prefix && !/\s$/.test(_prefix)) _prefix += ' ';
+    if (_suffix && !/^\s/.test(_suffix)) _suffix = ' ' + _suffix;
+    _chunks = []; _windowLen = 0; _committedText = ''; _windowText = '';
+
+    // Surface model-download progress on first use via the button tooltip.
+    _progressCb = (d) => {
+      if (!_btn || _state === 'idle') return;
+      if (d && d.ready) { _btn.title = 'Listening…'; return; }
+      const p = d && d.progress ? Math.round(d.progress * 100) : 0;
+      _btn.title = 'Loading model… ' + p + '%';
+    };
+
     setState('recording');
+    captureLoop();
   }
 
   function stopRecording() {
-    try { if (_rec && _rec.state !== 'inactive') _rec.stop(); } catch (_) {}
-  }
-
-  function releaseMic() {
-    try { if (_media) _media.getTracks().forEach(t => t.stop()); } catch (_) {}   // clears the browser's recording indicator
-    _media = null;
-  }
-
-  async function onRecordingStop() {
-    releaseMic();
-    const type = (_rec && _rec.mimeType) || 'audio/webm';
-    const blob = new Blob(_chunks, { type });
-    _chunks = []; _rec = null;
-    if (!blob.size) { setState('idle'); return; }
-    setState('transcribing');
-    try {
-      const audio = await decodeToMono16k(blob);
-      if (!audio.length) { setState('idle'); return; }
-      const text = await transcribeAudio(audio);
-      if (text) insertText(text);
-    } catch (e) {
-      flashError('Transcription failed');
-      console.warn('[stt] transcription failed:', (e && e.message) || e);
-    } finally {
-      setState('idle');
-    }
-  }
-
-  // ============================================================
-  // Insert transcript into the composer — at the caret if focused, else append.
-  // Dispatches an 'input' event so conversations.js's autosize listener fires
-  // (it does NOT observe the .value property, only the input event).
-  // ============================================================
-  function insertText(text) {
-    const ta = document.getElementById('input');
-    if (!ta) return;
-    const t = String(text).trim();
-    if (!t) return;
-    const cur = ta.value;
-    const focused = document.activeElement === ta && ta.selectionStart != null;
-    if (focused) {
-      const s = ta.selectionStart, e = ta.selectionEnd;
-      const before = cur.slice(0, s), after = cur.slice(e);
-      const lead  = before && !/\s$/.test(before) ? ' ' : '';
-      const trail = after && !/^\s/.test(after) ? ' ' : '';
-      ta.value = before + lead + t + trail + after;
-      const pos = (before + lead + t).length;
-      try { ta.setSelectionRange(pos, pos); } catch (_) {}
-    } else {
-      ta.value = cur + (cur && !/\s$/.test(cur) ? ' ' : '') + t;
-    }
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    ta.focus();
+    if (_state !== 'recording') return;
+    setState('finalizing');
+    teardownCapture();   // stop capturing now; the loop does one last transcribe of what we have
+    wake();              // don't wait out the current tick delay
   }
 
   // ============================================================
@@ -208,7 +277,7 @@ const SandpieSpeech = (function () {
   function onMicClick() {
     if (_state === 'idle') startRecording();
     else if (_state === 'recording') stopRecording();
-    // 'transcribing' → ignore (button is disabled anyway)
+    // 'finalizing' → ignore (button is disabled)
   }
 
   function setState(s) {
@@ -216,10 +285,10 @@ const SandpieSpeech = (function () {
     if (!_btn) return;
     clearTimeout(_flashTimer);
     _btn.classList.toggle('recording', s === 'recording');
-    _btn.disabled = (s === 'transcribing');
-    _btn.textContent = (s === 'recording') ? '⏹' : '🎤';
-    _btn.title = s === 'recording' ? 'Stop & transcribe'
-               : s === 'transcribing' ? 'Transcribing on-device…'
+    _btn.disabled = (s === 'finalizing');
+    _btn.innerHTML = (s === 'idle') ? MIC_SVG : STOP_SVG;
+    _btn.title = s === 'recording' ? 'Listening… (click to stop)'
+               : s === 'finalizing' ? 'Finishing…'
                : 'Speak (on-device)';
   }
 
@@ -228,6 +297,7 @@ const SandpieSpeech = (function () {
     _btn.title = msg;
     clearTimeout(_flashTimer);
     _flashTimer = setTimeout(() => { if (_state === 'idle') _btn.title = 'Speak (on-device)'; }, 4000);
+    console.warn('[stt]', msg);
   }
 
   function injectButton() {
@@ -239,11 +309,14 @@ const SandpieSpeech = (function () {
     btn.id = 'micBtn';
     btn.className = 'attach-btn mic-btn';
     btn.title = 'Speak (on-device)';
-    btn.setAttribute('aria-label', 'Record speech');
-    btn.textContent = '🎤';
+    btn.setAttribute('aria-label', 'Dictate by voice');
+    btn.innerHTML = MIC_SVG;
     btn.addEventListener('click', onMicClick);
+    // Place it to the RIGHT of the model picker (send stays far right via margin).
+    const picker = document.getElementById('modelPicker');
     const attach = document.getElementById('attachBtn');
-    if (attach && attach.parentNode === bar) attach.insertAdjacentElement('afterend', btn);
+    if (picker && picker.parentNode === bar) picker.insertAdjacentElement('afterend', btn);
+    else if (attach && attach.parentNode === bar) attach.insertAdjacentElement('afterend', btn);
     else bar.insertBefore(btn, bar.firstChild);
     _btn = btn;
     return true;
@@ -254,8 +327,9 @@ const SandpieSpeech = (function () {
   // ============================================================
   const PANEL_HTML = `
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.6rem;">
-      Speak instead of typing. Transcription runs <strong>fully on-device</strong> with Whisper —
-      your microphone audio never leaves this tab. The first use downloads the model (cached after).
+      Speak instead of typing — the text streams into the box as you talk. Transcription runs
+      <strong>fully on-device</strong> with Whisper, so your microphone audio never leaves this tab.
+      The first use downloads the model (cached after).
     </p>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Model</label>
     <select id="sttModel" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;"></select>
@@ -318,7 +392,7 @@ const SandpieSpeech = (function () {
     setTimeout(init, 500);   // composer or a host not ready yet — retry
   }
 
-  return { init, insertText, startRecording, stopRecording, supported, _internals: { decodeToMono16k, transcribeAudio } };
+  return { init, supported, startRecording, stopRecording, _internals: { resampleLinear, transcribeAudio } };
 })();
 
 if (typeof window !== 'undefined') window.SandpieSpeech = SandpieSpeech;
