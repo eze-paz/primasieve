@@ -29,6 +29,7 @@ const ESM_URL = 'https://esm.sh/@huggingface/transformers@4';
 let _lib = null;                 // cached imported module
 let _transcriber = null;         // the ASR pipeline
 let _currentModelId = null;
+let _device = null;              // 'webgpu' | 'wasm' — which backend actually loaded
 
 async function lib() {
   if (!_lib) _lib = await import(ESM_URL);
@@ -62,6 +63,7 @@ async function ensureModel(modelId, dtype) {
       dtype: dtype || { encoder_model: 'fp32', decoder_model_merged: 'q4' },
       progress_callback,
     });
+    _device = 'webgpu';
   } catch (gpuErr) {
     // No usable WebGPU adapter — CPU/WASM fallback (quantised to fit the ~2 GB
     // WASM heap). Slower, but works everywhere.
@@ -70,6 +72,7 @@ async function ensureModel(modelId, dtype) {
       dtype: 'q8',
       progress_callback,
     });
+    _device = 'wasm';
   }
 
   _transcriber = transcriber;
@@ -118,7 +121,7 @@ self.addEventListener('message', async (e) => {
   try {
     if (msg.type === 'load') {
       await ensureModel(msg.modelId, msg.dtype);
-      self.postMessage({ type: 'ready', modelId: msg.modelId });   // always reply to a load, even when already cached
+      self.postMessage({ type: 'ready', modelId: msg.modelId, device: _device });   // always reply to a load, even when already cached
       return;
     }
     if (msg.type === 'transcribe') {

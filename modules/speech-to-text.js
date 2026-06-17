@@ -46,9 +46,14 @@ const SandpieSpeech = (function () {
   const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto' };
 
   const TARGET_SR  = 16000;   // Whisper expects 16 kHz mono
-  const TICK_MS    = 700;     // re-transcribe cadence (+ the transcribe time itself)
-  const MIN_SEC    = 0.4;     // don't transcribe less than this (avoids silence hallucination)
-  const COMMIT_SEC = 24;      // commit + slide the window before whisper's 30s receptive field
+  const TICK_MS    = 350;     // how often the loop wakes (it transcribes far less often — see below)
+  const MIN_SEC    = 0.4;     // don't transcribe a window shorter than this
+  const MIN_NEW_SEC = 1.0;    // …and not until this much NEW audio has arrived since the last transcribe.
+                              //    Whisper pays a fixed ~30s-padded encode PER call, so re-transcribing
+                              //    every tick over a barely-grown window is the main source of lag.
+  const SILENCE_TAIL_SEC = 0.6; // a trailing pause this long = phrase boundary → transcribe + commit
+  const SILENCE_PEAK = 0.01;    // peak amplitude below this counts as silence
+  const COMMIT_SEC = 12;      // hard cap: commit + slide a run-on window before whisper's 30s field
 
   // ── Professional mic glyph (inline SVG, inherits the button's currentColor).
   // Outline mic for idle, filled square for the stop/recording state. ──
@@ -84,7 +89,7 @@ const SandpieSpeech = (function () {
   // (Bump ?v when editing stt-worker.js: it isn't a <script> in the HTML, so the
   // page cache-buster doesn't cover it.)
   // ============================================================
-  const WORKER_URL = 'modules/stt-worker.js?v=3';
+  const WORKER_URL = 'modules/stt-worker.js?v=4';
   let _worker = null, _seq = 0, _progressCb = null;
   function getWorker() {
     if (!_worker) {
@@ -124,7 +129,7 @@ const SandpieSpeech = (function () {
       const onMsg = (e) => {
         const m = e.data || {};
         if (m.type === 'progress') { try { onProgress && onProgress(m.data); } catch (_) {} return; }
-        if (m.type === 'ready') { cleanup(); resolve(); return; }
+        if (m.type === 'ready') { cleanup(); resolve(m.device || null); return; }
         if (m.type === 'error') { cleanup(); reject(new Error(m.message || 'stt worker error')); return; }
       };
       worker.addEventListener('message', onMsg);
@@ -140,6 +145,7 @@ const SandpieSpeech = (function () {
   let _srcRate = TARGET_SR;
   let _chunks = [];          // Float32Array chunks captured since the last commit
   let _windowLen = 0;        // samples in _chunks (at _srcRate)
+  let _lastTxLen = 0;        // window length (16k samples) at the last transcribe — gates re-transcribes
   let _committedText = '';   // dictation committed before the current window
   let _windowText = '';      // latest transcript of the current window
   let _prefix = '', _suffix = '';   // the composer text around the dictated region
@@ -166,7 +172,13 @@ const SandpieSpeech = (function () {
   // Cheap energy gate — skip transcribing near-silence (whisper hallucinates text
   // like "Thank you." on silence). Only gates BEFORE any speech is detected, so
   // trailing pauses never blank already-dictated text.
-  function hasSpeech(a) { let peak = 0; for (let i = 0; i < a.length; i += 64) { const v = Math.abs(a[i]); if (v > peak) peak = v; } return peak > 0.01; }
+  function hasSpeech(a) { let peak = 0; for (let i = 0; i < a.length; i += 64) { const v = Math.abs(a[i]); if (v > peak) peak = v; } return peak > SILENCE_PEAK; }
+  // Peak amplitude over the last `sec` seconds — used to detect a trailing pause.
+  function tailPeak(a, sec) {
+    let peak = 0;
+    for (let i = Math.max(0, a.length - Math.floor(sec * TARGET_SR)); i < a.length; i += 32) { const v = Math.abs(a[i]); if (v > peak) peak = v; }
+    return peak;
+  }
 
   function joinText(a, b) { a = (a || '').trim(); b = (b || '').trim(); if (!a) return b; if (!b) return a; return a + ' ' + b; }
 
@@ -188,17 +200,30 @@ const SandpieSpeech = (function () {
     const secs = audio.length / TARGET_SR;
     if (!final && secs < MIN_SEC) return;
     if (final && secs < 0.15 && !_windowText) return;
-    const gate = (!_committedText && !_windowText);
-    if (gate && !hasSpeech(audio)) return;
+    // Never transcribe a window with no speech: that's where whisper hallucinates
+    // ("Thank you." on silence) AND it would waste a full encode pass.
+    if (!hasSpeech(audio)) return;
+    const newSecs   = (audio.length - _lastTxLen) / TARGET_SR;
+    const tailQuiet = tailPeak(audio, SILENCE_TAIL_SEC) < SILENCE_PEAK;
+    // Throttle: only re-transcribe once enough NEW audio has arrived, or the
+    // speaker paused (phrase boundary), or we're finalizing. Whisper's encode is a
+    // fixed ~30s cost per call, so this is what keeps the stream cheap.
+    if (!final && newSecs < MIN_NEW_SEC && !tailQuiet) return;
+
     let txt;
     try { txt = await transcribeAudio(audio); }
     catch (e) { if (final) flashError('Transcription failed'); console.warn('[stt] transcribe failed:', (e && e.message) || e); return; }
     _windowText = txt;
+    _lastTxLen = audio.length;
     renderLive();
-    // Commit + slide so the next tick re-transcribes only the trailing window.
-    if (!final && secs >= COMMIT_SEC && _windowText) {
+
+    // Commit on a sustained pause (clean word boundary) or the hard cap, then clear
+    // the window so the NEXT phrase is transcribed on its own. This keeps each
+    // transcription short and bounded instead of re-processing the whole utterance
+    // every tick — the main fix for "streaming feels slow".
+    if (!final && _windowText && (tailQuiet || secs >= COMMIT_SEC)) {
       _committedText = joinText(_committedText, _windowText);
-      _chunks = []; _windowLen = 0; _windowText = '';
+      _chunks = []; _windowLen = 0; _windowText = ''; _lastTxLen = 0;
     }
   }
 
@@ -231,7 +256,7 @@ const SandpieSpeech = (function () {
   }
   function resetSession() {
     teardownCapture();
-    _chunks = []; _windowLen = 0; _committedText = ''; _windowText = '';
+    _chunks = []; _windowLen = 0; _lastTxLen = 0; _committedText = ''; _windowText = '';
     _prefix = ''; _suffix = ''; _progressCb = null;
   }
 
@@ -268,7 +293,7 @@ const SandpieSpeech = (function () {
     _suffix = ta ? ta.value.slice(at) : '';
     if (_prefix && !/\s$/.test(_prefix)) _prefix += ' ';
     if (_suffix && !/^\s/.test(_suffix)) _suffix = ' ' + _suffix;
-    _chunks = []; _windowLen = 0; _committedText = ''; _windowText = '';
+    _chunks = []; _windowLen = 0; _committedText = ''; _windowText = ''; _lastTxLen = 0;
 
     // Surface model-download progress on first use via the button tooltip.
     _progressCb = (d) => {
@@ -384,11 +409,11 @@ const SandpieSpeech = (function () {
       preload.disabled = true;
       status.textContent = 'Loading…';
       try {
-        await loadModel(cfgModel(), (d) => {
+        const dev = await loadModel(cfgModel(), (d) => {
           const pct = d && d.progress ? Math.round(d.progress * 100) : 0;
           status.textContent = pct ? ('Downloading model… ' + pct + '%') : 'Loading…';
         });
-        status.textContent = 'Model ready.';
+        status.textContent = 'Model ready' + (dev ? ' — running on ' + (dev === 'webgpu' ? 'GPU (WebGPU)' : 'CPU (WASM)') : '') + '.';
       } catch (e) {
         status.textContent = 'Failed: ' + ((e && e.message) || e);
       } finally {
