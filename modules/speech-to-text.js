@@ -84,7 +84,7 @@ const SandpieSpeech = (function () {
   // (Bump ?v when editing stt-worker.js: it isn't a <script> in the HTML, so the
   // page cache-buster doesn't cover it.)
   // ============================================================
-  const WORKER_URL = 'modules/stt-worker.js?v=2';
+  const WORKER_URL = 'modules/stt-worker.js?v=3';
   let _worker = null, _seq = 0, _progressCb = null;
   function getWorker() {
     if (!_worker) {
@@ -109,6 +109,26 @@ const SandpieSpeech = (function () {
       worker.addEventListener('message', onMsg);
       // Transfer the audio buffer (no copy). Callers pass a disposable snapshot.
       try { worker.postMessage({ type: 'transcribe', id, modelId: cfgModel(), lang: cfgLang(), audio }, [audio.buffer]); }
+      catch (e) { cleanup(); reject(e); }
+    });
+  }
+
+  // Preload / switch the model. Attaches its OWN listener (a plain 'load' posted
+  // without this would have nothing routing the worker's reply back), and the
+  // worker replies 'ready' to every load — even when the model is already cached
+  // — so the settings panel gets a definite finish instead of hanging on "Loading…".
+  function loadModel(modelId, onProgress) {
+    const worker = getWorker();
+    return new Promise((resolve, reject) => {
+      function cleanup() { worker.removeEventListener('message', onMsg); }
+      const onMsg = (e) => {
+        const m = e.data || {};
+        if (m.type === 'progress') { try { onProgress && onProgress(m.data); } catch (_) {} return; }
+        if (m.type === 'ready') { cleanup(); resolve(); return; }
+        if (m.type === 'error') { cleanup(); reject(new Error(m.message || 'stt worker error')); return; }
+      };
+      worker.addEventListener('message', onMsg);
+      try { worker.postMessage({ type: 'load', modelId }); }
       catch (e) { cleanup(); reject(e); }
     });
   }
@@ -360,16 +380,20 @@ const SandpieSpeech = (function () {
       return;
     }
 
-    preload.addEventListener('click', () => {
+    preload.addEventListener('click', async () => {
       preload.disabled = true;
       status.textContent = 'Loading…';
-      _progressCb = (d) => {
-        if (d && d.ready) { status.textContent = 'Model ready.'; preload.disabled = false; _progressCb = null; return; }
-        const pct = d && d.progress ? Math.round(d.progress * 100) : 0;
-        status.textContent = 'Downloading model… ' + pct + '%';
-      };
-      try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); }
-      catch (e) { status.textContent = 'Failed: ' + ((e && e.message) || e); preload.disabled = false; _progressCb = null; }
+      try {
+        await loadModel(cfgModel(), (d) => {
+          const pct = d && d.progress ? Math.round(d.progress * 100) : 0;
+          status.textContent = pct ? ('Downloading model… ' + pct + '%') : 'Loading…';
+        });
+        status.textContent = 'Model ready.';
+      } catch (e) {
+        status.textContent = 'Failed: ' + ((e && e.message) || e);
+      } finally {
+        preload.disabled = false;
+      }
     });
   }
 

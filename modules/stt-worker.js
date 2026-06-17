@@ -86,8 +86,6 @@ async function ensureModel(modelId, dtype) {
   } catch (err) {
     console.warn('[stt-worker] warmup failed (continuing):', (err && err.message) || err);
   }
-
-  self.postMessage({ type: 'ready', modelId });
 }
 
 // Whisper's multilingual checkpoints want a full language NAME ('english'), or
@@ -118,7 +116,11 @@ async function transcribe(id, audio, lang) {
 self.addEventListener('message', async (e) => {
   const msg = e.data || {};
   try {
-    if (msg.type === 'load') { await ensureModel(msg.modelId, msg.dtype); return; }
+    if (msg.type === 'load') {
+      await ensureModel(msg.modelId, msg.dtype);
+      self.postMessage({ type: 'ready', modelId: msg.modelId });   // always reply to a load, even when already cached
+      return;
+    }
     if (msg.type === 'transcribe') {
       await ensureModel(msg.modelId, msg.dtype);   // no-op if already loaded
       await transcribe(msg.id, msg.audio, msg.lang);
