@@ -95,7 +95,7 @@ async function ensureModel(modelId, dtype) {
 // deliberately kept out of the page-side catalog so passing a language is always
 // valid here.)
 const LANG_NAMES = {
-  auto: null, en: 'english', es: 'spanish', fr: 'french', de: 'german',
+  auto: null, en: 'english', es: 'spanish', ca: 'catalan', fr: 'french', de: 'german',
   it: 'italian', pt: 'portuguese', nl: 'dutch', ru: 'russian', zh: 'chinese',
   ja: 'japanese', ko: 'korean', ar: 'arabic', hi: 'hindi',
 };

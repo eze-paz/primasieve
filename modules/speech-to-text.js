@@ -36,7 +36,7 @@ const SandpieSpeech = (function () {
     { id: 'onnx-community/whisper-small', label: 'Whisper Small — most accurate (~480 MB)' },
   ];
   const LANGS = [
-    ['auto', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'],
+    ['auto', 'Auto-detect'], ['en', 'English'], ['es', 'Spanish'], ['ca', 'Catalan'], ['fr', 'French'],
     ['de', 'German'], ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'],
     ['ru', 'Russian'], ['zh', 'Chinese'], ['ja', 'Japanese'], ['ko', 'Korean'],
     ['ar', 'Arabic'], ['hi', 'Hindi'],
@@ -84,7 +84,7 @@ const SandpieSpeech = (function () {
   // (Bump ?v when editing stt-worker.js: it isn't a <script> in the HTML, so the
   // page cache-buster doesn't cover it.)
   // ============================================================
-  const WORKER_URL = 'modules/stt-worker.js?v=1';
+  const WORKER_URL = 'modules/stt-worker.js?v=2';
   let _worker = null, _seq = 0, _progressCb = null;
   function getWorker() {
     if (!_worker) {
