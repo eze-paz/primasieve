@@ -443,13 +443,13 @@ function setStreamSending(stream, sending) {
 }
 async function handleSubmit() {
   const text = $('input').value.trim();
-  if (!text && !SandpieImages.hasImage()) return;
+  if (!text && !SandpieImages.hasAttachment()) return;
   SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
   $('input').value = '';
 
   const content = await SandpieImages.buildContent(text);
 
-  if (SandpieImages.hasImage()) {
+  if (SandpieImages.hasAttachment()) {
     SandpieImages.clear();
   }
   const m = $('messages');
@@ -485,12 +485,17 @@ function handleButtonClick() {
   }
 }
 function updateQueueCount(stream) {
-
+  // Refresh just the queue pill inside the live timer. The timer's own tick
+  // (startTotalTimer→paint) also keeps this in sync; this gives an instant
+  // update when the queue changes without rebuilding the timer's other spans.
   const s = stream || activeStream();
   if (!s || !s.timerEl) return;
-  const sec = Math.floor((Date.now() - s.timerStart) / 1000);
-  const queueBadge = s.queue.length > 0 ? ` <span class="queue-pill">${s.queue.length} queued</span>` : '';
-  s.timerEl.innerHTML = `${sec}s${queueBadge}`;
+  const queueEl = s.timerEl.querySelector('.mt-queue, .queue-pill');
+  if (!queueEl) return;
+  const q = s.queue.length;
+  queueEl.dataset.q = String(q);
+  queueEl.className = q > 0 ? 'queue-pill' : 'mt-queue';
+  queueEl.textContent = q > 0 ? `${q} queued` : '';
 }
 async function processQueueFor(stream) {
   if (!stream || stream.isProcessing || stream.queue.length === 0) return;
@@ -711,6 +716,27 @@ async function sendSingle(text, stream, opts = {}) {
     try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
+// Expand a { type:'file' } attachment reference into a text part at send time.
+// Small UTF-8 text files are inlined directly; binaries (and oversized text) are
+// handed to the model as a workspace path it can open with the run_python tool —
+// the SW mounts OPFS at /files (the tool's working dir), so the stored OPFS path
+// is exactly what open() expects.
+const ATTACH_INLINE_CAP = 200_000;   // chars of text inlined before falling back to a path reference
+async function resolveFilePart(f) {
+  const size = opfs.formatSize(f.size) || `${f.size || 0} B`;
+  if (f.text) {
+    try {
+      const content = await opfs.read(f.path);
+      if (content.length <= ATTACH_INLINE_CAP) {
+        return `[Attached file "${f.name}" — saved at ${f.path}]\n\n${content}`;
+      }
+      return `[Attached file "${f.name}" — ${size} of text, saved at ${f.path}. Too large to inline; read it with the run_python tool, e.g. open(${JSON.stringify(f.path)}).read().]`;
+    } catch (_) {
+      return `[Attached file "${f.name}" is no longer available in the workspace.]`;
+    }
+  }
+  return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
+}
 async function buildAgentConfig(convMessages) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
@@ -724,6 +750,8 @@ async function buildAgentConfig(convMessages) {
           if (dataUrl) {
             resolvedContent.push({ type: 'image_url', image_url: { url: dataUrl } });
           }
+        } else if (part.type === 'file' && part.file) {
+          resolvedContent.push({ type: 'text', text: await resolveFilePart(part.file) });
         } else {
           resolvedContent.push(part);
         }
@@ -823,6 +851,31 @@ function flightRead(id) {
 
 function flightClear(id) { try { localStorage.removeItem(SP_FLIGHT_KEY(id)); } catch(_) {} }
 
+// Render an attached-document part ({ type:'file' }) as a clickable chip in a
+// message bubble. Clicking opens it in the OPFS file viewer. Images use the
+// <img> path above; this is for everything else.
+function buildFileChip(f) {
+  const chip = document.createElement('span');
+  chip.className = 'file-chip';
+  const icon = document.createElement('span');
+  icon.className = 'fc-icon';
+  icon.textContent = (typeof SandpieImages !== 'undefined' && SandpieImages.iconFor)
+    ? SandpieImages.iconFor(f.name, f.mime) : '📄';
+  const nm = document.createElement('span');
+  nm.className = 'fc-name';
+  nm.textContent = f.name || 'file';
+  const sz = document.createElement('span');
+  sz.className = 'fc-size';
+  sz.textContent = f.size ? (opfs.formatSize(f.size) || '') : '';
+  chip.append(icon, nm, sz);
+  if (f.path) {
+    chip.title = 'Open ' + (f.name || 'file');
+    chip.style.cursor = 'pointer';
+    chip.onclick = () => { try { opfs.openFile(f.path, f.name); } catch (_) {} };
+  }
+  return chip;
+}
+
 function addMsg(role, text = '', host = null) {
 
   const target = host || (activeStream() && activeStream().host) || $('messages');
@@ -878,6 +931,8 @@ function addMsg(role, text = '', host = null) {
           img.style.borderRadius = '4px';
           img.style.display = 'block';
           bubble.appendChild(img);
+        } else if (part.type === 'file' && part.file) {
+          bubble.appendChild(buildFileChip(part.file));
         }
       }
     } else {
