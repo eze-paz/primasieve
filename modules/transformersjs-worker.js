@@ -19,11 +19,14 @@
 //     { type:'complete', id, content }             // full generated text, done
 //     { type:'error', id, message }
 
-// Pinned to 3.7.1 — the exact version the known-good HF qwen3-webgpu Space uses.
-// A floating '@4' pulled a newer onnxruntime-web whose WebGPU buffer readback
-// (BufferManager::Download) device-losses mid-generation on the SAME model the
-// Space runs fine. Bump this deliberately, never by float.
-const ESM_URL = 'https://esm.sh/@huggingface/transformers@3.7.1';
+// Pinned to a SPECIFIC version — NEVER float. A floating '@4' resolves to an
+// arbitrary newest 4.x and once device-lost on WebGPU readback (non-deterministic);
+// that, plus the fp16 dtype, is what froze/errored before. 4.2.0 is the exact
+// version the known-good webml-community/Qwen3.5-WebGPU Space ships (it pulls
+// onnxruntime-web 1.26.x), and 4.x unlocks newer model archs (Qwen3/3.5, new VLMs).
+// Bump deliberately to a TESTED version — never to a floating range, never to bare
+// "latest".
+const ESM_URL = 'https://esm.sh/@huggingface/transformers@4.2.0';
 
 let _lib = null;                                   // cached imported module
 let _tokenizer = null, _model = null, _currentModelId = null;
