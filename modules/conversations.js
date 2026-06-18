@@ -598,6 +598,18 @@ async function sendSingle(text, stream, opts = {}) {
   }
   requestWakeLock();
   setStreamSending(stream, true);
+
+  // Proactive compaction: if a compactor agent's context threshold is met, run
+  // it BEFORE this turn goes out so we never ship an over-limit request (and a
+  // conversation already at the limit can still continue). Awaited so the
+  // now-smaller context is what gets built below. Runs before startTotalTimer
+  // because compaction re-renders the conversation host, which would otherwise
+  // drop a timer added first.
+  if (typeof SandpieAgents !== 'undefined' && SandpieAgents.maybeCompactBeforeSend) {
+    try { await SandpieAgents.maybeCompactBeforeSend(convId); }
+    catch (e) { console.warn('[sandpie] pre-send compaction failed:', e); }
+  }
+
   startTotalTimer(stream);
   flightWrite(convId, text);
 
@@ -1549,6 +1561,10 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
   // 4) persist the compacted messages (saveConv keeps `compactions` via ...prev)
   await saveActiveConv();
+  // The recorded usage still reflects the PRE-compaction context — drop it so the
+  // context %-meters (and the compactor's own threshold) read the reduced size
+  // instead of a stale-high value that would re-trigger compaction next send.
+  try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
   return { ok: true, removed: split, kept: messages.length };
 }
 async function restoreLastCompaction(convId) {

@@ -305,15 +305,43 @@ function emitChanged(path) {
 }
 
 // ---- triggers --------------------------------------------------------------
+// Estimate the live conversation size in tokens (chars/4 — the same heuristic
+// SandpieTokens uses). Counts the CURRENT messages array, so it already includes
+// a turn the user just typed but hasn't sent yet.
+function estimateConvTokens(msgs) {
+  let chars = 0;
+  for (const m of msgs || []) {
+    chars += textOf(m.content).length;
+    if (Array.isArray(m.tool_calls)) for (const tc of m.tool_calls) {
+      chars += ((tc.function && tc.function.arguments) || '').length + ((tc.function && tc.function.name) || '').length;
+    }
+  }
+  return Math.ceil(chars / 4);
+}
+
+// Current context usage as a % of the active provider's window, or null when the
+// window is unknown (no way to compute a %, so the at_context_pct trigger can't
+// fire — the provider needs a context window set). Takes the LARGER of the
+// authoritative last-turn usage and a fresh estimate of the live array: the
+// estimate catches a big turn before it is sent (last usage only reflects the
+// PREVIOUS turn, and is stale after a compaction), while the authoritative figure
+// accounts for the system prompt + tools the estimate can't see.
+async function contextPct() {
+  if (typeof SandpieTokens === 'undefined') return null;
+  let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
+  if (!w) return null;
+  const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
+  let used = estimateConvTokens(msgs);
+  try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
+  return (used / w) * 100;
+}
+
 async function shouldRun(a, convId) {
   if (a.errors.length) return false;
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
   if (a.everyMessages != null && (msgs.length - cursorOf(a.id, convId)) >= a.everyMessages) return true;
-  if (a.atContextPct != null && typeof SandpieTokens !== 'undefined') {
-    try {
-      const w = SandpieTokens.contextWindow();
-      if (w) { const t = await SandpieTokens.conversationTokens(); if ((t / w) * 100 >= a.atContextPct) return true; }
-    } catch {}
+  if (a.atContextPct != null) {
+    try { const p = await contextPct(); if (p != null && p >= a.atContextPct) return true; } catch {}
   }
   if (a.everyMinutes != null) {
     const last = parseInt(localStorage.getItem(lastRunKey(a.id)) || '0', 10) || 0;
@@ -411,6 +439,28 @@ async function onTurnComplete(payload) {
     if (!fire) continue;
     await execAgent(a, convId);
     break; // single-flight
+  }
+}
+
+// Proactive, pre-send compaction. The composer calls this right BEFORE a turn is
+// sent: if an enabled compact-sink agent's context threshold is already met, run
+// it now so the outgoing request stays under the limit. This is what makes the
+// compactor reliable — the reactive generation:complete path only fires AFTER a
+// turn (so it cannot save a turn that itself overflows), and a request that
+// fails on overflow records no usage, so the reactive %-check then reads
+// stale-low and never fires. Awaited by the caller, so the now-smaller context
+// is what gets built into the request.
+async function maybeCompactBeforeSend(convId) {
+  if (busy || !convId || convId !== activeConv()) return;   // compaction mutates the active conversation only
+  if (!agents.length) { try { await loadAgents(); } catch {} }
+  for (const a of agents) {
+    if (!a.enabled || a.errors.length) continue;
+    if (a.sink !== 'compact' || a.atContextPct == null) continue;
+    let p = null;
+    try { p = await contextPct(); } catch {}
+    if (p == null || p < a.atContextPct) continue;
+    await execAgent(a, convId);
+    break; // one compaction per send
   }
 }
 
@@ -561,7 +611,8 @@ if (document.readyState === 'loading') {
 window.SandpieAgents = {
   loadAgents,
   runNow,
+  maybeCompactBeforeSend,
   stopAll,
   get agents() { return agents; },
-  _internals: { parseAgent, parseFrontmatter, parseTriggerSummary: triggerSummary, buildTranscript, slugTopic, shouldRun, applySink, runAgent, withEnabled, newAgentId },
+  _internals: { parseAgent, parseFrontmatter, parseTriggerSummary: triggerSummary, buildTranscript, slugTopic, shouldRun, contextPct, estimateConvTokens, applySink, runAgent, withEnabled, newAgentId },
 };

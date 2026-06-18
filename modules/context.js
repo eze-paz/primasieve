@@ -71,11 +71,19 @@ const SandpieTokens = (() => {
     notify();
   }
 
+  // Drop a conversation's recorded usage so its size is re-derived from the live
+  // messages (used after compaction, whose summary makes the old usage stale-high).
+  function forget(convId) {
+    if (!convId) return;
+    try { localStorage.removeItem(USAGE_PREFIX + convId); } catch {}
+    notify();
+  }
+
   function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    recordUsage, conversationTokens, isEstimated, weeklyTotal,
+    recordUsage, forget, conversationTokens, isEstimated, weeklyTotal,
     contextWindow, subscribe, notify,
   };
 })();
