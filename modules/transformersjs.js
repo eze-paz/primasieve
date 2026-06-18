@@ -68,7 +68,7 @@ const SandpieTransformersJS = (function () {
   // ============================================================
   // Bump ?v when editing the worker file so the browser refetches it (it isn't a
   // <script> in the HTML, so the page cache-buster doesn't cover it).
-  const WORKER_URL = 'modules/transformersjs-worker.js?v=6';
+  const WORKER_URL = 'modules/transformersjs-worker.js?v=7';
   let _worker = null;
   let _reqSeq = 0;
   function getWorker() {

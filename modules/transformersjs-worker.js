@@ -57,8 +57,13 @@ async function ensureModel(modelId, dtype) {
 
   let model;
   try {
-    // dtype is per-model (e.g. Bonsai needs 'q1'); default to q4f16 on WebGPU.
-    model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: dtype || 'q4f16', device: 'webgpu', progress_callback });
+    // dtype is per-model (e.g. Bonsai needs 'q1'); default to q4 on WebGPU. NOT
+    // q4f16 — fp16 WebGPU kernels are unstable on Intel iGPUs (Iris Xe): a single
+    // fp16 submission trips the OS GPU watchdog (TDR) → driver reset → whole-PC
+    // freeze. The known-good Qwen3.5-WebGPU Space runs its DECODER at q4 (fp16 only
+    // for the vision encoder) for exactly this reason. q4 costs a little more memory
+    // (fp32 activations) but sidesteps the fp16 driver path.
+    model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: dtype || 'q4', device: 'webgpu', progress_callback });
   } catch (gpuErr) {
     // No usable WebGPU adapter — fall back to CPU/WASM (q4). Note the WASM heap
     // caps ~2 GB, so big models can still std::bad_alloc here; that's a device
