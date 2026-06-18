@@ -949,6 +949,32 @@
     form input, form textarea { font-size: 16px;  }
     #messages { padding: 1rem; }
     .msg { max-width: 95%; }
+
+    /* Settings modal — the desktop two-column (150px nav | panels) layout leaves
+       the actual settings panels far too narrow on a phone. Go near-full-width
+       and stack the nav as a horizontal, scrollable tab strip on top, so the
+       panels get the modal's full width. */
+    #settingsModal .modal-content {
+      width: 96vw !important;
+      max-width: none !important;
+      max-height: 90vh !important;
+      max-height: 90dvh !important;
+    }
+    #settingsModal .modal-content > div:last-child { flex-direction: column; }
+    #settingsNav {
+      flex: 0 0 auto !important;
+      flex-direction: row !important;
+      gap: 0.4rem !important;
+      padding: 0.5rem 0.6rem !important;
+      border-right: none !important;
+      border-bottom: 1px solid var(--sp-border) !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      scrollbar-width: none;
+    }
+    #settingsNav::-webkit-scrollbar { display: none; }
+    #settingsNav button { flex: 0 0 auto; white-space: nowrap; }
+    #settingsPanels { padding: 0.9rem 1rem !important; }
   }
   .chip-row {
     display: flex;
