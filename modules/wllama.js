@@ -206,6 +206,11 @@ const SandpieWllama = (function() {
   let _instanceThreads = 0;
   let _instanceBatch = 0;
   let _loadingKey = null;
+  // Digests of the last successfully-cached messages (one per message, in order).
+  // Used for PREFIX matching: if the new messages start with the same sequence,
+  // wllama can reuse its KV cache (cache_prompt:true). On edit/rewind/delete
+  // the prefix diverges → cache_prompt:false.
+  let _cachedMsgDigests = null;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
   // crashes (the "unreachable" wasm trap), the async iterator never
@@ -257,6 +262,7 @@ const SandpieWllama = (function() {
         _instanceGpuLayers = 0;
         _instanceThreads = 0;
         _instanceBatch = 0;
+        _cachedMsgDigests = null;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -295,6 +301,40 @@ const SandpieWllama = (function() {
     } finally {
       if (_loadingKey === key) _loadingKey = null;
     }
+  }
+
+  // ============================================================
+  // Cache-prompt helpers
+  // ============================================================
+  /**
+   * Build a compact digest of a single message for cache-prefix matching.
+   */
+  function digestMessage(m) {
+    if (!m) return '';
+    const role = m.role || '?';
+    let content = m.content || '';
+    if (Array.isArray(content)) {
+      content = content.filter(p => p && p.type === 'text').map(p => p.text || '').join(' ');
+    }
+    content = String(content).replace(/\s+/g, ' ').trim();
+    return role + ':' + content.slice(0, 200);
+  }
+
+  /**
+   * Build digests for a message list so we know whether the new prompt is a
+   * prefix extension of the previously-cached one.
+   */
+  function digestMessages(msgs) {
+    if (!Array.isArray(msgs) || !msgs.length) return [];
+    return msgs.map(digestMessage);
+  }
+
+  /**
+   * Check whether `cached` is a non-empty prefix of `current`.
+   */
+  function isPrefixMatch(current, cached) {
+    return cached && cached.length > 0 && cached.length <= current.length &&
+           cached.every((d, i) => d === current[i]);
   }
 
   // ============================================================
@@ -372,9 +412,16 @@ const SandpieWllama = (function() {
     let finishReason = null;
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
+    const adaptedMessages = adaptMessages(messages);
+    const currentDigests = digestMessages(adaptedMessages);
+    // Reuse the KV cache when the previously-cached messages are a PREFIX
+    // of the current ones (normal append-only chat). On edit/rewind/delete
+    // the prefix diverges → full re-prefill for safety.
+    const useCache = isPrefixMatch(currentDigests, _cachedMsgDigests);
+
     const request = {
       modelUrl,
-      messages: adaptMessages(messages),
+      messages: adaptedMessages,
       max_tokens: maxTokens || 2048,
       temperature: temperature != null ? temperature : 0.7,
       top_p: topP != null ? topP : 0.9,
@@ -404,6 +451,8 @@ const SandpieWllama = (function() {
     };
     const disarmWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
 
+    dbg(`→ round cache: ${useCache ? 'HIT (reusing KV cache)' : 'MISS (full prefill)'}`);
+
     try {
       const stream = await wllama.createChatCompletion({
         messages: request.messages,
@@ -416,13 +465,10 @@ const SandpieWllama = (function() {
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
-        // cache_prompt:false re-prefills the whole prompt each call instead of reusing
-        // the persistent KV cache. We keep ONE wllama instance across turns, so on a
-        // rewind/edit the new prompt is SHORTER than what's cached — wllama then dies
-        // with "inconsistent sequence positions" (KV at X, batch starts at Y < X) and
-        // takes the worker down. Re-prefilling is the price of correctness; we re-send
-        // the full history every round anyway, so cache reuse bought us little.
-        cache_prompt: false,
+        // cache_prompt reuses the persistent KV cache when the working history
+        // hash matches what we previously cached (normal append-only chat).
+        // On edit/rewind/delete the hash changes → cache_prompt:false for safety.
+        cache_prompt: useCache,
         // tool_choice:'auto' is REQUIRED for wllama to render the tools into the chat
         // template — passing `tools` alone leaves them out of the prompt, so the model
         // reports having no tools. (Matches wllama's own tools example.)
@@ -466,11 +512,20 @@ const SandpieWllama = (function() {
       if (watchdogFired && !finishReason && !content && !toolCalls.length) {
         throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
       }
+    } catch (err) {
+      // The KV cache is potentially corrupt after any error mid-generation;
+      // force a full re-prefill on the next turn.
+      _cachedMsgDigests = null;
+      throw err;
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }
 
     if (aborted) throw new DOMException('aborted', 'AbortError');
+
+    // Round completed normally — remember the message digests so the next
+    // turn can reuse the cached KV state if the history is extended.
+    _cachedMsgDigests = currentDigests;
 
     const keptToolCalls = toolCalls.filter(tc => tc && tc.id);
     const dtMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
