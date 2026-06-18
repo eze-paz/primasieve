@@ -44,27 +44,16 @@ const SandpieLiteRTLM = (function () {
       label: 'Gemma 4 E4B-it (~3.0 GB, tools, WebGPU — more capable)',
       modelId: `${HF}/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-web.litertlm`,
     },
-    // --- Community (non-Gemma) LiteRT-LM builds. These are NOT from
-    // litert-community and only VibeThinker ships a "-web" convert, so the WebGPU
-    // web SDK may or may not load the Qwen ones (q4/q8 community converts — try
-    // them, fall back if Engine.create rejects). Full URLs because they live under
-    // other HF orgs (so no ${HF}). The Gemma-specific <|think|> reasoning-split
-    // does NOT apply here — any thinking these emit shows inline as content.
-    {
-      id: 'qwen3.5-2b-litertlm-q4',
-      label: 'Qwen 3.5 2B — q4 LiteRT (~1.0 GB, WebGPU, community)',
-      modelId: 'https://huggingface.co/paulsp94/Qwen3.5-2B-LiteRT-LM/resolve/main/qwen35_2b_q4.litertlm',
-    },
-    {
-      id: 'qwen3.5-0.8b-litertlm-q8',
-      label: 'Qwen 3.5 0.8B — q8 LiteRT (~1.1 GB, WebGPU, community)',
-      modelId: 'https://huggingface.co/GabrieleConte/Qwen3.5-0.8B-LiteRT/resolve/main/qwen35_mm_q8_ekv2048.litertlm',
-    },
-    {
-      id: 'vibethinker-3b-litertlm-web',
-      label: 'VibeThinker 3B — LiteRT web (~3.3 GB, WebGPU, reasoning, community)',
-      modelId: 'https://huggingface.co/Tdamre/VibeThinker-3B-litert-lm/resolve/main/VibeThinker-3B-web.litertlm',
-    },
+    // NOTE: community Qwen 3.5 / VibeThinker .litertlm builds were added here and
+    // then REMOVED (2026-06-18). The LiteRT-LM *web* SDK (@litert-lm/core 0.13.1,
+    // the latest published) cannot load them — it aborts with
+    //   "Streaming HF_Tokenizer_Zlib section is not supported yet".
+    // Qwen-family models carry a HuggingFace/BPE tokenizer (stored zlib-compressed),
+    // and the web runtime currently parses ONLY SentencePiece tokenizers (what Gemma
+    // ships). A "-web" filename doesn't change the tokenizer type, and no SDK version
+    // fixes this yet. For Qwen 3.5 in-browser, use the wllama backend instead (it runs
+    // the dense GGUF builds). Re-add a LiteRT Qwen here ONLY once the web SDK gains
+    // HF-tokenizer support. Users can still paste such a URL via the "Custom" option.
   ];
 
   // ============================================================
