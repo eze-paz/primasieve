@@ -131,13 +131,18 @@
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
   async function download(path, signal) {
-    const token = await accessToken();
-    const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/download'), {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Dropbox-API-Arg': apiArg({ path }), 'Content-Type': 'text/plain', ...pathRootHeaderObj() },
-      signal,
-    });
-    if (!res.ok) throw new Error(`Download ${path}: ${res.status} ${await res.text()}`);
+    // /2/files/download's SUCCESS (200) response does NOT carry CORS headers — only
+    // its preflight and ERROR responses do. So a direct browser fetch can read an
+    // error but not the file: a 200 fails the browser CORS check ("No
+    // Access-Control-Allow-Origin"), which is exactly what breaks sync. The old
+    // build hid this by routing through a same-origin /proxy/; this server has none
+    // (see dbxRoute). Dropbox's documented browser-download path is
+    // get_temporary_link (a normal RPC — fully CORS-enabled) → GET the returned URL
+    // (a plain GET = no custom headers = NO preflight, and the temp-link host returns
+    // ACAO), which works cross-origin even under the prod COOP/COEP isolation.
+    const tl = await api('/2/files/get_temporary_link', { path });
+    const res = await fetch(dbxRoute(tl.link), { method: 'GET', signal });
+    if (!res.ok) throw new Error(`Download ${path}: ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
   }
   async function uploadSessionStart(content, close = true) {
