@@ -429,6 +429,25 @@ function applyTypeUI() {
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
+  // Per-backend option visibility — each local backend shows ONLY the params it
+  // actually reads, so wllama-only knobs no longer bleed into transformers.js /
+  // litertlm. Cloud (non-local) keeps the generic context/maxTokens/temperature.
+  //   contextWindow: wllama (n_ctx) + litertlm (maxNumTokens) + cloud; NOT transformers.js
+  //   temperature:   wllama + litertlm + cloud; NOT transformers.js (uses model default)
+  //   freq penalty:  wllama + transformers.js (repetition_penalty); NOT litertlm
+  //   presence pen.: wllama only
+  //   reasoning:     wllama (/think) + litertlm (Gemma thinking); NOT transformers.js
+  //   flash / GPU layers / threads / n_batch: wllama only (llama.cpp load params)
+  show('spContextWindow', !transformersjs);
+  show('spTemperature', !local || wllama || litertlm);
+  show('spFreqPenalty', wllama || transformersjs);
+  show('spPresencePenalty', wllama);
+  show('spReasoning', wllama || litertlm);
+  show('spFlashAttn', wllama);
+  show('spGpuLayers', wllama);
+  show('spThreads', wllama);
+  show('spBatch', wllama);
+  // Container shows whenever any local field is visible (i.e. any local backend).
   const wp = document.getElementById('spWllamaParams');
   if (wp) wp.style.display = local ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
