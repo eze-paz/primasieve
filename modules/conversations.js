@@ -32,6 +32,8 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
     messages: msgs,
   };
+  delete data.compactions;   // legacy restore-stack — superseded by `compaction`
+  if (s) { if (s.compaction) data.compaction = s.compaction; else delete data.compaction; }
   await opfs.write(convPath(convId), JSON.stringify(data));
   Sandpie.events.emit('file:changed', convPath(convId));
   await refreshConversationList();
@@ -88,6 +90,77 @@ function renderHistoricalMessage(m, host = null) {
 
   }
 }
+// Render a whole conversation into `host` (default: the active stream's host),
+// honouring compaction: messages before the boundary are NOT sent to the model —
+// they render collapsed behind a toggle, with the summary that's sent in their
+// place — and messages from the boundary on render normally (in context).
+function renderConversation(msgs, compaction, host = null) {
+  const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
+  if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); return; }
+  renderCompactionBlock(comp, msgs, host);
+  for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host);
+}
+
+function renderCompactionBlock(comp, msgs, host) {
+  const target = host || (activeStream() && activeStream().host) || $('messages');
+  const n = comp.boundary;
+  const label = (open) => `${open ? '▾' : '▸'} ${n} earlier message${n === 1 ? '' : 's'} — compacted out of the model's context`;
+  const wrap = document.createElement('div');
+  wrap.className = 'compaction-block';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'compaction-toggle';
+  toggle.textContent = label(false);
+  const archived = document.createElement('div');
+  archived.className = 'compaction-archived';
+  for (let i = 0; i < n; i++) renderHistoricalMessage(msgs[i], archived);
+  toggle.onclick = () => { const open = wrap.classList.toggle('open'); toggle.textContent = label(open); };
+  const sum = document.createElement('div');
+  sum.className = 'compaction-summary';
+  const lab = document.createElement('div');
+  lab.className = 'cs-label';
+  lab.textContent = 'Summary sent to the model in place of the above ↓';
+  const txt = document.createElement('div');
+  txt.className = 'cs-text';
+  txt.textContent = comp.summary;
+  sum.appendChild(lab);
+  sum.appendChild(txt);
+  wrap.appendChild(toggle);
+  wrap.appendChild(archived);
+  wrap.appendChild(sum);
+  target.appendChild(wrap);
+}
+
+// Migrate the OLD compaction format (a data.compactions[] stack of removed heads,
+// with data.messages already spliced down to [summary, …tail]) to the new one
+// (data.messages = the FULL conversation + a single data.compaction {boundary,
+// summary}). In-memory only; the next saveConv persists the new shape.
+function migrateCompactionData(data) {
+  if (!data || data.compaction || !Array.isArray(data.compactions) || !data.compactions.length) return data;
+  const msgs = Array.isArray(data.messages) ? data.messages : [];
+  const isSummary = (m) => m && typeof m.content === 'string' && m.content.startsWith(SP_SUMMARY_MARKER);
+  const originals = [];
+  for (const c of data.compactions) {
+    if (!c || !Array.isArray(c.removed)) continue;
+    for (const m of c.removed) if (!isSummary(m)) originals.push(m);
+  }
+  const headSummary = isSummary(msgs[0]);
+  const summary = headSummary ? msgs[0].content.slice(SP_SUMMARY_MARKER.length).replace(/^\s+/, '') : '';
+  const tail = headSummary ? msgs.slice(1) : msgs.slice();
+  data.messages = [...originals, ...tail];
+  data.compaction = summary ? { boundary: originals.length, summary } : null;
+  delete data.compactions;
+  return data;
+}
+
+// Load a conversation file's messages + compaction state onto a stream (with
+// migration). Used by every load path so compaction always survives a reload.
+function hydrateStreamFromData(s, data) {
+  migrateCompactionData(data);
+  s.messages = (data.messages || []).slice();
+  s.compaction = data.compaction || null;
+}
+
 function clearActiveConvUI() {
 
   const s = activeStream();
@@ -133,9 +206,9 @@ async function loadConv(id) {
       return;
     }
     const s = ensureStream(id);
-    s.messages = (data.messages || []).slice();
+    hydrateStreamFromData(s, data);
     mountConv(id);
-    for (const m of s.messages) renderHistoricalMessage(m);
+    renderConversation(s.messages, s.compaction);
   }
   activeConvId = id;
   localStorage.setItem('sandpie-active-conv', id);
@@ -613,7 +686,7 @@ async function sendSingle(text, stream, opts = {}) {
   startTotalTimer(stream);
   flightWrite(convId, text);
 
-  const config = await buildAgentConfig(convMessages);
+  const config = await buildAgentConfig(convMessages, stream.compaction);
 
   const ctrl = new AbortController();
   stream.requestId = ctrl;
@@ -749,11 +822,21 @@ async function resolveFilePart(f) {
   }
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
-async function buildAgentConfig(convMessages) {
+async function buildAgentConfig(convMessages, compaction) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
+  // Non-destructive compaction: send [summary, …in-context tail] in place of the
+  // full history so the model's context stays bounded. The full convMessages
+  // still drives the system prompt (skill detection) below.
+  let sendMessages = convMessages;
+  if (compaction && compaction.boundary > 0 && compaction.boundary < convMessages.length) {
+    sendMessages = [
+      { role: 'user', content: SP_SUMMARY_MARKER + '\n\n' + compaction.summary },
+      ...convMessages.slice(compaction.boundary),
+    ];
+  }
   const resolvedMessages = [];
-  for (const msg of convMessages) {
+  for (const msg of sendMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
       const resolvedContent = [];
       for (const part of msg.content) {
@@ -843,6 +926,7 @@ function ensureStream(id) {
       messages: [],
       queue: [], isProcessing: false, queueAborted: false,
       abort: null,
+      compaction: null,
       timerEl: null, timerStart: 0, timerInterval: null,
       genChars: 0, tokTarget: 0, tokShown: 0, rateShown: 0,
       generating: false,
@@ -1457,12 +1541,12 @@ async function maybeResumeFlight(id) {
   let data;
   try { data = JSON.parse(await opfs.read(convPath(id))); } catch { flightClear(id); return; }
   const s = ensureStream(id);
-  s.messages = (data.messages || []).slice();
+  hydrateStreamFromData(s, data);
   if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
     flightClear(id); return;
   }
   mountConv(id);
-  for (const m of s.messages) renderHistoricalMessage(m);
+  renderConversation(s.messages, s.compaction);
   addMsg('info', 'Resuming generation…', s.host);
   sendSingle(ck.text, s, { resume: true });
 }
@@ -1509,23 +1593,26 @@ async function rewindFromMenu() {
     updateQueueCount(s);
   }
   messages.length = idx;
+  // Rewinding into (or before) the compacted span invalidates the summary —
+  // drop the compaction so the remaining (now short) history is sent in full.
+  if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
   clearActiveConvUI();
-  for (const m of messages) renderHistoricalMessage(m);
+  renderConversation(messages, s ? s.compaction : null);
 
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   await saveActiveConv();
 }
-/* ---- conversation compaction (compress older turns into a summary) -------
-   Replace messages[0..split) with ONE user-role summary message, keeping the
-   most recent `keepTail` messages verbatim, so the live context stays bounded
-   and a chat can run indefinitely. The replaced span is stored as a restore
-   point INSIDE the conversation file (data.compactions) — never a sidecar file
-   (listConversations() treats every *.json in _conversations/ as a chat, so a
-   sidecar would show up as a phantom conversation; in-file also means it
-   deletes/archives/syncs with the conversation, leaving no orphans). Mutates
-   `messages` IN PLACE so it stays the same array reference as the active
-   stream's s.messages (see mountConv) — the same way rewindFromMenu persists. */
+/* ---- conversation compaction (NON-destructive) ---------------------------
+   Compaction never deletes turns. It records a boundary + a summary on the
+   conversation (data.compaction = { boundary, summary }) and keeps the FULL
+   message history intact. At SEND time buildAgentConfig ships only
+   [summary, …messages.from(boundary)], so the model's context stays bounded and
+   a chat can run indefinitely; in the UI the whole conversation is rendered, the
+   pre-boundary span collapsed behind a toggle (renderConversation) and clearly
+   marked as not sent. safeSplitIndex picks where the boundary lands; the boundary
+   only ever moves forward. (Old chats used a data.compactions[] restore-stack +
+   spliced messages — migrateCompactionData converts them on load.) */
 const SP_SUMMARY_MARKER = '[Earlier conversation auto-summarized to preserve context]';
 function safeSplitIndex(msgs, keepTail) {
   let split = Math.max(0, msgs.length - (keepTail || 10));
@@ -1537,50 +1624,34 @@ function safeSplitIndex(msgs, keepTail) {
   while (split < msgs.length && (!msgs[split] || msgs[split].role !== 'assistant')) split++;
   return split;
 }
+function getCompaction(convId) {
+  const s = convStreams.get(convId);
+  return (s && s.compaction) || null;
+}
 async function compactConversation(convId, { keepTail = 10, summary = '' } = {}) {
   if (!convId || convId !== activeConvId) return { ok: false, reason: 'not the active conversation' };
   const text = String(summary || '').trim();
   if (!text) return { ok: false, reason: 'empty summary' };
-  const split = safeSplitIndex(messages, keepTail);
-  if (split <= 1 || split >= messages.length) return { ok: false, reason: 'nothing safe to compact' };
-  const removed = messages.slice(0, split).map(m => ({ ...m }));
-  const summaryMsg = { role: 'user', content: SP_SUMMARY_MARKER + '\n\n' + text };
-  // 1) persist the restore point first (file still holds the pre-compaction messages)
-  let prev = {};
-  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
-  const compactions = Array.isArray(prev.compactions) ? prev.compactions : [];
-  compactions.push({ at: new Date().toISOString(), count: split, removed });
-  while (compactions.length > 20) compactions.shift();   // bound file growth
-  await updateConvFile(convId, { compactions });
-  // 2) rewrite the live array IN PLACE (keeps the s.messages reference)
-  messages.splice(0, split, summaryMsg);
-  // 3) re-render exactly like rewind
+  const s = activeStream();
+  const boundary = safeSplitIndex(messages, keepTail);
+  const prevBoundary = (s && s.compaction && s.compaction.boundary) || 0;
+  if (boundary <= prevBoundary || boundary >= messages.length) return { ok: false, reason: 'nothing new to compact' };
+  // Non-destructive: keep the full history, just advance the boundary + summary.
+  const compaction = { boundary, summary: text, at: new Date().toISOString() };
+  if (s) s.compaction = compaction;
+  await updateConvFile(convId, { compaction, compactions: undefined });
+  // Re-render the whole conversation: pre-boundary span collapsed (not sent),
+  // the rest in context.
   clearActiveConvUI();
-  for (const m of messages) renderHistoricalMessage(m);
+  renderConversation(messages, compaction);
   const el = $('messages');
   if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
-  // 4) persist the compacted messages (saveConv keeps `compactions` via ...prev)
   await saveActiveConv();
-  // The recorded usage still reflects the PRE-compaction context — drop it so the
-  // context %-meters (and the compactor's own threshold) read the reduced size
-  // instead of a stale-high value that would re-trigger compaction next send.
+  // The recorded usage still reflects the PRE-compaction (larger) context — drop
+  // it so the context %-meters (and the compactor's own threshold) read the
+  // reduced send size instead of a stale-high value that would re-trigger next send.
   try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
-  return { ok: true, removed: split, kept: messages.length };
-}
-async function restoreLastCompaction(convId) {
-  if (!convId || convId !== activeConvId) return { ok: false, reason: 'not the active conversation' };
-  let data = {};
-  try { data = JSON.parse(await opfs.read(convPath(convId))); } catch { return { ok: false }; }
-  const comps = Array.isArray(data.compactions) ? data.compactions.slice() : [];
-  const last = comps.pop();
-  if (!last || !Array.isArray(last.removed)) return { ok: false, reason: 'no restore point' };
-  const head = (messages[0] && typeof messages[0].content === 'string' && messages[0].content.startsWith(SP_SUMMARY_MARKER)) ? 1 : 0;
-  messages.splice(0, head, ...last.removed);
-  await updateConvFile(convId, { compactions: comps });
-  clearActiveConvUI();
-  for (const m of messages) renderHistoricalMessage(m);
-  await saveActiveConv();
-  return { ok: true, restored: last.removed.length };
+  return { ok: true, removed: boundary, kept: messages.length - boundary };
 }
 function toggleToolsMinimizedFromMenu() {
   toolsMinimized = !toolsMinimized;
@@ -1969,7 +2040,7 @@ window.convPath = convPath;
 window.ensureActiveConv = ensureActiveConv;
 window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
-window.SandpieConversations = { compact: compactConversation, restoreLast: restoreLastCompaction, safeSplitIndex };
+window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;
@@ -2140,10 +2211,10 @@ function bootConversations() {
       const s = ensureStream(restoreId);
       try {
         const data = JSON.parse(await opfs.read(convPath(restoreId)));
-        s.messages = (data.messages || []).slice();
+        hydrateStreamFromData(s, data);
       } catch {  }
       mountConv(restoreId);
-      for (const m of s.messages) renderHistoricalMessage(m);
+      renderConversation(s.messages, s.compaction);
     }
     const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
     requestAnimationFrame(() => requestAnimationFrame(scrollEnd));

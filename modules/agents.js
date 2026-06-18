@@ -331,7 +331,17 @@ async function contextPct() {
   let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
   if (!w) return null;
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
-  let used = estimateConvTokens(msgs);
+  // Measure what's actually SENT: with non-destructive compaction the live array
+  // holds the full history but only [summary + in-context tail] goes to the model.
+  let sent = msgs;
+  try {
+    const comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
+      ? SandpieConversations.getCompaction(activeConv()) : null;
+    if (comp && comp.boundary > 0 && comp.boundary < msgs.length) {
+      sent = [{ role: 'user', content: comp.summary || '' }, ...msgs.slice(comp.boundary)];
+    }
+  } catch {}
+  let used = estimateConvTokens(sent);
   try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
   return (used / w) * 100;
 }
@@ -385,19 +395,28 @@ async function applySink(a, out, convId) {
 async function runAgent(a, convId, signal) {
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
   let from = 0, to = msgs.length;
+  let priorSummary = '';
   if (a.sink === 'compact') {
-    // Summarize everything except the protected tail — the exact span the
-    // compactor will splice out, so the prompt sees what it replaces.
+    // Summarize the span between the current compaction boundary and the new one
+    // (everything except the protected tail). Build on the prior summary so old
+    // context isn't lost re-summarizing only the newly-aged turns.
     const keepTail = a.keepTail || 10;
     to = (typeof SandpieConversations !== 'undefined' && SandpieConversations.safeSplitIndex)
       ? SandpieConversations.safeSplitIndex(msgs, keepTail)
       : Math.max(0, msgs.length - keepTail);
+    const comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
+      ? SandpieConversations.getCompaction(convId) : null;
+    from = (comp && comp.boundary) || 0;
+    priorSummary = (comp && comp.summary) || '';
   } else if (a.input === 'since_last_run') {
     from = cursorOf(a.id, convId);
   } else if (/^last_\d+$/.test(a.input)) {
     from = Math.max(0, msgs.length - parseInt(a.input.slice(5), 10));
   }
-  const transcript = buildTranscript(msgs, from, to);
+  let transcript = buildTranscript(msgs, from, to);
+  if (a.sink === 'compact' && priorSummary) {
+    transcript = '[Summary of the conversation so far]\n' + priorSummary + '\n\n[New turns to fold into the summary]\n' + transcript;
+  }
   if (!transcript.trim()) return { status: 'nothing to process' };
   const out = await runPrompt(a.prompt, transcript, { model: a.model || undefined, signal, maxTokens: a.sink === 'compact' ? 2048 : 1024 });
   localStorage.setItem(cursorKey(a.id, convId), String(msgs.length));

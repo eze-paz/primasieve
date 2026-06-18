@@ -1258,6 +1258,27 @@
   .file-chip .fc-size { font-size: 0.7rem; color: var(--sp-text-dim); flex: none; }
   .bubble .file-chip { cursor: pointer; }
   .bubble .file-chip:hover { border-color: var(--sp-accent); }
+
+  /* Compaction block: the pre-boundary turns the model no longer sees, shown
+     collapsed with a toggle, plus the summary that's sent in their place. */
+  .compaction-block { margin: 0.25rem 0 0.6rem; }
+  .compaction-toggle {
+    display: block; width: 100%; text-align: left;
+    background: transparent; border: 1px dashed var(--sp-border); border-radius: 6px;
+    color: var(--sp-text-dim); font: inherit; font-size: 0.72rem;
+    padding: 0.3rem 0.6rem; cursor: pointer;
+  }
+  .compaction-toggle:hover { border-color: var(--sp-text-dim); color: var(--sp-text); }
+  .compaction-archived { display: none; margin: 0.4rem 0; padding-left: 0.6rem; border-left: 2px solid var(--sp-border); }
+  .compaction-block.open .compaction-archived { display: block; }
+  .compaction-archived .msg { opacity: 0.5; }
+  .compaction-summary {
+    margin: 0.45rem 0 0.2rem; padding: 0.5rem 0.7rem;
+    background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 8px;
+    border-left: 3px solid var(--sp-accent);
+  }
+  .compaction-summary .cs-label { font-size: 0.64rem; color: var(--sp-accent); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+  .compaction-summary .cs-text { font-size: 0.8rem; color: var(--sp-text-dim); white-space: pre-wrap; max-height: 12rem; overflow-y: auto; }
   #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
   #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
   .welcome {
