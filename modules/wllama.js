@@ -411,7 +411,7 @@ const SandpieWllama = (function() {
    *   temperature — sampling temperature (0–2)
    *   topP        — nucleus sampling (0–1)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, nThreads, nBatch, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed, reasoning }) {
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, nThreads, nBatch, maxTokens, temperature, topP, topK, frequencyPenalty, presencePenalty, reasoning }) {
     const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers, nThreads, nBatch });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
@@ -419,7 +419,7 @@ const SandpieWllama = (function() {
     // to the raw-completion path (manual prompt + `<think` prefill, reasoning split
     // out as reasoning_content, no tools). `tools` is intentionally ignored here.
     if (isRwkvUrl(modelUrl)) {
-      return streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed });
+      return streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, frequencyPenalty, presencePenalty });
     }
 
     let aborted = false;
@@ -463,10 +463,8 @@ const SandpieWllama = (function() {
     // Optional sampling / penalty params (top-level; llama.cpp + OAI names). Only
     // sent when set, so wllama keeps its own defaults otherwise.
     if (topK != null) request.top_k = topK;
-    if (minP != null) request.min_p = minP;
     if (frequencyPenalty != null) request.frequency_penalty = frequencyPenalty;
     if (presencePenalty != null) request.presence_penalty = presencePenalty;
-    if (seed != null) request.seed = seed;
     dbg(`→ round: ${request.messages.length} msgs, ${tools ? tools.length : 0} tools, last role: ${request.messages.length ? request.messages[request.messages.length - 1].role : '(none)'}`);
 
     // Watchdog: if the wllama worker crashes (wasm unreachable) the async
@@ -493,10 +491,8 @@ const SandpieWllama = (function() {
         temperature: request.temperature,
         top_p: request.top_p,
         ...(request.top_k != null ? { top_k: request.top_k } : {}),
-        ...(request.min_p != null ? { min_p: request.min_p } : {}),
         ...(request.frequency_penalty != null ? { frequency_penalty: request.frequency_penalty } : {}),
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
-        ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
         // cache_prompt is held false (useCache is forced false above) — KV reuse
         // across chat turns desynced the worker, so we always full re-prefill.
@@ -621,7 +617,7 @@ const SandpieWllama = (function() {
     return turns.join('\n\n') + '\n\nAssistant:' + promptPrefill;
   }
 
-  async function streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, minP, frequencyPenalty, presencePenalty, seed }) {
+  async function streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, topP, topK, frequencyPenalty, presencePenalty }) {
     // Reasoning toggle → assistant prefill:
     //   no_think → seed a closed, empty block ("fake thinking, fast" per BlinkDL)
     //   think / auto → seed an open `<think>` so the model reasons (G1's default).
@@ -711,8 +707,6 @@ const SandpieWllama = (function() {
       stop: ['\n\nUser:'],
     };
     if (topK != null) params.top_k = topK;
-    if (minP != null) params.min_p = minP;
-    if (seed != null) params.seed = seed;
 
     dbg(`→ rwkv round (${mode}): prompt ${prompt.length} chars`);
 
@@ -867,10 +861,8 @@ const SandpieWllama = (function() {
       temperature: provider.temperature != null ? provider.temperature : undefined,
       topP: provider.topP != null ? provider.topP : undefined,
       topK: provider.topK != null ? provider.topK : undefined,
-      minP: provider.minP != null ? provider.minP : undefined,
       frequencyPenalty: provider.frequencyPenalty != null ? provider.frequencyPenalty : undefined,
       presencePenalty: provider.presencePenalty != null ? provider.presencePenalty : undefined,
-      seed: provider.seed != null ? provider.seed : undefined,
     };
 
     // Agentic loop, mirroring the SW's runAgent: stream a round, append the
