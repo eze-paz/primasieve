@@ -732,6 +732,11 @@ const SandpieWllama = (function() {
   //   { type:'error', message } { type:'agent_done' }
   async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, onEvent) {
     const emit = (ev) => { try { onEvent && onEvent(ev); } catch (_) {} };
+    // Single active local backend: free the OTHER local LLMs' GPU/WASM contexts
+    // before we run, so two WebGPU runtimes never share the (weak) GPU and
+    // device-loss each other. (A backend never unloads itself.)
+    try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
+    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
     const modelUrl = provider && (provider.endpoint || '').trim();
     if (!modelUrl) {
       emit({ type: 'error', message: 'wllama: this provider has no model URL — set the GGUF URL in Settings.' });
@@ -891,10 +896,28 @@ const SandpieWllama = (function() {
     emit({ type: 'agent_done' });
   }
 
+  // Free this backend's wllama instance + its WebGPU/WASM context. Called by the
+  // OTHER local backends (and applyActiveProvider) so only one local LLM is ever
+  // resident — two WebGPU runtimes on one weak GPU device-loss each other.
+  // Idempotent; the model lazily reloads via getInstance on next use.
+  async function unload() {
+    if (!_instance) return;
+    try { await _instance.exit(); } catch (_) {}
+    _instance = null;
+    _instanceUrl = null;
+    _instanceCtx = 0;
+    _instanceFlashAttn = true;
+    _instanceGpuLayers = 0;
+    _instanceThreads = 0;
+    _instanceBatch = 0;
+    _kvDirty = false;
+  }
+
   return {
     DEFAULT_MODELS,
     DEFAULT_N_CTX,
     getInstance,
+    unload,
     streamRound,
     runConversation,
   };

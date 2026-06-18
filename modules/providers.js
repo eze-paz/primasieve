@@ -216,6 +216,16 @@ function getActiveProvider() {
 // conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
   const p = getActiveProvider();
+  // Single active local backend: when the active provider changes, eagerly free
+  // any local LLM that isn't the active type (no-op if it wasn't loaded). The hard
+  // guarantee lives in each backend's runConversation; this frees idle GPU/WASM
+  // sooner. A cloud provider (type is none of the 3 local types) frees all three.
+  try {
+    const _t = p && p.type;
+    if (_t !== 'wllama') window.SandpieWllama?.unload?.();
+    if (_t !== 'transformersjs') window.SandpieTransformersJS?.unload?.();
+    if (_t !== 'litertlm') window.SandpieLiteRTLM?.unload?.();
+  } catch (_) {}
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');
   const ak = document.getElementById('apiKey');

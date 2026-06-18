@@ -558,6 +558,10 @@ const SandpieLiteRTLM = (function () {
   // and no need for filterChannelContentFromKvCache.
   // ============================================================
   async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, emit) {
+    // Single active local backend: free the OTHER local LLMs' GPU/WASM contexts
+    // first, so only one local runtime holds a WebGPU device at a time.
+    try { await window.SandpieWllama?.unload?.(); } catch (_) {}
+    try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
     const MAX_ROUNDS = 8;
     const toolList = (tools || []).filter(t => t && t.type === 'function');
     const nCtx = (provider.contextWindow | 0) || DEFAULT_N_CTX;
@@ -723,7 +727,16 @@ const SandpieLiteRTLM = (function () {
   // ============================================================
   // Exports
   // ============================================================
-  return { DEFAULT_MODELS, DEFAULT_N_CTX, streamRound, runConversation };
+  // Free the LiteRT engine + its WebGPU device. Called by the other local backends
+  // (and applyActiveProvider) so only one local LLM holds a GPU context at a time.
+  // ensureEngine() lazily recreates it on next use.
+  async function unload() {
+    if (!_engine) return;
+    try { await _engine.delete(); } catch (_) {}
+    _engine = null; _engineModel = null; _engineCtx = 0;
+  }
+
+  return { DEFAULT_MODELS, DEFAULT_N_CTX, unload, streamRound, runConversation };
 })();
 
 if (typeof window !== 'undefined') window.SandpieLiteRTLM = SandpieLiteRTLM;

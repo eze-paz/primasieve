@@ -231,6 +231,10 @@ const SandpieTransformersJS = (function () {
     { provider, messages, systemPrompt, tools, convId, signal },
     emit
   ) {
+    // Single active local backend: free the OTHER local LLMs' GPU/WASM contexts
+    // first, so only one local runtime holds a WebGPU device at a time.
+    try { await window.SandpieWllama?.unload?.(); } catch (_) {}
+    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
     const MAX_ROUNDS = 8;
     const work = [];
 
@@ -344,9 +348,17 @@ const SandpieTransformersJS = (function () {
   // ============================================================
   // Exports
   // ============================================================
+  // Free the worker (its WebGPU device + the loaded model). Called by the other
+  // local backends (and applyActiveProvider) so only one local LLM holds a GPU
+  // context at a time. getWorker() lazily recreates it on the next generation.
+  function unload() {
+    if (_worker) { try { _worker.terminate(); } catch (_) {} _worker = null; }
+  }
+
   const api = {
     DEFAULT_MODELS,
     DEFAULT_N_CTX,
+    unload,
     streamRound,
     runConversation,
   };
