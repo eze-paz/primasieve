@@ -63,19 +63,21 @@ const SandpieTransformersJS = (function () {
   // ============================================================
   // Model — load + generation run INLINE on the main thread.
   // ============================================================
-  // Pinned to a SPECIFIC version — NEVER float. A floating '@4' resolves to an
-  // arbitrary newest 4.x and once device-lost on WebGPU readback; 4.2.0 is the
-  // exact version the known-good webml-community/Qwen3.5-WebGPU Space ships (pulls
-  // onnxruntime-web 1.26.x). Bump deliberately to a TESTED version, never to a
-  // floating range or bare "latest".
-  const ESM_URL = 'https://esm.sh/@huggingface/transformers@4.2.0';
+  // Loaded from jsdelivr — the EXACT CDN the working webml-community/Qwen3.5-WebGPU
+  // Space imports from. We were on esm.sh, which re-resolves transformers.js's
+  // onnxruntime-web to a DEV build (1.26.0-dev) whose WASM traps mid-generation with
+  // "operation does not support unaligned accesses"; jsdelivr serves the ORT build
+  // transformers.js actually ships (what the Space runs). jsdelivr is also already
+  // in the app CSP (marked/dompurify load from it). Pin a SPECIFIC version — NEVER
+  // float ('@4' / "latest"); bump deliberately to a TESTED version.
+  const LIB_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
 
   let _lib = null;                                  // cached imported module
   let _tokenizer = null, _model = null, _currentModelId = null;
   let _stopping = null;                             // InterruptableStoppingCriteria for the active run
 
   async function lib() {
-    if (!_lib) _lib = await import(ESM_URL);
+    if (!_lib) _lib = await import(LIB_URL);
     return _lib;
   }
 
