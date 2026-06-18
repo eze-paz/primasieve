@@ -1802,7 +1802,17 @@ applyToolsMinimized();
   setupScrollTracking($('messages'));
   setupScrollTracking($('messagesSide'));
   ta.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    // Alt+Enter → newline, same as Shift+Enter. Browsers insert a newline for
+    // Shift+Enter natively but NOT for Alt+Enter, so do it explicitly here.
+    if (e.altKey) {
+      e.preventDefault();
+      ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));   // fire autosize
+      return;
+    }
+    // Plain Enter submits; Shift+Enter falls through to the native newline.
+    if (!e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
