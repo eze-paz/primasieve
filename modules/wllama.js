@@ -34,13 +34,35 @@ const SandpieWllama = (function() {
   // ("unreachable") on common GGUFs. We sidestep that by ALWAYS passing an
   // explicit n_gpu_layers (default 0 = pure CPU; see getInstance). GPU offload
   // is opt-in per provider via the "GPU layers" field.
-  const WLLAMA_VERSION = '3.4.1';
+  const WLLAMA_VERSION = '3.5.1';
   const SDK_URL  = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/index.min.js`;
   const WASM_URL = `https://cdn.jsdelivr.net/npm/@wllama/wllama@${WLLAMA_VERSION}/esm/wasm/wllama.wasm`;
 
   // Curated GGUF catalog. URLs point at HuggingFace direct downloads.
   // The dropdown also offers a "Custom" free-text option for any GGUF URL.
   const DEFAULT_MODELS = [
+    // Qwen 3.5 — the hybrid Gated-DeltaNet family. The GGUF declares arch
+    // "qwen35": most layers are SSM / linear-attention (a fixed-size recurrent
+    // state, so decode cost is O(1) per token with no growing KV cache) with a
+    // periodic full-attention layer. These need a wllama whose bundled llama.cpp
+    // carries the qwen35 graph + delta_net / gated_delta / linear_attn ops — those
+    // are present in the WASM (verified ≥3.4.1). DENSE variants only: small enough
+    // for the browser. The MoE Qwen3.5 (35B-A3B and up) won't fit in a tab.
+    {
+      id: 'qwen3.5-0.8b-q4_k_m',
+      label: 'Qwen 3.5 0.8B — Q4_K_M (~0.5 GB, DeltaNet, reasoning + tools)',
+      url: 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf',
+    },
+    {
+      id: 'qwen3.5-2b-q4_k_m',
+      label: 'Qwen 3.5 2B — Q4_K_M (~1.2 GB, DeltaNet, reasoning + tools)',
+      url: 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
+    },
+    {
+      id: 'qwen3.5-4b-q4_k_m',
+      label: 'Qwen 3.5 4B — Q4_K_M (~2.6 GB, DeltaNet, reasoning + tools)',
+      url: 'https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
+    },
     {
       id: 'qwen2.5-1.5b-instruct-q4_k_m',
       label: 'Qwen 2.5 1.5B Instruct — Q4_K_M (~1 GB, tool-calling)',
@@ -408,6 +430,7 @@ const SandpieWllama = (function() {
     }
 
     let content = '';
+    let reasoningText = '';
     const toolCalls = [];
     let finishReason = null;
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -486,6 +509,12 @@ const SandpieWllama = (function() {
         if (choice && choice.finish_reason) finishReason = choice.finish_reason;
         if (!delta) continue;
         if (delta.content) content += delta.content;
+        // Reasoning models (e.g. Qwen 3.5 / arch "qwen35") emit their <think>
+        // stream as reasoning_content, which llama.cpp keeps OUT of content.
+        // Capture it and forward it below so the page shows it live in the
+        // "Thinking…" box (conversations.js applyDelta reads reasoning_content).
+        // Without this, an all-thinking turn looks like an empty reply.
+        if (delta.reasoning_content) reasoningText += delta.reasoning_content;
         if (delta.tool_calls) {
           // Accumulate by index — same approach as the SW path.  Some
           // models stream the function name/arguments in multiple pieces.
@@ -503,7 +532,7 @@ const SandpieWllama = (function() {
         // never created and the later tool_started / tool_result events
         // silently no-op (markToolStarted looks up an element by tc.id
         // and bails when it can't find one).
-        if (delta.content || delta.tool_calls) {
+        if (delta.content || delta.tool_calls || delta.reasoning_content) {
           try { onDelta && onDelta(delta); } catch (_) {}
         }
       }
@@ -537,7 +566,7 @@ const SandpieWllama = (function() {
       self.__wllamaLastRound = {
         ts: new Date().toISOString(),
         request,
-        response: { content, tool_calls: keptToolCalls, finish_reason: finishReason, duration_ms: dtMs },
+        response: { content, reasoning: reasoningText, tool_calls: keptToolCalls, finish_reason: finishReason, duration_ms: dtMs },
       };
     } catch (_) {}
 
