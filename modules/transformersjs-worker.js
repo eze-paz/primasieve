@@ -19,7 +19,11 @@
 //     { type:'complete', id, content }             // full generated text, done
 //     { type:'error', id, message }
 
-const ESM_URL = 'https://esm.sh/@huggingface/transformers@4';
+// Pinned to 3.7.1 — the exact version the known-good HF qwen3-webgpu Space uses.
+// A floating '@4' pulled a newer onnxruntime-web whose WebGPU buffer readback
+// (BufferManager::Download) device-losses mid-generation on the SAME model the
+// Space runs fine. Bump this deliberately, never by float.
+const ESM_URL = 'https://esm.sh/@huggingface/transformers@3.7.1';
 
 let _lib = null;                                   // cached imported module
 let _tokenizer = null, _model = null, _currentModelId = null;
@@ -155,8 +159,7 @@ async function generate(id, payload) {
   const opts = { ...inputs, max_new_tokens: p.maxTokens || 2048, do_sample: true };
   if (streamer) opts.streamer = streamer;
   if (_stopping) opts.stopping_criteria = _stopping;
-  if (p.temperature != null) opts.temperature = p.temperature;
-  if (p.topP != null) opts.top_p = p.topP;
+  // temperature/top_p intentionally omitted — always use the model's defaults.
   if (p.topK != null) opts.top_k = p.topK;
   if (p.frequencyPenalty != null) opts.repetition_penalty = 1 + p.frequencyPenalty;
   if (p.seed != null) opts.seed = p.seed;
