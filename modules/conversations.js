@@ -681,6 +681,16 @@ async function sendSingle(text, stream, opts = {}) {
     catch (e) { console.warn('[sandpie] pre-send compaction failed:', e); }
   }
 
+  // Snapshot the conversation's token size NOW (after any compaction) as the
+  // baseline for the live CONTEXT meter; the paint loop pushes baseline +
+  // generated-so-far while the turn runs. Clear any stale live override first so
+  // we read the authoritative size.
+  if (typeof SandpieTokens !== 'undefined') {
+    try { SandpieTokens.clearLiveTokens && SandpieTokens.clearLiveTokens(); } catch (_) {}
+    try { stream.tokBaseline = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; }
+    catch (_) { stream.tokBaseline = 0; }
+  }
+
   startTotalTimer(stream);
   flightWrite(convId, text);
 
@@ -782,6 +792,9 @@ async function sendSingle(text, stream, opts = {}) {
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
+    // Drop the live CONTEXT override so the panel shows the authoritative
+    // provider-reported size now the turn is done.
+    try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.clearLiveTokens) SandpieTokens.clearLiveTokens(convId); } catch (_) {}
     setStreamSending(stream, false);
     await saveConv(convId);
 
@@ -919,7 +932,7 @@ function ensureStream(id) {
       abort: null,
       compaction: null,
       timerEl: null, timerStart: 0, timerInterval: null,
-      genChars: 0, tokTarget: 0, tokShown: 0, rateShown: 0,
+      genChars: 0, tokTarget: 0, tokShown: 0, rateShown: 0, tokBaseline: 0,
       generating: false,
     };
     convStreams.set(id, s);
@@ -2143,6 +2156,13 @@ function startTotalTimer(stream) {
     const inst = elapsed > 0.4 ? target / elapsed : 0;
     stream.rateShown = reduce ? inst : stream.rateShown + (inst - stream.rateShown) * TOK_EASE;
     set(rateEl, RATE_FMT(stream.rateShown));
+
+    // Live CONTEXT meter: baseline + generated-so-far, pushed only for the
+    // visible conversation (SandpieTokens throttles the panel re-render). Cleared
+    // in sendSingle's finally → the panel snaps to the authoritative size.
+    if (stream.id === activeConvId && typeof SandpieTokens !== 'undefined' && SandpieTokens.setLiveTokens) {
+      SandpieTokens.setLiveTokens(stream.id, (stream.tokBaseline || 0) + target);
+    }
 
     const q = stream.queue.length;
     if (queueEl.dataset.q !== String(q)) {

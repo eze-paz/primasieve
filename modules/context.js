@@ -36,9 +36,15 @@ const SandpieTokens = (() => {
     return Math.ceil(chars / 4);
   }
 
+  // Live override pushed by the streaming loop during generation, so the panel
+  // climbs in real time (baseline + generated-so-far) instead of only updating
+  // when the turn ends. Cleared when the turn finishes → authoritative wins.
+  let _liveTotal = null, _liveConvId = null, _liveNotifyT = null;
+
   async function conversationTokens() {
     const convId = localStorage.getItem('sandpie-active-conv');
     if (!convId) return 0;
+    if (_liveTotal != null && _liveConvId === convId) return _liveTotal;
     try {
       const stored = localStorage.getItem(USAGE_PREFIX + convId);
       if (stored) return usageTotal(JSON.parse(stored));
@@ -54,7 +60,22 @@ const SandpieTokens = (() => {
 
   function isEstimated() {
     const convId = localStorage.getItem('sandpie-active-conv');
+    if (_liveTotal != null && _liveConvId === convId) return true;   // live = estimate
     return !convId || !localStorage.getItem(USAGE_PREFIX + convId);
+  }
+
+  // Streaming loop calls this (throttled internally) with the live running total.
+  function setLiveTokens(convId, total) {
+    _liveConvId = convId;
+    _liveTotal = (typeof total === 'number' && total >= 0) ? total : null;
+    if (_liveNotifyT) return;   // coalesce re-renders to ~5/s
+    _liveNotifyT = setTimeout(() => { _liveNotifyT = null; notify(); }, 200);
+  }
+  function clearLiveTokens(convId) {
+    if (convId != null && convId !== _liveConvId) return;
+    _liveTotal = null; _liveConvId = null;
+    if (_liveNotifyT) { clearTimeout(_liveNotifyT); _liveNotifyT = null; }
+    notify();
   }
 
   function contextWindow() {
@@ -84,7 +105,7 @@ const SandpieTokens = (() => {
 
   return {
     recordUsage, forget, conversationTokens, isEstimated, weeklyTotal,
-    contextWindow, subscribe, notify,
+    contextWindow, subscribe, notify, setLiveTokens, clearLiveTokens,
   };
 })();
 window.SandpieTokens = SandpieTokens;
