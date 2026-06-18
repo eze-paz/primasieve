@@ -228,11 +228,11 @@ const SandpieWllama = (function() {
   let _instanceThreads = 0;
   let _instanceBatch = 0;
   let _loadingKey = null;
-  // Digests of the last successfully-cached messages (one per message, in order).
-  // Used for PREFIX matching: if the new messages start with the same sequence,
-  // wllama can reuse its KV cache (cache_prompt:true). On edit/rewind/delete
-  // the prefix diverges → cache_prompt:false.
-  let _cachedMsgDigests = null;
+  // After a worker error/timeout, the slot's KV cache may hold a partial token
+  // sequence the engine can't reconcile. This flag forces ONE clean prefill
+  // (cache_prompt:false) on the next chat round, then reuse resumes. Normal
+  // edits/rewinds need no flag — the engine truncates to the common prefix.
+  let _kvDirty = false;
 
   // Hard timeout guard for the streaming round.  If the wllama worker
   // crashes (the "unreachable" wasm trap), the async iterator never
@@ -284,7 +284,7 @@ const SandpieWllama = (function() {
         _instanceGpuLayers = 0;
         _instanceThreads = 0;
         _instanceBatch = 0;
-        _cachedMsgDigests = null;
+        _kvDirty = false;
       }
       // Fetch the GGUF and pass a Blob to loadModel(), which skips
       // wllama's ModelManager/CacheManager entirely (its useCache:false
@@ -323,40 +323,6 @@ const SandpieWllama = (function() {
     } finally {
       if (_loadingKey === key) _loadingKey = null;
     }
-  }
-
-  // ============================================================
-  // Cache-prompt helpers
-  // ============================================================
-  /**
-   * Build a compact digest of a single message for cache-prefix matching.
-   */
-  function digestMessage(m) {
-    if (!m) return '';
-    const role = m.role || '?';
-    let content = m.content || '';
-    if (Array.isArray(content)) {
-      content = content.filter(p => p && p.type === 'text').map(p => p.text || '').join(' ');
-    }
-    content = String(content).replace(/\s+/g, ' ').trim();
-    return role + ':' + content.slice(0, 200);
-  }
-
-  /**
-   * Build digests for a message list so we know whether the new prompt is a
-   * prefix extension of the previously-cached one.
-   */
-  function digestMessages(msgs) {
-    if (!Array.isArray(msgs) || !msgs.length) return [];
-    return msgs.map(digestMessage);
-  }
-
-  /**
-   * Check whether `cached` is a non-empty prefix of `current`.
-   */
-  function isPrefixMatch(current, cached) {
-    return cached && cached.length > 0 && cached.length <= current.length &&
-           cached.every((d, i) => d === current[i]);
   }
 
   // ============================================================
@@ -435,21 +401,21 @@ const SandpieWllama = (function() {
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
     const adaptedMessages = adaptMessages(messages);
-    const currentDigests = digestMessages(adaptedMessages);
-    // KV-cache reuse (cache_prompt:true) is DISABLED. Re-enabling it via
-    // message-digest prefix matching (commit abeaf8d) regressed real multi-turn
-    // use (wllama reported broken in prod, 2026-06-18). Two reasons it's unsafe:
-    // (1) the digest is only a 200-char content prefix, so two messages sharing
-    // a prefix collide; (2) more fundamentally, KV reuse across chat turns is
-    // fragile — the assistant's generated tokens sit in the KV cache, but the
-    // next round re-sends that turn through the chat template (role markers,
-    // <think> handling), so token positions desync → llama.cpp aborts with
-    // "inconsistent sequence positions" and takes the worker down. Re-prefilling
-    // every round is the price of correctness; we re-send the full history
-    // anyway, so reuse bought little. Revisit ONLY with token-level (not
-    // digest-level) prefix tracking. The digest bookkeeping below is left in
-    // place, dormant, for that future work.
-    const useCache = false;
+    // Reuse the KV cache across rounds (cache_prompt:true). wllama embeds
+    // llama.cpp's single-slot server core, so on every call it finds the longest
+    // common TOKEN prefix between this prompt and the slot's cached tokens, removes
+    // the divergent suffix from the KV (the `kv cache rm [n, end)` line in
+    // llama-server logs), then prefills only from the divergence point. Edits,
+    // rewinds, branch/conversation switches — and the <think> stripping in
+    // runConversation, which makes a replayed assistant turn diverge from the raw
+    // tokens still cached — are therefore reconciled INSIDE the engine. No app-side
+    // prefix tracking is needed; the earlier 200-char message digest that tried it
+    // was itself the prod-breakage cause (collisions mislabeled divergent prompts
+    // as extensions, and a coarse digest can't drive token-level truncation anyway).
+    // The only state the engine can't recover is a partial KV left by a worker
+    // error/timeout, so we force one clean prefill after those (see _kvDirty).
+    const useCache = !_kvDirty;
+    _kvDirty = false;
 
     const request = {
       modelUrl,
@@ -489,8 +455,9 @@ const SandpieWllama = (function() {
         ...(request.frequency_penalty != null ? { frequency_penalty: request.frequency_penalty } : {}),
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         stream: true,
-        // cache_prompt is held false (useCache is forced false above) — KV reuse
-        // across chat turns desynced the worker, so we always full re-prefill.
+        // Reuse the KV cache; the engine truncates to the common prefix on any
+        // divergence (see the useCache note above). Held false for one round only
+        // after a worker error/timeout, via _kvDirty.
         cache_prompt: useCache,
         // tool_choice:'auto' is REQUIRED for wllama to render the tools into the chat
         // template — passing `tools` alone leaves them out of the prompt, so the model
@@ -542,19 +509,15 @@ const SandpieWllama = (function() {
         throw new Error('Model timed out — the inference worker appears to have crashed. Try reloading the page or selecting a different model.');
       }
     } catch (err) {
-      // The KV cache is potentially corrupt after any error mid-generation;
-      // force a full re-prefill on the next turn.
-      _cachedMsgDigests = null;
+      // A worker error/timeout can leave a partial sequence in the KV cache;
+      // force one clean (cache_prompt:false) prefill on the next round.
+      _kvDirty = true;
       throw err;
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }
 
     if (aborted) throw new DOMException('aborted', 'AbortError');
-
-    // Round completed normally — remember the message digests so the next
-    // turn can reuse the cached KV state if the history is extended.
-    _cachedMsgDigests = currentDigests;
 
     const keptToolCalls = toolCalls.filter(tc => tc && tc.id);
     const dtMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
@@ -686,11 +649,13 @@ const SandpieWllama = (function() {
     // BlinkDL's recommended G1 reasoning sampling (temp 1.0, presence/frequency
     // penalty 0.5 to curb RWKV repetition) unless the provider overrides. top_p
     // option removed — RWKV now uses llama.cpp's default top_p.
-    // cache_prompt:false re-prefills each round — same correctness trade-off as the
-    // chat path (avoids the recurrent-state rewind crash). It isn't in the public
-    // RawCompletionParams type but is read by the shared completion impl; harmless
-    // if ignored. Abort is handled by the `aborted` flag + break, matching the chat
-    // path (no abortSignal, to avoid the iterator throwing mid-stream).
+    // cache_prompt stays FALSE here — unlike the transformer chat path, which now
+    // reuses the KV. RWKV is recurrent: its "cache" is one evolving state with no
+    // per-token positions, so the engine can't reconcile a diverged prefix by
+    // removing a suffix (the chat path's trick). Re-prefilling each round is the
+    // safe choice. The flag isn't in the public RawCompletionParams type but is
+    // read by the shared completion impl; harmless if ignored. Abort is handled by
+    // the `aborted` flag + break (no abortSignal, to avoid throwing mid-stream).
     const params = {
       prompt,
       stream: true,
