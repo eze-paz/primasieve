@@ -582,6 +582,11 @@
     50%      { transform: scale(1.55); opacity: 0.55; }
   }
 
+  /* Dropbox sync progress bar (above the conversation list, during transfers) */
+  .sync-progress { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.3rem 0.1rem 0.5rem; }
+  .sync-progress .sp-row { display: flex; justify-content: space-between; font-size: 0.66rem; color: var(--sp-text-dim); }
+  .sync-progress .sp-track { height: 3px; background: var(--sp-border); border-radius: 2px; overflow: hidden; }
+  .sync-progress .sp-fill { height: 100%; background: var(--sp-accent); border-radius: 2px; transition: width 0.15s; }
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
   ul.conv-list li:hover { background: var(--sp-surface); border-color: var(--sp-border-bright); }
   ul.conv-list li.active { background: var(--sp-panel); border-color: var(--sp-accent); }

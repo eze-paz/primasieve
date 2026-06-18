@@ -336,37 +336,29 @@
     return { index: out, delta: null };
   }
 
-  // ---- first-sync progress bar in the conversations list ---------------------
-  // While the VERY FIRST sync is downloading, show a progress bar in #convList
-  // (replacing the "Loading…" placeholder). It both informs the user and keeps
-  // them from opening/editing a conversation before it has arrived — which would
-  // otherwise risk a local-vs-cloud conflict. refreshConversationList() rebuilds
-  // the list via replaceChildren when the first sync ends, which clears the bar
-  // (the finally in sync() also clears it defensively on the error path).
-  function _updateConvProgress(done, total) {
+  // ---- sync progress bar (non-disruptive) -----------------------------------
+  // Live transfer progress shown ABOVE the conversation list during ANY sync —
+  // downloads (pulling cloud files) AND uploads (pushing local changes) — so it's
+  // actually visible in normal use. (The old bar replaced #convList and only ran
+  // on the very first sync's downloads, which a returning user whose files are
+  // already local never hits — hence "I never see it".) It's a sibling of
+  // #convList, so refreshConversationList()'s replaceChildren doesn't touch it;
+  // sync()'s finally clears it. Hidden whenever nothing is transferring.
+  function _setSyncProgress(done, total, phase) {
     const ul = document.getElementById('convList');
-    if (!ul) return;
-    if (!total) {
-      const only = ul.querySelector(':scope > li[data-sync-progress]');
-      if (only && ul.children.length === 1) only.remove();
-      return;
+    if (!ul || !ul.parentNode) return;
+    let bar = document.getElementById('dbxSyncProgress');
+    if (!total) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'dbxSyncProgress';
+      bar.className = 'sync-progress';
+      ul.parentNode.insertBefore(bar, ul);
     }
     const pct = Math.min(100, Math.round((done / total) * 100));
-    let li = ul.querySelector(':scope > li[data-sync-progress]');
-    if (!li) {
-      li = document.createElement('li');
-      li.className = 'empty';
-      li.dataset.syncProgress = '1';
-      li.style.cssText = 'flex-direction:column;align-items:stretch;padding:0.5rem;gap:0.25rem;font-style:normal;';
-      ul.replaceChildren(li);
-    }
-    li.innerHTML = `
-      <span style="font-size:0.75rem;color:var(--sp-text-dim);">Syncing…</span>
-      <span style="font-size:0.65rem;color:var(--sp-text-dim);">${done} / ${total}</span>
-      <div style="width:100%;height:3px;background:var(--sp-border);border-radius:2px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:var(--sp-accent);border-radius:2px;transition:width 0.15s;"></div>
-      </div>
-    `;
+    bar.innerHTML =
+      `<div class="sp-row"><span>${phase || 'Syncing'}…</span><span>${done} / ${total}</span></div>` +
+      `<div class="sp-track"><div class="sp-fill" style="width:${pct}%"></div></div>`;
   }
 
   // ---- bounded-parallel per-file download ------------------------------------
@@ -435,8 +427,8 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      if (firstSync && toDownload.length) _updateConvProgress(0, toDownload.length);
-      await bulkDownload(toDownload, state, opfs, firstSync ? _updateConvProgress : null);
+      if (toDownload.length) _setSyncProgress(0, toDownload.length, 'Downloading');
+      await bulkDownload(toDownload, state, opfs, toDownload.length ? (d, t) => _setSyncProgress(d, t, 'Downloading') : null);
 
       // push: dirty = event-marked (syncedMtime===0); full scan walks all local
       // files. Uploaded via upload_session + finish_batch_v2 (one commit call per
@@ -464,6 +456,8 @@
         }
       }
       const BATCH_SIZE = 50;
+      let upDone = 0;
+      if (dirty.length) _setSyncProgress(0, dirty.length, 'Uploading');
       for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
         const chunk = dirty.slice(i, i + BATCH_SIZE);
         const files = await Promise.all(chunk.map(async ({ rel, lm, s }) => ({ rel, lm, s, content: await opfs.readBytes(rel) })));
@@ -481,6 +475,8 @@
             }
           }
         } catch (err) { console.warn('[dropbox-full] batch upload failed:', err); }
+        upDone += chunk.length;
+        _setSyncProgress(upDone, dirty.length, 'Uploading');
       }
       setSyncState(state);
 
@@ -493,7 +489,7 @@
       console.warn('[dropbox-full] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
-      try { _updateConvProgress(0, 0); } catch (_) {}   // defensive clear (error path)
+      try { _setSyncProgress(0, 0); } catch (_) {}   // clear the bar when the cycle ends
     }
   }
 

@@ -33,12 +33,10 @@ const AI_HTML = `
           <option value="wllama">Local model (wllama, in-browser)</option>
           <option value="transformersjs">Local model (Transformers.js, in-browser)</option>
           <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
-          <option value="webllm">Local model (WebLLM / MLC, in-browser)</option>
         </select>
         <select id="spWllamaModel" style="display:none;"></select>
         <select id="spTransformersJSModel" style="display:none;"></select>
         <select id="spLiteRTLMModel" style="display:none;"></select>
-        <select id="spWebLLMModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -153,23 +151,6 @@ function _wireProviderPanel() {
       commitForm();
     });
     lrSel._spBound = true;
-  }
-  const wbSel = document.getElementById('spWebLLMModel');
-  if (wbSel && !wbSel._spBound) {
-    if (typeof SandpieWebLLM !== 'undefined' && !wbSel.options.length) {
-      wbSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieWebLLM.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
-        + '<option value="__custom">Custom model_id…</option>';
-    }
-    wbSel.addEventListener('change', () => {
-      const v = wbSel.value;
-      if (!v || v === '__custom') return;
-      const m = (typeof SandpieWebLLM !== 'undefined') ? SandpieWebLLM.DEFAULT_MODELS.find(x => x.modelId === v) : null;
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
-      commitForm();
-    });
-    wbSel._spBound = true;
   }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
@@ -426,8 +407,6 @@ function loadFormFor(id) {
   if (tj) tj.value = (p.type === 'transformersjs' && p.endpoint) ? p.endpoint : '';
   const lr = document.getElementById('spLiteRTLMModel');
   if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
-  const wb = document.getElementById('spWebLLMModel');
-  if (wb) wb.value = (p.type === 'webllm' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
 }
 
@@ -437,13 +416,11 @@ function applyTypeUI() {
   const wllama = type === 'wllama';
   const transformersjs = type === 'transformersjs';
   const litertlm = type === 'litertlm';
-  const webllm = type === 'webllm';
-  const local = wllama || transformersjs || litertlm || webllm;
+  const local = wllama || transformersjs || litertlm;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spWllamaModel', wllama);
   show('spTransformersJSModel', transformersjs);
   show('spLiteRTLMModel', litertlm);
-  show('spWebLLMModel', webllm);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
@@ -585,8 +562,6 @@ function updateRoutingHint() {
     hint.textContent = 'In-browser Transformers.js · ' + (active.model || 'local model');
   } else if (active?.type === 'litertlm') {
     hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'local model');
-  } else if (active?.type === 'webllm') {
-    hint.textContent = 'In-browser WebLLM · ' + (active.model || 'local model');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
   } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
@@ -599,7 +574,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'wllama' || active?.type === 'transformersjs' || active?.type === 'litertlm' || active?.type === 'webllm');
+  const local = (active?.type === 'wllama' || active?.type === 'transformersjs' || active?.type === 'litertlm');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }

@@ -658,14 +658,12 @@ async function sendSingle(text, stream, opts = {}) {
   const _isWllama = !!(_active && _active.type === 'wllama');
   const _isTransformersJS = !!(_active && _active.type === 'transformersjs');
   const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
-  const _isWebLLM = !!(_active && _active.type === 'webllm');
-  const _isLocal = _isWllama || _isTransformersJS || _isLiteRTLM || _isWebLLM;
+  const _isLocal = _isWllama || _isTransformersJS || _isLiteRTLM;
   if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
     addMsg('err',
       _isWllama ? 'Pick a wllama model in Settings before sending.' :
       _isTransformersJS ? 'Pick a Transformers.js model in Settings before sending.' :
       _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
-      _isWebLLM ? 'Pick a WebLLM model in Settings before sending.' :
       'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
   }
@@ -737,13 +735,6 @@ async function sendSingle(text, stream, opts = {}) {
     } else if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
       await SandpieLiteRTLM.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else if (_isWebLLM && typeof SandpieWebLLM !== 'undefined' && SandpieWebLLM.runConversation) {
-      // Local model via WebLLM (MLC, WebGPU). Same page-side loop; OAI-native tools
-      // with a prompt-parse fallback, <think> reasoning split out to the Thinking box.
-      await SandpieWebLLM.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
@@ -2082,7 +2073,7 @@ const TOK_FMT = n => Math.round(n).toLocaleString('en-US');
 const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s';
 
 // Generated-token bookkeeping for the live counter. Every backend (local
-// wllama/transformers.js/litert/webllm AND the SW/API path) funnels its stream
+// wllama/transformers.js/litert AND the SW/API path) funnels its stream
 // through sendSingle's `dispatch`, so counting here is universal. Local
 // backends emit no `usage` events, so a chars/4 estimate — the same heuristic
 // SandpieTokens.estimateTokens uses — is the only signal available; we use it
