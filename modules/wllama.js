@@ -437,10 +437,20 @@ const SandpieWllama = (function() {
 
     const adaptedMessages = adaptMessages(messages);
     const currentDigests = digestMessages(adaptedMessages);
-    // Reuse the KV cache when the previously-cached messages are a PREFIX
-    // of the current ones (normal append-only chat). On edit/rewind/delete
-    // the prefix diverges → full re-prefill for safety.
-    const useCache = isPrefixMatch(currentDigests, _cachedMsgDigests);
+    // KV-cache reuse (cache_prompt:true) is DISABLED. Re-enabling it via
+    // message-digest prefix matching (commit abeaf8d) regressed real multi-turn
+    // use (wllama reported broken in prod, 2026-06-18). Two reasons it's unsafe:
+    // (1) the digest is only a 200-char content prefix, so two messages sharing
+    // a prefix collide; (2) more fundamentally, KV reuse across chat turns is
+    // fragile — the assistant's generated tokens sit in the KV cache, but the
+    // next round re-sends that turn through the chat template (role markers,
+    // <think> handling), so token positions desync → llama.cpp aborts with
+    // "inconsistent sequence positions" and takes the worker down. Re-prefilling
+    // every round is the price of correctness; we re-send the full history
+    // anyway, so reuse bought little. Revisit ONLY with token-level (not
+    // digest-level) prefix tracking. The digest bookkeeping below is left in
+    // place, dormant, for that future work.
+    const useCache = false;
 
     const request = {
       modelUrl,
@@ -488,9 +498,8 @@ const SandpieWllama = (function() {
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         ...(request.seed != null ? { seed: request.seed } : {}),
         stream: true,
-        // cache_prompt reuses the persistent KV cache when the working history
-        // hash matches what we previously cached (normal append-only chat).
-        // On edit/rewind/delete the hash changes → cache_prompt:false for safety.
+        // cache_prompt is held false (useCache is forced false above) — KV reuse
+        // across chat turns desynced the worker, so we always full re-prefill.
         cache_prompt: useCache,
         // tool_choice:'auto' is REQUIRED for wllama to render the tools into the chat
         // template — passing `tools` alone leaves them out of the prompt, so the model
