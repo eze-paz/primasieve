@@ -146,7 +146,7 @@
   // ---------------------------------------------------------------------------
   // Relay service-worker logs into the (hijacked) console so [sw] output is
   // captured here too. OPFS-change SW messages are handled separately in
-  // modules/dropbox.js.
+  // modules/dropbox-full.js.
   // ---------------------------------------------------------------------------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (ev) => {

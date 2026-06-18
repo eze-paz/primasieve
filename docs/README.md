@@ -28,7 +28,7 @@ and the rest. Edit it directly.
 | [conversations](modules/conversations.md) | messages, streaming, conversation CRUD, side panel |
 | [opfs](modules/opfs.md) | OPFS filesystem + file browser + file viewer |
 | [providers](modules/providers.md) | AI endpoint / key / model config |
-| [dropbox](modules/dropbox.md) | Dropbox cloud sync (transport + engine) |
+| [dropbox-full](../modules/dropbox-full.js) | Dropbox cloud sync (Full Dropbox; transport + engine) |
 | [themes](modules/themes.md) | appearance / palettes |
 | [console](modules/console.md) | in-app console panel + SW log relay |
 | [images](modules/images.md) | image attachments |

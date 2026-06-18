@@ -85,8 +85,8 @@ without referencing each other. Full catalog:
 
 | Event | Payload | Emitted by | Consumed by |
 |---|---|---|---|
-| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload), context.js (skills scaffold), agents.js (agent config + memory/append writes) | dropbox.js (sync engine), agents.js (re-render on external `agents/` edit) |
-| `file:deleted` | `path` (string) | conversations.js (delete), opfs.js (delete), agents.js (agent delete) | dropbox.js |
+| `file:changed` | `path` (string) | conversations.js (save / update / duplicate), opfs.js (write / upload), context.js (skills scaffold), agents.js (agent config + memory/append writes) | dropbox-full.js (sync engine), agents.js (re-render on external `agents/` edit) |
+| `file:deleted` | `path` (string) | conversations.js (delete), opfs.js (delete), agents.js (agent delete) | dropbox-full.js |
 | `tokens:record` | `{ convId, usage }` | conversations.js (on a usage event) | context.js (`SandpieTokens`) |
 | `generation:complete` | `{ convId, aborted }` | conversations.js (round `finally`) | notifications.js (system toast), agents.js (background-automation trigger tick) |
 | `sync:provider-changed` | provider \| `null` | core.js (`registerSyncProvider`) | internal |
@@ -106,7 +106,7 @@ No central registration needed.
 
 ## 4. Registries (optional capabilities)
 
-- **Sync provider** — `dropbox.js` calls `Sandpie.registerSyncProvider({ sync(),
+- **Sync provider** — `dropbox-full.js` calls `Sandpie.registerSyncProvider({ sync(),
   fileStatus(path, opfsMtime), getState(), isConnected(), initialSyncDone })`.
   With no provider registered, `Sandpie.sync()` / `fileSyncStatus()` are no-ops and
   the file browser shows a local-only view. This is the reference pattern for any
@@ -131,7 +131,7 @@ each module directly via `document.getElementById(dotId).classList`.
 | `artifactsSection` | artifacts.js | `SandpieMenu.add` |
 | `themeSection` | themes.js | `SandpieMenu.add` |
 | `console` | console.js | `SandpieMenu.add` |
-| `cloudSection` | dropbox.js | `SandpieMenu.add` |
+| `cloudSection` | dropbox-full.js | `SandpieMenu.add` |
 | `notificationsSection` | notifications.js | `SandpieMenu.add` |
 
 ---
@@ -157,7 +157,7 @@ script type are load-bearing:
   core.js                     (classic)   ← FIRST: defines $, SandpieMenu, Sandpie, state
   themes.js                   (classic)
   providers.js                (module)
-  console.js, dropbox.js, images.js, notifications.js, tools.js, opfs.js  (classic)
+  console.js, dropbox-full.js, images.js, notifications.js, tools.js, opfs.js  (classic)
   mobile.js, conversations.js (module)
 <body>
   ...markup...

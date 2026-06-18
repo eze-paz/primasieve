@@ -183,8 +183,8 @@ opfs.currentPath = function() {
 
 /* Read-only fence. Subscription mirrors are owned by the sync provider, which
    declares which paths are read-only and the reserved dir name. Falls back to
-   "everything writable" when the provider doesn't implement it (e.g. the
-   app-folder dropbox.js used by sandpie.html). */
+   "everything writable" when the provider doesn't implement it (e.g. an older
+   sync provider that predates read-only subscriptions). */
 opfs._roProvider = function() { try { return window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); } catch { return null; } };
 opfs.isReadOnly = function(path) { const p = opfs._roProvider(); try { return !!(p && p.isReadOnlyPath && p.isReadOnlyPath(path)); } catch { return false; } };
 opfs.subsDirName = function() { const p = opfs._roProvider(); try { return (p && p.subscriptionsDir && p.subscriptionsDir()) || null; } catch { return null; } };

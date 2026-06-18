@@ -1,10 +1,10 @@
 /* =============================================================================
    modules/dropbox-full.js — Full-Dropbox sync provider (subscription model).
 
-   ALTERNATIVE to modules/dropbox.js (App-folder access). Load ONE or the other,
-   never both — each registers a Sandpie sync provider + the 'cloudSection'
-   sidebar section. Self-contained (its own dbx* transport + a separate
-   `dbxfull-*` localStorage namespace), so it never collides with dropbox.js.
+   The app's sole cloud-sync provider (the former App-folder modules/dropbox.js
+   was removed 2026-06-18). Registers a Sandpie sync provider + its cloud-sync
+   settings panel. Self-contained: its own dbx* transport + a `dbxfull-*`
+   localStorage namespace.
 
    Requires the user's Dropbox app to be **Full Dropbox** access type with scopes:
      account_info.read, files.metadata.read, files.content.read, files.content.write
@@ -336,11 +336,45 @@
     return { index: out, delta: null };
   }
 
+  // ---- first-sync progress bar in the conversations list ---------------------
+  // While the VERY FIRST sync is downloading, show a progress bar in #convList
+  // (replacing the "Loading…" placeholder). It both informs the user and keeps
+  // them from opening/editing a conversation before it has arrived — which would
+  // otherwise risk a local-vs-cloud conflict. refreshConversationList() rebuilds
+  // the list via replaceChildren when the first sync ends, which clears the bar
+  // (the finally in sync() also clears it defensively on the error path).
+  function _updateConvProgress(done, total) {
+    const ul = document.getElementById('convList');
+    if (!ul) return;
+    if (!total) {
+      const only = ul.querySelector(':scope > li[data-sync-progress]');
+      if (only && ul.children.length === 1) only.remove();
+      return;
+    }
+    const pct = Math.min(100, Math.round((done / total) * 100));
+    let li = ul.querySelector(':scope > li[data-sync-progress]');
+    if (!li) {
+      li = document.createElement('li');
+      li.className = 'empty';
+      li.dataset.syncProgress = '1';
+      li.style.cssText = 'flex-direction:column;align-items:stretch;padding:0.5rem;gap:0.25rem;font-style:normal;';
+      ul.replaceChildren(li);
+    }
+    li.innerHTML = `
+      <span style="font-size:0.75rem;color:var(--sp-text-dim);">Syncing…</span>
+      <span style="font-size:0.65rem;color:var(--sp-text-dim);">${done} / ${total}</span>
+      <div style="width:100%;height:3px;background:var(--sp-border);border-radius:2px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:var(--sp-accent);border-radius:2px;transition:width 0.15s;"></div>
+      </div>
+    `;
+  }
+
   // ---- bounded-parallel per-file download ------------------------------------
   const DL_CONCURRENCY = 16;
-  async function bulkDownload(items, state, opfs) {
+  async function bulkDownload(items, state, opfs, onProgress) {
     if (!items.length) return;
-    let i = 0;
+    let i = 0, done = 0;
+    const total = items.length;
     async function worker() {
       while (i < items.length) {
         const it = items[i++];
@@ -350,6 +384,7 @@
           const mtime = await Sandpie.opfsMtime(it.rel);
           state[it.rel] = { rev: it.e.rev, size: it.e.size, syncedMtime: mtime };
         } catch (err) { console.warn('[dropbox-full] download failed:', it.rel, err); }
+        if (onProgress) { try { onProgress(++done, total); } catch (_) {} }
       }
     }
     await Promise.all(Array.from({ length: Math.min(DL_CONCURRENCY, items.length) }, worker));
@@ -400,7 +435,8 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      await bulkDownload(toDownload, state, opfs);
+      if (firstSync && toDownload.length) _updateConvProgress(0, toDownload.length);
+      await bulkDownload(toDownload, state, opfs, firstSync ? _updateConvProgress : null);
 
       // push: dirty = event-marked (syncedMtime===0); full scan walks all local
       // files. Uploaded via upload_session + finish_batch_v2 (one commit call per
@@ -457,6 +493,7 @@
       console.warn('[dropbox-full] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
+      try { _updateConvProgress(0, 0); } catch (_) {}   // defensive clear (error path)
     }
   }
 
