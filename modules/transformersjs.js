@@ -77,7 +77,18 @@ const SandpieTransformersJS = (function () {
   let _stopping = null;                             // InterruptableStoppingCriteria for the active run
 
   async function lib() {
-    if (!_lib) _lib = await import(LIB_URL);
+    if (!_lib) {
+      _lib = await import(LIB_URL);
+      // Force onnxruntime-web SINGLE-THREADED. Our prod page is cross-origin isolated
+      // (COOP/COEP, on for wllama), so SharedArrayBuffer exists and ORT would pick the
+      // MULTI-THREADED WASM build — whose atomics trap with "operation does not support
+      // unaligned accesses" mid-generation (a WASM atomic-alignment trap; only the
+      // threaded build uses atomics). The single-threaded build has none. WebGPU
+      // compute is unaffected (runs on the GPU); this only bounds ORT's WASM
+      // orchestration + CPU-fallback ops. The HF Qwen3.5-WebGPU Space runs single-
+      // threaded too (it isn't cross-origin isolated) — so this matches the example.
+      try { _lib.env.backends.onnx.wasm.numThreads = 1; } catch (_) {}
+    }
     return _lib;
   }
 
