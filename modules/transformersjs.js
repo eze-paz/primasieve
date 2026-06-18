@@ -68,7 +68,7 @@ const SandpieTransformersJS = (function () {
   // ============================================================
   // Bump ?v when editing the worker file so the browser refetches it (it isn't a
   // <script> in the HTML, so the page cache-buster doesn't cover it).
-  const WORKER_URL = 'modules/transformersjs-worker.js?v=5';
+  const WORKER_URL = 'modules/transformersjs-worker.js?v=6';
   let _worker = null;
   let _reqSeq = 0;
   function getWorker() {
@@ -175,7 +175,7 @@ const SandpieTransformersJS = (function () {
   // One generation round — delegated to the worker, tokens relayed back.
   // Resolves { content, tool_calls } (tool calls parsed page-side from the text).
   // ============================================================
-  function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, maxTokens, topK, frequencyPenalty }) {
+  function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, maxTokens, frequencyPenalty }) {
     const worker = getWorker();
     const id = ++_reqSeq;
     let acc = '';
@@ -208,7 +208,7 @@ const SandpieTransformersJS = (function () {
         worker.postMessage({
           type: 'generate', id, modelId: modelUrl, dtype: _dtype,
           messages: messages, tools: (tools || []),
-          params: { maxTokens, topK, frequencyPenalty },
+          params: { maxTokens, frequencyPenalty },
         });
       } catch (e) { cleanup(); reject(e); }
     }).then((fullText) => {
@@ -253,7 +253,6 @@ const SandpieTransformersJS = (function () {
 
     const sample = {
       maxTokens: provider.maxTokens || 2048,
-      topK: provider.topK != null ? provider.topK : undefined,
       frequencyPenalty: provider.frequencyPenalty != null ? provider.frequencyPenalty : undefined,
     };
 

@@ -336,7 +336,7 @@ const SandpieLiteRTLM = (function () {
 
   // ============================================================
   // Sampling + conversation config. The LiteRT-LM Web SDK takes sampling on the
-  // SessionConfig (samplerParams: {temperature, k, p}) and the per-response cap
+  // SessionConfig (samplerParams: {temperature}) and the per-response cap
   // as sessionConfig.maxOutputTokens — NOT on sendMessage. We read the same provider
   // fields the other local backends use (providers.js "Local sampling & reasoning").
   // ============================================================
@@ -344,8 +344,6 @@ const SandpieLiteRTLM = (function () {
     const p = provider || {};
     const sp = {};
     if (p.temperature != null && p.temperature >= 0) sp.temperature = p.temperature;
-    if (p.topK != null) sp.k = p.topK | 0;
-    if (p.topP != null) sp.p = p.topP;
     return Object.keys(sp).length ? sp : null;
   }
 

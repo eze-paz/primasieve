@@ -11,7 +11,7 @@
 //
 // Message protocol —
 //   page → worker:
-//     { type:'generate', id, modelId, messages, tools, params:{maxTokens,topK,frequencyPenalty} }
+//     { type:'generate', id, modelId, messages, tools, params:{maxTokens,frequencyPenalty} }
 //     { type:'stop' }                              // interrupt the running generation
 //   worker → page:
 //     { type:'progress', data:{loaded,total,progress} }   // model download
@@ -159,8 +159,7 @@ async function generate(id, payload) {
   const opts = { ...inputs, max_new_tokens: p.maxTokens || 2048, do_sample: true };
   if (streamer) opts.streamer = streamer;
   if (_stopping) opts.stopping_criteria = _stopping;
-  // temperature/top_p intentionally omitted — always use the model's defaults.
-  if (p.topK != null) opts.top_k = p.topK;
+  // temperature/top_p/top_k intentionally omitted — always use the model's defaults.
   if (p.frequencyPenalty != null) opts.repetition_penalty = 1 + p.frequencyPenalty;
 
   await _model.generate(opts);

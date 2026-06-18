@@ -49,8 +49,6 @@ const AI_HTML = `
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
         <div id="spWllamaParams" style="display:none; flex-direction:column; gap:0.4rem;">
           <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local sampling &amp; reasoning</div>
-          <input id="spTopP" type="number" min="0" max="1" step="0.01" autocomplete="off" placeholder="top_p (e.g. 0.8)">
-          <input id="spTopK" type="number" min="0" step="1" autocomplete="off" placeholder="top_k (e.g. 20)">
           <input id="spFreqPenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="frequency_penalty (−2 to 2)">
           <input id="spPresencePenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="presence_penalty (−2 to 2)">
           <select id="spReasoning">
@@ -93,7 +91,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spTopP','spTopK','spFreqPenalty','spPresencePenalty','spReasoning','spFlashAttn','spGpuLayers','spThreads','spBatch']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spFreqPenalty','spPresencePenalty','spReasoning','spFlashAttn','spGpuLayers','spThreads','spBatch']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -393,7 +391,6 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spReasoningEffort', p.reasoningEffort);
   set('spType', p.type || 'openai');
-  set('spTopP', p.topP); set('spTopK', p.topK);
   set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty);
   const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
   const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
@@ -447,8 +444,6 @@ function commitForm() {
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
   // wllama-only sampling / reasoning params
-  const tpp = num('spTopP');              if (tpp != null) p.topP = tpp; else delete p.topP;
-  const tpk = num('spTopK');              if (tpk != null) p.topK = tpk; else delete p.topK;
   const fpen = num('spFreqPenalty');      if (fpen != null) p.frequencyPenalty = fpen; else delete p.frequencyPenalty;
   const ppen = num('spPresencePenalty');  if (ppen != null) p.presencePenalty = ppen; else delete p.presencePenalty;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
