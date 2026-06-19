@@ -70,7 +70,52 @@ const AI_HTML = `
         </div>
       </div>
       <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
+      <div id="localCacheSection" style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); display:flex; flex-direction:column; gap:0.4rem;">
+        <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local model storage</div>
+        <div style="font-size:0.72rem; color:var(--sp-text-dim);">In-browser models (wllama / Transformers.js / LiteRT-LM) are cached on this device. Clearing frees the space; they re-download next time you use them.</div>
+        <button class="ghost" type="button" id="spClearModelCache">Clear cached local models</button>
+        <div id="spClearCacheStatus" style="font-size:0.7rem; color:var(--sp-text-dim);"></div>
+      </div>
     `;
+
+// Clear all cached in-browser model files (Cache Storage). Local model bytes live in
+// Cache Storage (NOT OPFS — kept out of Dropbox sync): wllama 'sandpie-wllama-models',
+// litertlm 'sandpie-litertlm-models', Transformers.js the library's 'transformers-*'
+// cache. Unload any resident model first so the freed space isn't immediately re-held.
+// Allowlist match so the app / service-worker caches are never touched.
+async function clearLocalModelCaches() {
+  const btn = document.getElementById('spClearModelCache');
+  const status = document.getElementById('spClearCacheStatus');
+  const setStatus = (t) => { if (status) status.textContent = t; };
+  if (!window.confirm('Clear all cached local models from this device? They will re-download the next time you use them.')) return;
+  if (btn) btn.disabled = true;
+  setStatus('Clearing…');
+  try {
+    try { await window.SandpieWllama?.unload?.(); } catch (_) {}
+    try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
+    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
+    let before = 0, after = 0;
+    try { before = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
+    if (typeof caches === 'undefined') { setStatus('Cache Storage is unavailable in this browser.'); return; }
+    const names = await caches.keys();
+    const target = names.filter(n =>
+      n === 'sandpie-wllama-models' ||
+      n === 'sandpie-litertlm-models' ||
+      n.startsWith('transformers')   // @huggingface/transformers browser cache
+    );
+    let deleted = 0;
+    for (const n of target) { try { if (await caches.delete(n)) deleted++; } catch (_) {} }
+    try { after = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
+    const freedMB = Math.max(0, before - after) / (1024 * 1024);
+    setStatus(deleted
+      ? `Cleared ${deleted} model cache${deleted > 1 ? 's' : ''}${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
+      : 'No cached local models found.');
+  } catch (e) {
+    setStatus('Error clearing cache: ' + ((e && e.message) || e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
 
 // Prefer the gear modal (SandpieSettings); fall back to the sidebar (SandpieMenu).
 function init() {
@@ -150,6 +195,8 @@ function _wireProviderPanel() {
   }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
+  const _clearBtn = document.getElementById('spClearModelCache');
+  if (_clearBtn && !_clearBtn._spBound) { _clearBtn._spBound = true; _clearBtn.addEventListener('click', clearLocalModelCaches); }
   if (_activeProviderId) loadFormFor(_activeProviderId);
   applyTypeUI();
   updateRoutingHint();
