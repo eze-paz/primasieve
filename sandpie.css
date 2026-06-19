@@ -1139,7 +1139,8 @@
     border-bottom: 1px solid var(--sp-border);
     padding: 0.2rem 0.6rem;
   }
-  .tool-call .tc-expanded { display: none; }
+  .tool-call { padding: 0; }
+  .tool-call + .tool-call { margin-top: -0.6rem; }
   .tool-call.expanded .tc-expanded { display: block; }
 
   .tc-prompt {
