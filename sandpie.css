@@ -1153,14 +1153,16 @@
     padding: 0.5rem 0.75rem;
     color: var(--sp-accent);
   }
-  body.tools-minimized .tool-call:hover {
-    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
-    border-color: var(--sp-accent-dim);
-    box-shadow: 0 0 0 1px var(--sp-accent-dim);
+  /* Collapsed (default) state: show the summary, hide the expanded detail */
+  .tool-call .tc-expanded { display: none; }
+  .tool-call .tc-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    min-width: 0;
   }
-  .tool-call .tc-expanded { display: inline; }
-  .tool-call .tc-collapsed { display: none; }
-  body.tools-minimized .tool-call {
+  .tool-call {
     display: flex;
     align-items: center;
     padding: 0.5rem 0.8rem;
@@ -1176,15 +1178,15 @@
     align-self: flex-start;
     width: fit-content;
   }
-  body.tools-minimized .tool-call .tc-expanded { display: none; }
-  body.tools-minimized .tool-call .tc-collapsed {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    width: 100%;
-    min-width: 0;
+  .tool-call:hover {
+    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
+    border-color: var(--sp-accent-dim);
+    box-shadow: 0 0 0 1px var(--sp-accent-dim);
   }
-  body.tools-minimized .tool-result { display: none; }
+  /* Expanded state: show the detail, hide the summary */
+  .tool-call.expanded .tc-expanded { display: inline; }
+  .tool-call.expanded .tc-collapsed { display: none; }
+  .tool-call.expanded .tool-result { display: block; }
   .repl-loader {
     flex-shrink: 0;
     display: inline-flex;
@@ -1416,7 +1418,7 @@
   }
   .msg.think .think-body::-webkit-scrollbar { display: none; }
   .msg.think .think-body { scrollbar-width: none; -ms-overflow-style: none; }
-  .msg.think[data-collapsed] .think-body { display: none; }
+  .msg.think .think-body { scrollbar-width: none; -ms-overflow-style: none; }
   /* Hide scrollbar */
   .msg.think .think-body::-webkit-scrollbar { display: none; }
   .msg.think .think-body { scrollbar-width: none; }

@@ -17,7 +17,7 @@ Window-exposed for inline handlers, the host contract, and other modules:
 - **Streams:** `ensureStream`, `activeStream`, `anyStreamGenerating`, `setStreamSending`, `startTotalTimer` / `endTotalTimer`.
 - **CRUD / list:** `newConversation`, `loadConv`, `saveConv` / `saveActiveConv`, `deleteConv`, `renameConv`, `togglePinConv` / `toggleArchiveConv`, `duplicateConv`, `refreshConversationList`, `mountConv`, `convPath`.
 - **Sending:** `handleSubmit`, `handleButtonClick`, `enqueueForActive`, `processQueueFor`, `sendSingle`, `buildAgentConfig`, `readAgentEvents`, `dispatchAgentEvent`.
-- **Bubble menu (inline `onclick`):** `rewindFromMenu`, `copyFromMenu`, `toggleToolsMinimizedFromMenu`, `toggleThoughtsFromMenu`.
+- **Bubble menu (inline `onclick`):** `rewindFromMenu`, `copyFromMenu`.
 - **Boot:** `maybeResumeFlight`, `window.sidePanel`.
 - Backs `Sandpie.addMsg`, `Sandpie.isGenerating`, `Sandpie.refreshConversations`.
 

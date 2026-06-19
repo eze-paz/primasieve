@@ -996,6 +996,11 @@ function addMsg(role, text = '', host = null) {
     collapsed.className = 'tc-collapsed';
     div.appendChild(expanded);
     div.appendChild(collapsed);
+    // Collapsed by default; left-click toggles only this element.
+    div.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      div.classList.toggle('expanded');
+    });
   } else {
     const bubble = document.createElement('span');
     bubble.className = 'bubble';
@@ -1304,7 +1309,7 @@ class RoundRenderer {
     this.thinkStart = performance.now();
     const det = document.createElement('details');
     det.className = 'msg think';
-    det.open = true;
+    det.open = false;
     const sum = document.createElement('summary');
     sum.innerHTML = 'Thinking ' + REPL_LOADER();
     const body = document.createElement('div');
@@ -1503,13 +1508,6 @@ function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
 
-/* ---- tool-call visibility toggle ---- */
-let toolsMinimized = localStorage.getItem('sandpie-tools-minimized') !== '0';
-function applyToolsMinimized() {
-
-  document.body.classList.toggle('tools-minimized', toolsMinimized);
-}
-
 /* ---- system prompt (OPFS sandpie_memory.md + optional skills block) ---- */
 async function buildSystemPrompt(convMessages) {
   let content;
@@ -1561,8 +1559,6 @@ function onBubbleContextMenu(e) {
   e.preventDefault();
   e.stopPropagation();
   _bubbleMenuTarget = e.currentTarget;
-  updateThoughtsMenuLabel();
-  $('bubbleToggleToolsItem').textContent = toolsMinimized ? 'Show tool calls' : 'Hide tool calls';
   const menu = $('bubbleContextMenu');
   menu.style.display = '';
   menu.style.left = e.clientX + 'px';
@@ -1656,30 +1652,6 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   // reduced send size instead of a stale-high value that would re-trigger next send.
   try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
   return { ok: true, removed: boundary, kept: messages.length - boundary };
-}
-function toggleToolsMinimizedFromMenu() {
-  toolsMinimized = !toolsMinimized;
-  localStorage.setItem('sandpie-tools-minimized', toolsMinimized ? '1' : '0');
-  applyToolsMinimized();
-  hideBubbleMenu();
-}
-let thoughtsVisible = true;
-function toggleThoughtsFromMenu() {
-  thoughtsVisible = !thoughtsVisible;
-  var el = document.getElementById('bubbleToggleThoughtsItem');
-  if (el) el.textContent = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
-  document.querySelectorAll('.msg.think').forEach(function(t) {
-    t[thoughtsVisible ? 'removeAttribute' : 'setAttribute']('data-collapsed', '');
-  });
-}
-function updateThoughtsMenuLabel() {
-  var el = document.getElementById('bubbleToggleThoughtsItem');
-  if (!el) return;
-  var total = document.querySelectorAll('.msg.think').length;
-  if (!total) { el.textContent = 'Show thoughts'; thoughtsVisible = true; return; }
-  var open = document.querySelectorAll('.msg.think:not([data-collapsed])').length;
-  el.textContent = (open === total) ? 'Hide thoughts' : 'Show thoughts';
-  thoughtsVisible = (open === total);
 }
 async function copyFromMenu() {
   const target = _bubbleMenuTarget;
@@ -1861,7 +1833,6 @@ let sidePanel = null;
    Module boot — runs at deferred-module eval time (after the document is parsed
    but before DOMContentLoaded), so every #id these touch already exists.
    ============================================================================= */
-applyToolsMinimized();
 
 (function setupInput() {
   const ta = $('input');
@@ -2020,8 +1991,6 @@ window.maybeResumeFlight = maybeResumeFlight;
 window.anyStreamGenerating = anyStreamGenerating;
 window.rewindFromMenu = rewindFromMenu;
 window.copyFromMenu = copyFromMenu;
-window.toggleToolsMinimizedFromMenu = toggleToolsMinimizedFromMenu;
-window.toggleThoughtsFromMenu = toggleThoughtsFromMenu;
 
 /* expose on window for inline script compatibility */
 window.ensureStream = ensureStream;
