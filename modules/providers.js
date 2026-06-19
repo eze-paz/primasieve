@@ -359,6 +359,9 @@ function renderModelPicker() {
   if (!host) return;
   const wasOpen = host.classList.contains('open');
   const active = getActiveProvider();
+  // Clean up any panel previously moved to <body>.
+  const oldPanel = document.querySelector('.mp-panel');
+  if (oldPanel) oldPanel.remove();
   host.innerHTML = '';
   host.classList.toggle('open', wasOpen);   // preserve open state across a re-render
 
@@ -373,7 +376,7 @@ function renderModelPicker() {
   caret.className = 'mp-caret';
   caret.textContent = '▴';
   trigger.append(lbl, caret);
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); });
+  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); else { const p = document.querySelector('.mp-panel'); if (p) p.classList.remove('visible'); } });
 
   const panel = document.createElement('div');
   panel.className = 'mp-panel';
@@ -383,7 +386,7 @@ function renderModelPicker() {
     b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
     b.textContent = p.name || p.model || 'Unnamed';
     if (p.model) b.title = p.model;
-    b.addEventListener('click', () => { host.classList.remove('open'); selectProvider(p.id); });
+    b.addEventListener('click', () => { host.classList.remove('open'); const mp = document.querySelector('.mp-panel'); if (mp) mp.classList.remove('visible'); selectProvider(p.id); });
     return b;
   };
   const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
@@ -406,17 +409,21 @@ function renderModelPicker() {
   if (wasOpen) positionModelPickerPanel(host);
 }
 
-// The dropup panel is position:fixed so it escapes the composer's overflow:hidden
-// (.input-wrap clips to its rounded corners). Anchor it just above the trigger, in
-// viewport coordinates, clamped so a wide panel never spills off the screen edge.
+// The dropup panel is appended to <body> and position:fixed so it escapes both
+// .input-wrap's overflow:hidden AND any backdrop-filter containing block on the
+// form (aurora theme). Anchor it just above the trigger, in viewport coordinates,
+// clamped so a wide panel never spills off the screen edge.
 function positionModelPickerPanel(host) {
   const trig = host.querySelector('.mp-trigger');
-  const panel = host.querySelector('.mp-panel');
+  let panel = host.querySelector('.mp-panel');
   if (!trig || !panel) return;
+  // Move panel to <body> so it's not trapped in a backdrop-filter containing block.
+  if (panel.parentNode !== document.body) document.body.appendChild(panel);
   const r = trig.getBoundingClientRect();
   panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
   const pw = panel.offsetWidth || 220;
   panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
+  panel.classList.add('visible');
 }
 
 // ============================================================
@@ -677,7 +684,12 @@ function bootProviders() {
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
     const h = document.getElementById('modelPicker');
-    if (h && h.classList.contains('open') && !h.contains(e.target)) h.classList.remove('open');
+    if (h && h.classList.contains('open') && !h.contains(e.target)) {
+      const p = document.querySelector('.mp-panel');
+      if (p && p.contains(e.target)) return;
+      h.classList.remove('open');
+      if (p) p.classList.remove('visible');
+    }
   });
   // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
   window.addEventListener('resize', () => {

@@ -402,7 +402,7 @@
   /* position:fixed (JS sets bottom/left from the trigger rect) so the dropup escapes
      .input-wrap's overflow:hidden instead of being clipped above the composer. */
   .mp-panel { display: none; position: fixed; min-width: 200px; max-width: 300px; max-height: 50vh; overflow-y: auto; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); z-index: 1000; padding: 0.3rem; }
-  .model-picker.open .mp-panel { display: block; }
+  .mp-panel.visible { display: block; }
   .mp-hdr { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-text-dim); padding: 0.3rem 0.5rem 0.2rem; }
   .mp-sep { height: 1px; background: var(--sp-border); margin: 0.35rem 0.3rem; }
   .mp-item { display: block; width: 100%; text-align: left; padding: 0.35rem 0.5rem; background: transparent; border: none; border-radius: 5px; color: var(--sp-text); font: inherit; font-size: 0.8rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1884,6 +1884,7 @@
 
 [data-theme="aurora"] form { background: rgba(15,23,42,0.55); border-top: 1px solid rgba(148,163,184,0.06); backdrop-filter: blur(16px); }
 [data-theme="aurora"] .input-wrap { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
+[data-theme="aurora"] .mp-panel { background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 [data-theme="aurora"] .input-wrap:focus-within { border-color: rgba(56,189,248,0.3); background: rgba(0,0,0,0.4); box-shadow: 0 0 0 3px rgba(56,189,248,0.08), 0 8px 32px rgba(0,0,0,0.2); }
 [data-theme="aurora"] .input-wrap textarea { color: #f1f5f9; font-family: 'JetBrains Mono', monospace; }
 [data-theme="aurora"] .attach-btn { background: transparent !important; color: #94a3b8 !important; }
