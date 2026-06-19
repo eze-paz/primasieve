@@ -415,7 +415,7 @@ function renderModelPicker() {
 // clamped so a wide panel never spills off the screen edge.
 function positionModelPickerPanel(host) {
   const trig = host.querySelector('.mp-trigger');
-  let panel = host.querySelector('.mp-panel');
+  let panel = host.querySelector('.mp-panel') || document.querySelector('.mp-panel');
   if (!trig || !panel) return;
   // Move panel to <body> so it's not trapped in a backdrop-filter containing block.
   if (panel.parentNode !== document.body) document.body.appendChild(panel);
