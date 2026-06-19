@@ -331,8 +331,8 @@ const SandpieTransformersJS = (function () {
     const promptText = await buildPrompt(messages, tools);
 
     let inputs;
-    try { inputs = await _processor(promptText, { return_tensors: true, padding: false }); }
-    catch (_) { inputs = await _processor(promptText, { return_tensors: true }); }
+    try { inputs = await _processor(promptText, null, { return_tensors: true, padding: false }); }
+    catch (_) { inputs = await _processor(promptText, null, { return_tensors: true }); }
 
     let content = '';
     let streamer = null;
