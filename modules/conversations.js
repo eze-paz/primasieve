@@ -505,7 +505,7 @@ function setStreamSending(stream, sending) {
     stream.generating = false;
 
     for (const el of stream.host.querySelectorAll('.tool-call')) {
-      if (el.querySelector('.tc-check')) continue;
+      if (el.querySelector('.tc-prompt')) continue;
       el.classList.remove('in-flight');
       renderTcDone(el, el.dataset.fname);
     }
@@ -991,7 +991,6 @@ function addMsg(role, text = '', host = null) {
 
     const expanded = document.createElement('span');
     expanded.className = 'tc-expanded';
-    expanded.textContent = text;
     const collapsed = document.createElement('span');
     collapsed.className = 'tc-collapsed';
     div.appendChild(collapsed);
@@ -1121,7 +1120,7 @@ function buildToolBox(args, toolName) {
   const name = toolName || 'tool';
   const box = document.createElement('div');
   box.className = 'tool-box';
-  box.innerHTML = `<div class="tool-header">${tcEscape(name)}</div><div class="tool-code">${codeHtml}</div>`;
+  box.innerHTML = `<div class="tool-code">${codeHtml}</div>`;
   return box;
 }
 
@@ -1140,7 +1139,8 @@ function renderTcPreparing(div, fname, args) {
     el.innerHTML =
       REPL_LOADER('tc-dim') +
       `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
-      '<span class="tc-meta"></span>';
+      '<span class="tc-meta"></span>' +
+      '<span class="tc-chevron">▸</span>';
   }
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
@@ -1152,7 +1152,8 @@ function renderTcRunning(div, fname) {
   if (!el.querySelector('.repl-loader')) {
     el.innerHTML =
       REPL_LOADER() +
-      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>`;
+      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
+      '<span class="tc-chevron">▸</span>';
   }
 }
 
@@ -1160,8 +1161,9 @@ function renderTcDone(div, fname) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
   el.innerHTML =
-    '<span class="tc-check">✓</span>' +
-    `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>`;
+    '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
+    `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>` +
+    '<span class="tc-chevron">▸</span>';
 }
 
 class RoundRenderer {

@@ -1105,45 +1105,78 @@
     background: var(--sp-danger-dim);
   }
 
+  /* ---- Tool call: Terminal aesthetic ----
+     Collapsed: bare >>> prompt line, no border, no background.
+     Hover: subtle panel bg + border.
+     Expanded: header becomes terminal title bar, body unfolds below. */
   .tool-call {
+    display: flex;
+    flex-direction: column;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 88%;
+    font: 12px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+  }
+  .tool-call .tc-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
   }
-  .tool-call:hover {
-    background: var(--sp-accent-dim);
-    border-color: var(--sp-accent-dim);
+  .tool-call .tc-collapsed:hover {
+    background: var(--sp-panel);
+    border-color: var(--sp-border);
   }
+  .tool-call.expanded .tc-collapsed {
+    background: var(--sp-panel);
+    border: 1px solid var(--sp-border);
+    border-radius: 6px 6px 0 0;
+    border-bottom: 1px solid var(--sp-border);
+  }
+  .tool-call .tc-expanded { display: none; }
+  .tool-call.expanded .tc-expanded { display: block; }
+
+  .tc-prompt {
+    flex-shrink: 0;
+    color: var(--sp-success);
+    font-weight: 700;
+  }
+  .tc-chevron {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--sp-text-dim);
+    opacity: 0.35;
+    font-size: 10px;
+    transition: transform 0.2s ease, opacity 0.15s ease;
+  }
+  .tool-call .tc-collapsed:hover .tc-chevron { opacity: 0.7; }
+  .tool-call.expanded .tc-collapsed .tc-chevron { transform: rotate(90deg); opacity: 0.7; }
 
   .tool-box {
-    align-self: flex-start;
-    max-width: 100%;
-    background: var(--sp-surface);
+    background: var(--sp-bg);
     border: 1px solid var(--sp-border);
-    border-radius: 0.375rem;
-    font: 11px/1.6 'Space Mono', 'JetBrains Mono', monospace;
-    white-space: pre-wrap;
-    overflow-x: auto;
-  }
-  .tool-box .tool-header {
-    padding: 0.25rem 0.75rem;
-    font-size: 10px;
-    color: var(--sp-text-dim);
-    background: var(--sp-accent-dim);
-    border-bottom: 1px solid var(--sp-border);
-    border-radius: 0.375rem 0.375rem 0 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
   }
   .tool-box .tool-code {
     padding: 0.5rem 0.75rem;
     color: var(--sp-text);
+    font: 11px/1.6 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+    white-space: pre-wrap;
+    overflow-x: auto;
   }
   .tool-box .tool-code .line::before {
     content: ">>> ";
     color: var(--sp-text-dim);
     user-select: none;
     font-size: 10px;
-    opacity: 0.7;
+    opacity: 0.5;
   }
   .tool-box .tool-sep {
     border-top: 1px solid var(--sp-border);
@@ -1152,44 +1185,9 @@
   .tool-box .tool-result {
     padding: 0.5rem 0.75rem;
     color: var(--sp-accent);
+    font: 11px/1.6 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+    white-space: pre-wrap;
   }
-  /* Collapsed (default) state: show the summary header, hide the detail body */
-  .tool-call .tc-collapsed {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    width: 100%;
-    min-width: 0;
-    cursor: pointer;
-  }
-  .tool-call .tc-expanded { display: none; }
-  /* Expanded state: show the detail body below the header */
-  .tool-call.expanded .tc-expanded { display: block; }
-  .tool-call.expanded .tc-collapsed { display: flex; }
-  .tool-call {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0.5rem 0.8rem;
-    font-size: 12px;
-    line-height: 1.5;
-    min-height: 30px;
-    max-width: 88%;
-    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
-    border: 1px solid var(--sp-accent-dim);
-    white-space: normal;
-    overflow: hidden;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-    align-self: flex-start;
-    width: fit-content;
-  }
-  .tool-call:hover {
-    background: linear-gradient(135deg, var(--sp-accent-dim), var(--sp-accent-dim));
-    border-color: var(--sp-accent-dim);
-    box-shadow: 0 0 0 1px var(--sp-accent-dim);
-  }
-  /* Expanded state: detail body visible (header stays for re-collapse) */
-  .tool-call.expanded .tool-result { display: block; }
   .repl-loader {
     flex-shrink: 0;
     display: inline-flex;
@@ -1203,21 +1201,16 @@
   .repl-loader > i { font-style: normal; opacity: 0.3; animation: repl-sweep 1.15s ease-in-out infinite; }
   .repl-loader > i:nth-child(2) { animation-delay: 0.19s; }
   .repl-loader > i:nth-child(3) { animation-delay: 0.38s; }
-  .tc-title { color: var(--sp-text); white-space: nowrap; }
+  .tc-title { color: var(--sp-text-dim); white-space: nowrap; font-weight: 500; }
   .tc-title b { color: var(--sp-accent); font-weight: 600; }
   .tc-meta {
     margin-left: auto;
     font-size: 10px;
-    color: #6e7681;
+    color: var(--sp-text-dim);
+    opacity: 0.6;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     flex-shrink: 0;
-  }
-  .tc-check {
-    flex-shrink: 0;
-    color: #56d364;
-    font-weight: bold;
-    font-size: 12px;
   }
   .tc-dim { opacity: 0.65; }
 
