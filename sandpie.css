@@ -1137,6 +1137,7 @@
     border: 1px solid var(--sp-border);
     border-radius: 6px 6px 0 0;
     border-bottom: 1px solid var(--sp-border);
+    padding: 0.2rem 0.6rem;
   }
   .tool-call .tc-expanded { display: none; }
   .tool-call.expanded .tc-expanded { display: block; }
@@ -1165,9 +1166,9 @@
     overflow: hidden;
   }
   .tool-box .tool-code {
-    padding: 0.5rem 0.75rem;
+    padding: 0.3rem 0.6rem;
     color: var(--sp-text);
-    font: 11px/1.6 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+    font: 11px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
     white-space: pre-wrap;
     overflow-x: auto;
   }
@@ -1180,12 +1181,12 @@
   }
   .tool-box .tool-sep {
     border-top: 1px solid var(--sp-border);
-    margin: 0 0.75rem;
+    margin: 0 0.6rem;
   }
   .tool-box .tool-result {
-    padding: 0.5rem 0.75rem;
+    padding: 0.3rem 0.6rem;
     color: var(--sp-accent);
-    font: 11px/1.6 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+    font: 11px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
     white-space: pre-wrap;
   }
   .repl-loader {
