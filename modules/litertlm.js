@@ -79,6 +79,75 @@ const SandpieLiteRTLM = (function () {
   }
 
   // ============================================================
+  // WebGPU device — fp32-forced (no shader-f16).
+  //
+  // The LiteRT-LM SDK's createDefaultWebGpuDevice() requests 'shader-f16' if the
+  // adapter supports it. When the feature is present, the SDK's WGSL shaders use
+  // f16 types for matmuls, reductions, and softmax — which is fine for most models
+  // but CATASTROPHIC for Gemma. Gemma's architecture (RMSNorm scale = 1.0, tight
+  // softmax temperatures) loses meaningful precision in fp16: the logits drift
+  // off-distribution, dense non-English tokens (Chinese, Tamil) leak through, and
+  // with no repetition penalty the model locks into infinite loops. This is a
+  // well-documented, architecture-level fp16 intolerance.
+  //
+  // On desktop GPUs the corruption is often mild enough to go unnoticed (larger
+  // registers, better fp16 accumulation). On mobile GPUs — where fp16 is the norm
+  // and accumulators are narrower — the corruption is severe and immediate.
+  //
+  // FIX: create the WebGPU device ourselves WITHOUT 'shader-f16'. Its absence
+  // forces the SDK's shaders to use f32 everywhere, keeping Gemma's logits clean.
+  // We set this as preinitializedWebGPUDevice on the WASM module BEFORE
+  // Engine.create(), so the SDK's internal setupDefaultWebGpuDevice() sees a
+  // device is already set and skips its own (fp16-enabling) creation.
+  // ============================================================
+  async function createFp32WebGpuDevice() {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) {
+      throw new Error(
+        'LiteRT-LM: No WebGPU adapter found. WebGPU is required for in-browser Gemma inference. '
+        + 'Use Chrome/Edge with WebGPU enabled, or pick a wllama (CPU) model instead.'
+      );
+    }
+
+    // Deliberately do NOT request 'shader-f16'. Its absence forces fp32 shaders.
+    // 'subgroups' is a thread-cooperation feature (not precision-related); keep it
+    // if available for performance.
+    const requiredFeatures = [];
+    if (adapter.features.has('subgroups')) requiredFeatures.push('subgroups');
+
+    const requiredLimits = {
+      maxBufferSize: adapter.limits.maxBufferSize,
+      maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
+      maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
+      maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+    };
+
+    let device;
+    try {
+      device = await adapter.requestDevice({ requiredFeatures, requiredLimits });
+    } catch (e) {
+      throw new Error(
+        'LiteRT-LM: Failed to create a WebGPU device (fp32 mode). '
+        + 'The GPU adapter was found but device creation failed: '
+        + ((e && e.message) || e)
+        + '. Try closing other GPU-heavy tabs or use a wllama (CPU) model instead.'
+      );
+    }
+
+    // Sanity check: confirm shader-f16 is NOT enabled on the device. If the
+    // browser granted it despite our not requesting it (shouldn't happen, but
+    // defend against it), warn — the SDK may use fp16 shaders and corrupt Gemma.
+    if (device.features.has('shader-f16')) {
+      console.warn('[litertlm] WARNING: WebGPU device has shader-f16 despite not requesting it. '
+        + 'The SDK may use fp16 shaders — Gemma output may be corrupted (non-English tokens, '
+        + 'repetition loops) on this device. Consider using a wllama (CPU) model instead.');
+    }
+
+    dbg('WebGPU device created (fp32-forced, shader-f16 excluded). Features:', requiredFeatures);
+    return device;
+  }
+
+  // ============================================================
   // Model cache (Cache Storage API — NOT OPFS, so Dropbox sync can't see it).
   // The LiteRT-LM Web SDK fetches the .litertlm URL itself with no persistent
   // cache, so a 2–3 GB model re-downloads on every load. We fetch it through the
@@ -137,15 +206,42 @@ const SandpieLiteRTLM = (function () {
     // the UI can show a "loading" line before the (multi-GB, slow) first load.
     try { onProgress && onProgress({ status: 'loading' }); } catch (_) {}
     const { Engine } = await loadLib();
-    // Per the docs, Engine.create sets up the WASM runtime + WebGPU device itself.
-    // If a future SDK build needs explicit init, the module also exports
-    // loadLiteRtLm() / getOrLoadGlobalLiteRtLm() / setupDefaultWebGpuDevice().
+    // Engine.create() internally calls setupDefaultWebGpuDevice(), but we pre-set
+    // our own fp32-forced device (below) so it skips its fp16-enabling creation.
     dbg('Engine.create', modelUrl, 'maxNumTokens', ctx);
     // Hand the SDK the CACHED byte stream (Cache Storage) instead of the URL, so the
     // multi-GB model is downloaded once and reused across loads. Falls back to the
     // URL if the body isn't streamable. EngineSettings.model accepts a ReadableStream.
     const modelSource = (await fetchModelStream(modelUrl, onProgress)) || modelUrl;
-    _engine = await Engine.create({ model: modelSource, mainExecutorSettings: { maxNumTokens: ctx } });
+
+    // Pre-set an fp32-forced WebGPU device on the WASM module BEFORE Engine.create.
+    // Engine.create() internally calls setupDefaultWebGpuDevice(), which checks
+    // preinitializedWebGPUDevice — if already set, it skips its own device creation
+    // (which would request shader-f16 and enable fp16 shaders). By pre-setting ours
+    // (no shader-f16), we force the SDK's WGSL shaders to use f32 everywhere,
+    // keeping Gemma's logits clean on mobile GPUs where fp16 corrupts them.
+    const lib = await loadLib();
+    let litertlm = null;
+    try {
+      // getOrLoadGlobalLiteRtLm() loads the WASM module (one-time) and returns the
+      // singleton LiteRtLm instance whose .liteRtLmWasm holds the WASM bindings.
+      litertlm = await lib.getOrLoadGlobalLiteRtLm();
+    } catch (e) {
+      throw new Error('LiteRT-LM: Failed to load WASM runtime: ' + ((e && e.message) || e));
+    }
+    if (litertlm && litertlm.liteRtLmWasm && !litertlm.liteRtLmWasm.preinitializedWebGPUDevice) {
+      try {
+        const device = await createFp32WebGpuDevice();
+        litertlm.liteRtLmWasm.preinitializedWebGPUDevice = device;
+        dbg('Pre-set fp32 WebGPU device on WASM module');
+      } catch (e) {
+        // If we can't create an fp32 device, surface the error clearly — running
+        // with the SDK's default (fp16) device will corrupt Gemma on mobile.
+        throw e;
+      }
+    }
+
+    _engine = await lib.Engine.create({ model: modelSource, mainExecutorSettings: { maxNumTokens: ctx } });
     _engineModel = modelUrl;
     _engineCtx = ctx;
     return _engine;
