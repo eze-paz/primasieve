@@ -73,26 +73,6 @@ const SandpieTransformersJS = (function () {
   // float ('@4' / "latest"); bump deliberately to a TESTED version.
   const LIB_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
 
-  // STABLE ORT WASM binaries. transformers.js 4.2.0 bundles onnxruntime-web
-  // 1.26.0-dev.20260416-b7804b056c (a DEV build) and sets wasmPaths to that dev
-  // version's files on jsdelivr during init. The dev build's
-  // ort-wasm-simd-threaded.asyncify.wasm has an alignment bug that traps with
-  // "RuntimeError: operation does not support unaligned accesses" during Qwen3.5's
-  // forward pass (the matmul / attention ops hit an unaligned WASM memory access).
-  // Setting numThreads=1 does NOT fix this — the threaded binary is still loaded,
-  // it just runs with 1 worker; the buggy code paths are still executed.
-  //
-  // FIX: override wasmPaths to point at the STABLE onnxruntime-web@1.26.0 release
-  // (different binary, 4,759,682 vs 4,732,131 bytes — the alignment bug is fixed).
-  // Must be set BEFORE any model loads (ORT reads wasmPaths once during
-  // initializeWebAssembly, which happens on the first InferenceSession creation).
-  const ORT_STABLE_VERSION = '1.26.0';
-  const ORT_STABLE_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_STABLE_VERSION}/dist/`;
-  const ORT_STABLE_WASM_PATHS = {
-    mjs: `${ORT_STABLE_BASE}ort-wasm-simd-threaded.asyncify.mjs`,
-    wasm: `${ORT_STABLE_BASE}ort-wasm-simd-threaded.asyncify.wasm`,
-  };
-
   let _lib = null;                                  // cached imported module
   let _processor = null, _model = null, _currentModelId = null;
   let _stopping = null;                             // InterruptableStoppingCriteria for the active run
@@ -100,22 +80,16 @@ const SandpieTransformersJS = (function () {
   async function lib() {
     if (!_lib) {
       _lib = await import(LIB_URL);
-      // Override the DEV-build WASM paths with STABLE ORT 1.26.0 binaries BEFORE any
-      // model loads. This must happen before the first InferenceSession.create() call
-      // (which triggers initializeWebAssembly and reads wasmPaths). See the comment
-      // above ORT_STABLE_WASM_PATHS for why the dev build's WASM traps.
-      try {
-        _lib.env.backends.onnx.wasm.wasmPaths = ORT_STABLE_WASM_PATHS;
-      } catch (e) {
-        console.warn('[transformersjs] Failed to override ORT wasmPaths — may use dev build:', e && e.message);
-      }
-      // Force onnxruntime-web SINGLE-THREADED. Our prod page is cross-origin isolated
-      // (COOP/COEP, on for wllama), so SharedArrayBuffer exists and ORT would pick the
-      // MULTI-THREADED WASM build. With the stable binaries the alignment trap is fixed,
-      // but single-threaded still matches the HF Qwen3.5-WebGPU Space (which isn't
-      // cross-origin isolated) and avoids worker-spawn overhead. WebGPU compute is
-      // unaffected (runs on the GPU); this only bounds ORT's WASM orchestration.
-      try { _lib.env.backends.onnx.wasm.numThreads = 1; } catch (_) {}
+      // NO env overrides. The working webml-community/Qwen3.5-WebGPU HF Space
+      // overrides nothing — it uses the defaults that transformers.js 4.2.0 ships
+      // with. We previously overrode wasmPaths to a "stable" ORT 1.26.0 binary and
+      // forced numThreads=1 (for an old Qwen2.5 WASM alignment bug), but the
+      // stable WASM binary is ABI-incompatible with the dev-build JS glue code
+      // that transformers.js 4.2.0 bundles. That mismatch corrupts the data
+      // marshaling between WASM and WebGPU, invalidating GPU buffers ("Failed to
+      // download data from buffer: mapAsync ... is invalid due to a previous
+      // error"). The dev build's alignment bug only affected the old Qwen2.5
+      // model on the WASM backend; Qwen3.5 runs on WebGPU and is unaffected.
     }
     return _lib;
   }
