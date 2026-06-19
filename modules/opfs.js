@@ -332,7 +332,13 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     try {
       await opfs.getPptxViewer();
       const container = document.createElement('div');
-      container.style.cssText = 'width:100%;min-height:60vh;';
+      // Force a light-theme context: pptx-viewer renders slides as SVG, and SVG
+      // text without an explicit fill inherits currentColor. Sandpie's dark theme
+      // sets color:white → invisible text on white slide backgrounds. Pinning
+      // color:#333 + background:#fff ensures inherited text is always visible.
+      // Also reset font-family so the viewer's own styles apply cleanly.
+      container.style.cssText = 'width:100%;min-height:60vh;color:#333;background:#fff;font-family:sans-serif;';
+      container.className = 'pptx-viewer-container';
       body.innerHTML = '';
       body.appendChild(container);
       const viewer = new window.PPTXViewer.PPTXViewer(container, {

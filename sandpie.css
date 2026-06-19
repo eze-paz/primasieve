@@ -159,6 +159,13 @@
   .file-viewer .md-preview a { color: var(--sp-accent); }
   .file-viewer .md-preview table { border-collapse: collapse; }
   .file-viewer .md-preview th, .file-viewer .md-preview td { border: 1px solid var(--sp-border); padding: 0.3rem 0.6rem; }
+  /* PPTX viewer: force light-theme context so SVG text (which inherits currentColor)
+     is visible on white slide backgrounds. Sandpie's dark theme sets color:white
+     which makes text invisible without this override. Only target text elements
+     that have NO explicit fill attribute — respect the library's explicit colors. */
+  .pptx-viewer-container { color: #333 !important; background: #fff !important; }
+  .pptx-viewer-container svg { color: #333; }
+  .pptx-viewer-container svg text:not([fill]) { fill: #333; }
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
   ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
 
