@@ -433,13 +433,13 @@ function applyTypeUI() {
   // actually reads, so wllama-only knobs no longer bleed into transformers.js /
   // litertlm. Cloud (non-local) keeps the generic context/maxTokens/temperature.
   //   contextWindow: wllama (n_ctx) + litertlm (maxNumTokens) + cloud; NOT transformers.js
-  //   temperature:   wllama + litertlm + cloud; NOT transformers.js (uses model default)
+  //   temperature:   cloud only — removed as a configurable option for all 3 local backends
   //   freq penalty:  wllama + transformers.js (repetition_penalty); NOT litertlm
   //   presence pen.: wllama only
   //   reasoning:     wllama (/think) + litertlm (Gemma thinking); NOT transformers.js
   //   flash / GPU layers / threads / n_batch: wllama only (llama.cpp load params)
   show('spContextWindow', !transformersjs);
-  show('spTemperature', !local || wllama || litertlm);
+  show('spTemperature', !local);
   show('spFreqPenalty', wllama || transformersjs);
   show('spPresencePenalty', wllama);
   show('spReasoning', wllama || litertlm);

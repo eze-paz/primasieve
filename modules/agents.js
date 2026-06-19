@@ -232,7 +232,6 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
       // model reload mid-conversation (nThreads/nBatch are load-time params).
       nThreads: active.nThreads != null ? (active.nThreads | 0) : undefined,
       nBatch: active.nBatch != null ? (active.nBatch | 0) : undefined,
-      temperature: active.temperature != null ? active.temperature : undefined,
       // Utility prompts (titles, distill, etc.) want a fast direct answer — for
       // RWKV that means the no_think prefill. Ignored by non-RWKV models.
       reasoning: 'no_think',
@@ -245,7 +244,6 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
       modelUrl: active.endpoint,
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       tools: [], signal, maxTokens,
-      temperature: active.temperature != null ? active.temperature : undefined,
     });
     return (r && r.content) || '';
   }

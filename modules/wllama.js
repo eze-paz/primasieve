@@ -374,9 +374,8 @@ const SandpieWllama = (function() {
    *   nCtx        — context window in tokens (load-time; triggers reload)
    *   flashAttn   — enable flash attention (load-time; triggers reload)
    *   maxTokens   — max output tokens per round
-   *   temperature — sampling temperature (0–2)
    */
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, nThreads, nBatch, maxTokens, temperature, frequencyPenalty, presencePenalty, reasoning }) {
+  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, nCtx, flashAttn, nGpuLayers, nThreads, nBatch, maxTokens, frequencyPenalty, presencePenalty, reasoning }) {
     const wllama = await getInstance(modelUrl, onProgress, { nCtx, flashAttn, nGpuLayers, nThreads, nBatch });
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
@@ -384,7 +383,7 @@ const SandpieWllama = (function() {
     // to the raw-completion path (manual prompt + `<think` prefill, reasoning split
     // out as reasoning_content, no tools). `tools` is intentionally ignored here.
     if (isRwkvUrl(modelUrl)) {
-      return streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, frequencyPenalty, presencePenalty });
+      return streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, frequencyPenalty, presencePenalty });
     }
 
     let aborted = false;
@@ -421,7 +420,6 @@ const SandpieWllama = (function() {
       modelUrl,
       messages: adaptedMessages,
       max_tokens: maxTokens || 2048,
-      temperature: temperature != null ? temperature : 0.7,
       tools: tools && tools.length ? tools : undefined,
     };
     // Optional sampling / penalty params (top-level; llama.cpp + OAI names). Only
@@ -451,7 +449,6 @@ const SandpieWllama = (function() {
       const stream = await wllama.createChatCompletion({
         messages: request.messages,
         max_tokens: request.max_tokens,
-        temperature: request.temperature,
         ...(request.frequency_penalty != null ? { frequency_penalty: request.frequency_penalty } : {}),
         ...(request.presence_penalty != null ? { presence_penalty: request.presence_penalty } : {}),
         stream: true,
@@ -575,7 +572,7 @@ const SandpieWllama = (function() {
     return turns.join('\n\n') + '\n\nAssistant:' + promptPrefill;
   }
 
-  async function streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, temperature, frequencyPenalty, presencePenalty }) {
+  async function streamRoundRwkv({ wllama, messages, signal, onDelta, reasoning, maxTokens, frequencyPenalty, presencePenalty }) {
     // Reasoning toggle → assistant prefill:
     //   no_think → seed a closed, empty block ("fake thinking, fast" per BlinkDL)
     //   think / auto → seed an open `<think>` so the model reasons (G1's default).
@@ -646,9 +643,9 @@ const SandpieWllama = (function() {
     const maxOut = maxTokens || 2048;
     const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
-    // BlinkDL's recommended G1 reasoning sampling (temp 1.0, presence/frequency
-    // penalty 0.5 to curb RWKV repetition) unless the provider overrides. top_p
-    // option removed — RWKV now uses llama.cpp's default top_p.
+    // BlinkDL's recommended G1 reasoning: presence/frequency penalty 0.5 to curb
+    // RWKV repetition, unless the provider overrides. top_p AND temperature options
+    // removed — RWKV now uses llama.cpp's defaults for those.
     // cache_prompt stays FALSE here — unlike the transformer chat path, which now
     // reuses the KV. RWKV is recurrent: its "cache" is one evolving state with no
     // per-token positions, so the engine can't reconcile a diverged prefix by
@@ -661,7 +658,6 @@ const SandpieWllama = (function() {
       stream: true,
       cache_prompt: false,
       max_tokens: maxOut,
-      temperature: temperature != null ? temperature : 1.0,
       presence_penalty: presencePenalty != null ? presencePenalty : 0.5,
       frequency_penalty: frequencyPenalty != null ? frequencyPenalty : 0.5,
       stop: ['\n\nUser:'],
@@ -705,7 +701,7 @@ const SandpieWllama = (function() {
     try {
       self.__wllamaLastRound = {
         ts: new Date().toISOString(),
-        request: { rwkv: true, mode, prompt, max_tokens: params.max_tokens, temperature: params.temperature },
+        request: { rwkv: true, mode, prompt, max_tokens: params.max_tokens },
         response: { content: emittedContent, reasoning: emittedReasoning, finish_reason: finishReason, duration_ms: dtMs, timings: lastTimings },
       };
     } catch (_) {}
@@ -822,7 +818,6 @@ const SandpieWllama = (function() {
       nThreads: provider.nThreads != null ? (provider.nThreads | 0) : undefined,
       nBatch: provider.nBatch != null ? (provider.nBatch | 0) : undefined,
       maxTokens: provider.maxTokens || undefined,
-      temperature: provider.temperature != null ? provider.temperature : undefined,
       frequencyPenalty: provider.frequencyPenalty != null ? provider.frequencyPenalty : undefined,
       presencePenalty: provider.presencePenalty != null ? provider.presencePenalty : undefined,
     };
