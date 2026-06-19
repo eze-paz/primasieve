@@ -994,10 +994,10 @@ function addMsg(role, text = '', host = null) {
     expanded.textContent = text;
     const collapsed = document.createElement('span');
     collapsed.className = 'tc-collapsed';
-    div.appendChild(expanded);
     div.appendChild(collapsed);
-    // Collapsed by default; left-click toggles only this element.
-    div.addEventListener('click', (ev) => {
+    div.appendChild(expanded);
+    // Collapsed by default; click the header (tc-collapsed) to toggle.
+    collapsed.addEventListener('click', (ev) => {
       ev.stopPropagation();
       div.classList.toggle('expanded');
     });
