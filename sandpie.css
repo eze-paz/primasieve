@@ -1894,6 +1894,21 @@
 [data-theme="aurora"] ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.15); border-radius: 10px; }
 [data-theme="aurora"] ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
 
+/* Aurora modals: the theme's --sp-surface is rgba(15,23,42,0.6) (60% opacity glass),
+   which is fine for the sidebar (it has backdrop-filter:blur) but makes modal content
+   hard to read — text shows the page behind it. Override modal-content to be near-opaque
+   with a blur so the glass aesthetic is kept but content is legible. */
+[data-theme="aurora"] .modal-content {
+  background: rgba(15,23,42,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(148,163,184,0.15);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+}
+[data-theme="aurora"] .modal-backdrop {
+  background: rgba(7,11,20,0.7);
+}
+
 [data-theme="electric"] {
   --sp-accent-2: #ffcc00;
 }
