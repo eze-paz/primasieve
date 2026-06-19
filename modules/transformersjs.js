@@ -157,16 +157,11 @@ const SandpieTransformersJS = (function () {
     _model = model;
     _currentModelId = modelId;
 
-    // WARMUP — compile the WebGPU shaders with a 1-token dummy generation first, so
-    // the first real generate doesn't compile every shader AND run a long burst in
-    // one sustained GPU submission (which can trip the OS GPU watchdog). Mirrors the
-    // HF demos' load(). Best-effort.
-    try {
-      const warm = await _processor('a');
-      await _model.generate({ ...warm, max_new_tokens: 1 });
-    } catch (err) {
-      dbg('warmup failed (continuing):', (err && err.message) || err);
-    }
+    // NOTE: No warmup. The working webml-community/Qwen3.5-WebGPU HF Space does
+    // NOT warm up — and a failed warmup generation can corrupt the WebGPU device
+    // state (invalid buffers), causing every subsequent generate() to fail with
+    // "Failed to download data from buffer: mapAsync ... is invalid due to a
+    // previous error." The first real generate compiles shaders on its own.
   }
 
   // Free the model + its WebGPU device. Called by the other local backends (and
@@ -331,8 +326,8 @@ const SandpieTransformersJS = (function () {
     const promptText = await buildPrompt(messages, tools);
 
     let inputs;
-    try { inputs = await _processor(promptText, null, { return_tensors: true, padding: false }); }
-    catch (_) { inputs = await _processor(promptText, null, { return_tensors: true }); }
+    try { inputs = await _processor(promptText); }
+    catch (_) { inputs = await _processor(promptText, null); }
 
     let content = '';
     let streamer = null;
