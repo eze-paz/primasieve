@@ -1,36 +1,50 @@
 // sandpie/modules/transformersjs.js — In-browser LLM via Transformers.js, run
-// INLINE on the page main thread (no Web Worker), exactly like the working HF
-// Spaces (webml-community/Qwen3.5-WebGPU, transformers.js-examples/qwen3-webgpu):
-// those load + generate on the main thread and do NOT crash. We previously ran it
-// in a worker; that added a second WebGPU instance whose teardown raced the GPU
-// process ("A valid external Instance reference no longer exists") and never solved
-// the underlying iGPU issue (that was the fp16 dtype, now q4). wllama and litertlm
-// already load their libs on the main thread too, so this is consistent.
+// INLINE on the page main thread (no Web Worker), as a FAITHFUL MIRROR of the
+// working HF Space webml-community/Qwen3.5-WebGPU (transformers.js@4.2.0).
 //
-// This module owns the curated catalog, loads the model, drives the agentic tool
-// loop (tool calls hit the SW's /sandpie-tool), and parses tool calls out of the
-// model's text. Tool-calling is prompt-driven (no grammar engine), so we parse
-// <tool_call> blocks from the output.
+// This module is deliberately kept as close to that Space's index.js as possible
+// because that Space WORKS and our earlier divergences did not. Specifically we
+// match the Space on every load/generation decision:
+//   • import @huggingface/transformers@4.2.0 from jsdelivr, NO env overrides
+//     (no wasmPaths override, no numThreads — the Space sets none, and forcing
+//     the threaded ORT WASM without cross-origin isolation mis-loads).
+//   • AutoProcessor + Qwen3_5ForConditionalGeneration, per-component dtype map,
+//     device:'webgpu' ONLY (no WASM fallback).
+//   • NO warmup (a failed warmup corrupts the WebGPU device → every later
+//     generate() fails on invalid buffers).
+//   • Manual ChatML prompt (<|im_start|>…<think>…) — NOT apply_chat_template;
+//     the Space hand-builds the prompt because that is what its KV-cache reuse
+//     (past_key_values across turns) requires.
+//   • generate(): max_new_tokens 2048/512 by thinking, do_sample:true,
+//     return_dict_in_generate:true; TextStreamer skip_special_tokens:!thinking.
+//   • KV-cache reuse: keep past_key_values + the decoded prompt history and feed
+//     them back on the next turn so only the new tokens are prefilled.
+//
+// The Space is a single-purpose chat demo: NO tool-calling, NO agentic loop. We
+// keep only a thin sandpie adapter on top — runConversation emits the host event
+// protocol (reasoning → reasoning_content, answer → content), and streamRound is
+// the stateless one-shot used by agents.js for utility prompts (titles, etc.).
 
 const SandpieTransformersJS = (function () {
   'use strict';
 
   const DEFAULT_N_CTX = 8192;
 
-  // All PUBLIC (no HF token needed). modelId is the BASE repo id; the quant is
-  // chosen via the per-component dtype map (QWEN35_DTYPE). Gated/private models
-  // can't load in the browser at all (tokens are server-side only), so we curate
-  // public ones.
-  // Qwen3.5 multimodal (vision + text) models — the same repos the working
-  // webml-community/Qwen3.5-WebGPU HF Space uses. These are
-  // Qwen3_5ForConditionalGeneration models loaded via AutoProcessor (NOT
-  // AutoModelForCausalLM/AutoTokenizer), with a per-component dtype map.
+  // Kill-switch for cross-turn KV-cache reuse. ON mirrors the Space (faster
+  // multi-turn). If it ever produces garbled continuations on some model/lib
+  // combo, flip to false to force a full cold prefill every turn (always
+  // correct, just slower) without touching the rest of the logic.
+  const ENABLE_KV_CACHE = true;
+
+  // Per-component quant — IDENTICAL to the Space. NOTE q4 (NOT q4f16): fp16
+  // WebGPU kernels freeze Intel iGPUs (TDR → driver reset).
   const QWEN35_DTYPE = {
     embed_tokens: 'q4',
     vision_encoder: 'fp16',
     decoder_model_merged: 'q4',
   };
 
+  // Exactly the Space's dropdown option values (its <select id="modelSelect">).
   const DEFAULT_MODELS = [
     {
       id: 'qwen3.5-0.8b',
@@ -49,6 +63,10 @@ const SandpieTransformersJS = (function () {
     },
   ];
 
+  // The EXACT CDN + version the Space imports. Pin a SPECIFIC version — NEVER
+  // float ('@4'/'latest'); bump deliberately to a TESTED version.
+  const LIB_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
+
   // ============================================================
   // Debug logging
   // ============================================================
@@ -62,291 +80,221 @@ const SandpieTransformersJS = (function () {
   }
 
   // ============================================================
-  // Model — load + generation run INLINE on the main thread.
+  // Module state (model + the cross-turn KV cache)
   // ============================================================
-  // Loaded from jsdelivr — the EXACT CDN the working webml-community/Qwen3.5-WebGPU
-  // Space imports from. We were on esm.sh, which re-resolves transformers.js's
-  // onnxruntime-web to a DEV build (1.26.0-dev) whose WASM traps mid-generation with
-  // "operation does not support unaligned accesses"; jsdelivr serves the ORT build
-  // transformers.js actually ships (what the Space runs). jsdelivr is also already
-  // in the app CSP (marked/dompurify load from it). Pin a SPECIFIC version — NEVER
-  // float ('@4' / "latest"); bump deliberately to a TESTED version.
-  const LIB_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
-
-  let _lib = null;                                  // cached imported module
+  let _lib = null;
   let _processor = null, _model = null, _currentModelId = null;
-  let _stopping = null;                             // InterruptableStoppingCriteria for the active run
 
+  // KV-cache state — mirrors the Space's pastKeyValues/promptHistory, scoped to a
+  // conversation so we only reuse the cache on a verified clean append.
+  let _pastKeyValues = null;     // the model's KV cache from the last generation
+  let _promptHistory = '';       // full decoded sequence the cache corresponds to
+  let _kvConvId = null;          // which conversation the cache belongs to
+  let _consumedSig = null;       // signature of the messages already baked into the cache
+  let _consumedCount = 0;        // how many messages are baked in
+
+  // Import the library. NO env overrides — the Space sets none and works; letting
+  // onnxruntime-web auto-pick its backend (single-threaded when there's no
+  // SharedArrayBuffer) is exactly what the Space relies on.
   async function lib() {
-    if (!_lib) {
-      _lib = await import(LIB_URL);
-      // NO env overrides. The working webml-community/Qwen3.5-WebGPU HF Space
-      // overrides nothing — it uses the defaults that transformers.js 4.2.0 ships
-      // with. We previously overrode wasmPaths to a "stable" ORT 1.26.0 binary and
-      // forced numThreads=1 (for an old Qwen2.5 WASM alignment bug), but the
-      // stable WASM binary is ABI-incompatible with the dev-build JS glue code
-      // that transformers.js 4.2.0 bundles. That mismatch corrupts the data
-      // marshaling between WASM and WebGPU, invalidating GPU buffers ("Failed to
-      // download data from buffer: mapAsync ... is invalid due to a previous
-      // error"). The dev build's alignment bug only affected the old Qwen2.5
-      // model on the WASM backend; Qwen3.5 runs on WebGPU and is unaffected.
-    }
+    if (!_lib) _lib = await import(LIB_URL);
     return _lib;
   }
 
-  // Load (and cache) the processor + model. WebGPU first (q4 — NOT q4f16: fp16
-  // WebGPU kernels freeze Intel iGPUs), CPU/WASM fallback for no usable adapter.
-  // Switching models tears down the previous to free memory + the WebGPU device.
-  // Qwen3.5 models are multimodal (Qwen3_5ForConditionalGeneration) and use
-  // AutoProcessor (not AutoTokenizer) + a per-component dtype map, exactly like
-  // the working webml-community/Qwen3.5-WebGPU HF Space.
-  async function ensureModel(modelId, dtype, onProgress) {
+  // Dispose the KV cache tensors and clear all cache bookkeeping. Use only when we
+  // OWN the cache and are discarding it (cold start / model switch / unload).
+  function disposeKv() {
+    if (_pastKeyValues) {
+      try { for (const t of Object.values(_pastKeyValues)) t && t.dispose && t.dispose(); } catch (_) {}
+    }
+    resetKvRefs();
+  }
+  // Drop our references WITHOUT disposing (used after errors, to avoid a possible
+  // double-free if the library already freed mid-failure).
+  function resetKvRefs() {
+    _pastKeyValues = null;
+    _promptHistory = '';
+    _kvConvId = null;
+    _consumedSig = null;
+    _consumedCount = 0;
+  }
+
+  // Load (and cache) the processor + model, exactly like the Space:
+  // AutoProcessor + Qwen3_5ForConditionalGeneration, dtype map, device:'webgpu',
+  // NO warmup. Switching models tears down the previous one (and its KV cache,
+  // whose tensors belong to the old model).
+  async function ensureModel(modelId, onProgress) {
     if (_currentModelId === modelId && _model && _processor) return;
-    if (_model) { try { await _model.dispose?.(); } catch (_) {} _model = null; _processor = null; _currentModelId = null; }
+    if (_model) { try { await _model.dispose?.(); } catch (_) {} }
+    disposeKv();
+    _model = null; _processor = null; _currentModelId = null;
 
     const { AutoProcessor, Qwen3_5ForConditionalGeneration } = await lib();
     const progress_callback = onProgress || undefined;
 
     const processor = await AutoProcessor.from_pretrained(modelId, { progress_callback });
-
-    let model;
-    try {
-      model = await Qwen3_5ForConditionalGeneration.from_pretrained(modelId, {
-        dtype: dtype || QWEN35_DTYPE,
-        device: 'webgpu',
-        progress_callback,
-      });
-    } catch (gpuErr) {
-      // No usable WebGPU adapter — fall back to CPU/WASM (q4). The WASM heap caps
-      // ~2 GB, so big models can still std::bad_alloc here; that's a device limit.
-      dbg('webgpu load failed, falling back to wasm:', (gpuErr && gpuErr.message) || gpuErr);
-      model = await Qwen3_5ForConditionalGeneration.from_pretrained(modelId, {
-        dtype: dtype || QWEN35_DTYPE,
-        device: 'wasm',
-        progress_callback,
-      });
-    }
+    const model = await Qwen3_5ForConditionalGeneration.from_pretrained(modelId, {
+      dtype: QWEN35_DTYPE,
+      device: 'webgpu',
+      progress_callback,
+    });
 
     _processor = processor;
     _model = model;
     _currentModelId = modelId;
-
-    // NOTE: No warmup. The working webml-community/Qwen3.5-WebGPU HF Space does
-    // NOT warm up — and a failed warmup generation can corrupt the WebGPU device
-    // state (invalid buffers), causing every subsequent generate() to fail with
-    // "Failed to download data from buffer: mapAsync ... is invalid due to a
-    // previous error." The first real generate compiles shaders on its own.
+    // No warmup — see header. The first real generate compiles shaders itself.
   }
 
   // Free the model + its WebGPU device. Called by the other local backends (and
   // applyActiveProvider) so only one local LLM holds a GPU context at a time.
-  // ensureModel lazily reloads on next use.
   async function unload() {
     if (_model) { try { await _model.dispose?.(); } catch (_) {} }
+    disposeKv();
     _model = null; _processor = null; _currentModelId = null;
   }
 
-  // Build the prompt with the processor's tokenizer chat template (tools when
-  // supported), falling back to a manual format. Tool-calling is prompt-driven.
-  async function buildPrompt(messages, tools) {
-    const t = _processor && _processor.tokenizer ? _processor.tokenizer : _processor;
-    const nativeTools = (tools || []).filter(x => x && x.type === 'function');
-
-    if (t && typeof t.apply_chat_template === 'function') {
-      // Native chat template WITH tools.
-      if (nativeTools.length) {
-        try {
-          const r = await t.apply_chat_template(messages, { add_generation_prompt: true, tools: nativeTools });
-          if (typeof r === 'string') return r;
-          if (r && typeof r.text === 'string') return r.text;
-        } catch (_) {}
-      }
-      // Native chat template WITHOUT tools (+ manual tool injection).
-      try {
-        const r = await t.apply_chat_template(messages, { add_generation_prompt: true });
-        if (typeof r === 'string') return injectTools(r, nativeTools);
-        if (r && typeof r.text === 'string') return injectTools(r.text, nativeTools);
-      } catch (_) {}
+  // ============================================================
+  // Prompt construction — manual ChatML, mirroring the Space.
+  // ============================================================
+  // Flatten a message's content (string or OpenAI-style parts array) to text.
+  // Image parts are dropped: this is the Space's text path (vision isn't wired).
+  function textOf(content) {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content.map(p => {
+        if (typeof p === 'string') return p;
+        if (p && p.type === 'text') return p.text || '';
+        return '';
+      }).join('');
     }
+    return content == null ? '' : String(content);
+  }
 
-    // Manual fallback.
+  function imBlock(role, text) {
+    return `<|im_start|>${role}\n${text}<|im_end|>\n`;
+  }
+  // The assistant generation opener — IDENTICAL to the Space. With thinking the
+  // model continues inside an open <think>; without, the block is pre-closed.
+  function assistantOpen(enableThinking) {
+    return enableThinking
+      ? `<|im_start|>assistant\n<think>\n`
+      : `<|im_start|>assistant\n<think>\n\n</think>\n\n`;
+  }
+  // Render a list of messages as consecutive ChatML blocks (no trailing
+  // assistant opener). tool messages (none in this backend) map to user blocks.
+  function renderHistory(msgs) {
     let p = '';
-    for (const m of messages) {
-      if (m.role === 'system') p += m.content + '\n\n';
-      else if (m.role === 'user') p += 'User: ' + m.content + '\n\n';
-      else if (m.role === 'assistant') p += 'Assistant: ' + (m.content || '') + '\n\n';
-      else if (m.role === 'tool') p += 'Tool result: ' + m.content + '\n\n';
+    for (const m of msgs || []) {
+      const role = (m.role === 'system' || m.role === 'user' || m.role === 'assistant') ? m.role : 'user';
+      p += imBlock(role, textOf(m.content));
     }
-    return injectTools(p + 'Assistant:', nativeTools);
+    return p;
   }
-
-  function injectTools(prompt, tools) {
-    if (!tools || !tools.length) return prompt;
-    const block = tools.map(t => {
-      const fn = t.function || {};
-      return `## ${fn.name}\nDescription: ${fn.description || ''}\nParameters: ${JSON.stringify(fn.parameters || {})}`;
-    }).join('\n\n');
-    return prompt + '\n\nYou have access to the following tools:\n\n' + block +
-      '\n\nWhen you need to use a tool, output exactly:\n<tool_call>{"name": "<tool_name>", "arguments": {...}}</tool_call>\n\n';
+  // Stable signature of a message slice, to detect a clean append vs an edit.
+  function sig(msgs) {
+    return JSON.stringify((msgs || []).map(m => [m.role, textOf(m.content)]));
+  }
+  function decodeSeq(result) {
+    const dec = (_processor && _processor.batch_decode) ? _processor : (_processor && _processor.tokenizer);
+    try { return dec.batch_decode(result.sequences, { skip_special_tokens: false })[0] || ''; }
+    catch (_) { return ''; }
   }
 
   // ============================================================
-  // Tool-call parsing (pure text — accommodates several conventions)
+  // Core generation — one inline generate(), streamed. Mirrors the Space:
+  // processor(promptText) → generate({...inputs, [past_key_values], max_new_tokens,
+  // do_sample, streamer, stopping_criteria, return_dict_in_generate}). When
+  // thinking, skip_special_tokens is OFF so we can split on </think> and route the
+  // chain-of-thought to onReasoning and the answer to onContent.
   // ============================================================
-  function parseToolCalls(text) {
-    const tool_calls = [];
-    const seen = new Set(); // dedupe by raw text
-
-    // Pattern 1: <tool_call>{"name":"...", "arguments":{...}}</tool_call>
-    const rxToolCall = /<tool_call>([\s\S]*?)<\/tool_call>/g;
-    let m;
-    while ((m = rxToolCall.exec(text)) !== null) {
-      if (seen.has(m[1])) continue;
-      seen.add(m[1]);
-      try {
-        const parsed = JSON.parse(m[1].trim());
-        tool_calls.push(normalizeToolCall(parsed));
-      } catch (e) {
-        dbg('failed to parse <tool_call> JSON:', m[1]);
-      }
-    }
-
-    // Pattern 2: markdown code block ```json [{"name":"...",...}]
-    const rxJsonBlock = /```json\s*([\s\S]*?)```/g;
-    while ((m = rxJsonBlock.exec(text)) !== null) {
-      try {
-        const parsed = JSON.parse(m[1].trim());
-        if (Array.isArray(parsed)) {
-          for (const item of parsed) {
-            const tc = normalizeToolCall(item);
-            if (tc && !seen.has(m[1])) {
-              seen.add(m[1]);
-              tool_calls.push(tc);
-            }
-          }
-        } else {
-          const tc = normalizeToolCall(parsed);
-          if (tc && !seen.has(m[1])) {
-            seen.add(m[1]);
-            tool_calls.push(tc);
-          }
-        }
-      } catch (e) {
-        dbg('failed to parse JSON block:', m[1]);
-      }
-    }
-
-    // Pattern 3: bare JSON array/object on its own line that looks like a tool call
-    const rxBare = /(^|\n)\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*(\n|$)/g;
-    while ((m = rxBare.exec(text)) !== null) {
-      try {
-        const parsed = JSON.parse(m[2].trim());
-        if (Array.isArray(parsed)) {
-          for (const item of parsed) {
-            const tc = normalizeToolCall(item);
-            if (tc && !seen.has(m[2])) {
-              seen.add(m[2]);
-              tool_calls.push(tc);
-            }
-          }
-        } else {
-          const tc = normalizeToolCall(parsed);
-          if (tc && !seen.has(m[2])) {
-            seen.add(m[2]);
-            tool_calls.push(tc);
-          }
-        }
-      } catch (e) {
-        // Not valid JSON, skip
-      }
-    }
-
-    return tool_calls.map((tc, idx) => ({
-      ...tc,
-      index: idx,
-    }));
-  }
-
-  function normalizeToolCall(raw) {
-    if (!raw) return null;
-    const name = raw.name || raw.function?.name;
-    if (!name) return null;
-    let args = raw.arguments || raw.arguments_text || raw.function?.arguments || raw.params || raw.parameters || {};
-    if (typeof args === 'string') {
-      try { args = JSON.parse(args); } catch (_) { args = {}; }
-    }
-    return {
-      id: 'call_' + Math.random().toString(36).slice(2, 11),
-      type: 'function',
-      function: {
-        name,
-        arguments: typeof args === 'string' ? args : JSON.stringify(args),
-      },
-    };
-  }
-
-  // ============================================================
-  // One generation round — loads the model if needed, generates inline, streams
-  // tokens via onDelta. Resolves { content, tool_calls } (parsed from the text).
-  // ============================================================
-  async function streamRound({ modelUrl, messages, tools, signal, onDelta, onProgress, maxTokens, frequencyPenalty }) {
-    if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
-
-    const dtype = (DEFAULT_MODELS.find(m => m.modelId === modelUrl) || {}).dtype;
-    await ensureModel(modelUrl, dtype, onProgress);
+  async function generate({ modelId, promptText, pastKeyValues, maxTokens, enableThinking, signal, onReasoning, onContent, onProgress }) {
+    await ensureModel(modelId, onProgress);
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
 
     const { TextStreamer, InterruptableStoppingCriteria } = await lib();
-    const promptText = await buildPrompt(messages, tools);
 
-    let inputs;
-    try { inputs = await _processor(promptText); }
-    catch (_) { inputs = await _processor(promptText, null); }
+    const inputs = await _processor(promptText);
+    const generateArgs = pastKeyValues ? { ...inputs, past_key_values: pastKeyValues } : { ...inputs };
 
-    let content = '';
-    let streamer = null;
-    if (TextStreamer) {
-      streamer = new TextStreamer(_processor.tokenizer || _processor, {
-        skip_prompt: true,
-        skip_special_tokens: true,
-        callback_function: (txt) => {
-          if (!txt) return;
-          content += txt;
-          try { onDelta && onDelta({ content: txt }); } catch (_) {}
-        },
-      });
-    }
+    // Single accumulating buffer; on each token we recompute the reasoning/content
+    // split and emit only the new tail (idempotent, handles the </think> boundary
+    // crossing a token).
+    let raw = '', prevReason = '', prevContent = '';
+    const split = () => {
+      let reason = '', content = '';
+      if (enableThinking) {
+        const idx = raw.indexOf('</think>');
+        if (idx === -1) { reason = raw; }
+        else { reason = raw.slice(0, idx); content = raw.slice(idx + '</think>'.length); }
+      } else {
+        content = raw;
+      }
+      content = content.replace(/<\|im_end\|>[\s\S]*$/, '').replace(/^\n+/, '');
+      reason = reason.replace(/^\n+/, '');
+      return { reason, content };
+    };
 
-    _stopping = InterruptableStoppingCriteria ? new InterruptableStoppingCriteria() : null;
-    const onAbort = () => { try { _stopping && _stopping.interrupt(); } catch (_) {} };
+    const streamer = new TextStreamer(_processor.tokenizer || _processor, {
+      skip_prompt: true,
+      skip_special_tokens: !enableThinking,
+      callback_function: (token) => {
+        if (!token) return;
+        raw += token;
+        const { reason, content } = split();
+        if (reason.length > prevReason.length) { const d = reason.slice(prevReason.length); prevReason = reason; try { onReasoning && onReasoning(d); } catch (_) {} }
+        if (content.length > prevContent.length) { const d = content.slice(prevContent.length); prevContent = content; try { onContent && onContent(d); } catch (_) {} }
+      },
+    });
+
+    const stopping = InterruptableStoppingCriteria ? new InterruptableStoppingCriteria() : null;
+    const onAbort = () => { try { stopping && stopping.interrupt(); } catch (_) {} };
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
-    const opts = { ...inputs, max_new_tokens: maxTokens || 2048, do_sample: true };
-    if (streamer) opts.streamer = streamer;
-    if (_stopping) opts.stopping_criteria = _stopping;
-    // temperature/top_p/top_k intentionally omitted — always use the model's defaults.
-    if (frequencyPenalty != null) opts.repetition_penalty = 1 + frequencyPenalty;
-
-    dbg('→ generate', modelUrl, 'msgs', (messages || []).length, 'tools', (tools || []).length);
+    let result;
     try {
-      await _model.generate(opts);
+      const opts = {
+        ...generateArgs,
+        max_new_tokens: maxTokens || (enableThinking ? 2048 : 512),
+        do_sample: true,
+        streamer,
+        return_dict_in_generate: true,
+      };
+      if (stopping) opts.stopping_criteria = stopping;
+      dbg('→ generate', modelId, 'cache', !!pastKeyValues, 'thinking', enableThinking);
+      result = await _model.generate(opts);
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }
 
-    const tool_calls = parseToolCalls(content || '');
-    const cleanContent = (content || '')
-      .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
-      .replace(/```json\s*[\s\S]*?```/g, '')
-      .replace(/<\|.*?>\n?/g, '')
-      .trim()
-      .replace(/^Assistant:\s*/i, '');
-    return { content: cleanContent, tool_calls };
+    const { reason, content } = split();
+    return { content: content.trim(), reasoning: reason.trim(), result };
   }
 
   // ============================================================
-  // Agentic conversation loop (mirrors wllama runConversation). Emits the same
-  // event protocol conversations.js expects; tool calls run via /sandpie-tool.
+  // streamRound — stateless one-shot used by agents.js (titles/distill etc.).
+  // Never touches the conversation KV cache; thinking off for a fast direct
+  // answer. Returns { content, tool_calls:[] } (no tools in this backend).
+  // ============================================================
+  async function streamRound({ modelUrl, messages, signal, onDelta, onProgress, maxTokens }) {
+    if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+    const promptText = renderHistory(messages) + assistantOpen(false);
+    const { content } = await generate({
+      modelId: modelUrl,
+      promptText,
+      pastKeyValues: null,
+      maxTokens: maxTokens || 512,
+      enableThinking: false,
+      signal,
+      onProgress,
+      onContent: (d) => { try { onDelta && onDelta({ content: d }); } catch (_) {} },
+    });
+    return { content, tool_calls: [] };
+  }
+
+  // ============================================================
+  // Agentic-shaped adapter for the host (conversations.js). No tools/rounds —
+  // one generation per user turn — but emits the same event protocol so the
+  // renderer (incl. the Thinking box via reasoning_content) is reused unchanged.
   // ============================================================
   async function runConversation(
     { provider, messages, systemPrompt, tools, convId, signal },
@@ -357,26 +305,25 @@ const SandpieTransformersJS = (function () {
     try { await window.SandpieWllama?.unload?.(); } catch (_) {}
     try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
 
-    const MAX_ROUNDS = 8;
-    const work = [];
+    const modelId = provider.endpoint;
+    const reasoning = (provider.reasoning || 'auto');
+    const enableThinking = reasoning !== 'off' && reasoning !== 'none' && reasoning !== 'no_think';
+    const maxTokens = provider.maxTokens || (enableThinking ? 2048 : 512);
 
     const sysText = systemPrompt && typeof systemPrompt === 'object' ? (systemPrompt.content || '') : systemPrompt;
+    const work = [];
     if (sysText) work.push({ role: 'system', content: sysText });
-    work.push(...messages);
+    work.push(...(messages || []));
 
-    const toolList = (tools || []).filter(t => t && t.type === 'function');
-
-    // Loading line. A CACHED load fires NO download-progress events, so we must
-    // show this up front (waiting on a progress callback was the bug where it never
-    // appeared) — then refine with the download % when a download does happen, and
-    // clear it on the first generated token.
+    // Loading line. A CACHED load fires NO download-progress events, so show this
+    // up front, refine with the % when a download happens, clear on first token.
     let firstToken = false;
     let lastPct = -1;
-    const alreadyLoaded = (_currentModelId === provider.endpoint && _model && _processor);
+    const alreadyLoaded = (_currentModelId === modelId && _model && _processor);
     if (!alreadyLoaded) {
       emit({ type: 'info', message: 'Loading local model… first run downloads it (cached after) — this can take a while.' });
     }
-    const onDownloadProgress = (p) => {
+    const onProgress = (p) => {
       if (firstToken || alreadyLoaded || !p || p.status !== 'progress') return;
       const pct = Math.round(p.progress != null ? p.progress : (p.total ? (p.loaded / p.total) * 100 : -1));
       if (pct >= 0 && pct <= 100 && pct !== lastPct) {
@@ -385,93 +332,76 @@ const SandpieTransformersJS = (function () {
       }
     };
 
-    const sample = {
-      maxTokens: provider.maxTokens || 2048,
-      frequencyPenalty: provider.frequencyPenalty != null ? provider.frequencyPenalty : undefined,
-    };
+    emit({ type: 'round_start' });
 
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
-      emit({ type: 'round_start' });
-
-      let result;
-      try {
-        result = await streamRound({
-          modelUrl: provider.endpoint,
-          messages: work,
-          tools: toolList,
-          signal,
-          onProgress: round === 0 ? onDownloadProgress : undefined,
-          ...sample,
-          onDelta: (delta) => {
-            if (!firstToken) {
-              firstToken = true;
-              emit({ type: 'info', message: null });
-            }
-            emit({ type: 'delta', delta });
-          },
-        });
-      } catch (e) {
-        if (e && e.name === 'AbortError') throw e;
-        emit({ type: 'info', message: null });
-        emit({ type: 'error', message: 'transformersjs: ' + ((e && e.message) || e) });
-        emit({ type: 'agent_done' });
-        return;
-      }
-
-      emit({ type: 'info', message: null });
-      // Parsed (non-streamed) tool calls need a synthetic OAI-streaming delta so the
-      // renderer builds the tool-call bubbles; without it tool_started/tool_result
-      // no-op (they find the bubble by id and bail). Same fix as litertlm.js.
-      if (result.tool_calls && result.tool_calls.length) {
-        emit({ type: 'delta', delta: { tool_calls: result.tool_calls.map((tc, i) => ({
-          index: tc.index != null ? tc.index : i,
-          id: tc.id,
-          type: 'function',
-          function: { name: (tc.function && tc.function.name) || '', arguments: (tc.function && tc.function.arguments) || '' },
-        })) } });
-      }
-      emit({ type: 'round_end', content: result.content });
-
-      const asst = { role: 'assistant', content: result.content };
-      if (result.tool_calls && result.tool_calls.length) asst.tool_calls = result.tool_calls;
-      work.push(asst);
-      emit({ type: 'message_added', message: asst });
-
-      if (!result.tool_calls || !result.tool_calls.length) break;
-
-      for (const tc of result.tool_calls) {
-        if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
-        emit({ type: 'tool_started', tc });
-
-        let args = {};
-        try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
-        let out;
-        try {
-          const res = await fetch('./sandpie-tool', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: tc.function && tc.function.name,
-              args,
-              conversation_file_name: convId,
-            }),
-            signal,
-          });
-          out = res.ok
-            ? await res.json()
-            : { result: 'Error: tool endpoint ' + res.status + ' — service worker not ready.' };
-        } catch (e) {
-          if (e && e.name === 'AbortError') throw e;
-          out = { result: 'Error: ' + ((e && e.message) || e) };
-        }
-        const toolResult = (out && out.result != null) ? out.result : '';
-        emit({ type: 'tool_result', id: tc.id, result: toolResult, artifacts: out && out.artifacts });
-        const toolMsg = { role: 'tool', tool_call_id: tc.id, content: toolResult };
-        work.push(toolMsg);
-        emit({ type: 'message_added', message: toolMsg });
-      }
+    // Cold prefill vs KV-cache continuation. Continue ONLY when this is a verified
+    // clean append to the same conversation we cached (same convId, the cached
+    // prefix is byte-identical, and there's at least one new message). Any doubt →
+    // cold prefill, which is always correct.
+    let promptText, usingCache = false;
+    const canContinue = ENABLE_KV_CACHE
+      && _kvConvId === convId && _pastKeyValues && _promptHistory
+      && work.length > _consumedCount
+      && sig(work.slice(0, _consumedCount)) === _consumedSig;
+    if (canContinue) {
+      const newMsgs = work.slice(_consumedCount);
+      promptText = _promptHistory + '\n' + renderHistory(newMsgs) + assistantOpen(enableThinking);
+      usingCache = true;
+    } else {
+      disposeKv();
+      promptText = renderHistory(work) + assistantOpen(enableThinking);
     }
+
+    let res;
+    try {
+      res = await generate({
+        modelId,
+        promptText,
+        pastKeyValues: usingCache ? _pastKeyValues : null,
+        maxTokens,
+        enableThinking,
+        signal,
+        onProgress,
+        onReasoning: (d) => {
+          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+          emit({ type: 'delta', delta: { reasoning_content: d } });
+        },
+        onContent: (d) => {
+          if (!firstToken) { firstToken = true; emit({ type: 'info', message: null }); }
+          emit({ type: 'delta', delta: { content: d } });
+        },
+      });
+    } catch (e) {
+      emit({ type: 'info', message: null });
+      resetKvRefs();   // next turn starts clean (avoid double-free on a mid-failure cache)
+      if (e && e.name === 'AbortError') throw e;
+      emit({ type: 'error', message: 'transformersjs: ' + ((e && e.message) || e) });
+      emit({ type: 'agent_done' });
+      return;
+    }
+
+    emit({ type: 'info', message: null });
+    emit({ type: 'round_end', content: res.content });
+
+    const asst = { role: 'assistant', content: res.content };
+    emit({ type: 'message_added', message: asst });
+
+    // Update the KV cache for the next turn. Mirror the Space: just reassign
+    // past_key_values (the library extends/owns it — do NOT dispose here, or we'd
+    // free tensors the new cache reuses). Record the snapshot of everything baked
+    // in (= work + the assistant we just produced) so next turn can verify a clean
+    // append before reusing the cache.
+    if (ENABLE_KV_CACHE && res.result && res.result.past_key_values) {
+      _pastKeyValues = res.result.past_key_values;
+      _promptHistory = decodeSeq(res.result);
+      _kvConvId = convId;
+      const snap = [...work, asst];
+      _consumedSig = sig(snap);
+      _consumedCount = snap.length;
+    } else {
+      resetKvRefs();
+    }
+
     emit({ type: 'agent_done' });
   }
 

@@ -488,13 +488,14 @@ function applyTypeUI() {
   // litertlm. Cloud (non-local) keeps the generic context/maxTokens/temperature.
   //   contextWindow: wllama (n_ctx) + litertlm (maxNumTokens) + cloud; NOT transformers.js
   //   temperature:   cloud only — removed as a configurable option for all 3 local backends
-  //   freq penalty:  wllama + transformers.js (repetition_penalty); NOT litertlm
+  //   freq penalty:  wllama only — transformers.js now mirrors the HF Space, which
+  //                  uses no repetition_penalty (model defaults); NOT litertlm
   //   presence pen.: wllama only
   //   reasoning:     wllama (/think) + litertlm (Gemma thinking); NOT transformers.js
   //   flash / GPU layers / threads / n_batch: wllama only (llama.cpp load params)
   show('spContextWindow', !transformersjs);
   show('spTemperature', !local);
-  show('spFreqPenalty', wllama || transformersjs);
+  show('spFreqPenalty', wllama);
   show('spPresencePenalty', wllama);
   show('spReasoning', wllama || litertlm);
   show('spFlashAttn', wllama);
