@@ -9,7 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=18">
+<link rel="stylesheet" href="sandpie.css?v=19">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="modules/core.js"></script>
@@ -56,11 +56,6 @@
   <input id="apiKey" type="hidden">
   <input id="proxyUrl" type="hidden">
 
-  <div id="bubbleContextMenu" class="context-menu" style="display:none;">
-    <div class="context-item" onclick="copyFromMenu()">Copy</div>
-    <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
-
-  </div>
     <details class="service" id="filesSection" open>
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
     <div class="service-body">
@@ -76,6 +71,10 @@
     <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
   </div>
 </aside>
+<div id="bubbleContextMenu" class="context-menu" style="display:none;">
+  <div class="context-item" onclick="copyFromMenu()">Copy</div>
+  <div class="context-item context-delete" onclick="rewindFromMenu()">Rewind from here</div>
+</div>
 <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
 <main>
 

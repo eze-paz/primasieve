@@ -1762,6 +1762,8 @@
 
 [data-theme="cyberpunk"] .ctx-menu { background: #11111a; border-color: #2d2d44; }
 [data-theme="cyberpunk"] .ctx-menu .context-item:hover { background: #11111a; }
+[data-theme="cyberpunk"] .context-menu { background: #11111a; border-color: #2d2d44; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+[data-theme="cyberpunk"] .context-item:hover { background: #1a1a2e; }
 
 [data-theme="cyberpunk"] ::-webkit-scrollbar-thumb { background: #1a1a2e; }
 [data-theme="cyberpunk"] ::-webkit-scrollbar-thumb:hover { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; }
@@ -1895,6 +1897,8 @@
 [data-theme="aurora"] .send-btn.sending { background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(129,140,248,0.2)) !important; }
 [data-theme="aurora"] .ctx-menu { background: rgba(15,23,42,0.8); border: 1px solid rgba(148,163,184,0.08); backdrop-filter: blur(16px); }
 [data-theme="aurora"] .ctx-menu .context-item:hover { background: rgba(15,23,42,0.6); }
+[data-theme="aurora"] .context-menu { background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+[data-theme="aurora"] .context-item:hover { background: rgba(56,189,248,0.08); }
 [data-theme="aurora"] ::-webkit-scrollbar { width: 5px; height: 5px; }
 [data-theme="aurora"] ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.15); border-radius: 10px; }
 [data-theme="aurora"] ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
@@ -2214,6 +2218,8 @@
 }
 [data-theme="electric"] .ctx-menu { background: var(--sp-surface); border-color: var(--sp-border); }
 [data-theme="electric"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
+[data-theme="electric"] .context-menu { background: var(--sp-surface); border-color: var(--sp-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+[data-theme="electric"] .context-item:hover { background: var(--sp-panel); }
 [data-theme="electric"] ::-webkit-scrollbar { width: 6px; height: 6px; }
 [data-theme="electric"] ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
 [data-theme="electric"] ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
