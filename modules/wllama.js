@@ -43,6 +43,20 @@ const SandpieWllama = (function() {
   // Curated GGUF catalog. URLs point at HuggingFace direct downloads.
   // The dropdown also offers a "Custom" free-text option for any GGUF URL.
   const DEFAULT_MODELS = [
+    // Gemma 4 E2B — the SAME model the litertlm backend runs, but as a GGUF on CPU
+    // (llama.cpp / WASM) instead of WebGPU. This is the PocketPal-equivalent path: it
+    // sidesteps the WebGPU GPU-process memory ceiling that crashes litertlm on phones
+    // ("Aw, Snap!"), trading it for single-thread WASM speed — a good deal on mobile,
+    // where the GPU path is fragile. From unsloth (ggml-org ships only Q8_0/bf16). The
+    // GGUF's embedded Gemma chat template handles formatting. NOTE: relies on wllama
+    // 3.5.1's bundled llama.cpp carrying the gemma3n/gemma4 graph — ggml-org publishes
+    // this GGUF, so llama.cpp supports it; if it fails to load in-tab the arch isn't
+    // compiled into this WASM build (fall back to the litertlm/WebGPU Gemma entry).
+    {
+      id: 'gemma-4-e2b-it-q4_k_m',
+      label: 'Gemma 4 E2B-it — Q4_K_M (~3.1 GB, CPU, mobile-stable alt to WebGPU/LiteRT)',
+      url: 'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
+    },
     // Qwen 3.5 — the hybrid Gated-DeltaNet family. The GGUF declares arch
     // "qwen35": most layers are SSM / linear-attention (a fixed-size recurrent
     // state, so decode cost is O(1) per token with no growing KV cache) with a
