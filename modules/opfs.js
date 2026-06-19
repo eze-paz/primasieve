@@ -322,6 +322,34 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     body.appendChild(f);
     mount(opfs.closeFile); return;
   }
+  if (ext === 'pptx' || ext === 'ppt') {
+    // PPTX rendering via pptx-viewer (MIT, lightweight, client-side — no server).
+    // Lazy-loaded from CDN on first use (same pattern as getMarked). The library
+    // parses the OOXML zip and renders slides as SVG in a container with nav
+    // controls. Falls back to a "download to view" message if the CDN is blocked.
+    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading presentation viewer…</div>';
+    mount(opfs.closeFile);
+    try {
+      await opfs.getPptxViewer();
+      const container = document.createElement('div');
+      container.style.cssText = 'width:100%;min-height:60vh;';
+      body.innerHTML = '';
+      body.appendChild(container);
+      const viewer = new window.PPTXViewer.PPTXViewer(container, {
+        showControls: true,
+        keyboardNavigation: true,
+      });
+      await viewer.load(file);
+    } catch (e) {
+      body.innerHTML = '';
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:1.5rem;color:var(--sp-text-dim);text-align:center;';
+      const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
+      div.innerHTML = `Could not load presentation viewer (${(e && e.message) || e}).<br><a href="${url}" download="${name}" style="color:var(--sp-accent);">Download ${name}</a> to view locally.`;
+      body.appendChild(div);
+    }
+    return;
+  }
 
   const text = await file.text();
   const sample = text.slice(0, 4000);
@@ -446,6 +474,21 @@ opfs.getMarked = function() {
     });
   }
   return window.markedPromise;
+};
+
+// Lazy-load pptx-viewer (MIT, ~110KB UMD, only dep is fflate for zip — bundled).
+// Renders .pptx slides client-side as SVG with navigation controls. No server.
+opfs.getPptxViewer = function() {
+  if (!window._pptxViewerPromise) {
+    window._pptxViewerPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pptx-viewer@0.2.2/dist/pptx-viewer.umd.js';
+      s.onload = () => resolve(window.PPTXViewer);
+      s.onerror = () => reject(new Error('failed to load pptx-viewer from CDN'));
+      document.head.appendChild(s);
+    });
+  }
+  return window._pptxViewerPromise;
 };
 
 opfs.up = function() {

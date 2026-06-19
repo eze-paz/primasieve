@@ -50,7 +50,7 @@ function _activeStream() {
 
 const RENDERABLE_EXTS = new Set([
   'html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp',
-  'pdf', 'csv', 'txt', 'json'
+  'pdf', 'csv', 'txt', 'json', 'pptx'
 ]);
 
 function renderArtifact(host, path) {
@@ -142,6 +142,23 @@ function renderArtifact(host, path) {
     dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-text-dim);';
     dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
     wrap.appendChild(dlRow);
+    target.appendChild(wrap);
+    return;
+  }
+
+  // PPTX can't render in a bare iframe (it's a zip, not a browser-native format).
+  // Show a placeholder with a button to open in the side panel (where the PPTX
+  // viewer runs). The ⊞ button in the header also does this.
+  if (ext === 'pptx') {
+    const placeholder = document.createElement('div');
+    placeholder.style.cssText = 'padding:16px 14px;font:12px monospace;color:var(--sp-text-dim);text-align:center;';
+    const btn = document.createElement('button');
+    btn.textContent = '▶ View presentation';
+    btn.style.cssText = 'margin-top:6px;padding:4px 12px;font:12px monospace;background:var(--sp-accent);color:#fff;border:none;border-radius:3px;cursor:pointer;';
+    btn.onclick = () => openArtifactPanel(clean);
+    placeholder.innerHTML = '📊 PowerPoint presentation<br>';
+    placeholder.appendChild(btn);
+    wrap.appendChild(placeholder);
     target.appendChild(wrap);
     return;
   }
