@@ -18,33 +18,34 @@ const SandpieTransformersJS = (function () {
   const DEFAULT_N_CTX = 8192;
 
   // All PUBLIC (no HF token needed). modelId is the BASE repo id; the quant is
-  // chosen via the dtype param (q4 default; Bonsai needs q1), NOT a repo-name
-  // suffix ("…-q4f16" repos don't exist and 401). Gated/private models can't load
-  // in the browser at all (tokens are server-side only), so we curate public ones.
+  // chosen via the per-component dtype map (QWEN35_DTYPE). Gated/private models
+  // can't load in the browser at all (tokens are server-side only), so we curate
+  // public ones.
+  // Qwen3.5 multimodal (vision + text) models — the same repos the working
+  // webml-community/Qwen3.5-WebGPU HF Space uses. These are
+  // Qwen3_5ForConditionalGeneration models loaded via AutoProcessor (NOT
+  // AutoModelForCausalLM/AutoTokenizer), with a per-component dtype map.
+  const QWEN35_DTYPE = {
+    embed_tokens: 'q4',
+    vision_encoder: 'fp16',
+    decoder_model_merged: 'q4',
+  };
+
   const DEFAULT_MODELS = [
     {
-      id: 'qwen2.5-0.5b-instruct',
-      label: 'Qwen 2.5 0.5B Instruct (~0.5 GB, tools — smallest, safest)',
-      modelId: 'onnx-community/Qwen2.5-0.5B-Instruct',
+      id: 'qwen3.5-0.8b',
+      label: 'Qwen 3.5 0.8B (~0.8 GB, smallest, fastest)',
+      modelId: 'onnx-community/Qwen3.5-0.8B-ONNX-OPT',
     },
     {
-      id: 'tinyllama-1.1b-chat-v1.0',
-      label: 'TinyLlama 1.1B Chat (~0.7 GB, no tools)',
-      modelId: 'Xenova/TinyLlama-1.1B-Chat-v1.0',
+      id: 'qwen3.5-2b',
+      label: 'Qwen 3.5 2B (~2 GB, balanced)',
+      modelId: 'onnx-community/Qwen3.5-2B-ONNX-OPT',
     },
     {
-      id: 'qwen2.5-1.5b-instruct',
-      label: 'Qwen 2.5 1.5B Instruct (~1.2 GB on WebGPU, tools)',
-      modelId: 'onnx-community/Qwen2.5-1.5B-Instruct',
-    },
-    {
-      // 1-bit (ternary) model — needs dtype 'q1', which is WebGPU-only (there's no
-      // CPU/WASM q1 kernel), so it won't run on the WASM fallback. It's a base
-      // model, so it completes text rather than chatting/tool-calling cleanly.
-      id: 'bonsai-1.7b',
-      label: 'Bonsai 1.7B — 1-bit (WebGPU only, experimental, base model)',
-      modelId: 'onnx-community/Bonsai-1.7B-ONNX',
-      dtype: 'q1',
+      id: 'qwen3.5-4b',
+      label: 'Qwen 3.5 4B (~4 GB, most capable)',
+      modelId: 'onnx-community/Qwen3.5-4B-ONNX-OPT',
     },
   ];
 
@@ -76,7 +77,7 @@ const SandpieTransformersJS = (function () {
   // 1.26.0-dev.20260416-b7804b056c (a DEV build) and sets wasmPaths to that dev
   // version's files on jsdelivr during init. The dev build's
   // ort-wasm-simd-threaded.asyncify.wasm has an alignment bug that traps with
-  // "RuntimeError: operation does not support unaligned accesses" during Qwen2.5's
+  // "RuntimeError: operation does not support unaligned accesses" during Qwen3.5's
   // forward pass (the matmul / attention ops hit an unaligned WASM memory access).
   // Setting numThreads=1 does NOT fix this — the threaded binary is still loaded,
   // it just runs with 1 worker; the buggy code paths are still executed.
@@ -93,7 +94,7 @@ const SandpieTransformersJS = (function () {
   };
 
   let _lib = null;                                  // cached imported module
-  let _tokenizer = null, _model = null, _currentModelId = null;
+  let _processor = null, _model = null, _currentModelId = null;
   let _stopping = null;                             // InterruptableStoppingCriteria for the active run
 
   async function lib() {
@@ -119,29 +120,40 @@ const SandpieTransformersJS = (function () {
     return _lib;
   }
 
-  // Load (and cache) the tokenizer + model. WebGPU first (q4 — NOT q4f16: fp16
+  // Load (and cache) the processor + model. WebGPU first (q4 — NOT q4f16: fp16
   // WebGPU kernels freeze Intel iGPUs), CPU/WASM fallback for no usable adapter.
   // Switching models tears down the previous to free memory + the WebGPU device.
+  // Qwen3.5 models are multimodal (Qwen3_5ForConditionalGeneration) and use
+  // AutoProcessor (not AutoTokenizer) + a per-component dtype map, exactly like
+  // the working webml-community/Qwen3.5-WebGPU HF Space.
   async function ensureModel(modelId, dtype, onProgress) {
-    if (_currentModelId === modelId && _model && _tokenizer) return;
-    if (_model) { try { await _model.dispose?.(); } catch (_) {} _model = null; _tokenizer = null; _currentModelId = null; }
+    if (_currentModelId === modelId && _model && _processor) return;
+    if (_model) { try { await _model.dispose?.(); } catch (_) {} _model = null; _processor = null; _currentModelId = null; }
 
-    const { AutoTokenizer, AutoModelForCausalLM } = await lib();
+    const { AutoProcessor, Qwen3_5ForConditionalGeneration } = await lib();
     const progress_callback = onProgress || undefined;
 
-    const tokenizer = await AutoTokenizer.from_pretrained(modelId, { progress_callback });
+    const processor = await AutoProcessor.from_pretrained(modelId, { progress_callback });
 
     let model;
     try {
-      model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: dtype || 'q4', device: 'webgpu', progress_callback });
+      model = await Qwen3_5ForConditionalGeneration.from_pretrained(modelId, {
+        dtype: dtype || QWEN35_DTYPE,
+        device: 'webgpu',
+        progress_callback,
+      });
     } catch (gpuErr) {
       // No usable WebGPU adapter — fall back to CPU/WASM (q4). The WASM heap caps
       // ~2 GB, so big models can still std::bad_alloc here; that's a device limit.
       dbg('webgpu load failed, falling back to wasm:', (gpuErr && gpuErr.message) || gpuErr);
-      model = await AutoModelForCausalLM.from_pretrained(modelId, { dtype: 'q4', device: 'wasm', progress_callback });
+      model = await Qwen3_5ForConditionalGeneration.from_pretrained(modelId, {
+        dtype: dtype || QWEN35_DTYPE,
+        device: 'wasm',
+        progress_callback,
+      });
     }
 
-    _tokenizer = tokenizer;
+    _processor = processor;
     _model = model;
     _currentModelId = modelId;
 
@@ -150,7 +162,7 @@ const SandpieTransformersJS = (function () {
     // one sustained GPU submission (which can trip the OS GPU watchdog). Mirrors the
     // HF demos' load(). Best-effort.
     try {
-      const warm = await _tokenizer('a');
+      const warm = await _processor('a');
       await _model.generate({ ...warm, max_new_tokens: 1 });
     } catch (err) {
       dbg('warmup failed (continuing):', (err && err.message) || err);
@@ -162,13 +174,13 @@ const SandpieTransformersJS = (function () {
   // ensureModel lazily reloads on next use.
   async function unload() {
     if (_model) { try { await _model.dispose?.(); } catch (_) {} }
-    _model = null; _tokenizer = null; _currentModelId = null;
+    _model = null; _processor = null; _currentModelId = null;
   }
 
-  // Build the prompt with the tokenizer's chat template (tools when supported),
-  // falling back to a manual format. Tool-calling is prompt-driven.
+  // Build the prompt with the processor's tokenizer chat template (tools when
+  // supported), falling back to a manual format. Tool-calling is prompt-driven.
   async function buildPrompt(messages, tools) {
-    const t = _tokenizer;
+    const t = _processor && _processor.tokenizer ? _processor.tokenizer : _processor;
     const nativeTools = (tools || []).filter(x => x && x.type === 'function');
 
     if (t && typeof t.apply_chat_template === 'function') {
@@ -319,13 +331,13 @@ const SandpieTransformersJS = (function () {
     const promptText = await buildPrompt(messages, tools);
 
     let inputs;
-    try { inputs = _tokenizer(promptText, { return_tensors: true, padding: false }); }
-    catch (_) { inputs = await _tokenizer(promptText, { return_tensors: true }); }
+    try { inputs = await _processor(promptText, { return_tensors: true, padding: false }); }
+    catch (_) { inputs = await _processor(promptText, { return_tensors: true }); }
 
     let content = '';
     let streamer = null;
     if (TextStreamer) {
-      streamer = new TextStreamer(_tokenizer, {
+      streamer = new TextStreamer(_processor.tokenizer || _processor, {
         skip_prompt: true,
         skip_special_tokens: true,
         callback_function: (txt) => {
@@ -391,7 +403,7 @@ const SandpieTransformersJS = (function () {
     // clear it on the first generated token.
     let firstToken = false;
     let lastPct = -1;
-    const alreadyLoaded = (_currentModelId === provider.endpoint && _model && _tokenizer);
+    const alreadyLoaded = (_currentModelId === provider.endpoint && _model && _processor);
     if (!alreadyLoaded) {
       emit({ type: 'info', message: 'Loading local model… first run downloads it (cached after) — this can take a while.' });
     }
