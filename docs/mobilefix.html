@@ -37,11 +37,13 @@
   <textarea id="prompt" rows="2" style="width:100%; background:#161b22; color:#c9d1d9; border:1px solid #30363d; border-radius:8px; padding:0.6rem; font:inherit;">What is the capital of France?</textarea>
   <div style="margin:0.4rem 0;">
     <button id="gen">Load model &amp; generate</button>
+    <button id="diag">Diagnose (phone)</button>
     <label style="color:#8b949e; font-size:0.85rem;">max tokens <input id="maxtok" type="number" value="80" style="width:4rem; background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;"></label>
     <span id="genstat" class="hi"></span>
     <span id="tps" class="ok" style="margin-left:0.6rem;"></span>
   </div>
   <pre id="out" style="min-height:3rem;">—</pre>
+  <pre id="diagout" style="min-height:2rem;">— Diagnose runs prefill, checks logits for NaN/degeneracy, then compares serial vs batched decode.</pre>
 </div>
 
 <h2 style="font-size:0.95rem; color:#8b949e;">Qwen3 kernel correctness (vs CPU reference)</h2>
@@ -162,6 +164,35 @@
     } catch (e) {
       $('genstat').textContent = 'error: ' + (e && e.message || e); console.error(e);
     } finally { $('gen').disabled = false; }
+  });
+
+  $('diag').addEventListener('click', async () => {
+    const Q = window.SandpieQwen3;
+    $('diag').disabled = true; set('diagout', 'loading + diagnosing…', 'hi');
+    try {
+      if (!Q.isLoaded()) await Q.loadModel({ onProgress: p => set('diagout', (p.phase||'')+' '+(p.pct||'')+'%','hi') });
+      const ids = Q.TOK.encodeChat([{ role:'user', content:'What is the capital of France?' }]);
+      // 1) single prefill forward → inspect logits
+      const tok0 = await Q.forward(ids, 0);
+      const lg = await Q.readLogits();
+      let nan = 0, mx = -1e30, mxi = 0, mn = 1e30;
+      for (let i = 0; i < lg.length; i++) { const v = lg[i]; if (Number.isNaN(v)) nan++; if (v > mx) { mx = v; mxi = i; } if (v < mn) mn = v; }
+      const top = Array.from(lg.keys()).sort((a,b)=>lg[b]-lg[a]).slice(0,5)
+        .map(i => `${i}:${JSON.stringify(Q.TOK.decode([i]))}=${lg[i].toFixed(2)}`).join('  ');
+      // 2) SERIAL chained decode (no batch) — 10 tokens
+      let pos = ids.length, t = tok0, serial = '';
+      for (let i = 0; i < 10; i++) { serial += Q.TOK.decode([t]); t = await Q.forward(null, pos, { chain:true }); pos++; }
+      // 3) BATCHED decode via generate — 10 tokens
+      const batched = await Q.generate('What is the capital of France?', { maxTokens: 10 });
+      set('diagout',
+        `prefill argmax tok0 = ${tok0} (${JSON.stringify(Q.TOK.decode([tok0]))})\n` +
+        `logits: NaN=${nan}  max=${mx.toFixed(2)}@${mxi}  min=${mn.toFixed(2)}\n` +
+        `top5: ${top}\n` +
+        `SERIAL (no batch): ${JSON.stringify(serial)}\n` +
+        `BATCHED (generate): ${JSON.stringify(batched)}`,
+        nan ? 'bad' : '');
+    } catch (e) { set('diagout', 'error: ' + (e && e.message || e), 'bad'); console.error(e); }
+    finally { $('diag').disabled = false; }
   });
 
   $('run').addEventListener('click', runAll);
