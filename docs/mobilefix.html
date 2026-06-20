@@ -60,8 +60,8 @@
 <pre id="bench">—</pre>
 
 <!-- Load the actual engine + model modules from the repo so we test the real code. -->
-<script src="./mobilefix-engine.js?v=mfix"></script>
-<script src="./mobilefix-qwen3.js?v=mfix"></script>
+<script src="./mobilefix-engine.js?v=mfix3"></script>
+<script src="./mobilefix-qwen3.js?v=mfix3"></script>
 <script>
   // Verbose engine logs in the console for this harness.
   try { localStorage.setItem('sandpie-webgpu-debug', '1'); } catch (_) {}
@@ -171,6 +171,13 @@
     $('diag').disabled = true; set('diagout', 'loading + diagnosing…', 'hi');
     try {
       if (!Q.isLoaded()) await Q.loadModel({ onProgress: p => set('diagout', (p.phase||'')+' '+(p.pct||'')+'%','hi') });
+      // stage-magnitude probe (localizes where the forward zeroes out)
+      const pr = await Q.probe();
+      const probeLine =
+        `PROBE: embW=${JSON.stringify(pr.embW_first4)} lnW=${JSON.stringify(pr.lnW_first4)}\n` +
+        `  embedOut(standalone)=${pr.embedOut_standalone}\n` +
+        `  per-layer residual: ${pr.perLayer ? Object.entries(pr.perLayer).map(([k,v])=>k+'='+v).join('  ') : 'n/a'}\n` +
+        `  forward: xFinal=${pr.forward_xFinal} normed=${pr.forward_normed} last=${pr.forward_last} logits=${pr.forward_logits}\n`;
       const ids = Q.TOK.encodeChat([{ role:'user', content:'What is the capital of France?' }]);
       // 1) single prefill forward → inspect logits
       const tok0 = await Q.forward(ids, 0);
@@ -185,6 +192,7 @@
       // 3) BATCHED decode via generate — 10 tokens
       const batched = await Q.generate('What is the capital of France?', { maxTokens: 10 });
       set('diagout',
+        probeLine +
         `prefill argmax tok0 = ${tok0} (${JSON.stringify(Q.TOK.decode([tok0]))})\n` +
         `logits: NaN=${nan}  max=${mx.toFixed(2)}@${mxi}  min=${mn.toFixed(2)}\n` +
         `top5: ${top}\n` +

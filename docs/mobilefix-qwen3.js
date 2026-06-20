@@ -1125,6 +1125,7 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
   let _scrT = 0;
   let _idsBuf = null, _idsCap = 0;
   let _tokHist = null;   // GPU token history: argmax of pos P writes [P+1]; decode embed at pos P reads [P]. Enables GPU-resident chaining (no per-token CPU readback in the loop).
+  const _capBufs = {};   // debug: per-layer residual snapshots (forward opts.capLayers)
 
   function scrBuf(n, label) { return E.createBuffer(n * 4, U.STORAGE | U.COPY_DST | U.COPY_SRC, label); }
   function ensureKv() {
@@ -1166,6 +1167,10 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
   //   the drain or read back — lets the caller pipeline (encode N+1 while GPU runs N).
   async function forward(idsArray, posBase, opts) {
     const chain = !!(opts && opts.chain), submitOnly = !!(opts && opts.submitOnly);
+    // Debug: opts.capLayers = array of layer indices whose post-layer residual
+    // (token-0 row) should be snapshotted into a side buffer for readback after
+    // the batch drains. Lets probe() localize WHICH layer first zeroes the stream.
+    const capLayers = (opts && opts.capLayers) || null;
     const _t0 = _PERF ? performance.now() : 0;
     const C = CONFIG, H = C.hidden, nHq = C.nHeads, nKv = C.nKvHeads, hd = C.headDim, I = C.intermediate;
     const T = chain ? 1 : idsArray.length, S = posBase + T;
@@ -1203,6 +1208,10 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
         await swiglu(s.gate, s.up, s.swi, T * I);
       }
       await linearQ(s.swi, Wq(p + 'mlp.down_proj.weight'), s.x, T, H, I, true);              // fused residual: x += down_proj
+      if (capLayers && capLayers.indexOf(l) !== -1) {
+        if (!_capBufs[l]) _capBufs[l] = E.createBuffer(H * 4, U.STORAGE | U.COPY_DST | U.COPY_SRC, 'cap' + l);
+        E.copyBuffer(s.x, 0, _capBufs[l], 0, H * 4);   // token-0 residual row, within the batch
+      }
     }
     await rmsnorm(s.x, W('model.norm.weight'), s.normed, T, H, C.rmsEps);
     // last token row → its own [H] buffer, then lm_head
@@ -1247,6 +1256,46 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
   // Debug: full logits readback (call right after a forward, before the next one).
   async function readLogits() { return E.readF32(_scr.logits, CONFIG.vocab); }
 
+  // Debug probe: localize where the forward goes to zero. Returns magnitudes of
+  // weights and stage outputs. (a) standalone embedGather (NOT batched), (b) full
+  // batched forward's final buffers. If embedOut!=0 but logits==0 the failure is
+  // inside the batched forward (uniforms/bind-group cache/batch ordering).
+  async function probe() {
+    await loadModel({});
+    ensureKv(); ensureScratch(1);
+    const s = _scr, H = CONFIG.hidden, V = CONFIG.vocab;
+    const sa = (a) => { let x = 0; for (let i = 0; i < a.length; i++) x += Math.abs(a[i]); return +x.toFixed(2); };
+    // weights (f16): are they non-zero on this GPU?
+    const embW = await readF16(_weights['model.embed_tokens.weight'].buf, 8);
+    const lnW  = await readF16(_weights['model.layers.0.input_layernorm.weight'].buf, 8);
+    // (a) standalone embedGather (own submit, NOT in a batch) for token 9707
+    uniformReset();
+    const ids = setIds([9707]);
+    await embedGather(ids, _weights['model.embed_tokens.weight'].buf, s.x, 1, H, 0);
+    const embedOut = sa(await E.readF32(s.x, H));
+    // (b) full batched forward, then read final-stage buffers. NOTE: forward()
+    // calls ensureScratch(T) which may REALLOCATE _scr (destroying the T=1 buffers
+    // above), so re-fetch _scr after the forward.
+    const tids = TOK.encodeChat([{ role: 'user', content: 'Hi' }]);
+    const capLayers = [0, 1, 2, 4, 8, 14, 20, 27];
+    await forward(tids, 0, { capLayers });
+    const s2 = _scr;
+    const xFinal   = sa(await E.readF32(s2.x, H));          // residual (token0 row)
+    const normed   = sa(await E.readF32(s2.normed, H));     // final-norm output
+    const last     = sa(await E.readF32(s2.last, H));       // row copied into lm_head input
+    const logits   = sa(await E.readF32(s2.logits, V));     // lm_head output
+    // per-layer residual magnitudes (token-0 row) — localizes the first zero layer
+    const perLayer = {};
+    for (const l of capLayers) perLayer['L' + l] = _capBufs[l] ? sa(await E.readF32(_capBufs[l], H)) : null;
+    return {
+      embW_first4: Array.from(embW.slice(0, 4)).map(v => +v.toFixed(3)),
+      lnW_first4: Array.from(lnW.slice(0, 4)).map(v => +v.toFixed(3)),
+      embedOut_standalone: embedOut,
+      perLayer,
+      forward_xFinal: xFinal, forward_normed: normed, forward_last: last, forward_logits: logits,
+    };
+  }
+
   // Greedy generate, PIPELINED + GPU-resident. The decode loop chains through the
   // GPU token history (argmax of pos P writes _tokHist[P+1]; embed at P+1 reads it),
   // so the CPU never round-trips the token mid-loop. We submit the next forward
@@ -1286,7 +1335,7 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
     CONFIG,
     rmsnorm, linearT, gemv, linear, embedGather, ropeQK, attention, swiglu, addInPlace,
     selfTestKernels,
-    TOK, loadModel, forward, generate, readLogits, isLoaded: () => _loaded,
+    TOK, loadModel, forward, generate, readLogits, probe, isLoaded: () => _loaded,
     _setMatvec: (b) => { _USE_MATVEC = !!b; },
     _setPerf: (b) => { _PERF = !!b; }, _perf: () => _perfData,
     _dbg: {
