@@ -436,6 +436,40 @@ fn main(@builtin(global_invocation_id) gid:vec3<u32>){
     return E.dispatch(pipe, [idsBuf, embedBuf, yBuf, p], [Math.ceil((T*H)/64), 1, 1]);
   }
 
+  // Embedding gather from the INT4 (tied) lm_head weights. The f16 embedding
+  // table is ~311 MB (vocab*hidden*2) which EXCEEDS maxStorageBufferBindingSize
+  // on mobile (typically 128 MB) — the bind is invalid and the gather silently
+  // returns zeros (the whole-output-is-"!" mobile bug). Since embeddings are
+  // tied, lm_head row n IS token n's embedding; the int4 pack is ~78 MB and
+  // binds fine everywhere. Dequant matches the int4 GEMV: w ≈ (nibble-8)*scale,
+  // nibble for k=h is byte (h/2) of word (h/8), low half if h even, high if odd.
+  const EMBEDQ_WGSL = `
+enable f16;
+struct P { T:u32, H:u32, idOff:u32, _b:u32 };
+@group(0) @binding(0) var<storage, read>       ids : array<u32>;
+@group(0) @binding(1) var<storage, read>       W   : array<u32>;   // [N*H/8] packed nibbles (lm_head)
+@group(0) @binding(2) var<storage, read>       sc  : array<f16>;   // [N*H/QGROUP] scales
+@group(0) @binding(3) var<storage, read_write> y   : array<f32>;
+@group(0) @binding(4) var<uniform>             p   : P;
+@compute @workgroup_size(64,1,1)
+fn main(@builtin(global_invocation_id) gid:vec3<u32>){
+  let idx=gid.x; let total=p.T*p.H; if(idx>=total){return;}
+  let t=idx/p.H; let h=idx%p.H;
+  let row=ids[p.idOff + t];
+  let words=p.H/8u; let gpr=p.H/${QGROUP}u;
+  let w=h/8u; let i=h%8u;
+  let pk=W[row*words + w];
+  let byte=(pk >> (8u*(i>>1u))) & 0xFFu;
+  let nib=select((byte>>4u)&0xFu, byte&0xFu, (i & 1u)==0u);
+  let s=f32(sc[row*gpr + h/${QGROUP}u]);
+  y[idx]=(f32(nib)-8.0)*s;
+}`;
+  function embedGatherQ(idsBuf, wrec, yBuf, T, H, idOff) {
+    const pipe = E.getPipeline('q3.embedQ', EMBEDQ_WGSL);
+    const p = uniform(new Uint32Array([T, H, idOff || 0, 0]));
+    return E.dispatch(pipe, [idsBuf, wrec.pack, wrec.scales, yBuf, p], [Math.ceil((T*H)/64), 1, 1]);
+  }
+
   // ============================================================
   // Kernel 4 — RoPE + per-head QK-norm (fused), for one tensor (q or k).
   // in[T, nH*hd] → out[T, nH*hd]. Per (t,head): RMSNorm over hd * normW[hd],
@@ -1183,7 +1217,7 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
     const embOff = chain ? posBase : 0;
     uniformReset();   // pooled uniforms get stable buffers per call-site → bind-group cache hits
     E.beginBatch();   // record the whole forward into ONE command buffer (1 submit vs ~364)
-    await embedGather(embIds, W('model.embed_tokens.weight'), s.x, T, H, embOff);
+    await embedGatherQ(embIds, Wq('lm_head.weight'), s.x, T, H, embOff);   // int4 (tied) — f16 table is too big to bind on mobile
     for (let l = 0; l < C.numLayers; l++) {
       const p = 'model.layers.' + l + '.';
       await rmsnorm(s.x, W(p + 'input_layernorm.weight'), s.normed, T, H, C.rmsEps);
@@ -1273,6 +1307,12 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
     const ids = setIds([9707]);
     await embedGather(ids, _weights['model.embed_tokens.weight'].buf, s.x, 1, H, 0);
     const embedOut = sa(await E.readF32(s.x, H));
+    // int4 (tied lm_head) gather — what forward() now uses. On desktop this must
+    // match the f16 gather (validates tying + dequant); on mobile the f16 one is
+    // 0 (binding too big) while this should be non-zero.
+    uniformReset();
+    await embedGatherQ(ids, _weights['lm_head.weight'], s.x, 1, H, 0);
+    const embedOutQ = sa(await E.readF32(s.x, H));
     // (b) full batched forward, then read final-stage buffers. NOTE: forward()
     // calls ensureScratch(T) which may REALLOCATE _scr (destroying the T=1 buffers
     // above), so re-fetch _scr after the forward.
@@ -1291,6 +1331,7 @@ fn main(@builtin(local_invocation_id) lid:vec3<u32>){
       embW_first4: Array.from(embW.slice(0, 4)).map(v => +v.toFixed(3)),
       lnW_first4: Array.from(lnW.slice(0, 4)).map(v => +v.toFixed(3)),
       embedOut_standalone: embedOut,
+      embedOut_int4: embedOutQ,
       perLayer,
       forward_xFinal: xFinal, forward_normed: normed, forward_last: last, forward_logits: logits,
     };
