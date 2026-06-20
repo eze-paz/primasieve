@@ -50,8 +50,17 @@ function _activeStream() {
 
 const RENDERABLE_EXTS = new Set([
   'html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp',
-  'pdf', 'csv', 'txt', 'json', 'pptx'
+  'pdf', 'csv', 'txt', 'json', 'pptx', 'docx', 'xlsx', 'xls', 'ods'
 ]);
+
+// Office formats that are OOXML/ODF zips, not browser-native — they can't render
+// in a bare iframe, so they show a placeholder that opens the side-panel viewer
+// (opfs.openFile), where the lazy-loaded docx-preview / SheetJS / pptx-viewer run.
+const PANEL_ONLY_EXTS = new Set(['pptx', 'docx', 'xlsx', 'xls', 'ods']);
+const PANEL_ONLY_LABELS = {
+  pptx: '📊 PowerPoint presentation', docx: '📘 Word document',
+  xlsx: '📊 Excel spreadsheet', xls: '📊 Excel spreadsheet', ods: '📊 Spreadsheet',
+};
 
 function renderArtifact(host, path) {
   const target = host || (_activeStream() && _activeStream().host) || _$('messages');
@@ -146,17 +155,17 @@ function renderArtifact(host, path) {
     return;
   }
 
-  // PPTX can't render in a bare iframe (it's a zip, not a browser-native format).
-  // Show a placeholder with a button to open in the side panel (where the PPTX
+  // Office zips (pptx/docx/xlsx/…) can't render in a bare iframe. Show a
+  // placeholder with a button to open in the side panel (where the lazy-loaded
   // viewer runs). The ⊞ button in the header also does this.
-  if (ext === 'pptx') {
+  if (PANEL_ONLY_EXTS.has(ext)) {
     const placeholder = document.createElement('div');
     placeholder.style.cssText = 'padding:16px 14px;font:12px monospace;color:var(--sp-text-dim);text-align:center;';
     const btn = document.createElement('button');
-    btn.textContent = '▶ View presentation';
+    btn.textContent = '▶ View';
     btn.style.cssText = 'margin-top:6px;padding:4px 12px;font:12px monospace;background:var(--sp-accent);color:#fff;border:none;border-radius:3px;cursor:pointer;';
     btn.onclick = () => openArtifactPanel(clean);
-    placeholder.innerHTML = '📊 PowerPoint presentation<br>';
+    placeholder.innerHTML = (PANEL_ONLY_LABELS[ext] || '📄 Document') + '<br>';
     placeholder.appendChild(btn);
     wrap.appendChild(placeholder);
     target.appendChild(wrap);

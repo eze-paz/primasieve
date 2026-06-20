@@ -356,6 +356,73 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     }
     return;
   }
+  if (ext === 'docx' || ext === 'doc') {
+    // docx-preview renders OOXML client-side into styled HTML (light theme,
+    // like Word). Lazy-loaded from CDN on first use. .doc (legacy binary) isn't
+    // OOXML → renderAsync throws → the catch shows a download link.
+    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading document viewer…</div>';
+    mount(opfs.closeFile);
+    try {
+      const docx = await opfs.getDocxPreview();
+      const container = document.createElement('div');
+      // docx-preview emits page-styled HTML; pin a light context so its text and
+      // page chrome stay readable under Sandpie's dark theme.
+      container.className = 'docx-viewer-container';
+      container.style.cssText = 'width:100%;min-height:60vh;color:#222;background:#f3f3f3;font-family:sans-serif;overflow:auto;';
+      body.innerHTML = '';
+      body.appendChild(container);
+      await docx.renderAsync(file, container, null, { className: 'docx', inWrapper: true });
+    } catch (e) {
+      body.innerHTML = '';
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:1.5rem;color:var(--sp-text-dim);text-align:center;';
+      const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
+      div.innerHTML = `Could not render document (${(e && e.message) || e}).<br><a href="${url}" download="${name}" style="color:var(--sp-accent);">Download ${name}</a> to view locally.`;
+      body.appendChild(div);
+    }
+    return;
+  }
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
+    // SheetJS reads the workbook client-side; each sheet renders to an HTML table
+    // with a tab bar to switch between sheets. Lazy-loaded from CDN on first use.
+    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading spreadsheet viewer…</div>';
+    mount(opfs.closeFile);
+    try {
+      const XLSX = await opfs.getSheetJS();
+      const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+      body.innerHTML = '';
+      const container = document.createElement('div');
+      container.className = 'xlsx-viewer-container';
+      container.style.cssText = 'width:100%;color:#222;background:#fff;font-family:sans-serif;';
+      const tabs = document.createElement('div');
+      tabs.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;padding:6px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#f5f5f5;z-index:1;';
+      const sheetHost = document.createElement('div');
+      sheetHost.style.cssText = 'overflow:auto;max-height:65vh;padding:4px;';
+      const showSheet = (nm) => {
+        sheetHost.innerHTML = XLSX.utils.sheet_to_html(wb.Sheets[nm], { editable: false });
+        Array.from(tabs.children).forEach(b => { b.style.fontWeight = (b.textContent === nm) ? '700' : '400'; });
+      };
+      wb.SheetNames.forEach(nm => {
+        const b = document.createElement('button');
+        b.textContent = nm;
+        b.style.cssText = 'padding:3px 10px;font:12px sans-serif;border:1px solid #ccc;border-radius:3px;background:#fff;color:#222;cursor:pointer;';
+        b.onclick = () => showSheet(nm);
+        tabs.appendChild(b);
+      });
+      if (wb.SheetNames.length > 1) container.appendChild(tabs);
+      container.appendChild(sheetHost);
+      body.appendChild(container);
+      showSheet(wb.SheetNames[0]);
+    } catch (e) {
+      body.innerHTML = '';
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:1.5rem;color:var(--sp-text-dim);text-align:center;';
+      const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
+      div.innerHTML = `Could not render spreadsheet (${(e && e.message) || e}).<br><a href="${url}" download="${name}" style="color:var(--sp-accent);">Download ${name}</a> to view locally.`;
+      body.appendChild(div);
+    }
+    return;
+  }
 
   const text = await file.text();
   const sample = text.slice(0, 4000);
@@ -495,6 +562,49 @@ opfs.getPptxViewer = function() {
     });
   }
   return window._pptxViewerPromise;
+};
+
+// Append a <script src> and resolve once it loads (shared by the docx/xlsx
+// lazy-loaders below). Rejects on a network/CDN failure so callers can fall back.
+opfs._loadScript = function(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('failed to load ' + src));
+    document.head.appendChild(s);
+  });
+};
+
+// Lazy-load docx-preview (Apache-2.0). Parses the OOXML zip and renders a .docx
+// into styled HTML, client-side. Needs JSZip present as a global, so load that
+// first. Exposes window.docx.renderAsync. No server. (.doc legacy binary isn't
+// OOXML and won't render — the openFile branch falls back to a download link.)
+opfs.getDocxPreview = function() {
+  if (!window._docxPreviewPromise) {
+    window._docxPreviewPromise = (async () => {
+      if (!window.JSZip) {
+        await opfs._loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+      }
+      await opfs._loadScript('https://cdn.jsdelivr.net/npm/docx-preview@0.3.5/dist/docx-preview.min.js');
+      if (!window.docx || !window.docx.renderAsync) throw new Error('docx-preview failed to initialize');
+      return window.docx;
+    })();
+  }
+  return window._docxPreviewPromise;
+};
+
+// Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
+// client-side; we render each sheet to an HTML table. Exposes window.XLSX.
+opfs.getSheetJS = function() {
+  if (!window._sheetjsPromise) {
+    window._sheetjsPromise = (async () => {
+      await opfs._loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      if (!window.XLSX) throw new Error('SheetJS failed to initialize');
+      return window.XLSX;
+    })();
+  }
+  return window._sheetjsPromise;
 };
 
 opfs.up = function() {
