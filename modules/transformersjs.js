@@ -304,6 +304,7 @@ const SandpieTransformersJS = (function () {
     // first, so only one local runtime holds a WebGPU device at a time.
     try { await window.SandpieWllama?.unload?.(); } catch (_) {}
     try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
+    try { await window.SandpieQwen35?.unload?.(); } catch (_) {}
 
     const modelId = provider.endpoint;
     const reasoning = (provider.reasoning || 'auto');

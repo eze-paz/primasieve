@@ -788,6 +788,7 @@ const SandpieWllama = (function() {
     // device-loss each other. (A backend never unloads itself.)
     try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
     try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
+    try { await window.SandpieQwen35?.unload?.(); } catch (_) {}
     const modelUrl = provider && (provider.endpoint || '').trim();
     if (!modelUrl) {
       emit({ type: 'error', message: 'wllama: this provider has no model URL — set the GGUF URL in Settings.' });

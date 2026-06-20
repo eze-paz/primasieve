@@ -33,10 +33,12 @@ const AI_HTML = `
           <option value="wllama">Local model (wllama, in-browser)</option>
           <option value="transformersjs">Local model (Transformers.js, in-browser)</option>
           <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
+          <option value="webgpu">Local model (WebGPU Qwen3.5, in-browser)</option>
         </select>
         <select id="spWllamaModel" style="display:none;"></select>
         <select id="spTransformersJSModel" style="display:none;"></select>
         <select id="spLiteRTLMModel" style="display:none;"></select>
+        <select id="spWebGPUModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -94,6 +96,7 @@ async function clearLocalModelCaches() {
     try { await window.SandpieWllama?.unload?.(); } catch (_) {}
     try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
     try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
+    try { await window.SandpieQwen35?.unload?.(); await window.SandpieQwen35?.clearCache?.(); } catch (_) {}   // OPFS model files
     let before = 0, after = 0;
     try { before = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
     if (typeof caches === 'undefined') { setStatus('Cache Storage is unavailable in this browser.'); return; }
@@ -193,6 +196,21 @@ function _wireProviderPanel() {
     });
     lrSel._spBound = true;
   }
+  const wgSel = document.getElementById('spWebGPUModel');
+  if (wgSel && !wgSel._spBound) {
+    if (typeof SandpieQwen35 !== 'undefined' && !wgSel.options.length) {
+      wgSel.innerHTML = '<option value="">— pick a model —</option>'
+        + SandpieQwen35.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('');
+    }
+    wgSel.addEventListener('change', () => {
+      const v = wgSel.value; if (!v) return;
+      const m = (typeof SandpieQwen35 !== 'undefined') ? SandpieQwen35.DEFAULT_MODELS.find(x => x.modelId === v) : null;
+      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
+      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
+      commitForm();
+    });
+    wgSel._spBound = true;
+  }
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
   const _clearBtn = document.getElementById('spClearModelCache');
@@ -272,6 +290,7 @@ function applyActiveProvider() {
     if (_t !== 'wllama') window.SandpieWllama?.unload?.();
     if (_t !== 'transformersjs') window.SandpieTransformersJS?.unload?.();
     if (_t !== 'litertlm') window.SandpieLiteRTLM?.unload?.();
+    if (_t !== 'webgpu') window.SandpieQwen35?.unload?.();
   } catch (_) {}
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');
@@ -466,6 +485,8 @@ function loadFormFor(id) {
   if (tj) tj.value = (p.type === 'transformersjs' && p.endpoint) ? p.endpoint : '';
   const lr = document.getElementById('spLiteRTLMModel');
   if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
+  const wg = document.getElementById('spWebGPUModel');
+  if (wg) wg.value = (p.type === 'webgpu' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
 }
 
@@ -475,11 +496,13 @@ function applyTypeUI() {
   const wllama = type === 'wllama';
   const transformersjs = type === 'transformersjs';
   const litertlm = type === 'litertlm';
-  const local = wllama || transformersjs || litertlm;
+  const webgpu = type === 'webgpu';
+  const local = wllama || transformersjs || litertlm || webgpu;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spWllamaModel', wllama);
   show('spTransformersJSModel', transformersjs);
   show('spLiteRTLMModel', litertlm);
+  show('spWebGPUModel', webgpu);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
@@ -493,18 +516,18 @@ function applyTypeUI() {
   //   presence pen.: wllama only
   //   reasoning:     wllama (/think) + litertlm (Gemma thinking); NOT transformers.js
   //   flash / GPU layers / threads / n_batch: wllama only (llama.cpp load params)
-  show('spContextWindow', !transformersjs);
+  show('spContextWindow', !transformersjs && !webgpu);   // webgpu ctx is fixed (MAX_SEQ)
   show('spTemperature', !local);
   show('spFreqPenalty', wllama);
   show('spPresencePenalty', wllama);
-  show('spReasoning', wllama || litertlm);
+  show('spReasoning', wllama || litertlm);   // webgpu Qwen3.5 always emits <think> (auto-split to the Thinking box)
   show('spFlashAttn', wllama);
   show('spGpuLayers', wllama);
   show('spThreads', wllama);
   show('spBatch', wllama);
-  // Container shows whenever any local field is visible (i.e. any local backend).
+  // Container shows whenever any local backend exposes params (webgpu exposes none).
   const wp = document.getElementById('spWllamaParams');
-  if (wp) wp.style.display = local ? 'flex' : 'none';
+  if (wp) wp.style.display = (local && !webgpu) ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
   if (ep) ep.placeholder = local ? 'Model ID (picker above; gated models need HF token)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
@@ -637,6 +660,8 @@ function updateRoutingHint() {
     hint.textContent = 'In-browser Transformers.js · ' + (active.model || 'local model');
   } else if (active?.type === 'litertlm') {
     hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'local model');
+  } else if (active?.type === 'webgpu') {
+    hint.textContent = 'In-browser WebGPU · ' + (active.model || 'Qwen3.5');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
   } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
@@ -649,7 +674,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'wllama' || active?.type === 'transformersjs' || active?.type === 'litertlm');
+  const local = (active?.type === 'wllama' || active?.type === 'transformersjs' || active?.type === 'litertlm' || active?.type === 'webgpu');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }

@@ -658,12 +658,14 @@ async function sendSingle(text, stream, opts = {}) {
   const _isWllama = !!(_active && _active.type === 'wllama');
   const _isTransformersJS = !!(_active && _active.type === 'transformersjs');
   const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
-  const _isLocal = _isWllama || _isTransformersJS || _isLiteRTLM;
+  const _isWebGPU = !!(_active && _active.type === 'webgpu');
+  const _isLocal = _isWllama || _isTransformersJS || _isLiteRTLM || _isWebGPU;
   if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
     addMsg('err',
       _isWllama ? 'Pick a wllama model in Settings before sending.' :
       _isTransformersJS ? 'Pick a Transformers.js model in Settings before sending.' :
       _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
+      _isWebGPU ? 'Pick a WebGPU (Qwen3.5) model in Settings before sending.' :
       'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
   }
@@ -745,6 +747,12 @@ async function sendSingle(text, stream, opts = {}) {
     } else if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
       await SandpieLiteRTLM.runConversation(
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+        dispatch,
+      );
+    } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
+      // Local Qwen3.5 via the from-scratch WebGPU engine. Chat-only (no tools yet).
+      await SandpieQwen35.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
