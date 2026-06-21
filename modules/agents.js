@@ -219,43 +219,20 @@ async function ensureDefaults() {
 // ---- direct (non-streaming) completion — never the SW conversation stream --
 async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {}) {
   const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  // Local (wllama) provider: run the completion IN-BROWSER. Its "endpoint" is a
-  // GGUF model URL, not an OpenAI server — never POST <gguf-url>/chat/completions.
-  if (active && active.type === 'wllama') {
-    if (typeof SandpieWllama === 'undefined' || !SandpieWllama.streamRound) throw new Error('wllama not loaded');
-    const r = await SandpieWllama.streamRound({
-      modelUrl: active.endpoint,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      tools: [], signal, maxTokens,
-      nCtx: (active.contextWindow | 0) || undefined,
-      // Match runConversation's instance key so a utility prompt doesn't force a
-      // model reload mid-conversation (nThreads/nBatch are load-time params).
-      nThreads: active.nThreads != null ? (active.nThreads | 0) : undefined,
-      nBatch: active.nBatch != null ? (active.nBatch | 0) : undefined,
-      // Utility prompts (titles, distill, etc.) want a fast direct answer — for
-      // RWKV that means the no_think prefill. Ignored by non-RWKV models.
-      reasoning: 'no_think',
-    });
-    return (r && r.content) || '';
-  }
-  if (active && active.type === 'transformersjs') {
-    if (typeof SandpieTransformersJS === 'undefined' || !SandpieTransformersJS.streamRound) throw new Error('Transformers.js not loaded');
-    const r = await SandpieTransformersJS.streamRound({
-      modelUrl: active.endpoint,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      tools: [], signal, maxTokens,
-    });
-    return (r && r.content) || '';
-  }
-  if (active && active.type === 'litertlm') {
-    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.streamRound) throw new Error('LiteRT-LM not loaded');
-    const r = await SandpieLiteRTLM.streamRound({
-      modelUrl: active.endpoint,
-      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      tools: [], signal,
-      nCtx: (active.contextWindow | 0) || undefined,
-    });
-    return (r && r.content) || '';
+  // Local (WebGPU Qwen3.5) provider: run the completion IN-BROWSER. Its "endpoint"
+  // is a model-variant id, not an OpenAI server — never POST <variant>/chat/completions.
+  // runConversation is the only entry point; drive it with no tools and collect the
+  // streamed content deltas into a single string.
+  if (active && active.type === 'webgpu') {
+    if (typeof SandpieQwen35 === 'undefined' || !SandpieQwen35.runConversation) throw new Error('WebGPU engine not loaded');
+    let out = '';
+    await SandpieQwen35.runConversation({
+      provider: { endpoint: active.endpoint, maxTokens },
+      messages: [{ role: 'user', content: user }],
+      systemPrompt: system,
+      tools: [], convId: null, signal,
+    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
+    return out;
   }
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';

@@ -1061,7 +1061,7 @@
     color: var(--sp-text);
     font-size: 0.85rem;
   }
-  /* Match the provider-form dropdowns (type / wllama model) to the inputs above. */
+  /* Match the provider-form dropdowns (type / model picker) to the inputs above. */
   #providerForm select {
     width: 100%;
     padding: 0.5rem;

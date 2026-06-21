@@ -655,16 +655,10 @@ async function sendSingle(text, stream, opts = {}) {
     try { SandpieProviders.ensureUsable(); } catch (_) {}
   }
   const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  const _isWllama = !!(_active && _active.type === 'wllama');
-  const _isTransformersJS = !!(_active && _active.type === 'transformersjs');
-  const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
   const _isWebGPU = !!(_active && _active.type === 'webgpu');
-  const _isLocal = _isWllama || _isTransformersJS || _isLiteRTLM || _isWebGPU;
+  const _isLocal = _isWebGPU;   // the WebGPU (Qwen3.5) engine is the only in-browser backend
   if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
     addMsg('err',
-      _isWllama ? 'Pick a wllama model in Settings before sending.' :
-      _isTransformersJS ? 'Pick a Transformers.js model in Settings before sending.' :
-      _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
       _isWebGPU ? 'Pick a WebGPU (Qwen3.5) model in Settings before sending.' :
       'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
@@ -728,30 +722,10 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
-    if (_isWllama && typeof SandpieWllama !== 'undefined' && SandpieWllama.runConversation) {
-      // Local model: run the agent loop on the PAGE (wllama's WASM model
-      // can't be reached from the service worker). It emits the same event
-      // protocol, so `dispatch` + the renderer + the lifecycle below are
-      // reused unchanged.
-      await SandpieWllama.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else if (_isTransformersJS && typeof SandpieTransformersJS !== 'undefined' && SandpieTransformersJS.runConversation) {
-      // Local model via Transformers.js (ONNX + WebGPU).
-      // Same page-side agent loop pattern as wllama.
-      await SandpieTransformersJS.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
-      // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
-      await SandpieLiteRTLM.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
-      // Local Qwen3.5 via the from-scratch WebGPU engine. Chat-only (no tools yet).
+    if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
+      // Local Qwen3.5 via the from-scratch WebGPU engine — the only in-browser backend.
+      // It runs the agent loop on the PAGE and emits the same event protocol, so `dispatch`
+      // + the renderer + the lifecycle below are reused unchanged.
       await SandpieQwen35.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
@@ -2064,10 +2038,10 @@ const TOK_EASE = 0.2;       // fraction of the remaining gap the shown count clo
 const TOK_FMT = n => Math.round(n).toLocaleString('en-US');
 const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s';
 
-// Generated-token bookkeeping for the live counter. Every backend (local
-// wllama/transformers.js/litert AND the SW/API path) funnels its stream
-// through sendSingle's `dispatch`, so counting here is universal. Local
-// backends emit no `usage` events, so a chars/4 estimate — the same heuristic
+// Generated-token bookkeeping for the live counter. Every backend (the local
+// WebGPU engine AND the SW/API path) funnels its stream through sendSingle's
+// `dispatch`, so counting here is universal. The local backend emits no `usage`
+// events, so a chars/4 estimate — the same heuristic
 // SandpieTokens.estimateTokens uses — is the only signal available; we use it
 // for every backend so the readout behaves identically everywhere. genChars
 // only grows, so tokTarget is monotonic. (Authoritative provider usage still

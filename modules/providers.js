@@ -30,14 +30,8 @@ const AI_HTML = `
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
         <select id="spType">
           <option value="openai">API (OpenAI-compatible)</option>
-          <option value="wllama">Local model (wllama, in-browser)</option>
-          <option value="transformersjs">Local model (Transformers.js, in-browser)</option>
-          <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
           <option value="webgpu">Local model (WebGPU Qwen3.5, in-browser)</option>
         </select>
-        <select id="spWllamaModel" style="display:none;"></select>
-        <select id="spTransformersJSModel" style="display:none;"></select>
-        <select id="spLiteRTLMModel" style="display:none;"></select>
         <select id="spWebGPUModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
@@ -49,23 +43,6 @@ const AI_HTML = `
         <input id="spTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
         <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
-        <div id="spWllamaParams" style="display:none; flex-direction:column; gap:0.4rem;">
-          <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local sampling &amp; reasoning</div>
-          <input id="spFreqPenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="frequency_penalty (−2 to 2)">
-          <input id="spPresencePenalty" type="number" min="-2" max="2" step="0.1" autocomplete="off" placeholder="presence_penalty (−2 to 2)">
-          <select id="spReasoning">
-            <option value="auto">Thinking: auto (model default)</option>
-            <option value="think">Thinking: on (/think)</option>
-            <option value="no_think">Thinking: off (/no_think)</option>
-          </select>
-          <select id="spFlashAttn">
-            <option value="false">Flash attention: off (safer)</option>
-            <option value="true">Flash attention: on (faster, may crash)</option>
-          </select>
-          <input id="spGpuLayers" type="number" min="0" step="1" autocomplete="off" placeholder="GPU layers (blank/0 = CPU, 999 = all, may crash)">
-          <input id="spThreads" type="number" min="1" step="1" autocomplete="off" placeholder="CPU threads (wllama; blank = all cores; needs COOP/COEP to multi-thread)">
-          <input id="spBatch" type="number" min="1" step="1" autocomplete="off" placeholder="n_batch (wllama; blank = default; bigger = faster prefill, more RAM)">
-        </div>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
           <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
@@ -74,17 +51,15 @@ const AI_HTML = `
       <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
       <div id="localCacheSection" style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); display:flex; flex-direction:column; gap:0.4rem;">
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local model storage</div>
-        <div style="font-size:0.72rem; color:var(--sp-text-dim);">In-browser models (wllama / Transformers.js / LiteRT-LM) are cached on this device. Clearing frees the space; they re-download next time you use them.</div>
+        <div style="font-size:0.72rem; color:var(--sp-text-dim);">The in-browser WebGPU model is cached on this device. Clearing frees the space; it re-downloads next time you use it.</div>
         <button class="ghost" type="button" id="spClearModelCache">Clear cached local models</button>
         <div id="spClearCacheStatus" style="font-size:0.7rem; color:var(--sp-text-dim);"></div>
       </div>
     `;
 
-// Clear all cached in-browser model files (Cache Storage). Local model bytes live in
-// Cache Storage (NOT OPFS — kept out of Dropbox sync): wllama 'sandpie-wllama-models',
-// litertlm 'sandpie-litertlm-models', Transformers.js the library's 'transformers-*'
-// cache. Unload any resident model first so the freed space isn't immediately re-held.
-// Allowlist match so the app / service-worker caches are never touched.
+// Clear the cached in-browser WebGPU model. Its weights live in OPFS (the quantized
+// q4 cache + any lingering source safetensors). Unload the resident model first so
+// the freed space isn't immediately re-held by the running engine.
 async function clearLocalModelCaches() {
   const btn = document.getElementById('spClearModelCache');
   const status = document.getElementById('spClearCacheStatus');
@@ -93,25 +68,15 @@ async function clearLocalModelCaches() {
   if (btn) btn.disabled = true;
   setStatus('Clearing…');
   try {
-    try { await window.SandpieWllama?.unload?.(); } catch (_) {}
-    try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
-    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
-    try { await window.SandpieQwen35?.unload?.(); await window.SandpieQwen35?.clearCache?.(); } catch (_) {}   // OPFS model files
     let before = 0, after = 0;
     try { before = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
-    if (typeof caches === 'undefined') { setStatus('Cache Storage is unavailable in this browser.'); return; }
-    const names = await caches.keys();
-    const target = names.filter(n =>
-      n === 'sandpie-wllama-models' ||
-      n === 'sandpie-litertlm-models' ||
-      n.startsWith('transformers')   // @huggingface/transformers browser cache
-    );
     let deleted = 0;
-    for (const n of target) { try { if (await caches.delete(n)) deleted++; } catch (_) {} }
+    // WebGPU Qwen3.5 stores its model files in OPFS (not Cache Storage).
+    try { await window.SandpieQwen35?.unload?.(); if (await window.SandpieQwen35?.clearCache?.()) deleted++; } catch (_) {}
     try { after = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
     const freedMB = Math.max(0, before - after) / (1024 * 1024);
     setStatus(deleted
-      ? `Cleared ${deleted} model cache${deleted > 1 ? 's' : ''}${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
+      ? `Cleared the cached local model${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
       : 'No cached local models found.');
   } catch (e) {
     setStatus('Error clearing cache: ' + ((e && e.message) || e));
@@ -139,63 +104,12 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort','spFreqPenalty','spPresencePenalty','spReasoning','spFlashAttn','spGpuLayers','spThreads','spBatch']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
-  const wmSel = document.getElementById('spWllamaModel');
-  if (wmSel && !wmSel._spBound) {
-    if (typeof SandpieWllama !== 'undefined' && !wmSel.options.length) {
-      wmSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieWllama.DEFAULT_MODELS.map(m => `<option value="${m.url}">${m.label}</option>`).join('')
-        + '<option value="__custom">Custom GGUF URL…</option>';
-    }
-    wmSel.addEventListener('change', () => {
-      const v = wmSel.value;
-      if (!v || v === '__custom') return;   // leave the Base URL field for manual entry
-      const m = (typeof SandpieWllama !== 'undefined') ? SandpieWllama.DEFAULT_MODELS.find(x => x.url === v) : null;
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.label;
-      commitForm();
-    });
-    wmSel._spBound = true;
-  }
-  const tjSel = document.getElementById('spTransformersJSModel');
-  if (tjSel && !tjSel._spBound) {
-    if (typeof SandpieTransformersJS !== 'undefined' && !tjSel.options.length) {
-      tjSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieTransformersJS.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
-        + '<option value="__custom">Custom HF model ID…</option>';
-    }
-    tjSel.addEventListener('change', () => {
-      const v = tjSel.value;
-      if (!v || v === '__custom') return;
-      const m = (typeof SandpieTransformersJS !== 'undefined') ? SandpieTransformersJS.DEFAULT_MODELS.find(x => x.modelId === v) : null;
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
-      commitForm();
-    });
-    tjSel._spBound = true;
-  }
-  const lrSel = document.getElementById('spLiteRTLMModel');
-  if (lrSel && !lrSel._spBound) {
-    if (typeof SandpieLiteRTLM !== 'undefined' && !lrSel.options.length) {
-      lrSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieLiteRTLM.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
-        + '<option value="__custom">Custom .litertlm URL…</option>';
-    }
-    lrSel.addEventListener('change', () => {
-      const v = lrSel.value;
-      if (!v || v === '__custom') return;
-      const m = (typeof SandpieLiteRTLM !== 'undefined') ? SandpieLiteRTLM.DEFAULT_MODELS.find(x => x.modelId === v) : null;
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
-      commitForm();
-    });
-    lrSel._spBound = true;
-  }
   const wgSel = document.getElementById('spWebGPUModel');
   if (wgSel && !wgSel._spBound) {
     if (typeof SandpieQwen35 !== 'undefined' && !wgSel.options.length) {
@@ -281,16 +195,10 @@ function getActiveProvider() {
 // conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
   const p = getActiveProvider();
-  // Single active local backend: when the active provider changes, eagerly free
-  // any local LLM that isn't the active type (no-op if it wasn't loaded). The hard
-  // guarantee lives in each backend's runConversation; this frees idle GPU/WASM
-  // sooner. A cloud provider (type is none of the 3 local types) frees all three.
+  // WebGPU Qwen3.5 is the only in-browser backend. When switching to a cloud
+  // provider, eagerly free its GPU context (no-op if it wasn't loaded).
   try {
-    const _t = p && p.type;
-    if (_t !== 'wllama') window.SandpieWllama?.unload?.();
-    if (_t !== 'transformersjs') window.SandpieTransformersJS?.unload?.();
-    if (_t !== 'litertlm') window.SandpieLiteRTLM?.unload?.();
-    if (_t !== 'webgpu') window.SandpieQwen35?.unload?.();
+    if (!(p && p.type === 'webgpu')) window.SandpieQwen35?.unload?.();
   } catch (_) {}
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');
@@ -474,17 +382,6 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spReasoningEffort', p.reasoningEffort);
   set('spType', p.type || 'openai');
-  set('spFreqPenalty', p.frequencyPenalty); set('spPresencePenalty', p.presencePenalty);
-  const rs = document.getElementById('spReasoning'); if (rs) rs.value = p.reasoning || 'auto';
-  const fa = document.getElementById('spFlashAttn'); if (fa) fa.value = p.flashAttn ? 'true' : 'false';
-  set('spGpuLayers', p.nGpuLayers);
-  set('spThreads', p.nThreads); set('spBatch', p.nBatch);
-  const wm = document.getElementById('spWllamaModel');
-  if (wm) wm.value = (p.type === 'wllama' && p.endpoint) ? p.endpoint : '';
-  const tj = document.getElementById('spTransformersJSModel');
-  if (tj) tj.value = (p.type === 'transformersjs' && p.endpoint) ? p.endpoint : '';
-  const lr = document.getElementById('spLiteRTLMModel');
-  if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
   const wg = document.getElementById('spWebGPUModel');
   if (wg) wg.value = (p.type === 'webgpu' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
@@ -493,41 +390,18 @@ function loadFormFor(id) {
 // Show/hide provider fields based on the selected backend type.
 function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
-  const wllama = type === 'wllama';
-  const transformersjs = type === 'transformersjs';
-  const litertlm = type === 'litertlm';
   const webgpu = type === 'webgpu';
-  const local = wllama || transformersjs || litertlm || webgpu;
+  const local = webgpu;   // WebGPU Qwen3.5 is the only local backend
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  show('spWllamaModel', wllama);
-  show('spTransformersJSModel', transformersjs);
-  show('spLiteRTLMModel', litertlm);
   show('spWebGPUModel', webgpu);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
-  // Per-backend option visibility — each local backend shows ONLY the params it
-  // actually reads, so wllama-only knobs no longer bleed into transformers.js /
-  // litertlm. Cloud (non-local) keeps the generic context/maxTokens/temperature.
-  //   contextWindow: wllama (n_ctx) + litertlm (maxNumTokens) + cloud; NOT transformers.js
-  //   temperature:   cloud only — removed as a configurable option for all 3 local backends
-  //   freq penalty:  wllama only — transformers.js now mirrors the HF Space, which
-  //                  uses no repetition_penalty (model defaults); NOT litertlm
-  //   presence pen.: wllama only
-  //   reasoning:     wllama (/think) + litertlm (Gemma thinking); NOT transformers.js
-  //   flash / GPU layers / threads / n_batch: wllama only (llama.cpp load params)
-  show('spContextWindow', !transformersjs && !webgpu);   // webgpu ctx is fixed (MAX_SEQ)
+  // WebGPU Qwen3.5 exposes no tunable params: fixed context (MAX_SEQ), built-in
+  // sampling defaults, and it always emits <think> (auto-split to the Thinking box).
+  // Cloud (non-local) keeps the generic context/maxTokens/temperature knobs.
+  show('spContextWindow', !webgpu);
   show('spTemperature', !local);
-  show('spFreqPenalty', wllama);
-  show('spPresencePenalty', wllama);
-  show('spReasoning', wllama || litertlm);   // webgpu Qwen3.5 always emits <think> (auto-split to the Thinking box)
-  show('spFlashAttn', wllama);
-  show('spGpuLayers', wllama);
-  show('spThreads', wllama);
-  show('spBatch', wllama);
-  // Container shows whenever any local backend exposes params (webgpu exposes none).
-  const wp = document.getElementById('spWllamaParams');
-  if (wp) wp.style.display = (local && !webgpu) ? 'flex' : 'none';
   const ep = document.getElementById('spEndpoint');
   if (ep) ep.placeholder = local ? 'Model ID (picker above; gated models need HF token)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
@@ -546,18 +420,10 @@ function commitForm() {
   p.apiKey = val('spApiKey');
   p.proxyUrl = val('spProxyUrl');
   p.name = val('spName') || p.model || 'Unnamed';
-  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else if (p.type === 'wllama' || p.type === 'transformersjs') p.contextWindow = 8192; else delete p.contextWindow;
+  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else delete p.contextWindow;
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
-  // wllama-only sampling / reasoning params
-  const fpen = num('spFreqPenalty');      if (fpen != null) p.frequencyPenalty = fpen; else delete p.frequencyPenalty;
-  const ppen = num('spPresencePenalty');  if (ppen != null) p.presencePenalty = ppen; else delete p.presencePenalty;
-  const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
-  const fa = (document.getElementById('spFlashAttn')?.value) || 'false'; p.flashAttn = fa === 'true';
-  const gl = num('spGpuLayers');          if (gl != null && gl >= 0) p.nGpuLayers = Math.round(gl); else delete p.nGpuLayers;
-  const th = num('spThreads');            if (th != null && th >= 1) p.nThreads = Math.round(th); else delete p.nThreads;
-  const nb = num('spBatch');              if (nb != null && nb >= 1) p.nBatch = Math.round(nb); else delete p.nBatch;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight
@@ -654,13 +520,7 @@ function updateRoutingHint() {
   const remote = (document.getElementById('proxyUrl')?.value || '').trim();
   const hint = document.getElementById('routingHint');
   if (!hint) return;
-  if (active?.type === 'wllama') {
-    hint.textContent = 'In-browser wllama · ' + (active.model || 'local model');
-  } else if (active?.type === 'transformersjs') {
-    hint.textContent = 'In-browser Transformers.js · ' + (active.model || 'local model');
-  } else if (active?.type === 'litertlm') {
-    hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'local model');
-  } else if (active?.type === 'webgpu') {
+  if (active?.type === 'webgpu') {
     hint.textContent = 'In-browser WebGPU · ' + (active.model || 'Qwen3.5');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
@@ -674,7 +534,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'wllama' || active?.type === 'transformersjs' || active?.type === 'litertlm' || active?.type === 'webgpu');
+  const local = (active?.type === 'webgpu');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
