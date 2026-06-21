@@ -110,15 +110,21 @@ function _wireProviderPanel() {
   }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
+  // WebGPU model list = dense Qwen3 (fast prefill, no DeltaNet) + hybrid Qwen3.5 (better
+  // long-context). Both engines emit the same protocol; conversations.js routes by model id.
+  const _wgModels = () => [
+    ...((typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS) ? SandpieQwen3.DEFAULT_MODELS : []),
+    ...((typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.DEFAULT_MODELS) ? SandpieQwen35.DEFAULT_MODELS : []),
+  ];
   const wgSel = document.getElementById('spWebGPUModel');
   if (wgSel && !wgSel._spBound) {
-    if (typeof SandpieQwen35 !== 'undefined' && !wgSel.options.length) {
+    if (!wgSel.options.length) {
       wgSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieQwen35.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('');
+        + _wgModels().map(m => `<option value="${m.modelId}">${m.label}</option>`).join('');
     }
     wgSel.addEventListener('change', () => {
       const v = wgSel.value; if (!v) return;
-      const m = (typeof SandpieQwen35 !== 'undefined') ? SandpieQwen35.DEFAULT_MODELS.find(x => x.modelId === v) : null;
+      const m = _wgModels().find(x => x.modelId === v);
       const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
       const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
       commitForm();
@@ -195,10 +201,11 @@ function getActiveProvider() {
 // conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
   const p = getActiveProvider();
-  // WebGPU Qwen3.5 is the only in-browser backend. When switching to a cloud
-  // provider, eagerly free its GPU context (no-op if it wasn't loaded).
+  // In-browser WebGPU backends: hybrid Qwen3.5 + dense Qwen3. When switching to a cloud
+  // provider, eagerly free both GPU contexts (no-op if not loaded). The active-engine swap
+  // between the two webgpu models is handled in conversations.js (single active local model).
   try {
-    if (!(p && p.type === 'webgpu')) window.SandpieQwen35?.unload?.();
+    if (!(p && p.type === 'webgpu')) { window.SandpieQwen35?.unload?.(); window.SandpieQwen3?.unload?.(); }
   } catch (_) {}
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');

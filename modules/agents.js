@@ -224,9 +224,14 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
   // runConversation is the only entry point; drive it with no tools and collect the
   // streamed content deltas into a single string.
   if (active && active.type === 'webgpu') {
-    if (typeof SandpieQwen35 === 'undefined' || !SandpieQwen35.runConversation) throw new Error('WebGPU engine not loaded');
+    // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a utility
+    // prompt doesn't load the other model. Match the active model id against the dense set.
+    const isDense = typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
+      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === active.endpoint);
+    const eng = isDense ? SandpieQwen3 : (typeof SandpieQwen35 !== 'undefined' ? SandpieQwen35 : null);
+    if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
     let out = '';
-    await SandpieQwen35.runConversation({
+    await eng.runConversation({
       provider: { endpoint: active.endpoint, maxTokens },
       messages: [{ role: 'user', content: user }],
       systemPrompt: system,

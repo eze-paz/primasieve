@@ -722,10 +722,19 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
-    if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
-      // Local Qwen3.5 via the from-scratch WebGPU engine — the only in-browser backend.
-      // It runs the agent loop on the PAGE and emits the same event protocol, so `dispatch`
-      // + the renderer + the lifecycle below are reused unchanged.
+    // Route the WebGPU model to its engine: dense Qwen3 (fast prefill, no DeltaNet) vs the
+    // hybrid Qwen3.5. Both run the agent loop on the PAGE and emit the same event protocol,
+    // so `dispatch` + the renderer + the lifecycle below are reused unchanged.
+    const _isDense = _isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
+      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
+    if (_isDense && SandpieQwen3.runConversation) {
+      try { await SandpieQwen35?.unload?.(); } catch (_) {}   // single active local model
+      await SandpieQwen3.runConversation(
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+        dispatch,
+      );
+    } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
+      try { await SandpieQwen3?.unload?.(); } catch (_) {}    // single active local model
       await SandpieQwen35.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
