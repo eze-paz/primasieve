@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wllama CPU bench — Qwen3.5-0.8B (WASM, multi-thread)</title>
+<!-- Loaded FIRST and as a classic script: it self-registers a COI service worker
+     and reloads the page once so we become crossOriginIsolated → SharedArrayBuffer
+     → wllama multi-threading. Must run before the wllama module below. -->
+<script src="coi-serviceworker.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; background:#0d1117; color:#c9d1d9; margin:0; padding:1.5rem; }
+  h1 { font-size:1.1rem; color:#58a6ff; margin:0 0 .25rem; }
+  .sub { color:#8b949e; margin:0 0 1.1rem; }
+  .panel { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:.85rem 1rem; margin:.7rem 0; }
+  .iso { font-size:1rem; font-weight:700; }
+  .iso .on { color:#3fb950; } .iso .off { color:#f85149; }
+  button { font:inherit; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:.45rem 1rem; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:#58a6ff; }
+  button:disabled { opacity:.5; cursor:default; }
+  input, textarea { font:inherit; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:.35rem .5rem; }
+  textarea { width:100%; box-sizing:border-box; }
+  label { color:#8b949e; }
+  .row { display:flex; flex-wrap:wrap; gap:.8rem; align-items:center; margin:.5rem 0; }
+  .stat { display:inline-block; min-width:9rem; }
+  .stat b { color:#d29922; font-weight:700; }
+  .big { font-size:1.35rem; color:#3fb950; font-weight:700; }
+  pre { background:#0a0e14; border:1px solid #30363d; border-radius:8px; padding:.85rem 1rem; white-space:pre-wrap; word-break:break-word; min-height:3rem; }
+  .hi { color:#d29922; } .dim { color:#6e7681; } code { color:#79c0ff; }
+</style>
+</head>
+<body>
+<h1>wllama CPU benchmark — Qwen3.5-0.8B Q4_K_M</h1>
+<p class="sub">Pure-CPU llama.cpp (ggml) compiled to WebAssembly, running entirely in this tab. Measures how close in-browser CPU gets to native <code>llama-server -ngl 0</code>. No GPU, no WebGPU.</p>
+
+<div class="panel iso">
+  Cross-origin isolated (multi-thread enabled): <span id="iso">checking…</span>
+  <div class="dim" id="isoNote" style="font-size:.8rem; font-weight:400; margin-top:.3rem;"></div>
+</div>
+
+<div class="panel">
+  <div class="row">
+    <label>threads <input id="threads" type="number" min="1" max="32" style="width:4rem"></label>
+    <label>n_ctx <input id="nctx" type="number" min="512" step="512" value="4096" style="width:5rem"></label>
+    <label>max tokens <input id="maxtok" type="number" min="1" value="128" style="width:4.5rem"></label>
+    <label><input id="flash" type="checkbox" checked> flash_attn</label>
+    <label><input id="kvq8" type="checkbox" checked> KV q8_0</label>
+  </div>
+  <textarea id="prompt" rows="2">Explain what a service worker is, in two sentences.</textarea>
+  <div class="row" style="margin-top:.5rem;">
+    <button id="go">Load model &amp; generate</button>
+    <span id="status" class="hi"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <span class="stat">prefill: <b id="sPrefill">—</b></span>
+  <span class="stat">decode: <span class="big" id="sDecode">—</span></span>
+  <span class="stat dim" id="sMeta"></span>
+</div>
+
+<pre id="out">—</pre>
+
+<p class="dim" style="font-size:.8rem;">
+  First run downloads ~0.5 GB (cached after, in OPFS via wllama). Qwen3.5 emits <code>&lt;think&gt;…&lt;/think&gt;</code> before its answer.
+  Decode tok/s is timed from the first token (prefill excluded) — the apples-to-apples number vs <code>llama-server</code> eval rate.
+</p>
+
+<script type="module">
+import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.5.1/esm/index.min.js';
+
+const WASM_URL  = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.5.1/esm/wasm/wllama.wasm';
+// Validated Qwen3.5-0.8B (hybrid Gated-DeltaNet) GGUF — needs wllama >= 3.4.1 for the qwen35 ops.
+const MODEL_URL = 'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf';
+
+const $ = (id) => document.getElementById(id);
+const set = (id, t) => { $(id).textContent = t; };
+
+// ---- isolation / thread status ----
+const cores = navigator.hardwareConcurrency || 4;
+$('threads').value = Math.min(cores, 8);   // match a typical `llama-server -t 8`; raise to compare
+function paintIso() {
+  const iso = !!self.crossOriginIsolated;
+  $('iso').innerHTML = iso
+    ? `<span class="on">YES</span> — SharedArrayBuffer available, wllama will multi-thread`
+    : `<span class="off">NO</span> — single-threaded (expect ~1/Nth the speed)`;
+  $('isoNote').textContent = iso
+    ? `${cores} logical cores detected.`
+    : `The COI service worker should reload this page once to enable isolation. If it stays NO, another service worker on this origin may be intercepting, or the page must be served over https/localhost.`;
+}
+paintIso();
+
+let wllama = null, loadedThreads = 0;
+
+async function ensureModel() {
+  const nThreads = Math.max(1, parseInt($('threads').value, 10) || cores);
+  const nCtx = Math.max(512, parseInt($('nctx').value, 10) || 4096);
+  const flash = $('flash').checked;
+  const kvq8 = $('kvq8').checked;
+  if (wllama && loadedThreads === nThreads) return wllama;
+  if (wllama) { try { await wllama.exit(); } catch (_) {} wllama = null; }
+
+  set('status', 'loading model (first run downloads ~0.5 GB)…');
+  const inst = new Wllama({ default: WASM_URL });
+  const opts = {
+    n_threads: nThreads,
+    n_ctx: nCtx,
+    n_gpu_layers: 0,                 // CPU only — never offload to a GPU
+    flash_attn: flash,
+    progressCallback: ({ loaded, total }) => {
+      if (total) set('status', `downloading ${(100 * loaded / total).toFixed(0)}% (${(loaded / 1e6).toFixed(0)}/${(total / 1e6).toFixed(0)} MB)`);
+    },
+  };
+  if (kvq8) { opts.cache_type_k = 'q8_0'; opts.cache_type_v = 'q8_0'; }
+  await inst.loadModelFromUrl(MODEL_URL, opts);
+  wllama = inst; loadedThreads = nThreads;
+  return inst;
+}
+
+$('go').addEventListener('click', async () => {
+  $('go').disabled = true;
+  set('out', ''); set('sPrefill', '—'); set('sDecode', '…'); set('sMeta', '');
+  try {
+    const inst = await ensureModel();
+    set('status', 'generating…');
+    const maxTokens = Math.max(1, parseInt($('maxtok').value, 10) || 128);
+    const prompt = $('prompt').value;
+
+    let nTok = 0, tStart = performance.now(), tFirst = 0;
+    await inst.createChatCompletion(
+      [{ role: 'user', content: prompt }],
+      {
+        nPredict: maxTokens,
+        useCache: true,
+        onNewToken: (token, piece, currentText) => {
+          if (nTok === 0) tFirst = performance.now();   // timer starts at first token (prefill excluded)
+          nTok++;
+          $('out').textContent = currentText;
+        },
+      },
+    );
+    const tEnd = performance.now();
+    const prefillMs = tFirst - tStart;
+    const decodeTokps = nTok > 1 ? (nTok - 1) / ((tEnd - tFirst) / 1000) : 0;
+    set('sPrefill', `${prefillMs.toFixed(0)} ms`);
+    set('sDecode', `${decodeTokps.toFixed(1)} tok/s`);
+    set('sMeta', `(${nTok} tokens · ${loadedThreads} threads · isolated=${!!self.crossOriginIsolated})`);
+    set('status', 'done');
+  } catch (e) {
+    set('status', 'error: ' + ((e && e.message) || e));
+    set('sDecode', '—');
+    console.error(e);
+  } finally {
+    $('go').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
