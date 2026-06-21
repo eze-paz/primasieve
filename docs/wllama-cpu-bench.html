@@ -31,8 +31,8 @@
 </style>
 </head>
 <body>
-<h1>wllama CPU benchmark — Qwen3.5-0.8B Q4_K_M</h1>
-<p class="sub">Pure-CPU llama.cpp (ggml) compiled to WebAssembly, running entirely in this tab. Measures how close in-browser CPU gets to native <code>llama-server -ngl 0</code>. No GPU, no WebGPU.</p>
+<h1>wllama benchmark — Qwen3.5-0.8B Q4_K_M</h1>
+<p class="sub">llama.cpp (ggml) in WebAssembly, running entirely in this tab. <b>GPU layers = 0</b> → pure CPU (vs native <code>llama-server -ngl 0</code>). <b>GPU layers = 99</b> → offload to WebGPU via llama.cpp's GPU backend — exactly what the official ngxson/wllama demo does by default. Flip the toggle to compare both on your hardware.</p>
 
 <div class="panel iso">
   Cross-origin isolated (multi-thread enabled): <span id="iso">checking…</span>
@@ -41,11 +41,15 @@
 
 <div class="panel">
   <div class="row">
+    <label title="0 = CPU only. 99 = offload all layers to WebGPU, exactly what the official demo does by default.">GPU layers <input id="ngl" type="number" min="0" max="999" value="0" style="width:4rem"> <span class="dim">(0=CPU · 99=WebGPU like the demo)</span></label>
+  </div>
+  <div class="row">
     <label>threads <input id="threads" type="number" min="1" max="32" style="width:4rem"></label>
+    <label>n_batch <input id="nbatch" type="number" min="1" step="1" value="128" style="width:4.5rem"></label>
     <label>n_ctx <input id="nctx" type="number" min="512" step="512" value="4096" style="width:5rem"></label>
     <label>max tokens <input id="maxtok" type="number" min="1" value="128" style="width:4.5rem"></label>
-    <label><input id="flash" type="checkbox" checked> flash_attn</label>
-    <label><input id="kvq8" type="checkbox" checked> KV q8_0</label>
+    <label><input id="flash" type="checkbox"> flash_attn</label>
+    <label><input id="kvq8" type="checkbox"> KV q8_0</label>
   </div>
   <textarea id="prompt" rows="2">Explain what a service worker is, in two sentences.</textarea>
   <div class="row" style="margin-top:.5rem;">
@@ -79,7 +83,7 @@ const set = (id, t) => { $(id).textContent = t; };
 
 // ---- isolation / thread status ----
 const cores = navigator.hardwareConcurrency || 4;
-$('threads').value = Math.min(cores, 8);   // match a typical `llama-server -t 8`; raise to compare
+$('threads').value = cores;   // the demo uses all cores (n_threads:-1); lower it to compare
 function paintIso() {
   const iso = !!self.crossOriginIsolated;
   $('iso').innerHTML = iso
@@ -91,14 +95,17 @@ function paintIso() {
 }
 paintIso();
 
-let wllama = null, loadedThreads = 0;
+let wllama = null, loadedKey = '';
 
 async function ensureModel() {
   const nThreads = Math.max(1, parseInt($('threads').value, 10) || cores);
   const nCtx = Math.max(512, parseInt($('nctx').value, 10) || 4096);
+  const nBatch = Math.max(1, parseInt($('nbatch').value, 10) || 128);
+  const nGpuLayers = Math.max(0, parseInt($('ngl').value, 10) || 0);   // 0=CPU, 99=WebGPU offload (the demo's default)
   const flash = $('flash').checked;
   const kvq8 = $('kvq8').checked;
-  if (wllama && loadedThreads === nThreads) return wllama;
+  const key = [nThreads, nCtx, nBatch, nGpuLayers, flash, kvq8].join('|');
+  if (wllama && loadedKey === key) return wllama;
   if (wllama) { try { await wllama.exit(); } catch (_) {} wllama = null; }
 
   set('status', 'loading model (first run downloads ~0.5 GB)…');
@@ -106,7 +113,8 @@ async function ensureModel() {
   const opts = {
     n_threads: nThreads,
     n_ctx: nCtx,
-    n_gpu_layers: 0,                 // CPU only — never offload to a GPU
+    n_batch: nBatch,
+    n_gpu_layers: nGpuLayers,        // 0 = CPU only; >0 offloads to WebGPU (llama.cpp's GPU backend)
     flash_attn: flash,
     progressCallback: ({ loaded, total }) => {
       if (total) set('status', `downloading ${(100 * loaded / total).toFixed(0)}% (${(loaded / 1e6).toFixed(0)}/${(total / 1e6).toFixed(0)} MB)`);
@@ -114,7 +122,7 @@ async function ensureModel() {
   };
   if (kvq8) { opts.cache_type_k = 'q8_0'; opts.cache_type_v = 'q8_0'; }
   await inst.loadModelFromUrl(MODEL_URL, opts);
-  wllama = inst; loadedThreads = nThreads;
+  wllama = inst; loadedKey = key;
   return inst;
 }
 
@@ -145,7 +153,8 @@ $('go').addEventListener('click', async () => {
     const decodeTokps = nTok > 1 ? (nTok - 1) / ((tEnd - tFirst) / 1000) : 0;
     set('sPrefill', `${prefillMs.toFixed(0)} ms`);
     set('sDecode', `${decodeTokps.toFixed(1)} tok/s`);
-    set('sMeta', `(${nTok} tokens · ${loadedThreads} threads · isolated=${!!self.crossOriginIsolated})`);
+    const ngl = Math.max(0, parseInt($('ngl').value, 10) || 0);
+    set('sMeta', `(${nTok} tokens · ${ngl > 0 ? 'WebGPU offload (' + ngl + ' layers)' : $('threads').value + ' CPU threads'} · isolated=${!!self.crossOriginIsolated})`);
     set('status', 'done');
   } catch (e) {
     set('status', 'error: ' + ((e && e.message) || e));
