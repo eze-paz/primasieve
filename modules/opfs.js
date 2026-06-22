@@ -153,8 +153,7 @@ opfs.getFolderSize = async function(path) {
     total += state[k].size || 0;
   }
   try {
-    for (const f of await opfs.list(path)) {
-      const full = (path ? path + '/' : '') + f;
+    for (const full of await opfs.list(path)) {   // opfs.list already returns full paths
       if (!state[full]) {
         try {
           const parts = full.split('/').filter(Boolean);
@@ -208,6 +207,13 @@ opfs.showContextMenu = function(x, y, items) {
   menu.className = 'ctx-menu';
   menu.setAttribute('data-chrome', '');
   for (const item of items) {
+    if (item.info) {                 // non-clickable display row (e.g. folder size)
+      const info = document.createElement('div');
+      info.className = 'ctx-info';
+      info.textContent = item.label;
+      menu.appendChild(info);
+      continue;
+    }
     const btn = document.createElement('button');
     btn.textContent = item.label;
     if (item.danger) btn.className = 'danger';
@@ -222,6 +228,7 @@ opfs.showContextMenu = function(x, y, items) {
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';
   _activeCtxMenu = menu;
+  return menu;
 };
 
 
@@ -793,6 +800,9 @@ opfs.refreshFileList = async function() {
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
+      // For folders, show the (recursively summed) size at the top — computed on
+      // demand here so navigating the list never pays for the subtree walk.
+      if (it.kind === 'folder') menuItems.push({ info: true, label: 'Size: …' });
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
       if (!ro) {
         menuItems.push({ label: 'Upload files', action: () => opfs.promptUpload(opfsCurrentPath()) });
@@ -810,7 +820,13 @@ opfs.refreshFileList = async function() {
           await opfs.refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
       }});
-      opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
+      const menu = opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
+      if (it.kind === 'folder') {
+        const infoEl = menu.querySelector('.ctx-info');
+        opfs.getFolderSize(it.fullKey).then((sz) => {
+          if (infoEl && infoEl.isConnected) infoEl.textContent = 'Size: ' + (opfs.formatSize(sz) || '0B');
+        }).catch(() => { if (infoEl && infoEl.isConnected) infoEl.textContent = 'Size: —'; });
+      }
     });
     frag.appendChild(li);
   };
@@ -822,22 +838,25 @@ opfs.refreshFileList = async function() {
     const remote = remoteMap.get(name);
     const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
     const fullKey = opfsJoin(path, name);
-    let status = 'synced';
-    if (kind === 'folder') {
-      status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
-    } else if (!local) {
-      status = 'cloud';
-    } else if (!remote) {
-      status = 'local';
-    } else {
-      const s = state[fullKey];
-      const lastMod = await opfs.lastModified(fullKey);
-      status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
-    }
-    items.push({ name, kind, status, fullKey });
+    items.push({ name, kind, fullKey, local, remote });
   }
+  // Resolve per-item status + size concurrently. Folders show NO inline size
+  // (Windows-Explorer style — folder size is computed on demand from the
+  // right-click menu) so we never trigger the recursive subtree walk here.
+  // Files: lastModified (status) and getFileSize run in parallel across items.
   await Promise.all(items.map(async (it) => {
-    it.size = it.kind === 'folder' ? await opfs.getFolderSize(it.fullKey) : await opfs.getFileSize(it.fullKey);
+    const { local, remote, fullKey, kind } = it;
+    if (kind === 'folder') {
+      it.status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+      it.size = undefined;          // computed lazily in the folder context menu
+      return;
+    }
+    it.size = await opfs.getFileSize(fullKey);
+    if (!local) { it.status = 'cloud'; return; }
+    if (!remote) { it.status = 'local'; return; }
+    const s = state[fullKey];
+    const lastMod = await opfs.lastModified(fullKey);
+    it.status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
 
@@ -847,10 +866,10 @@ opfs.refreshFileList = async function() {
   if (path === '' && SUBS) {
     let subDirs = [];
     try { subDirs = (await opfs.listDir(SUBS)).filter(e => e.kind === 'directory'); } catch {}
-    subItems = await Promise.all(subDirs.map(async (e) => {
+    subItems = subDirs.map((e) => {
       const fullKey = SUBS + '/' + e.name;
-      return { name: e.name, kind: 'folder', status: 'synced', fullKey, size: await opfs.getFolderSize(fullKey) };
-    }));
+      return { name: e.name, kind: 'folder', status: 'synced', fullKey, size: undefined };
+    });
     subItems.sort((a, b) => a.name.localeCompare(b.name));
   }
 
