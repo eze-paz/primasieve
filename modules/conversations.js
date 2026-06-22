@@ -262,13 +262,6 @@ async function listConversations() {
   }
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
-function refreshNewChatButton() {
-  const btn = $('newChatBtn');
-  if (!btn) return;
-  const empty = messages.length === 0;
-  btn.disabled = empty;
-  btn.title = empty ? "Already a fresh chat — just start typing below." : '';
-}
 let archivedExpanded = false;
 async function updateConvFile(id, patch) {
   let data;
@@ -431,7 +424,6 @@ function buildConvLi(c, idx) {
   return li;
 }
 async function refreshConversationList() {
-  refreshNewChatButton();
   const ul = $('convList');
   if (!ul) return;
   let list = await listConversations();
@@ -2014,7 +2006,6 @@ window.mountConv = mountConv;
 window.loadConv = loadConv;
 window.newConversation = newConversation;
 window.listConversations = listConversations;
-window.refreshNewChatButton = refreshNewChatButton;
 window.updateConvFile = updateConvFile;
 window.renameConv = renameConv;
 window.togglePinConv = togglePinConv;
@@ -2218,7 +2209,6 @@ export {
   loadConv,
   newConversation,
   listConversations,
-  refreshNewChatButton,
   updateConvFile,
   renameConv,
   togglePinConv,
