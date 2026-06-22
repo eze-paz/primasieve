@@ -219,11 +219,16 @@ async function ensureDefaults() {
 // ---- direct (non-streaming) completion — never the SW conversation stream --
 async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {}) {
   const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  // Local (WebGPU) provider: run the completion IN-BROWSER on the dense Qwen3 engine. Its
-  // "endpoint" is a model-variant id, not an OpenAI server — never POST <variant>/chat/completions.
-  // (DeltaNet hybrid Qwen3.5 disabled — unusably slow GPU prefill; see conversations.js.)
+  // Local (WebGPU Qwen3.5) provider: run the completion IN-BROWSER. Its "endpoint"
+  // is a model-variant id, not an OpenAI server — never POST <variant>/chat/completions.
+  // runConversation is the only entry point; drive it with no tools and collect the
+  // streamed content deltas into a single string.
   if (active && active.type === 'webgpu') {
-    const eng = (typeof SandpieQwen3 !== 'undefined') ? SandpieQwen3 : null;
+    // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a utility
+    // prompt doesn't load the other model. Match the active model id against the dense set.
+    const isDense = typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
+      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === active.endpoint);
+    const eng = isDense ? SandpieQwen3 : (typeof SandpieQwen35 !== 'undefined' ? SandpieQwen35 : null);
     if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
     let out = '';
     await eng.runConversation({
