@@ -110,11 +110,13 @@ function _wireProviderPanel() {
   }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
-  // WebGPU model list = dense Qwen3 (fast prefill, no DeltaNet) + hybrid Qwen3.5 (better
-  // long-context). Both engines emit the same protocol; conversations.js routes by model id.
+  // WebGPU model list = dense Qwen3 only (fast parallel prefill). The hybrid Qwen3.5
+  // (gated-DeltaNet) models are DISABLED: the serial DeltaNet scan makes prefill unusably
+  // slow on GPU (~minute for a 2.5k-tok prompt). To re-enable, uncomment the SandpieQwen35
+  // spread below (+ the routing in conversations.js / agents.js + the <script> in sandpie.html).
   const _wgModels = () => [
     ...((typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS) ? SandpieQwen3.DEFAULT_MODELS : []),
-    ...((typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.DEFAULT_MODELS) ? SandpieQwen35.DEFAULT_MODELS : []),
+    // ...((typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.DEFAULT_MODELS) ? SandpieQwen35.DEFAULT_MODELS : []),
   ];
   const wgSel = document.getElementById('spWebGPUModel');
   if (wgSel && !wgSel._spBound) {

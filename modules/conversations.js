@@ -714,23 +714,22 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
-    // Route the WebGPU model to its engine: dense Qwen3 (fast prefill, no DeltaNet) vs the
-    // hybrid Qwen3.5. Both run the agent loop on the PAGE and emit the same event protocol,
-    // so `dispatch` + the renderer + the lifecycle below are reused unchanged.
-    const _isDense = _isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
-      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
-    if (_isDense && SandpieQwen3.runConversation) {
-      try { await SandpieQwen35?.unload?.(); } catch (_) {}   // single active local model
+    // The WebGPU backend runs the dense Qwen3 engine on the PAGE (fast parallel prefill) and
+    // emits the same event protocol as the SW/API path, so `dispatch` + the renderer + the
+    // lifecycle below are reused unchanged.
+    if (_isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.runConversation) {
       await SandpieQwen3.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
-    } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
-      try { await SandpieQwen3?.unload?.(); } catch (_) {}    // single active local model
-      await SandpieQwen35.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
+    // DELTANET HYBRID (Qwen3.5) DISABLED — serial DeltaNet scan = unusably slow GPU prefill.
+    // To re-enable, restore the SandpieQwen35 model spread (providers.js), the <script> in
+    // sandpie.html, and uncomment this branch (+ the per-engine single-active unload):
+    // } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
+    //   await SandpieQwen35.runConversation(
+    //     { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+    //     dispatch,
+    //   );
     } else {
     await _swReady;
     const res = await fetch('./sandpie-agent', {
