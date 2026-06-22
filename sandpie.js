@@ -615,8 +615,20 @@ async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
   try {
-    await opfsReadBytes(clean);
-    return { result: 'image:' + clean };
+    const bytes = await opfsReadBytes(clean);
+    // Raw base64 data URL — no decode/recompress (the SW has no DOM canvas). The
+    // agent loop turns this into a user-role image_url so the cloud model can see
+    // the pixels in the same round; `image:<path>` drives the inline UI thumbnail.
+    const ext = (clean.split('.').pop() || '').toLowerCase();
+    const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+                   gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
+    let bin = '';
+    const CHUNK = 0x8000;   // chunk the encode — fromCharCode on the whole array overflows the stack
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    const dataUrl = 'data:' + mime + ';base64,' + btoa(bin);
+    return { result: 'image:' + clean, image: { path: clean, dataUrl } };
   } catch (e) {
     return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
   }
@@ -1102,6 +1114,7 @@ async function runAgent(config, ctx) {
     const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
     messages.push(asstMsg);
     ctx.emit({ type: 'message_added', message: asstMsg });
+    const loadedImages = [];   // images produced by load_image this turn (injected after all tool results)
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       
@@ -1141,8 +1154,31 @@ async function runAgent(config, ctx) {
       };
       
       messages.push(toolMsg);
-      
+
       ctx.emit({ type: 'message_added', message: toolMsg });
+
+      if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
+    }
+
+    // Tool-role messages can't carry images on OpenAI-style /chat/completions, so
+    // any image loaded this turn is threaded in as a user-role image_url block —
+    // injected AFTER all tool results so parallel tool calls stay grouped.
+    if (loadedImages.length) {
+      // Cloud-visible: real data URLs (the model sees the pixels this round and on).
+      messages.push({
+        role: 'user',
+        content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: im.dataUrl } })),
+      });
+      // Persisted form: opfs:// refs (small, re-resolved by buildAgentConfig on later
+      // turns/reloads) + a flag so the renderer skips it (the tool box shows the image).
+      ctx.emit({
+        type: 'message_added',
+        message: {
+          role: 'user',
+          _loadedImage: true,
+          content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: 'opfs://' + im.path } })),
+        },
+      });
     }
   }
   ctx.emit({ type: 'agent_done' });

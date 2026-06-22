@@ -1196,6 +1196,13 @@
     font: 11px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
     white-space: pre-wrap;
   }
+  .tool-box .tool-result-image { padding: 0.4rem 0.6rem; }
+  .tool-box .tool-image {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 4px;
+    display: block;
+  }
   .repl-loader {
     flex-shrink: 0;
     display: inline-flex;

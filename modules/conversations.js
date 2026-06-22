@@ -40,6 +40,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
 }
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
+    if (m._loadedImage) return;   // model-only image (load_image); shown in its tool-call box, not as a bubble
     bindBubble(addMsg('user', m.content, host), m);
   } else if (m.role === 'assistant') {
     const contentStr = typeof m.content === 'string' ? m.content :
@@ -77,12 +78,16 @@ function renderHistoricalMessage(m, host = null) {
     }
   } else if (m.role === 'tool') {
     const content = String(m.content || '');
-    if (!content.startsWith('artifact:') && !content.startsWith('image:')) {
+    const target = host || $('messages');
+    const toolCalls = target.querySelectorAll('.msg.tool-call');
+    if (content.startsWith('image:')) {
+      const path = content.slice('image:'.length);
+      if (path && toolCalls.length > 0) {
+        appendToolResultImage(toolCalls[toolCalls.length - 1].dataset.tcId, path);
+      }
+    } else if (!content.startsWith('artifact:')) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
-
-      const target = host || $('messages');
-      const toolCalls = target.querySelectorAll('.msg.tool-call');
       if (toolCalls.length > 0) {
         appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
       }
@@ -1087,6 +1092,45 @@ function appendToolResult(tcId, result) {
   box.appendChild(resultDiv);
 }
 
+// Render a loaded image (load_image tool) inline inside its tool-call box, in
+// place of a text result. The thumbnail is resolved from OPFS page-side.
+function appendToolResultImage(tcId, path) {
+  const toolCalls = document.querySelectorAll('.msg.tool-call');
+  let toolCallDiv = null;
+  for (const div of toolCalls) {
+    if (div.dataset.tcId === tcId) { toolCallDiv = div; break; }
+  }
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'tool-result tool-result-image';
+  const img = document.createElement('img');
+  img.alt = path;
+  img.className = 'tool-image';
+  SandpieImages.dataUrlFromPath(path).then(dataUrl => {
+    if (dataUrl) img.src = dataUrl;
+    else resultDiv.textContent = '(image not found: ' + path + ')';
+  });
+  resultDiv.appendChild(img);
+  box.appendChild(sep);
+  box.appendChild(resultDiv);
+}
+
 function buildToolBox(args, toolName) {
   let code = '';
   try {
@@ -1261,13 +1305,7 @@ class RoundRenderer {
 
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
-      if (path) {
-        SandpieImages.dataUrlFromPath(path).then(dataUrl => {
-          if (dataUrl) {
-            SandpieImages.setState({ kind: 'image', opfsPath: path, name: path.split('/').pop(), thumb: dataUrl });
-          }
-        });
-      }
+      if (path && idx >= 0 && this.toolCallEls[idx]) appendToolResultImage(tcId, path);
       return;
     }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
@@ -1987,6 +2025,7 @@ window.addMsg = addMsg;
 window.bindBubble = bindBubble;
 window.tcEscape = tcEscape;
 window.appendToolResult = appendToolResult;
+window.appendToolResultImage = appendToolResultImage;
 window.buildToolBox = buildToolBox;
 window.renderTcPreparing = renderTcPreparing;
 window.renderTcRunning = renderTcRunning;
