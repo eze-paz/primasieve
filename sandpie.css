@@ -573,6 +573,10 @@
     position: relative;
     z-index: 1;
   }
+  /* A closed <details> must hide its body. The rules above set display:flex on
+     .service-body unconditionally, which overrides the native details collapse —
+     so without this a section with no `open` attribute still renders expanded. */
+  aside details.service:not([open]) .service-body { display: none; }
   aside .status-dot {
     margin-left: auto;
     width: 8px; height: 8px;
