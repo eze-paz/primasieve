@@ -45,6 +45,9 @@ self.addEventListener('unhandledrejection', (ev) => {
   console.error('unhandled rejection:', r && (r.stack || r.message) || String(r));
 });
 
+// Dropbox context pushed from the page so tool_search_dropbox can call the API.
+let _dbxCtx = null;
+
 // Drain the boot buffer when a client connects + asks for it. The page
 // pings us with `sandpie-sw-flush-logs` on its message-handler init.
 self.addEventListener('message', async (event) => {
@@ -101,6 +104,10 @@ self.addEventListener('message', async (event) => {
       }
     });
     
+    return;
+  }
+  if (data.type === 'dbx-token') {
+    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, workingRoot: data.workingRoot || '' };
     return;
   }
 });
@@ -822,9 +829,48 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
   return { result: head + buf.replace(/\n$/, '') };
 }
 
+async function tool_search_dropbox({ query, path, filename_only }) {
+  if (!_dbxCtx) return { result: 'Error: Dropbox token not available in service worker. Connect Dropbox in Settings and reload the page.' };
+  if (!query || typeof query !== 'string' || !query.trim()) return { result: 'Error: query is required.' };
+
+  const { token, pathRoot, workingRoot } = _dbxCtx;
+  const searchPath = (typeof path === 'string' && path.trim()) ? path.trim() : (workingRoot || '');
+
+  const reqBody = {
+    query: query.trim(),
+    options: { path: searchPath, max_results: 101, file_status: 'active', filename_only: !!filename_only },
+  };
+  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
+
+  let res;
+  try {
+    res = await fetch('https://api.dropboxapi.com/2/files/search_v2', { method: 'POST', headers, body: JSON.stringify(reqBody) });
+  } catch (e) {
+    return { result: 'Error reaching Dropbox: ' + e.message };
+  }
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    return { result: 'Dropbox search failed (' + res.status + '): ' + txt.slice(0, 400) };
+  }
+
+  const data = await res.json();
+  const matches = Array.isArray(data.matches) ? data.matches : [];
+
+  if (matches.length === 0) return { result: 'No files found for "' + query + '".' };
+  if (matches.length > 100) return { result: 'Too many results (>100) for "' + query + '". Use more specific terms or restrict to a subfolder with the path parameter.' };
+
+  const paths = matches.map(m => {
+    const meta = m.metadata?.metadata || m.metadata || {};
+    return meta.path_display || meta.path_lower || '(unknown)';
+  }).sort();
+
+  return { result: matches.length + ' file(s) found for "' + query + '":\n' + paths.join('\n') };
+}
+
 // Names runTool actually dispatches. Keep in sync with the switch below.
 const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file',
-                     'list_files','search','show_artifact','load_skill','load_image'];
+                     'list_files','search','search_dropbox','show_artifact','load_skill','load_image'];
 
 // A call to a tool that doesn't exist. Return a factual, generic correction so
 // the model can self-correct next round: if the name is actually a skill, point
@@ -849,7 +895,8 @@ async function runTool(name, args, ctx) {
     case 'load_skill':    return tool_load_skill(args, ctx);
     case 'read_file':     return tool_read_file(args, ctx);
     case 'list_files':    return tool_list_files(args, ctx);
-    case 'search':        return tool_search(args, ctx);
+    case 'search':          return tool_search(args, ctx);
+    case 'search_dropbox':  return tool_search_dropbox(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);   // ← add
     case 'edit_file':     return tool_edit_file(args, ctx);    // ← add
     default:              return unknownTool(name);

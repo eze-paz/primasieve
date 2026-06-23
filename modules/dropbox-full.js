@@ -90,6 +90,7 @@
     stored.access_token = data.access_token;
     stored.expires_at = Date.now() + data.expires_in * 1000;
     localStorage.setItem(TOKENS_KEY, JSON.stringify(stored));
+    pushDbxTokenToSW();
     return data.access_token;
   }
   // On a team space we operate relative to the team-space ROOT namespace so team
@@ -750,8 +751,22 @@
     if (changed) setSyncState(st);
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
+  function pushDbxTokenToSW() {
+    const ctrl = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!ctrl) return;
+    const t = tokens();
+    if (!t) return;
+    ctrl.postMessage({
+      type: 'dbx-token',
+      token: t.access_token,
+      pathRoot: localStorage.getItem(NS_KEY) || null,
+      workingRoot: localStorage.getItem(ROOT_KEY) || '',
+    });
+  }
   function wireServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.addEventListener('controllerchange', () => pushDbxTokenToSW());
+    pushDbxTokenToSW();
     navigator.serviceWorker.addEventListener('message', (ev) => {
       const d = ev.data; if (!d) return;
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {

@@ -85,6 +85,24 @@ edit_file: {
       required: ['pattern'],
     },
   },
+  search_dropbox: {
+    description: `Search for files in the user's Dropbox by keyword using Dropbox search_v2 (full-text content search).
+Rules:
+- If the result count is >100, you MUST refine the query (more specific terms or a narrower path) before proceeding — do NOT try to read all matches.
+- If ≤100 results, list the matching paths; use read_file on whichever files are relevant.
+- Dropbox search is token/prefix-based, NOT substring or regex — use whole words for best recall.
+- Results are eventually consistent: newly created or edited files may not appear immediately.
+- Set filename_only:true to match only file names (faster, less noise); omit it (default false) to also match file content.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query:         { type: 'string',  description: 'Search query. Use whole words; Dropbox does prefix-token matching.' },
+        path:          { type: 'string',  description: 'Optional Dropbox folder path to restrict the search (e.g. "/R+D+I/reports"). Defaults to the user\'s working sync folder.' },
+        filename_only: { type: 'boolean', description: 'Search file names only (default false = also search file content).' },
+      },
+      required: ['query'],
+    },
+  },
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
 Use this whenever:
