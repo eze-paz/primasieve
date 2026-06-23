@@ -963,8 +963,11 @@
   let _migrationChecked = false;
   async function dbxMeta(path, pathRoot) {
     // Metadata, or null if absent. Rethrows other errors so the caller can abort.
+    // not_found ⇒ absent here. malformed_path ⇒ this path is invalid in THIS
+    // namespace (e.g. an /Apps/ virtual path probed under the team path-root) —
+    // treat as absent so the caller can fall through to the home namespace.
     try { return await api('/2/files/get_metadata', { path }, { pathRoot }); }
-    catch (e) { if (/not_found/.test(String(e && e.message))) return null; throw e; }
+    catch (e) { if (/not_found|malformed_path/.test(String(e && e.message))) return null; throw e; }
   }
   async function findOldRoot() {
     // /Apps/AI_Sandbox, but under a team space it sits beneath the member's folder
