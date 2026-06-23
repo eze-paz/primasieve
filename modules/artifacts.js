@@ -111,11 +111,20 @@ function renderArtifact(host, path) {
     btns.appendChild(panelBtn);
 
     const openLink = document.createElement('a');
-    openLink.href = 'opfs/' + clean;
+    openLink.href = '#';
     openLink.target = '_blank';
     openLink.title = 'Open in new tab';
     openLink.textContent = '↗';
     openLink.className = 'artifact-icon-btn';
+    openLink.onclick = async (e) => {
+      e.preventDefault();
+      try {
+        const url = await opfs.toUrl(clean);
+        const win = window.open(url, '_blank');
+        // Revoke after a minute — enough for the new tab to finish loading.
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) { console.error('[artifact] open in tab failed:', err); }
+    };
     btns.appendChild(openLink);
   }
 
@@ -123,14 +132,19 @@ function renderArtifact(host, path) {
   dlBtn.title = 'Download';
   dlBtn.textContent = '⬇';
   dlBtn.className = 'artifact-icon-btn';
-  dlBtn.onclick = () => {
-    const a = document.createElement('a');
-    a.href = 'opfs/' + clean + '?download=1';
-    a.download = clean.split('/').pop();
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    requestAnimationFrame(() => a.remove());
+  dlBtn.onclick = async () => {
+    try {
+      const bytes = await opfs.readBytes(clean);
+      const ext2 = clean.split('.').pop().toLowerCase();
+      const mime = ({html:'text/html',htm:'text/html',svg:'image/svg+xml',png:'image/png',
+        jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',
+        csv:'text/csv',json:'application/json',txt:'text/plain'})[ext2] || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url; a.download = clean.split('/').pop(); a.style.display = 'none';
+      document.body.appendChild(a); a.click();
+      requestAnimationFrame(() => { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
+    } catch (e) { console.error('[artifact] download failed:', e); }
   };
   btns.appendChild(dlBtn);
 
@@ -192,14 +206,19 @@ function renderArtifact(host, path) {
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
-  frame.src = 'opfs/' + clean;
-  frame.addEventListener('load', () => {
-    fetch('opfs/' + clean, { method: 'HEAD' }).then(r => {
-      if (!r.ok) showArtifactError(wrap, frame, '404 — file not found: ' + clean);
-    }).catch(() => {});
-  });
   wrap.appendChild(frame);
   target.appendChild(wrap);
+  // Load async: read from OPFS, create blob URL, revoke old one on refresh.
+  (async () => {
+    try {
+      const url = await opfs.toUrl(clean);
+      if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
+      frame._blobUrl = url;
+      frame.src = url;
+    } catch (e) {
+      showArtifactError(wrap, frame, 'failed to load: ' + clean + ' — ' + (e && e.message || e));
+    }
+  })();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -242,13 +261,17 @@ function collapseArtifact(wrap) {
     const info = metaRow.querySelector('.artifact-meta-info');
     if (info) {
       const age = ts ? ' · ' + formatArtifactAge(ts) : '';
-      fetch('opfs/' + path, { method: 'HEAD' }).then(r => {
-        const len = r.headers.get('content-length');
-        const size = len ? ' · ' + formatArtifactBytes(parseInt(len, 10)) : '';
-        if (info) info.textContent = path.split('/').pop() + size + age;
-      }).catch(() => {
-        if (info) info.textContent = path.split('/').pop() + age;
-      });
+      (async () => {
+        try {
+          const { parts, name } = splitPath(path);
+          const dir = await opfs.resolveDir(parts);
+          const file = await (await dir.getFileHandle(name)).getFile();
+          const size = file.size > 0 ? ' · ' + formatArtifactBytes(file.size) : '';
+          if (info) info.textContent = path.split('/').pop() + size + age;
+        } catch {
+          if (info) info.textContent = path.split('/').pop() + age;
+        }
+      })();
     }
   }
 }

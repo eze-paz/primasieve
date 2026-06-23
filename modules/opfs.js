@@ -489,7 +489,7 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
       const f = document.createElement('iframe');
       f.className = 'fv-frame';
       f.setAttribute('data-chrome', '');
-      f.src = 'opfs/' + fullKey;   // served live by the SW (scripts run)
+      opfs.toUrl(fullKey).then(url => { f.src = url; }).catch(() => {});
       f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff;';
       body.appendChild(f);
     } else {
@@ -665,6 +665,39 @@ opfs.createFile = async function() {
 // (attach button, drag-and-drop, programmatic writes) routes through here. The
 // SW only live-syncs once Pyodide has booted; before that the file is already in
 // OPFS and gets picked up when the /files mount populates. The sidebar refresh
+// Serve an OPFS file as a blob URL — replaces the /opfs/ SW fetch intercept.
+// HTML files get the postMessage resize script injected so artifact iframes
+// auto-size. Call URL.revokeObjectURL() on the returned URL when done.
+opfs.toUrl = async function(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  const ext = (clean.split('.').pop() || '').toLowerCase();
+  const mimeMap = {
+    html:'text/html', htm:'text/html', svg:'image/svg+xml',
+    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+    gif:'image/gif', webp:'image/webp', csv:'text/csv',
+    json:'application/json', txt:'text/plain',
+  };
+  const mime = mimeMap[ext] || 'application/octet-stream';
+  const bytes = await this.readBytes(clean);
+  if (ext === 'html' || ext === 'htm') {
+    let text = new TextDecoder().decode(bytes);
+    const script = `<script>(function(){` +
+      `function report(){var h=Math.max(document.body?document.body.scrollHeight:0,` +
+      `document.documentElement?document.documentElement.scrollHeight:0,100);` +
+      `parent.postMessage({type:'sandpie-artifact-resize',h:h},'*');}` +
+      `var ro=new ResizeObserver(function(){requestAnimationFrame(report);});` +
+      `if(document.body)ro.observe(document.body);` +
+      `if(document.documentElement)ro.observe(document.documentElement);` +
+      `window.addEventListener('load',report);` +
+      `setTimeout(report,50);setTimeout(report,300);` +
+      `})();<\/script>`;
+    if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, script + '</body>');
+    else text += script;
+    return URL.createObjectURL(new Blob([text], { type: 'text/html' }));
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+};
+
 // is debounced so a multi-file drop refreshes the list just once.
 let _notifyRefreshT = null;
 opfs.notifyUpload = function(path) {
