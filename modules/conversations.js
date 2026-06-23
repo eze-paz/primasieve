@@ -652,10 +652,12 @@ async function sendSingle(text, stream, opts = {}) {
     try { SandpieProviders.ensureUsable(); } catch (_) {}
   }
   const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+  const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
   const _isWebGPU = !!(_active && _active.type === 'webgpu');
-  const _isLocal = _isWebGPU;   // the WebGPU (Qwen3.5) engine is the only in-browser backend
+  const _isLocal = _isLiteRTLM || _isWebGPU;
   if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
     addMsg('err',
+      _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
       _isWebGPU ? 'Pick a WebGPU (Qwen3.5) model in Settings before sending.' :
       'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
@@ -719,6 +721,14 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
+    if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
+      // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
+      try { await SandpieQwen35?.unload?.(); await SandpieQwen3?.unload?.(); } catch (_) {}
+      await SandpieLiteRTLM.runConversation(
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+        dispatch,
+      );
+    } else {
     // Route the WebGPU model to its engine: dense Qwen3 (fast prefill, no DeltaNet) vs the
     // hybrid Qwen3.5. Both run the agent loop on the PAGE and emit the same event protocol,
     // so `dispatch` + the renderer + the lifecycle below are reused unchanged.
@@ -761,7 +771,8 @@ async function sendSingle(text, stream, opts = {}) {
         host,
       );
     }
-    }
+    }   // end inner cloud else
+    }   // end outer else (litertlm not active)
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
       wasAborted = true;

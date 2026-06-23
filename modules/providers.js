@@ -30,8 +30,10 @@ const AI_HTML = `
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
         <select id="spType">
           <option value="openai">API (OpenAI-compatible)</option>
+          <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
           <option value="webgpu">Local model (WebGPU Qwen3.5, in-browser)</option>
         </select>
+        <select id="spLiteRTLMModel" style="display:none;"></select>
         <select id="spWebGPUModel" style="display:none;"></select>
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
@@ -51,15 +53,15 @@ const AI_HTML = `
       <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
       <div id="localCacheSection" style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); display:flex; flex-direction:column; gap:0.4rem;">
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local model storage</div>
-        <div style="font-size:0.72rem; color:var(--sp-text-dim);">The in-browser WebGPU model is cached on this device. Clearing frees the space; it re-downloads next time you use it.</div>
+        <div style="font-size:0.72rem; color:var(--sp-text-dim);">In-browser models (LiteRT-LM / WebGPU) are cached on this device. Clearing frees the space; they re-download next time you use them.</div>
         <button class="ghost" type="button" id="spClearModelCache">Clear cached local models</button>
         <div id="spClearCacheStatus" style="font-size:0.7rem; color:var(--sp-text-dim);"></div>
       </div>
     `;
 
-// Clear the cached in-browser WebGPU model. Its weights live in OPFS (the quantized
-// q4 cache + any lingering source safetensors). Unload the resident model first so
-// the freed space isn't immediately re-held by the running engine.
+// Clear all cached in-browser model files. LiteRT-LM bytes live in Cache Storage
+// ('sandpie-litertlm-models'); WebGPU model files live in OPFS. Unload any resident
+// model first so the freed space isn't immediately re-held by the running engine.
 async function clearLocalModelCaches() {
   const btn = document.getElementById('spClearModelCache');
   const status = document.getElementById('spClearCacheStatus');
@@ -68,15 +70,21 @@ async function clearLocalModelCaches() {
   if (btn) btn.disabled = true;
   setStatus('Clearing…');
   try {
+    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
+    try { await window.SandpieQwen35?.unload?.(); await window.SandpieQwen35?.clearCache?.(); } catch (_) {}
     let before = 0, after = 0;
     try { before = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
     let deleted = 0;
-    // WebGPU Qwen3.5 stores its model files in OPFS (not Cache Storage).
-    try { await window.SandpieQwen35?.unload?.(); if (await window.SandpieQwen35?.clearCache?.()) deleted++; } catch (_) {}
+    // LiteRT-LM uses Cache Storage; WebGPU OPFS cleared above.
+    if (typeof caches !== 'undefined') {
+      const names = await caches.keys();
+      const target = names.filter(n => n === 'sandpie-litertlm-models');
+      for (const n of target) { try { if (await caches.delete(n)) deleted++; } catch (_) {} }
+    }
     try { after = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
     const freedMB = Math.max(0, before - after) / (1024 * 1024);
     setStatus(deleted
-      ? `Cleared the cached local model${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
+      ? `Cleared ${deleted} model cache${deleted > 1 ? 's' : ''}${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
       : 'No cached local models found.');
   } catch (e) {
     setStatus('Error clearing cache: ' + ((e && e.message) || e));
@@ -110,6 +118,23 @@ function _wireProviderPanel() {
   }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
+  const lrSel = document.getElementById('spLiteRTLMModel');
+  if (lrSel && !lrSel._spBound) {
+    if (typeof SandpieLiteRTLM !== 'undefined' && !lrSel.options.length) {
+      lrSel.innerHTML = '<option value="">— pick a model —</option>'
+        + SandpieLiteRTLM.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
+        + '<option value="__custom">Custom .litertlm URL…</option>';
+    }
+    lrSel.addEventListener('change', () => {
+      const v = lrSel.value;
+      if (!v || v === '__custom') return;
+      const m = (typeof SandpieLiteRTLM !== 'undefined') ? SandpieLiteRTLM.DEFAULT_MODELS.find(x => x.modelId === v) : null;
+      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
+      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
+      commitForm();
+    });
+    lrSel._spBound = true;
+  }
   // WebGPU model list = dense Qwen3 (fast prefill, no DeltaNet) + hybrid Qwen3.5 (better
   // long-context). Both engines emit the same protocol; conversations.js routes by model id.
   const _wgModels = () => [
@@ -205,7 +230,9 @@ function applyActiveProvider() {
   // provider, eagerly free both GPU contexts (no-op if not loaded). The active-engine swap
   // between the two webgpu models is handled in conversations.js (single active local model).
   try {
-    if (!(p && p.type === 'webgpu')) { window.SandpieQwen35?.unload?.(); window.SandpieQwen3?.unload?.(); }
+    const _t = p && p.type;
+    if (_t !== 'litertlm') window.SandpieLiteRTLM?.unload?.();
+    if (_t !== 'webgpu') { window.SandpieQwen35?.unload?.(); window.SandpieQwen3?.unload?.(); }
   } catch (_) {}
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');
@@ -389,6 +416,8 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spReasoningEffort', p.reasoningEffort);
   set('spType', p.type || 'openai');
+  const lr = document.getElementById('spLiteRTLMModel');
+  if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
   const wg = document.getElementById('spWebGPUModel');
   if (wg) wg.value = (p.type === 'webgpu' && p.endpoint) ? p.endpoint : '';
   applyTypeUI();
@@ -397,22 +426,38 @@ function loadFormFor(id) {
 // Show/hide provider fields based on the selected backend type.
 function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
+  const litertlm = type === 'litertlm';
   const webgpu = type === 'webgpu';
-  const local = webgpu;   // WebGPU Qwen3.5 is the only local backend
+  const local = litertlm || webgpu;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('spLiteRTLMModel', litertlm);
   show('spWebGPUModel', webgpu);
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
-  // WebGPU Qwen3.5 exposes no tunable params: fixed context (MAX_SEQ), built-in
-  // sampling defaults, and it always emits <think> (auto-split to the Thinking box).
-  // Cloud (non-local) keeps the generic context/maxTokens/temperature knobs.
+  // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: no params (fixed ctx).
   show('spContextWindow', !webgpu);
   show('spTemperature', !local);
+  // Reasoning select: only LiteRT-LM exposes a Gemma thinking toggle.
+  let rsn = document.getElementById('spReasoning');
+  if (!rsn && litertlm) {
+    // Lazily inject the reasoning select after the context window field if not present.
+    const cw = document.getElementById('spContextWindow');
+    if (cw && cw.parentNode) {
+      rsn = document.createElement('select');
+      rsn.id = 'spReasoning';
+      rsn.innerHTML = '<option value="auto">Thinking: auto (model default)</option>'
+        + '<option value="think">Thinking: on</option>'
+        + '<option value="no_think">Thinking: off</option>';
+      rsn.addEventListener('change', commitForm);
+      cw.parentNode.insertBefore(rsn, cw.nextSibling);
+    }
+  }
+  if (rsn) rsn.style.display = litertlm ? '' : 'none';
   const ep = document.getElementById('spEndpoint');
-  if (ep) ep.placeholder = local ? 'Model ID (picker above; gated models need HF token)' : 'Base URL (e.g. https://api.openai.com/v1)';
+  if (ep) ep.placeholder = local ? 'Model ID (picker above)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
-  if (cw) cw.placeholder = local ? 'Context window (n_ctx, default 8192)' : 'Context window (e.g. 128000)';
+  if (cw) cw.placeholder = litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)';
 }
 
 // Commit form edits to the active provider (auto-save on field change/blur).
@@ -431,6 +476,7 @@ function commitForm() {
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
+  const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();
   applyActiveProvider();
   renderChips();   // reflect a renamed chip / active highlight
@@ -527,7 +573,9 @@ function updateRoutingHint() {
   const remote = (document.getElementById('proxyUrl')?.value || '').trim();
   const hint = document.getElementById('routingHint');
   if (!hint) return;
-  if (active?.type === 'webgpu') {
+  if (active?.type === 'litertlm') {
+    hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'Gemma');
+  } else if (active?.type === 'webgpu') {
     hint.textContent = 'In-browser WebGPU · ' + (active.model || 'Qwen3.5');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
@@ -541,7 +589,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'webgpu');
+  const local = (active?.type === 'litertlm' || active?.type === 'webgpu');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
