@@ -1413,7 +1413,7 @@ class RoundRenderer {
     }
   }
   _scheduleDrain() {
-    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), this.isLocal ? 100 : 16);
+    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
   }
   _drainTick() {
     this.drainTimer = null;
@@ -1423,11 +1423,18 @@ class RoundRenderer {
     const stick = shouldAutoScroll(scrollHost);
 
     if (this.pending.length > 0) {
-      const n = Math.max(1, Math.ceil(this.pending.length / 30));
-      this.displayed += this.pending.slice(0, n);
-      this.pending = this.pending.slice(n);
+      if (this.isLocal) {
+        // Local inference: tokens arrive steadily one-by-one, no burst — show all at once.
+        // The /30 trickle was designed for bursty cloud streams; here it just delays display.
+        this.displayed += this.pending;
+        this.pending = '';
+      } else {
+        const n = Math.max(1, Math.ceil(this.pending.length / 30));
+        this.displayed += this.pending.slice(0, n);
+        this.pending = this.pending.slice(n);
+        if (this.pending.length > 0) anyPending = true;
+      }
       this._paintContent();
-      if (this.pending.length > 0) anyPending = true;
     }
 
     for (let i = 0; i < this.toolPending.length; i++) {
