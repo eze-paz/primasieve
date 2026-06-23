@@ -48,10 +48,17 @@ self.addEventListener('unhandledrejection', (ev) => {
 // Dropbox context pushed from the page so tool_search_dropbox can call the API.
 let _dbxCtx = null;
 
+// Dehydrated-Dropbox state (opt-in JIT hydration). When on, the page stops
+// bulk-downloading and pushes the cloud INDEX here; files are fetched lazily on
+// first touch. See the hydration helpers further down. Default off ⇒ no change.
+let _dehydrated = false;
+let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
+let _dbxExempt = ['_conversations', 'skills', 'agents'];   // always eager — the app reads these directly
+
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.0.0-web-worker';
+const WORKER_VERSION = '2.1.0-dehydrated';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -66,6 +73,13 @@ self.addEventListener('message', async (event) => {
 
   if (data.type === 'dbx-token') {
     _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, workingRoot: data.workingRoot || '' };
+    _dehydrated = !!data.dehydrated;
+    return;
+  }
+
+  if (data.type === 'dbx-index') {
+    _dbxIndex = data.index || null;
+    if (Array.isArray(data.exempt) && data.exempt.length) _dbxExempt = data.exempt;
     return;
   }
 
@@ -180,6 +194,7 @@ async function initPyodide() {
         _nativefs = await p.mountNativeFS('/files', opfsRootDir);
         p.runPython('import os; os.chdir("/files")');
         p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
+        try { p.runPython(_HYDRATE_AUDIT_PY); } catch (e) { console.warn('[sandpie-worker] hydrate audit hook install failed:', e); }
         console.log('[sandpie-worker] OPFS mounted at /files (cwd); FS tracking installed');
       } catch (e) {
         _nativefs = null;
@@ -246,6 +261,160 @@ async function opfsWriteBytes(path, bytes) {
   await w.write(bytes);
   await w.close();
 }
+
+// ============================================================
+// Dehydrated Dropbox — opt-in JIT hydration
+// ============================================================
+// When "on-demand file access" is on, the page pushes the cloud index here and
+// stops bulk-downloading. Files fault in on first touch: ASYNC for the file
+// tools (read_file/load_image/list_files), and SYNCHRONOUSLY (blocking XHR) for
+// Pyodide's read() during run_python — only possible in a Web Worker, since sync
+// XHR (and responseType on it) is forbidden on the main thread and there is no
+// SharedArrayBuffer (no cross-origin isolation in prod). _conversations/, skills/
+// and agents/ are EXEMPT and stay on the page's eager sync. Stage 1 is ephemeral:
+// hydrated files are recorded in an OPFS manifest and wiped on the next boot.
+const _hydratedSet = new Set();
+const _hydrating = new Map();         // rel -> Promise (async hydration dedupe)
+const _HYDRATED_MANIFEST = '_dehydrated_cache.json';
+
+function _relExempt(rel) {
+  const r = String(rel).replace(/^\/+/, '').toLowerCase();
+  return _dbxExempt.some(p => { const pl = String(p).toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
+}
+function _indexEntry(rel) {
+  if (!_dehydrated || !_dbxIndex) return null;
+  const r = String(rel).replace(/^\/+/, '');
+  if (!r || _relExempt(r)) return null;
+  const e = _dbxIndex[r];
+  return (e && e.kind === 'file') ? e : null;
+}
+async function _opfsGetFile(rel) {
+  const { parts, name } = splitPath(rel);
+  const dir = await opfsResolveDir(parts);
+  return (await dir.getFileHandle(name)).getFile();
+}
+function _cloudPathFor(rel, entry) {
+  if (entry && entry.path) return entry.path;
+  const root = (_dbxCtx && _dbxCtx.workingRoot) || '';
+  return root + '/' + String(rel).replace(/^\/+/, '');
+}
+function _dbxHeaders(json) {
+  const h = { Authorization: 'Bearer ' + (_dbxCtx && _dbxCtx.token) };
+  if (json) h['Content-Type'] = 'application/json';
+  if (_dbxCtx && _dbxCtx.pathRoot) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: _dbxCtx.pathRoot });
+  return h;
+}
+// Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
+// Mirrors dropbox-full.js download() — the documented CORS-enabled browser path.
+async function hydrateAsync(rel) {
+  const entry = _indexEntry(rel);
+  if (!entry) return false;
+  if (_hydrating.has(rel)) return _hydrating.get(rel);
+  const job = (async () => {
+    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _dbxHeaders(true), body: JSON.stringify({ path: _cloudPathFor(rel, entry) }) });
+    if (!tlRes.ok) throw new Error('get_temporary_link ' + tlRes.status);
+    const dl = await fetch((await tlRes.json()).link, { method: 'GET' });
+    if (!dl.ok) throw new Error('download ' + dl.status);
+    await opfsWriteBytes(rel, new Uint8Array(await dl.arrayBuffer()));
+    _hydratedSet.add(rel); _saveHydratedManifest();
+    return true;
+  })();
+  _hydrating.set(rel, job);
+  try { return await job; } finally { _hydrating.delete(rel); }
+}
+// Synchronous hydration for Pyodide: two blocking XHRs (get_temporary_link, then
+// GET), writing THROUGH Pyodide's FS so the just-opened file is visible inline
+// without a syncfs round-trip. Exposed to Python via the run_python audit hook.
+function _syncDownloadBytes(cloudPath) {
+  const x1 = new XMLHttpRequest();
+  x1.open('POST', 'https://api.dropboxapi.com/2/files/get_temporary_link', false);
+  const h = _dbxHeaders(true);
+  for (const k in h) x1.setRequestHeader(k, h[k]);
+  x1.send(JSON.stringify({ path: cloudPath }));
+  if (x1.status !== 200) throw new Error('get_temporary_link ' + x1.status);
+  const link = JSON.parse(x1.responseText).link;
+  const x2 = new XMLHttpRequest();
+  x2.open('GET', link, false);
+  let ab = true;
+  try { x2.responseType = 'arraybuffer'; } catch (_) { ab = false; }   // workers allow this on sync XHR; main thread does not
+  if (!ab) { try { x2.overrideMimeType('text/plain; charset=x-user-defined'); } catch (_) {} }
+  x2.send();
+  if (x2.status !== 200) throw new Error('download ' + x2.status);
+  if (ab && x2.response) return new Uint8Array(x2.response);
+  const s = x2.responseText, b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
+  return b;
+}
+self._sandpie_hydrate_sync = function (pathStr) {
+  try {
+    if (!_dehydrated || !_dbxIndex || !_dbxCtx || !py) return;
+    let full = String(pathStr || '');
+    if (!full) return;
+    if (!full.startsWith('/')) full = '/files/' + full.replace(/^files\//, '');
+    if (!full.startsWith('/files/')) return;
+    const rel = full.slice('/files/'.length).replace(/^\/+/, '');
+    if (!rel || _relExempt(rel)) return;
+    try { if (py.FS.analyzePath(full).exists) return; } catch (_) {}
+    const entry = _dbxIndex[rel];
+    if (!entry || entry.kind !== 'file') return;
+    const bytes = _syncDownloadBytes(_cloudPathFor(rel, entry));
+    const dir = full.slice(0, full.lastIndexOf('/'));
+    if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
+    py.FS.writeFile(full, bytes);
+    _hydratedSet.add(rel);
+  } catch (e) { console.warn('[sandpie-worker] sync hydrate failed:', pathStr, (e && e.message) || e); }
+};
+// Python preamble: an audit hook that faults in /files paths on open(). Bound
+// once after Pyodide init. Skips stdlib (absolute non-/files) and pseudo-paths.
+const _HYDRATE_AUDIT_PY = `
+import sys
+from js import _sandpie_hydrate_sync as __sp_hydrate
+def __sp_audit(event, args):
+    if event == 'open' and args:
+        p = args[0]
+        if isinstance(p, str) and (p.startswith('/files') or (p[:1] not in ('/', '<'))):
+            try: __sp_hydrate(p)
+            except Exception: pass
+sys.addaudithook(__sp_audit)
+`;
+// Build a directory listing from the cloud index (no download) for list_files.
+function _indexEntriesUnder(norm, recursive) {
+  if (!_dehydrated || !_dbxIndex) return [];
+  const base = norm ? String(norm).replace(/^\/+|\/+$/g, '') : '';
+  const basePrefix = base ? base + '/' : '';
+  const bpl = basePrefix.toLowerCase();
+  const out = [], dirs = new Set();
+  for (const rel0 of Object.keys(_dbxIndex)) {
+    const rel = rel0.replace(/^\/+/, '');
+    if (_relExempt(rel)) continue;
+    if (basePrefix && !rel.toLowerCase().startsWith(bpl)) continue;
+    const sub = basePrefix ? rel.slice(basePrefix.length) : rel;
+    if (!sub) continue;
+    const slash = sub.indexOf('/');
+    if (!recursive && slash >= 0) { dirs.add(basePrefix + sub.slice(0, slash)); continue; }
+    const e = _dbxIndex[rel0];
+    out.push({ path: rel, kind: e.kind === 'folder' ? 'directory' : 'file', size: e.size, cloudMtime: e.cloudMtime });
+  }
+  for (const d of dirs) out.push({ path: d, kind: 'directory' });
+  return out;
+}
+// Ephemeral bookkeeping: record hydrated rels, wipe them on the next boot.
+let _manifestTimer = null;
+function _saveHydratedManifest() {
+  if (_manifestTimer) return;
+  _manifestTimer = setTimeout(async () => {
+    _manifestTimer = null;
+    try { await opfsWriteBytes(_HYDRATED_MANIFEST, new TextEncoder().encode(JSON.stringify([..._hydratedSet]))); } catch (_) {}
+  }, 1000);
+}
+async function _wipeHydratedFromLastSession() {
+  let list = [];
+  try { list = JSON.parse(new TextDecoder().decode(await opfsReadBytes(_HYDRATED_MANIFEST))); } catch (_) { return; }
+  if (Array.isArray(list)) { for (const rel of list) if (typeof rel === 'string') { try { await swOpfsDelete(rel, false); } catch (_) {} } }
+  try { await swOpfsDelete(_HYDRATED_MANIFEST, false); } catch (_) {}
+  if (Array.isArray(list) && list.length) console.log('[sandpie-worker] wiped ' + list.length + ' ephemeral hydrated file(s) from last session');
+}
+_wipeHydratedFromLastSession();
 
 // ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
 let _capActive = false;
@@ -431,7 +600,12 @@ async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
   try {
-    const bytes = await opfsReadBytes(clean);
+    let bytes;
+    try { bytes = await opfsReadBytes(clean); }
+    catch (miss) {
+      if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
+      else throw miss;
+    }
     const ext = (clean.split('.').pop() || '').toLowerCase();
     const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
     let bin = ''; const CHUNK = 0x8000;
@@ -497,8 +671,13 @@ async function tool_read_file({ path, offset, limit }) {
   const norm = normFilesPath(path);
   if (!norm) return { result: 'Error: path is required.' };
   let file;
-  try { const { parts, name } = splitPath(norm); const dir = await opfsResolveDir(parts); file = await (await dir.getFileHandle(name)).getFile(); }
-  catch { return { result: 'Error: file not found: ' + norm }; }
+  try { file = await _opfsGetFile(norm); }
+  catch {
+    if (_indexEntry(norm)) {
+      try { await hydrateAsync(norm); file = await _opfsGetFile(norm); }
+      catch (e) { return { result: `Error: ${norm} is in Dropbox but could not be fetched: ${(e && e.message) || e}` }; }
+    } else { return { result: 'Error: file not found: ' + norm }; }
+  }
   if (file.size > FILE_TEXT_MAX) return { result: `Error: ${norm} is ${file.size} bytes — too large to read as text. Process it with run_python instead.` };
   const text = await file.text();
   if (/\x00/.test(text.slice(0, 4096))) return { result: `Error: ${norm} looks binary. Use load_image (images) or run_python.` };
@@ -521,8 +700,15 @@ async function tool_read_file({ path, offset, limit }) {
 async function tool_list_files({ path, pattern, recursive }) {
   const norm = normFilesPath(path);
   const rx = pattern ? globToRegExp(pattern) : null;
-  const entries = await opfsCollect(norm, { recursive: !!recursive, includeDirs: !recursive, max: 4000 });
-  if (entries === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+  let entries = await opfsCollect(norm, { recursive: !!recursive, includeDirs: !recursive, max: 4000 });
+  const idxEntries = _indexEntriesUnder(norm, !!recursive);   // [] unless dehydrated mode is on
+  if (entries === null && !idxEntries.length) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+  entries = entries || [];
+  if (idxEntries.length) {
+    const seen = new Set(entries.map(e => e.path));   // local (OPFS) entries win — they reflect hydration
+    for (const ie of idxEntries) if (!seen.has(ie.path)) entries.push(ie);
+    entries.sort((a, b) => a.path.localeCompare(b.path));
+  }
   const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
   if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} under /${norm || ''}.` };
   let buf = `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} under /${norm || ''}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
@@ -532,7 +718,12 @@ async function tool_list_files({ path, pattern, recursive }) {
     if (e.kind === 'directory') { line = e.path + '/\n'; }
     else {
       let size = '?', mtime = '';
-      try { const f = await e.handle.getFile(); size = f.size + 'b'; mtime = '  ' + new Date(f.lastModified).toISOString().slice(0, 16).replace('T', ' '); } catch {}
+      if (e.handle) {
+        try { const f = await e.handle.getFile(); size = f.size + 'b'; mtime = '  ' + new Date(f.lastModified).toISOString().slice(0, 16).replace('T', ' '); } catch {}
+      } else if (e.size != null) {            // index-only (not yet hydrated) — size/mtime from Dropbox metadata
+        size = e.size + 'b';
+        if (e.cloudMtime) { try { mtime = '  ' + new Date(e.cloudMtime).toISOString().slice(0, 16).replace('T', ' '); } catch {} }
+      }
       line = `${e.path}\t${size}${mtime}\n`;
     }
     if (buf.length + line.length > FILE_TOOL_CAP) { truncated = true; break; }

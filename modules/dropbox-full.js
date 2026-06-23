@@ -51,6 +51,8 @@
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const SUBSTATE_KEY  = 'dbxfull-subs-state';   // { localRel: {rev,size} } for subscription mirrors — rev-based pull, no mtime/dirty tracking (read-only)
   const SUBS_PREFIX   = '_subs';                // reserved OPFS top-level dir holding read-only subscription mirrors; fenced out of push
+  const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // opt-in: don't bulk-download; the AI hydrates files on demand (worker)
+  const EXEMPT_PREFIXES = ['_conversations', 'skills', 'agents'];   // always eagerly synced — the app reads these directly
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -284,6 +286,11 @@
   function setSyncState(s) { localStorage.setItem(STATE_KEY, JSON.stringify(s)); }
   function cloudIndex() { try { return JSON.parse(localStorage.getItem(INDEX_KEY) || '{}'); } catch { return {}; } }
   function setCloudIndex(i) { localStorage.setItem(INDEX_KEY, JSON.stringify(i)); }
+  function dehydrated() { return localStorage.getItem(DEHYDRATED_KEY) === '1'; }
+  function isExemptRel(rel) {
+    const r = String(rel).replace(/^\/+/, '').toLowerCase();
+    return EXEMPT_PREFIXES.some(p => { const pl = p.toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
+  }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
   function subscriptions() { try { return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); } catch { return []; } }
@@ -396,6 +403,7 @@
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
       const { index: cloud, delta } = await cloudListWorking();
+      if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
 
@@ -414,6 +422,7 @@
       const toDownload = [];
       for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
+        if (dehydrated() && !isExemptRel(path)) continue;   // on-demand: skip eager download; worker hydrates on touch
         const s = state[path];
         const localExists = await opfs.exists(path);
         if (!s) {
@@ -436,12 +445,15 @@
       // batch) — minimizes round-trips and avoids too_many_write_operations
       // throttling on a large first sync. syncedMtime is the mtime captured at
       // collection time, so a write that lands mid-upload re-uploads next cycle.
+      const deh = dehydrated();
+      const cidx = deh ? cloudIndex() : null;   // dehydrated: don't push lazily-hydrated cloud files back (stage 1)
       const dirty = [];
       if (fullScan) {
         let rels = []; try { rels = await opfs.list(); } catch {}
         for (const rel of rels) {
           if (rel === openFilePath) continue;
           if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
+          if (deh && !isExemptRel(rel) && cidx[rel]) continue;   // lazy cloud file — not a local creation
           const s = state[rel];
           const lm = await Sandpie.opfsMtime(rel);
           if (s && lm <= s.syncedMtime) continue;
@@ -451,6 +463,7 @@
         for (const rel of Object.keys(state)) {
           if (rel === openFilePath) continue;
           if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
+          if (deh && !isExemptRel(rel) && cidx[rel]) continue;   // lazy cloud file — not a local creation
           if (state[rel].syncedMtime !== 0) continue;
           if (!(await opfs.exists(rel))) continue;
           dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
@@ -765,11 +778,20 @@
       token: t.access_token,
       pathRoot: localStorage.getItem(NS_KEY) || null,
       workingRoot: localStorage.getItem(ROOT_KEY) || '',
+      dehydrated: dehydrated(),
     });
+  }
+  // Push the cloud INDEX to the worker so dehydrated mode can list/hydrate from
+  // it. index:null clears it (mode off) → worker falls back to OPFS-only.
+  function pushDbxIndexToSW() {
+    const worker = window._sandpieWorker;
+    if (!worker) { setTimeout(pushDbxIndexToSW, 1000); return; }
+    worker.postMessage({ type: 'dbx-index', index: dehydrated() ? cloudIndex() : null, exempt: EXEMPT_PREFIXES });
   }
   function wireServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     pushDbxTokenToSW();
+    pushDbxIndexToSW();
     navigator.serviceWorker.addEventListener('message', (ev) => {
       const d = ev.data; if (!d) return;
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
@@ -927,6 +949,11 @@
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
         <button class="ghost" id="dbxfullSubsBtn" title="Browse Dropbox and mirror folders read-only" style="margin-top:0.5rem; width:100%;">📡 Subscriptions…</button>
+        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.78rem; margin-top:0.7rem; cursor:pointer;">
+          <input type="checkbox" id="dbxfullDehydrated" style="flex:none; width:16px; height:16px; margin:0; padding:0;">
+          <span>On-demand file access</span>
+        </label>
+        <div style="font-size:0.63rem; color:var(--sp-text-dim); margin:0.2rem 0 0 1.5rem; line-height:1.35;">The AI sees your whole Dropbox tree and fetches a file only when it reads or runs it — no bulk download. <code>_conversations</code>, <code>skills</code>, <code>agents</code> stay fully synced. Fetched files are cleared on reload.</div>
       `;
   function wireCloudPanel(body) {
     const input = body.querySelector('#dbxfullAppKey');
@@ -949,6 +976,16 @@
     }
     body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
     body.querySelector('#dbxfullSubsBtn')?.addEventListener('click', openSubscriptionManager);
+    const dehyd = body.querySelector('#dbxfullDehydrated');
+    if (dehyd) {
+      dehyd.checked = dehydrated();
+      dehyd.addEventListener('change', () => {
+        localStorage.setItem(DEHYDRATED_KEY, dehyd.checked ? '1' : '0');
+        pushDbxTokenToSW();
+        pushDbxIndexToSW();
+        sync({ full: true }).catch(() => {});
+      });
+    }
     renderCloudState();   // paint the live connection state on (re)render — the fix
   }
   // Prefer the gear modal (SandpieSettings); fall back to the sidebar. The
