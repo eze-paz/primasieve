@@ -613,13 +613,15 @@ function getSandpieWorker() {
   return _sandpieWorker;
 }
 // Eagerly create the Worker so Pyodide starts preloading on page boot.
-// If an old SW is controlling this page, its fetch handler would intercept
-// the sandpie-worker.js script fetch and stall it — unregister + reload once.
+// If any SW is still controlling this page (old versions ran Pyodide+tools in
+// the SW and registered a fetch handler), that handler would intercept the
+// sandpie-worker.js script fetch and stall it as 'pending'. Unregister every
+// registered SW and reload — on the next load no SW is active, so the Worker
+// fetch goes straight to the network. No sessionStorage guard: we check
+// navigator.serviceWorker.controller directly each load, which is null once
+// all SWs are gone, so there's no reload loop.
 (async function() {
-  if ('serviceWorker' in navigator &&
-      navigator.serviceWorker.controller &&
-      !sessionStorage.getItem('sw-cleared')) {
-    sessionStorage.setItem('sw-cleared', '1');
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     try {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map(r => r.unregister()));
