@@ -592,7 +592,10 @@ async function processQueueFor(stream) {
 let _sandpieWorker = null;
 function getSandpieWorker() {
   if (_sandpieWorker) return _sandpieWorker;
-  _sandpieWorker = new Worker('./sandpie-worker.js');
+  // Lives under modules/ (served wholesale by sandpie-server) rather than the
+  // web root, where brand-new files have no route and 404. Path resolves against
+  // the document base (root) → /modules/sandpie-worker.js.
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
