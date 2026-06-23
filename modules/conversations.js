@@ -655,6 +655,7 @@ async function sendSingle(text, stream, opts = {}) {
   const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
   const _isWebGPU = !!(_active && _active.type === 'webgpu');
   const _isLocal = _isLiteRTLM || _isWebGPU;
+  if (_isLocal) _localInferring = true;
   if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
     addMsg('err',
       _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
@@ -777,6 +778,7 @@ async function sendSingle(text, stream, opts = {}) {
     stream.requestId = null;
     flightClear(convId);
 
+    _localInferring = false;
     renderer.finalize();
 
     releaseWakeLock();
@@ -1321,9 +1323,13 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._flushAllPending();
     this._finishThinking();
-    // Full markdown render deferred from local inference — do it once now
+    // Full markdown render deferred from local inference — do it once now, then scroll
     if (this.isLocal && this.reply && this.displayed) {
       this.reply.innerHTML = renderMd(this.displayed);
+    }
+    if (this.isLocal) {
+      const sh = this._scrollHost();
+      if (sh && shouldAutoScroll(sh)) requestAnimationFrame(() => { sh.scrollTop = sh.scrollHeight; });
     }
   }
 
@@ -1435,7 +1441,7 @@ class RoundRenderer {
     }
     this._appendCloseParensIfReady();
 
-    if (scrollHost && stick) scrollHost.scrollTop = scrollHost.scrollHeight;
+    if (scrollHost && stick && !this.isLocal) scrollHost.scrollTop = scrollHost.scrollHeight;
     if (anyPending) this._scheduleDrain();
   }
 
@@ -1964,6 +1970,8 @@ window.sidePanel = sidePanel;
   });
 })();
 
+let _localInferring = false;
+
 (function() {
   const messages = document.getElementById('messages');
   if (!messages) return;
@@ -2008,6 +2016,7 @@ window.sidePanel = sidePanel;
     }
   }
   function onScroll() {
+    if (_localInferring) return;
     updateTargets();
     if (!animating) {
       animating = true;
