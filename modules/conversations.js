@@ -699,7 +699,7 @@ async function sendSingle(text, stream, opts = {}) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const renderer = new RoundRenderer(host, convMessages);
+  const renderer = new RoundRenderer(host, convMessages, _isLocal);
 
   let agentDoneSeen = false;
   let errorSeen = false;
@@ -723,26 +723,16 @@ async function sendSingle(text, stream, opts = {}) {
 
     if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
-      try { await SandpieQwen35?.unload?.(); await SandpieQwen3?.unload?.(); } catch (_) {}
+      try { await SandpieQwen3?.unload?.(); } catch (_) {}
       await SandpieLiteRTLM.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
     } else {
-    // Route the WebGPU model to its engine: dense Qwen3 (fast prefill, no DeltaNet) vs the
-    // hybrid Qwen3.5. Both run the agent loop on the PAGE and emit the same event protocol,
-    // so `dispatch` + the renderer + the lifecycle below are reused unchanged.
     const _isDense = _isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
       && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
     if (_isDense && SandpieQwen3.runConversation) {
-      try { await SandpieQwen35?.unload?.(); } catch (_) {}   // single active local model
       await SandpieQwen3.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else if (_isWebGPU && typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.runConversation) {
-      try { await SandpieQwen3?.unload?.(); } catch (_) {}    // single active local model
-      await SandpieQwen35.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
         dispatch,
       );
@@ -1205,9 +1195,10 @@ function renderTcDone(div, fname) {
 }
 
 class RoundRenderer {
-  constructor(host, convMessages) {
+  constructor(host, convMessages, isLocal = false) {
     this.host = host;
     this.convMessages = convMessages;
+    this.isLocal = isLocal;
 
     this.reply = null;
 
@@ -1330,6 +1321,10 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._flushAllPending();
     this._finishThinking();
+    // Full markdown render deferred from local inference — do it once now
+    if (this.isLocal && this.reply && this.displayed) {
+      this.reply.innerHTML = renderMd(this.displayed);
+    }
   }
 
   _appendReasoning(chunk) {
@@ -1377,6 +1372,13 @@ class RoundRenderer {
   }
   _paintContent() {
     if (!this.reply) return;
+    if (this.isLocal) {
+      // Skip marked+DOMPurify per token — main thread stays free for GPU inference.
+      // Full markdown render happens once in finalize() when generation is done.
+      const bubble = this.reply.querySelector('.bubble') || this.reply;
+      bubble.textContent = this.displayed;
+      return;
+    }
     this.reply.innerHTML = renderMd(this.displayed);
   }
   _applyToolCallDelta(tc) {
@@ -1405,7 +1407,7 @@ class RoundRenderer {
     }
   }
   _scheduleDrain() {
-    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
+    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), this.isLocal ? 100 : 16);
   }
   _drainTick() {
     this.drainTimer = null;
