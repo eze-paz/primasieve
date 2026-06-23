@@ -613,7 +613,22 @@ function getSandpieWorker() {
   return _sandpieWorker;
 }
 // Eagerly create the Worker so Pyodide starts preloading on page boot.
-getSandpieWorker();
+// If an old SW is controlling this page, its fetch handler would intercept
+// the sandpie-worker.js script fetch and stall it — unregister + reload once.
+(async function() {
+  if ('serviceWorker' in navigator &&
+      navigator.serviceWorker.controller &&
+      !sessionStorage.getItem('sw-cleared')) {
+    sessionStorage.setItem('sw-cleared', '1');
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    } catch (_) {}
+    window.location.reload();
+    return;
+  }
+  getSandpieWorker();
+})();
 
 // Build a ReadableStream that bridges Worker {type:'event'} messages into the
 // NDJSON format that readAgentEvents() expects, so the rest of sendSingle()
@@ -660,50 +675,6 @@ function workerAgentStream(worker, id, signal) {
   });
 }
 
-let _swReady = (async () => {
-  if (!('serviceWorker' in navigator)) {
-    throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
-  }
-
-  const regs = await navigator.serviceWorker.getRegistrations();
-  for (const r of regs) {
-    const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || '';
-    if (/\/sandpie-sw\.js$/.test(url)) {
-      await r.unregister();
-      console.log('[sandpie] unregistered stale SW:', url);
-    }
-  }
-
-  const reg = await navigator.serviceWorker.register('./sandpie.js', { updateViaCache: 'none' });
-  await navigator.serviceWorker.ready;
-
-  // A page can load UNCONTROLLED — typically a hard reload of an already-active
-  // SW: clients.claim() ran before this page existed, so it won't re-fire and
-  // navigator.serviceWorker.controller stays null. An uncontrolled page can't have
-  // /sandpie-agent intercepted, so sends would silently never dispatch. Wait
-  // briefly for a claim; if none comes, reload ONCE (a normal reload of an active,
-  // claiming SW attaches deterministically). A sessionStorage guard prevents any
-  // reload loop — worst case we proceed uncontrolled rather than thrash or hang.
-  if (!navigator.serviceWorker.controller) {
-    await new Promise((resolve) => {
-      if (navigator.serviceWorker.controller) return resolve();
-      const done = () => { clearTimeout(t); navigator.serviceWorker.removeEventListener('controllerchange', done); resolve(); };
-      navigator.serviceWorker.addEventListener('controllerchange', done);
-      const t = setTimeout(done, 1500);
-    });
-    if (!navigator.serviceWorker.controller && !sessionStorage.getItem('sandpie-sw-reattach')) {
-      sessionStorage.setItem('sandpie-sw-reattach', '1');
-      console.warn('[sandpie] SW not controlling this page — reloading once to attach.');
-      location.reload();
-      await new Promise(() => {});   // halt this load; the reload supersedes it
-    }
-  } else {
-    sessionStorage.removeItem('sandpie-sw-reattach');   // healthy controlled load → reset the guard
-  }
-  console.log('[sandpie] SW ready — controller:', navigator.serviceWorker.controller?.scriptURL);
-  return reg;
-})();
-_swReady.catch(e => console.error('[sandpie] SW registration failed:', e));
 async function sendSingle(text, stream, opts = {}) {
   const { id: convId, messages: convMessages, host } = stream;
 

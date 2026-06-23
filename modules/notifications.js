@@ -139,26 +139,11 @@ const SandpieNotifications = (function() {
       icon: 'icon-192.png',
       tag: 'sandpie-conv-' + convId,
     };
-    // Prefer SW.showNotification — only path that works on mobile.
-    let shown = false;
     try {
-      const reg = navigator.serviceWorker
-        && await navigator.serviceWorker.getRegistration();
-      if (reg && reg.showNotification) {
-        await reg.showNotification('sandpie', opts);
-        shown = true;
-      }
+      const notif = new Notification('sandpie', opts);
+      notif.onclick = () => { window.focus(); notif.close(); };
     } catch (e) {
-      console.error('[sandpie] notify: SW showNotification threw:', e);
-    }
-    // Desktop fallback for environments without an SW registration.
-    if (!shown) {
-      try {
-        const notif = new Notification('sandpie', opts);
-        notif.onclick = () => { window.focus(); notif.close(); };
-      } catch (e) {
-        console.error('[sandpie] notify: Notification constructor threw:', e);
-      }
+      console.error('[sandpie] notify: Notification constructor threw:', e);
     }
   }
 
