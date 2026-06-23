@@ -587,7 +587,79 @@ async function processQueueFor(stream) {
 
   if (stream.queue.length > 0) processQueueFor(stream);
 }
-const SW_STREAM_PATH = './sandpie-stream';
+// ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
+// Created once per page load. Other modules reach it via window._sandpieWorker.
+let _sandpieWorker = null;
+function getSandpieWorker() {
+  if (_sandpieWorker) return _sandpieWorker;
+  _sandpieWorker = new Worker('./sandpie-worker.js');
+  window._sandpieWorker = _sandpieWorker;
+  _sandpieWorker.addEventListener('message', (event) => {
+    const msg = event.data;
+    if (!msg) return;
+    if (msg.type === 'sandpie-worker-log') {
+      const fn = console[msg.level] || console.log;
+      fn.call(console, '[worker]', msg.text);
+      return;
+    }
+    if (msg.type === 'forward-to-page') {
+      // Relay opfs-deleted-by-python / sw-opfs-changed to existing SW message
+      // listeners (dropbox-full.js) by dispatching onto navigator.serviceWorker.
+      try { navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: msg.payload })); } catch (_) {}
+      return;
+    }
+  });
+  _sandpieWorker.postMessage({ type: 'flush-logs' });
+  return _sandpieWorker;
+}
+// Eagerly create the Worker so Pyodide starts preloading on page boot.
+getSandpieWorker();
+
+// Build a ReadableStream that bridges Worker {type:'event'} messages into the
+// NDJSON format that readAgentEvents() expects, so the rest of sendSingle()
+// works unchanged. When the abort signal fires the stream errors with AbortError.
+function workerAgentStream(worker, id, signal) {
+  const queue = [];
+  let streamDone = false;
+  let notify = null;
+
+  const messageHandler = (event) => {
+    const msg = event.data;
+    if (!msg || msg.id !== id || msg.type !== 'event') return;
+    queue.push(JSON.stringify(msg.event) + '\n');
+    if (msg.event.type === 'agent_done' || msg.event.type === 'error') {
+      streamDone = true;
+      worker.removeEventListener('message', messageHandler);
+    }
+    if (notify) { const n = notify; notify = null; n(); }
+  };
+  worker.addEventListener('message', messageHandler);
+
+  const cleanup = () => {
+    worker.removeEventListener('message', messageHandler);
+    try { worker.postMessage({ type: 'abort', id }); } catch (_) {}
+  };
+
+  const enc = new TextEncoder();
+  return new ReadableStream({
+    async pull(controller) {
+      while (queue.length > 0) controller.enqueue(enc.encode(queue.shift()));
+      if (streamDone) { controller.close(); return; }
+      // Block until next event or abort signal fires.
+      await new Promise((resolve, reject) => {
+        notify = resolve;
+        if (signal) {
+          if (signal.aborted) { reject(new DOMException('aborted', 'AbortError')); return; }
+          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+        }
+      });
+      while (queue.length > 0) controller.enqueue(enc.encode(queue.shift()));
+      if (streamDone) controller.close();
+    },
+    cancel() { cleanup(); },
+  });
+}
+
 let _swReady = (async () => {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers not supported in this browser — sandpie needs them. Try Chrome, Edge, Firefox, or Safari on a recent version.');
@@ -738,27 +810,16 @@ async function sendSingle(text, stream, opts = {}) {
         dispatch,
       );
     } else {
-    await _swReady;
-    const res = await fetch('./sandpie-agent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      addMsg('err', `Error: ${res.status}: ${errText.slice(0, 300)}`, host);
-      return;
-    }
-
-    await readAgentEvents(res.body, dispatch);
+    const worker = getSandpieWorker();
+    const _agentId = Math.random().toString(36).slice(2);
+    worker.postMessage({ type: 'agent', id: _agentId, config });
+    const workerStream = workerAgentStream(worker, _agentId, ctrl.signal);
+    await readAgentEvents(workerStream, dispatch);
 
     if (!agentDoneSeen && !wasAborted && !errorSeen) {
-      const trigger = lastInFlightTool
-        ? ` while running \`${lastInFlightTool}\``
-        : '';
+      const trigger = lastInFlightTool ? ` while running \`${lastInFlightTool}\`` : '';
       addMsg('err',
-        `Service worker died mid-stream${trigger} — typically a Pyodide WASM crash that terminates the whole SW thread. The browser will spawn a fresh SW (with a clean Pyodide) on your next message. If the same code keeps killing it, that input is the culprit; rewrite or skip it.`,
+        `Worker died mid-stream${trigger} — typically a Pyodide WASM crash. The worker will be restarted on your next message.`,
         host,
       );
     }

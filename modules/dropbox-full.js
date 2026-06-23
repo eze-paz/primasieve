@@ -752,11 +752,15 @@
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
   function pushDbxTokenToSW() {
-    const ctrl = navigator.serviceWorker && navigator.serviceWorker.controller;
-    if (!ctrl) return;
+    const worker = window._sandpieWorker;
+    if (!worker) {
+      // Worker initialised by conversations.js which loads after this module.
+      setTimeout(pushDbxTokenToSW, 1000);
+      return;
+    }
     const t = tokens();
     if (!t) return;
-    ctrl.postMessage({
+    worker.postMessage({
       type: 'dbx-token',
       token: t.access_token,
       pathRoot: localStorage.getItem(NS_KEY) || null,
@@ -765,7 +769,6 @@
   }
   function wireServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.addEventListener('controllerchange', () => pushDbxTokenToSW());
     pushDbxTokenToSW();
     navigator.serviceWorker.addEventListener('message', (ev) => {
       const d = ev.data; if (!d) return;

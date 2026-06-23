@@ -47,8 +47,7 @@ const opfs = {
     await dir.removeEntry(name, { recursive: true });
 
     try {
-      const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-      if (sw) sw.postMessage({ type: 'opfs-removed', paths: [path] });
+      if (window._sandpieWorker) window._sandpieWorker.postMessage({ type: 'opfs-removed', paths: [path] });
     } catch (_) {}
   },
 
@@ -671,8 +670,7 @@ let _notifyRefreshT = null;
 opfs.notifyUpload = function(path) {
   try { if (typeof Sandpie !== 'undefined') Sandpie.events.emit('file:changed', path); } catch (_) {}
   try {
-    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-    if (sw) sw.postMessage({ type: 'opfs-changed', paths: [path] });
+    if (window._sandpieWorker) window._sandpieWorker.postMessage({ type: 'opfs-changed', paths: [path] });
   } catch (_) {}
   clearTimeout(_notifyRefreshT);
   _notifyRefreshT = setTimeout(() => { try { opfs.refreshFileList(); } catch (_) {} }, 60);
