@@ -58,7 +58,7 @@ let _dbxExempt = ['_conversations', 'skills', 'agents'];   // always eager — t
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.1.0-dehydrated';
+const WORKER_VERSION = '2.2.0-dehydrated-writeback';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -273,9 +273,13 @@ async function opfsWriteBytes(path, bytes) {
 // SharedArrayBuffer (no cross-origin isolation in prod). _conversations/, skills/
 // and agents/ are EXEMPT and stay on the page's eager sync. Stage 1 is ephemeral:
 // hydrated files are recorded in an OPFS manifest and wiped on the next boot.
-const _hydratedSet = new Set();
+const _hydratedSet = new Set();       // rels hydrated this session (in-memory; the page owns persistence + flush)
 const _hydrating = new Map();         // rel -> Promise (async hydration dedupe)
-const _HYDRATED_MANIFEST = '_dehydrated_cache.json';
+// Report an OPFS hydration to the page so it can record a sync-state entry
+// (enables write-back of later edits) and flush the file on the next boot.
+function _reportHydrated(rel) {
+  try { self.postMessage({ type: 'forward-to-page', payload: { type: 'worker-hydrated', paths: [rel] } }); } catch (_) {}
+}
 
 function _relExempt(rel) {
   const r = String(rel).replace(/^\/+/, '').toLowerCase();
@@ -316,7 +320,7 @@ async function hydrateAsync(rel) {
     const dl = await fetch((await tlRes.json()).link, { method: 'GET' });
     if (!dl.ok) throw new Error('download ' + dl.status);
     await opfsWriteBytes(rel, new Uint8Array(await dl.arrayBuffer()));
-    _hydratedSet.add(rel); _saveHydratedManifest();
+    _hydratedSet.add(rel); _reportHydrated(rel);
     return true;
   })();
   _hydrating.set(rel, job);
@@ -398,23 +402,9 @@ function _indexEntriesUnder(norm, recursive) {
   for (const d of dirs) out.push({ path: d, kind: 'directory' });
   return out;
 }
-// Ephemeral bookkeeping: record hydrated rels, wipe them on the next boot.
-let _manifestTimer = null;
-function _saveHydratedManifest() {
-  if (_manifestTimer) return;
-  _manifestTimer = setTimeout(async () => {
-    _manifestTimer = null;
-    try { await opfsWriteBytes(_HYDRATED_MANIFEST, new TextEncoder().encode(JSON.stringify([..._hydratedSet]))); } catch (_) {}
-  }, 1000);
-}
-async function _wipeHydratedFromLastSession() {
-  let list = [];
-  try { list = JSON.parse(new TextDecoder().decode(await opfsReadBytes(_HYDRATED_MANIFEST))); } catch (_) { return; }
-  if (Array.isArray(list)) { for (const rel of list) if (typeof rel === 'string') { try { await swOpfsDelete(rel, false); } catch (_) {} } }
-  try { await swOpfsDelete(_HYDRATED_MANIFEST, false); } catch (_) {}
-  if (Array.isArray(list) && list.length) console.log('[sandpie-worker] wiped ' + list.length + ' ephemeral hydrated file(s) from last session');
-}
-_wipeHydratedFromLastSession();
+// Flushing last session's hydrated copies is now PAGE-side (dropbox-full
+// dehydratePurge() on boot) — it knows sync state, so it can skip files with
+// unsynced edits. The worker no longer persists a manifest or wipes on boot.
 
 // ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
 let _capActive = false;

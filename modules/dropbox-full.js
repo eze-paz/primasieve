@@ -316,6 +316,16 @@
     setSyncState(st);
     return { purged, kept };
   }
+  // One-time: stage 1 wrote a worker manifest (_dehydrated_cache.json) at the OPFS
+  // root which the push could leak to Dropbox. We no longer create it — remove any
+  // leftover copy locally and remotely (best-effort, guarded once; it's our own
+  // internal file, never user data, so del() here is safe).
+  async function cleanupStaleArtifacts() {
+    if (localStorage.getItem('dbxfull-artifacts-cleaned') === '1') return;
+    localStorage.setItem('dbxfull-artifacts-cleaned', '1');
+    try { await Sandpie.opfs.remove('_dehydrated_cache.json'); } catch (_) {}
+    try { if (tokens()) await del(relToCloud('_dehydrated_cache.json')); } catch (_) {}
+  }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
   function subscriptions() { try { return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); } catch { return []; } }
@@ -470,15 +480,12 @@
       // batch) — minimizes round-trips and avoids too_many_write_operations
       // throttling on a large first sync. syncedMtime is the mtime captured at
       // collection time, so a write that lands mid-upload re-uploads next cycle.
-      const deh = dehydrated();
-      const cidx = deh ? cloudIndex() : null;   // dehydrated: don't push lazily-hydrated cloud files back (stage 1)
       const dirty = [];
       if (fullScan) {
         let rels = []; try { rels = await opfs.list(); } catch {}
         for (const rel of rels) {
           if (rel === openFilePath) continue;
           if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
-          if (deh && !isExemptRel(rel) && cidx[rel]) continue;   // lazy cloud file — not a local creation
           const s = state[rel];
           const lm = await Sandpie.opfsMtime(rel);
           if (s && lm <= s.syncedMtime) continue;
@@ -488,7 +495,6 @@
         for (const rel of Object.keys(state)) {
           if (rel === openFilePath) continue;
           if (isUnderSubs(rel)) continue;            // read-only subscription mirror — never push
-          if (deh && !isExemptRel(rel) && cidx[rel]) continue;   // lazy cloud file — not a local creation
           if (state[rel].syncedMtime !== 0) continue;
           if (!(await opfs.exists(rel))) continue;
           dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
@@ -832,6 +838,22 @@
         if (changed) setSyncState(st);
         return;
       }
+      // The worker fetched (hydrated) cloud files into OPFS. Record them as clean
+      // synced copies so they aren't re-uploaded, but ARE flushed on next boot and
+      // — if later edited — become dirty and write back. (Read-only hydration for
+      // run_python stays in MEMFS and is not reported here.)
+      if (d.type === 'worker-hydrated' && Array.isArray(d.paths)) {
+        (async () => {
+          const st = syncState(); const idx = cloudIndex(); let changed = false;
+          for (const p of d.paths) {
+            const e = idx[p]; if (!e) continue;
+            st[p] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(p) };
+            changed = true;
+          }
+          if (changed) setSyncState(st);
+        })();
+        return;
+      }
     });
   }
 
@@ -1130,6 +1152,9 @@
         if (await Sandpie.opfs.exists(r)) return true;
         const bytes = await download(e.path || relToCloud(r));
         await Sandpie.opfs.write(r, bytes);
+        // Record as a clean synced copy (same as worker-hydrated) so it's flushed
+        // on next boot and writes back if edited.
+        try { const st = syncState(); st[r] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(r) }; setSyncState(st); } catch (_) {}
         return true;
       },
     });
@@ -1153,6 +1178,8 @@
         try { await ensureWorkingRoot(); await maybeMigrateAiSandbox(); }   // MIGRATE_AI_SANDBOX (temporary)
         catch (e) { console.warn('[dropbox-full] pre-sync:', e && e.message); }
         dbxStatus('', 'connected');
+        await cleanupStaleArtifacts();
+        if (dehydrated()) { try { await dehydratePurge(); } catch (_) {} }   // ephemeral: flush last session's clean hydrated copies (skips unsynced edits)
         sync().then(refreshSubscriptions);
       })();
     }
