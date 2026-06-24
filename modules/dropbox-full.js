@@ -1115,6 +1115,23 @@
       isReadOnlyPath: (rel) => isUnderSubs(rel),   // subscription mirrors are read-only
       subscriptionsDir: () => SUBS_PREFIX,
       get initialSyncDone() { return initialSyncDone; },
+      // Dehydrated-mode hooks: let the file browser show the full Dropbox tree
+      // (what the LLM sees) as cloud placeholders and fetch one on demand when
+      // opened. hydrate() uses download() → opfs.write — the same read-only path
+      // as bulk sync; it never emits file:deleted, so nothing is deleted remotely.
+      isDehydrated: () => dehydrated(),
+      cloudIndex: () => (dehydrated() ? cloudIndex() : null),
+      isExempt: (rel) => isExemptRel(rel),
+      hydrate: async (rel) => {
+        const r = String(rel).replace(/^\/+/, '');
+        if (!dehydrated() || isExemptRel(r)) return false;
+        const e = cloudIndex()[r];
+        if (!e || e.kind !== 'file') return false;
+        if (await Sandpie.opfs.exists(r)) return true;
+        const bytes = await download(e.path || relToCloud(r));
+        await Sandpie.opfs.write(r, bytes);
+        return true;
+      },
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);

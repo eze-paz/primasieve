@@ -236,14 +236,21 @@ opfs.showContextMenu = function(x, y, items) {
 opfs.openFile = async function(fullKey, name, opts = {}) {
 
   let file;
-  try {
+  const _readLocal = async () => {
     const { parts, name: fname } = splitPath(fullKey);
     const dir = await opfs.resolveDir(parts);
-    const handle = await dir.getFileHandle(fname);
-    file = await handle.getFile();
+    return (await dir.getFileHandle(fname)).getFile();
+  };
+  try {
+    file = await _readLocal();
   } catch (e) {
-    Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`);
-    return;
+    // Dehydrated mode: a cloud placeholder (bytes not local). Fetch on demand via
+    // the sync provider, then open and refresh the list so the ☁ becomes 📄.
+    const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+    let hydrated = false;
+    if (sp && sp.hydrate) { try { hydrated = await sp.hydrate(fullKey); } catch (_) {} }
+    if (hydrated) { try { file = await _readLocal(); } catch (_) {} opfs.refreshFileList().catch(() => {}); }
+    if (!file) { Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`); return; }
   }
   opfs.closeFile();                 // single viewer instance — close any open one first
   window._openFilePath = fullKey;
@@ -787,6 +794,8 @@ opfs.refreshFileList = async function() {
   for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
 
   const state = (window.Sandpie && Sandpie.syncProvider()?.getState?.()) || {};
+  const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  const cidx = (_sp && _sp.cloudIndex) ? _sp.cloudIndex() : null;   // full Dropbox tree in dehydrated mode; null otherwise
   const prefix = path ? path + '/' : '';
   const remoteMap = new Map();
   for (const k of Object.keys(state)) {
@@ -799,6 +808,25 @@ opfs.refreshFileList = async function() {
       if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
     } else {
       remoteMap.set(rest, 'file');
+    }
+  }
+  // Dehydrated mode: surface the full Dropbox tree (what the LLM sees) as cloud
+  // placeholders even though the bytes aren't local. Exempt folders already come
+  // from OPFS/state above, so skip them to avoid duplicates.
+  if (cidx) {
+    const pl = prefix.toLowerCase();
+    for (const rel of Object.keys(cidx)) {
+      if (_sp.isExempt && _sp.isExempt(rel)) continue;
+      const rl = rel.toLowerCase();
+      if (pl && !rl.startsWith(pl)) continue;
+      const rest = rel.slice(prefix.length);
+      if (!rest) continue;
+      if (rest.includes('/')) {
+        const firstSeg = rest.split('/')[0];
+        if (!remoteMap.has(firstSeg) && !localMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+      } else if (!remoteMap.has(rest)) {
+        remoteMap.set(rest, 'file');
+      }
     }
   }
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
@@ -883,7 +911,7 @@ opfs.refreshFileList = async function() {
       return;
     }
     it.size = await opfs.getFileSize(fullKey);
-    if (!local) { it.status = 'cloud'; return; }
+    if (!local) { it.status = 'cloud'; if (cidx && cidx[fullKey] && cidx[fullKey].size != null) it.size = cidx[fullKey].size; return; }
     if (!remote) { it.status = 'local'; return; }
     const s = state[fullKey];
     const lastMod = await opfs.lastModified(fullKey);
