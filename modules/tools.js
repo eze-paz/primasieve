@@ -130,9 +130,25 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
         required: ['path'],
       },
     },
+    copy_to_workspace: {
+      description: `Copy a file from ELSEWHERE in the user's Dropbox INTO their workspace so you can use it. Use this after the search tool returns a file OUTSIDE the workspace (an absolute Dropbox path like "/R+D+I/reports/q1.pdf") that you need to read or process — read_file/run_python/load_image cannot reach paths outside the workspace directly. The copy is server-side and READ-ONLY on the source (the original is never modified, moved, or deleted). Returns the new workspace-relative path; then use read_file / run_python / load_image on it as normal.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          src:  { type: 'string', description: 'Absolute Dropbox path of the file to copy in (as returned by search), e.g. "/R+D+I/reports/q1.pdf".' },
+          dest: { type: 'string', description: 'Optional destination within the workspace (default: the source filename), e.g. "imported/q1.pdf".' },
+        },
+        required: ['src'],
+      },
+    },
 };
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => {
+    // copy_to_workspace only works with Dropbox connected — hide it otherwise.
+    if (name === 'copy_to_workspace') {
+      try { const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); return !!(p && p.isConnected && p.isConnected()); }
+      catch (_) { return false; }
+    }
     return true;
   })
   .map(([name, t]) => ({

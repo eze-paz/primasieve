@@ -58,7 +58,7 @@ let _dbxExempt = ['_conversations', 'skills', 'agents'];   // always eager — t
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.3.0-unified-search';
+const WORKER_VERSION = '2.4.0-copy-to-workspace';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -859,7 +859,47 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
   return { result: head + local.buf.replace(/\n$/, '') + cloudExtra };
 }
 
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','show_artifact','load_skill','load_image'];
+// ---- copy_to_workspace — server-side copy a file from elsewhere in the user's
+// Dropbox INTO the working root so the LLM can use it. READ-ONLY on the source.
+// Only offered when Dropbox is connected (gated in tools.js toolDefs).
+async function tool_copy_to_workspace({ src, dest }) {
+  if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };
+  const from = (src == null ? '' : String(src)).trim();
+  if (!from) return { result: 'Error: "src" (an absolute Dropbox path, e.g. from search) is required.' };
+  if (!from.startsWith('/')) return { result: 'Error: "src" must be an absolute Dropbox path like "/R+D+I/reports/q1.pdf" (use the path search returned).' };
+  const wr = (_dbxCtx.workingRoot || '').replace(/\/+$/, '');
+  if (!wr) return { result: 'Error: your workspace folder is not resolved yet — try again in a moment.' };
+  let rel = (dest != null && String(dest).trim())
+    ? String(dest).trim().replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '')
+    : from.split('/').filter(Boolean).pop();
+  if (!rel || rel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
+  const headers = { Authorization: 'Bearer ' + _dbxCtx.token, 'Content-Type': 'application/json' };
+  if (_dbxCtx.pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: _dbxCtx.pathRoot });
+  let res;
+  try { res = await fetch('https://api.dropboxapi.com/2/files/copy_v2', { method: 'POST', headers, body: JSON.stringify({ from_path: from, to_path: wr + '/' + rel, autorename: true }) }); }
+  catch (e) { return { result: 'Error reaching Dropbox: ' + (e && e.message || e) }; }
+  if (!res.ok) { const txt = await res.text().catch(() => ''); return { result: 'Copy failed (' + res.status + '): ' + txt.slice(0, 400) }; }
+  const meta = ((await res.json().catch(() => ({}))) || {}).metadata || {};
+  const finalPath = meta.path_display || (wr + '/' + rel);
+  const finalRel = _relUnderRoot(finalPath) || rel;
+  if (meta['.tag'] === 'folder') {
+    return { result: `Copied folder into your workspace as ${finalRel}/. Its files appear after the next sync; then use list_files / read_file on them.` };
+  }
+  // Make it usable now: in on-demand mode, index it so read_file hydrates it
+  // lazily; otherwise pull the bytes into the workspace immediately.
+  if (_dehydrated) {
+    if (!_dbxIndex) _dbxIndex = {};
+    _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'file', path: finalPath, size: meta.size, rev: meta.rev, cloudMtime: meta.server_modified };
+  } else {
+    try {
+      const tl = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers, body: JSON.stringify({ path: finalPath }) });
+      if (tl.ok) { const dl = await fetch((await tl.json()).link, { method: 'GET' }); if (dl.ok) await opfsWriteBytes(finalRel, new Uint8Array(await dl.arrayBuffer())); }
+    } catch (_) { /* best-effort; the next sync pulls it down */ }
+  }
+  return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}. Use read_file or run_python on "${finalRel}".` };
+}
+
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image'];
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -880,6 +920,7 @@ async function runTool(name, args, ctx) {
     case 'list_files':    return tool_list_files(args, ctx);
     case 'search':        return tool_search(args, ctx);
     case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
+    case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     default:              return unknownTool(name);
