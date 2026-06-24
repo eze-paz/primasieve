@@ -291,6 +291,31 @@
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
     return EXEMPT_PREFIXES.some(p => { const pl = p.toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
   }
+  // Convert an already-synced workspace to on-demand: remove LOCAL copies of clean
+  // cloud files so they re-fetch lazily. SAFETY: deletes via opfs.remove() only —
+  // it never emits 'file:deleted', so onFileDeleted/del() never runs and NOTHING
+  // is deleted from Dropbox. Skips exempt folders, the open file, and any file
+  // with unsynced local edits (lm > syncedMtime) so no local change is lost.
+  async function dehydratePurge() {
+    const opfs = Sandpie.opfs;
+    const idx = cloudIndex();
+    const st = syncState();
+    const openFilePath = Sandpie.openFilePath ? Sandpie.openFilePath() : null;
+    let purged = 0, kept = 0;
+    for (const rel of Object.keys(idx)) {
+      const e = idx[rel];
+      if (!e || e.kind !== 'file') continue;
+      if (isExemptRel(rel) || rel === openFilePath) { kept++; continue; }
+      if (!(await opfs.exists(rel))) continue;                 // already not local
+      const s = st[rel];
+      const lm = await Sandpie.opfsMtime(rel);
+      if (!s || lm > s.syncedMtime) { kept++; continue; }      // untracked or locally modified — keep
+      try { await opfs.remove(rel); delete st[rel]; purged++; } // OPFS-only delete; Dropbox untouched
+      catch (_) {}
+    }
+    setSyncState(st);
+    return { purged, kept };
+  }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
   function subscriptions() { try { return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); } catch { return []; } }
@@ -979,9 +1004,21 @@
     const dehyd = body.querySelector('#dbxfullDehydrated');
     if (dehyd) {
       dehyd.checked = dehydrated();
-      dehyd.addEventListener('change', () => {
-        localStorage.setItem(DEHYDRATED_KEY, dehyd.checked ? '1' : '0');
+      dehyd.addEventListener('change', async () => {
+        const on = dehyd.checked;
+        if (on) {
+          const idx = cloudIndex();
+          const n = Object.keys(idx).filter(r => idx[r] && idx[r].kind === 'file' && !isExemptRel(r)).length;
+          const ok = confirm(`Enable on-demand file access?\n\nLocal copies of ~${n} Dropbox file(s) will be removed from this browser so the AI fetches them only when it needs them. Your files stay safe in Dropbox — nothing is deleted there. _conversations, skills and agents stay fully synced, and any unsaved local changes are kept.`);
+          if (!ok) { dehyd.checked = false; return; }
+        }
+        localStorage.setItem(DEHYDRATED_KEY, on ? '1' : '0');
         pushDbxTokenToSW();
+        if (on) {
+          try { const res = await dehydratePurge(); console.info('[dropbox-full] dehydrate purge:', res); }
+          catch (e) { console.warn('[dropbox-full] dehydrate purge failed:', e); }
+          try { if (typeof window.refreshFileList === 'function') window.refreshFileList(); } catch (_) {}
+        }
         pushDbxIndexToSW();
         sync({ full: true }).catch(() => {});
       });
