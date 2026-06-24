@@ -1583,15 +1583,14 @@ function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
 
-/* ---- system prompt (OPFS sandpie_memory.md + optional skills block) ---- */
+/* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
 async function buildSystemPrompt(convMessages) {
-  let content;
-  try {
-    content = await opfs.read('sandpie_memory.md');
-  } catch (e) {
-    content = 'You are a helpful assistant that reasons through the users requests step-by-step.';
-    await opfs.write('sandpie_memory.md', content);
-  }
+  // The system prompt is an editable value cached in localStorage (Settings →
+  // System prompt) — NOT a synced or browsable OPFS file. Falls back to the
+  // default if the system-prompt module hasn't loaded yet.
+  let content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
+    ? SandpieSystemPrompt.get()
+    : (localStorage.getItem('sandpie-system-prompt') || 'You are a helpful assistant that reasons through the users requests step-by-step.');
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill
   // tool when relevant). Module absent ⇒ plain memory prompt.
