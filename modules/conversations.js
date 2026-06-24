@@ -514,7 +514,7 @@ function setStreamSending(stream, sending) {
 async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !SandpieImages.hasAttachment()) return;
-  SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
+  if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
   $('input').value = '';
 
   const content = await SandpieImages.buildContent(text);
@@ -748,11 +748,11 @@ async function sendSingle(text, stream, opts = {}) {
     if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') {
       lastInFlightTool = ev.tc?.function?.name || 'unknown';
-      try { const a = JSON.parse(ev.tc?.function?.arguments || '{}'); if (ev.tc?.function?.name === 'run_python' && a.path) SandpieAugmentations.getConvMeta(activeConvId).scripts.add(a.path); } catch (_) {}
+      try { const a = JSON.parse(ev.tc?.function?.arguments || '{}'); if (ev.tc?.function?.name === 'run_python' && a.path && typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.getConvMeta(activeConvId).scripts.add(a.path); } catch (_) {}
     }
     if (ev.type === 'tool_result') {
       lastInFlightTool = null;
-      try { const m = String(ev.result || '').match(/Created:\s*([^\s]+)/); if (m) SandpieAugmentations.getConvMeta(activeConvId).files.add(m[1]); } catch (_) {}
+      try { const m = String(ev.result || '').match(/Created:\s*([^\s]+)/); if (m && typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.getConvMeta(activeConvId).files.add(m[1]); } catch (_) {}
     }
     if (ev.type === 'usage') Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
     dispatchAgentEvent(ev, renderer, host);
