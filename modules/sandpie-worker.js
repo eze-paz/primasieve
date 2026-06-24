@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie'];   // the whole sandpie/ folder (conversations, age
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.5.0-sandpie-folder';
+const WORKER_VERSION = '2.6.0-no-index-files';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -488,21 +488,6 @@ function truncateToolResult(result) {
   return new TextDecoder().decode(bytes.slice(0, MAX_TOOL_RESULT_BYTES)) + "\n\n[truncated: tool result exceeded 30kB]";
 }
 
-async function trackScriptRun(scriptPath, success, stderr) {
-  try {
-    const key = 'script_usage_index.json';
-    const root = await navigator.storage.getDirectory();
-    let data = {};
-    try { const fh = await root.getFileHandle(key); data = JSON.parse(await (await fh.getFile()).text()); } catch (_) {}
-    if (!data[scriptPath]) data[scriptPath] = { count: 0, errors: 0, firstUsed: Date.now() };
-    data[scriptPath].count += 1;
-    data[scriptPath].lastUsed = Date.now();
-    if (!success) { data[scriptPath].errors += 1; data[scriptPath].lastError = (stderr || '').trim().slice(0, 500); }
-    const fh = await root.getFileHandle(key, { create: true });
-    const w = await fh.createWritable(); await w.write(JSON.stringify(data, null, 2)); await w.close();
-  } catch (e) { console.warn('[sandpie-worker] usage tracking failed:', e); }
-}
-
 function sourceFromTraceback(tb, code) {
   if (!tb || !code) return '';
   const lines = code.split('\n');
@@ -553,7 +538,6 @@ async function tool_run_python({ path, args }, ctx) {
       }
       let out = stdout.trimEnd();
       if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-      trackScriptRun(normPath, true, stderr);
       return { result: out || '(no output)' };
     } catch (e) {
       let msg = '';
@@ -565,10 +549,8 @@ async function tool_run_python({ path, args }, ctx) {
       const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
       if (isPyodideFatal(e, msg, stderr)) {
         resetPyodide(msg || stderr.trim() || 'empty exception');
-        trackScriptRun(normPath, false, stderr);
         return { result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.' + (msg ? '\n--- crash signal ---\n' + msg : '') + tail };
       }
-      trackScriptRun(normPath, false, stderr);
       const src = sourceFromTraceback(msg, code);
       return { result: 'Error: ' + (msg || 'unknown (no message)') + (src ? '\n\n--- ' + normPath + ' (around the error) ---\n' + src : '') + tail };
     } finally {
@@ -1132,16 +1114,6 @@ async function tool_write_file({ path, content, _conv }) {
         catch (e) { console.warn('[sandpie-worker] syncfs after write_file failed:', e); resolve(); }
       }));
     }
-    try {
-      const root = await navigator.storage.getDirectory();
-      let fh; try { fh = await root.getFileHandle('conv2file_index.json'); } catch (_) { fh = await root.getFileHandle('conv2file_index.json', { create: true }); }
-      const writable = await fh.createWritable({ keepExistingData: true });
-      let map = {}; try { map = JSON.parse(await (await fh.getFile()).text()); } catch (_) {}
-      if (!map[norm]) map[norm] = { conversations: [], count: 0 };
-      if (_conv && !map[norm].conversations.includes(_conv)) map[norm].conversations.push(_conv);
-      map[norm].count++;
-      await writable.write(JSON.stringify(map, null, 2)); await writable.close();
-    } catch (_) {}
     return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
 }

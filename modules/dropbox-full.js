@@ -310,6 +310,15 @@
       localStorage.removeItem('dbxfull-subscriptions');
       localStorage.removeItem('dbxfull-subs-state');
     }
+    // Worker provenance/usage index files are no longer written — remove any
+    // leftovers locally + from Dropbox (root-level files that used to sync). Once.
+    if (localStorage.getItem('dbxfull-index-files-cleaned') !== '1') {
+      localStorage.setItem('dbxfull-index-files-cleaned', '1');
+      for (const f of ['conv2file_index.json', 'script_usage_index.json']) {
+        try { await Sandpie.opfs.remove(f); } catch (_) {}
+        try { if (tokens()) await del(relToCloud(f)); } catch (_) {}
+      }
+    }
   }
 
   // One-time move of the exempt folders under a single sandpie/ folder:
