@@ -33,7 +33,7 @@
  * Usage: <script type="module" src="modules/agents.js"></script>
  */
 
-const AGENTS_DIR = 'agents';
+const AGENTS_DIR = 'sandpie/agents';
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
 // ---- small helpers ---------------------------------------------------------

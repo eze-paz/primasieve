@@ -45,7 +45,7 @@
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // opt-in: don't bulk-download; the AI hydrates files on demand (worker)
-  const EXEMPT_PREFIXES = ['_conversations', 'skills', 'agents'];   // always eagerly synced — the app reads these directly
+  const EXEMPT_PREFIXES = ['sandpie'];   // the whole sandpie/ folder (conversations, agents, skills) is always eagerly synced
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -310,6 +310,51 @@
       localStorage.removeItem('dbxfull-subscriptions');
       localStorage.removeItem('dbxfull-subs-state');
     }
+  }
+
+  // One-time move of the exempt folders under a single sandpie/ folder:
+  //   _conversations -> sandpie/conversations,  agents -> sandpie/agents,  skills -> sandpie/skills
+  // Dropbox side uses move_v2 (ATOMIC — the source is preserved if it fails), and
+  // if it can't complete we abort WITHOUT touching local, so local and Dropbox
+  // never diverge (no data loss, no duplication); we retry next boot. Only after
+  // Dropbox reflects the new layout (or we're offline) do we move OPFS + set the
+  // guard. Runs before dehydratePurge so the moved files are seen as exempt.
+  const SANDPIE_MOVES = [['_conversations', 'sandpie/conversations'], ['agents', 'sandpie/agents'], ['skills', 'sandpie/skills']];
+  async function opfsMoveDir(oldRel, newRel) {
+    const opfs = Sandpie.opfs;
+    let files = [];
+    try { files = await opfs.list(oldRel); } catch { return; }   // nothing to move
+    for (const f of files) {
+      const sub = f.slice(oldRel.length).replace(/^\/+/, '');
+      try { await opfs.write(newRel + '/' + sub, await opfs.readBytes(f)); }
+      catch (e) { console.warn('[dropbox-full] move file failed:', f, e && e.message); }
+    }
+    try { await opfs.remove(oldRel); } catch (_) {}
+  }
+  async function migrateExemptToSandpie() {
+    if (localStorage.getItem('dbxfull-sandpie-migrated') === '1') return;
+    if (tokens()) {
+      let wr = '';
+      try { await ensureWorkingRoot(); wr = (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''); } catch (_) {}
+      if (!wr) return;   // root not resolved yet → retry next boot
+      for (const [oldName, newRel] of SANDPIE_MOVES) {
+        try { await api('/2/files/move_v2', { from_path: wr + '/' + oldName, to_path: wr + '/' + newRel, autorename: false }); }
+        catch (e) {
+          const m = String((e && e.message) || '').toLowerCase();
+          // not_found = source already moved/never existed; conflict/duplicate = dest already there → fine.
+          if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox-full] sandpie migration deferred:', oldName, m); return; }
+        }
+      }
+      // Dropbox now reflects the new layout — reset sync state so the next sync
+      // reconciles it cleanly (the existing target-change reset path).
+      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY);
+    }
+    for (const [oldName, newRel] of SANDPIE_MOVES) {
+      try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox-full] local move failed:', oldName, e && e.message); }
+    }
+    localStorage.setItem('dbxfull-sandpie-migrated', '1');
+    try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
+    try { if (window.refreshConversationList) window.refreshConversationList(); } catch (_) {}
   }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
@@ -741,7 +786,7 @@
           <input type="checkbox" id="dbxfullDehydrated" style="flex:none; width:16px; height:16px; margin:0; padding:0;">
           <span>On-demand file access</span>
         </label>
-        <div style="font-size:0.63rem; color:var(--sp-text-dim); margin:0.2rem 0 0 1.5rem; line-height:1.35;">The AI sees your whole Dropbox tree and fetches a file only when it reads or runs it — no bulk download. <code>_conversations</code>, <code>skills</code>, <code>agents</code> stay fully synced. Fetched files are cleared on reload.</div>
+        <div style="font-size:0.63rem; color:var(--sp-text-dim); margin:0.2rem 0 0 1.5rem; line-height:1.35;">The AI sees your whole Dropbox tree and fetches a file only when it reads or runs it — no bulk download. the <code>sandpie/</code> folder (conversations, agents, skills) stays fully synced. Fetched files are cleared on reload.</div>
       `;
   function wireCloudPanel(body) {
     const input = body.querySelector('#dbxfullAppKey');
@@ -771,7 +816,7 @@
         if (on) {
           const idx = cloudIndex();
           const n = Object.keys(idx).filter(r => idx[r] && idx[r].kind === 'file' && !isExemptRel(r)).length;
-          const ok = confirm(`Enable on-demand file access?\n\nLocal copies of ~${n} Dropbox file(s) will be removed from this browser so the AI fetches them only when it needs them. Your files stay safe in Dropbox — nothing is deleted there. _conversations, skills and agents stay fully synced, and any unsaved local changes are kept.`);
+          const ok = confirm(`Enable on-demand file access?\n\nLocal copies of ~${n} Dropbox file(s) will be removed from this browser so the AI fetches them only when it needs them. Your files stay safe in Dropbox — nothing is deleted there. Your sandpie/ folder (conversations, agents, skills) stays fully synced, and any unsaved local changes are kept.`);
           if (!ok) { dehyd.checked = false; return; }
         }
         localStorage.setItem(DEHYDRATED_KEY, on ? '1' : '0');
@@ -910,6 +955,7 @@
         await maybeMigrateAiSandbox();   // MIGRATE_AI_SANDBOX (temporary)
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
+        await migrateExemptToSandpie();
         sync();
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
@@ -918,9 +964,12 @@
         catch (e) { console.warn('[dropbox-full] pre-sync:', e && e.message); }
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
+        await migrateExemptToSandpie();
         if (dehydrated()) { try { await dehydratePurge(); } catch (_) {} }   // ephemeral: flush last session's clean hydrated copies (skips unsynced edits)
         sync();
       })();
+    } else {
+      migrateExemptToSandpie().catch(() => {});   // offline: local-only move under sandpie/
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

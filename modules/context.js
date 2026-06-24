@@ -50,7 +50,7 @@ const SandpieTokens = (() => {
       if (stored) return usageTotal(JSON.parse(stored));
     } catch {}
     try {
-      const text = await window.opfs.read('_conversations/' + convId + '.json');
+      const text = await window.opfs.read('sandpie/conversations/' + convId + '.json');
       const data = JSON.parse(text);
       if (data.usage) return usageTotal(data.usage);
       if (data.messages) return estimateTokens(data.messages);
@@ -135,7 +135,7 @@ window.SandpieTokens = SandpieTokens;
    sandpie.js → tool_load_skill) when a request matches — by intent, not keywords.
    ============================================================================= */
 const SandpieContext = (() => {
-  const SKILLS_DIR = 'skills';
+  const SKILLS_DIR = 'sandpie/skills';
   const SKILL_FILE = 'SKILL.md';
   const DESC_CAP = 400;           // chars of description shown per skill in the prompt
   const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;

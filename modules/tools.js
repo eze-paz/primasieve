@@ -72,7 +72,7 @@ edit_file: {
     },
   },
   search: {
-    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /_conversations unless "path" points inside it.`,
+    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it.`,
     parameters: {
       type: 'object',
       properties: {

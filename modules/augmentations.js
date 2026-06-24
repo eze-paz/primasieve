@@ -24,7 +24,7 @@ function buildTf(tokens) {
 async function buildIndex() {
   const docs = [], tdc = new Map(), kp = [];
   try {
-    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
+    const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('sandpie')).getDirectoryHandle('conversations');
     for await (const [_,h] of d.entries()) {
       try {
         const data = JSON.parse(await (await h.getFile()).text());
@@ -56,7 +56,7 @@ function cosine(a,b) {
 async function indexKey() {
   const k = [];
   try {
-    const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
+    const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('sandpie')).getDirectoryHandle('conversations');
     for await (const [_,h] of d.entries()) {
       try {
         const data = JSON.parse(await (await h.getFile()).text());
@@ -88,7 +88,7 @@ async function showRelevance(queryText, activeConvId) {
     const m = getConvMeta(id);
     let c = null;
     try {
-      const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('_conversations');
+      const d = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('sandpie')).getDirectoryHandle('conversations');
       const h = await d.getFileHandle(id + '.json');
       c = JSON.parse(await (await h.getFile()).text());
     } catch(e) {}

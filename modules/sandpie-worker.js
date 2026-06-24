@@ -53,12 +53,12 @@ let _dbxCtx = null;
 // first touch. See the hydration helpers further down. Default off ⇒ no change.
 let _dehydrated = false;
 let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
-let _dbxExempt = ['_conversations', 'skills', 'agents'];   // always eager — the app reads these directly
+let _dbxExempt = ['sandpie'];   // the whole sandpie/ folder (conversations, agents, skills) is always eager
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.4.0-copy-to-workspace';
+const WORKER_VERSION = '2.5.0-sandpie-folder';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -270,8 +270,8 @@ async function opfsWriteBytes(path, bytes) {
 // tools (read_file/load_image/list_files), and SYNCHRONOUSLY (blocking XHR) for
 // Pyodide's read() during run_python — only possible in a Web Worker, since sync
 // XHR (and responseType on it) is forbidden on the main thread and there is no
-// SharedArrayBuffer (no cross-origin isolation in prod). _conversations/, skills/
-// and agents/ are EXEMPT and stay on the page's eager sync. Stage 1 is ephemeral:
+// SharedArrayBuffer (no cross-origin isolation in prod). The sandpie/ folder
+// (conversations/agents/skills) is EXEMPT and stays on the page's eager sync. Ephemeral:
 // hydrated files are recorded in an OPFS manifest and wiped on the next boot.
 const _hydratedSet = new Set();       // rels hydrated this session (in-memory; the page owns persistence + flush)
 const _hydrating = new Map();         // rel -> Promise (async hydration dedupe)
@@ -611,7 +611,7 @@ async function tool_load_image({ path }, ctx) {
 async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
-  const file = 'skills/' + n + '/SKILL.md';
+  const file = 'sandpie/skills/' + n + '/SKILL.md';
   let text;
   try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
   catch (e) { return { result: 'Error: could not read ' + file + ' — no such skill, or its ' + file + ' is missing.' }; }
@@ -621,7 +621,7 @@ async function tool_load_skill({ name }, ctx) {
 
 const FILE_TOOL_CAP = 28 * 1024;
 const FILE_TEXT_MAX = 2 * 1024 * 1024;
-const SEARCH_SKIP_TOP = '_conversations';
+const SEARCH_SKIP_TOP = 'sandpie/conversations';
 
 function normFilesPath(p) {
   return String(p == null ? '' : p).replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '');
@@ -904,7 +904,7 @@ const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_fil
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
   if (/^[a-z0-9][a-z0-9_-]*$/.test(n)) {
-    try { await opfsReadBytes('skills/' + n + '/SKILL.md'); return { result: 'Error: "' + name + '" is a skill, not a tool. Call load_skill({"name":"' + n + '"}) to use it.' }; } catch {}
+    try { await opfsReadBytes('sandpie/skills/' + n + '/SKILL.md'); return { result: 'Error: "' + name + '" is a skill, not a tool. Call load_skill({"name":"' + n + '"}) to use it.' }; } catch {}
   }
   return { result: 'Error: unknown tool "' + name + '". Available tools: ' + KNOWN_TOOLS.join(', ') + '.' };
 }
