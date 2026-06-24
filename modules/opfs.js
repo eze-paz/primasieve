@@ -179,13 +179,11 @@ opfs.currentPath = function() {
   return (document.getElementById('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
 };
 
-/* Read-only fence. Subscription mirrors are owned by the sync provider, which
-   declares which paths are read-only and the reserved dir name. Falls back to
-   "everything writable" when the provider doesn't implement it (e.g. an older
-   sync provider that predates read-only subscriptions). */
+/* Read-only fence. The sync provider MAY declare which paths are read-only; this
+   falls back to "everything writable" when it doesn't (the current provider
+   doesn't — read-only subscriptions were removed). */
 opfs._roProvider = function() { try { return window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); } catch { return null; } };
 opfs.isReadOnly = function(path) { const p = opfs._roProvider(); try { return !!(p && p.isReadOnlyPath && p.isReadOnlyPath(path)); } catch { return false; } };
-opfs.subsDirName = function() { const p = opfs._roProvider(); try { return (p && p.subscriptionsDir && p.subscriptionsDir()) || null; } catch { return null; } };
 
 
 
@@ -782,7 +780,6 @@ opfs.uploadEntry = async function(entry, dirPath) {
 };
 
 
-let subsExpanded = false;
 
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
@@ -830,10 +827,6 @@ opfs.refreshFileList = async function() {
     }
   }
   const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
-  const SUBS = opfs.subsDirName();   // reserved subscription-mirror dir (null if the provider has none)
-  // At root the subscription mirror is surfaced as its own "Subscriptions"
-  // group (below), not as a regular inline folder.
-  if (path === '' && SUBS) names.delete(SUBS);
 
   const frag = document.createDocumentFragment();
 
@@ -919,23 +912,10 @@ opfs.refreshFileList = async function() {
   }));
   items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
 
-  // Subscriptions (read-only Dropbox mirrors) — shown at root only, as a
-  // collapsible group instead of an inline folder.
-  let subItems = [];
-  if (path === '' && SUBS) {
-    let subDirs = [];
-    try { subDirs = (await opfs.listDir(SUBS)).filter(e => e.kind === 'directory'); } catch {}
-    subItems = subDirs.map((e) => {
-      const fullKey = SUBS + '/' + e.name;
-      return { name: e.name, kind: 'folder', status: 'synced', fullKey, size: undefined };
-    });
-    subItems.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
   const fcEl = document.getElementById('fileCount');
   if (fcEl) fcEl.textContent = items.length ? `${items.length}` : '';
 
-  if (!items.length && !subItems.length) {
+  if (!items.length) {
     const li = document.createElement('li');
     li.className = 'empty';
     li.textContent = (window.Sandpie && Sandpie.initialSyncDone()) ? '(empty)' : 'Loading…';
@@ -944,16 +924,6 @@ opfs.refreshFileList = async function() {
   }
 
   for (const it of items) renderItem(it);
-
-  if (subItems.length) {
-    const header = document.createElement('li');
-    header.className = 'shared-toggle';
-    header.textContent = `${subsExpanded ? '▾' : '▸'} Subscriptions (${subItems.length})`;
-    header.title = 'Read-only Dropbox folder mirrors';
-    header.onclick = () => { subsExpanded = !subsExpanded; opfs.refreshFileList(); };
-    frag.appendChild(header);
-    if (subsExpanded) subItems.forEach(renderItem);
-  }
 
   ul.replaceChildren(frag);
 };
