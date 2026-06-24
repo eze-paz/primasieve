@@ -72,35 +72,17 @@ edit_file: {
     },
   },
   search: {
-    description: `Search file CONTENTS by regular expression across OPFS (/files/), returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path" (a subtree) and/or "include" (a name glob like "*.js"). Set files_only:true to get just the list of matching files. Case-insensitive unless ignore_case:false. (To find files by NAME, use list_files.) Skips /_conversations unless "path" points inside it.`,
+    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /_conversations unless "path" points inside it.`,
     parameters: {
       type: 'object',
       properties: {
         pattern:     { type: 'string', description: 'JavaScript regular expression matched per line (e.g. "function\\\\s+\\\\w+", "TODO").' },
-        path:        { type: 'string', description: 'Subtree to search, relative to /files/ (default: everything).' },
+        path:        { type: 'string', description: 'Subtree relative to your workspace (default: everything), or an absolute Dropbox path (e.g. "/Shared/reports") to search elsewhere in Dropbox.' },
         include:     { type: 'string', description: 'Only search files whose name/path matches this glob (e.g. "*.py").' },
         files_only:  { type: 'boolean', description: 'Return just matching file paths instead of per-line matches.' },
         ignore_case: { type: 'boolean', description: 'Case-insensitive (default true).' },
       },
       required: ['pattern'],
-    },
-  },
-  search_dropbox: {
-    description: `Search for files in the user's Dropbox by keyword using Dropbox search_v2 (full-text content search).
-Rules:
-- If the result count is >100, you MUST refine the query (more specific terms or a narrower path) before proceeding — do NOT try to read all matches.
-- If ≤100 results, list the matching paths; use read_file on whichever files are relevant.
-- Dropbox search is token/prefix-based, NOT substring or regex — use whole words for best recall.
-- Results are eventually consistent: newly created or edited files may not appear immediately.
-- Set filename_only:true to match only file names (faster, less noise); omit it (default false) to also match file content.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        query:         { type: 'string',  description: 'Search query. Use whole words; Dropbox does prefix-token matching.' },
-        path:          { type: 'string',  description: 'Optional Dropbox folder path to restrict the search (e.g. "/R+D+I/reports"). Defaults to the user\'s working sync folder.' },
-        filename_only: { type: 'boolean', description: 'Search file names only (default false = also search file content).' },
-      },
-      required: ['query'],
     },
   },
   show_artifact: {

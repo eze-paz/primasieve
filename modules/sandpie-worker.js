@@ -45,7 +45,7 @@ self.addEventListener('unhandledrejection', (ev) => {
   console.error('unhandled rejection:', r && (r.stack || r.message) || String(r));
 });
 
-// Dropbox context pushed from the page so tool_search_dropbox can call the API.
+// Dropbox context pushed from the page so search (cloud leg) + hydration can call the API.
 let _dbxCtx = null;
 
 // Dehydrated-Dropbox state (opt-in JIT hydration). When on, the page stops
@@ -58,7 +58,7 @@ let _dbxExempt = ['_conversations', 'skills', 'agents'];   // always eager — t
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.2.0-dehydrated-writeback';
+const WORKER_VERSION = '2.3.0-unified-search';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -583,7 +583,10 @@ async function tool_show_artifact({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
   try { await opfsReadBytes(clean); return { result: 'artifact:' + clean }; }
-  catch (e) { return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' }; }
+  catch (e) {
+    if (_indexEntry(clean)) { try { await hydrateAsync(clean); return { result: 'artifact:' + clean }; } catch (_) {} }
+    return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
+  }
 }
 
 async function tool_load_image({ path }, ctx) {
@@ -723,15 +726,41 @@ async function tool_list_files({ path, pattern, recursive }) {
   return { result: buf.replace(/\n$/, '') };
 }
 
-async function tool_search({ pattern, path, include, files_only, ignore_case }) {
-  if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
-  let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
-  catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
-  const norm = normFilesPath(path);
+// ---- search (unified: local grep + Dropbox content search, path-aware) -----
+// Literal words (>=3 chars) lifted from the regex, used to narrow the cloud leg
+// (Dropbox search is keyword-based, not regex).
+function _searchLiterals(pattern) {
+  const terms = String(pattern).match(/[A-Za-z0-9_]{3,}/g) || [];
+  return [...new Set(terms)].sort((a, b) => b.length - a.length).slice(0, 4);
+}
+async function _opfsExists(rel) { try { await _opfsGetFile(rel); return true; } catch { return false; } }
+// Working-root-relative form of a Dropbox absolute path, or null if outside it.
+function _relUnderRoot(absPath) {
+  const wr = ((_dbxCtx && _dbxCtx.workingRoot) || '').replace(/\/+$/, '').toLowerCase();
+  const p = String(absPath).replace(/\/+$/, '');
+  if (!wr) return null;
+  if (p.toLowerCase() === wr) return '';
+  if (p.toLowerCase().startsWith(wr + '/')) return p.slice(wr.length + 1);
+  return null;
+}
+// Dropbox search_v2 → sorted path_display list. Throws on API error.
+async function _dropboxSearchPaths(query, searchPath, filenameOnly) {
+  const { token, pathRoot } = _dbxCtx;
+  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
+  const body = JSON.stringify({ query, options: { path: searchPath || '', max_results: 101, file_status: 'active', filename_only: !!filenameOnly } });
+  const res = await fetch('https://api.dropboxapi.com/2/files/search_v2', { method: 'POST', headers, body });
+  if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox search failed (' + res.status + '): ' + txt.slice(0, 300)); }
+  const data = await res.json();
+  const matches = Array.isArray(data.matches) ? data.matches : [];
+  const paths = matches.map(m => { const meta = m.metadata?.metadata || m.metadata || {}; return meta.path_display || meta.path_lower || ''; }).filter(Boolean);
+  return { paths: paths.sort(), tooMany: matches.length > 100 };
+}
+async function _localGrep(rx, norm, include, files_only) {
   const inc = include ? globToRegExp(include) : null;
   const skipTop = norm.startsWith(SEARCH_SKIP_TOP) ? null : SEARCH_SKIP_TOP;
   const files = await opfsCollect(norm, { recursive: true, includeDirs: false, max: 6000, skipTop });
-  if (files === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+  if (files === null) return null;
   let buf = '', matches = 0, scanned = 0, truncated = false;
   const hitFiles = new Set();
   for (const f of files) {
@@ -751,37 +780,86 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
     }
     if (truncated) break;
   }
-  const where = norm ? '/' + norm : '/files/';
-  if (files_only) {
-    if (!hitFiles.size) return { result: `No files contain /${pattern}/ in ${where}. Scanned ${scanned}.` };
-    return { result: `${hitFiles.size} file(s) match (scanned ${scanned}):\n` + [...hitFiles].sort().join('\n') };
+  return { buf, matches, scanned, truncated, hitFiles };
+}
+
+// Unified search. Path-aware: inside the working root it greps local files and
+// (when dehydrated) merges Dropbox content-search hits for un-downloaded files;
+// an absolute Dropbox path OUTSIDE the working root does a pure cloud search.
+async function tool_search({ pattern, path, include, files_only, ignore_case }) {
+  if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
+  let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
+  catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
+
+  const connected = !!(_dbxCtx && _dbxCtx.token);
+  const wr = ((_dbxCtx && _dbxCtx.workingRoot) || '').replace(/\/+$/, '');
+  const raw = (path == null) ? '' : String(path).trim();
+
+  // Classify the path. A leading "/" is a Dropbox-absolute path; if it isn't under
+  // the working root, search it purely in the cloud.
+  let outsideRoot = false, cloudScope = wr, norm = '';
+  if (raw.startsWith('/')) {
+    const rel = _relUnderRoot(raw);
+    if (rel == null) { outsideRoot = true; cloudScope = raw.replace(/\/+$/, ''); }
+    else { norm = rel; cloudScope = wr + (rel ? '/' + rel : ''); }
+  } else {
+    norm = normFilesPath(raw);
+    cloudScope = wr + (norm ? '/' + norm : '');
   }
-  if (!matches) return { result: `No matches for /${pattern}/ in ${where}${inc ? ' (include ' + include + ')' : ''}. Scanned ${scanned} files.` };
-  const head = `${matches} match${matches === 1 ? '' : 'es'} in ${hitFiles.size} file${hitFiles.size === 1 ? '' : 's'} (scanned ${scanned})${truncated ? ' — truncated; narrow the pattern or path' : ''}:\n`;
-  return { result: head + buf.replace(/\n$/, '') };
+
+  // OUTSIDE the working root → pure cloud search (file hits only).
+  if (outsideRoot) {
+    if (!connected) return { result: `Error: "${raw}" is outside your synced workspace and Dropbox isn't connected, so it can't be searched.` };
+    const lits = _searchLiterals(pattern);
+    if (!lits.length) return { result: 'To search outside your workspace, include a literal word (cloud search is keyword-based, not full regex).' };
+    let r; try { r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false); }
+    catch (e) { return { result: e.message }; }
+    if (r.tooMany) return { result: `Too many cloud matches (>100) for "${lits.join(' ')}" in ${cloudScope}. Narrow the path or use more specific terms.` };
+    if (!r.paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${cloudScope}.` };
+    return { result: `${r.paths.length} cloud file(s) matching "${lits.join(' ')}" in ${cloudScope} (open with read_file):\n` + r.paths.join('\n') };
+  }
+
+  // IN the working root → local grep.
+  const local = await _localGrep(rx, norm, include, files_only);
+  if (local === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
+  const where = norm ? '/' + norm : '/files/';
+
+  // Dehydrated → also surface matching cloud files not downloaded locally.
+  let cloudExtra = '';
+  if (_dehydrated && connected) {
+    const lits = _searchLiterals(pattern);
+    if (lits.length) {
+      try {
+        const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false);
+        if (r.tooMany) {
+          cloudExtra = `\n\n(Cloud: >100 more files may match "${lits.join(' ')}" — narrow the path/pattern to list them.)`;
+        } else {
+          const cloudOnly = [];
+          for (const p of r.paths) {
+            const rel = _relUnderRoot(p);
+            if (rel == null || _relExempt(rel)) continue;
+            if (local.hitFiles.has(rel)) continue;       // already shown with line matches
+            if (await _opfsExists(rel)) continue;         // hydrated locally → already grepped
+            cloudOnly.push(rel);
+          }
+          if (cloudOnly.length) cloudExtra = `\n\nCloud files also matching "${lits.join(' ')}" (not downloaded — open with read_file):\n` + cloudOnly.sort().join('\n');
+        }
+      } catch (_) { /* cloud leg is best-effort */ }
+    }
+  }
+
+  if (files_only) {
+    const head = local.hitFiles.size
+      ? `${local.hitFiles.size} local file(s) match (scanned ${local.scanned}):\n` + [...local.hitFiles].sort().join('\n')
+      : `No local files contain /${pattern}/ in ${where}. Scanned ${local.scanned}.`;
+    return { result: head + cloudExtra };
+  }
+  if (!local.matches) return { result: `No local matches for /${pattern}/ in ${where}. Scanned ${local.scanned} files.` + cloudExtra };
+  const head = `${local.matches} match${local.matches === 1 ? '' : 'es'} in ${local.hitFiles.size} file${local.hitFiles.size === 1 ? '' : 's'} (scanned ${local.scanned})${local.truncated ? ' — truncated; narrow the pattern or path' : ''}:\n`;
+  return { result: head + local.buf.replace(/\n$/, '') + cloudExtra };
 }
 
-async function tool_search_dropbox({ query, path, filename_only }) {
-  if (!_dbxCtx) return { result: 'Error: Dropbox token not available in worker. Connect Dropbox in Settings and reload the page.' };
-  if (!query || typeof query !== 'string' || !query.trim()) return { result: 'Error: query is required.' };
-  const { token, pathRoot, workingRoot } = _dbxCtx;
-  const searchPath = (typeof path === 'string' && path.trim()) ? path.trim() : (workingRoot || '');
-  const reqBody = { query: query.trim(), options: { path: searchPath, max_results: 101, file_status: 'active', filename_only: !!filename_only } };
-  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
-  let res;
-  try { res = await fetch('https://api.dropboxapi.com/2/files/search_v2', { method: 'POST', headers, body: JSON.stringify(reqBody) }); }
-  catch (e) { return { result: 'Error reaching Dropbox: ' + e.message }; }
-  if (!res.ok) { const txt = await res.text().catch(() => ''); return { result: 'Dropbox search failed (' + res.status + '): ' + txt.slice(0, 400) }; }
-  const data = await res.json();
-  const matches = Array.isArray(data.matches) ? data.matches : [];
-  if (matches.length === 0) return { result: 'No files found for "' + query + '".' };
-  if (matches.length > 100) return { result: 'Too many results (>100) for "' + query + '". Use more specific terms or restrict to a subfolder with the path parameter.' };
-  const paths = matches.map(m => { const meta = m.metadata?.metadata || m.metadata || {}; return meta.path_display || meta.path_lower || '(unknown)'; }).sort();
-  return { result: matches.length + ' file(s) found for "' + query + '":\n' + paths.join('\n') };
-}
-
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','search_dropbox','show_artifact','load_skill','load_image'];
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','show_artifact','load_skill','load_image'];
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -801,7 +879,7 @@ async function runTool(name, args, ctx) {
     case 'read_file':     return tool_read_file(args, ctx);
     case 'list_files':    return tool_list_files(args, ctx);
     case 'search':        return tool_search(args, ctx);
-    case 'search_dropbox':return tool_search_dropbox(args, ctx);
+    case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     default:              return unknownTool(name);
@@ -1066,7 +1144,13 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   let current;
   try { current = new TextDecoder().decode(await opfsReadBytes(norm)); }
-  catch { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
+  catch {
+    // Dehydrated: edit a not-yet-downloaded cloud file by hydrating it first.
+    if (_indexEntry(norm)) {
+      try { await hydrateAsync(norm); current = new TextDecoder().decode(await opfsReadBytes(norm)); }
+      catch { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
+    } else { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
+  }
   const res = applyEdit(current, old_str, new_str);
   if (res.error) return { result: res.error };
   try {
