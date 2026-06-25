@@ -157,16 +157,19 @@
   .sp-block-head { font-size: 0.82rem; font-weight: 600; color: var(--sp-text); display: flex; align-items: baseline; gap: 0.45rem; }
   .sp-count { font-size: 0.7rem; color: var(--sp-text-dim); font-weight: 400; }
   .sp-block-hint { font-size: 0.7rem; color: var(--sp-text-dim); margin: 0.2rem 0 0.55rem; line-height: 1.4; }
-  .sp-item { border: 1px solid var(--sp-border); border-radius: 6px; margin-bottom: 0.35rem; overflow: hidden; }
+  /* Self-contained card: its OWN panel background + text colour (mirrors the
+     prompt textarea), so rows stay legible no matter the modal/--sp-surface
+     colour or a custom palette — never rely on inheriting the modal background. */
+  .sp-item { border: 1px solid var(--sp-border); border-radius: 6px; margin-bottom: 0.35rem; overflow: hidden; background: var(--sp-panel); color: var(--sp-text); }
   .sp-item-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.55rem; cursor: pointer; }
-  .sp-item-head:hover { background: var(--sp-panel); }
+  .sp-item-head:hover { background: var(--sp-border); }
   .sp-item-head input[type="checkbox"] { flex: 0 0 auto; cursor: pointer; }
-  .sp-item-name { font: 0.8rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); white-space: nowrap; }
+  .sp-item-name { font: 0.8rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); white-space: nowrap; flex: 0 0 auto; }
   .sp-item-desc { font-size: 0.72rem; color: var(--sp-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
   .sp-item-meta { font-size: 0.62rem; color: var(--sp-text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto; white-space: nowrap; }
   .sp-caret { font-size: 0.7rem; color: var(--sp-text-dim); }
   .sp-item-body { padding: 0.5rem 0.55rem; border-top: 1px solid var(--sp-border); }
-  .sp-edit { width: 100%; resize: vertical; padding: 0.45rem; background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 5px; color: var(--sp-text); font: 0.74rem 'JetBrains Mono', Consolas, monospace; line-height: 1.45; box-sizing: border-box; }
+  .sp-edit { width: 100%; resize: vertical; padding: 0.45rem; background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 5px; color: var(--sp-text); font: 0.74rem 'JetBrains Mono', Consolas, monospace; line-height: 1.45; box-sizing: border-box; }
   .sp-item-btns { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.45rem; }
   .sp-item-btns button { font-size: 0.72rem; padding: 0.2rem 0.55rem; }
   .sp-item-btns button:disabled { opacity: 0.45; cursor: default; }
