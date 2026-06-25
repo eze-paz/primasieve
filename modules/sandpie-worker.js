@@ -927,20 +927,53 @@ async function tool_copy_to_workspace({ src, dest }) {
   const finalPath = meta.path_display || (wr + '/' + rel);
   const finalRel = _relUnderRoot(finalPath) || rel;
   if (meta['.tag'] === 'folder') {
+    if (_dehydrated) {
+      if (!_dbxIndex) _dbxIndex = {};
+      _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'folder', path: finalPath, cloudMtime: meta.server_modified };
+    }
     return { result: `Copied folder into your workspace as ${finalRel}/. Its files appear after the next sync; then use list_files / read_file on them.` };
   }
-  // Make it usable now: in on-demand mode, index it so read_file hydrates it
-  // lazily; otherwise pull the bytes into the workspace immediately.
-  if (_dehydrated) {
-    if (!_dbxIndex) _dbxIndex = {};
-    _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'file', path: finalPath, size: meta.size, rev: meta.rev, cloudMtime: meta.server_modified };
-  } else {
-    try {
-      const tl = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers, body: JSON.stringify({ path: finalPath }) });
-      if (tl.ok) { const dl = await fetch((await tl.json()).link, { method: 'GET' }); if (dl.ok) await opfsWriteBytes(finalRel, new Uint8Array(await dl.arrayBuffer())); }
-    } catch (_) { /* best-effort; the next sync pulls it down */ }
+
+  // Download the copied file into OPFS immediately so the LLM can work on it.
+  let dlOk = false;
+  try {
+    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers, body: JSON.stringify({ path: finalPath }) });
+    if (tlRes.ok) {
+      const { link } = await tlRes.json();
+      const dl = await fetch(link, { method: 'GET' });
+      if (dl.ok) {
+        const bytes = new Uint8Array(await dl.arrayBuffer());
+        await opfsWriteBytes(finalRel, bytes);
+        dlOk = true;
+
+        // 1. Record in cloud index so it's known as synced
+        if (_dehydrated) {
+          if (!_dbxIndex) _dbxIndex = {};
+          _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'file', path: finalPath, size: meta.size, rev: meta.rev, cloudMtime: meta.server_modified };
+        }
+
+        // 2. Notify the page (dropbox-full.js) so file viewer renders it
+        _reportHydrated(finalRel);
+
+        // 3. If Pyodide is running, sync the new file into MEMFS so run_python sees it
+        if (py && _nativefs) {
+          await withPy(async () => {
+            const full = '/files/' + finalRel;
+            const dir = full.substring(0, full.lastIndexOf('/'));
+            if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
+            py.FS.writeFile(full, bytes);
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[sandpie-worker] copy_to_workspace download failed:', e);
   }
-  return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}. Use read_file or run_python on "${finalRel}".` };
+
+  let extra = dlOk
+    ? ' — downloaded and ready to use'
+    : ' (Dropbox copy succeeded, but download to workspace failed — will appear after next sync)';
+  return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
 const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image'];
