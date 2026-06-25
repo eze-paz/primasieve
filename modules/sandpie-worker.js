@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.8.0-load-image-size-guard';
+const WORKER_VERSION = '2.7.0-sandpie-content-folders';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -571,11 +571,6 @@ async function tool_show_artifact({ path }, ctx) {
   }
 }
 
-// An image is embedded as a base64 data URL in the next model request. Past a few
-// MB that payload exceeds per-image limits (Claude rejects > ~5MB) and/or blows the
-// context, so load_image refuses oversized images instead of sending them.
-const IMAGE_MAX_B64_BYTES = 5 * 1024 * 1024;   // ~5MB base64 payload ≈ 3.75MB raw image
-
 async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
@@ -585,14 +580,6 @@ async function tool_load_image({ path }, ctx) {
     catch (miss) {
       if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
       else throw miss;
-    }
-    // Size guard: estimate the base64 payload from the raw byte count and bail BEFORE
-    // building the (huge) string — return an actionable error instead of loading it.
-    const b64Bytes = Math.ceil(bytes.length / 3) * 4;
-    if (b64Bytes > IMAGE_MAX_B64_BYTES) {
-      const mb = (bytes.length / (1024 * 1024)).toFixed(1);
-      const capMb = (IMAGE_MAX_B64_BYTES * 3 / 4 / (1024 * 1024)).toFixed(1);
-      return { result: `Error: "${clean}" is ${mb} MB — too large to load as an image and was NOT loaded (its base64 form would exceed the ~5 MB per-image limit and could blow the context window). Downscale it first: write a run_python script that opens it with Pillow (from PIL import Image), shrinks the longest side to <= ~1568 px (img.thumbnail((1568, 1568))) and/or re-saves it as a lower-quality JPEG into sandpie/artifacts/, then call load_image on that smaller copy. Keep the source under about ${capMb} MB.` };
     }
     const ext = (clean.split('.').pop() || '').toLowerCase();
     const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
@@ -1216,6 +1203,8 @@ async function tool_write_file({ path, content, _conv }) {
   } catch (_) {}
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
+    // Notify the page so sync state marks this file dirty (prevents sync deletion).
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
     if (py && _nativefs) {
       await withPy(() => new Promise((resolve) => {
         try { py.FS.syncfs(true, (err) => { if (err) console.warn('[sandpie-worker] syncfs after write_file failed:', err); resolve(); }); }
@@ -1276,6 +1265,8 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (res.error) return { result: res.error };
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(res.updated));
+    // Notify the page so sync state marks this file dirty (prevents sync deletion).
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
     if (py && _nativefs) {
       await withPy(() => new Promise((resolve) => {
         try { py.FS.syncfs(true, (err) => { if (err) console.warn('[sandpie-worker] syncfs after edit_file failed:', err); resolve(); }); }
