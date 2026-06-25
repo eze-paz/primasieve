@@ -492,6 +492,23 @@
         delete state[path]; removedAny = true;
       }
 
+      // When delta sync is unavailable (full re-list / first sync / state lost),
+      // also clean up orphaned local files that no longer exist in Dropbox.
+      // Files created very recently (<60 s) are given a grace period to avoid
+      // deleting conversation artifacts whose dirty-state update is still in flight.
+      if (fullScan) {
+        let allLocal = []; try { allLocal = await opfs.list(); } catch {}
+        const now = Date.now();
+        for (const path of allLocal) {
+          if (cloud[path]) continue;
+          const st = state[path];
+          if (st && st.syncedMtime === 0) continue;            // dirty — keep
+          const lm = await Sandpie.opfsMtime(path);
+          if (!st && lm > 0 && (now - lm) < 60000) continue;  // brand-new — grace period
+          try { await opfs.remove(path); if (st) delete state[path]; removedAny = true; } catch {}
+        }
+      }
+
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
       const toDownload = [];
