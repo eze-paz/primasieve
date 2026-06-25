@@ -242,8 +242,9 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
   try {
     file = await _readLocal();
   } catch (e) {
-    // Dehydrated mode: a cloud placeholder (bytes not local). Fetch on demand via
-    // the sync provider, then open and refresh the list so the ☁ becomes 📄.
+    // Dehydrated mode: a not-yet-downloaded cloud file (bytes not local). Fetch on
+    // demand via the sync provider, then open + refresh (rows look identical
+    // whether local or not, so nothing visibly changes).
     const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
     let hydrated = false;
     if (sp && sp.hydrate) { try { hydrated = await sp.hydrate(fullKey); } catch (_) {} }
@@ -834,11 +835,14 @@ opfs.refreshFileList = async function() {
     const li = document.createElement('li');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
-    const isPlaceholder = it.kind === 'file' && it.status === 'cloud';
     const ro = opfs.isReadOnly(it.fullKey);
-    const kindIcon = it.kind === 'folder' ? '📁 ' : (isPlaceholder ? '☁ ' : '📄 ');
+    const kindIcon = it.kind === 'folder' ? '📁 ' : '📄 ';
     btn.textContent = kindIcon + it.name;
-    btn.title = isPlaceholder ? 'cloud placeholder · click to download' : `${it.kind} · ${it.status}${ro ? ' · read-only' : ''}`;
+    // Hydration is invisible to the user too: a not-yet-downloaded cloud file
+    // looks like any other file (📄) and reports "synced" — clicking it fetches it
+    // transparently (openFile → provider.hydrate).
+    const statusLabel = it.status === 'cloud' ? 'synced' : it.status;
+    btn.title = `${it.kind} · ${statusLabel}${ro ? ' · read-only' : ''}`;
     if (it.kind === 'folder') {
       btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
     } else {
