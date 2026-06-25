@@ -83,13 +83,13 @@ function renderHistoricalMessage(m, host = null) {
     if (content.startsWith('image:')) {
       const path = content.slice('image:'.length);
       if (path && toolCalls.length > 0) {
-        appendToolResultImage(toolCalls[toolCalls.length - 1].dataset.tcId, path);
+        appendToolResultImage(toolCalls[toolCalls.length - 1].dataset.tcId, path, target);
       }
     } else if (!content.startsWith('artifact:')) {
       const t = content;
       const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
       if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display);
+        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display, target);
       }
     }
 
@@ -595,7 +595,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=9');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=10');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1087,8 +1087,9 @@ function tcEscape(s) {
   }[c]));
 }
 
-function appendToolResult(tcId, result) {
-  const toolCalls = document.querySelectorAll('.msg.tool-call');
+function appendToolResult(tcId, result, scopeEl) {
+  const root = scopeEl || document;
+  const toolCalls = root.querySelectorAll('.msg.tool-call');
   let toolCallDiv = null;
   for (const div of toolCalls) {
     if (div.dataset.tcId === tcId) {
@@ -1123,8 +1124,9 @@ function appendToolResult(tcId, result) {
 
 // Render a loaded image (load_image tool) inline inside its tool-call box, in
 // place of a text result. The thumbnail is resolved from OPFS page-side.
-function appendToolResultImage(tcId, path) {
-  const toolCalls = document.querySelectorAll('.msg.tool-call');
+function appendToolResultImage(tcId, path, scopeEl) {
+  const root = scopeEl || document;
+  const toolCalls = root.querySelectorAll('.msg.tool-call');
   let toolCallDiv = null;
   for (const div of toolCalls) {
     if (div.dataset.tcId === tcId) { toolCallDiv = div; break; }
@@ -1335,12 +1337,12 @@ class RoundRenderer {
 
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
-      if (path && idx >= 0 && this.toolCallEls[idx]) appendToolResultImage(tcId, path);
+      if (path && idx >= 0 && this.toolCallEls[idx]) appendToolResultImage(tcId, path, this.host);
       return;
     }
     const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
     if (idx >= 0 && this.toolCallEls[idx]) {
-      appendToolResult(tcId, display);
+      appendToolResult(tcId, display, this.host);
     }
   }
   finalize() {
