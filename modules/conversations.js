@@ -1,8 +1,11 @@
 const CONV_DIR = 'sandpie/conversations';
+const ARCHIVED_DIR = 'sandpie/conversations/archived';
 function newConvId() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
-function convPath(id) { return `${CONV_DIR}/${id}.json`; }
+function convPath(id, archived = false) {
+  return archived ? `${ARCHIVED_DIR}/${id}.json` : `${CONV_DIR}/${id}.json`;
+}
 async function ensureActiveConv() {
   if (activeConvId) return;
   activeConvId = newConvId();
@@ -15,8 +18,12 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
 
+  // Preserve archived location if the conv is already in archived folder.
+  const archived = await opfs.exists(convPath(convId, true));
+  const path = convPath(convId, archived);
+
   let prev = {};
-  try { prev = JSON.parse(await opfs.read(convPath(convId))); } catch {}
+  try { prev = JSON.parse(await opfs.read(path)); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
   let derived = 'Untitled';
   if (firstUser && firstUser.content) {
@@ -34,8 +41,8 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   };
   delete data.compactions;   // legacy restore-stack — superseded by `compaction`
   if (s) { if (s.compaction) data.compaction = s.compaction; else delete data.compaction; }
-  await opfs.write(convPath(convId), JSON.stringify(data));
-  Sandpie.events.emit('file:changed', convPath(convId));
+  await opfs.write(path, JSON.stringify(data));
+  Sandpie.events.emit('file:changed', path);
   await refreshConversationList();
 }
 function renderHistoricalMessage(m, host = null) {
@@ -204,11 +211,17 @@ async function loadConv(id) {
     mountConv(id);
   } else {
     let data;
-    try { data = JSON.parse(await opfs.read(convPath(id))); }
-    catch (e) {
-      if (activeConvId) mountConv(activeConvId);
-      addMsg('err', 'Failed to load conversation: ' + e.message);
-      return;
+    // Try archived path first, then active.
+    let path = convPath(id, true);
+    try { data = JSON.parse(await opfs.read(path)); }
+    catch {
+      path = convPath(id, false);
+      try { data = JSON.parse(await opfs.read(path)); }
+      catch (e) {
+        if (activeConvId) mountConv(activeConvId);
+        addMsg('err', 'Failed to load conversation: ' + e.message);
+        return;
+      }
     }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
@@ -236,30 +249,35 @@ async function newConversation() {
 }
 async function listConversations() {
   let entries = [];
-  try { entries = await opfs.listDir(CONV_DIR); } catch { return []; }
+  try { entries = await opfs.listDir(CONV_DIR); } catch { /* empty */ }
+  let archivedEntries = [];
+  try { archivedEntries = await opfs.listDir(ARCHIVED_DIR); } catch { /* empty */ }
 
   const searchActive = !!($('convSearch')?.value.trim());
 
-  const reads = entries
-    .filter(e => e.kind === 'file' && e.name.endsWith('.json'))
-    .map(async (e) => {
-      const id = e.name.slice(0, -5);
-      try {
-        const data = JSON.parse(await opfs.read(convPath(id)));
-        const row = {
-          id: data.id || id,
-          title: data.title || '(no title)',
-          updated: data.updated || '',
-          pinned: !!data.pinned,
-          archived: !!data.archived,
-        };
-        if (searchActive) {
-          const messages = data.messages || [];
-          row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
-        }
-        return row;
-      } catch { return null; }
-    });
+  const reads = [entries, archivedEntries]
+    .flatMap((list, idx) =>
+      list.filter(e => e.kind === 'file' && e.name.endsWith('.json'))
+        .map(async (e) => {
+          const id = e.name.slice(0, -5);
+          const archived = idx === 1;
+          try {
+            const data = JSON.parse(await opfs.read(convPath(id, archived)));
+            const row = {
+              id: data.id || id,
+              title: data.title || '(no title)',
+              updated: data.updated || '',
+              pinned: !!data.pinned,
+              archived,
+            };
+            if (searchActive) {
+              const messages = data.messages || [];
+              row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
+            }
+            return row;
+          } catch { return null; }
+        })
+    );
   const out = (await Promise.all(reads)).filter(Boolean);
 
   for (const c of out) {
@@ -269,12 +287,16 @@ async function listConversations() {
 }
 let archivedExpanded = false;
 async function updateConvFile(id, patch) {
-  let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); }
-  catch { return; }
+  let data, path = convPath(id, true);
+  try { data = JSON.parse(await opfs.read(path)); }
+  catch {
+    path = convPath(id, false);
+    try { data = JSON.parse(await opfs.read(path)); }
+    catch { return; }
+  }
   Object.assign(data, patch);
-  await opfs.write(convPath(id), JSON.stringify(data));
-  Sandpie.events.emit('file:changed', convPath(id));
+  await opfs.write(path, JSON.stringify(data));
+  Sandpie.events.emit('file:changed', path);
 }
 async function renameConv(id, current) {
   const next = prompt('Rename conversation', current);
@@ -289,27 +311,49 @@ async function togglePinConv(id, currentlyPinned) {
   await refreshConversationList();
 }
 async function toggleArchiveConv(id, currentlyArchived) {
-  await updateConvFile(id, { archived: !currentlyArchived });
+  // Archive is now a folder move, not a JSON property.
+  const fromPath = convPath(id, currentlyArchived);
+  const toPath = convPath(id, !currentlyArchived);
+  let data;
+  try { data = JSON.parse(await opfs.read(fromPath)); }
+  catch { return; }
+  // Keep the old JSON property for backward compatibility during transition.
+  data.archived = !currentlyArchived;
+  delete data.pinned;             // archived convs cannot stay pinned
+  try {
+    await opfs.write(toPath, JSON.stringify(data));
+    Sandpie.events.emit('file:changed', toPath);
+    await opfs.remove(fromPath);
+    Sandpie.events.emit('file:deleted', fromPath);
+  } catch (e) { console.warn('toggleArchiveConv failed:', e); }
   await refreshConversationList();
 }
 async function duplicateConv(id, title) {
   let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); }
-  catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
+  // Try archived path first.
+  let srcPath = convPath(id, true);
+  try { data = JSON.parse(await opfs.read(srcPath)); }
+  catch {
+    srcPath = convPath(id, false);
+    try { data = JSON.parse(await opfs.read(srcPath)); }
+    catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
+  }
   const newId = newConvId();
   data.id = newId;
   data.title = (data.title || title || '(no title)') + ' (copy)';
   data.pinned = false;
   data.archived = false;
   data.updated = new Date().toISOString();
-  await opfs.write(convPath(newId), JSON.stringify(data));
-  Sandpie.events.emit('file:changed', convPath(newId));
+  await opfs.write(convPath(newId, false), JSON.stringify(data));
+  Sandpie.events.emit('file:changed', convPath(newId, false));
   await refreshConversationList();
 }
 async function deleteConv(id, title) {
   const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
-  const path = convPath(id);
+  // Try archived path first, then active.
+  let path = convPath(id, true);
+  if (!(await opfs.exists(path))) path = convPath(id, false);
   try { await opfs.remove(path); } catch {}
   Sandpie.events.emit('file:deleted', path);
 
@@ -1617,7 +1661,12 @@ async function maybeResumeFlight(id) {
   if (!ck) return;
   if (Date.now() - ck.t > 5 * 60 * 1000) { flightClear(id); return; }
   let data;
-  try { data = JSON.parse(await opfs.read(convPath(id))); } catch { flightClear(id); return; }
+  let path = convPath(id, true);
+  try { data = JSON.parse(await opfs.read(path)); }
+  catch {
+    path = convPath(id, false);
+    try { data = JSON.parse(await opfs.read(path)); } catch { flightClear(id); return; }
+  }
   const s = ensureStream(id);
   hydrateStreamFromData(s, data);
   if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
@@ -1851,8 +1900,13 @@ class SidePanel {
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
     let data;
-    try { data = JSON.parse(await opfs.read(convPath(id))); }
-    catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
+    let path = convPath(id, true);
+    try { data = JSON.parse(await opfs.read(path)); }
+    catch {
+      path = convPath(id, false);
+      try { data = JSON.parse(await opfs.read(path)); }
+      catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
+    }
     const s = ensureStream(id);
     s.messages = (data.messages || []).slice();
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
@@ -2269,7 +2323,13 @@ function bootConversations() {
       activeConvId = null;
       const s = ensureStream(restoreId);
       try {
-        const data = JSON.parse(await opfs.read(convPath(restoreId)));
+        let path = convPath(restoreId, true);
+        let data;
+        try { data = JSON.parse(await opfs.read(path)); }
+        catch {
+          path = convPath(restoreId, false);
+          data = JSON.parse(await opfs.read(path));
+        }
         hydrateStreamFromData(s, data);
       } catch {  }
       mountConv(restoreId);
