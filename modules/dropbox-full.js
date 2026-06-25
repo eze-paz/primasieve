@@ -45,6 +45,7 @@
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // opt-in: don't bulk-download; the AI hydrates files on demand (worker)
+  const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata: always eagerly synced. (sandpie/scripts, sandpie/artifacts, sandpie/memory are NOT exempt — dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
 
@@ -240,6 +241,7 @@
       localStorage.removeItem(STATE_KEY);
       localStorage.removeItem(INDEX_KEY);
       localStorage.removeItem(CURSOR_KEY);
+      localStorage.removeItem(PENDING_KEY);
     }
     localStorage.setItem(ROOT_KEY, root);
     return root;
@@ -361,7 +363,7 @@
       }
       // Dropbox now reflects the new layout — reset sync state so the next sync
       // reconciles it cleanly (the existing target-change reset path).
-      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY);
+      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
     }
     for (const [oldName, newRel] of SANDPIE_MOVES) {
       try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox-full] local move failed:', oldName, e && e.message); }
@@ -372,6 +374,28 @@
   }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
+
+  // ---- pending-upload set (protect freshly-uploaded files from cleanup race) ----
+  // `cloudListWorking()` clears entries as soon as Dropbox cursor/index confirms them.
+  // This prevents the deletion pass from removing a file whose upload succeeded but
+  // whose cursor has not yet moved past it. No timeout needed — deterministic.
+  function pending() {
+    try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function setPending(obj) { localStorage.setItem(PENDING_KEY, JSON.stringify(obj)); }
+  function addPending(rel) {
+    const p = pending(); if (!p[rel]) { p[rel] = 1; setPending(p); }
+  }
+  function removePending(rel) {
+    const p = pending(); if (p[rel]) { delete p[rel]; setPending(p); }
+  }
+  function clearPending(confirmedRels) {
+    // Batch-remove a set of relatives from pending.
+    const p = pending(); let changed = false;
+    for (const r of confirmedRels) { if (p[r]) { delete p[r]; changed = true; } }
+    if (changed) setPending(p);
+  }
 
   let _syncing = false;
   let initialSyncDone = !tokens();
@@ -386,12 +410,15 @@
       try {
         const result = await listContinue(stored);
         const delta = [];
+        const confirmed = [];
         for (const e of result.entries) {
           const rel = cloudToRel(e.path);
           if (rel == null || rel === '') continue;
           if (e.kind === 'deleted') delete idx[rel];
           else { idx[rel] = e; delta.push([rel, e]); }
+          confirmed.push(rel);   // clear pending for any cursor entry (present or deleted)
         }
+        if (confirmed.length) clearPending(confirmed);
         setCursor(result.cursor); setCloudIndex(idx);
         return { index: idx, delta };
       } catch (err) {
@@ -403,18 +430,20 @@
     try {
       result = await listFolder(workingRoot(), { recursive: true });
     } catch (e) {
-      if (String(e.message).includes('not_found')) {   // working folder doesn't exist yet
-        setCursor(null); setCloudIndex({});
+      if (String(e.message).includes('not_found')) {   // working folder doesn't exist yet (or was deleted)
+        setCursor(null); setCloudIndex({}); setPending({});
         return { index: {}, delta: null };
       }
       throw e;
     }
     const out = {};
+    const confirmed = [];
     for (const e of result.entries) {
       const rel = cloudToRel(e.path);
       if (rel == null || rel === '') continue;
-      if (e.kind !== 'deleted') out[rel] = e;
+      if (e.kind !== 'deleted') { out[rel] = e; confirmed.push(rel); }
     }
+    if (confirmed.length) clearPending(confirmed);
     setCursor(result.cursor); setCloudIndex(out);
     return { index: out, delta: null };
   }
@@ -483,18 +512,20 @@
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
 
       // ── Dropbox is the authority: delete everything that no longer exists in cloud ──
-      // The ONLY local file kept when absent from cloud is one explicitly marked dirty
-      // (syncedMtime === 0) — meaning it was just created/edited during a conversation
-      // and could not be uploaded (connection interruption).
+      // Files kept when absent from cloud:
+      //   1) Dirty (syncedMtime === 0) — just created/edited during conversation.
+      //   2) Pending (localStorage pending set) — upload succeeded but cursor hasn't confirmed it yet.
       let removedAny = false;
 
       // Build a full cloud index for fast lookup.
       const cloudSet = new Set(Object.keys(cloud));
+      const p = pending();
 
       // Pass 1: clean entries that still exist in our sync-state map.
       for (const path of Object.keys(state)) {
         if (cloudSet.has(path)) continue;
         if (state[path].syncedMtime === 0) continue;   // dirty — keep as connection orphan
+        if (p[path]) continue;                         // pending — upload succeeded but cursor hasn't confirmed
         try {
           await opfs.remove(path);
           delete state[path]; removedAny = true;
@@ -513,6 +544,7 @@
       for (const path of allLocal) {
         if (cloudSet.has(path)) { keptCount++; continue; }
         if (state[path] && state[path].syncedMtime === 0) { keptCount++; continue; }
+        if (p[path]) { keptCount++; continue; }          // upload in flight — keep until cursor confirms
         try {
           await opfs.remove(path);
           if (state[path]) delete state[path];
@@ -572,6 +604,7 @@
                 size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
                 syncedMtime: r.lm,
               };
+              addPending(r.rel);   // protect from deletion until cursor confirms
             } else {
               console.warn('[dropbox-full] batch item failed:', r.rel, r.meta);
             }
@@ -720,7 +753,7 @@
     localStorage.setItem(AUTOCONN_OPTOUT, '1');
     // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY].forEach(k => localStorage.removeItem(k));
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
