@@ -660,6 +660,10 @@ const SandpieLiteRTLM = (function () {
     // first, so only one local runtime holds a WebGPU device at a time.
     try { await window.SandpieWllama?.unload?.(); } catch (_) {}
     try { await window.SandpieTransformersJS?.unload?.(); } catch (_) {}
+    // Deep-free the Qwen3 WebGPU worker (buffers + device) and WAIT, so switching
+    // Qwen3 → Gemma never leaves two backends holding GPU. (Qwen35 is the old removed
+    // fork — keep the call as a harmless no-op in case an old build lingers.)
+    try { await window.SandpieQwen3?.unload?.(); } catch (_) {}
     try { await window.SandpieQwen35?.unload?.(); } catch (_) {}
     const MAX_ROUNDS = 8;
     const toolList = (tools || []).filter(t => t && t.type === 'function');
