@@ -593,9 +593,19 @@
   }
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
-    const st = syncState(); const lk = rel.toLowerCase(); let changed = false;
+    const lk = rel.toLowerCase();
+    const st = syncState(); let changed = false;
     for (const k of Object.keys(st)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete st[k]; changed = true; } }
     if (changed) setSyncState(st);
+    // Also drop it (and any children, for a folder) from the cloud index — otherwise
+    // the file browser and the worker's list_files re-surface it as a cloud
+    // placeholder after deletion (on-demand mode merges the index), so it looks like
+    // the delete didn't take. Push the trimmed index to the worker too.
+    try {
+      const idx = cloudIndex(); let idxChanged = false;
+      for (const k of Object.keys(idx)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete idx[k]; idxChanged = true; } }
+      if (idxChanged) { setCloudIndex(idx); pushDbxIndexToSW(); }
+    } catch (_) {}
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
   function pushDbxTokenToSW() {
