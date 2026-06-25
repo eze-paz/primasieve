@@ -125,7 +125,8 @@ Pass the skill's name exactly as listed. Returns the skill's instructions (or an
       description: `Load an image file from OPFS so you can see its pixel content. The image is returned as part of this tool call — you will see it immediately on the next step, no further action needed.
 WHEN TO USE: Only when the user asks about an image stored in /files/ AND that image is NOT already attached to their current message. Example: user says "look at images/cat.png" with no inline attachment — call this with path="images/cat.png".
 WHEN NOT TO USE: If the user's current message already contains an image (an image_url content block, an inline image, a photo they just attached/pasted/dropped), DO NOT call this tool. The image is already visible to you — describe it directly. Calling load_image in that case wastes a turn and ignores what the user actually sent. Never call this on a guessed filename from a directory listing.
-Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
+Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.
+Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT loaded and you get an error instead — downscale it first with run_python + Pillow (e.g. img.thumbnail((1568,1568))) and load the smaller copy.`,
       parameters: {
         type: 'object',
         properties: {
