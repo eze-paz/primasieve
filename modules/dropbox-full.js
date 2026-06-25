@@ -482,31 +482,27 @@
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
 
-      // remote deletions: tracked locally but gone from cloud
+      // ── Dropbox is the authority: delete everything that no longer exists in cloud ──
+      // The ONLY local file kept when absent from cloud is one explicitly marked dirty
+      // (syncedMtime === 0) — meaning it was just created/edited during a conversation
+      // and could not be uploaded (connection interruption).
       let removedAny = false;
+
+      // Pass 1: clean entries that still exist in our sync-state map.
       for (const path of Object.keys(state)) {
         if (cloud[path]) continue;
-        const lm = await Sandpie.opfsMtime(path);
-        if (lm > 0 && lm > state[path].syncedMtime) continue;   // locally modified — keep
+        if (state[path].syncedMtime === 0) continue;   // dirty — keep as connection orphan
         try { await opfs.remove(path); } catch {}
         delete state[path]; removedAny = true;
       }
 
-      // When delta sync is unavailable (full re-list / first sync / state lost),
-      // also clean up orphaned local files that no longer exist in Dropbox.
-      // Files created very recently (<60 s) are given a grace period to avoid
-      // deleting conversation artifacts whose dirty-state update is still in flight.
-      if (fullScan) {
-        let allLocal = []; try { allLocal = await opfs.list(); } catch {}
-        const now = Date.now();
-        for (const path of allLocal) {
-          if (cloud[path]) continue;
-          const st = state[path];
-          if (st && st.syncedMtime === 0) continue;            // dirty — keep
-          const lm = await Sandpie.opfsMtime(path);
-          if (!st && lm > 0 && (now - lm) < 60000) continue;  // brand-new — grace period
-          try { await opfs.remove(path); if (st) delete state[path]; removedAny = true; } catch {}
-        }
+      // Pass 2: clean any local file with NO state entry (state lost / first sync /
+      // stale device). Dropbox has the truth; anything not in cloud is dead.
+      let allLocal = []; try { allLocal = await opfs.list(); } catch {}
+      for (const path of allLocal) {
+        if (cloud[path]) continue;
+        if (state[path] && state[path].syncedMtime === 0) continue;  // dirty — keep
+        try { await opfs.remove(path); if (state[path]) delete state[path]; removedAny = true; } catch {}
       }
 
       // pull
@@ -523,9 +519,7 @@
           continue;
         }
         const cloudChanged = s.rev !== e.rev;
-        const localDirty = localExists && (await Sandpie.opfsMtime(path)) > s.syncedMtime;
         if (path === openFilePath) continue;
-        if (cloudChanged && localDirty) continue;          // conflict — leave for the user
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
