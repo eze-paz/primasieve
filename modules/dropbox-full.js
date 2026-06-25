@@ -488,22 +488,41 @@
       // and could not be uploaded (connection interruption).
       let removedAny = false;
 
+      // Build a full cloud index for fast lookup.
+      const cloudSet = new Set(Object.keys(cloud));
+
       // Pass 1: clean entries that still exist in our sync-state map.
       for (const path of Object.keys(state)) {
-        if (cloud[path]) continue;
+        if (cloudSet.has(path)) continue;
         if (state[path].syncedMtime === 0) continue;   // dirty — keep as connection orphan
-        try { await opfs.remove(path); } catch {}
-        delete state[path]; removedAny = true;
+        try {
+          await opfs.remove(path);
+          delete state[path]; removedAny = true;
+        } catch (e) {
+          console.warn('[dropbox-full] remove(state) FAILED:', path, e && e.message);
+        }
       }
 
       // Pass 2: clean any local file with NO state entry (state lost / first sync /
       // stale device). Dropbox has the truth; anything not in cloud is dead.
-      let allLocal = []; try { allLocal = await opfs.list(); } catch {}
-      for (const path of allLocal) {
-        if (cloud[path]) continue;
-        if (state[path] && state[path].syncedMtime === 0) continue;  // dirty — keep
-        try { await opfs.remove(path); if (state[path]) delete state[path]; removedAny = true; } catch {}
+      let allLocal = []; try { allLocal = await opfs.list(); } catch (e) {
+        console.warn('[dropbox-full] opfs.list() FAILED:', e && e.message);
       }
+      console.log('[dropbox-full] cleanup scan:', allLocal.length, 'local files vs', cloudSet.size, 'cloud items');
+      let removedCount = 0, keptCount = 0;
+      for (const path of allLocal) {
+        if (cloudSet.has(path)) { keptCount++; continue; }
+        if (state[path] && state[path].syncedMtime === 0) { keptCount++; continue; }
+        try {
+          await opfs.remove(path);
+          if (state[path]) delete state[path];
+          removedAny = true; removedCount++;
+        } catch (e) {
+          console.warn('[dropbox-full] remove(orphan) FAILED:', path, e && e.message);
+        }
+      }
+      if (removedCount) console.log('[dropbox-full] removed', removedCount, 'orphans; kept', keptCount);
+      else console.log('[dropbox-full] no orphans to remove');
 
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
