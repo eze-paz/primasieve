@@ -175,6 +175,83 @@ opfs.formatSize = function(bytes) {
   return (u === 0 ? bytes : bytes.toFixed(1).replace(/\.0$/, '')) + units[u];
 };
 
+// Lightweight transient toast (no CSS dependency) — reused for folder-zip progress.
+opfs._toast = function(msg, ms) {
+  let el = document.getElementById('opfsToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'opfsToast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%);' +
+      'background:var(--sp-surface,#1c2128);color:var(--sp-text,#e6edf3);' +
+      'border:1px solid var(--sp-border,#30363d);border-radius:8px;padding:0.5rem 0.9rem;' +
+      'font:0.82rem system-ui,sans-serif;z-index:4000;box-shadow:0 4px 16px rgba(0,0,0,0.45);' +
+      'max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  if (ms) el._t = setTimeout(() => { el.style.display = 'none'; }, ms);
+  return el;
+};
+
+// Download an entire OPFS folder as a .zip. Collects every file under the folder
+// (local OPFS + any cloud-only files from the dehydrated index, hydrating those on
+// demand), builds a DEFLATE zip with JSZip (lazy-loaded), and triggers a browser
+// download. Read-only safe; works on dehydrated folders too.
+opfs.downloadFolderZip = async function(folderKey) {
+  const folderName = (folderKey.split('/').filter(Boolean).pop()) || 'folder';
+  try {
+    const fileSet = new Set();
+    try { for (const f of await opfs.list(folderKey)) fileSet.add(f); } catch (_) {}
+    const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+    const cidx = (sp && sp.cloudIndex) ? sp.cloudIndex() : null;   // dehydrated: cloud-only files live here
+    if (cidx) {
+      const pfx = folderKey + '/';
+      for (const rel of Object.keys(cidx)) {
+        const e = cidx[rel];
+        if (e && e.kind === 'file' && rel.startsWith(pfx)) fileSet.add(rel);
+      }
+    }
+    const files = [...fileSet].sort();
+    if (!files.length) { opfs._toast(folderName + ' is empty — nothing to download', 3500); return; }
+
+    if (!window.JSZip) {
+      opfs._toast('Preparing…');
+      await opfs._loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    }
+    if (!window.JSZip) throw new Error('zip library unavailable');
+    const zip = new JSZip();
+
+    let added = 0, skipped = 0;
+    for (let i = 0; i < files.length; i++) {
+      const rel = files[i];
+      if (files.length > 3 && i % 4 === 0) opfs._toast('Zipping ' + folderName + ' — ' + (i + 1) + '/' + files.length + '…');
+      let bytes = null;
+      try { bytes = await opfs.readBytes(rel); } catch (_) {}
+      if (bytes == null && sp && sp.hydrate) {   // cloud-only placeholder → fetch then read
+        try { await sp.hydrate(rel); bytes = await opfs.readBytes(rel); } catch (_) {}
+      }
+      if (bytes == null) { skipped++; continue; }
+      zip.file(folderName + '/' + rel.slice(folderKey.length + 1), bytes);
+      added++;
+    }
+    if (!added) { opfs._toast('Could not read any files in ' + folderName, 4000); return; }
+
+    opfs._toast('Compressing ' + folderName + '…');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = folderName + '.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    opfs._toast('Downloaded ' + folderName + '.zip' + (skipped ? ' (' + skipped + ' file' + (skipped > 1 ? 's' : '') + ' skipped)' : ''), 4000);
+  } catch (e) {
+    console.warn('[opfs] folder zip failed:', folderKey, e);
+    opfs._toast('Download failed: ' + (e && e.message ? e.message : 'error'), 4500);
+  }
+};
+
 opfs.currentPath = function() {
   return (document.getElementById('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
 };
@@ -903,6 +980,9 @@ opfs.refreshFileList = async function() {
       if (it.kind === 'file') {
         menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
         menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
+      }
+      if (it.kind === 'folder') {
+        menuItems.push({ label: 'Download as zip', action: () => opfs.downloadFolderZip(it.fullKey) });
       }
       if (!ro) menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
