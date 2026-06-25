@@ -114,7 +114,9 @@
     if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
     return await res.json();
   }
-  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
+  // DeletedMetadata sometimes lacks path_display (only path_lower). Fallback so
+  // deletion entries survive `cloudToRel` and actually remove items from index.
+  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
   async function listFolder(folderPath, { recursive = false } = {}) {
     let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true });
     let entries = data.entries.slice();
@@ -414,8 +416,12 @@
         for (const e of result.entries) {
           const rel = cloudToRel(e.path);
           if (rel == null || rel === '') continue;
-          if (e.kind === 'deleted') delete idx[rel];
-          else { idx[rel] = e; delta.push([rel, e]); }
+          if (e.kind === 'deleted') {
+            delete idx[rel];
+            // path_lower may differ in case from the original key — try case-insensitive too
+            const rl = rel.toLowerCase();
+            for (const k of Object.keys(idx)) { if (k.toLowerCase() === rl) { delete idx[k]; break; } }
+          } else { idx[rel] = e; delta.push([rel, e]); }
           confirmed.push(rel);   // clear pending for any cursor entry (present or deleted)
         }
         if (confirmed.length) clearPending(confirmed);
@@ -512,49 +518,58 @@
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
 
       // ── Dropbox is the authority: delete everything that no longer exists in cloud ──
-      // Files kept when absent from cloud:
-      //   1) Dirty (syncedMtime === 0) — just created/edited during conversation.
-      //   2) Pending (localStorage pending set) — upload succeeded but cursor hasn't confirmed it yet.
       let removedAny = false;
-
-      // Build a full cloud index for fast lookup.
       const cloudSet = new Set(Object.keys(cloud));
       const p = pending();
+      const isConv = p => p.includes('conversations');
 
-      // Pass 1: clean entries that still exist in our sync-state map.
+      // ── Pass 1: entries still in sync-state ──
       for (const path of Object.keys(state)) {
         if (cloudSet.has(path)) continue;
-        if (state[path].syncedMtime === 0) continue;   // dirty — keep as connection orphan
-        if (p[path]) continue;                         // pending — upload succeeded but cursor hasn't confirmed
+        if (state[path].syncedMtime === 0) {
+          if (isConv(path)) console.log('[dropbox-full] PASS1 KEEP (dirty):', path, 'syncedMtime=0');
+          continue;
+        }
+        if (p[path]) {
+          if (isConv(path)) console.log('[dropbox-full] PASS1 KEEP (pending):', path);
+          continue;
+        }
+        const exists = await opfs.exists(path);
+        if (isConv(path)) console.log('[dropbox-full] PASS1 DELETE:', path, 'exists=', exists);
+        if (!exists) { delete state[path]; continue; }
         try {
           await opfs.remove(path);
           delete state[path]; removedAny = true;
         } catch (e) {
-          console.warn('[dropbox-full] remove(state) FAILED:', path, e && e.message);
+          console.warn('[dropbox-full] PASS1 remove FAILED:', path, e && e.message);
         }
       }
 
-      // Pass 2: clean any local file with NO state entry (state lost / first sync /
-      // stale device). Dropbox has the truth; anything not in cloud is dead.
+      // ── Pass 2: local files with no state entry ──
       let allLocal = []; try { allLocal = await opfs.list(); } catch (e) {
         console.warn('[dropbox-full] opfs.list() FAILED:', e && e.message);
       }
-      console.log('[dropbox-full] cleanup scan:', allLocal.length, 'local files vs', cloudSet.size, 'cloud items');
       let removedCount = 0, keptCount = 0;
       for (const path of allLocal) {
         if (cloudSet.has(path)) { keptCount++; continue; }
-        if (state[path] && state[path].syncedMtime === 0) { keptCount++; continue; }
-        if (p[path]) { keptCount++; continue; }          // upload in flight — keep until cursor confirms
+        if (state[path] && state[path].syncedMtime === 0) {
+          if (isConv(path)) console.log('[dropbox-full] PASS2 KEEP (dirty-state):', path);
+          keptCount++; continue;
+        }
+        if (p[path]) {
+          if (isConv(path)) console.log('[dropbox-full] PASS2 KEEP (pending):', path);
+          keptCount++; continue;
+        }
+        if (isConv(path)) console.log('[dropbox-full] PASS2 DELETE orphan:', path);
         try {
           await opfs.remove(path);
           if (state[path]) delete state[path];
           removedAny = true; removedCount++;
         } catch (e) {
-          console.warn('[dropbox-full] remove(orphan) FAILED:', path, e && e.message);
+          console.warn('[dropbox-full] PASS2 remove FAILED:', path, e && e.message);
         }
       }
-      if (removedCount) console.log('[dropbox-full] removed', removedCount, 'orphans; kept', keptCount);
-      else console.log('[dropbox-full] no orphans to remove');
+      console.log('[dropbox-full] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
 
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
