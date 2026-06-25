@@ -781,6 +781,16 @@ opfs.toUrl = async function(path) {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 };
 
+// Ensure a file's bytes are in OPFS, hydrating it from the cloud in on-demand
+// mode. Returns true if the file is now local, false if it couldn't be fetched.
+opfs.ensureLocal = async function(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  try { if (await opfs.exists(clean)) return true; } catch (_) {}
+  const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  if (sp && sp.hydrate) { try { return !!(await sp.hydrate(clean)); } catch (_) {} }
+  return false;
+};
+
 // is debounced so a multi-file drop refreshes the list just once.
 let _notifyRefreshT = null;
 opfs.notifyUpload = function(path) {
@@ -978,8 +988,29 @@ opfs.refreshFileList = async function() {
         menuItems.push({ label: 'New file', action: () => opfs.createFile() });
       }
       if (it.kind === 'file') {
-        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
+        // OPFS files are served as blob URLs (the /opfs/ SW route is gone); in
+        // on-demand mode the bytes may not be local yet, so hydrate first.
+        menuItems.push({ label: 'Open in new tab', action: () => {
+          const w = window.open('', '_blank');   // open synchronously to keep the user gesture (avoids popup-block after await)
+          (async () => {
+            try {
+              if (!await opfs.ensureLocal(it.fullKey)) throw new Error('file unavailable');
+              const url = await opfs.toUrl(it.fullKey);
+              if (w) w.location = url; else window.open(url, '_blank');
+              setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+            } catch (e) { if (w) { try { w.close(); } catch (_) {} } opfs._toast('Open failed: ' + ((e && e.message) || 'error'), 3500); }
+          })();
+        } });
+        menuItems.push({ label: 'Download', action: async () => {
+          try {
+            if (!await opfs.ensureLocal(it.fullKey)) throw new Error('file unavailable');
+            const bytes = await opfs.readBytes(it.fullKey);
+            const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+            const a = document.createElement('a'); a.href = url; a.download = it.name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 10000);
+          } catch (e) { opfs._toast('Download failed: ' + ((e && e.message) || 'error'), 3500); }
+        } });
       }
       if (it.kind === 'folder') {
         menuItems.push({ label: 'Download as zip', action: () => opfs.downloadFolderZip(it.fullKey) });
