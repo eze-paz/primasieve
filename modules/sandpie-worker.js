@@ -673,8 +673,48 @@ async function tool_read_file({ path, offset, limit }) {
 }
 
 async function tool_list_files({ path, pattern, recursive }) {
-  const norm = normFilesPath(path);
   const rx = pattern ? globToRegExp(pattern) : null;
+  const raw = (path == null) ? '' : String(path).trim();
+
+  // Classify the path. A leading "/" is a Dropbox-absolute path; if it isn't under
+  // the working root, list it directly from the cloud.
+  let outsideRoot = false, norm = '';
+  if (raw.startsWith('/')) {
+    const rel = _relUnderRoot(raw);
+    if (rel == null) { outsideRoot = true; }
+    else { norm = rel; }
+  } else {
+    norm = normFilesPath(raw);
+  }
+
+  const connected = !!(_dbxCtx && _dbxCtx.token);
+
+  // ---- OUTSIDE working root → pure Dropbox list ----
+  if (outsideRoot) {
+    if (!connected) return { result: `Error: "${raw}" is outside your synced workspace and Dropbox isn't connected.` };
+    let entries;
+    try { entries = await _dropboxListFolder(raw.replace(/\/+$/, ''), recursive); }
+    catch (e) { return { result: e.message }; }
+    const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
+    if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} under ${raw}.` };
+    let buf = `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} under ${raw}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
+    let shown = 0, truncated = false;
+    for (const e of rows) {
+      let line;
+      if (e.kind === 'directory') { line = e.path + '/\n'; }
+      else {
+        const size = e.size != null ? e.size + 'b' : '?';
+        const mtime = e.cloudMtime ? '  ' + new Date(e.cloudMtime).toISOString().slice(0, 16).replace('T', ' ') : '';
+        line = `${e.path}\t${size}${mtime}\n`;
+      }
+      if (buf.length + line.length > FILE_TOOL_CAP) { truncated = true; break; }
+      buf += line; shown++;
+    }
+    if (truncated) buf += `…[${rows.length - shown} more not shown; narrow with path/pattern]`;
+    return { result: buf.replace(/\n$/, '') };
+  }
+
+  // ---- INSIDE working root (or relative) → OPFS + cloud index merge ----
   let entries = await opfsCollect(norm, { recursive: !!recursive, includeDirs: !recursive, max: 4000 });
   const idxEntries = _indexEntriesUnder(norm, !!recursive);   // [] unless dehydrated mode is on
   if (entries === null && !idxEntries.length) return { result: 'Error: not a directory: ' + (norm || '/files/') };
@@ -737,6 +777,28 @@ async function _dropboxSearchPaths(query, searchPath, filenameOnly) {
   const matches = Array.isArray(data.matches) ? data.matches : [];
   const paths = matches.map(m => { const meta = m.metadata?.metadata || m.metadata || {}; return meta.path_display || meta.path_lower || ''; }).filter(Boolean);
   return { paths: paths.sort(), tooMany: matches.length > 100 };
+}
+async function _dropboxListFolder(folderPath, recursive) {
+  const { token, pathRoot } = _dbxCtx;
+  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
+  const body = JSON.stringify({ path: folderPath || '', recursive: !!recursive, include_mounted_folders: false, include_deleted: false, include_has_explicit_shared_members: false, limit: 999 });
+  let res = await fetch('https://api.dropboxapi.com/2/files/list_folder', { method: 'POST', headers, body });
+  if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox list failed (' + res.status + '): ' + txt.slice(0, 300)); }
+  let data = await res.json();
+  let entries = data.entries || [];
+  // Paginate if needed
+  while (data.has_more) {
+    res = await fetch('https://api.dropboxapi.com/2/files/list_folder/continue', { method: 'POST', headers: headers, body: JSON.stringify({ cursor: data.cursor }) });
+    data = await res.json();
+    entries = entries.concat(data.entries || []);
+  }
+  return entries.map(e => ({
+    path: e.path_display || e.path_lower,
+    kind: e['.tag'] === 'folder' ? 'directory' : 'file',
+    size: e.size,
+    cloudMtime: e.client_modified
+  }));
 }
 async function _localGrep(rx, norm, include, files_only) {
   const inc = include ? globToRegExp(include) : null;
