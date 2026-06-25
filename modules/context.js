@@ -324,41 +324,129 @@ const escHtml = s => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
+// Estimate the conversation's token usage split by TYPE (a client-side estimate
+// at ~4 chars/token, like SandpieTokens.estimateTokens). The provider only gives
+// a single total, so the per-type split is necessarily approximate.
+//  - system prompt   : the editable base prompt (SandpieSystemPrompt)
+//  - tool descriptions: the serialized tool defs sent every request (toolDefs)
+//  - skills          : the skills block appended to the system prompt (from the
+//                      cached scan, so we don't re-read OPFS on every tick)
+//  - messages        : user + assistant text
+//  - tool calls      : assistant tool_calls (name + arguments)
+//  - tool results    : tool-role message content
+//  - images          : counted (their token cost is provider/size-specific)
+const CTX_CATS = [
+  ['system',      'System prompt',     '#58a6ff'],
+  ['tools',       'Tool descriptions', '#a371f7'],
+  ['skills',      'Skills',            '#3fb950'],
+  ['messages',    'Messages',          '#d29922'],
+  ['toolCalls',   'Tool calls',        '#f778ba'],
+  ['toolResults', 'Tool results',      '#ff7b72'],
+];
+
+async function computeBreakdown() {
+  const toTok = c => Math.ceil((c || 0) / 4);
+  const b = { system: 0, tools: 0, skills: 0, messages: 0, toolCalls: 0, toolResults: 0, images: 0 };
+  try { if (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get) b.system = toTok((SandpieSystemPrompt.get() || '').length); } catch {}
+  try { if (typeof toolDefs === 'function') b.tools = toTok(JSON.stringify(toolDefs() || []).length); } catch {}
+  try {
+    if (typeof SandpieContext !== 'undefined' && SandpieContext.lastState) {
+      const st = SandpieContext.lastState();
+      if (st && st.exists) {
+        let chars = 620;  // the fixed instruction/header in the skills block
+        for (const s of (st.skills || [])) { if (s.enabled === false) continue; chars += (s.name || '').length + Math.min((s.desc || '').length, 400) + 12; }
+        b.skills = toTok(chars);
+      }
+    }
+  } catch {}
+  let msgs = [];
+  try {
+    const convId = localStorage.getItem('sandpie-active-conv');
+    if (convId && window.opfs) {
+      const data = JSON.parse(await opfs.read('sandpie/conversations/' + convId + '.json'));
+      if (Array.isArray(data.messages)) msgs = data.messages;
+    }
+  } catch {}
+  for (const m of msgs) {
+    if (!m) continue;
+    let textLen = 0;
+    const c = m.content;
+    if (typeof c === 'string') textLen += c.length;
+    else if (Array.isArray(c)) for (const p of c) {
+      if (p && p.type === 'text') textLen += (p.text || '').length;
+      else if (p && /image/.test(String(p.type || ''))) b.images++;
+    }
+    if (m.role === 'tool') b.toolResults += toTok(textLen); else b.messages += toTok(textLen);
+    if (Array.isArray(m.tool_calls)) {
+      let t = 0;
+      for (const tc of m.tool_calls) { const f = tc.function || {}; t += (f.name || '').length + (f.arguments || '').length; }
+      b.toolCalls += toTok(t);
+    }
+  }
+  return b;
+}
+
 async function render() {
   const T = SandpieTokens;
   if (typeof T === 'undefined') return;
 
   const convEl = document.getElementById('ctxConvTokens');
-  const barEl = document.getElementById('ctxConvBar');
+  if (!convEl) return;
   const pctEl = document.getElementById('ctxConvPct');
   const weekEl = document.getElementById('ctxWeekTokens');
-  if (!convEl) return;
+  const barEl = document.getElementById('ctxStackBar');
+  const legEl = document.getElementById('ctxBreakdown');
+  const section = document.getElementById('contextSection');
+  const open = !section || section.open;
 
-  const convTokens = await T.conversationTokens();
+  const reportedTotal = await T.conversationTokens();
   const window_ = T.contextWindow();
   const estimated = T.isEstimated();
 
-  convEl.textContent = fmtTokens(convTokens) + (estimated ? ' ~' : '');
-  convEl.title = estimated
-    ? 'Estimated (provider did not report usage)'
-    : 'Reported by the provider';
+  // The per-type breakdown is also a fuller estimate: it counts the system prompt,
+  // tool defs, and skills that the message-only estimate misses.
+  const b = await computeBreakdown();
+  const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
+  // When estimating, show whichever is larger — the live/running figure or the
+  // breakdown sum — so the headline never reads smaller than its own breakdown.
+  const total = estimated ? Math.max(reportedTotal, sum) : reportedTotal;
 
-  let badge = fmtTokens(convTokens);
+  convEl.textContent = fmtTokens(total) + (estimated ? ' ~' : '');
+  convEl.title = estimated ? 'Estimated client-side (provider did not report usage)' : 'Reported by the provider';
+
+  let badge = fmtTokens(total);
   if (window_) {
-    const pct = Math.min(100, (convTokens / window_) * 100);
-    barEl.style.width = pct.toFixed(1) + '%';
-    barEl.style.background = pct > 90 ? 'var(--sp-accent-neg, #e06c75)' : 'var(--sp-accent)';
-    barEl.parentElement.style.visibility = 'visible';
-    pctEl.textContent = `${pct.toFixed(pct < 10 ? 1 : 0)}% used · ${fmtTokens(window_ - convTokens)} left of ${fmtTokens(window_)}`;
+    const pct = Math.min(100, (total / window_) * 100);
     badge = `${pct.toFixed(0)}%`;
-  } else {
-    barEl.parentElement.style.visibility = 'hidden';
+    if (pctEl) pctEl.textContent = `${pct.toFixed(pct < 10 ? 1 : 0)}% of ${fmtTokens(window_)} window · ${fmtTokens(Math.max(0, window_ - total))} left`;
+  } else if (pctEl) {
     pctEl.textContent = 'Context window unknown for this model';
   }
-
   if (weekEl) weekEl.textContent = fmtTokens(T.weeklyTotal());
-
   if (typeof SandpieMenu !== 'undefined') SandpieMenu.updateBadge('contextSection', badge);
+
+  // Only the bar/legend DOM is skipped when collapsed (the totals above stay live);
+  // the toggle handler re-runs render() when the section is expanded.
+  if (!open || (!barEl && !legEl)) return;
+
+  const present = CTX_CATS.filter(([k]) => b[k] > 0);
+
+  if (barEl) {
+    barEl.innerHTML = sum > 0
+      ? present.map(([k, label, color]) => `<div title="${label}: ${fmtTokens(b[k])} (${Math.round(b[k] / sum * 100)}%)" style="width:${(b[k] / sum * 100).toFixed(2)}%;background:${color};height:100%;"></div>`).join('')
+      : '';
+  }
+  if (legEl) {
+    const rows = present.map(([k, label, color]) =>
+      `<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.72rem;line-height:1.55;">
+        <span style="width:9px;height:9px;border-radius:2px;background:${color};flex:0 0 auto;"></span>
+        <span style="color:var(--sp-text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>
+        <span style="font-variant-numeric:tabular-nums;color:var(--sp-text);">${fmtTokens(b[k])}</span>
+        <span style="color:var(--sp-text-dim);min-width:2.6em;text-align:right;">${Math.round(b[k] / sum * 100)}%</span>
+      </div>`).join('');
+    const imgNote = b.images ? `<div style="font-size:0.68rem;color:var(--sp-text-dim);margin-top:0.2rem;">+ ${b.images} image${b.images > 1 ? 's' : ''} (size not estimated)</div>` : '';
+    legEl.innerHTML = sum > 0 ? rows + imgNote : '<div style="font-size:0.72rem;color:var(--sp-text-dim);">No messages yet.</div>';
+  }
 }
 
 function init() {
@@ -379,14 +467,13 @@ function init() {
     badge: '—',
     open: false,
     html: `
-      <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.25rem;">
+      <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.3rem;">
         <span style="color:var(--sp-text-dim);">Conversation</span>
         <span id="ctxConvTokens" style="font-variant-numeric:tabular-nums;">–</span>
       </div>
-      <div style="height:6px; border-radius:3px; background:var(--sp-border); overflow:hidden; visibility:hidden;">
-        <div id="ctxConvBar" style="height:100%; width:0%; background:var(--sp-accent); transition:width 0.3s;"></div>
-      </div>
-      <p id="ctxConvPct" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.3rem 0 0;"></p>
+      <div id="ctxStackBar" title="Estimated breakdown by type" style="display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--sp-border);"></div>
+      <p id="ctxConvPct" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.35rem 0 0.55rem;"></p>
+      <div id="ctxBreakdown" style="display:flex; flex-direction:column; gap:0.1rem;"></div>
       <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:0.7rem;">
         <span style="color:var(--sp-text-dim);">This week (7d)</span>
         <span id="ctxWeekTokens" style="font-variant-numeric:tabular-nums;">–</span>
@@ -394,6 +481,13 @@ function init() {
     `,
     onRender(bodyEl) {
       if (!_unsubscribe) _unsubscribe = SandpieTokens.subscribe(render);
+      // Recompute the breakdown when the user expands the (collapsed-by-default)
+      // section, since render() skips the heavy part while it's closed.
+      const section = document.getElementById('contextSection');
+      if (section && !section._ctxToggleWired) {
+        section._ctxToggleWired = true;
+        section.addEventListener('toggle', () => { if (section.open) render(); });
+      }
       render();
     }
   });
