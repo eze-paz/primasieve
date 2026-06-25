@@ -785,54 +785,86 @@ opfs.uploadEntry = async function(entry, dirPath) {
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
   const path = opfs.currentPath();
+  const frag = document.createDocumentFragment();
 
-  let opfsList = [];
-  try { opfsList = await opfs.listDir(path); } catch {}
-  const localMap = new Map();
-  for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
-
-  const state = (window.Sandpie && Sandpie.syncProvider()?.getState?.()) || {};
   const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  const state = (_sp && _sp.getState) ? (_sp.getState() || {}) : {};
   const cidx = (_sp && _sp.cloudIndex) ? _sp.cloudIndex() : null;   // full Dropbox tree in dehydrated mode; null otherwise
-  const prefix = path ? path + '/' : '';
-  const remoteMap = new Map();
-  for (const k of Object.keys(state)) {
-    const kl = k.toLowerCase();
-    if (!kl.startsWith(prefix.toLowerCase())) continue;
-    const rest = k.slice(prefix.length);
-    if (!rest) continue;
-    if (rest.includes('/')) {
-      const firstSeg = rest.split('/')[0];
-      if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
-    } else {
-      remoteMap.set(rest, 'file');
-    }
-  }
-  // Dehydrated mode: surface the full Dropbox tree (what the LLM sees) as cloud
-  // placeholders even though the bytes aren't local. Exempt folders already come
-  // from OPFS/state above, so skip them to avoid duplicates.
-  if (cidx) {
-    const pl = prefix.toLowerCase();
-    for (const rel of Object.keys(cidx)) {
-      if (_sp.isExempt && _sp.isExempt(rel)) continue;
-      const rl = rel.toLowerCase();
-      if (pl && !rl.startsWith(pl)) continue;
-      const rest = rel.slice(prefix.length);
+
+  // Build the sorted entry list for ONE directory (local listing + dehydrated
+  // cloud-index merge + per-item status/size). Kept separate from rendering so we
+  // can list more than one directory into the same panel — the root view renders
+  // the user's files, then lists sandpie/'s children under a collapsible section.
+  async function computeEntries(dirPath) {
+    let opfsList = [];
+    try { opfsList = await opfs.listDir(dirPath); } catch {}
+    const localMap = new Map();
+    for (const e of opfsList) localMap.set(e.name, e.kind === 'directory' ? 'folder' : 'file');
+    const prefix = dirPath ? dirPath + '/' : '';
+    const remoteMap = new Map();
+    for (const k of Object.keys(state)) {
+      const kl = k.toLowerCase();
+      if (!kl.startsWith(prefix.toLowerCase())) continue;
+      const rest = k.slice(prefix.length);
       if (!rest) continue;
       if (rest.includes('/')) {
         const firstSeg = rest.split('/')[0];
-        if (!remoteMap.has(firstSeg) && !localMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
-      } else if (!remoteMap.has(rest)) {
+        if (!remoteMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+      } else {
         remoteMap.set(rest, 'file');
       }
     }
+    // Dehydrated mode: surface the full Dropbox tree (what the LLM sees) as cloud
+    // placeholders even though the bytes aren't local. Exempt folders already come
+    // from OPFS/state above, so skip them to avoid duplicates.
+    if (cidx) {
+      const pl = prefix.toLowerCase();
+      for (const rel of Object.keys(cidx)) {
+        if (_sp.isExempt && _sp.isExempt(rel)) continue;
+        const rl = rel.toLowerCase();
+        if (pl && !rl.startsWith(pl)) continue;
+        const rest = rel.slice(prefix.length);
+        if (!rest) continue;
+        if (rest.includes('/')) {
+          const firstSeg = rest.split('/')[0];
+          if (!remoteMap.has(firstSeg) && !localMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
+        } else if (!remoteMap.has(rest)) {
+          remoteMap.set(rest, 'file');
+        }
+      }
+    }
+    const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
+    const items = [];
+    for (const name of names) {
+      const local = localMap.get(name);
+      const remote = remoteMap.get(name);
+      const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
+      const fullKey = opfsJoin(dirPath, name);
+      items.push({ name, kind, fullKey, local, remote });
+    }
+    // Resolve per-item status + size concurrently. Folders show NO inline size
+    // (Windows-Explorer style — computed on demand from the right-click menu).
+    await Promise.all(items.map(async (it) => {
+      const { local, remote, fullKey, kind } = it;
+      if (kind === 'folder') {
+        it.status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
+        it.size = undefined;
+        return;
+      }
+      it.size = await opfs.getFileSize(fullKey);
+      if (!local) { it.status = 'cloud'; if (cidx && cidx[fullKey] && cidx[fullKey].size != null) it.size = cidx[fullKey].size; return; }
+      if (!remote) { it.status = 'local'; return; }
+      const s = state[fullKey];
+      const lastMod = await opfs.lastModified(fullKey);
+      it.status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
+    }));
+    items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+    return items;
   }
-  const names = new Set([...localMap.keys(), ...remoteMap.keys()]);
 
-  const frag = document.createDocumentFragment();
-
-  const renderItem = (it) => {
+  const renderItem = (it, liClass) => {
     const li = document.createElement('li');
+    if (liClass) li.className = liClass;
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
     const ro = opfs.isReadOnly(it.fullKey);
@@ -887,34 +919,18 @@ opfs.refreshFileList = async function() {
     frag.appendChild(li);
   };
 
-  // Regular entries in the current directory
-  const items = [];
-  for (const name of names) {
-    const local = localMap.get(name);
-    const remote = remoteMap.get(name);
-    const kind = local === 'folder' || remote === 'folder' ? 'folder' : 'file';
-    const fullKey = opfsJoin(path, name);
-    items.push({ name, kind, fullKey, local, remote });
+  const items = await computeEntries(path);
+
+  // At the root, lift the app's own sandpie/ folder into a collapsible "SANDPIE"
+  // section (mirrors the conversations "Archived" toggle) so system files are
+  // visually separated from the user's files, which render normally above it.
+  const atRoot = !path;
+  let sandpieEntry = null;
+  let normalItems = items;
+  if (atRoot) {
+    sandpieEntry = items.find((it) => it.kind === 'folder' && it.name === 'sandpie') || null;
+    if (sandpieEntry) normalItems = items.filter((it) => it !== sandpieEntry);
   }
-  // Resolve per-item status + size concurrently. Folders show NO inline size
-  // (Windows-Explorer style — folder size is computed on demand from the
-  // right-click menu) so we never trigger the recursive subtree walk here.
-  // Files: lastModified (status) and getFileSize run in parallel across items.
-  await Promise.all(items.map(async (it) => {
-    const { local, remote, fullKey, kind } = it;
-    if (kind === 'folder') {
-      it.status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
-      it.size = undefined;          // computed lazily in the folder context menu
-      return;
-    }
-    it.size = await opfs.getFileSize(fullKey);
-    if (!local) { it.status = 'cloud'; if (cidx && cidx[fullKey] && cidx[fullKey].size != null) it.size = cidx[fullKey].size; return; }
-    if (!remote) { it.status = 'local'; return; }
-    const s = state[fullKey];
-    const lastMod = await opfs.lastModified(fullKey);
-    it.status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
-  }));
-  items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
 
   const fcEl = document.getElementById('fileCount');
   if (fcEl) fcEl.textContent = items.length ? `${items.length}` : '';
@@ -927,7 +943,36 @@ opfs.refreshFileList = async function() {
     return;
   }
 
-  for (const it of items) renderItem(it);
+  for (const it of normalItems) renderItem(it);
+
+  // Collapsible SANDPIE section: a "▸ SANDPIE" header at the bottom that expands
+  // in place to list sandpie/'s children (conversations, agents, skills, scripts,
+  // artifacts, memory). State persists in localStorage; collapsed by default.
+  if (sandpieEntry) {
+    const SANDPIE_OPEN_KEY = 'sandpie-files-section-open';
+    const open = localStorage.getItem(SANDPIE_OPEN_KEY) === '1';
+    const toggle = document.createElement('li');
+    toggle.className = 'sandpie-toggle';
+    toggle.textContent = `${open ? '▾' : '▸'} SANDPIE`;
+    toggle.title = "sandpie's own files — conversations, agents, skills, scripts, artifacts, memory";
+    toggle.onclick = () => {
+      const cur = localStorage.getItem(SANDPIE_OPEN_KEY) === '1';
+      localStorage.setItem(SANDPIE_OPEN_KEY, cur ? '0' : '1');
+      opfs.refreshFileList();
+    };
+    frag.appendChild(toggle);
+    if (open) {
+      const kids = await computeEntries('sandpie');
+      if (!kids.length) {
+        const li = document.createElement('li');
+        li.className = 'empty sandpie-child';
+        li.textContent = '(empty)';
+        frag.appendChild(li);
+      } else {
+        for (const it of kids) renderItem(it, 'sandpie-child');
+      }
+    }
+  }
 
   ul.replaceChildren(frag);
 };

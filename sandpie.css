@@ -136,6 +136,19 @@
   ul.fs-list .name:hover { text-decoration: underline; }
   ul.fs-list .name.folder { color: var(--sp-text); }
   ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; margin-left: 0.5rem; }
+  /* Collapsible "SANDPIE" section header in the Files panel — splits the app's
+     own system files from the user's files. Mirrors the conversations "Archived"
+     toggle. The border-top + margin give the visual separation. */
+  ul.fs-list li.sandpie-toggle {
+    cursor: pointer; user-select: none;
+    color: var(--sp-text-dim);
+    font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase;
+    justify-content: flex-start; gap: 0.3rem;
+    padding: 0.4rem 0.2rem 0.2rem; margin-top: 0.3rem;
+    border-top: 1px solid var(--sp-border);
+  }
+  ul.fs-list li.sandpie-toggle:hover { color: var(--sp-text); }
+  ul.fs-list li.sandpie-child { padding-left: 0.95rem; }
 
   .file-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
   .file-viewer .panel { background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 8px; max-width: min(900px, 100%); max-height: 100%; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
