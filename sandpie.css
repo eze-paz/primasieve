@@ -2235,3 +2235,20 @@
 [data-theme="cyberpunk"] { --sp-accent: var(--sp-accent, var(--sp-cyb-00f0ff)); }
 [data-theme="aurora"]    { --sp-accent: var(--sp-accent, var(--sp-aur-38bdf8)); }
 [data-theme="electric"]   { --sp-accent: var(--sp-accent, var(--sp-accent)); }
+
+/* ── Local-inference GPU yield ─────────────────────────────────────────────
+   While the in-tab WebGPU model is generating (body.sp-decoding, toggled by
+   webgpu-host.js), suppress GPU-compositor work that competes with the decode
+   loop for the SHARED GPU. backdrop-filter:blur() recomputes EVERY frame the
+   streamed text behind it changes — the single biggest offender — and infinite
+   CSS animations composite every frame. This was the focused-tab decode collapse
+   (GPU ~20% focused vs 100% backgrounded): the decode loop is fine, but expensive
+   foreground compositing starves the GPU only when the tab is visible. One-time
+   style recalc per message (on class toggle), not per frame. */
+body.sp-decoding *,
+body.sp-decoding *::before,
+body.sp-decoding *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation-play-state: paused !important;
+}
