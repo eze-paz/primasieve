@@ -430,20 +430,32 @@ async function render() {
   if (!open || (!barEl && !legEl)) return;
 
   const present = CTX_CATS.filter(([k]) => b[k] > 0);
+  // The bar represents the WHOLE context window: coloured "used" segments fill
+  // total/window of it, and the rest stays as the bar's --sp-border background =
+  // the free/unused window. Without a known window we fall back to pure
+  // composition (segments fill 100%, no "Free").
+  const haveWin = window_ > 0;
+  const usedFrac = haveWin ? Math.min(1, total / window_) : 1;
+  const freeTokens = haveWin ? Math.max(0, window_ - total) : 0;
+  const segPct = k => (sum > 0 ? (b[k] / sum) * usedFrac * 100 : 0);   // segment width as % of the whole bar
 
   if (barEl) {
     barEl.innerHTML = sum > 0
-      ? present.map(([k, label, color]) => `<div title="${label}: ${fmtTokens(b[k])} (${Math.round(b[k] / sum * 100)}%)" style="width:${(b[k] / sum * 100).toFixed(2)}%;background:${color};height:100%;"></div>`).join('')
+      ? present.map(([k, label, color]) => `<div title="${label}: ${fmtTokens(b[k])}" style="width:${segPct(k).toFixed(2)}%;background:${color};height:100%;"></div>`).join('')
       : '';
   }
   if (legEl) {
-    const rows = present.map(([k, label, color]) =>
+    const pf = p => (p > 0 && p < 0.5) ? '<1%' : Math.round(p) + '%';   // never show 0% for a non-zero row
+    const row = (color, label, toks, pct, free) =>
       `<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.72rem;line-height:1.55;">
-        <span style="width:9px;height:9px;border-radius:2px;background:${color};flex:0 0 auto;"></span>
+        <span style="width:9px;height:9px;border-radius:2px;background:${color};flex:0 0 auto;${free ? 'border:1px solid var(--sp-border-bright,#484f58);' : ''}"></span>
         <span style="color:var(--sp-text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>
-        <span style="font-variant-numeric:tabular-nums;color:var(--sp-text);">${fmtTokens(b[k])}</span>
-        <span style="color:var(--sp-text-dim);min-width:2.6em;text-align:right;">${Math.round(b[k] / sum * 100)}%</span>
-      </div>`).join('');
+        <span style="font-variant-numeric:tabular-nums;color:${free ? 'var(--sp-text-dim)' : 'var(--sp-text)'};">${toks}</span>
+        <span style="color:var(--sp-text-dim);min-width:2.6em;text-align:right;">${pf(pct)}</span>
+      </div>`;
+    // % is of the whole window when known (so type rows + Free sum to 100%), else share of used.
+    let rows = present.map(([k, label, color]) => row(color, label, fmtTokens(b[k]), (b[k] / sum) * (haveWin ? usedFrac : 1) * 100, false)).join('');
+    if (haveWin) rows += row('var(--sp-border)', 'Free', fmtTokens(freeTokens), Math.max(0, (1 - usedFrac) * 100), true);
     const imgNote = b.images ? `<div style="font-size:0.68rem;color:var(--sp-text-dim);margin-top:0.2rem;">+ ${b.images} image${b.images > 1 ? 's' : ''} (size not estimated)</div>` : '';
     legEl.innerHTML = sum > 0 ? rows + imgNote : '<div style="font-size:0.72rem;color:var(--sp-text-dim);">No messages yet.</div>';
   }
