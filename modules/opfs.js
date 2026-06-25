@@ -829,7 +829,10 @@ opfs.refreshFileList = async function() {
           const firstSeg = rest.split('/')[0];
           if (!remoteMap.has(firstSeg) && !localMap.has(firstSeg)) remoteMap.set(firstSeg, 'folder');
         } else if (!remoteMap.has(rest)) {
-          remoteMap.set(rest, 'file');
+          // Standalone index entry (no sub-path): trust its Dropbox kind so an
+          // empty / childless-in-index folder (e.g. a freshly-moved sandpie/
+          // artifacts) isn't mislabeled a file.
+          remoteMap.set(rest, cidx[rel] && cidx[rel].kind === 'folder' ? 'folder' : 'file');
         }
       }
     }
