@@ -45,7 +45,7 @@
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // opt-in: don't bulk-download; the AI hydrates files on demand (worker)
-  const EXEMPT_PREFIXES = ['sandpie'];   // the whole sandpie/ folder (conversations, agents, skills) is always eagerly synced
+  const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata: always eagerly synced. (sandpie/scripts, sandpie/artifacts, sandpie/memory are NOT exempt — dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -321,14 +321,19 @@
     }
   }
 
-  // One-time move of the exempt folders under a single sandpie/ folder:
-  //   _conversations -> sandpie/conversations,  agents -> sandpie/agents,  skills -> sandpie/skills
+  // One-time move of the app folders under a single sandpie/ folder:
+  //   _conversations -> sandpie/conversations,  agents -> sandpie/agents,  skills -> sandpie/skills,
+  //   scripts -> sandpie/scripts,  artifacts -> sandpie/artifacts,  memory -> sandpie/memory.
+  // (conversations/agents/skills are exempt = eager; scripts/artifacts/memory stay
+  // dehydratable — they're just relocated, NOT added to EXEMPT_PREFIXES.)
   // Dropbox side uses move_v2 (ATOMIC — the source is preserved if it fails), and
   // if it can't complete we abort WITHOUT touching local, so local and Dropbox
   // never diverge (no data loss, no duplication); we retry next boot. Only after
   // Dropbox reflects the new layout (or we're offline) do we move OPFS + set the
-  // guard. Runs before dehydratePurge so the moved files are seen as exempt.
-  const SANDPIE_MOVES = [['_conversations', 'sandpie/conversations'], ['agents', 'sandpie/agents'], ['skills', 'sandpie/skills']];
+  // guard. Runs before dehydratePurge so the moved files are seen at their new path.
+  // Guard bumped to -v2 when scripts/artifacts/memory were added: users who ran the
+  // 3-folder v1 re-run once (already-moved folders no-op via not_found/conflict).
+  const SANDPIE_MOVES = [['_conversations', 'sandpie/conversations'], ['agents', 'sandpie/agents'], ['skills', 'sandpie/skills'], ['scripts', 'sandpie/scripts'], ['artifacts', 'sandpie/artifacts'], ['memory', 'sandpie/memory']];
   async function opfsMoveDir(oldRel, newRel) {
     const opfs = Sandpie.opfs;
     let files = [];
@@ -341,7 +346,7 @@
     try { await opfs.remove(oldRel); } catch (_) {}
   }
   async function migrateExemptToSandpie() {
-    if (localStorage.getItem('dbxfull-sandpie-migrated') === '1') return;
+    if (localStorage.getItem('dbxfull-sandpie-migrated-v2') === '1') return;
     if (tokens()) {
       let wr = '';
       try { await ensureWorkingRoot(); wr = (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''); } catch (_) {}
@@ -361,7 +366,7 @@
     for (const [oldName, newRel] of SANDPIE_MOVES) {
       try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox-full] local move failed:', oldName, e && e.message); }
     }
-    localStorage.setItem('dbxfull-sandpie-migrated', '1');
+    localStorage.setItem('dbxfull-sandpie-migrated-v2', '1');
     try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
     try { if (window.refreshConversationList) window.refreshConversationList(); } catch (_) {}
   }

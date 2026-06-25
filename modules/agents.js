@@ -20,13 +20,13 @@
  * read_file / write_file / edit_file tools — no special plumbing. The sidebar
  * lists agents and edits the raw file (generic to any field we add later).
  *
- * Sinks: `memory` parses {topic,note} JSON -> appends memory/<topic>.md;
+ * Sinks: `memory` parses {topic,note} JSON -> appends sandpie/memory/<topic>.md;
  * `append:<path>` appends the raw output to a file; `note` just surfaces it.
  *
  * Guardrails: opt-in; idle-only (runs on generation:complete, skips while
  * generating); single-flight; gated (a per-(agent,conversation) cursor so a
  * span isn't reprocessed); loop-proof (a direct non-streaming call — never the
- * conversation stream — emits no generation:complete; agents write to memory/ or
+ * conversation stream — emits no generation:complete; agents write to sandpie/memory/ or
  * append paths, never agents/); cancellable; failure-isolated; malformed agents
  * are flagged and never run.
  *
@@ -198,7 +198,7 @@ sink: note
 Describe the job here. You receive a slice of the conversation as input and
 produce text output. With sink "note" the output is shown in the sidebar; use
 sink "append:<path>" to append it to a file, or "memory" with a JSON
-{"topic","note"} result to write memory/<topic>.md.
+{"topic","note"} result to write sandpie/memory/<topic>.md.
 `;
 
 async function ensureDefaults() {
@@ -348,7 +348,7 @@ async function applySink(a, out, convId) {
   if (!obj || obj.skip || !obj.topic || !obj.note) return { status: 'nothing durable' };
   const topic = slugTopic(obj.topic); if (!topic) return { status: 'bad topic' };
   const note = String(obj.note).trim().replace(/\s+/g, ' '); if (!note) return { status: 'empty note' };
-  const file = 'memory/' + topic + '.md';
+  const file = 'sandpie/memory/' + topic + '.md';
   let body; try { body = await opfs.read(file); }
   catch { body = `# ${topic}\n\n> Distilled notes from past conversations (auto-written by an agent).\n`; }
   body += `\n- [${nowDate()}] ${note} _(conv: ${convId})_`;

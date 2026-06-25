@@ -53,12 +53,12 @@ let _dbxCtx = null;
 // first touch. See the hydration helpers further down. Default off ⇒ no change.
 let _dehydrated = false;
 let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
-let _dbxExempt = ['sandpie'];   // the whole sandpie/ folder (conversations, agents, skills) is always eager
+let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata, always eager; sandpie/scripts|artifacts|memory stay dehydratable
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.6.0-no-index-files';
+const WORKER_VERSION = '2.7.0-sandpie-content-folders';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
