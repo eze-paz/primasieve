@@ -141,6 +141,24 @@ const SandpieContext = (() => {
   const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
   const listeners = new Set();
 
+  // Enable/disable (global, localStorage). A disabled skill is omitted from the
+  // prompt's skill table so the model can't see or load it; the file stays on disk.
+  const SKILLS_DISABLED_KEY = 'sandpie-skills-disabled';
+  function disabledSkills() { try { const a = JSON.parse(localStorage.getItem(SKILLS_DISABLED_KEY) || '[]'); return new Set(Array.isArray(a) ? a : []); } catch { return new Set(); } }
+  function isSkillEnabled(name) { return !disabledSkills().has(name); }
+  function setSkillEnabled(name, on) {
+    const s = disabledSkills();
+    if (on) s.delete(name); else s.add(name);
+    localStorage.setItem(SKILLS_DISABLED_KEY, JSON.stringify([...s]));
+    notify();
+  }
+  // Save an edited SKILL.md back to OPFS (the settings inline editor uses this).
+  async function saveSkill(file, text) {
+    await opfs.write(file, text);
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', file); } catch (_) {}
+    notify();
+  }
+
   // Last computed state, for the sidebar: {exists, skills, errors, loaded}
   let last = { exists: false, skills: [], errors: [], loaded: [] };
 
@@ -186,7 +204,7 @@ const SandpieContext = (() => {
       }
       const desc = (fm.description || '').replace(/\s+/g, ' ').trim();
       if (!desc) { errors.push(`${file} — missing "description"; the model needs it to decide when to load this skill`); continue; }
-      skills.push({ name: folder, desc, path, file });
+      skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
     skills.sort((a, b) => a.name.localeCompare(b.name));
     return { exists: true, skills, errors };
@@ -227,11 +245,12 @@ const SandpieContext = (() => {
       `To add a skill, create \`${SKILLS_DIR}/<name>/${SKILL_FILE}\` with frontmatter (a "---" block holding name + description) — it's discovered automatically, no registry to update.`,
     );
     lines.push('', '| Skill | When to use |', '|---|---|');
-    for (const s of idx.skills) {
+    const activeSkills = idx.skills.filter(s => s.enabled);   // disabled skills are hidden from the model
+    for (const s of activeSkills) {
       const mark = loaded.has(s.name) ? ' _(already loaded above)_' : '';
       lines.push(`| ${s.name} | ${clip(s.desc)}${mark} |`);
     }
-    if (!idx.skills.length) lines.push('| _none yet_ | — |');
+    if (!activeSkills.length) lines.push('| _none yet_ | — |');
     if (idx.errors.length) {
       lines.push('', `Skill problems (${idx.errors.length}) — these folders are NOT loadable until fixed:`);
       for (const e of idx.errors.slice(0, 5)) lines.push(`- ${e}`);
@@ -272,6 +291,7 @@ returned to the model when it calls load_skill on this skill.
 
   return {
     SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
+    isSkillEnabled, setSkillEnabled, saveSkill,
     lastState: () => last,
   };
 })();
@@ -292,7 +312,6 @@ window.SandpieContext = SandpieContext;
  */
 
 let _unsubscribe = null;
-let _unsubscribeSkills = null;
 
 function fmtTokens(n) {
   n = Math.max(0, Math.round(n || 0));
@@ -304,40 +323,6 @@ function fmtTokens(n) {
 const escHtml = s => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
-
-async function renderSkills() {
-  const countEl = document.getElementById('ctxSkillCount');
-  const listEl = document.getElementById('ctxSkillList');
-  const errEl = document.getElementById('ctxSkillErrors');
-  const createBtn = document.getElementById('ctxSkillCreate');
-  if (!countEl || typeof SandpieContext === 'undefined') return;
-
-  const msgs = (typeof messages !== 'undefined') ? messages : [];
-  let st;
-  try { st = await SandpieContext.inspect(msgs); }
-  catch (e) { console.warn('skills inspect failed:', e); return; }
-
-  if (!st.exists) {
-    countEl.textContent = '—';
-    listEl.innerHTML = `<span style="color:var(--sp-text-dim);">No ${escHtml(SandpieContext.SKILLS_DIR)}/ folder yet.</span>`;
-    errEl.innerHTML = '';
-    createBtn.style.display = '';
-    return;
-  }
-  createBtn.style.display = 'none';
-  countEl.textContent = String(st.skills.length) + (st.errors.length ? ` · ${st.errors.length}⚠` : '');
-
-  const loaded = new Set(st.loaded || []);
-  listEl.innerHTML = st.skills.length
-    ? st.skills.map(s => {
-        const mark = loaded.has(s.name)
-          ? ' <span style="color:var(--sp-accent);" title="The model loaded this skill in this conversation">● loaded</span>'
-          : '';
-        return `<div title="${escHtml(s.desc)}">${escHtml(s.name)}${mark}<div style="color:var(--sp-text-dim); font-size:0.95em; padding-left:0.4rem;">${escHtml(s.desc.length > 70 ? s.desc.slice(0, 70) + '…' : s.desc)}</div></div>`;
-      }).join('')
-    : `<span style="color:var(--sp-text-dim);">No valid skills — add ${escHtml(SandpieContext.SKILLS_DIR)}/&lt;name&gt;/SKILL.md with frontmatter.</span>`;
-  errEl.innerHTML = st.errors.map(e => `<div title="Flagged automatically — not loadable until fixed">⚠ ${escHtml(e)}</div>`).join('');
-}
 
 async function render() {
   const T = SandpieTokens;
@@ -406,25 +391,10 @@ function init() {
         <span style="color:var(--sp-text-dim);">This week (7d)</span>
         <span id="ctxWeekTokens" style="font-variant-numeric:tabular-nums;">–</span>
       </div>
-      <div style="border-top:1px solid var(--sp-border); margin-top:0.8rem; padding-top:0.6rem;">
-        <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
-          <span style="color:var(--sp-text-dim);">Skills</span>
-          <span id="ctxSkillCount" style="font-variant-numeric:tabular-nums;">–</span>
-        </div>
-        <div id="ctxSkillList" style="font-size:0.72rem; line-height:1.6; margin-top:0.25rem;"></div>
-        <div id="ctxSkillErrors" style="font-size:0.7rem; color:var(--sp-accent-neg, #e06c75); margin-top:0.25rem;"></div>
-        <button id="ctxSkillCreate" style="display:none; margin-top:0.4rem; font-size:0.7rem; padding:0.2rem 0.5rem; background:transparent; color:var(--sp-text-dim); border:1px solid var(--sp-border); border-radius:4px; cursor:pointer;">Create example skill
-      </div>
     `,
     onRender(bodyEl) {
       if (!_unsubscribe) _unsubscribe = SandpieTokens.subscribe(render);
-      if (!_unsubscribeSkills) {
-        _unsubscribeSkills = SandpieContext.subscribe(renderSkills);
-        const btn = document.getElementById('ctxSkillCreate');
-        if (btn) btn.onclick = async () => { await SandpieContext.scaffold(); renderSkills(); };
-      }
       render();
-      renderSkills();
     }
   });
 

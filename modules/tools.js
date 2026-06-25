@@ -146,17 +146,64 @@ Supports JPEG, PNG, GIF, WEBP. Path is relative to /files/.`,
       },
     },
 };
+// ── Enable/disable + description overrides (global, localStorage) ─────────────
+// Lets the user (Settings → System prompt) turn tools off and rewrite their
+// descriptions. Stored globally so it applies to every conversation. toolDefs()
+// — what's actually sent to the model — is the single choke point that honors it.
+const TOOLS_DISABLED_KEY = 'sandpie-tools-disabled';   // JSON array of disabled names
+const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: customDescription }
+function _toolsReadJson(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
+  catch { return fallback; }
+}
+function _toolsDisabledSet() { const a = _toolsReadJson(TOOLS_DISABLED_KEY, []); return new Set(Array.isArray(a) ? a : []); }
+function _toolsDescMap() { const m = _toolsReadJson(TOOLS_DESC_KEY, {}); return (m && typeof m === 'object') ? m : {}; }
+// A tool may be present but unavailable (e.g. copy_to_workspace needs Dropbox).
+function _toolAvailable(name) {
+  if (name === 'copy_to_workspace') {
+    try { const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); return !!(p && p.isConnected && p.isConnected()); }
+    catch (_) { return false; }
+  }
+  return true;
+}
+
+const SandpieTools = {
+  names() { return Object.keys(tools); },
+  defaultDescription(name) { return tools[name] ? tools[name].description : ''; },
+  description(name) { const o = _toolsDescMap(); return (o[name] != null) ? o[name] : SandpieTools.defaultDescription(name); },
+  isCustom(name) { const o = _toolsDescMap(); return o[name] != null && o[name] !== SandpieTools.defaultDescription(name); },
+  isEnabled(name) { return !_toolsDisabledSet().has(name); },
+  isAvailable(name) { return _toolAvailable(name); },
+  setEnabled(name, on) {
+    const s = _toolsDisabledSet();
+    if (on) s.delete(name); else s.add(name);
+    localStorage.setItem(TOOLS_DISABLED_KEY, JSON.stringify([...s]));
+  },
+  setDescription(name, text) {
+    const o = _toolsDescMap();
+    if (text == null || String(text).trim() === '' || text === SandpieTools.defaultDescription(name)) delete o[name];
+    else o[name] = String(text);
+    localStorage.setItem(TOOLS_DESC_KEY, JSON.stringify(o));
+  },
+  resetDescription(name) { const o = _toolsDescMap(); delete o[name]; localStorage.setItem(TOOLS_DESC_KEY, JSON.stringify(o)); },
+  // Everything the settings UI needs to render a row, in catalog order.
+  list() {
+    return Object.keys(tools).map(name => ({
+      name,
+      description: SandpieTools.description(name),
+      defaultDescription: SandpieTools.defaultDescription(name),
+      custom: SandpieTools.isCustom(name),
+      enabled: SandpieTools.isEnabled(name),
+      available: _toolAvailable(name),
+    }));
+  },
+};
+window.SandpieTools = SandpieTools;
+
 const toolDefs = () => Object.entries(tools)
-  .filter(([name]) => {
-    // copy_to_workspace only works with Dropbox connected — hide it otherwise.
-    if (name === 'copy_to_workspace') {
-      try { const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); return !!(p && p.isConnected && p.isConnected()); }
-      catch (_) { return false; }
-    }
-    return true;
-  })
-  .map(([name, t]) => ({
+  .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
+  .map(([name]) => ({
     type: 'function',
-    function: { name, description: t.description, parameters: t.parameters },
+    function: { name, description: SandpieTools.description(name), parameters: tools[name].parameters },
   }));
 

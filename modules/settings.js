@@ -36,7 +36,7 @@ const SandpieSettings = (() => {
     items.set(o.id, {
       id: o.id, title: o.title || o.id,
       order: (o.order == null ? 100 : o.order),
-      render: o.render, panel: null, navBtn: null, rendered: false,
+      render: o.render, onShow: o.onShow, panel: null, navBtn: null, rendered: false,
     });
     if (navEl()) buildNav();   // modal already in the DOM — refresh nav
     return true;
@@ -78,6 +78,11 @@ const SandpieSettings = (() => {
     if (!it.rendered && typeof it.render === 'function') {
       it.rendered = true;
       try { it.render(it.panel); } catch (e) { console.warn('[SandpieSettings] render failed:', id, e); }
+    }
+    // onShow runs on EVERY activation (not just first render) so panels with
+    // file-derived content (e.g. the skills list) refresh when re-opened.
+    if (typeof it.onShow === 'function') {
+      try { it.onShow(it.panel); } catch (e) { console.warn('[SandpieSettings] onShow failed:', id, e); }
     }
   }
 
