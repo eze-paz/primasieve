@@ -64,6 +64,14 @@ const SandpieTokens = (() => {
     return !convId || !localStorage.getItem(USAGE_PREFIX + convId);
   }
 
+  // True while a turn is actively streaming into the visible conversation (the live
+  // running total is being pushed by the HUD). render() uses this to DEFER the heavy
+  // per-type breakdown to turn end instead of recomputing it on every streamed frame.
+  function isLive() {
+    const convId = localStorage.getItem('sandpie-active-conv');
+    return _liveTotal != null && _liveConvId === convId;
+  }
+
   // Streaming loop calls this (throttled internally) with the live running total.
   function setLiveTokens(convId, total) {
     _liveConvId = convId;
@@ -104,7 +112,7 @@ const SandpieTokens = (() => {
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    recordUsage, forget, conversationTokens, isEstimated, weeklyTotal,
+    recordUsage, forget, conversationTokens, isEstimated, isLive, weeklyTotal,
     contextWindow, subscribe, notify, setLiveTokens, clearLiveTokens,
   };
 })();
@@ -344,6 +352,16 @@ const CTX_CATS = [
   ['toolResults', 'Tool results',      '#ff7b72'],
 ];
 
+// Cache the last full per-type breakdown. computeBreakdown() reads OPFS + JSON.parses
+// the whole conversation + JSON.stringify(toolDefs) on every call; the streaming HUD
+// ticks setLiveTokens at ~15fps → notify() ~5×/s, so during in-tab decode this ran on
+// the main thread 5×/s and starved the WebGPU/Gemma worker on the shared iGPU
+// (focused-tab decode collapse: GPU ~30% focused / 100% backgrounded). The breakdown
+// only changes when a turn completes, so render() computes it ONCE per turn: while a
+// turn streams (SandpieTokens.isLive()) it reuses this cache, and clearLiveTokens()→
+// notify() at turn end recomputes it fresh against the saved conversation.
+let _bdCache = null;
+
 async function computeBreakdown() {
   const toTok = c => Math.ceil((c || 0) / 4);
   const b = { system: 0, tools: 0, skills: 0, messages: 0, toolCalls: 0, toolResults: 0, images: 0 };
@@ -404,8 +422,17 @@ async function render() {
   const estimated = T.isEstimated();
 
   // The per-type breakdown is also a fuller estimate: it counts the system prompt,
-  // tool defs, and skills that the message-only estimate misses.
-  const b = await computeBreakdown();
+  // tool defs, and skills that the message-only estimate misses. It only changes at
+  // turn boundaries, so while a turn is streaming reuse the cached breakdown and skip
+  // the heavy recompute entirely — see the _bdCache note above (focused-tab
+  // decode-collapse fix). Turn end (clearLiveTokens→notify) recomputes it fresh.
+  let b;
+  if (T.isLive && T.isLive() && _bdCache) {
+    b = _bdCache;
+  } else {
+    b = await computeBreakdown();
+    _bdCache = b;
+  }
   const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
   // When estimating, show whichever is larger — the live/running figure or the
   // breakdown sum — so the headline never reads smaller than its own breakdown.
