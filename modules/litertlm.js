@@ -639,7 +639,23 @@ const SandpieLiteRTLM = (function () {
   // so Gemma 4's "thoughts must not precede the next turn" rule holds with no KV surgery
   // and no need for filterChannelContentFromKvCache.
   // ============================================================
+  // While local inference runs, add body.sp-decoding so the shared CSS rule suppresses
+  // GPU-compositor work (backdrop-filter:blur recompute per streamed token, infinite CSS
+  // animations) that otherwise starves the WebGPU decode loop for the shared GPU — the
+  // same focused-tab slowdown fixed for the Qwen3 backend (webgpu-host.js). LiteRT runs
+  // on the main thread, so it can toggle the class directly. Ref-counted + try/finally so
+  // it always clears (runConversation can exit via return / normal end / thrown abort).
+  let _decoding = 0;
+  function _setDecoding(on) {
+    try {
+      const b = (typeof document !== 'undefined') && document.body; if (!b) return;
+      if (on) { if (_decoding++ === 0) b.classList.add('sp-decoding'); }
+      else { _decoding = Math.max(0, _decoding - 1); if (_decoding === 0) b.classList.remove('sp-decoding'); }
+    } catch (_) {}
+  }
   async function runConversation({ provider, messages, systemPrompt, tools, convId, signal }, emit) {
+    _setDecoding(true);
+    try {
     // Single active local backend: free the OTHER local LLMs' GPU/WASM contexts
     // first, so only one local runtime holds a WebGPU device at a time.
     try { await window.SandpieWllama?.unload?.(); } catch (_) {}
@@ -792,6 +808,7 @@ const SandpieLiteRTLM = (function () {
       emit({ type: 'error', message: 'litertlm: ' + ((e && e.message) || e) });
     }
     emit({ type: 'agent_done' });
+    } finally { _setDecoding(false); }
   }
 
   // ============================================================
