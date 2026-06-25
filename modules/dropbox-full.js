@@ -515,28 +515,17 @@
       if (toDownload.length) _setSyncProgress(0, toDownload.length, 'Downloading');
       await bulkDownload(toDownload, state, opfs, toDownload.length ? (d, t) => _setSyncProgress(d, t, 'Downloading') : null);
 
-      // push: dirty = event-marked (syncedMtime===0); full scan walks all local
-      // files. Uploaded via upload_session + finish_batch_v2 (one commit call per
-      // batch) — minimizes round-trips and avoids too_many_write_operations
-      // throttling on a large first sync. syncedMtime is the mtime captured at
-      // collection time, so a write that lands mid-upload re-uploads next cycle.
+      // push: only files explicitly marked dirty (syncedMtime===0) by edit events.
+      // A full-scan upload that treated "no state entry" as dirty has been removed
+      // because it causes mega-uploads when localStorage state is lost or reset and
+      // Dropbox already holds the correct copies. Dropbox is the authority; we only
+      // upload files the conversation itself created or edited.
       const dirty = [];
-      if (fullScan) {
-        let rels = []; try { rels = await opfs.list(); } catch {}
-        for (const rel of rels) {
-          if (rel === openFilePath) continue;
-          const s = state[rel];
-          const lm = await Sandpie.opfsMtime(rel);
-          if (s && lm <= s.syncedMtime) continue;
-          dirty.push({ rel, lm, s });
-        }
-      } else {
-        for (const rel of Object.keys(state)) {
-          if (rel === openFilePath) continue;
-          if (state[rel].syncedMtime !== 0) continue;
-          if (!(await opfs.exists(rel))) continue;
-          dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
-        }
+      for (const rel of Object.keys(state)) {
+        if (rel === openFilePath) continue;
+        if (state[rel].syncedMtime !== 0) continue;
+        if (!(await opfs.exists(rel))) continue;
+        dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
       }
       const BATCH_SIZE = 50;
       let upDone = 0;
@@ -593,19 +582,9 @@
   }
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
-    const lk = rel.toLowerCase();
-    const st = syncState(); let changed = false;
+    const st = syncState(); const lk = rel.toLowerCase(); let changed = false;
     for (const k of Object.keys(st)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete st[k]; changed = true; } }
     if (changed) setSyncState(st);
-    // Also drop it (and any children, for a folder) from the cloud index — otherwise
-    // the file browser and the worker's list_files re-surface it as a cloud
-    // placeholder after deletion (on-demand mode merges the index), so it looks like
-    // the delete didn't take. Push the trimmed index to the worker too.
-    try {
-      const idx = cloudIndex(); let idxChanged = false;
-      for (const k of Object.keys(idx)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete idx[k]; idxChanged = true; } }
-      if (idxChanged) { setCloudIndex(idx); pushDbxIndexToSW(); }
-    } catch (_) {}
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
   function pushDbxTokenToSW() {
