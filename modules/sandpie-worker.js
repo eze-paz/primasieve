@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.10.0-search-scope';
+const WORKER_VERSION = '2.11.0-image-budget';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -571,6 +571,27 @@ async function tool_show_artifact({ path }, ctx) {
   }
 }
 
+// Images are embedded as base64 in the NEXT model request. One giant image, or a
+// batch of load_image calls in a single turn, can blow the context window (and the
+// request body). Guard both: a per-image cap, and a cumulative budget over every
+// image already in the conversation (ctx._imageBudget, seeded in runAgent).
+const IMAGE_MAX_B64_BYTES    = 5 * 1024 * 1024;    // per image  (~5MB base64 ≈ 3.75MB raw)
+const IMAGE_CONVO_B64_BUDGET = 12 * 1024 * 1024;   // cumulative across the whole conversation
+const _fmtMB = n => (n / (1024 * 1024)).toFixed(1) + ' MB';
+// Base64 bytes of images already present in the request messages (real data: URLs
+// only; opfs:// placeholders cost nothing).
+function _imageB64InMessages(msgs) {
+  let n = 0;
+  for (const m of (msgs || [])) {
+    const c = m && m.content;
+    if (!Array.isArray(c)) continue;
+    for (const p of c) {
+      if (p && p.type === 'image_url' && p.image_url && typeof p.image_url.url === 'string' && p.image_url.url.startsWith('data:')) n += p.image_url.url.length;
+    }
+  }
+  return n;
+}
+
 async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
@@ -581,6 +602,17 @@ async function tool_load_image({ path }, ctx) {
       if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
       else throw miss;
     }
+    // Estimate the base64 payload from the raw byte count and bail BEFORE building
+    // the (huge) string: (1) per-image cap, (2) cumulative conversation budget.
+    const estB64 = Math.ceil(bytes.length / 3) * 4;
+    if (estB64 > IMAGE_MAX_B64_BYTES) {
+      return { result: `Error: "${clean}" is ${_fmtMB(bytes.length)} — too large to load as one image (limit ~${_fmtMB(IMAGE_MAX_B64_BYTES * 3 / 4)} raw). Downscale it first with run_python + Pillow (img.thumbnail((1568,1568))) and load the smaller copy.` };
+    }
+    const budget = ctx && ctx._imageBudget;
+    if (budget && budget.used + estB64 > budget.total) {
+      return { result: `Error: "${clean}" was NOT loaded — the conversation already holds ${_fmtMB(budget.used)} of images and adding this (${_fmtMB(estB64)}) would exceed the ${_fmtMB(budget.total)} image budget that protects the context window. Don't load several images at once; load only the one(s) you actually need, reuse images already shown above, or continue in a fresh conversation.` };
+    }
+    if (budget) budget.used += estB64;   // reserve before encoding so the next call in the batch sees it
     const ext = (clean.split('.').pop() || '').toLowerCase();
     const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
     let bin = ''; const CHUNK = 0x8000;
@@ -1170,6 +1202,10 @@ async function runAgent(config, ctx) {
   const convFileName = config.conversation_file_name || 'unknown';
   ctx._conversation_file_name = convFileName;
   const messages = config.messages.slice();
+  // Cumulative image budget for load_image — seeded from images already in the
+  // conversation, then incremented per load so a batch of parallel load_image
+  // calls in one turn can't pile up and blow the context / request body.
+  ctx._imageBudget = { total: IMAGE_CONVO_B64_BUDGET, used: _imageB64InMessages(messages) };
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
