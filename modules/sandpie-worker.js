@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.13.0-request-size-guard';
+const WORKER_VERSION = '2.14.0-image-compress-to-fit';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -571,19 +571,21 @@ async function tool_show_artifact({ path }, ctx) {
   }
 }
 
-// Images are embedded as base64 in the NEXT model request. One giant image, or a
-// batch of load_image calls in a single turn, can blow the context window (and the
-// request body). Guard both: a per-image cap, and a cumulative budget over every
-// image already in the conversation (ctx._imageBudget, seeded in runAgent).
-const IMAGE_MAX_B64_BYTES    = 5 * 1024 * 1024;    // per image  (~5MB base64 ≈ 3.75MB raw)
-const IMAGE_CONVO_B64_BUDGET = 18 * 1024 * 1024;   // cumulative images across the conversation
-// Hard ceiling on the WHOLE serialized request body — just under the server's
-// 25 MB cap (nginx client_max_body_size 25m + Express express.json {limit:'25mb'}).
-// Bounds everything (system prompt + history + tool results + images), not just
-// images, so an over-size request fails fast client-side with a clear message
-// instead of a server 413. Keep < the server cap; raise both together if changed.
-const MAX_REQUEST_BYTES      = 24 * 1024 * 1024;
-const _fmtMB = n => (n / (1024 * 1024)).toFixed(1) + ' MB';
+// Images are embedded as base64 in the NEXT model request. The upstream gateway
+// (NPAW ai-balancer.npaw.com) caps the WHOLE request body at ~1 MB and that limit
+// is NOT raisable, so instead of rejecting a large image we downscale + re-encode
+// it to fit (see _compressImageToFit / tool_load_image). All three limits sit
+// UNDER ~1 MB, leaving headroom for the system prompt + tools + history that share
+// the body with the image(s):
+//   • IMAGE_MAX_B64_BYTES    — per image: the compress-to-fit target (base64).
+//   • IMAGE_CONVO_B64_BUDGET — cumulative images across the conversation (≈ 1 image).
+//   • MAX_REQUEST_BYTES      — hard ceiling on the WHOLE serialized body, just under
+//                              the gateway's cap; an over-size request then fails
+//                              fast client-side with a clear message, not a 413.
+const IMAGE_MAX_B64_BYTES    = 700 * 1024;   // per image: compress-to-fit target
+const IMAGE_CONVO_B64_BUDGET = 900 * 1024;   // cumulative images across the conversation
+const MAX_REQUEST_BYTES      = 950 * 1024;   // whole serialized body (just under NPAW's ~1 MB cap)
+const _fmtBytes = n => n >= 1024 * 1024 ? (n / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
 // Base64 bytes of images already present in the request messages (real data: URLs
 // only; opfs:// placeholders cost nothing).
 function _imageB64InMessages(msgs) {
@@ -598,6 +600,48 @@ function _imageB64InMessages(msgs) {
   return n;
 }
 
+// Downscale + re-encode an image (in the worker, via OffscreenCanvas) until its
+// base64 size is at or under `targetB64`. The upstream gateway caps the whole
+// request body near 1 MB, so a full-res photo has to be shrunk to fit. Walks
+// progressively smaller max-dimensions × JPEG qualities and returns the FIRST that
+// fits (so most images keep high resolution/quality), else the smallest achieved.
+// Returns { bytes, mime, estB64 } or null if the image can't be decoded here (e.g.
+// an SVG) — the caller then falls back to the raw bytes.
+async function _compressImageToFit(rawBytes, srcMime, targetB64) {
+  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') return null;
+  let bmp;
+  try { bmp = await createImageBitmap(new Blob([rawBytes], { type: srcMime })); }
+  catch (_) { return null; }
+  const DIMS = [1568, 1024, 768, 512, 384];
+  const QUALS = [0.7, 0.5];
+  let best = null;
+  try {
+    for (const maxDim of DIMS) {
+      let w = bmp.width, h = bmp.height;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { h = Math.max(1, Math.round(h * maxDim / w)); w = maxDim; }
+        else { w = Math.max(1, Math.round(w * maxDim / h)); h = maxDim; }
+      }
+      const canvas = new OffscreenCanvas(w, h);
+      const cx = canvas.getContext('2d');
+      cx.fillStyle = '#fff';            // flatten any transparency — JPEG has no alpha
+      cx.fillRect(0, 0, w, h);
+      cx.drawImage(bmp, 0, 0, w, h);
+      for (const q of QUALS) {
+        let blob;
+        try { blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: q }); }
+        catch (_) { continue; }
+        if (!blob) continue;
+        const estB64 = Math.ceil(blob.size / 3) * 4;
+        if (estB64 <= targetB64) return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/jpeg', estB64 };
+        if (!best || estB64 < best.estB64) best = { blob, estB64 };
+      }
+    }
+  } finally { if (bmp && bmp.close) bmp.close(); }
+  if (best) return { bytes: new Uint8Array(await best.blob.arrayBuffer()), mime: 'image/jpeg', estB64: best.estB64 };
+  return null;
+}
+
 async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
@@ -608,19 +652,22 @@ async function tool_load_image({ path }, ctx) {
       if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
       else throw miss;
     }
-    // Estimate the base64 payload from the raw byte count and bail BEFORE building
-    // the (huge) string: (1) per-image cap, (2) cumulative conversation budget.
-    const estB64 = Math.ceil(bytes.length / 3) * 4;
+    const ext = (clean.split('.').pop() || '').toLowerCase();
+    let mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
+    // Estimate the base64 payload from the raw byte count. If it's over the
+    // per-image target, downscale + re-encode to fit (the gateway caps the body
+    // near 1 MB) rather than rejecting. SVG / undecodable → fall through raw.
+    let estB64 = Math.ceil(bytes.length / 3) * 4;
     if (estB64 > IMAGE_MAX_B64_BYTES) {
-      return { result: `Error: "${clean}" is ${_fmtMB(bytes.length)} — too large to load as one image (limit ~${_fmtMB(IMAGE_MAX_B64_BYTES * 3 / 4)} raw). Downscale it first with run_python + Pillow (img.thumbnail((1568,1568))) and load the smaller copy.` };
+      const c = await _compressImageToFit(bytes, mime, IMAGE_MAX_B64_BYTES);
+      if (c) { bytes = c.bytes; mime = c.mime; estB64 = c.estB64; }
     }
+    // Cumulative conversation budget (on the FINAL, possibly-compressed size).
     const budget = ctx && ctx._imageBudget;
     if (budget && budget.used + estB64 > budget.total) {
-      return { result: `Error: "${clean}" was NOT loaded — the conversation already holds ${_fmtMB(budget.used)} of images and adding this (${_fmtMB(estB64)}) would exceed the ${_fmtMB(budget.total)} image budget that protects the context window. Don't load several images at once; load only the one(s) you actually need, reuse images already shown above, or continue in a fresh conversation.` };
+      return { result: `Error: "${clean}" was NOT loaded — even compressed, the conversation's images would total ${_fmtBytes(budget.used + estB64)}, over the ${_fmtBytes(budget.total)} image budget (the upstream gateway caps the whole request near 1 MB). Load only the one image you need, reuse an image already shown above, or continue in a fresh conversation.` };
     }
     if (budget) budget.used += estB64;   // reserve before encoding so the next call in the batch sees it
-    const ext = (clean.split('.').pop() || '').toLowerCase();
-    const mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
     let bin = ''; const CHUNK = 0x8000;
     for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
     const dataUrl = 'data:' + mime + ';base64,' + btoa(bin);
@@ -1166,12 +1213,12 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   // 413. Measures real UTF-8 bytes. Not retryable (size won't change on retry).
   let bytes; try { bytes = new Blob([payload]).size; } catch (_) { bytes = payload.length; }
   if (bytes > MAX_REQUEST_BYTES) {
-    throw new Error(`Request too large: ${_fmtMB(bytes)} exceeds the ~${_fmtMB(MAX_REQUEST_BYTES)} limit. The conversation is holding too much to send (usually images) — remove some, load only the one(s) you need, or start a fresh conversation.`);
+    throw new Error(`Request too large: ${_fmtBytes(bytes)} exceeds the ~${_fmtBytes(MAX_REQUEST_BYTES)} limit (the upstream gateway caps the request body near 1 MB and that can't be raised). The conversation is holding too much to send (usually images) — remove some, load only the one(s) you need, or start a fresh conversation.`);
   }
   const res = await fetch(reqUrl, { method: 'POST', headers, body: payload, signal: ctx.signal });
   if (!res.ok) {
     const text = (await res.text()).slice(0, 300);
-    const hint = res.status === 413 ? ` (request body was ${_fmtMB(bytes)}; the server/proxy rejected it as too large — raise its body-size limit)` : '';
+    const hint = res.status === 413 ? ` (request body was ${_fmtBytes(bytes)}; the upstream gateway rejected it as too large — its ~1 MB cap can't be raised, so send fewer/smaller images or trim the conversation)` : '';
     throw Object.assign(new Error(res.status + ': ' + text + hint), { status: res.status });
   }
   const reader = res.body.getReader();

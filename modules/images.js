@@ -60,8 +60,34 @@ const SandpieImages = (function() {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';            // flatten any transparency — JPEG has no alpha
+    ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  // Per-image base64 budget for an LLM request. Must stay well under the upstream
+  // gateway's ~1 MB whole-body cap so the system prompt + tools + history still
+  // fit alongside the image. Keep in sync with IMAGE_MAX_B64_BYTES in
+  // sandpie-worker.js (the load_image tool path).
+  const LLM_IMAGE_TARGET_B64 = 700 * 1024;
+
+  // Downscale + re-encode `img` (JPEG) until the data URL fits `targetBytes`.
+  // Walks smaller max-dimensions × qualities and returns the FIRST that fits (so
+  // most images keep high resolution/quality), else the smallest achieved. The
+  // data-URL prefix adds ~23 chars over the raw base64 — negligible vs the target.
+  function compressImageToTarget(img, targetBytes) {
+    const DIMS = [1568, 1024, 768, 512, 384];
+    const QUALS = [0.7, 0.5];
+    let best = null;
+    for (const maxDim of DIMS) {
+      for (const q of QUALS) {
+        const url = compressImage(img, maxDim, q);
+        if (url.length <= targetBytes) return url;
+        if (!best || url.length < best.length) best = url;
+      }
+    }
+    return best;
   }
 
   /**
@@ -387,7 +413,7 @@ const SandpieImages = (function() {
       const blob = new Blob([bytes], { type: mime });
 
       const img = await loadImageFromBlob(blob);
-      return compressImage(img, 1024, 0.75);
+      return compressImageToTarget(img, LLM_IMAGE_TARGET_B64);
     } catch (e) {
       console.error('Failed to load image from OPFS:', e);
       return null;
@@ -407,7 +433,7 @@ const SandpieImages = (function() {
       const mime = (a.file && a.file.type) || getMimeType(a.opfsPath);
       const blob = new Blob([bytes], { type: mime });
       const img = await loadImageFromBlob(blob);
-      return compressImage(img, 1024, 0.75);
+      return compressImageToTarget(img, LLM_IMAGE_TARGET_B64);
     } catch (e) {
       console.error('Failed to compress image for LLM:', e);
       return null;
