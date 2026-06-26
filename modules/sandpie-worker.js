@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.7.0-sandpie-content-folders';
+const WORKER_VERSION = '2.8.0-dropbox-list-cap';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -695,9 +695,10 @@ async function tool_list_files({ path, pattern, recursive }) {
     let entries;
     try { entries = await _dropboxListFolder(raw.replace(/\/+$/, ''), recursive); }
     catch (e) { return { result: e.message }; }
+    const capped = !!entries.capped;   // the subtree was bigger than we scanned
     const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
     if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} under ${raw}.` };
-    let buf = `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} under ${raw}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
+    let buf = `${rows.length}${capped ? '+' : ''} entr${rows.length === 1 ? 'y' : 'ies'} under ${raw}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
     let shown = 0, truncated = false;
     for (const e of rows) {
       let line;
@@ -711,6 +712,7 @@ async function tool_list_files({ path, pattern, recursive }) {
       buf += line; shown++;
     }
     if (truncated) buf += `…[${rows.length - shown} more not shown; narrow with path/pattern]`;
+    if (capped) buf += `\n⚠ "${raw}" is very large — stopped after ${entries.length} entries; the full subtree was NOT scanned. Don't list a big Dropbox tree recursively: list a specific subfolder with recursive:false and drill down, or use search to find files by content.`;
     return { result: buf.replace(/\n$/, '') };
   }
 
@@ -787,18 +789,26 @@ async function _dropboxListFolder(folderPath, recursive) {
   if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox list failed (' + res.status + '): ' + txt.slice(0, 300)); }
   let data = await res.json();
   let entries = data.entries || [];
-  // Paginate if needed
-  while (data.has_more) {
+  // Cap pagination. A recursive list over a large Dropbox subtree can be MILLIONS
+  // of entries and would never return (the tool call hangs). Bound it to ~2-3 API
+  // calls and flag it as `capped` so the caller can steer the model to narrow.
+  const LIST_CAP = recursive ? 1500 : 6000;
+  let capped = false;
+  while (data.has_more && entries.length < LIST_CAP) {
     res = await fetch('https://api.dropboxapi.com/2/files/list_folder/continue', { method: 'POST', headers: headers, body: JSON.stringify({ cursor: data.cursor }) });
     data = await res.json();
     entries = entries.concat(data.entries || []);
   }
-  return entries.map(e => ({
+  if (data.has_more) capped = true;                 // more remained beyond the cap
+  if (entries.length > LIST_CAP) entries = entries.slice(0, LIST_CAP);
+  const rows = entries.map(e => ({
     path: e.path_display || e.path_lower,
     kind: e['.tag'] === 'folder' ? 'directory' : 'file',
     size: e.size,
     cloudMtime: e.client_modified
   }));
+  rows.capped = capped;
+  return rows;
 }
 async function _localGrep(rx, norm, include, files_only) {
   const inc = include ? globToRegExp(include) : null;

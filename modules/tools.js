@@ -60,17 +60,15 @@ edit_file: {
     },
   },
   list_files: {
-    description: `List files and folders in OPFS (/files/) with size + modified time. PREFER THIS over run_python for browsing. Default lists the immediate contents of "path" (like ls). To find files BY NAME, set a glob "pattern" (e.g. "*.py", "**/*.md") and usually recursive:true. To find files BY CONTENT, use search instead.
+    description: `List files and folders with size + modified time. PREFER THIS over run_python for browsing. Default lists the immediate contents of "path" (like ls). Find files BY NAME with a glob "pattern" (e.g. "**/*.md"); find files BY CONTENT with search.
 
-"path" can be:
-- A relative OPFS path (default everything under /files/)
-- An absolute Dropbox path (e.g. "/Shared/reports") to list elsewhere in your Dropbox`,
+"path" can be relative (your workspace, default) OR an absolute Dropbox path (e.g. "/R+D+I/reports") to browse elsewhere in Dropbox. For a Dropbox path, list shallowly and drill into a subfolder — recursive:true on a large/unknown Dropbox tree is capped (~1500 entries, not the whole tree) and is the wrong tool for broad discovery.`,
     parameters: {
       type: 'object',
       properties: {
         path:      { type: 'string', description: 'Directory relative to /files/ (default: root), or an absolute Dropbox path (e.g. "/R+D+I/reports").' },
         pattern:   { type: 'string', description: 'Glob to filter names/paths: * (within a segment), ** (across folders), ? (one char). E.g. "**/*.json".' },
-        recursive: { type: 'boolean', description: 'Walk subfolders (default false). Set true when using a "**" pattern.' },
+        recursive: { type: 'boolean', description: 'Walk subfolders (default false). Use only on a small, specific folder; recursing a large/unknown Dropbox subtree is capped — list shallowly and drill down instead.' },
       },
       required: [],
     },
