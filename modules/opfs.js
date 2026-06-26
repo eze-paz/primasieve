@@ -859,6 +859,12 @@ opfs.uploadEntry = async function(entry, dirPath) {
 
 
 
+// File-list sort mode (the right-click "Sort by" section). Folders always group
+// first and sort by name; files sort by this mode. Persisted in localStorage.
+const FILE_SORT_KEY = 'sandpie-files-sort';
+function fileSortMode() { const m = localStorage.getItem(FILE_SORT_KEY); return (m === 'size' || m === 'mtime') ? m : 'name'; }
+function setFileSortMode(m) { localStorage.setItem(FILE_SORT_KEY, (m === 'size' || m === 'mtime') ? m : 'name'); opfs.refreshFileList(); }
+
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
   const path = opfs.currentPath();
@@ -929,16 +935,33 @@ opfs.refreshFileList = async function() {
       if (kind === 'folder') {
         it.status = local && remote ? 'synced' : (local ? 'local' : 'cloud');
         it.size = undefined;
+        it.mtime = 0;
         return;
       }
       it.size = await opfs.getFileSize(fullKey);
-      if (!local) { it.status = 'cloud'; if (cidx && cidx[fullKey] && cidx[fullKey].size != null) it.size = cidx[fullKey].size; return; }
+      it.mtime = local ? await opfs.lastModified(fullKey) : 0;
+      if (!local) {
+        it.status = 'cloud';
+        if (cidx && cidx[fullKey]) {
+          if (cidx[fullKey].size != null) it.size = cidx[fullKey].size;
+          if (cidx[fullKey].cloudMtime) it.mtime = Date.parse(cidx[fullKey].cloudMtime) || 0;
+        }
+        return;
+      }
       if (!remote) { it.status = 'local'; return; }
       const s = state[fullKey];
-      const lastMod = await opfs.lastModified(fullKey);
-      it.status = lastMod > 0 && s && s.syncedMtime != null && lastMod <= s.syncedMtime ? 'synced' : 'modified';
+      it.status = it.mtime > 0 && s && s.syncedMtime != null && it.mtime <= s.syncedMtime ? 'synced' : 'modified';
     }));
-    items.sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+    // Folders always group first + sort by name; files sort by the chosen mode
+    // (size / last-modified descending). Set via the right-click "Sort by" section.
+    const _mode = fileSortMode();
+    items.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
+      if (a.kind === 'folder') return a.name.localeCompare(b.name);
+      if (_mode === 'size')  return (b.size || 0) - (a.size || 0) || a.name.localeCompare(b.name);
+      if (_mode === 'mtime') return (b.mtime || 0) - (a.mtime || 0) || a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name);
+    });
     return items;
   }
 
@@ -995,6 +1018,13 @@ opfs.refreshFileList = async function() {
           await opfs.refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
       }});
+      // Sort-by (view setting for the whole list; folders always group first by
+      // name, so this orders the files). Shown for both file and folder menus.
+      const _sortMode = fileSortMode();
+      menuItems.push({ info: true, label: 'Sort by' });
+      menuItems.push({ label: (_sortMode === 'name'  ? '● ' : '○ ') + 'Alphabetical',  action: () => setFileSortMode('name') });
+      menuItems.push({ label: (_sortMode === 'size'  ? '● ' : '○ ') + 'File size',     action: () => setFileSortMode('size') });
+      menuItems.push({ label: (_sortMode === 'mtime' ? '● ' : '○ ') + 'Last modified', action: () => setFileSortMode('mtime') });
       const menu = opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
       if (it.kind === 'folder') {
         const infoEl = menu.querySelector('.ctx-info');
