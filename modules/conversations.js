@@ -1266,6 +1266,10 @@ function renderTcDone(div, fname) {
     '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
     `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>` +
     '<span class="tc-chevron">▸</span>';
+  // load_image renders the image inside the expanded box, so show it by default
+  // (other tools stay collapsed behind the header toggle). The user can still
+  // collapse it by clicking the header.
+  if (fname === 'load_image') div.classList.add('expanded');
 }
 
 class RoundRenderer {
