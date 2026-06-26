@@ -1009,6 +1009,10 @@
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),
+      // Absolute Dropbox path of the synced workspace (e.g. /R+D+I/sandpie). Lets the
+      // search tool tell the model where it is, so it can scope a cloud search to the
+      // parent shared folder instead of guessing.
+      workingRoot: () => (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''),
       get initialSyncDone() { return initialSyncDone; },
       // Dehydrated-mode hooks: let the file browser show the full Dropbox tree
       // (what the LLM sees) as cloud placeholders and fetch one on demand when

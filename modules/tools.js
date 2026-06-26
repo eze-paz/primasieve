@@ -74,16 +74,19 @@ edit_file: {
     },
   },
   search: {
-    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it. A cloud search over an absolute Dropbox path returns up to 100 matches per page with the total count — pass "offset" (e.g. 100, 200) to page through them, or narrow the path/term for fewer results.`,
+    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search.
+SCOPE — by default searches your WORKSPACE (the synced working folder); "path" then scopes to a subtree of it. To search the wider Dropbox instead, set scope:"dropbox" — then "path" is an ABSOLUTE Dropbox folder that narrows it (e.g. "/R+D+I"), default = all of Dropbox. (Don't pass "/" expecting the whole Dropbox; "/" is just the workspace root — use scope:"dropbox".)
+Also "include" (a name glob like "*.js"). files_only:true returns just matching files. Case-insensitive unless ignore_case:false. In the workspace, files not downloaded locally are also listed as cloud matches (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it. A scope:"dropbox" search returns up to 100 matches per page with the total count — pass "offset" (e.g. 100, 200) to page, or narrow the path/term.`,
     parameters: {
       type: 'object',
       properties: {
         pattern:     { type: 'string', description: 'JavaScript regular expression matched per line (e.g. "function\\\\s+\\\\w+", "TODO").' },
-        path:        { type: 'string', description: 'Subtree relative to your workspace (default: everything), or an absolute Dropbox path (e.g. "/Shared/reports") to search elsewhere in Dropbox.' },
+        scope:       { type: 'string', enum: ['workspace', 'dropbox'], description: '"workspace" (default) = search your synced working folder; "dropbox" = search the wider connected Dropbox (use "path" to narrow to an absolute folder).' },
+        path:        { type: 'string', description: 'With scope "workspace" (default): a subtree relative to your workspace (default: everything). With scope "dropbox": an absolute Dropbox folder to narrow it (e.g. "/R+D+I"), default = all of Dropbox.' },
         include:     { type: 'string', description: 'Only search files whose name/path matches this glob (e.g. "*.py").' },
         files_only:  { type: 'boolean', description: 'Return just matching file paths instead of per-line matches.' },
         ignore_case: { type: 'boolean', description: 'Case-insensitive (default true).' },
-        offset:      { type: 'integer', description: 'For an absolute-path (outside-workspace) cloud search with many matches: skip this many results to page through them, 100 per page (e.g. offset:100 for the next page). Default 0.' },
+        offset:      { type: 'integer', description: 'For a scope:"dropbox" search with many matches: skip this many results to page through them, 100 per page (e.g. offset:100 for the next page). Default 0.' },
       },
       required: ['pattern'],
     },
@@ -200,8 +203,21 @@ window.SandpieTools = SandpieTools;
 
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
-  .map(([name]) => ({
-    type: 'function',
-    function: { name, description: SandpieTools.description(name), parameters: tools[name].parameters },
-  }));
+  .map(([name]) => {
+    let description = SandpieTools.description(name);
+    // Tell the model WHERE its workspace sits in Dropbox so a scope:"dropbox"
+    // search can target the parent shared folder precisely (e.g. /R+D+I) instead
+    // of guessing. Only when Dropbox is connected + the working root is resolved.
+    if (name === 'search') {
+      try {
+        const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
+        const wr = p && p.workingRoot && p.workingRoot();
+        if (wr) {
+          const parent = wr.replace(/\/[^/]+$/, '') || '/';
+          description += `\nYour workspace is the Dropbox folder "${wr}"; its parent shared folder is "${parent}". To search the wider shared area, use scope:"dropbox" with path:"${parent}" (or another absolute folder).`;
+        }
+      } catch (_) {}
+    }
+    return { type: 'function', function: { name, description, parameters: tools[name].parameters } };
+  });
 

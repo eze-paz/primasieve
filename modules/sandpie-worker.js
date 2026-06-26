@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.9.0-cloud-search-paging';
+const WORKER_VERSION = '2.10.0-search-scope';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -867,31 +867,36 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
   const connected = !!(_dbxCtx && _dbxCtx.token);
   const wr = ((_dbxCtx && _dbxCtx.workingRoot) || '').replace(/\/+$/, '');
   const raw = (path == null) ? '' : String(path).trim();
+  const relIfAbs = raw.startsWith('/') ? _relUnderRoot(raw) : undefined;
 
-  // Classify the path. A leading "/" is a Dropbox-absolute path; if it isn't under
-  // the working root, search it purely in the cloud.
-  let outsideRoot = false, cloudScope = wr, norm = '';
-  if (raw.startsWith('/')) {
-    const rel = _relUnderRoot(raw);
-    if (rel == null) { outsideRoot = true; cloudScope = raw.replace(/\/+$/, ''); }
-    else { norm = rel; cloudScope = wr + (rel ? '/' + rel : ''); }
-  } else {
-    norm = normFilesPath(raw);
-    cloudScope = wr + (norm ? '/' + norm : '');
-  }
+  // `scope` decides local-vs-cloud — don't infer it from the path.
+  //  - 'dropbox' (or 'cloud') → search the connected Dropbox; `path` (absolute)
+  //    narrows it, default = all of Dropbox. A bare "/" means the WORKSPACE root,
+  //    not the cloud (consistent with read_file / list_files).
+  //  - otherwise (workspace = default) → grep the working root; but an absolute
+  //    path that falls OUTSIDE the workspace still cloud-searches there, so passing
+  //    e.g. /R+D+I directly works without scope.
+  const wantCloud = (scope === 'dropbox' || scope === 'cloud')
+    || (raw.startsWith('/') && raw !== '/' && relIfAbs == null);
 
-  // OUTSIDE the working root → pure cloud search (file hits only).
-  if (outsideRoot) {
-    if (!connected) return { result: `Error: "${raw}" is outside your synced workspace and Dropbox isn't connected, so it can't be searched.` };
+  if (wantCloud) {
+    if (!connected) return { result: 'Error: a Dropbox (cloud) search needs Dropbox connected.' };
+    let cs;
+    if (scope === 'dropbox' || scope === 'cloud') cs = (raw === '' || raw === '/') ? '' : (raw.startsWith('/') ? raw : '/' + raw);
+    else cs = raw;                                   // implicit: an absolute path outside the workspace
+    const cloudScope = cs.replace(/\/+$/, '');
+    const label = cloudScope || 'all of Dropbox';
     const lits = _searchLiterals(pattern);
-    if (!lits.length) return { result: 'To search outside your workspace, include a literal word (cloud search is keyword-based, not full regex).' };
+    if (!lits.length) return { result: 'To search Dropbox, include a literal word (Dropbox search is keyword-based, not full regex).' };
     let r; try { r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false); }
     catch (e) { return { result: e.message }; }
-    if (!r.paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${cloudScope}.` };
-    return { result: _formatCloudPage(r, lits.join(' '), cloudScope, offset) };
+    if (!r.paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${label}.` };
+    return { result: _formatCloudPage(r, lits.join(' '), label, offset) };
   }
 
-  // IN the working root → local grep.
+  // WORKSPACE scope → local grep (+ dehydrated cloud merge within the workspace).
+  const norm = raw.startsWith('/') ? (relIfAbs || '') : normFilesPath(raw);
+  const cloudScope = wr + (norm ? '/' + norm : '');
   const local = await _localGrep(rx, norm, include, files_only);
   if (local === null) return { result: 'Error: not a directory: ' + (norm || '/files/') };
   const where = norm ? '/' + norm : '/files/';
