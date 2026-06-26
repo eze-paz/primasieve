@@ -61,12 +61,12 @@ edit_file: {
   },
   list_files: {
     description: `List files and folders with size + modified time. PREFER THIS over run_python for browsing. Default lists the immediate contents of "path" (like ls). Find files BY NAME with a glob "pattern" (e.g. "**/*.md"); find files BY CONTENT with search.
-
-"path" can be relative (your workspace, default) OR an absolute Dropbox path (e.g. "/R+D+I/reports") to browse elsewhere in Dropbox. For a Dropbox path, list shallowly and drill into a subfolder — recursive:true on a large/unknown Dropbox tree is capped (~1500 entries, not the whole tree) and is the wrong tool for broad discovery.`,
+SCOPE — by default lists your WORKSPACE (the synced working folder); "path" is then relative. To browse the wider connected Dropbox set scope:"dropbox" — then "path" is an ABSOLUTE Dropbox folder (e.g. "/R+D+I/reports"), default = root. (A bare "/" is the workspace root, not all of Dropbox — use scope:"dropbox".) For a Dropbox listing, list shallowly and drill into a subfolder: recursive:true on a large/unknown tree is capped (~1500 entries, not the whole tree).`,
     parameters: {
       type: 'object',
       properties: {
-        path:      { type: 'string', description: 'Directory relative to /files/ (default: root), or an absolute Dropbox path (e.g. "/R+D+I/reports").' },
+        scope:     { type: 'string', enum: ['workspace', 'dropbox'], description: '"workspace" (default) = list your synced working folder; "dropbox" = list the wider connected Dropbox ("path" = an absolute folder, default = root).' },
+        path:      { type: 'string', description: 'With scope "workspace" (default): directory relative to /files/ (default: root). With scope "dropbox": an absolute Dropbox folder to list (e.g. "/R+D+I/reports"), default = Dropbox root.' },
         pattern:   { type: 'string', description: 'Glob to filter names/paths: * (within a segment), ** (across folders), ? (one char). E.g. "**/*.json".' },
         recursive: { type: 'boolean', description: 'Walk subfolders (default false). Use only on a small, specific folder; recursing a large/unknown Dropbox subtree is capped — list shallowly and drill down instead.' },
       },

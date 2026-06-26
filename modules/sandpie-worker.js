@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.11.0-image-budget';
+const WORKER_VERSION = '2.12.0-listfiles-scope';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -704,33 +704,42 @@ async function tool_read_file({ path, offset, limit }) {
   return { result: buf.replace(/\n$/, '') };
 }
 
-async function tool_list_files({ path, pattern, recursive }) {
+async function tool_list_files({ path, pattern, recursive, scope }) {
   const rx = pattern ? globToRegExp(pattern) : null;
   const raw = (path == null) ? '' : String(path).trim();
+  const connected = !!(_dbxCtx && _dbxCtx.token);
 
-  // Classify the path. A leading "/" is a Dropbox-absolute path; if it isn't under
-  // the working root, list it directly from the cloud.
-  let outsideRoot = false, norm = '';
-  if (raw.startsWith('/')) {
+  // `scope` decides workspace-vs-cloud (mirrors search):
+  //  - 'dropbox' (or 'cloud') → list the connected Dropbox; `path` is an absolute
+  //    folder, default = root.
+  //  - otherwise (workspace = default) → list the working root (relative `path`);
+  //    a bare "/" is the workspace root. An absolute path OUTSIDE the workspace
+  //    still lists from the cloud there, so /R+D+I works without scope.
+  const cloudScope = (scope === 'dropbox' || scope === 'cloud');
+  let outsideRoot = false, norm = '', cloudPath = '';
+  if (cloudScope) {
+    outsideRoot = true;
+    cloudPath = (raw === '' || raw === '/') ? '' : (raw.startsWith('/') ? raw : '/' + raw);
+  } else if (raw.startsWith('/')) {
     const rel = _relUnderRoot(raw);
-    if (rel == null) { outsideRoot = true; }
-    else { norm = rel; }
+    if (rel == null && raw !== '/') { outsideRoot = true; cloudPath = raw; }
+    else { norm = rel || ''; }
   } else {
     norm = normFilesPath(raw);
   }
 
-  const connected = !!(_dbxCtx && _dbxCtx.token);
-
-  // ---- OUTSIDE working root → pure Dropbox list ----
+  // ---- Dropbox (cloud) listing ----
   if (outsideRoot) {
-    if (!connected) return { result: `Error: "${raw}" is outside your synced workspace and Dropbox isn't connected.` };
+    if (!connected) return { result: 'Error: a Dropbox listing needs Dropbox connected (scope:"dropbox").' };
+    const cs = cloudPath.replace(/\/+$/, '');
+    const label = cs || 'Dropbox root';
     let entries;
-    try { entries = await _dropboxListFolder(raw.replace(/\/+$/, ''), recursive); }
+    try { entries = await _dropboxListFolder(cs, recursive); }
     catch (e) { return { result: e.message }; }
     const capped = !!entries.capped;   // the subtree was bigger than we scanned
     const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
-    if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} under ${raw}.` };
-    let buf = `${rows.length}${capped ? '+' : ''} entr${rows.length === 1 ? 'y' : 'ies'} under ${raw}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
+    if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} in ${label}.` };
+    let buf = `${rows.length}${capped ? '+' : ''} entr${rows.length === 1 ? 'y' : 'ies'} in ${label}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
     let shown = 0, truncated = false;
     for (const e of rows) {
       let line;
@@ -744,7 +753,7 @@ async function tool_list_files({ path, pattern, recursive }) {
       buf += line; shown++;
     }
     if (truncated) buf += `…[${rows.length - shown} more not shown; narrow with path/pattern]`;
-    if (capped) buf += `\n⚠ "${raw}" is very large — stopped after ${entries.length} entries; the full subtree was NOT scanned. Don't list a big Dropbox tree recursively: list a specific subfolder with recursive:false and drill down, or use search to find files by content.`;
+    if (capped) buf += `\n⚠ "${label}" is very large — stopped after ${entries.length} entries; the full subtree was NOT scanned. Don't list a big Dropbox tree recursively: list a specific subfolder with recursive:false and drill down, or use search to find files by content.`;
     return { result: buf.replace(/\n$/, '') };
   }
 
@@ -891,7 +900,7 @@ async function _localGrep(rx, norm, include, files_only) {
 // Unified search. Path-aware: inside the working root it greps local files and
 // (when dehydrated) merges Dropbox content-search hits for un-downloaded files;
 // an absolute Dropbox path OUTSIDE the working root does a pure cloud search.
-async function tool_search({ pattern, path, include, files_only, ignore_case, offset }) {
+async function tool_search({ pattern, path, include, files_only, ignore_case, offset, scope }) {
   if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
   let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
   catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
