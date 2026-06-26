@@ -110,9 +110,7 @@ Typical flow:
     },
   },
     load_skill: {
-      description: `Load a skill's full instructions. Skills are saved playbooks for specific tasks, listed in the "# Skills" section of the system prompt with their name and a "when to use" description.
-WHEN TO USE: As soon as the user's request matches a skill's description — judged by intent, not exact wording (e.g. "ship it to prod" matches a deploy skill). Call this BEFORE you start the task, then follow the returned instructions for the rest of the turn.
-Pass the skill's name exactly as listed. Returns the skill's instructions (or an error if there's no such skill). Don't reload a skill already marked "(already loaded above)" — its instructions are already in this conversation. If no skill fits the request, don't call this.`,
+      description: `Load a skill's full instructions by name (the available skills and when to use each are listed in the "# Skills" section). Don't re-load one already marked "(already loaded above)".`,
       parameters: {
         type: 'object',
         properties: {
