@@ -74,7 +74,7 @@ edit_file: {
     },
   },
   search: {
-    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it.`,
+    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search. Scope with "path": a subtree relative to your workspace (default: everything), OR an absolute Dropbox path (e.g. "/R+D+I/reports") to search elsewhere in the user's Dropbox. Also "include" (a name glob like "*.js"). files_only:true returns just the matching files. Case-insensitive unless ignore_case:false. When some files aren't downloaded locally, it also lists matching cloud files (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it. A cloud search over an absolute Dropbox path returns up to 100 matches per page with the total count — pass "offset" (e.g. 100, 200) to page through them, or narrow the path/term for fewer results.`,
     parameters: {
       type: 'object',
       properties: {
@@ -83,6 +83,7 @@ edit_file: {
         include:     { type: 'string', description: 'Only search files whose name/path matches this glob (e.g. "*.py").' },
         files_only:  { type: 'boolean', description: 'Return just matching file paths instead of per-line matches.' },
         ignore_case: { type: 'boolean', description: 'Case-insensitive (default true).' },
+        offset:      { type: 'integer', description: 'For an absolute-path (outside-workspace) cloud search with many matches: skip this many results to page through them, 100 per page (e.g. offset:100 for the next page). Default 0.' },
       },
       required: ['pattern'],
     },

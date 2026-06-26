@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.8.0-dropbox-list-cap';
+const WORKER_VERSION = '2.9.0-cloud-search-paging';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -772,13 +772,32 @@ async function _dropboxSearchPaths(query, searchPath, filenameOnly) {
   const { token, pathRoot } = _dbxCtx;
   const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
-  const body = JSON.stringify({ query, options: { path: searchPath || '', max_results: 101, file_status: 'active', filename_only: !!filenameOnly } });
+  // max_results max is 1000; fetch up to that so we can report a count AND
+  // paginate the display. has_more ⇒ still more beyond 1000 (reported as "1000+").
+  const body = JSON.stringify({ query, options: { path: searchPath || '', max_results: 1000, file_status: 'active', filename_only: !!filenameOnly } });
   const res = await fetch('https://api.dropboxapi.com/2/files/search_v2', { method: 'POST', headers, body });
   if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox search failed (' + res.status + '): ' + txt.slice(0, 300)); }
   const data = await res.json();
   const matches = Array.isArray(data.matches) ? data.matches : [];
   const paths = matches.map(m => { const meta = m.metadata?.metadata || m.metadata || {}; return meta.path_display || meta.path_lower || ''; }).filter(Boolean);
-  return { paths: paths.sort(), tooMany: matches.length > 100 };
+  return { paths: paths.sort(), hasMore: !!data.has_more };
+}
+// Format a cloud-search result as ONE page (100 paths) + the total count + paging
+// hints, so the model can page (offset) or narrow — instead of hitting a wall.
+function _formatCloudPage(r, query, scope, offset) {
+  const PAGE = 100;
+  const total = r.paths.length;                          // capped at the 1000 fetch
+  const totalStr = r.hasMore ? `${total}+` : String(total);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+  const page = r.paths.slice(off, off + PAGE);
+  if (!page.length) return `No more cloud matches for "${query}" in ${scope} — ${totalStr} total; offset ${off} is past the end.`;
+  if (total <= PAGE && off === 0) return `${total} cloud file(s) matching "${query}" in ${scope} (open with read_file):\n` + page.join('\n');
+  const end = off + page.length;
+  const hints = [];
+  if (end < total) hints.push(`call search again with offset:${end} for the next ${Math.min(PAGE, total - end)}`);
+  if (r.hasMore && end >= total) hints.push(`>${total} matches total — narrow the path/term to reach the rest`);
+  hints.push('or narrow the path/term for fewer, more relevant matches');
+  return `${totalStr} cloud files match "${query}" in ${scope} — showing ${off + 1}-${end} (open with read_file):\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
 }
 async function _dropboxListFolder(folderPath, recursive) {
   const { token, pathRoot } = _dbxCtx;
@@ -840,7 +859,7 @@ async function _localGrep(rx, norm, include, files_only) {
 // Unified search. Path-aware: inside the working root it greps local files and
 // (when dehydrated) merges Dropbox content-search hits for un-downloaded files;
 // an absolute Dropbox path OUTSIDE the working root does a pure cloud search.
-async function tool_search({ pattern, path, include, files_only, ignore_case }) {
+async function tool_search({ pattern, path, include, files_only, ignore_case, offset }) {
   if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
   let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
   catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
@@ -868,9 +887,8 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
     if (!lits.length) return { result: 'To search outside your workspace, include a literal word (cloud search is keyword-based, not full regex).' };
     let r; try { r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false); }
     catch (e) { return { result: e.message }; }
-    if (r.tooMany) return { result: `Too many cloud matches (>100) for "${lits.join(' ')}" in ${cloudScope}. Narrow the path or use more specific terms.` };
     if (!r.paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${cloudScope}.` };
-    return { result: `${r.paths.length} cloud file(s) matching "${lits.join(' ')}" in ${cloudScope} (open with read_file):\n` + r.paths.join('\n') };
+    return { result: _formatCloudPage(r, lits.join(' '), cloudScope, offset) };
   }
 
   // IN the working root → local grep.
@@ -885,18 +903,21 @@ async function tool_search({ pattern, path, include, files_only, ignore_case }) 
     if (lits.length) {
       try {
         const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false);
-        if (r.tooMany) {
-          cloudExtra = `\n\n(Cloud: >100 more files may match "${lits.join(' ')}" — narrow the path/pattern to list them.)`;
-        } else {
-          const cloudOnly = [];
-          for (const p of r.paths) {
-            const rel = _relUnderRoot(p);
-            if (rel == null || _relExempt(rel)) continue;
-            if (local.hitFiles.has(rel)) continue;       // already shown with line matches
-            if (await _opfsExists(rel)) continue;         // hydrated locally → already grepped
-            cloudOnly.push(rel);
-          }
-          if (cloudOnly.length) cloudExtra = `\n\nCloud files also matching "${lits.join(' ')}" (not downloaded — open with read_file):\n` + cloudOnly.sort().join('\n');
+        const CAP = 100;
+        const cloudOnly = [];
+        let scanned = 0;
+        for (const p of r.paths) {
+          if (cloudOnly.length >= CAP || scanned >= 500) break;   // bound the per-path OPFS checks
+          scanned++;
+          const rel = _relUnderRoot(p);
+          if (rel == null || _relExempt(rel)) continue;
+          if (local.hitFiles.has(rel)) continue;        // already shown with line matches
+          if (await _opfsExists(rel)) continue;          // hydrated locally → already grepped
+          cloudOnly.push(rel);
+        }
+        if (cloudOnly.length) {
+          cloudExtra = `\n\nCloud files also matching "${lits.join(' ')}" (not downloaded — open with read_file):\n` + cloudOnly.sort().join('\n');
+          if (cloudOnly.length >= CAP || r.hasMore) cloudExtra += `\n(More cloud files match — narrow the path/pattern to list them all.)`;
         }
       } catch (_) { /* cloud leg is best-effort */ }
     }
