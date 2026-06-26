@@ -435,8 +435,9 @@ function applyTypeUI() {
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
-  // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: no params (fixed ctx).
-  show('spContextWindow', !webgpu);
+  // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
+  // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
+  show('spContextWindow', true);
   show('spTemperature', !local);
   // Reasoning select: only LiteRT-LM exposes a Gemma thinking toggle.
   let rsn = document.getElementById('spReasoning');
@@ -457,7 +458,7 @@ function applyTypeUI() {
   const ep = document.getElementById('spEndpoint');
   if (ep) ep.placeholder = local ? 'Model ID (picker above)' : 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
-  if (cw) cw.placeholder = litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)';
+  if (cw) cw.placeholder = webgpu ? 'Context size (default 4096; ↑ = more GPU memory)' : (litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)');
 }
 
 // Commit form edits to the active provider (auto-save on field change/blur).
