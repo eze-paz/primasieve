@@ -142,28 +142,49 @@ opfs.getFileSize = async function(path) {
 };
 
 opfs.getFolderSize = async function(path) {
+  // Report the EXPECTED (hydrated) size. In on-demand mode most files are cloud
+  // placeholders with no local bytes, so summing OPFS + sync-state alone misses
+  // them (they live only in the cloud index) and undercounts. Build a best-known
+  // size per file from, in priority: local OPFS (real size of hydrated/local-only
+  // files) → cloud index (expected size of un-hydrated placeholders) → sync state
+  // (tracked files not in the index, e.g. exempt folders / non-dehydrated mode).
   const prefix = path ? path.toLowerCase() + '/' : '';
-  let total = 0;
-  const state = Sandpie.syncProvider()?.getState?.() || {};
+  const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  const sizes = new Map();   // lowercased path -> size
+
+  // 1) Local files — their on-disk size IS the hydrated size.
+  try {
+    for (const full of await opfs.list(path)) {   // opfs.list returns full paths under `path`
+      try {
+        const { parts, name } = splitPath(full);
+        const dir = await opfs.resolveDir(parts);
+        sizes.set(full.toLowerCase(), (await (await dir.getFileHandle(name)).getFile()).size);
+      } catch {}
+    }
+  } catch {}
+
+  // 2) Cloud index (on-demand mode) — expected size for files not present locally.
+  const cidx = (sp && sp.cloudIndex) ? sp.cloudIndex() : null;
+  if (cidx) {
+    for (const k of Object.keys(cidx)) {
+      const e = cidx[k];
+      if (!e || e.kind !== 'file') continue;
+      const kl = k.toLowerCase();
+      if (prefix && !kl.startsWith(prefix)) continue;
+      if (!sizes.has(kl)) sizes.set(kl, e.size || 0);
+    }
+  }
+
+  // 3) Sync state — tracked files that are neither local nor in the index.
+  const state = (sp && sp.getState) ? (sp.getState() || {}) : {};
   for (const k of Object.keys(state)) {
     const kl = k.toLowerCase();
     if (prefix && !kl.startsWith(prefix)) continue;
-    if (prefix && kl.length <= prefix.length) continue;
-    total += state[k].size || 0;
+    if (!sizes.has(kl)) sizes.set(kl, state[k].size || 0);
   }
-  try {
-    for (const full of await opfs.list(path)) {   // opfs.list already returns full paths
-      if (!state[full]) {
-        try {
-          const parts = full.split('/').filter(Boolean);
-          const name = parts.pop();
-          const dir = await opfs.resolveDir(parts);
-          const handle = await dir.getFileHandle(name);
-          total += (await handle.getFile()).size;
-        } catch {}
-      }
-    }
-  } catch {}
+
+  let total = 0;
+  for (const v of sizes.values()) total += v || 0;
   return total;
 };
 
