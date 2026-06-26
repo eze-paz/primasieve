@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.12.1-cloud-open-hint';
+const WORKER_VERSION = '2.13.0-request-size-guard';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -576,7 +576,13 @@ async function tool_show_artifact({ path }, ctx) {
 // request body). Guard both: a per-image cap, and a cumulative budget over every
 // image already in the conversation (ctx._imageBudget, seeded in runAgent).
 const IMAGE_MAX_B64_BYTES    = 5 * 1024 * 1024;    // per image  (~5MB base64 ≈ 3.75MB raw)
-const IMAGE_CONVO_B64_BUDGET = 12 * 1024 * 1024;   // cumulative across the whole conversation
+const IMAGE_CONVO_B64_BUDGET = 18 * 1024 * 1024;   // cumulative images across the conversation
+// Hard ceiling on the WHOLE serialized request body — just under the server's
+// 25 MB cap (nginx client_max_body_size 25m + Express express.json {limit:'25mb'}).
+// Bounds everything (system prompt + history + tool results + images), not just
+// images, so an over-size request fails fast client-side with a clear message
+// instead of a server 413. Keep < the server cap; raise both together if changed.
+const MAX_REQUEST_BYTES      = 24 * 1024 * 1024;
 const _fmtMB = n => (n / (1024 * 1024)).toFixed(1) + ' MB';
 // Base64 bytes of images already present in the request messages (real data: URLs
 // only; opfs:// placeholders cost nothing).
@@ -1155,10 +1161,18 @@ function normalizeToolArgs(raw) {
 }
 
 async function streamOneRound(reqUrl, headers, body, ctx) {
-  const res = await fetch(reqUrl, { method: 'POST', headers, body: JSON.stringify(body), signal: ctx.signal });
+  const payload = JSON.stringify(body);
+  // Total-body guard: fail fast (and clearly) BEFORE the server returns a cryptic
+  // 413. Measures real UTF-8 bytes. Not retryable (size won't change on retry).
+  let bytes; try { bytes = new Blob([payload]).size; } catch (_) { bytes = payload.length; }
+  if (bytes > MAX_REQUEST_BYTES) {
+    throw new Error(`Request too large: ${_fmtMB(bytes)} exceeds the ~${_fmtMB(MAX_REQUEST_BYTES)} limit. The conversation is holding too much to send (usually images) — remove some, load only the one(s) you need, or start a fresh conversation.`);
+  }
+  const res = await fetch(reqUrl, { method: 'POST', headers, body: payload, signal: ctx.signal });
   if (!res.ok) {
     const text = (await res.text()).slice(0, 300);
-    throw Object.assign(new Error(res.status + ': ' + text), { status: res.status });
+    const hint = res.status === 413 ? ` (request body was ${_fmtMB(bytes)}; the server/proxy rejected it as too large — raise its body-size limit)` : '';
+    throw Object.assign(new Error(res.status + ': ' + text + hint), { status: res.status });
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
