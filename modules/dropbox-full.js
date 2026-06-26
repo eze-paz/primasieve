@@ -658,11 +658,22 @@
     if (st[rel]) st[rel].syncedMtime = 0; else st[rel] = { rev: '', size: 0, syncedMtime: 0 };
     setSyncState(st);
   }
+  // Remove a path (and its subtree) from BOTH the sync state and the cloud index.
+  // The file viewer and the worker read the cloud index in dehydrated mode, so
+  // skipping the index left a deleted cloud-only placeholder still showing (and
+  // re-listable) after the delete. Re-pushes the trimmed index to the worker.
+  function forgetFromStateAndIndex(rel) {
+    const lk = String(rel).toLowerCase();
+    const st = syncState(); let sChanged = false;
+    for (const k of Object.keys(st)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete st[k]; sChanged = true; } }
+    if (sChanged) setSyncState(st);
+    const idx = cloudIndex(); let iChanged = false;
+    for (const k of Object.keys(idx)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete idx[k]; iChanged = true; } }
+    if (iChanged) { setCloudIndex(idx); pushDbxIndexToSW(); }
+  }
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
-    const st = syncState(); const lk = rel.toLowerCase(); let changed = false;
-    for (const k of Object.keys(st)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete st[k]; changed = true; } }
-    if (changed) setSyncState(st);
+    forgetFromStateAndIndex(rel);
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
   function pushDbxTokenToSW() {
@@ -697,9 +708,7 @@
       const d = ev.data; if (!d) return;
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
         (async () => { if (!tokens()) return; for (const p of d.paths) { try { await del(relToCloud(p)); } catch {} } })();
-        const st = syncState(); let changed = false;
-        for (const p of d.paths) { const lk = p.toLowerCase(); for (const k of Object.keys(st)) { if (k.toLowerCase() === lk || k.toLowerCase().startsWith(lk + '/')) { delete st[k]; changed = true; } } }
-        if (changed) setSyncState(st);
+        for (const p of d.paths) forgetFromStateAndIndex(p);
         return;
       }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {

@@ -986,7 +986,11 @@ opfs.refreshFileList = async function() {
       }
       if (!ro) menuItems.push({ label: 'Delete', danger: true, action: async () => {
         try {
-          await opfs.remove(it.fullKey);
+          // A dehydrated, cloud-only file has no local copy, so opfs.remove throws
+          // NotFoundError — that must NOT abort the delete. Drop the local copy if
+          // present, then ALWAYS emit file:deleted (→ Dropbox delete_v2 + removes
+          // the cloud-index placeholder) and refresh.
+          try { await opfs.remove(it.fullKey); } catch (_) {}
           if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
           await opfs.refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
