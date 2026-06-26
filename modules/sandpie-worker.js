@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.14.0-image-compress-to-fit';
+const WORKER_VERSION = '2.15.0-search-include';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -851,6 +851,20 @@ function _searchLiterals(pattern) {
   const terms = String(pattern).match(/[A-Za-z0-9_]{3,}/g) || [];
   return [...new Set(terms)].sort((a, b) => b.length - a.length).slice(0, 4);
 }
+// Bare file extensions from an `include` glob ("*.jpg", "**/*.md", "*.{jpg,png}",
+// "*.jpg *.png") → for Dropbox search_v2's file_extensions filter. null if none.
+function _globExtensions(glob) {
+  if (!glob) return null;
+  // Expand "PFX{a,b}" → "PFXa PFXb" first, so a comma INSIDE braces isn't treated
+  // as a separator ("*.{pdf,docx}" → "*.pdf *.docx").
+  const expanded = String(glob).replace(/([^\s,]*)\{([^}]*)\}/g, (_, pfx, inner) => inner.split(',').map(s => pfx + s.trim()).join(' '));
+  const out = new Set();
+  for (const g of expanded.split(/[\s,]+/).filter(Boolean)) {
+    const m = /\.([A-Za-z0-9]+)$/.exec(g);   // require a dot so a name glob ("report_*") isn't read as an extension
+    if (m) out.add(m[1].toLowerCase());
+  }
+  return out.size ? [...out] : null;
+}
 async function _opfsExists(rel) { try { await _opfsGetFile(rel); return true; } catch { return false; } }
 // Working-root-relative form of a Dropbox absolute path, or null if outside it.
 function _relUnderRoot(absPath) {
@@ -862,13 +876,15 @@ function _relUnderRoot(absPath) {
   return null;
 }
 // Dropbox search_v2 → sorted path_display list. Throws on API error.
-async function _dropboxSearchPaths(query, searchPath, filenameOnly) {
+async function _dropboxSearchPaths(query, searchPath, filenameOnly, fileExtensions) {
   const { token, pathRoot } = _dbxCtx;
   const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
   // max_results max is 1000; fetch up to that so we can report a count AND
   // paginate the display. has_more ⇒ still more beyond 1000 (reported as "1000+").
-  const body = JSON.stringify({ query, options: { path: searchPath || '', max_results: 1000, file_status: 'active', filename_only: !!filenameOnly } });
+  const opts = { path: searchPath || '', max_results: 1000, file_status: 'active', filename_only: !!filenameOnly };
+  if (Array.isArray(fileExtensions) && fileExtensions.length) opts.file_extensions = fileExtensions;   // type filter (from `include`)
+  const body = JSON.stringify({ query, options: opts });
   const res = await fetch('https://api.dropboxapi.com/2/files/search_v2', { method: 'POST', headers, body });
   if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox search failed (' + res.status + '): ' + txt.slice(0, 300)); }
   const data = await res.json();
@@ -981,11 +997,15 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
     const cloudScope = cs.replace(/\/+$/, '');
     const label = cloudScope || 'all of Dropbox';
     const lits = _searchLiterals(pattern);
-    if (!lits.length) return { result: 'To search Dropbox, include a literal word (Dropbox search is keyword-based, not full regex).' };
-    let r; try { r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false); }
+    if (!lits.length) return { result: 'To search Dropbox, give a keyword (≥3 chars). Dropbox search matches file NAMES + text contents by keyword (regex is reduced to its literal words).' };
+    const exts = _globExtensions(include);            // `include` → server-side file-type filter
+    let r; try { r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false, exts); }
     catch (e) { return { result: e.message }; }
-    if (!r.paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${label}.` };
-    return { result: _formatCloudPage(r, lits.join(' '), label, offset) };
+    let paths = r.paths;
+    if (include) { const ig = globToRegExp(include); paths = paths.filter(p => ig.test(p) || ig.test(p.split('/').pop())); }
+    let clabel = label; if (include) clabel += ' [' + include + ']';
+    if (!paths.length) return { result: `No cloud files found for "${lits.join(' ')}" in ${clabel}.` };
+    return { result: _formatCloudPage({ paths, hasMore: r.hasMore }, lits.join(' '), clabel, offset) };
   }
 
   // WORKSPACE scope → local grep (+ dehydrated cloud merge within the workspace).
@@ -1001,7 +1021,7 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
     const lits = _searchLiterals(pattern);
     if (lits.length) {
       try {
-        const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false);
+        const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false, _globExtensions(include));
         const CAP = 100;
         const cloudOnly = [];
         let scanned = 0;

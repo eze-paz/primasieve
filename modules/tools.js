@@ -74,16 +74,18 @@ SCOPE — by default lists your WORKSPACE (the synced working folder); "path" is
     },
   },
   search: {
-    description: `Search file CONTENTS by regular expression, returning matches as "path:line: text". PREFER THIS over run_python for grep-style search.
-SCOPE — by default searches your WORKSPACE (the synced working folder); "path" then scopes to a subtree of it. To search the wider Dropbox instead, set scope:"dropbox" — then "path" is an ABSOLUTE Dropbox folder that narrows it (e.g. "/R+D+I"), default = all of Dropbox. (Don't pass "/" expecting the whole Dropbox; "/" is just the workspace root — use scope:"dropbox".)
-Also "include" (a name glob like "*.js"). files_only:true returns just matching files. Case-insensitive unless ignore_case:false. In the workspace, files not downloaded locally are also listed as cloud matches (open them with read_file). (To find files by NAME, use list_files.) Skips /sandpie/conversations unless "path" points inside it. A scope:"dropbox" search returns up to 100 matches per page with the total count — pass "offset" (e.g. 100, 200) to page, or narrow the path/term.`,
+    description: `Find files by CONTENT or NAME. PREFER THIS over run_python for grep-style search.
+WORKSPACE (default scope) — greps file CONTENTS in your synced working folder by regex; "path" scopes to a subtree; matches return as "path:line: text" (on-demand files not downloaded locally are also listed as cloud matches to open with read_file).
+DROPBOX (scope:"dropbox") — a Dropbox KEYWORD search over file NAMES + text contents: give plain keywords, NOT regex (only the literal words ≥3 chars in "pattern" are used — "Reixach.*compressor" just searches "Reixach compressor"). "path" = an absolute folder to narrow (e.g. "/R+D+I"), default = all of Dropbox. A bare "/" is the workspace root, not Dropbox; up to 100 matches/page (use "offset" to page).
+"include" filters results by file type / name glob (e.g. "*.jpg", "*.{pdf,docx}") — works in BOTH scopes. files_only:true returns just paths. Case-insensitive unless ignore_case:false. Skips /sandpie/conversations unless "path" points inside it.
+IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them by NAME keywords + the extension (e.g. pattern:"compressor reixach", include:"*.jpg"), or browse the folder with list_files(scope:"dropbox").`,
     parameters: {
       type: 'object',
       properties: {
-        pattern:     { type: 'string', description: 'JavaScript regular expression matched per line (e.g. "function\\\\s+\\\\w+", "TODO").' },
+        pattern:     { type: 'string', description: 'WORKSPACE scope: a JS regex matched per line (e.g. "function\\\\s+\\\\w+"). DROPBOX scope: its literal words become the keyword query (regex/wildcards ignored — just give keywords, e.g. "compressor reixach").' },
         scope:       { type: 'string', enum: ['workspace', 'dropbox'], description: '"workspace" (default) = search your synced working folder; "dropbox" = search the wider connected Dropbox (use "path" to narrow to an absolute folder).' },
         path:        { type: 'string', description: 'With scope "workspace" (default): a subtree relative to your workspace (default: everything). With scope "dropbox": an absolute Dropbox folder to narrow it (e.g. "/R+D+I"), default = all of Dropbox.' },
-        include:     { type: 'string', description: 'Only search files whose name/path matches this glob (e.g. "*.py").' },
+        include:     { type: 'string', description: 'Filter results by file type / name glob (e.g. "*.jpg", "*.{pdf,docx}"). Works in both scopes; in dropbox scope it narrows to those file types.' },
         files_only:  { type: 'boolean', description: 'Return just matching file paths instead of per-line matches.' },
         ignore_case: { type: 'boolean', description: 'Case-insensitive (default true).' },
         offset:      { type: 'integer', description: 'For a scope:"dropbox" search with many matches: skip this many results to page through them, 100 per page (e.g. offset:100 for the next page). Default 0.' },
