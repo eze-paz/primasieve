@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.12.0-listfiles-scope';
+const WORKER_VERSION = '2.12.1-cloud-open-hint';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -832,13 +832,13 @@ function _formatCloudPage(r, query, scope, offset) {
   const off = Math.max(0, parseInt(offset, 10) || 0);
   const page = r.paths.slice(off, off + PAGE);
   if (!page.length) return `No more cloud matches for "${query}" in ${scope} — ${totalStr} total; offset ${off} is past the end.`;
-  if (total <= PAGE && off === 0) return `${total} cloud file(s) matching "${query}" in ${scope} (open with read_file):\n` + page.join('\n');
+  if (total <= PAGE && off === 0) return `${total} cloud file(s) matching "${query}" in ${scope} (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it):\n` + page.join('\n');
   const end = off + page.length;
   const hints = [];
   if (end < total) hints.push(`call search again with offset:${end} for the next ${Math.min(PAGE, total - end)}`);
   if (r.hasMore && end >= total) hints.push(`>${total} matches total — narrow the path/term to reach the rest`);
   hints.push('or narrow the path/term for fewer, more relevant matches');
-  return `${totalStr} cloud files match "${query}" in ${scope} — showing ${off + 1}-${end} (open with read_file):\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
+  return `${totalStr} cloud files match "${query}" in ${scope} — showing ${off + 1}-${end} (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it):\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
 }
 async function _dropboxListFolder(folderPath, recursive) {
   const { token, pathRoot } = _dbxCtx;
