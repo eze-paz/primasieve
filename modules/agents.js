@@ -223,6 +223,21 @@ async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {})
   // is a model-variant id, not an OpenAI server — never POST <variant>/chat/completions.
   // runConversation is the only entry point; drive it with no tools and collect the
   // streamed content deltas into a single string.
+  // Local (LiteRT-LM / Gemma) provider: same story — its "endpoint" is a model URL,
+  // not an OpenAI server. Drive the in-browser engine with no tools and collect the
+  // streamed content deltas. Spread the active provider so contextWindow/reasoning
+  // carry over; override maxTokens for this utility prompt.
+  if (active && active.type === 'litertlm') {
+    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.runConversation) throw new Error('LiteRT-LM engine not loaded');
+    let out = '';
+    await SandpieLiteRTLM.runConversation({
+      provider: { ...active, maxTokens },
+      messages: [{ role: 'user', content: user }],
+      systemPrompt: system,
+      tools: [], convId: null, signal,
+    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
+    return out;
+  }
   if (active && active.type === 'webgpu') {
     // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a utility
     // prompt doesn't load the other model. Match the active model id against the dense set.
