@@ -188,7 +188,7 @@ function render() {
 function init() {
   if (typeof SandpieMenu === 'undefined') { setTimeout(init, 500); return; }
   SandpieMenu.add(SECTION_ID, {
-    title: '🧠 Mindframe',
+    title: 'Mindframe',
     badge: badge(),
     open: false,
     html: '<div id="mindframeBody" style="font-size:0.75rem;line-height:1.4;"></div>',
