@@ -83,7 +83,7 @@ async function loadXterm() {
 }
 
 /* ---- UI ---- */
-let term = null, ws = null, connected = false, pollTimer = null;
+let term = null, ws = null, connected = false, pollTimer = null, userQuit = false;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
@@ -140,9 +140,29 @@ function terminalShell(body) {
       <button id="ltDisconnect" style="margin-left:auto;font-size:0.68rem;padding:0.1rem 0.45rem;border:1px solid var(--sp-border);border-radius:4px;background:transparent;color:var(--sp-text-dim);cursor:pointer;">Disconnect</button>
     </div>
     <div id="ltTerm" style="height:320px;background:#1a1a1a;border:1px solid var(--sp-border);border-radius:6px;overflow:hidden;"></div>`;
-  body.querySelector('#ltDisconnect').onclick = () => { try { ws && ws.close(); } catch {} term && term.dispose(); term = null; connected = false; renderInstall(body, 'Disconnected.'); };
+  body.querySelector('#ltDisconnect').onclick = () => {
+    userQuit = true; stopPoll();
+    try { ws && ws.close(); } catch {}
+    try { term && term.dispose(); } catch {}
+    term = null; connected = false;
+    renderDisconnected(body);
+  };
 }
 function setStatus(body, text, color) { const s = body.querySelector('#ltStatus'); if (s) { s.textContent = text; s.style.color = color || 'var(--sp-text-dim)'; } }
+
+// Shown after the user clicks Disconnect: stays disconnected (no auto-reconnect poll)
+// until they explicitly click Reconnect. Closing the socket also ends the shell
+// session on the helper; the helper process itself keeps running in the background.
+function renderDisconnected(body) {
+  stopPoll();
+  body.innerHTML = `<div style="font-size:0.78rem;line-height:1.5;color:var(--sp-text-dim);">
+    <p style="margin:0 0 0.5rem;">Disconnected. The localterm helper is still running in the background.</p>
+    <button id="ltReconnect" style="background:var(--sp-accent,#2563eb);color:#fff;border:0;border-radius:6px;padding:0.4rem 0.85rem;font-weight:600;cursor:pointer;">Reconnect</button>
+    <p style="margin:0.6rem 0 0;font-size:0.68rem;">To stop the helper entirely (it has no window): on Windows run <code style="color:var(--sp-text);">Get-Process localterm* | Stop-Process -Force</code>; mac/Linux: kill the localterm process.</p>
+  </div>`;
+  const b = body.querySelector('#ltReconnect');
+  if (b) b.onclick = () => { userQuit = false; renderSection(body); };
+}
 
 async function connect(body) {
   const token = getToken();
@@ -163,8 +183,8 @@ async function connect(body) {
     size(); new ResizeObserver(size).observe(host); term.focus();
   };
   ws.onmessage = e => term.write(new Uint8Array(e.data));
-  ws.onclose = () => { connected = false; if (!opened) renderInstall(body, 'Helper not reachable — is localterm running?'); else setStatus(body, 'closed', '#e06c75'); };
-  ws.onerror = () => { if (!opened) renderInstall(body, `Could not reach the helper on 127.0.0.1:${PORT}.`); };
+  ws.onclose = () => { connected = false; if (userQuit) return; if (!opened) renderInstall(body, 'Helper not reachable — is localterm running?'); else setStatus(body, 'closed', '#e06c75'); };
+  ws.onerror = () => { if (userQuit) return; if (!opened) renderInstall(body, `Could not reach the helper on 127.0.0.1:${PORT}.`); };
 }
 
 function isMobile() {
@@ -172,6 +192,7 @@ function isMobile() {
 }
 async function renderSection(body) {
   if (connected) return;
+  if (userQuit) { renderDisconnected(body); return; }   // stay disconnected until Reconnect
   if (getToken() && await helperUp()) connect(body);
   else renderInstall(body, '');
 }
