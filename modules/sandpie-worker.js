@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.16.0-auth-refresh';
+const WORKER_VERSION = '2.17.0-web-search';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -124,6 +124,7 @@ self.addEventListener('message', async (event) => {
       emit: (ev) => { try { self.postMessage({ type: 'event', id, event: ev }); } catch (_) {} },
       signal: abortCtl.signal,
       origin: config.origin || '',
+      localterm: config.localterm || null,
     };
     try {
       await runAgent(config, ctx);
@@ -136,8 +137,8 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'tool') {
-    const { id, name, args, conversation_file_name } = data;
-    const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
+    const { id, name, args, conversation_file_name, localterm } = data;
+    const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {}, localterm: localterm || null };
     let out;
     try { out = await runTool(name, args || {}, ctx); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
@@ -557,6 +558,227 @@ async function tool_run_python({ path, args }, ctx) {
       _capActive = false;
       try { p && p.setStdout({}); } catch (_) {}
       try { p && p.setStderr({}); } catch (_) {}
+    }
+  });
+}
+
+// ============================================================
+// web_search / read_url — public-web access via the server's /proxy/ route
+// (CORS bypass), parsed with BeautifulSoup in Pyodide. Robust by design: a
+// multi-engine fallback chain so one engine being blocked doesn't fail the
+// search. Same trust boundary as run_python's pyfetch — everything goes through
+// the user's own /proxy/, no third-party search service.
+// ============================================================
+const _WEB_SEARCH_PY = `
+import json, re, urllib.parse, asyncio
+from js import _sandpie_ws_args
+from pyodide.http import pyfetch
+from bs4 import BeautifulSoup
+
+_a = json.loads(str(_sandpie_ws_args))
+_QUERY = (_a.get("query") or "").strip()
+_N = max(1, min(int(_a.get("n") or 8), 20))
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+def _txt(el, limit=320):
+    if not el: return ""
+    return " ".join(el.get_text(" ", strip=True).split())[:limit]
+
+def _unwrap(href):
+    if not href: return ""
+    if href.startswith("//"): href = "https:" + href
+    m = re.search(r"[?&](?:uddg|u)=([^&]+)", href)
+    if m:
+        try: return urllib.parse.unquote(m.group(1))
+        except Exception: pass
+    return href
+
+def _looks_blocked(html):
+    low = html[:5000].lower()
+    return any(s in low for s in ("captcha", "challenge-form", "unusual traffic",
+                                  "are you a robot", "/sorry/", "detected unusual"))
+
+async def _fetch(url):
+    resp = await asyncio.wait_for(
+        pyfetch(url, headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"}),
+        timeout=12)
+    if resp.status != 200: return None
+    return await resp.string()
+
+def _p_ddg_html(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for r in s.find_all("div", class_="result"):
+        a = r.find("a", class_="result__a")
+        if not a: continue
+        out.append({"title": _txt(a, 200), "url": _unwrap(a.get("href", "")),
+                    "snippet": _txt(r.find("a", class_="result__snippet"))})
+    return out
+
+def _p_ddg_lite(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    links = s.select("a.result-link")
+    snips = [_txt(td) for td in s.select("td.result-snippet")]
+    for i, a in enumerate(links):
+        out.append({"title": _txt(a, 200), "url": _unwrap(a.get("href", "")),
+                    "snippet": snips[i] if i < len(snips) else ""})
+    return out
+
+def _p_brave(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for d in s.select("div[data-pos], div.snippet"):
+        a = d.find("a", href=True)
+        if not a: continue
+        t = d.select_one(".title, .snippet-title, .url") or a
+        out.append({"title": _txt(t, 200), "url": a.get("href", ""),
+                    "snippet": _txt(d.select_one(".snippet-description, .snippet-content, p"))})
+    return out
+
+def _p_bing(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for li in s.select("li.b_algo"):
+        a = li.select_one("h2 a") or li.find("a", href=True)
+        if not a: continue
+        out.append({"title": _txt(a, 200), "url": a.get("href", ""),
+                    "snippet": _txt(li.select_one(".b_caption p") or li.find("p"))})
+    return out
+
+_ENGINES = [
+    ("duckduckgo",      "/proxy/html.duckduckgo.com/html/?q={q}",      _p_ddg_html),
+    ("duckduckgo-lite", "/proxy/lite.duckduckgo.com/lite/?q={q}",      _p_ddg_lite),
+    ("brave",           "/proxy/search.brave.com/search?q={q}",        _p_brave),
+    ("bing",            "/proxy/www.bing.com/search?q={q}&setlang=en", _p_bing),
+]
+
+def _valid(r):
+    u = r.get("url", "")
+    return bool(r.get("title")) and u.startswith("http") and "duckduckgo.com/l/" not in u
+
+def _dedupe(rows):
+    seen = set(); out = []
+    for r in rows:
+        k = re.sub(r"#.*$", "", r["url"]).rstrip("/")
+        if k in seen: continue
+        seen.add(k); out.append(r)
+    return out
+
+async def _run():
+    if not _QUERY:
+        return {"error": "empty query", "results": [], "tried": []}
+    q = urllib.parse.quote(_QUERY)
+    tried = []
+    for name, tmpl, parse in _ENGINES:
+        try:
+            html = await _fetch(tmpl.format(q=q))
+        except Exception as e:
+            tried.append("%s: fetch error (%s)" % (name, type(e).__name__)); continue
+        if not html:
+            tried.append("%s: no/non-200 response" % name); continue
+        if _looks_blocked(html):
+            tried.append("%s: blocked/captcha page" % name); continue
+        try:
+            rows = _dedupe([r for r in parse(html) if _valid(r)])
+        except Exception as e:
+            tried.append("%s: parse error (%s)" % (name, type(e).__name__)); continue
+        if rows:
+            return {"engine": name, "query": _QUERY, "results": rows[:_N], "tried": tried}
+        tried.append("%s: 0 results" % name)
+    return {"engine": None, "query": _QUERY, "results": [], "tried": tried}
+
+_out = await _run()
+json.dumps(_out)
+`;
+
+const _READ_URL_PY = `
+import json, re
+from js import _sandpie_ru_args
+from pyodide.http import pyfetch
+from bs4 import BeautifulSoup
+
+_a = json.loads(str(_sandpie_ru_args))
+_URL = (_a.get("url") or "").strip()
+_CAP = max(500, min(int(_a.get("cap") or 8000), 40000))
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+async def _run():
+    if not _URL:
+        return {"error": "empty url"}
+    proxied = "/proxy/" + re.sub(r"^https?://", "", _URL)
+    try:
+        resp = await pyfetch(proxied, headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"})
+    except Exception as e:
+        return {"error": "fetch error (%s)" % type(e).__name__}
+    if resp.status != 200:
+        return {"error": "HTTP %s" % resp.status}
+    ctype = ""
+    try: ctype = (resp.headers.get("content-type") or "").lower()
+    except Exception: pass
+    html = await resp.string()
+    if "html" in ctype or "<html" in html[:2000].lower():
+        soup = BeautifulSoup(html, "html.parser")
+        for t in soup(["script", "style", "noscript", "header", "footer", "nav",
+                       "aside", "form", "svg", "iframe"]):
+            t.decompose()
+        main = soup.find("article") or soup.find("main") or soup.body or soup
+        body = re.sub(r"\\n{3,}", "\\n\\n", main.get_text("\\n", strip=True))
+        title = soup.title.get_text(strip=True) if soup.title else _URL
+    else:
+        body = html
+        title = _URL
+    return {"url": _URL, "title": title, "text": body[:_CAP], "total": len(body)}
+
+_r = await _run()
+json.dumps(_r)
+`;
+
+async function tool_web_search({ query, num_results }, ctx) {
+  if (!query || !String(query).trim()) return { result: 'Error: "query" is required (plain keywords).' };
+  return withPy(async () => {
+    let p;
+    try { p = await initPyodide(); }
+    catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
+    try {
+      self._sandpie_ws_args = JSON.stringify({ query: String(query), n: num_results });
+      try { await p.loadPackagesFromImports('from bs4 import BeautifulSoup'); } catch (_) {}
+      const jsonStr = await p.runPythonAsync(_WEB_SEARCH_PY);
+      let data = null; try { data = JSON.parse(jsonStr); } catch (_) {}
+      if (!data) return { result: 'Error: web_search returned no parseable data.' };
+      if (!data.results || !data.results.length) {
+        const why = (data.tried && data.tried.length) ? '\nEngines tried:\n- ' + data.tried.join('\n- ') : '';
+        return { result: `No web results for "${data.query || query}".${why}\n(If every engine was blocked or unreachable, the /proxy/ route may be unavailable in this deployment.)` };
+      }
+      const lines = data.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}${r.snippet ? '\n   ' + r.snippet : ''}`);
+      return { result: `Web results for "${data.query}" (via ${data.engine}):\n\n${lines.join('\n\n')}\n\nTo read a result's full page text, call read_url with its URL.` };
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      if (isPyodideFatal(e, msg, '')) { resetPyodide(msg); return { result: 'FATAL: Pyodide crashed during web_search and was reset. Retry the search.' }; }
+      return { result: 'Error during web_search: ' + msg };
+    }
+  });
+}
+
+async function tool_read_url({ url, max_chars }, ctx) {
+  if (!url || !String(url).trim()) return { result: 'Error: "url" is required.' };
+  return withPy(async () => {
+    let p;
+    try { p = await initPyodide(); }
+    catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
+    try {
+      self._sandpie_ru_args = JSON.stringify({ url: String(url), cap: max_chars });
+      try { await p.loadPackagesFromImports('from bs4 import BeautifulSoup'); } catch (_) {}
+      const jsonStr = await p.runPythonAsync(_READ_URL_PY);
+      let data = null; try { data = JSON.parse(jsonStr); } catch (_) {}
+      if (!data) return { result: 'Error: read_url returned no parseable data.' };
+      if (data.error) return { result: `Could not read ${url}: ${data.error}.\n(The page is fetched via /proxy/; it may be unavailable, blocked, or non-HTML.)` };
+      const head = data.title ? `# ${data.title}\n${data.url}\n\n` : `${data.url}\n\n`;
+      const more = (data.total > (data.text || '').length)
+        ? `\n\n…(showing ${(data.text || '').length} of ${data.total} chars; call read_url again with a larger max_chars to read more)` : '';
+      return { result: head + (data.text || '') + more };
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      if (isPyodideFatal(e, msg, '')) { resetPyodide(msg); return { result: 'FATAL: Pyodide crashed during read_url and was reset. Retry.' }; }
+      return { result: 'Error during read_url: ' + msg };
     }
   });
 }
@@ -1126,7 +1348,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image'];
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','show_artifact','load_skill','load_image','local_shell'];
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -1134,6 +1356,41 @@ async function unknownTool(name) {
     try { await opfsReadBytes('sandpie/skills/' + n + '/SKILL.md'); return { result: 'Error: "' + name + '" is a skill, not a tool. Call load_skill({"name":"' + n + '"}) to use it.' }; } catch {}
   }
   return { result: 'Error: unknown tool "' + name + '". Available tools: ' + KNOWN_TOOLS.join(', ') + '.' };
+}
+
+// local_shell — run a command on the user's OWN machine via the localterm helper
+// (loopback /exec). Token comes from ctx.localterm (passed in the run config; the
+// worker has no localStorage). Graceful, non-looping errors when the helper is down.
+async function tool_local_shell({ command, timeout }, ctx) {
+  const cmd = (command == null) ? '' : String(command);
+  if (!cmd.trim()) return { result: 'Error: "command" is required.' };
+  const lt = ctx && ctx.localterm;
+  if (!lt || !lt.token) return { result: 'Error: the local terminal is not available — the localterm helper is not running or not paired. Tell the user to start it (sandpie Terminal panel → Download), then retry ONCE. Do not retry repeatedly.' };
+  const port = lt.port || 8771;
+  let to = parseInt(timeout, 10); if (!(to > 0)) to = 60; if (to > 300) to = 300;
+  let r;
+  try {
+    r = await fetch(`http://127.0.0.1:${port}/exec?token=${encodeURIComponent(lt.token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, timeout: to }),
+      signal: ctx && ctx.signal,
+    });
+  } catch (e) {
+    return { result: `Error: could not reach the localterm helper on 127.0.0.1:${port} (${(e && e.message) || e}). It is likely not running — tell the user to start it (Terminal panel) and STOP, do not retry in a loop.` };
+  }
+  if (!r.ok) {
+    const hint = r.status === 403 ? ' Token rejected (helper may have restarted) — ask the user to reopen sandpie from the helper to re-pair.' : '';
+    return { result: `Error: localterm helper returned HTTP ${r.status}.${hint}` };
+  }
+  let d; try { d = await r.json(); } catch { return { result: 'Error: bad response from the localterm helper.' }; }
+  let out = d.stdout || '';
+  if (d.stderr) out += (out ? '\n' : '') + '[stderr]\n' + d.stderr;
+  if (d.timedOut) out += `\n[timed out after ${to}s — command killed]`;
+  out += `\n[exit code ${d.code}]`;
+  const CAP = 20000;
+  if (out.length > CAP) out = out.slice(0, CAP) + `\n…(output truncated; ${out.length} bytes total)`;
+  return { result: out.trim() };
 }
 
 async function runTool(name, args, ctx) {
@@ -1147,9 +1404,12 @@ async function runTool(name, args, ctx) {
     case 'list_files':    return tool_list_files(args, ctx);
     case 'search':        return tool_search(args, ctx);
     case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
+    case 'web_search':    return tool_web_search(args, ctx);
+    case 'read_url':      return tool_read_url(args, ctx);
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
+    case 'local_shell':   return tool_local_shell(args, ctx);
     default:              return unknownTool(name);
   }
 }

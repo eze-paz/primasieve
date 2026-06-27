@@ -639,7 +639,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=21');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=23');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -945,6 +945,9 @@ async function buildAgentConfig(convMessages, compaction) {
     reasoningEffort: (active && active.reasoningEffort) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
+    // For the local_shell tool: the localterm helper token (read on the main
+    // thread; the worker has no localStorage). Empty string when not paired.
+    localterm: { token: localStorage.getItem('sandpie:localterm:token') || '', port: 8771 },
   };
 }
 async function readAgentEvents(body, onEvent) {

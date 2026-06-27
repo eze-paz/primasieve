@@ -93,6 +93,31 @@ IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them 
       required: ['pattern'],
     },
   },
+  web_search: {
+    description: `Search the WEB and get back a ranked list of results (title, URL, snippet). Use whenever the user asks to search the web / look something up online / find current or recent information, or when you need facts beyond your knowledge or a source to cite.
+Give plain keywords (not a regex). Robust by design: it transparently falls back across several engines (DuckDuckGo, Brave, Bing), so one engine being rate-limited or blocked won't fail the search; the engine actually used is reported.
+This searches the public web — it is NOT for the user's files (use search / list_files for those). To read a result's full page text, follow up with read_url on its URL.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query:       { type: 'string', description: 'Plain-keyword search query, e.g. "python asyncio tutorial" or "Reixach compressor datasheet".' },
+        num_results: { type: 'integer', description: 'Max results to return (default 8, max 20).' },
+      },
+      required: ['query'],
+    },
+  },
+  read_url: {
+    description: `Fetch a web page and return its main readable text (nav/scripts/ads/boilerplate stripped) plus the page title. Use it to READ a result from web_search, or any URL the user gives you, when you need the actual content rather than just the snippet.
+Returns up to max_chars characters and reports the total length; if the page is longer than you got, call again with a larger max_chars.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        url:       { type: 'string', description: 'Full URL to fetch, e.g. "https://example.com/article".' },
+        max_chars: { type: 'integer', description: 'Max characters of text to return (default 8000, max 40000).' },
+      },
+      required: ['url'],
+    },
+  },
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
 Use this whenever:
@@ -148,6 +173,22 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
         required: ['src'],
       },
     },
+    local_shell: {
+      description: `Run a command on the USER'S OWN computer — the real machine running this browser (PowerShell on Windows, bash/zsh on macOS/Linux) — via the locally-installed "localterm" helper, and get back stdout, stderr and the exit code.
+
+This is the user's ACTUAL operating system, not a sandbox. Use it only when the user wants something done on their own machine: inspect or edit their files, run a build/test, git, check versions, system info, install a package, etc. This tool is OFF by default; if you can call it, the user deliberately enabled it — but still avoid destructive commands (rm -rf, format, mass deletes, overwrites) unless they clearly asked.
+DON'T confuse with the sandbox: for Python data work in the in-browser sandbox use run_python; for the OPFS workspace files use read_file/write_file/list_files. local_shell is for the user's real OS.
+Each call is independent: there is NO persistent shell state between calls (cwd, env, and shell variables reset every time) — chain steps with && or set them inline (e.g. cd path && cmd). There is NO interactive TTY, so never launch programs that need one (vim, top, an ssh login prompt, REPLs); use non-interactive flags. Output is truncated if very long.
+If it returns "helper not running/reachable", tell the user to start the localterm helper (sandpie Terminal panel → Download) and STOP — do not retry in a loop.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The exact command line to run in the user default shell, non-interactively. E.g. "git -C ~/proj status", "node -v", "ls -la". Chain with && for multiple steps.' },
+          timeout: { type: 'integer', description: 'Max seconds to wait before the command is killed (default 60, max 300).' },
+        },
+        required: ['command'],
+      },
+    },
 };
 // ── Enable/disable + description overrides (global, localStorage) ─────────────
 // Lets the user (Settings → System prompt) turn tools off and rewrite their
@@ -155,11 +196,16 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
 // — what's actually sent to the model — is the single choke point that honors it.
 const TOOLS_DISABLED_KEY = 'sandpie-tools-disabled';   // JSON array of disabled names
 const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: customDescription }
+const TOOLS_ENABLED_KEY  = 'sandpie-tools-enabled';    // JSON array of explicitly-ON names (for default-off tools)
+// Tools that stay OFF until the user explicitly turns them on. They NEVER auto-enable:
+// isEnabled returns false unless the name is in TOOLS_ENABLED_KEY (set only by setEnabled).
+const TOOLS_DEFAULT_OFF  = new Set(['local_shell']);
 function _toolsReadJson(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
   catch { return fallback; }
 }
 function _toolsDisabledSet() { const a = _toolsReadJson(TOOLS_DISABLED_KEY, []); return new Set(Array.isArray(a) ? a : []); }
+function _toolsEnabledSet() { const a = _toolsReadJson(TOOLS_ENABLED_KEY, []); return new Set(Array.isArray(a) ? a : []); }
 function _toolsDescMap() { const m = _toolsReadJson(TOOLS_DESC_KEY, {}); return (m && typeof m === 'object') ? m : {}; }
 // A tool may be present but unavailable (e.g. copy_to_workspace needs Dropbox).
 function _toolAvailable(name) {
@@ -175,9 +221,18 @@ const SandpieTools = {
   defaultDescription(name) { return tools[name] ? tools[name].description : ''; },
   description(name) { const o = _toolsDescMap(); return (o[name] != null) ? o[name] : SandpieTools.defaultDescription(name); },
   isCustom(name) { const o = _toolsDescMap(); return o[name] != null && o[name] !== SandpieTools.defaultDescription(name); },
-  isEnabled(name) { return !_toolsDisabledSet().has(name); },
+  isEnabled(name) {
+    if (TOOLS_DEFAULT_OFF.has(name)) return _toolsEnabledSet().has(name);   // off until explicitly enabled
+    return !_toolsDisabledSet().has(name);
+  },
   isAvailable(name) { return _toolAvailable(name); },
   setEnabled(name, on) {
+    if (TOOLS_DEFAULT_OFF.has(name)) {       // default-off tools track explicit ON, not OFF
+      const e = _toolsEnabledSet();
+      if (on) e.add(name); else e.delete(name);
+      localStorage.setItem(TOOLS_ENABLED_KEY, JSON.stringify([...e]));
+      return;
+    }
     const s = _toolsDisabledSet();
     if (on) s.delete(name); else s.add(name);
     localStorage.setItem(TOOLS_DISABLED_KEY, JSON.stringify([...s]));
