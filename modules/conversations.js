@@ -639,7 +639,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=20');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=21');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -653,6 +653,12 @@ function getSandpieWorker() {
       // Relay opfs-deleted-by-python / sw-opfs-changed to existing SW message
       // listeners (dropbox-full.js) by dispatching onto navigator.serviceWorker.
       try { navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: msg.payload })); } catch (_) {}
+      return;
+    }
+    if (msg.type === 'managed-token-refreshed') {
+      // The worker silently re-minted the managed session token after a 401; keep
+      // the page-side provider + hidden #apiKey in sync so the next request is fresh.
+      try { window.SandpieAccount?.applyRefreshedToken?.(msg.token); } catch (_) {}
       return;
     }
   });
@@ -925,6 +931,11 @@ async function buildAgentConfig(convMessages, compaction) {
   return {
     url,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    // Managed (company sign-in) provider only: let the worker silently re-mint the
+    // session token from the SSO cookie via /auth/token on a 401, so an expired JWT
+    // never interrupts the user mid-generation. null for personal providers — a 401
+    // there is a real bad-key error, not a refreshable session.
+    authRefreshUrl: (active && active.managed) ? new URL('/auth/token', location.href).href : null,
     model: $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages),
     messages: resolvedMessages,

@@ -108,6 +108,17 @@ const SandpieAccount = (() => {
   // Called by providers.js bootProviders so the picker never misses the catalog.
   function ensureManaged() { applyManaged(); }
 
+  // The worker re-minted the managed session token after a 401 (the short-lived
+  // JWT lapsed while the SSO cookie is still valid). Apply it page-side so future
+  // requests use the fresh token too — no second /auth/token round-trip and no
+  // user prompt. setManaged() preserves the active pick (not a first injection)
+  // and re-syncs the hidden #apiKey input via applyActiveProvider().
+  function applyRefreshedToken(token) {
+    if (!token) return;
+    if (_managedCache) { _managedCache.token = token; applyManaged(); }
+    else { refreshManagedProvider(); }   // catalog not loaded yet → do a full refresh
+  }
+
   function login()  { window.location.href = '/auth/login'; }
   function logout() {
     try { if (window.SandpieProviders && SandpieProviders.clearManaged) SandpieProviders.clearManaged(); } catch (_) {}
@@ -146,6 +157,6 @@ const SandpieAccount = (() => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { login, logout, isActive: () => !!_user, current: () => _user, ensureManaged };
+  return { login, logout, isActive: () => !!_user, current: () => _user, ensureManaged, applyRefreshedToken };
 })();
 window.SandpieAccount = SandpieAccount;

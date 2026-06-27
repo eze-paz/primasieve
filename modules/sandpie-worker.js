@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.15.0-search-include';
+const WORKER_VERSION = '2.16.0-auth-refresh';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -1170,14 +1170,41 @@ function swSleep(ms, signal) {
     if (signal) signal.addEventListener('abort', () => { clearTimeout(id); reject(new DOMException('aborted', 'AbortError')); }, { once: true });
   });
 }
+// One-shot silent re-mint of an expired managed session token (JWT). The token
+// lapses while the SSO cookie stays valid, so /auth/token — cookie-authed and
+// same-origin — returns a fresh one. A same-origin worker fetch carries the
+// (HttpOnly) SSO cookie automatically. Returns null if the SSO session is gone.
+async function _refreshAuthToken(url) {
+  try {
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (!r.ok) return null;
+    const d = await r.json().catch(() => null);
+    return (d && d.token) || null;
+  } catch (_) { return null; }
+}
+
 async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
   const BACKOFF_MS = [1000, 2000, 5000, 10000];
+  let authRefreshed = false;   // at most one transparent token re-mint per round
   for (let attempt = 0; ; attempt++) {
     try {
       if (attempt > 0) ctx.emit({ type: 'info', message: null });
       return await streamOneRound(reqUrl, headers, body, ctx);
     } catch (e) {
       if (ctx.signal?.aborted) throw e;
+      // Managed session token expired → re-mint from the still-valid SSO cookie
+      // and retry once, transparently (no user-facing message). Gated to the
+      // managed provider (ctx._authRefreshUrl set) and to one attempt: a fresh
+      // token that still 401s means the SSO session itself is gone — let it surface.
+      if (e && e.status === 401 && ctx._authRefreshUrl && !authRefreshed) {
+        authRefreshed = true;
+        const tok = await _refreshAuthToken(ctx._authRefreshUrl);
+        if (tok) {
+          headers['Authorization'] = 'Bearer ' + tok;   // mutate in place → later rounds reuse it
+          self.postMessage({ type: 'managed-token-refreshed', token: tok });
+          continue;                                      // immediate retry with the fresh token
+        }
+      }
       if (!isRetryableError(e)) throw e;
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
       ctx.emit({ type: 'info', message: `Provider error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
@@ -1296,6 +1323,9 @@ async function runAgent(config, ctx) {
   // conversation, then incremented per load so a batch of parallel load_image
   // calls in one turn can't pile up and blow the context / request body.
   ctx._imageBudget = { total: IMAGE_CONVO_B64_BUDGET, used: _imageB64InMessages(messages) };
+  // Managed provider only: URL to silently re-mint an expired session token on a
+  // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
+  ctx._authRefreshUrl = config.authRefreshUrl || null;
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
