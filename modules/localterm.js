@@ -155,8 +155,19 @@ async function connect(body) {
   ws.onerror = () => { if (!opened) renderInstall(body, `Could not reach the helper on 127.0.0.1:${PORT}.`); };
 }
 
+function isMobile() {
+  return (navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
+function renderMobile(body) {
+  body.innerHTML = `<div style="font-size:0.75rem;line-height:1.5;color:var(--sp-text-dim);">
+    <p style="margin:0 0 0.4rem;">The local terminal needs a desktop.</p>
+    <p style="margin:0;">Phones have no local shell and can't run the background helper. Open sandpie on your computer to use this — or reach a remote machine from <strong>Devices</strong>.</p>
+  </div>`;
+}
+
 async function renderSection(body) {
   if (connected) return;
+  if (isMobile()) { renderMobile(body); return; }
   if (getToken() && await helperUp()) connect(body);
   else renderInstall(body, '');
 }
