@@ -9,14 +9,14 @@
  *   - if yes: opens an xterm.js terminal connected over ws://127.0.0.1:PORT/pty,
  *   - auto-pairs via a token the helper passes in the URL fragment (#lt=...).
  *
- * Usage: <script type="module" src="modules/localterm.js?v=1"></script>
+ * Usage: <script type="module" src="modules/localterm.js"></script>
  */
 
 const PORT = 8771;
 const BASE = `http://127.0.0.1:${PORT}`;
 const TOKEN_KEY = 'sandpie:localterm:token';
 // Where the helper binaries are hosted (drop the Desktop\localterm\* files here on deploy).
-const DOWNLOAD_BASE = '/localterm';
+const DOWNLOAD_BASE = '/modules';
 const FILES = [
   ['Windows (x64)',  'localterm-windows-amd64.exe'],
   ['Windows (ARM)',  'localterm-windows-arm64.exe'],
@@ -51,11 +51,15 @@ async function detectBinary() {
   else os = os.includes('win') ? 'windows' : os.includes('mac') ? 'macos' : 'linux';
   if (/aarch64|arm64/i.test(ua)) arm = true;
   // Apple Silicon usually reports Intel in UA; default modern Macs to arm64.
+  const android = /android/i.test(ua);
+  if (android) { os = 'linux'; if (!/x86_64|i686|x86;/i.test(ua)) arm = true; } // Android = Linux kernel, ~always arm64
   const archName = arm ? 'arm64' : 'amd64';
   const ext = os === 'windows' ? '.exe' : '';
   const file = `localterm-${os}-${archName}${ext}`;
-  const label = { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[os] + (arm ? ' (ARM)' : ' (x64)');
-  return { os, file, label };
+  const label = android
+    ? `Android · Linux ${arm ? 'ARM64' : 'x64'}`
+    : { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[os] + (arm ? ' (ARM)' : ' (x64)');
+  return { os, file, label, android };
 }
 
 /* ---- presence probe (does NOT spawn a shell) ---- */
@@ -86,21 +90,29 @@ function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = nul
 
 async function renderInstall(body, msg) {
   connected = false;
-  const { file, label } = await detectBinary();
+  const { file, label, android } = await detectBinary();
+  const mobile = isMobile();
   const others = FILES.filter(f => f[1] !== file)
     .map(f => `<a href="${DOWNLOAD_BASE}/${f[1]}" download style="color:var(--sp-text-dim);font-size:0.68rem;text-decoration:none;border-bottom:1px dotted var(--sp-border);">${f[0]}</a>`)
     .join(' · ');
+  const intro = mobile
+    ? `Use your phone's shell here — on Android via <a href="https://termux.dev" target="_blank" style="color:var(--sp-accent,#2563eb);">Termux</a> (any app that runs a Linux binary).`
+    : `Run a tiny one-time helper to use your machine's terminal here.`;
+  const steps = mobile
+    ? `<li>In Termux: <code style="color:var(--sp-text);">chmod +x ${file} &amp;&amp; ./${file}</code></li>
+        <li>Open the link it prints (or it opens sandpie) — now paired.</li>`
+    : `<li>Run the downloaded file (approve your OS prompt once).</li>
+        <li>It re-opens sandpie already paired — this turns into a terminal.</li>`;
   body.innerHTML = `
     <div style="font-size:0.75rem;line-height:1.5;">
       ${msg ? `<p style="color:var(--sp-text-dim);margin:0 0 0.5rem;">${esc(msg)}</p>` : ''}
-      <p style="margin:0 0 0.5rem;">Run a tiny one-time helper to use your machine's terminal here.</p>
+      <p style="margin:0 0 0.5rem;">${intro}</p>
       <a id="ltDownload" href="${DOWNLOAD_BASE}/${file}" download
          style="display:inline-block;background:var(--sp-accent,#2563eb);color:#fff;padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;text-decoration:none;">
          ⬇ Download for ${label}
       </a>
       <ol style="margin:0.7rem 0 0.4rem;padding-left:1.1rem;color:var(--sp-text-dim);">
-        <li>Run the downloaded file (approve your OS prompt once).</li>
-        <li>It re-opens sandpie already paired — this turns into a terminal.</li>
+        ${steps}
       </ol>
       <details style="margin-top:0.3rem;"><summary style="cursor:pointer;color:var(--sp-text-dim);font-size:0.7rem;">other platforms</summary>
         <div style="margin-top:0.35rem;display:flex;gap:0.5rem;flex-wrap:wrap;">${others}</div>
@@ -158,16 +170,8 @@ async function connect(body) {
 function isMobile() {
   return (navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
-function renderMobile(body) {
-  body.innerHTML = `<div style="font-size:0.75rem;line-height:1.5;color:var(--sp-text-dim);">
-    <p style="margin:0 0 0.4rem;">The local terminal needs a desktop.</p>
-    <p style="margin:0;">Phones have no local shell and can't run the background helper. Open sandpie on your computer to use this — or reach a remote machine from <strong>Devices</strong>.</p>
-  </div>`;
-}
-
 async function renderSection(body) {
   if (connected) return;
-  if (isMobile()) { renderMobile(body); return; }
   if (getToken() && await helperUp()) connect(body);
   else renderInstall(body, '');
 }
