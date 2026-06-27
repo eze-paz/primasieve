@@ -1,23 +1,26 @@
 /**
- * Mindframe Module for Sandpie — Stage 0: AWARENESS.
+ * Mindframe Module for Sandpie — a harness-enforced problem-solving frame.
  *
- * A "mindframe" forces the model through an explicit problem-solving frame
- * before it acts. This module ships ONLY Stage 0 — the AWARENESS scan — so we
- * can test, in isolation, how well large vs small models ground themselves
- * before answering.
+ * A "mindframe" forces the model through an explicit frame before it acts,
+ * appended to the system prompt (via the SandpieMindframe.systemBlock hook in
+ * conversations.buildSystemPrompt). It works identically across every backend
+ * (cloud, WebGPU, LiteRT-LM) because it only shapes the system prompt, and it
+ * returns '' when off so there is zero behavior change when disabled.
  *
- * When active, a directive is appended to the system prompt (via the
- * SandpieMindframe.systemBlock hook in conversations.buildSystemPrompt). The
- * directive forces the model to first split the user's message into:
- *   - NOUNS  (the things the task is about)  → rate confidence 1–10, define each
- *   - VERBS  (the actions being asked for)   → state capability + an exit check
- * and to research (or at minimum flag) every noun scored at/below a threshold.
+ * Two parts, kept deliberately small:
  *
- * Enforcement is prompt-level: it works identically across every backend
- * (cloud, WebGPU, LiteRT-LM) because it only shapes the system prompt. Whether a
- * given model actually obeys is exactly the thing we want to observe.
+ *   STEP 1 — AWARENESS: split the request into NOUNS (things → confidence 1–10 +
+ *            definition) and VERBS (actions → an exit check), then classify the
+ *            task MODE: RESEARCH (facts), DERIVE (math/logic/code), or MIXED.
  *
- * Usage: <script type="module" src="modules/mindframe.js?v=1"></script>
+ *   STEP 2 — GROUNDING (one rule): never assert; ground. Every claim is tagged
+ *            [cite: source] (facts → a real file/URL you can open),
+ *            [check: how]  (math/code → something you ran or derived), or
+ *            [known]       (common knowledge / a reasoning step).
+ *            This is what guards non-research tasks: a computation is PROVEN
+ *            with [check], never cited — you don't cite the web for 2+2.
+ *
+ * Usage: <script type="module" src="modules/mindframe.js?v=2"></script>
  */
 
 /* -------------------------------------------------------------------------- */
@@ -25,10 +28,10 @@
 /* -------------------------------------------------------------------------- */
 const K_ACTIVE    = 'sandpie:mindframe:active';
 const K_THRESHOLD = 'sandpie:mindframe:threshold';
-const K_RESEARCH  = 'sandpie:mindframe:research';
+const K_GROUNDING = 'sandpie:mindframe:grounding';
 const K_SCANONLY  = 'sandpie:mindframe:scanonly';
 
-const DEFAULTS = { active: false, threshold: 6, research: true, scanOnly: true };
+const DEFAULTS = { active: false, threshold: 6, grounding: true, scanOnly: false };
 
 function getBool(key, def) {
   const v = localStorage.getItem(key);
@@ -37,13 +40,13 @@ function getBool(key, def) {
 function setBool(key, v) { localStorage.setItem(key, v ? '1' : '0'); }
 
 const cfg = {
-  get active()    { return getBool(K_ACTIVE, DEFAULTS.active); },
-  set active(v)   { setBool(K_ACTIVE, v); },
-  get research()  { return getBool(K_RESEARCH, DEFAULTS.research); },
-  set research(v) { setBool(K_RESEARCH, v); },
-  get scanOnly()  { return getBool(K_SCANONLY, DEFAULTS.scanOnly); },
-  set scanOnly(v) { setBool(K_SCANONLY, v); },
-  get threshold() {
+  get active()     { return getBool(K_ACTIVE, DEFAULTS.active); },
+  set active(v)    { setBool(K_ACTIVE, v); },
+  get grounding()  { return getBool(K_GROUNDING, DEFAULTS.grounding); },
+  set grounding(v) { setBool(K_GROUNDING, v); },
+  get scanOnly()   { return getBool(K_SCANONLY, DEFAULTS.scanOnly); },
+  set scanOnly(v)  { setBool(K_SCANONLY, v); },
+  get threshold()  {
     const n = parseInt(localStorage.getItem(K_THRESHOLD) || '', 10);
     return Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : DEFAULTS.threshold;
   },
@@ -51,55 +54,55 @@ const cfg = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  the directive (Stage 0: AWARENESS) — this is the "mindframe"               */
+/*  the directive — this is the "mindframe"                                     */
 /* -------------------------------------------------------------------------- */
 function buildDirective() {
   const t = cfg.threshold;
 
-  const researchClause = cfg.research
-    ? `You MUST research every UNKNOWN noun before you continue. Use the tools available to you — e.g. run_python with pyodide's \`pyfetch\` to fetch a reference page (Wikipedia, docs, the project's own files via read_file/search) — find out what the term actually refers to, then revise its score. If you genuinely have no tool that can look a term up, say so explicitly on that line instead of guessing.`
-    : `Flag every UNKNOWN noun clearly (mark it RESEARCH) so the user can see exactly what you are unsure of. Do not silently guess.`;
+  const awareness = `STEP 1 — AWARENESS. Split the user's request into its parts:
+- NOUNS (the things it is about): for each, rate 1–10 how sure you are you know what it refers to, and give a one-line definition. Proper names, product/library names, version numbers, acronyms, and anything dated after your training cutoff → score LOW. Do not inflate scores. A noun you cannot define in one clean line is a noun you do not know.
+- VERBS (the actions asked of you): for each, state how you would CHECK that it was done correctly (its exit test).
+Then classify the task MODE:
+- RESEARCH — the answer depends on facts about the world or specific entities (look-up-able)
+- DERIVE   — the answer is computed or provable: math, logic, code (NOT look-up-able)
+- MIXED    — both
 
-  const stopClause = cfg.scanOnly
-    ? `STOP after the scan. Do NOT answer the request yet — this run is an awareness check only. Output the scan and nothing after it.`
-    : `Then proceed to address the request, using what the scan revealed (a low-confidence noun means you do the lookup first; the verbs and their checks become your plan).`;
-
-  return `
-
-================ MINDFRAME · STAGE 0: AWARENESS (MANDATORY) ================
-Before you answer, plan, or call any tool for the user's LATEST message, you must
-run an AWARENESS SCAN. You are not allowed to leave this stage until the rubric
-below is fully filled in. Skipping it, abbreviating it, or starting the task
-first is a failure.
-
-Every request is made of THINGS and ACTIONS, so the scan has two columns:
-
-1. NOUNS — the things the request is about. For each noun, rate 1–10 how sure you
-   are you actually know what it refers to, and write the one-line definition you
-   would use. A noun you cannot define cleanly in one line is a noun you do not
-   know — score it low. Treat proper names, product/library names, version
-   numbers, acronyms, and anything dated after your training cutoff as low
-   confidence by default. Do not inflate scores.
-
-2. VERBS — the actions you are being asked to perform. For each, state whether you
-   have the capability/tools to do it, and how you would CHECK that the action was
-   done correctly (its exit test).
-
-A noun scored ${t}/10 or below is UNKNOWN. ${researchClause}
-
-Output the scan in EXACTLY this format:
-
-=== AWARENESS SCAN ===
+Output exactly:
+=== AWARENESS ===
 NOUNS:
 - "<noun>" — <N>/10 — <one-line definition>
 VERBS:
-- "<verb>" — capable: <yes/no> — check: <how you would verify it is done>
-UNKNOWN (<=${t}/10): <comma-separated nouns, or "none">
-=== END SCAN ===
+- "<verb>" — check: <how you would verify it is done>
+MODE: <RESEARCH | DERIVE | MIXED>
+=== END ===`;
 
-${stopClause}
-===========================================================================
-`;
+  const grounding = `
+STEP 2 — GROUNDING (one rule): never assert; ground. Tag EVERY claim in your answer with exactly one of:
+- [cite: <file path or URL>] — a REAL source you can open: a workspace file (read it with read_file) or a web page you fetched (run_python + pyodide \`pyfetch\`). Use for RESEARCH facts. For any noun you scored ${t}/10 or below you MUST go fetch the source now — do not answer it from memory. A citation must point to something that actually exists and actually says the claim; do not invent URLs.
+- [check: <what you ran>] — a verification you ACTUALLY performed: code you executed (run_python), a worked-out derivation, or a test that passed. Use for DERIVE answers. Do NOT cite the web for math or code — PROVE it by running or deriving it. This is how non-research tasks are grounded: with a check, never a citation.
+- [known] — textbook common knowledge or a pure reasoning step that needs no source. Use sparingly; it is not an excuse to skip a real [cite] or [check].
+If a claim fits none of the three, do not make it — say you are unsure instead.
+End your answer with a "Sources" list of every [cite] you used.`;
+
+  const stop = `
+STOP after STEP 1. Do NOT answer the request yet — this run checks AWARENESS only. Output the scan and nothing after it.`;
+
+  let body = `
+
+================ MINDFRAME (MANDATORY) ================
+Before you answer, plan, or call any tool for the user's LATEST message, work
+through this frame. You are not allowed to start the task until STEP 1 is fully
+filled in. Skipping it, abbreviating it, or answering first is a failure.
+
+${awareness}`;
+
+  if (cfg.scanOnly) {
+    body += `\n${stop}`;
+  } else if (cfg.grounding) {
+    body += `\n${grounding}`;
+  }
+  body += `\n=======================================================\n`;
+  return body;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -124,9 +127,10 @@ function render() {
 
   host.innerHTML = `
     <p style="color:var(--sp-text-dim);font-size:0.72rem;line-height:1.4;margin:0 0 0.55rem;">
-      Forces the model to scan your message into <strong>nouns</strong> (rated 1–10 for
-      confidence) and <strong>verbs</strong> (with an exit check) before it acts.
-      Stage 0 of the mindframe loop — run on its own to see how a model grounds itself.
+      Forces a frame before the model acts: <strong>scan</strong> the message into nouns
+      (rated 1–10) and verbs, then <strong>ground</strong> every claim — facts get a
+      <code>[cite]</code>, math/code get a <code>[check]</code>. You don't cite the web for a
+      computation; you prove it.
     </p>
 
     <button id="mfToggle" style="
@@ -134,7 +138,7 @@ function render() {
       padding:0.45rem 0.6rem;border:1px solid ${on ? 'var(--sp-accent,#3fb950)' : 'var(--sp-border)'};
       border-radius:6px;background:${on ? 'rgba(63,185,80,0.12)' : 'transparent'};
       color:var(--sp-text);cursor:pointer;font-size:0.8rem;">
-      <span><strong>Awareness scan</strong></span>
+      <span><strong>Mindframe</strong></span>
       <span style="font-size:0.72rem;color:${on ? '#3fb950' : 'var(--sp-text-dim)'};">
         ${on ? '● ACTIVE' : '○ off'}
       </span>
@@ -142,19 +146,19 @@ function render() {
 
     <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.5rem;${on ? '' : 'opacity:0.45;pointer-events:none;'}">
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--sp-text-dim);">
-        <span style="white-space:nowrap;">Unknown at/below</span>
+        <span style="white-space:nowrap;">Must fetch source at/below</span>
         <input id="mfThreshold" type="range" min="1" max="10" step="1" value="${cfg.threshold}" style="flex:1;">
         <span id="mfThreshVal" style="min-width:2.4em;text-align:right;color:var(--sp-text);">${cfg.threshold}/10</span>
       </label>
 
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--sp-text-dim);cursor:pointer;">
-        <input id="mfResearch" type="checkbox" ${cfg.research ? 'checked' : ''}>
-        <span>Force research on unknown nouns (else just flag them)</span>
+        <input id="mfGrounding" type="checkbox" ${cfg.grounding ? 'checked' : ''}>
+        <span>Require grounding (cite facts, prove computations)</span>
       </label>
 
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.74rem;color:var(--sp-text-dim);cursor:pointer;">
         <input id="mfScanOnly" type="checkbox" ${cfg.scanOnly ? 'checked' : ''}>
-        <span>Scan only — stop after the scan (don't answer)</span>
+        <span>Scan only — stop after awareness (don't answer)</span>
       </label>
     </div>
   `;
@@ -171,8 +175,8 @@ function render() {
     document.getElementById('mfThreshVal').textContent = cfg.threshold + '/10';
   };
 
-  const r = document.getElementById('mfResearch');
-  if (r) r.onchange = (e) => { cfg.research = e.target.checked; };
+  const g = document.getElementById('mfGrounding');
+  if (g) g.onchange = (e) => { cfg.grounding = e.target.checked; };
 
   const s = document.getElementById('mfScanOnly');
   if (s) s.onchange = (e) => { cfg.scanOnly = e.target.checked; };
