@@ -56,8 +56,30 @@ const cfg = {
 /* -------------------------------------------------------------------------- */
 /*  the directive — this is the "mindframe"                                     */
 /* -------------------------------------------------------------------------- */
-function buildDirective() {
+function buildDirective(compact) {
   const t = cfg.threshold;
+
+  // Short, low-pressure variant for small in-browser models. No rigid format, no
+  // "you may not leave until…", and explicit brevity so a 0.6B–4B model doesn't
+  // loop to the context limit. Honors the same toggles.
+  if (compact) {
+    let c = `
+
+--- MINDFRAME (brief) ---
+First, a SHORT awareness pass (a few lines, then move on):
+- NOUNS: the key things in the request, each with a 1–10 confidence and a few-word meaning.
+- VERBS: what you are asked to do.
+- MODE: RESEARCH (facts) / DERIVE (math·code) / MIXED.`;
+    if (cfg.scanOnly) {
+      c += `\nThen STOP — do not answer yet.`;
+    } else if (cfg.grounding) {
+      c += `\nThen answer. Back each claim: facts → [cite: a real url/file you actually opened], math/code → [check: what you ran or derived], otherwise [known]. For anything you scored ${t}/10 or below, look it up; if you can't, say "unsure" instead of guessing.`;
+    } else {
+      c += `\nThen answer the request.`;
+    }
+    c += `\nBe concise. Do not repeat these instructions.\n-------------------------\n`;
+    return c;
+  }
 
   const awareness = `STEP 1 — AWARENESS. Split the user's request into its parts:
 - NOUNS (the things it is about): for each, rate 1–10 how sure you are you know what it refers to, and give a one-line definition. Proper names, product/library names, version numbers, acronyms, and anything dated after your training cutoff → score LOW. Do not inflate scores. A noun you cannot define in one clean line is a noun you do not know.
@@ -108,9 +130,20 @@ ${awareness}`;
 /* -------------------------------------------------------------------------- */
 /*  host hook — appended to the system prompt by conversations.buildSystemPrompt */
 /* -------------------------------------------------------------------------- */
+// Small in-browser models (WebGPU Qwen3 dense, LiteRT-LM Gemma) collapse under a
+// long, rigid directive — they ramble to the context limit instead of answering.
+// Detect them and hand back a short, loose variant (see buildDirective(compact)).
+function activeIsSmallLocal() {
+  try {
+    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive)
+      ? SandpieProviders.getActive() : null;
+    return !!(p && (p.type === 'webgpu' || p.type === 'litertlm'));
+  } catch (_) { return false; }
+}
+
 window.SandpieMindframe = {
   isActive() { return cfg.active; },
-  systemBlock(/* convMessages */) { return cfg.active ? buildDirective() : ''; },
+  systemBlock(/* convMessages */) { return cfg.active ? buildDirective(activeIsSmallLocal()) : ''; },
 };
 
 /* -------------------------------------------------------------------------- */
