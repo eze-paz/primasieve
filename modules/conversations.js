@@ -1702,6 +1702,13 @@ async function buildSystemPrompt(convMessages) {
     try { content += await SandpieContext.skillBlock(convMessages); }
     catch (e) { console.warn('[sandpie] skills block failed:', e); }
   }
+  // Optional capability: mindframe.js appends a Stage-0 AWARENESS directive that
+  // forces the model to scan the prompt into nouns/verbs (and research unknown
+  // nouns) before acting. Returns '' when the toggle is off ⇒ no behavior change.
+  if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
+    try { content += SandpieMindframe.systemBlock(convMessages); }
+    catch (e) { console.warn('[sandpie] mindframe block failed:', e); }
+  }
   return { role: 'system', content };
 }
 
