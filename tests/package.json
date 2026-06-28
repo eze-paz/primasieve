@@ -1,0 +1,9 @@
+{
+  "name": "sandpie-tests",
+  "scripts": {
+    "validate": "node validate.js"
+  },
+  "devDependencies": {
+    "acorn": "^8.17.0"
+  }
+}
