@@ -178,15 +178,15 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
 
 This is the user's ACTUAL operating system, not a sandbox. Use it only when the user wants something done on their own machine: inspect or edit their files, run a build/test, git, check versions, system info, install a package, etc. This tool is OFF by default; if you can call it, the user deliberately enabled it — but still avoid destructive commands (rm -rf, format, mass deletes, overwrites) unless they clearly asked.
 DON'T confuse with the sandbox: for Python data work in the in-browser sandbox use run_python; for the OPFS workspace files use read_file/write_file/list_files. local_shell is for the user's real OS.
-Each call is independent: there is NO persistent shell state between calls (cwd, env, and shell variables reset every time) — chain steps with && or set them inline (e.g. cd path && cmd). There is NO interactive TTY, so never launch programs that need one (vim, top, an ssh login prompt, REPLs); use non-interactive flags. Output is truncated if very long.
-If it returns "helper not running/reachable", tell the user to start the localterm helper (sandpie Terminal panel → Download) and STOP — do not retry in a loop.`,
+It is ONE PERSISTENT terminal session: the working directory, environment, variables, and background jobs PERSIST across calls (e.g. "cd path" in one call — the next call is still in that dir). You get the raw terminal output (your command is echoed, then its output); there is NO separate exit code, so read the output to judge success. No full-screen TTY apps (vim, top, REPLs); use non-interactive commands.
+ASYNC: if a command is still running when the call times out, you get the output so far plus a "[still running…]" note — call local_shell again with an EMPTY command to read more, and keep polling until it finishes. Run things in the background (e.g. "… &" on Linux, "Start-Job"/"Start-Process" on Windows) and poll with empty commands.
+If it says the helper isn't running, tell the user to start localterm (sandpie Terminal panel → Download) and STOP — do not retry in a loop.`,
       parameters: {
         type: 'object',
         properties: {
-          command: { type: 'string', description: 'The exact command line to run in the user default shell, non-interactively. E.g. "git -C ~/proj status", "node -v", "ls -la". Chain with && for multiple steps.' },
-          timeout: { type: 'integer', description: 'Max seconds to wait before the command is killed (default 60, max 300).' },
+          command: { type: 'string', description: 'The command line to run in the persistent shell (e.g. "git -C ~/proj status", "node -v", "cd ~/proj"). Leave EMPTY ("") to poll for more output of a command that is still running.' },
+          timeout: { type: 'integer', description: 'Max seconds to wait for output before returning (default 30, max 300). If the command is still running you get partial output + [still running]; poll with an empty command.' },
         },
-        required: ['command'],
       },
     },
 };

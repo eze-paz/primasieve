@@ -1363,11 +1363,10 @@ async function unknownTool(name) {
 // worker has no localStorage). Graceful, non-looping errors when the helper is down.
 async function tool_local_shell({ command, timeout }, ctx) {
   const cmd = (command == null) ? '' : String(command);
-  if (!cmd.trim()) return { result: 'Error: "command" is required.' };
   const lt = ctx && ctx.localterm;
   if (!lt || !lt.token) return { result: 'Error: the local terminal is not available — the localterm helper is not running or not paired. Tell the user to start it (sandpie Terminal panel → Download), then retry ONCE. Do not retry repeatedly.' };
   const port = lt.port || 8771;
-  let to = parseInt(timeout, 10); if (!(to > 0)) to = 60; if (to > 300) to = 300;
+  let to = parseInt(timeout, 10); if (!(to > 0)) to = 30; if (to > 300) to = 300;
   let r;
   try {
     r = await fetch(`http://127.0.0.1:${port}/exec?token=${encodeURIComponent(lt.token)}`, {
@@ -1384,13 +1383,12 @@ async function tool_local_shell({ command, timeout }, ctx) {
     return { result: `Error: localterm helper returned HTTP ${r.status}.${hint}` };
   }
   let d; try { d = await r.json(); } catch { return { result: 'Error: bad response from the localterm helper.' }; }
-  let out = d.stdout || '';
-  if (d.stderr) out += (out ? '\n' : '') + '[stderr]\n' + d.stderr;
-  if (d.timedOut) out += `\n[timed out after ${to}s — command killed]`;
-  out += `\n[exit code ${d.code}]`;
+  let out = (d.output || '').trim();
+  if (d.more) out += (out ? '\n' : '') + '[still running — call local_shell again with an empty command to read more]';
+  else if (!out) out = '[no output]';
   const CAP = 20000;
   if (out.length > CAP) out = out.slice(0, CAP) + `\n…(output truncated; ${out.length} bytes total)`;
-  return { result: out.trim() };
+  return { result: out };
 }
 
 async function runTool(name, args, ctx) {
