@@ -1,9 +1,13 @@
-{
+﻿{
   "name": "sandpie-tests",
+  "version": "1.0.0",
   "scripts": {
-    "validate": "node validate.js"
+    "validate": "node validate.js",
+    "start-server": "node server.js",
+    "smoke": "npx playwright test smoke.spec.js --config playwright.config.js"
   },
   "devDependencies": {
-    "acorn": "^8.17.0"
+    "@playwright/test": "^1.61.0",
+    "acorn": "^8.14.0"
   }
 }
