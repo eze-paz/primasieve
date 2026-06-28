@@ -936,6 +936,7 @@ async function buildAgentConfig(convMessages, compaction) {
     // never interrupts the user mid-generation. null for personal providers — a 401
     // there is a real bad-key error, not a refreshable session.
     authRefreshUrl: (active && active.managed) ? new URL('/auth/token', location.href).href : null,
+    _hermesMode: !!(active && active.type === 'hermes'),
     model: $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages),
     messages: resolvedMessages,

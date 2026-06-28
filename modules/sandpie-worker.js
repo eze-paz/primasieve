@@ -1449,6 +1449,7 @@ async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
   for (let attempt = 0; ; attempt++) {
     try {
       if (attempt > 0) ctx.emit({ type: 'info', message: null });
+      ctx._hermesMode = body && body._hermesMode;
       return await streamOneRound(reqUrl, headers, body, ctx);
     } catch (e) {
       if (ctx.signal?.aborted) throw e;
@@ -1499,6 +1500,50 @@ function firstBalancedObject(s) {
     else if (c === '}' && --depth === 0) return s.slice(start, i + 1);
   }
   return null;
+}
+
+
+function parseHermesToolCalls(text) {
+  const toolCalls = [];
+  if (typeof text !== 'string') return { toolCalls, stripped: text };
+  const callRe = /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g;
+  let m;
+  let idx = 0;
+  while ((m = callRe.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1]);
+      if (parsed && parsed.name) {
+        toolCalls.push({
+          id: 'call_hermes_' + (idx++),
+          type: 'function',
+          function: {
+            name: String(parsed.name),
+            arguments: JSON.stringify(parsed.arguments || {})
+          }
+        });
+      }
+    } catch (_) {}
+  }
+  if (toolCalls.length === 0) {
+    const altRe = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+    while ((m = altRe.exec(text)) !== null) {
+      try {
+        const parsed = JSON.parse(m[1].trim());
+        if (parsed && parsed.name) {
+          toolCalls.push({
+            id: 'call_hermes_' + (idx++),
+            type: 'function',
+            function: {
+              name: String(parsed.name),
+              arguments: JSON.stringify(parsed.arguments || {})
+            }
+          });
+        }
+      } catch (_) {}
+    }
+  }
+  const stripped = text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').replace(/<tool_call>/g, '').replace(/<\/tool_call>/g, '').trim();
+  return { toolCalls, stripped };
 }
 
 function normalizeToolArgs(raw) {
@@ -1566,6 +1611,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     let parsed = parseLeakedToolCalls(content);
     if (parsed.toolCalls.length) { keptToolCalls = parsed.toolCalls; content = parsed.stripped; }
     else if (!content.trim()) { parsed = parseLeakedToolCalls(reasoningText); if (parsed.toolCalls.length) keptToolCalls = parsed.toolCalls; }
+  }
+  if (!keptToolCalls.length && ctx._hermesMode) {
+    const hermesParsed = parseHermesToolCalls(content);
+    if (hermesParsed.toolCalls.length) { keptToolCalls = hermesParsed.toolCalls; content = hermesParsed.stripped; }
   }
   for (const tc of keptToolCalls) {
     if (!tc || !tc.function) continue;

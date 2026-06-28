@@ -32,6 +32,7 @@ const AI_HTML = `
           <option value="openai">API (OpenAI-compatible)</option>
           <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
           <option value="webgpu">Local model (WebGPU Qwen3.5, in-browser)</option>
+          <option value="hermes">API (Hermes local llama.cpp)</option>
         </select>
         <select id="spLiteRTLMModel" style="display:none;"></select>
         <select id="spWebGPUModel" style="display:none;"></select>
@@ -428,6 +429,7 @@ function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
   const litertlm = type === 'litertlm';
   const webgpu = type === 'webgpu';
+  const hermes = type === 'hermes';
   const local = litertlm || webgpu;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   show('spLiteRTLMModel', litertlm);
@@ -578,6 +580,8 @@ function updateRoutingHint() {
     hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'Gemma');
   } else if (active?.type === 'webgpu') {
     hint.textContent = 'In-browser WebGPU · ' + (active.model || 'Qwen3.5');
+  } else if (active?.type === 'hermes') {
+    hint.textContent = 'Hermes local llama.cpp via ' + (active.endpoint || '(no endpoint set)');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
   } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
@@ -590,7 +594,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'litertlm' || active?.type === 'webgpu');
+  const local = (active?.type === 'litertlm' || active?.type === 'webgpu' || active?.type === 'hermes');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
