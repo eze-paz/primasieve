@@ -947,7 +947,7 @@ async function buildAgentConfig(convMessages, compaction) {
     conversation_file_name: activeConvId,
     // For the local_shell tool: the localterm helper token (read on the main
     // thread; the worker has no localStorage). Empty string when not paired.
-    localterm: { token: localStorage.getItem('sandpie:localterm:token') || '', port: 8771 },
+    localterm: { token: localStorage.getItem('sandpie:localterm:token') || '', port: +(localStorage.getItem('sandpie:localterm:port')) || 8771 },
   };
 }
 async function readAgentEvents(body, onEvent) {

@@ -15,9 +15,12 @@
  * Usage: <script type="module" src="modules/localterm.js"></script>
  */
 
-const PORT = 8771;
-const BASE = `http://127.0.0.1:${PORT}`;
 const TOKEN_KEY = 'sandpie:localterm:token';
+const PORT_KEY  = 'sandpie:localterm:port';
+// Port is learnable: a pasted pairing URL on a non-default port updates it, and
+// the local_shell tool reads the same stored value (conversations.js).
+let PORT = +(localStorage.getItem(PORT_KEY)) || 8771;
+const base = () => `http://127.0.0.1:${PORT}`;
 // Where the helper binaries are hosted (drop the Desktop\localterm\* files here on deploy).
 const DOWNLOAD_BASE = '/modules';
 const FILES = [
@@ -76,6 +79,25 @@ function readTokenFromHash() {
 }
 function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
 
+// Manual pairing: the user pastes the token (or the whole URL the helper prints).
+// We extract the token and, if a full URL with a non-default port was pasted,
+// the port too — so pairing works without the helper opening any browser.
+function parsePairInput(value) {
+  value = (value || '').trim();
+  if (!value) return null;
+  let token = '', port = 0;
+  const tm = value.match(/[?#&](?:token|lt)=([a-f0-9]+)/i);
+  if (tm) token = tm[1];
+  const pm = value.match(/(?:127\.0\.0\.1|localhost):(\d+)/i);
+  if (pm) port = +pm[1];
+  if (!token && /^[a-f0-9]{16,}$/i.test(value)) token = value; // bare token
+  return token ? { token, port } : null;
+}
+function applyPair(p) {
+  localStorage.setItem(TOKEN_KEY, p.token);
+  if (p.port) { PORT = p.port; localStorage.setItem(PORT_KEY, String(p.port)); }
+}
+
 /* ---- OS / arch detection -> recommended binary ---- */
 async function detectBinary() {
   let os = '', arm = false;
@@ -103,7 +125,7 @@ async function detectBinary() {
 /* ---- presence probe (does NOT spawn a shell) ---- */
 async function helperUp() {
   try {
-    const r = await fetch(`${BASE}/ping`, { mode: 'cors', cache: 'no-store' });
+    const r = await fetch(`${base()}/ping`, { mode: 'cors', cache: 'no-store' });
     return r.ok;
   } catch { return false; }
 }
@@ -164,9 +186,9 @@ async function renderInstall(body, msg) {
     : `Run a tiny one-time helper to use your machine's terminal here.`;
   const steps = mobile
     ? `<li>In Termux: <code style="color:var(--sp-text);">chmod +x ${file} &amp;&amp; ./${file}</code></li>
-        <li>Open the link it prints (or it opens sandpie) — now paired.</li>`
+        <li>It prints a <b>pairing token</b> — paste it below to connect.</li>`
     : `<li>Run the downloaded file (approve your OS prompt once).</li>
-        <li>It re-opens sandpie already paired — this turns into a terminal.</li>`;
+        <li>It prints a <b>pairing token</b> — paste it below to connect.</li>`;
   body.innerHTML = `
     <div style="font-size:0.75rem;line-height:1.5;">
       ${msg ? `<p style="color:var(--sp-text-dim);margin:0 0 0.5rem;">${esc(msg)}</p>` : ''}
@@ -181,17 +203,40 @@ async function renderInstall(body, msg) {
       <details style="margin-top:0.3rem;"><summary style="cursor:pointer;color:var(--sp-text-dim);font-size:0.7rem;">other platforms</summary>
         <div style="margin-top:0.35rem;display:flex;gap:0.5rem;flex-wrap:wrap;">${others}</div>
       </details>
+      <div style="margin-top:0.7rem;padding-top:0.55rem;border-top:1px solid var(--sp-border);">
+        <p style="margin:0 0 0.35rem;color:var(--sp-text-dim);">Already running it? Paste the pairing token (or the full URL it printed):</p>
+        <div style="display:flex;gap:0.35rem;">
+          <input id="ltPairInput" placeholder="token, or http://127.0.0.1:…/?token=…" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;padding:0.35rem 0.5rem;background:var(--sp-panel);border:1px solid var(--sp-border);border-radius:6px;color:var(--sp-text);font-size:0.72rem;">
+          <button id="ltPairBtn" style="background:var(--sp-accent,#2563eb);color:#fff;border:0;border-radius:6px;padding:0.35rem 0.8rem;font-weight:600;cursor:pointer;">Pair</button>
+        </div>
+        <p id="ltPairMsg" style="margin:0.35rem 0 0;color:var(--sp-text-dim);font-size:0.68rem;"></p>
+      </div>
       <p id="ltWait" style="margin:0.6rem 0 0;color:var(--sp-text-dim);font-size:0.7rem;">○ waiting for the helper…</p>
     </div>`;
-  // poll for the helper coming up
+  // manual pairing (paste token / URL) — the reliable path on mobile and when
+  // the helper doesn't open a browser.
+  const pairInput = body.querySelector('#ltPairInput');
+  const pairBtn = body.querySelector('#ltPairBtn');
+  const pairMsg = body.querySelector('#ltPairMsg');
+  async function doPair() {
+    const p = parsePairInput(pairInput && pairInput.value);
+    if (!p) { if (pairMsg) { pairMsg.style.color = '#e06c75'; pairMsg.textContent = 'No token found there — paste the token or the full URL it printed.'; } return; }
+    applyPair(p);
+    if (pairMsg) { pairMsg.style.color = 'var(--sp-text-dim)'; pairMsg.textContent = '● paired — checking helper…'; }
+    if (await helperUp()) { stopPoll(); connect(body); }
+    else if (pairMsg) { pairMsg.style.color = '#e06c75'; pairMsg.textContent = '● paired, but no helper reachable on ' + base() + ' — make sure it’s running.'; }
+  }
+  if (pairBtn) pairBtn.onclick = doPair;
+  if (pairInput) pairInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doPair(); } });
+
+  // poll for the helper coming up (auto-connect once it's up AND we have a token)
   stopPoll();
   pollTimer = setInterval(async () => {
     if (connected) return;
     if (await helperUp()) {
-      stopPoll();
-      const w = body.querySelector('#ltWait'); if (w) w.innerHTML = '● helper found — connecting…';
-      if (getToken()) connect(body);
-      else if (w) w.innerHTML = '● helper running, but not paired. Re-run it, or open ' + BASE + ' directly.';
+      const w = body.querySelector('#ltWait');
+      if (getToken()) { stopPoll(); if (w) w.innerHTML = '● helper found — connecting…'; connect(body); }
+      else if (w) w.innerHTML = '● helper running — paste its pairing token above to connect.';
     }
   }, 2000);
 }
