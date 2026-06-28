@@ -255,6 +255,8 @@ const SandpieTools = {
       available: _toolAvailable(name),
     }));
   },
+  schemas() { return toolDefs(); },
+  schemaFor(name) { const s = toolDefs(); return s.find(t => t.function && t.function.name === name); },
 };
 window.SandpieTools = SandpieTools;
 
