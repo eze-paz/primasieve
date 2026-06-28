@@ -257,6 +257,8 @@ const SandpieTools = {
   },
 };
 window.SandpieTools = SandpieTools;
+window.SandpieTools.schemaFor = (name) => (tools[name] ? { type: "function", function: { name, description: SandpieTools.description(name), parameters: tools[name].parameters } } : undefined);
+window.SandpieTools.schemas = toolDefs;
 
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
