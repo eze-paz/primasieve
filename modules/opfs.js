@@ -124,17 +124,15 @@ const sandpiePersistence = {
     } catch (e) { console.error('persisted() error:', e); }
 
     if (granted) {
-      icon.textContent = '\u2713';
-      msg.textContent = 'Data is protected from browser eviction';
-      banner.className = 'persist-banner persist-granted';
-      btn.style.display = 'none';
-    } else {
-      icon.textContent = '\u26a0';
-      msg.textContent = 'Files may be deleted by the browser';
-      banner.className = 'persist-banner persist-denied';
-      btn.style.display = '';
-      btn.onclick = () => this.request();
+      banner.style.display = 'none';
+      return;
     }
+
+    icon.textContent = '\u26a0';
+    msg.textContent = 'Files may be deleted by the browser';
+    banner.className = 'persist-banner persist-denied';
+    btn.style.display = '';
+    btn.onclick = () => this.request();
     banner.style.display = '';
   },
 
@@ -161,9 +159,7 @@ const sandpiePersistence = {
   }
 };
 
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') sandpiePersistence.check();
-});
+sandpiePersistence.check();
 
 
 
