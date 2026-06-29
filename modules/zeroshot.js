@@ -189,23 +189,22 @@ function _fill(template, vars) {
 
 const _FALLBACK = {
   planner: {
-    system: `You are the PLANNER. Look at the task and current state. Decide the SINGLE most logical next concrete step. Output ONLY a <PLAN> block. No filler. No tool calls. No greetings.`,
-    user: `TASK:\n\\n${task}\\n\\nCURRENT STATE:\n${state}\\n\\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- compute: run_python\n- artifact: show_artifact\\n\\nOutput ONLY:\n<PLAN>\\nStep: <single concrete next step>\\nTool needed: <tool name or none>\\nExpected outcome: <what success looks like for this step>\\n</PLAN>`
+    system: 'You are the PLANNER. Look at the task and current state. Decide the SINGLE most logical next concrete step. Output ONLY a <PLAN> block. No filler. No tool calls. No greetings.',
+    user: 'TASK:\n\n${task}\n\nCURRENT STATE:\n${state}\n\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- web: web_search, read_url\n- compute: run_python\n- artifact: show_artifact\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>'
   },
   compressor: {
-    system: `You are the COMPRESSOR. Distill the raw plan into a tight Execution Brief containing ONLY the relevant tool schemas and a spec for the actor. Output ONLY a <BRIEF> block. No chat.`,
-    user: `RAW PLAN:\n\\n${rawPlan}\\n\\nCURRENT STATE:\n${state}\\n\\nSELECTED TOOL SCHEMAS:\n${toolSchemas}\\n\\nOutput ONLY:\n<BRIEF>\\ngoal: <one-line sub-goal>\\ntool: <exact tool name>\\nparameters: <key=value guidance>\\nconstraints: <known constraints>\\n</BRIEF>`
+    system: 'You are the COMPRESSOR. Distill the raw plan into a tight Execution Brief containing ONLY the relevant tool schemas and a spec for the actor. Output ONLY a <BRIEF> block. No chat.',
+    user: 'RAW PLAN:\n\n${rawPlan}\n\nCURRENT STATE:\n${state}\n\nSELECTED TOOL SCHEMAS:\n${toolSchemas}\n\nOutput ONLY:\n<BRIEF>\ngoal: <one-line sub-goal>\ntool: <exact tool name>\nparameters: <key=value guidance>\nconstraints: <known constraints>\n</BRIEF>'
   },
   actor: {
-    system: `You are the ACTOR. Emit EXACTLY ONE valid JSON object representing a tool call.\\nRules:\\n- Output ONLY the JSON object. No markdown, no explanation, no thinking tags.\\n- Must match the tool schema exactly.\\n- If no tool is needed, output {\\"tool\\":\\"none\\",\\"arguments\\":{}}`,
-    user: `EXECUTION BRIEF:\n\\n${brief}\\n\\nTOOL SCHEMAS:\n\\n${toolSchemas}\\n\\nProduce EXACTLY ONE JSON object:\\n{\\n  \\"tool\\": \\"<tool_name>\\",\\n  \\"arguments\\": { ... }\\n}`
+    system: 'You are the ACTOR. Emit EXACTLY ONE valid JSON object representing a tool call.\nRules:\n- Output ONLY the JSON object. No markdown, no explanation, no thinking tags.\n- Must match the tool schema exactly.\n- If no tool is needed, output {\"tool\":\"none\",\"arguments\":{}}',
+    user: 'EXECUTION BRIEF:\n\n${brief}\n\nTOOL SCHEMAS:\n\n${toolSchemas}\n\nProduce EXACTLY ONE JSON object:\n{\n  \"tool\": \"<tool_name>\",\n  \"arguments\": { ... }\n}'
   },
   evaluator: {
-    system: `You are the EVALUATOR. Review the tool result and task. Output ONLY a JSON object with this exact shape:\\n{\\"done\\":true|false,\\"state\\":{\\"goal\\":\\"...\\",\\"progress\\":\\"...\\",\\"next\\":\\"...\\",\\"errors\\":[]},\\"reasoning\\":\\"...\\"}\\nNo markdown outside the JSON.`,
-    user: `ORIGINAL TASK: ${task}\\n\\nPREVIOUS STATE:\n\\n${state}\\n\\nEXECUTION BRIEF:\n\\n${brief}\\n\\nTOOL RESULT (first 4000 chars):\\n\\n${observation}\\n\\nYour JSON output:`
+    system: 'You are the EVALUATOR. Review the tool result and task. Output ONLY a JSON object with this exact shape:\n{\"done\":true|false,\"state\":{\"goal\":\"...\",\"progress\":\"...\",\"next\":\"...\",\"errors\":[]},\"reasoning\":\"...\"}\nNo markdown outside the JSON.',
+    user: 'ORIGINAL TASK: ${task}\n\nPREVIOUS STATE:\n\n${state}\n\nEXECUTION BRIEF:\n\n${brief}\n\nTOOL RESULT (first 4000 chars):\n\n${observation}\n\nYour JSON output:'
   }
 };
-
 async function _buildPrompt(name, vars) {
   const raw = await _loadPrompt(name);
   let p;
@@ -308,7 +307,7 @@ async function runLoop(convId, task, allTools, stream = null) {
       _addAsst('**Planner:**\n\n```\n' + plan + '\n```', host);
       pushMsg('assistant', '[Planner]\n\n' + plan);
 
-      /* 2. COMPRESSOR — select tools first */
+      /* 2. COMPRESSOR ï¿½ select tools first */
       const cLow = plan.toLowerCase();
       const cNeeded = allTools.filter(t =>
         cLow.includes(t.function.name.toLowerCase()) ||
