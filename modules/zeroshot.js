@@ -150,42 +150,75 @@ function _runToolViaWorker(name, args, convFileName, signal) {
   });
 }
 
-/* ---- prompt builders -------------------------------------------------- */
-function _plannerPrompt(task, state) {
-  return {
+/* ---- prompt loader (from agents/*.md files) ------------------------- */
+const _promptCache = new Map();
+const AGENTS_DIR = 'agents';
+
+async function _loadPrompt(name) {
+  if (_promptCache.has(name)) return _promptCache.get(name);
+  try {
+    const res = await fetch(`${AGENTS_DIR}/${name}.md?v=1`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const raw = await res.text();
+    _promptCache.set(name, raw);
+    return raw;
+  } catch (e) {
+    console.warn('[zeroshot] failed to load agent', name, e);
+    return null;
+  }
+}
+
+function _parseAgentMd(raw) {
+  // Expect: ---\nfrontmatter\n---\n\n# System\nsystem text\n\n# User\nuser template
+  const fmEnd = raw.indexOf('\\n---\\n');
+  const body = fmEnd > 0 ? raw.slice(fmEnd + 5).trim() : raw;
+  const sysMatch = body.match(/^# System\\s*\\n([^]*?)(?=\\n# User\\s*\\n|$)/i);
+  const usrMatch = body.match(/\\n# User\\s*\\n([^]*)/i);
+  const system = sysMatch ? sysMatch[1].trim() : '';
+  const userTemplate = usrMatch ? usrMatch[1].trim() : body;
+  return { system, userTemplate };
+}
+
+function _fill(template, vars) {
+  return template.replace(/\\$\\{([^}]+)\\}/g, (_, key) => {
+    if (key in vars) return String(vars[key] ?? '');
+    return '\\n';
+  });
+}
+
+const _FALLBACK = {
+  planner: {
     system: `You are the PLANNER. Look at the task and current state. Decide the SINGLE most logical next concrete step. Output ONLY a <PLAN> block. No filler. No tool calls. No greetings.`,
-    user: `TASK:\n${task}\n\nCURRENT STATE:\n${typeof state === 'string' ? state : JSON.stringify(state, null, 2)}\n\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- compute: run_python\n- artifact: show_artifact\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>`,
-  };
-}
-
-function _compressorPrompt(rawPlan, toolSchemas, state) {
-  const needed = toolSchemas.filter(t =>
-    rawPlan.toLowerCase().includes(t.function.name.toLowerCase()) ||
-    ['read_file','write_file','edit_file','search','list_files','run_python'].includes(t.function.name)
-  );
-  const seen = new Set();
-  const uniq = needed.filter(t => { if (seen.has(t.function.name)) return false; seen.add(t.function.name); return true; });
-  const selected = uniq.length ? uniq : toolSchemas.slice(0, 5);
-  return {
+    user: `TASK:\n\\n${task}\\n\\nCURRENT STATE:\n${state}\\n\\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- compute: run_python\n- artifact: show_artifact\\n\\nOutput ONLY:\n<PLAN>\\nStep: <single concrete next step>\\nTool needed: <tool name or none>\\nExpected outcome: <what success looks like for this step>\\n</PLAN>`
+  },
+  compressor: {
     system: `You are the COMPRESSOR. Distill the raw plan into a tight Execution Brief containing ONLY the relevant tool schemas and a spec for the actor. Output ONLY a <BRIEF> block. No chat.`,
-    user: `RAW PLAN:\n${rawPlan}\n\nCURRENT STATE:\n${typeof state === 'string' ? state : JSON.stringify(state, null, 2)}\n\nSELECTED TOOL SCHEMAS:\n${JSON.stringify(selected, null, 2)}\n\nOutput ONLY:\n<BRIEF>\ngoal: <one-line sub-goal>\ntool: <exact tool name>\nparameters: <key=value guidance>\nconstraints: <known constraints>\n</BRIEF>`,
-  };
-}
+    user: `RAW PLAN:\n\\n${rawPlan}\\n\\nCURRENT STATE:\n${state}\\n\\nSELECTED TOOL SCHEMAS:\n${toolSchemas}\\n\\nOutput ONLY:\n<BRIEF>\\ngoal: <one-line sub-goal>\\ntool: <exact tool name>\\nparameters: <key=value guidance>\\nconstraints: <known constraints>\\n</BRIEF>`
+  },
+  actor: {
+    system: `You are the ACTOR. Emit EXACTLY ONE valid JSON object representing a tool call.\\nRules:\\n- Output ONLY the JSON object. No markdown, no explanation, no thinking tags.\\n- Must match the tool schema exactly.\\n- If no tool is needed, output {\\"tool\\":\\"none\\",\\"arguments\\":{}}`,
+    user: `EXECUTION BRIEF:\n\\n${brief}\\n\\nTOOL SCHEMAS:\n\\n${toolSchemas}\\n\\nProduce EXACTLY ONE JSON object:\\n{\\n  \\"tool\\": \\"<tool_name>\\",\\n  \\"arguments\\": { ... }\\n}`
+  },
+  evaluator: {
+    system: `You are the EVALUATOR. Review the tool result and task. Output ONLY a JSON object with this exact shape:\\n{\\"done\\":true|false,\\"state\\":{\\"goal\\":\\"...\\",\\"progress\\":\\"...\\",\\"next\\":\\"...\\",\\"errors\\":[]},\\"reasoning\\":\\"...\\"}\\nNo markdown outside the JSON.`,
+    user: `ORIGINAL TASK: ${task}\\n\\nPREVIOUS STATE:\n\\n${state}\\n\\nEXECUTION BRIEF:\n\\n${brief}\\n\\nTOOL RESULT (first 4000 chars):\\n\\n${observation}\\n\\nYour JSON output:`
+  }
+};
 
-function _actorPrompt(brief, selectedTools) {
+async function _buildPrompt(name, vars) {
+  const raw = await _loadPrompt(name);
+  let p;
+  if (raw) {
+    p = _parseAgentMd(raw);
+  } else {
+    p = _FALLBACK[name];
+  }
+  if (!p) throw new Error('Unknown agent: ' + name);
   return {
-    system: `You are the ACTOR. Emit EXACTLY ONE valid JSON object representing a tool call.\nRules:\n- Output ONLY the JSON object. No markdown, no explanation, no thinking tags.\n- Must match the tool schema exactly.\n- If no tool is needed, output {"tool":"none","arguments":{}}`,
-    user: `EXECUTION BRIEF:\n${brief}\n\nTOOL SCHEMAS:\n${JSON.stringify(selectedTools, null, 2)}\n\nProduce EXACTLY ONE JSON object:\n{\n  "tool": "<tool_name>",\n  "arguments": { ... }\n}`,
+    system: p.system || '',
+    user: _fill(p.userTemplate || p.user || '', vars),
   };
 }
-
-function _evaluatorPrompt(task, brief, observation, state) {
-  return {
-    system: `You are the EVALUATOR. Review the tool result and task. Output ONLY a JSON object with this exact shape:\n{"done":true|false,"state":{"goal":"...","progress":"...","next":"...","errors":[]},"reasoning":"..."}\nNo markdown outside the JSON.`,
-    user: `ORIGINAL TASK: ${task}\n\nPREVIOUS STATE:\n${typeof state === 'string' ? state : JSON.stringify(state, null, 2)}\n\nEXECUTION BRIEF:\n${brief}\n\nTOOL RESULT (first 4000 chars):\n${String(observation).slice(0, 4000)}\n\nYour JSON output:`,
-  };
-}
-
 /* ---- content extractors --------------------------------------------- */
 function extractJSON(raw) {
   const text = String(raw || '').trim();
@@ -268,15 +301,25 @@ async function runLoop(convId, task, allTools, stream = null) {
       /* 1. PLANNER */
       _addInfo('Turn ' + turn + ' > Planner', host);
       let planRaw;
-      try { planRaw = await _llmCall({ ..._plannerPrompt(task, state), temperature: c.plannerTemp, signal: ctrl.signal }); }
+      try { planRaw = await _llmCall({ ...await _buildPrompt('planner', {task, state: typeof state === 'string' ? state : JSON.stringify(state, null, 2)}), temperature: c.plannerTemp, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Planner: ' + e.message; break; }
       const plan = extractBlock((planRaw.content || planRaw), 'PLAN');
       _addAsst('**Planner:**\n\n```\n' + plan + '\n```', host);
       pushMsg('assistant', '[Planner]\n\n' + plan);
 
-      /* 2. COMPRESSOR */
+      /* 2. COMPRESSOR — select tools first */
+      const cLow = plan.toLowerCase();
+      const cNeeded = allTools.filter(t =>
+        cLow.includes(t.function.name.toLowerCase()) ||
+        ['read_file','write_file','edit_file','search','list_files','run_python'].includes(t.function.name)
+      );
+      const cSeen = new Set();
+      const cDedup = [];
+      for (const t of cNeeded) { if (!cSeen.has(t.function.name)) { cSeen.add(t.function.name); cDedup.push(t); } }
+      const cSelected = cDedup.length ? cDedup : allTools.slice(0, 5);
+
       let briefRaw;
-      try { briefRaw = await _llmCall({ ..._compressorPrompt(plan, allTools, state), temperature: 0.2, signal: ctrl.signal }); }
+      try { briefRaw = await _llmCall({ ...await _buildPrompt('compressor', {rawPlan: plan, state: typeof state === 'string' ? state : JSON.stringify(state, null, 2), toolSchemas: JSON.stringify(cSelected, null, 2)}), temperature: 0.2, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Compressor: ' + e.message; break; }
       const brief = extractBlock((briefRaw.content || briefRaw), 'BRIEF');
       _addAsst('**Brief:**\n\n```\n' + brief + '\n```', host);
@@ -301,7 +344,7 @@ async function runLoop(convId, task, allTools, stream = null) {
       while (attempts < MAXA && !toolCall && !ctrl.signal.aborted) {
         attempts++;
         let aRaw;
-        try { aRaw = await _llmCall({ ..._actorPrompt(brief, actorTools), temperature: aTemp, tools: actorTools, signal: ctrl.signal }); }
+        try { aRaw = await _llmCall({ ...await _buildPrompt('actor', {brief, toolSchemas: JSON.stringify(actorTools, null, 2)}), temperature: aTemp, tools: actorTools, signal: ctrl.signal }); }
         catch (e) { lastErr = 'Actor: ' + e.message; break; }
         toolCall = extractJSON(aRaw.content || aRaw);
         if (!toolCall || !toolCall.tool) {
@@ -337,7 +380,7 @@ async function runLoop(convId, task, allTools, stream = null) {
 
       /* 5. EVALUATOR */
       let evalRaw;
-      try { evalRaw = await _llmCall({ ..._evaluatorPrompt(task, brief, obs, state), temperature: 0.1, signal: ctrl.signal }); }
+      try { evalRaw = await _llmCall({ ...await _buildPrompt('evaluator', {task, brief, observation: String(obs).slice(0, 4000), state: typeof state === 'string' ? state : JSON.stringify(state, null, 2)}), temperature: 0.1, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Evaluator: ' + e.message; break; }
       const ev = extractJSON(evalRaw.content || evalRaw);
       if (ev) {
