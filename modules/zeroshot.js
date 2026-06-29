@@ -157,13 +157,14 @@ const AGENTS_DIR = 'agents';
 async function _loadPrompt(name) {
   if (_promptCache.has(name)) return _promptCache.get(name);
   try {
-    const res = await fetch(`${AGENTS_DIR}/${name}.md?v=1`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const raw = await res.text();
-    _promptCache.set(name, raw);
-    return raw;
+    const raw = await window.opfs.read(`${AGENTS_DIR}/${name}.md`);
+    if (raw != null) {
+      _promptCache.set(name, raw);
+      return raw;
+    }
+    return null;
   } catch (e) {
-    console.warn('[zeroshot] failed to load agent', name, e);
+    console.warn('[zeroshot] agent not found in OPFS:', name, e.message);
     return null;
   }
 }
