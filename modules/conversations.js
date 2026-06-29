@@ -2200,6 +2200,18 @@ window.activeStream = activeStream;
 window.flightWrite = flightWrite;
 window.flightRead = flightRead;
 window.flightClear = flightClear;
+/* ---------------------------------------------------------------------------
+   Inject a synthetic user message (used for file upload notifications).
+   --------------------------------------------------------------------------- */
+function injectUploadMessage(text) {
+  const s = activeStream();
+  if (!s) return;
+  const msg = { role: 'user', content: text };
+  s.messages.push(msg);
+  bindBubble(addMsg('user', text, s.host), msg);
+  saveConv(s.id).catch(() => {});
+}
+window.injectUploadMessage = injectUploadMessage;
 window.addMsg = addMsg;
 window.bindBubble = bindBubble;
 window.tcEscape = tcEscape;

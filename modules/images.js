@@ -239,70 +239,145 @@ const SandpieImages = (function() {
   // ATTACH PATHS (push to _attachments; caller calls renderPreviews once)
   // ============================================================
 
-  async function attachImage(file) {
+  async function attachImage(file, { basePath = null, addComposerChip = false } = {}) {
     let blob = file;
-    let name = file.name || ('image_' + Date.now() + '.jpg');
-    if (HEIC_EXTS.has(extOf(name)) || /heic|heif/i.test(file.type || '')) {
+    let name = file.name || ("image_" + Date.now() + ".jpg");
+    if (HEIC_EXTS.has(extOf(name)) || /heic|heif/i.test(file.type || "")) {
       const convert = await loadHeic2any();
-      const out = await convert({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+      const out = await convert({ blob: file, toType: "image/jpeg", quality: 0.9 });
       blob = Array.isArray(out) ? out[0] : out;
-      name = name.replace(/\.(heic|heif)$/i, '') + '.jpg';
+      name = name.replace(/\.(heic|heif)$/i, "") + ".jpg";
     }
     const bytes = new Uint8Array(await blob.arrayBuffer());
     // Validate it actually decodes (and produce the thumbnail). Throws for
-    // formats the browser can't render → addFiles falls back to a file attach.
-    const img = await loadImageFromBlob(new Blob([bytes], { type: blob.type || getMimeType(name) }));
-    const thumb = compressImage(img, 200, 0.7);
+    // formats the browser can't render – addFiles falls back to a file attach.
+    const imgEl = await loadImageFromBlob(new Blob([bytes], { type: blob.type || getMimeType(name) }));
+    const thumb = compressImage(imgEl, 200, 0.7);
 
-    const opfsPath = await uniquePath('images', name);
+    const dir = basePath || "images";
+    const opfsPath = await uniquePath(dir, name);
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
-    _attachments.push({
-      kind: 'image', opfsPath, name, thumb,
-      mime: blob.type || getMimeType(opfsPath), size: bytes.length,
-      file: { name, type: blob.type || getMimeType(opfsPath) },
-    });
+    if (addComposerChip) {
+      _attachments.push({
+        kind: "image", opfsPath, name, thumb,
+        mime: blob.type || getMimeType(opfsPath), size: bytes.length,
+        file: { name, type: blob.type || getMimeType(opfsPath) },
+      });
+    }
+    return opfsPath;
   }
 
-  async function attachDocument(file) {
+  async function attachDocument(file, { basePath = null } = {}) {
     const name = file.name || ('file_' + Date.now());
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const opfsPath = await uniquePath('attachments', name);
+    const dir = basePath || 'attachments';
+    const opfsPath = await uniquePath(dir, name);
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
-    _attachments.push({
-      kind: 'file', opfsPath, name,
-      mime: file.type || '', size: bytes.length, isText: looksTextual(bytes),
-      file: { name, type: file.type || '' },
-    });
+    return opfsPath;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Walk a FileSystemEntry (file or directory) recursively.
+     --------------------------------------------------------------------------- */
+  async function walkFileEntry(entry, basePath) {
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        entry.file(async (file) => {
+          try {
+            const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
+            const opfsPath = looksImage
+              ? await attachImage(file, { basePath, addComposerChip: false })
+              : await attachDocument(file, { basePath });
+            resolve([opfsPath]);
+          } catch (err) {
+            console.warn('[sandpie] walkFileEntry failed:', file.name, err);
+            resolve([]);
+          }
+        }, () => resolve([]));
+      });
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const dirPath = basePath ? basePath + '/' + entry.name : entry.name;
+      return new Promise((resolve) => {
+        const children = [];
+        function readMore() {
+          reader.readEntries(async (results) => {
+            if (!results.length) {
+              const out = [];
+              for (const c of children) {
+                const paths = await walkFileEntry(c, dirPath);
+                out.push(...paths);
+              }
+              resolve(out);
+              return;
+            }
+            children.push(...Array.from(results));
+            readMore();
+          }, () => resolve([]));
+        }
+        readMore();
+      });
+    }
+    return [];
+  }
+
+  /* ---------------------------------------------------------------------------
+     Process items from a drop event (supports files and folders).
+     --------------------------------------------------------------------------- */
+  async function processDroppedItems(items) {
+    const basePath = (typeof opfsCurrentPath === 'function') ? opfsCurrentPath() : '';
+    const allPaths = [];
+    let topFolderName = null;
+
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+      if (!entry) continue;
+      if (entry.isDirectory && !topFolderName) topFolderName = entry.name;
+      const paths = await walkFileEntry(entry, basePath);
+      allPaths.push(...paths);
+    }
+
+    if (allPaths.length && typeof injectUploadMessage === 'function') {
+      const folder = basePath || '/';
+      if (topFolderName && allPaths.length > 1) {
+        injectUploadMessage(`User added folder "${topFolderName}/" to /${folder}/ containing ${allPaths.length} files.`);
+      } else {
+        const names = allPaths.map(p => p.split('/').pop()).filter(Boolean).join(', ');
+        injectUploadMessage(`User uploaded ${allPaths.length} file${allPaths.length > 1 ? 's' : ''} to /${folder}/: ${names}`);
+      }
+    }
   }
 
   /**
-   * Attach one or more File objects (from the picker or a drop). Each is routed
-   * to the image or document path, then the preview is rendered once.
-   * @param {FileList|File[]} fileList
+   * Attach one or more File objects (from the file picker or simple drag).
+   * Each is written to OPFS under the current file-viewer folder.
    */
   async function addFiles(fileList) {
     const files = Array.from(fileList || []);
+    const basePath = (typeof opfsCurrentPath === 'function') ? opfsCurrentPath() : 'attachments';
+    const paths = [];
     for (const file of files) {
       const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
       try {
-        if (looksImage) {
-          try {
-            await attachImage(file);
-          } catch (err) {
-            console.warn('[sandpie] image attach failed; attaching as a generic file:', err);
-            await attachDocument(file);
-          }
-        } else {
-          await attachDocument(file);
-        }
+        const opfsPath = looksImage
+          ? await attachImage(file, { basePath, addComposerChip: true })
+          : await attachDocument(file, { basePath });
+        paths.push(opfsPath);
       } catch (err) {
         console.error('[sandpie] attach failed:', err);
         alert('Could not attach "' + (file.name || 'file') + '": ' + ((err && err.message) || err));
       }
     }
     renderPreviews();
+
+    if (paths.length && typeof injectUploadMessage === 'function') {
+      const folder = basePath || '/';
+      const names = paths.map(p => p.split('/').pop()).filter(Boolean).join(', ');
+      injectUploadMessage(`User uploaded ${paths.length} file${paths.length > 1 ? 's' : ''} to /${folder}/: ${names}`);
+    }
   }
 
   /**
@@ -354,8 +429,9 @@ const SandpieImages = (function() {
       e.preventDefault();
       depth = 0;
       overlay.classList.remove('active');
-      const files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
-      if (files.length) await addFiles(files);
+      const items = (e.dataTransfer && e.dataTransfer.items) ? Array.from(e.dataTransfer.items) : [];
+      if (!items.length) return;
+      await processDroppedItems(items);
     });
   }
 
@@ -499,6 +575,7 @@ const SandpieImages = (function() {
     setState,
     handleSelect,
     addFiles,
+    processDroppedItems,
     removeAt,
     clear,
     saveToOpfs,
