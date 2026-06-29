@@ -107,6 +107,64 @@ function joinPath(folder, name) {
   return folder.replace(/\/$/, '') + '/' + name;
 }
 
+/* ---- storage persistence indicator -------------------------------------- */
+const sandpiePersistence = {
+  async check() {
+    const banner = document.getElementById('persistBanner');
+    const icon   = document.getElementById('persistIcon');
+    const msg    = document.getElementById('persistMsg');
+    const btn    = document.getElementById('persistBtn');
+    if (!banner || !msg) return;
+
+    let granted = false;
+    try {
+      if (navigator.storage && navigator.storage.persisted) {
+        granted = await navigator.storage.persisted();
+      }
+    } catch (e) { console.error('persisted() error:', e); }
+
+    if (granted) {
+      icon.textContent = '\u2713';
+      msg.textContent = 'Data is protected from browser eviction';
+      banner.className = 'persist-banner persist-granted';
+      btn.style.display = 'none';
+    } else {
+      icon.textContent = '\u26a0';
+      msg.textContent = 'Files may be deleted by the browser';
+      banner.className = 'persist-banner persist-denied';
+      btn.style.display = '';
+      btn.onclick = () => this.request();
+    }
+    banner.style.display = '';
+  },
+
+  async request() {
+    const btn = document.getElementById('persistBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Requesting\u2026'; }
+    let granted = false;
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        granted = await navigator.storage.persist();
+      }
+    } catch (e) {
+      console.error('persist() error:', e);
+      alert('Permission request failed: ' + e.message);
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = granted ? 'Granted!' : 'Protect files';
+    }
+    await this.check();
+    if (!granted) {
+      alert('Persistence not granted. Browser may evict data under pressure.');
+    }
+  }
+};
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') sandpiePersistence.check();
+});
+
 
 
 /* ---------------------------------------------------------------------------
