@@ -2232,6 +2232,7 @@ window.SandpieConversations = { compact: compactConversation, getCompaction, saf
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;
+window.lockScroll = lockScroll;
 window.mountConv = mountConv;
 window.loadConv = loadConv;
 window.newConversation = newConversation;
