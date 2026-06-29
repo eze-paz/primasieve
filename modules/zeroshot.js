@@ -170,11 +170,12 @@ async function _loadPrompt(name) {
 }
 
 function _parseAgentMd(raw) {
-  // Expect: ---\nfrontmatter\n---\n\n# System\nsystem text\n\n# User\nuser template
-  const fmEnd = raw.indexOf('\\n---\\n');
-  const body = fmEnd > 0 ? raw.slice(fmEnd + 5).trim() : raw;
-  const sysMatch = body.match(/^# System\\s*\\n([^]*?)(?=\\n# User\\s*\\n|$)/i);
-  const usrMatch = body.match(/\\n# User\\s*\\n([^]*)/i);
+  // Normalize Windows line endings before parsing
+  const text = raw.replace(/\r\n/g, '\n');
+  const fmEnd = text.indexOf('\n---\n');
+  const body = fmEnd > 0 ? text.slice(fmEnd + 5).trim() : text.trim();
+  const sysMatch = body.match(/^#\s*System\s*\n([^]*?)(?=\n#\s*User\s*\n|$)/im);
+  const usrMatch = body.match(/\n#\s*User\s*\n([^]*)/im);
   const system = sysMatch ? sysMatch[1].trim() : '';
   const userTemplate = usrMatch ? usrMatch[1].trim() : body;
   return { system, userTemplate };
