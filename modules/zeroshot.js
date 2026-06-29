@@ -204,15 +204,15 @@ function extractBlock(raw, tag) {
 }
 
 /* ---- UI helpers ------------------------------------------------------ */
-function _addInfo(text)  { if (typeof addMsg !== 'function') return null; try { return addMsg('info', text); } catch (_) { return null; } }
-function _addAsst(text)  { if (typeof addMsg !== 'function') return null; try { return addMsg('assistant', text); } catch (_) { return null; } }
-function _addErr(text)   { if (typeof addMsg !== 'function') return null; try { return addMsg('err', text); } catch (_) { return null; } }
-function _addUser(text)  { if (typeof addMsg !== 'function') return null; try { return addMsg('user', text); } catch (_) { return null; } }
+function _addInfo(text, host = null)  { if (typeof addMsg !== 'function') return null; try { return addMsg('info', text, host); } catch (_) { return null; } }
+function _addAsst(text, host = null)  { if (typeof addMsg !== 'function') return null; try { return addMsg('assistant', text, host); } catch (_) { return null; } }
+function _addErr(text, host = null)   { if (typeof addMsg !== 'function') return null; try { return addMsg('err', text, host); } catch (_) { return null; } }
+function _addUser(text, host = null)  { if (typeof addMsg !== 'function') return null; try { return addMsg('user', text, host); } catch (_) { return null; } }
 
-function _tcDiv(tool, args) {
+function _tcDiv(tool, args, host = null) {
   if (typeof addMsg !== 'function') return null;
   try {
-    const d = addMsg('tool-call', '');
+    const d = addMsg('tool-call', '', host);
     if (!d) return null;
     d.dataset.fname = tool;
     d.dataset.tcId = _nextId();
@@ -231,7 +231,7 @@ function _tcResult(div, text) {
 }
 
 /* ---- main zero-shot loop -------------------------------------------- */
-async function runLoop(convId, task, allTools) {
+async function runLoop(convId, task, allTools, stream = null) {
   const c = cfg();
   const ctrl = new AbortController();
   _abortCtrl = ctrl;
@@ -239,32 +239,48 @@ async function runLoop(convId, task, allTools) {
   let state = { goal: task, progress: 'Starting zero-shot loop.', next: 'Analyze the task and choose the first tool.', errors: [] };
   _running = { convId, turn: 0, state, ctrl };
 
-  _addInfo('Zero-shot agent ON -- max ' + c.maxTurns + ' turns');
+  const host = stream && stream.host ? stream.host : null;
+
+  /* Tie zeroshot abort to stream abort */
+  if (stream && stream.abort && stream.abort.signal) {
+    stream.abort.signal.addEventListener('abort', () => ctrl.abort(), { once: true });
+  }
+
+  const pushMsg = (role, content) => {
+    if (!stream || !stream.messages) return;
+    const msg = { role, content };
+    stream.messages.push(msg);
+    return msg;
+  };
+
+  _addInfo('Zero-shot agent ON -- max ' + c.maxTurns + ' turns', host);
 
   let done = false;
   let lastErr = null;
 
   try {
     for (let turn = 1; turn <= c.maxTurns; turn++) {
-      if (ctrl.signal.aborted) { _addInfo('Zero-shot agent stopped by user.'); break; }
+      if (ctrl.signal.aborted) { _addInfo('Zero-shot agent stopped by user.', host); break; }
       _running.turn = turn;
       _running.state = state;
       state.errors = [];
 
       /* 1. PLANNER */
-      _addInfo('Turn ' + turn + ' > Planner');
+      _addInfo('Turn ' + turn + ' > Planner', host);
       let planRaw;
       try { planRaw = await _llmCall({ ..._plannerPrompt(task, state), temperature: c.plannerTemp, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Planner: ' + e.message; break; }
       const plan = extractBlock((planRaw.content || planRaw), 'PLAN');
-      _addAsst('**Planner:**\n\n```\n' + plan + '\n```');
+      _addAsst('**Planner:**\n\n```\n' + plan + '\n```', host);
+      pushMsg('assistant', '[Planner]\n\n' + plan);
 
       /* 2. COMPRESSOR */
       let briefRaw;
       try { briefRaw = await _llmCall({ ..._compressorPrompt(plan, allTools, state), temperature: 0.2, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Compressor: ' + e.message; break; }
       const brief = extractBlock((briefRaw.content || briefRaw), 'BRIEF');
-      _addAsst('**Brief:**\n\n```\n' + brief + '\n```');
+      _addAsst('**Brief:**\n\n```\n' + brief + '\n```', host);
+      pushMsg('assistant', '[Brief]\n\n' + brief);
 
       /* Select tools actually needed for this turn */
       const bLow = brief.toLowerCase();
@@ -291,26 +307,31 @@ async function runLoop(convId, task, allTools) {
         if (!toolCall || !toolCall.tool) {
           toolCall = null;
           aTemp = Math.min(2.0, aTemp + ((c.failureTemp - c.actorTemp) / 2));
-          if (attempts < MAXA) _addInfo('Actor retry ' + attempts + ' (temp=' + aTemp.toFixed(2) + ')');
+          if (attempts < MAXA) _addInfo('Actor retry ' + attempts + ' (temp=' + aTemp.toFixed(2) + ')', host);
         }
       }
       if (!toolCall || !toolCall.tool) { lastErr = 'Actor failed after ' + MAXA + ' attempts.'; break; }
 
-      const tcd = _tcDiv(toolCall.tool, toolCall.arguments || {});
+      const tcd = _tcDiv(toolCall.tool, toolCall.arguments || {}, host);
+
+      pushMsg('assistant', '[Actor]\n\nTool: ' + toolCall.tool + '\nArgs: ' + JSON.stringify(toolCall.arguments || {}));
 
       /* 4. EXECUTE */
       let obs;
       if (toolCall.tool === 'none' || toolCall.tool === 'done') {
         obs = 'No tool needed; task may be complete.';
         done = true;
+        pushMsg('assistant', '[Actor]\n\nTool: none\nTask complete.');
       } else {
         try {
           obs = await _runToolViaWorker(toolCall.tool, toolCall.arguments || {}, convId, ctrl.signal);
           _tcResult(tcd, obs);
+          pushMsg('tool', JSON.stringify({ name: toolCall.tool, result: obs }, null, 2));
         } catch (e) {
           obs = 'Error: ' + e.message;
           state.errors.push(obs);
           _tcResult(tcd, obs);
+          pushMsg('tool', JSON.stringify({ name: toolCall.tool, error: obs }, null, 2));
         }
       }
 
@@ -322,24 +343,36 @@ async function runLoop(convId, task, allTools) {
       if (ev) {
         if (ev.done) done = true;
         if (ev.state) state = { ...state, ...ev.state };
-        if (ev.reasoning) _addAsst('**Evaluator:** ' + ev.reasoning);
+        if (ev.reasoning) {
+          _addAsst('**Evaluator:** ' + ev.reasoning, host);
+          pushMsg('assistant', '[Evaluator]\n\n' + ev.reasoning);
+        }
       }
 
       /* Detect repeated identical errors and inject escape hint */
       if (state.errors.length >= 2 && state.errors[state.errors.length - 1] === state.errors[state.errors.length - 2]) {
-        _addInfo('Repeated error detected -- forcing a different approach.');
+        _addInfo('Repeated error detected -- forcing a different approach.', host);
         state.next = 'Try a completely different approach; the current one is failing.';
       }
 
-      if (done) { _addAsst('Task completed in ' + turn + ' turn(s).'); break; }
+      if (done) {
+        _addAsst('Task completed in ' + turn + ' turn(s).', host);
+        pushMsg('assistant', '[System] Task completed in ' + turn + ' turn(s).');
+        break;
+      }
     }
   } finally {
     _running = null;
     _abortCtrl = null;
   }
 
-  if (!done && !lastErr && !ctrl.signal.aborted) _addErr('Max turns (' + c.maxTurns + ') reached without completion.');
-  else if (lastErr) _addErr('Zero-shot error: ' + lastErr);
+  if (!done && !lastErr && !ctrl.signal.aborted) {
+    _addErr('Max turns (' + c.maxTurns + ') reached without completion.', host);
+    pushMsg('assistant', '[System] Max turns (' + c.maxTurns + ') reached without completion.');
+  } else if (lastErr) {
+    _addErr('Zero-shot error: ' + lastErr, host);
+    pushMsg('assistant', '[System] Error: ' + lastErr);
+  }
 }
 
 /* ---- public API ------------------------------------------------------ */
@@ -381,25 +414,54 @@ function intercept() {
       return;
     }
 
-    const el = window.$('input');
-    const text = el ? (el.value || '').trim() : '';
-    if (!text) return;
-    el.value = '';
-    el.style.height = 'auto';
+    const text = window.$('input') ? (window.$('input').value || '').trim() : '';
+    if (!text && !(typeof SandpieImages !== 'undefined' && SandpieImages.hasAttachment && SandpieImages.hasAttachment())) return;
 
+    /* Respect image attachments exactly like normal handleSubmit */
+    const content = (typeof SandpieImages !== 'undefined' && SandpieImages.buildContent)
+      ? await SandpieImages.buildContent(text)
+      : text;
+    if (typeof SandpieImages !== 'undefined' && SandpieImages.hasAttachment && SandpieImages.hasAttachment()) {
+      SandpieImages.clear();
+    }
+
+    window.$('input').value = '';
+    window.$('input').style.height = 'auto';
+
+    const m = window.$('messages');
+    if (m) { lockScroll(m); m.scrollTop = m.scrollHeight; }
+
+    /* Integrate with stream lifecycle */
     if (typeof ensureActiveConv === 'function') await ensureActiveConv();
     const convId = activeConvId;
-    /* core.js global: messages */
-    /* eslint-disable no-undef */
-    messages.push({ role: 'user', content: text });
-    /* eslint-enable no-undef */
-    _addUser(text);
-    if (typeof saveActiveConv === 'function') await saveActiveConv();
+    const s = ensureStream(convId);
+    if (s.host.parentNode !== window.$('messages')) mountConv(convId);
 
-    const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
-    try { await runLoop(convId, text, tools); }
-    catch (e) { console.error('[zeroshot]', e); _addErr('Zero-shot error: ' + (e.message || e)); }
-    if (typeof saveActiveConv === 'function') await saveActiveConv();
+    /* Push user message to the stream (the real source of truth) */
+    const userMsg = { role: 'user', content: content };
+    s.messages.push(userMsg);
+    bindBubble(addMsg('user', typeof content === 'string' ? content : text, s.host), userMsg);
+    await saveConv(convId);
+
+    /* Set UI to 'sending' so button shows Stop */
+    setStreamSending(s, true);
+    s.abort = new AbortController();
+
+    const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas)
+      ? SandpieTools.schemas() : [];
+
+    try {
+      await runLoop(convId, text, tools, s);
+    } catch (e) {
+      console.error('[zeroshot]', e);
+      _addErr('Zero-shot error: ' + (e.message || e), s.host);
+    } finally {
+      setStreamSending(s, false);
+      s.abort = null;
+      await saveConv(convId);
+      Sandpie.events.emit('generation:complete', { convId, aborted: false });
+      try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
+    }
   };
 }
 
