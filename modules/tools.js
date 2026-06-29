@@ -91,32 +91,7 @@ IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them 
         offset:      { type: 'integer', description: 'For a scope:"dropbox" search with many matches: skip this many results to page through them, 100 per page (e.g. offset:100 for the next page). Default 0.' },
       },
       required: ['pattern'],
-    },
-  },
-  web_search: {
-    description: `Search the WEB and get back a ranked list of results (title, URL, snippet). Use whenever the user asks to search the web / look something up online / find current or recent information, or when you need facts beyond your knowledge or a source to cite.
-Give plain keywords (not a regex). Robust by design: it transparently falls back across several engines (DuckDuckGo, Brave, Bing), so one engine being rate-limited or blocked won't fail the search; the engine actually used is reported.
-This searches the public web — it is NOT for the user's files (use search / list_files for those). To read a result's full page text, follow up with read_url on its URL.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        query:       { type: 'string', description: 'Plain-keyword search query, e.g. "python asyncio tutorial" or "Reixach compressor datasheet".' },
-        num_results: { type: 'integer', description: 'Max results to return (default 8, max 20).' },
-      },
-      required: ['query'],
-    },
-  },
-  read_url: {
-    description: `Fetch a web page and return its main readable text (nav/scripts/ads/boilerplate stripped) plus the page title. Use it to READ a result from web_search, or any URL the user gives you, when you need the actual content rather than just the snippet.
-Returns up to max_chars characters and reports the total length; if the page is longer than you got, call again with a larger max_chars.`,
-    parameters: {
-      type: 'object',
-      properties: {
-        url:       { type: 'string', description: 'Full URL to fetch, e.g. "https://example.com/article".' },
-        max_chars: { type: 'integer', description: 'Max characters of text to return (default 8000, max 40000).' },
-      },
-      required: ['url'],
-    },
+    }
   },
   show_artifact: {
     description: `Render a file from OPFS as a live artifact injected directly into the chat.
