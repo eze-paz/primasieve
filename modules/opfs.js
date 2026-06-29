@@ -1046,7 +1046,7 @@ opfs.refreshFileList = async function() {
     // looks like any other file (📄) and reports "synced" — clicking it fetches it
     // transparently (openFile → provider.hydrate).
     const statusLabel = it.status === 'cloud' ? 'synced' : it.status;
-    btn.title = `${it.kind} · ${statusLabel}${ro ? ' · read-only' : ''}`;
+    btn.title = `${it.kind} · ${statusLabel}`;
     if (it.kind === 'folder') {
       btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
     } else {
