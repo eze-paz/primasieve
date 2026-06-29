@@ -1246,7 +1246,8 @@ function initFileBrowser() {
   refreshFileList();
 }
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initFileBrowser);
+  document.addEventListener('DOMContentLoaded', () => { initFileBrowser(); sandpiePersistence.check(); });
 } else {
   initFileBrowser();
+  sandpiePersistence.check();
 }
