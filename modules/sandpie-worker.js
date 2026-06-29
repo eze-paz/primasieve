@@ -1259,6 +1259,8 @@ async function runTool(name, args, ctx) {
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'local_shell':   return tool_local_shell(args, ctx);
+    case 'local_fs':      return tool_local_fs(args, ctx);
+    case 'local_run':     return tool_local_run(args, ctx);
     default:              return unknownTool(name);
   }
 }
