@@ -552,6 +552,19 @@ const SandpieImages = (function() {
    * Initialize attachment handling — binds the file input + attach button and
    * the window-wide drop zone.
    */
+  function initPaste() {
+    window.addEventListener('paste', async (e) => {
+      // Only intercept file pastes (screenshots, images copied from file explorer, etc.)
+      // Text paste goes to the composer textarea as normal.
+      const hasFiles = e.clipboardData && Array.from(e.clipboardData.types || []).includes('Files');
+      if (!hasFiles) return;
+
+      e.preventDefault();
+      const files = e.clipboardData.files ? Array.from(e.clipboardData.files) : [];
+      if (files.length) await addFiles(files);
+    });
+  }
+
   function init() {
     const imageInput = $('imageInput');
     const attachBtn = $('attachBtn');
@@ -567,6 +580,7 @@ const SandpieImages = (function() {
     }
 
     initWindowDrop();
+    initPaste();
   }
 
   // Export public API
