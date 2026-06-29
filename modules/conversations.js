@@ -595,7 +595,7 @@ function handleButtonClick() {
     if (s.abort) s.abort.abort();
     updateQueueCount(s);
   } else {
-    handleSubmit();
+    window.handleSubmit();
   }
 }
 function updateQueueCount(stream) {
@@ -2075,7 +2075,7 @@ let sidePanel = null;
     // Plain Enter submits; Shift+Enter falls through to the native newline.
     if (!e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      window.handleSubmit();
     }
   });
 
