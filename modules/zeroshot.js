@@ -152,7 +152,7 @@ function _runToolViaWorker(name, args, convFileName, signal) {
 
 /* ---- prompt loader (from agents/*.md files) ------------------------- */
 const _promptCache = new Map();
-const AGENTS_DIR = 'agents';
+const AGENTS_DIR = 'sandpie/agents';
 
 async function _loadPrompt(name) {
   if (_promptCache.has(name)) return _promptCache.get(name);
