@@ -508,7 +508,19 @@ async function tool_run_python({ path, args }, ctx) {
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
   const normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   let code;
-  try { code = new TextDecoder().decode(await opfsReadBytes(normPath)); }
+  // The audit hook only hydrates files the script open()s at RUNTIME; the entry
+  // script itself is read here before Python starts, so it needs the same
+  // try-OPFS-then-hydrate-on-miss dance as read_file/load_image. Otherwise a
+  // dehydrated (cloud-only) script reports "could not read".
+  try {
+    let bytes;
+    try { bytes = await opfsReadBytes(normPath); }
+    catch (miss) {
+      if (_indexEntry(normPath)) { await hydrateAsync(normPath); bytes = await opfsReadBytes(normPath); }
+      else throw miss;
+    }
+    code = new TextDecoder().decode(bytes);
+  }
   catch (e) { return { result: `Error: could not read /files/${normPath}: ${e.message}.` }; }
   return withPy(async () => {
     let p;
