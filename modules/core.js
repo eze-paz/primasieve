@@ -6,6 +6,7 @@
    names no specific module.
    ============================================================================= */
 const $ = id => document.getElementById(id);
+window.$ = $;
 
 /* =============================================================================
    SandpieMenu — Sidebar Section Registry
