@@ -154,7 +154,7 @@ function _runToolViaWorker(name, args, convFileName, signal) {
 function _plannerPrompt(task, state) {
   return {
     system: `You are the PLANNER. Look at the task and current state. Decide the SINGLE most logical next concrete step. Output ONLY a <PLAN> block. No filler. No tool calls. No greetings.`,
-    user: `TASK:\n${task}\n\nCURRENT STATE:\n${typeof state === 'string' ? state : JSON.stringify(state, null, 2)}\n\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- web: web_search, read_url\n- compute: run_python\n- artifact: show_artifact\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>`,
+    user: `TASK:\n${task}\n\nCURRENT STATE:\n${typeof state === 'string' ? state : JSON.stringify(state, null, 2)}\n\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- compute: run_python\n- artifact: show_artifact\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>`,
   };
 }
 

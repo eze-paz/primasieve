@@ -153,7 +153,7 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
 
 This is the user's ACTUAL operating system, not a sandbox. Use it only when the user wants something done on their own machine: inspect or edit their files, run a build/test, git, check versions, system info, install a package, etc. This tool is OFF by default; if you can call it, the user deliberately enabled it — but still avoid destructive commands (rm -rf, format, mass deletes, overwrites) unless they clearly asked.
 DON'T confuse with the sandbox: for Python data work in the in-browser sandbox use run_python; for the OPFS workspace files use read_file/write_file/list_files. local_shell is for the user's real OS.
-PowerShell and other shells parse command strings. For complex scripts with backticks, quotes or newlines, write the file to OPFS first with write_file, then call it. Simple commands are fine inline ? chain with ; or && (e.g. "cd path; ls", "cd path && cmd").
+Since localterm v2, Windows uses -EncodedCommand so backticks/quotes/newlines pass cleanly. For file I/O with no escaping issues, use local_fs; for structured execution (argv+stdin), use local_run. For anything else, simple commands are fine inline ? chain with ; or && (e.g. "cd path; ls", "cd path && cmd").
 Each call is a fresh, independent run: there is NO persistent state between calls (cwd, env, and variables reset every time). Multi-line commands are fine ? the whole block is parsed and run. You get clean stdout, stderr, and an exit code. No streaming; no interactive TTY. Do not launch full-screen/interactive programs (vim, top, REPLs, ssh). Use non-interactive flags. Long output is truncated.
 If it says the helper isn't running, tell the user to start localterm (sandpie Terminal panel → Download) and STOP — do not retry in a loop.`,
       parameters: {
@@ -165,9 +165,37 @@ If it says the helper isn't running, tell the user to start localterm (sandpie T
         required: ['command'],
       },
     },
+  local_fs: {
+    description: `Read/write/list/delete files on the user's OWN computer via the localterm helper. Uses raw binary I/O (base64 over JSON) — never passes file contents through a shell parser, so there are no escaping issues with quotes/backticks/newlines/binary data. This is the real filesystem, not OPFS.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        op:          { type: 'string', enum: ['write','read','list','delete','mkdir'], description: 'Operation to perform.' },
+        path:        { type: 'string', description: 'Relative path (e.g. "docs/report.txt"). Absolute paths are forbidden.' },
+        content_b64: { type: 'string', description: 'Base64-encoded file content (required for write).' },
+        dir:         { type: 'string', description: 'Working directory to resolve path against (default: current working directory).' },
+      },
+      required: ['op', 'path'],
+    },
+  },
+  local_run: {
+    description: `Execute a program on the user's OWN computer via localterm using an argv array and optional stdin — no shell string parsing at all. The executable and each argument are passed literally. Use for commands with complex quotes/backticks, or when you need to pipe data via stdin_b64. The files map lets you attach small files atomically before execution (base64-encoded).`,
+    parameters: {
+      type: 'object',
+      properties: {
+        argv:      { type: 'array', items: { type: 'string' }, description: 'Argv array: ["executable", "arg1", "arg2", ...].' },
+        args:      { type: 'array', items: { type: 'string' }, description: 'Extra arguments appended after argv[1:].' },
+        stdin_b64: { type: 'string', description: 'Base64 data piped to process stdin.' },
+        cwd:       { type: 'string', description: 'Working directory for the command.' },
+        env:       { type: 'object', additionalProperties: { type: 'string' }, description: 'Extra environment variables.' },
+        timeout:   { type: 'integer', description: 'Max seconds (default 60, max 300).' },
+        files:     { type: 'object', additionalProperties: { type: 'string' }, description: 'Map of filename -> base64 content, written before exec.' },
+      },
+      required: ['argv'],
+    },
+  },
 };
-// ── Enable/disable + description overrides (global, localStorage) ─────────────
-// Lets the user (Settings → System prompt) turn tools off and rewrite their
+//// Lets the user (Settings → System prompt) turn tools off and rewrite their
 // descriptions. Stored globally so it applies to every conversation. toolDefs()
 // — what's actually sent to the model — is the single choke point that honors it.
 const TOOLS_DISABLED_KEY = 'sandpie-tools-disabled';   // JSON array of disabled names
@@ -175,7 +203,7 @@ const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: custo
 const TOOLS_ENABLED_KEY  = 'sandpie-tools-enabled';    // JSON array of explicitly-ON names (for default-off tools)
 // Tools that stay OFF until the user explicitly turns them on. They NEVER auto-enable:
 // isEnabled returns false unless the name is in TOOLS_ENABLED_KEY (set only by setEnabled).
-const TOOLS_DEFAULT_OFF  = new Set(['local_shell']);
+const TOOLS_DEFAULT_OFF  = new Set(['local_shell','local_fs','local_run']);
 function _toolsReadJson(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
   catch { return fallback; }

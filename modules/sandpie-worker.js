@@ -1189,6 +1189,61 @@ async function tool_local_shell({ command, timeout }, ctx) {
   return { result: out.trim() };
 }
 
+
+
+async function tool_local_fs({ op, path, content_b64, dir }, ctx) {
+  const lt = ctx && ctx.localterm;
+  if (!lt || !lt.token) return { result: 'Error: localterm not running — ask the user to start it (Terminal panel).' };
+  const port = lt.port || 8771;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/v2/fs?token=${encodeURIComponent(lt.token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op, path, content_b64, dir }),
+      signal: ctx && ctx.signal,
+    });
+    if (!r.ok) return { result: `Error: local_fs HTTP ${r.status}` };
+    const d = await r.json();
+    if (d.error) return { result: `Error: ${d.error}` };
+    if (op === 'read' && d.content_b64) {
+      return { result: d.content_b64 };
+    }
+    if (op === 'list' && d.entries) {
+      const lines = d.entries.map(e => `${e.is_dir ? 'd' : '-'} ${String(e.size || 0).padStart(10)} ${e.name}`);
+      return { result: lines.join('\n') };
+    }
+    return { result: JSON.stringify(d) };
+  } catch (e) {
+    return { result: `Error: ${e.message}` };
+  }
+}
+
+async function tool_local_run({ argv, args, stdin_b64, cwd, env, timeout, files }, ctx) {
+  const lt = ctx && ctx.localterm;
+  if (!lt || !lt.token) return { result: 'Error: localterm not running — ask the user to start it (Terminal panel).' };
+  const port = lt.port || 8771;
+  let to = parseInt(timeout, 10); if (!(to > 0)) to = 60; if (to > 300) to = 300;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/v2/run?token=${encodeURIComponent(lt.token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ argv, args, stdin_b64, cwd, env, timeout: to, files }),
+      signal: ctx && ctx.signal,
+    });
+    if (!r.ok) return { result: `Error: local_run HTTP ${r.status}` };
+    const d = await r.json();
+    let out = d.stdout || '';
+    if (d.stderr) out += (out ? '\n' : '') + '[stderr]\n' + d.stderr;
+    if (d.timedOut) out += `\n[timed out after ${to}s]`;
+    out += `\n[exit code ${d.code != null ? d.code : '?'}]`;
+    const CAP = 20000;
+    if (out.length > CAP) out = out.slice(0, CAP) + `\n…(output truncated; ${out.length} bytes total)`;
+    return { result: out.trim() };
+  } catch (e) {
+    return { result: `Error: ${e.message}` };
+  }
+}
+
 async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
