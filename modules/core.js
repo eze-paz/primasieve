@@ -89,6 +89,85 @@ const SandpieMenu = (() => {
   };
 })();
 window.SandpieMenu = SandpieMenu;
+/* =============================================================================
+   SandpieCommands - Text Command Registry
+   ============================================================================= */
+const SandpieCommands = (() => {
+  const commands = new Map();
+  return {
+    register(cmd = {}) {
+      if (!cmd.name) { console.warn('SandpieCommands: missing name'); return false; }
+      commands.set(cmd.name, cmd);
+      return true;
+    },
+    unregister(name) { return commands.delete(name); },
+    get(name) { return commands.get(name) || null; },
+    list() { return Array.from(commands.values()); },
+    async dispatch(text) {
+      const trimmed = text.slice(3).trim(); // strip '>>>'
+      if (!trimmed) return false;
+      const parts = trimmed.split(/\s+/);
+      const cmd = commands.get(parts[0]);
+      if (!cmd) return false;
+      if (cmd.run) {
+        try {
+          const result = await cmd.run(text, parts);
+          if (SandpieCommandView) SandpieCommandView.show(result, cmd.name);
+        } catch (err) {
+          if (SandpieCommandView) SandpieCommandView.show('Error: ' + err.message, cmd.name);
+        }
+      } else {
+        if (SandpieCommandView) SandpieCommandView.show('(command not yet implemented)', cmd.name);
+      }
+      return true;
+    },
+    hintFor(text) {
+      // Return placeholder hint for matching commands
+      const t = text.slice(3).trimStart();
+      if (t === '') return null;
+      const matches = [];
+      for (const c of commands.values()) {
+        if (c.name.startsWith(t)) matches.push(c);
+      }
+      if (matches.length === 0) return null;
+      return matches.slice(0, 6).map(c => c.usage || c.name).join(' \u00B7 ');
+    }
+  };
+})();
+window.SandpieCommands = SandpieCommands;
+
+/* =============================================================================
+   SandpieCommandView - Inline output panel controller
+   ============================================================================= */
+const SandpieCommandView = (() => {
+  let panel = null, body = null, promptEl = null;
+  function ensure() {
+    if (panel) return;
+    panel = $('commandOutput');
+    if (!panel) return;
+    body = panel.querySelector('.cmd-body');
+    promptEl = panel.querySelector('.cmd-prompt');
+  }
+  return {
+    show(output, cmdName) {
+      ensure();
+      if (!panel || !body) return;
+      if (output instanceof HTMLElement) {
+        body.innerHTML = '';
+        body.appendChild(output);
+      } else {
+        body.textContent = typeof output === 'string' ? output : JSON.stringify(output, null, 2);
+      }
+      if (promptEl) promptEl.textContent = '>>> ' + (cmdName || '');
+      panel.style.display = '';
+    },
+    hide() { if (panel) panel.style.display = 'none'; },
+    clear() { if (body) body.textContent = ''; }
+  };
+})();
+window.SandpieCommandView = SandpieCommandView;
+
+
 
 /* =============================================================================
    Shared conversation state — host-global because several modules

@@ -139,6 +139,13 @@
       <iframe id="artifactPanelFrame" src="about:blank"></iframe>
     </div>
   </div>
+  <div id="commandOutput" class="cmd-output" style="display:none;">
+    <div class="cmd-header">
+      <span class="cmd-prompt">>>></span>
+      <button class="cmd-close" type="button" onclick="SandpieCommandView.hide()">x</button>
+    </div>
+    <pre class="cmd-body"></pre>
+  </div>
   <form onsubmit="event.preventDefault(); handleSubmit();">
     <input type="file" id="imageInput" multiple style="display:none" >
     <div id="imagePreview" class="image-preview" style="display:none"></div>

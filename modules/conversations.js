@@ -200,88 +200,83 @@ function mountConv(convId) {
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
-/* ---- text commands (>>> rewind [n]) -------------------------------------- */
-function handleRewindCommand(text) {
-  if (!text.startsWith('>>> rewind')) return false;
-
-  const parts = text.slice(3).trim().split(/\s+/);  // ['rewind', '3']
-  const n = parts.length > 1 ? parseInt(parts[1], 10) : 1;
-  if (Number.isNaN(n) || n < 1) {
-    addMsg('info', 'Usage: >>> rewind [N] — removes the last N user-assistant pairs.');
-    return true;
-  }
-
-  const s = activeStream();
-  if (!s || !messages.length) {
-    addMsg('info', 'Nothing to rewind.');
-    return true;
-  }
-
-  // Count how many user messages to go back
-  let userCount = 0;
-  let idx = messages.length;
-  while (idx > 0 && userCount < n) {
-    idx--;
-    if (messages[idx].role === 'user') userCount++;
-  }
-
-  if (userCount === 0) {
-    addMsg('info', 'No user messages found to rewind.');
-    return true;
-  }
-
-  const removed = messages.length - idx;
-  if (!confirm(`Remove the last ${removed} message(s)?`)) return true;
-
-  // Collect user messages that are about to be removed so we can restore
-  // their text into the input box (accumulated, most recent first).
-  const rewindTexts = [];
-  if (idx < messages.length) {
-    for (let i = messages.length - 1; i >= idx; i--) {
-      const m = messages[i];
-      if (m.role !== 'user' || !m.content) continue;
-      let txt = '';
-      if (typeof m.content === 'string') {
-        txt = m.content;
-      } else if (Array.isArray(m.content)) {
-        // Extract text parts from multimodal content (text + images)
-        txt = m.content
-          .filter(p => p && p.type === 'text' && p.text)
-          .map(p => p.text)
-          .join('\n');
+/* ---- command registration: rewind -------------------------------------- */
+function registerRewindCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'rewind',
+    module: 'core',
+    help: 'Rewind conversation N turns back',
+    usage: '>>> rewind [N]',
+    run(text, parts) {
+      const n = parts.length > 1 ? parseInt(parts[1], 10) : 1;
+      if (Number.isNaN(n) || n < 1) {
+        return 'Usage: >>> rewind [N] — removes the last N user-assistant pairs.';
       }
-      if (txt.trim()) rewindTexts.unshift(txt.trim());
+
+      const s = activeStream();
+      if (!s || !messages.length) return 'Nothing to rewind.';
+
+      let userCount = 0;
+      let idx = messages.length;
+      while (idx > 0 && userCount < n) {
+        idx--;
+        if (messages[idx].role === 'user') userCount++;
+      }
+      if (userCount === 0) return 'No user messages found to rewind.';
+
+      const removed = messages.length - idx;
+      if (!confirm(`Remove the last ${removed} message(s)?`)) return '(cancelled)';
+
+      // Collect user messages that are about to be removed for restoration
+      const rewindTexts = [];
+      if (idx < messages.length) {
+        for (let i = messages.length - 1; i >= idx; i--) {
+          const m = messages[i];
+          if (m.role !== 'user' || !m.content) continue;
+          let txt = '';
+          if (typeof m.content === 'string') {
+            txt = m.content;
+          } else if (Array.isArray(m.content)) {
+            txt = m.content
+              .filter(p => p && p.type === 'text' && p.text)
+              .map(p => p.text)
+              .join('\n');
+          }
+          if (txt.trim()) rewindTexts.unshift(txt.trim());
+        }
+      }
+
+      if (s) {
+        if (s.abort) { s.queueAborted = true; s.abort.abort(); }
+        s.queue.length = 0;
+        updateQueueCount(s);
+      }
+      messages.length = idx;
+      if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
+      clearActiveConvUI();
+      renderConversation(messages, s ? s.compaction : null);
+
+      const messagesEl = $('messages');
+      if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
+      saveActiveConv().catch(() => {});
+
+      if (rewindTexts.length) {
+        const ta = $('input');
+        if (ta) {
+          const combined = rewindTexts.join('\n\n');
+          ta.value = combined;
+          ta.style.height = 'auto';
+          ta.style.height = ta.scrollHeight + 'px';
+          ta.select();
+          ta.focus();
+        }
+      }
+      return removed > 1 ? `Removed ${removed} messages.` : 'Removed last turn.';
     }
-  }
-
-  if (s) {
-    if (s.abort) { s.queueAborted = true; s.abort.abort(); }
-    s.queue.length = 0;
-    updateQueueCount(s);
-  }
-  messages.length = idx;
-  if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
-  clearActiveConvUI();
-  renderConversation(messages, s ? s.compaction : null);
-
-  const messagesEl = $('messages');
-  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
-  saveActiveConv().catch(() => {});
-
-  // Restore accumulated user text into the input box, auto-selected.
-  if (rewindTexts.length) {
-    const ta = $('input');
-    if (ta) {
-      const combined = rewindTexts.join('\n\n');
-      ta.value = combined;
-      ta.style.height = 'auto';
-      ta.style.height = ta.scrollHeight + 'px';
-      ta.select();
-      ta.focus();
-    }
-  }
-  return true;
+  });
 }
+registerRewindCommand();
 
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -641,8 +636,16 @@ function setStreamSending(stream, sending) {
 async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !SandpieImages.hasAttachment()) return;
-  if (handleRewindCommand(text)) { $('input').value = ''; return; }
+  if (typeof SandpieCommands !== 'undefined' && text.startsWith('>>>')) {
+    const handled = await SandpieCommands.dispatch(text);
+    if (handled) {
+      $('input').value = '';
+      return;
+    }
+  }
   if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
+  // Clear command output on normal chat submit
+  if (SandpieCommandView) SandpieCommandView.hide();
   $('input').value = '';
 
   const content = await SandpieImages.buildContent(text);

@@ -2330,3 +2330,42 @@ body.sp-decoding *::after {
 .persist-banner button:hover {
   background: rgba(0,0,0,0.05);
 }
+
+/* ---- Command output panel (text-only CLI style) ------------------------ */
+.cmd-output {
+  background: var(--sp-bg);
+  border-top: 1px solid var(--sp-border);
+  border-bottom: 1px solid var(--sp-border);
+  font: 0.82rem 'JetBrains Mono', Consolas, monospace;
+  line-height: 1.5;
+}
+.cmd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.7rem;
+  background: var(--sp-panel);
+  border-bottom: 1px solid var(--sp-border);
+}
+.cmd-prompt {
+  color: var(--sp-accent);
+  font-weight: 600;
+}
+.cmd-close {
+  background: transparent;
+  border: none;
+  color: var(--sp-text-dim);
+  font: inherit;
+  cursor: pointer;
+  padding: 0 0.3rem;
+}
+.cmd-close:hover { color: var(--sp-text); }
+.cmd-body {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: var(--sp-text);
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

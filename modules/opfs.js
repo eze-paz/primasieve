@@ -1189,6 +1189,114 @@ window.refreshFileList = function() { return opfs.refreshFileList(); };
 
 
 window.opfs = opfs;
+/* ---- opfs CLI commands (>>> ls, cd, mkdir, cat, rm) ----------------------- */
+(function() {
+  if (typeof SandpieCommands === 'undefined') return;
+
+  let _cwd = '';
+
+  function resolvePath(arg) {
+    if (!arg) return _cwd;
+    if (arg.startsWith('/')) return arg.replace(/^\/+/, '');
+    return _cwd ? _cwd + '/' + arg : arg;
+  }
+
+  SandpieCommands.register({
+    name: 'ls',
+    module: 'opfs',
+    help: 'List files in workspace or path',
+    usage: '>>> ls [path]',
+    async run(text, parts) {
+      const path = resolvePath(parts[1] || '');
+      try {
+        const entries = await opfs.listDir(path);
+        if (!entries.length) return path ? path + '/  (empty)' : '(workspace empty)';
+        const rows = entries.map(e => {
+          const p = path ? path + '/' + e.name : e.name;
+          const icon = e.kind === 'directory' ? 'd' : '-';
+          return icon + ' ' + p;
+        });
+        return _cwd ? 'cwd: ' + _cwd + '\n' + rows.join('\n') : rows.join('\n');
+      } catch (err) {
+        return 'Error: ' + err.message;
+      }
+    }
+  });
+
+  SandpieCommands.register({
+    name: 'cd',
+    module: 'opfs',
+    help: 'Change working directory',
+    usage: '>>> cd <path>',
+    async run(text, parts) {
+      if (!parts[1]) { _cwd = ''; return 'cwd: /'; }
+      const target = resolvePath(parts[1]);
+      try {
+        await opfs.listDir(target);
+        _cwd = target;
+        return 'cwd: ' + (_cwd || '/');
+      } catch (err) {
+        return 'Error: ' + err.message;
+      }
+    }
+  });
+
+  SandpieCommands.register({
+    name: 'mkdir',
+    module: 'opfs',
+    help: 'Create a folder',
+    usage: '>>> mkdir <name>',
+    async run(text, parts) {
+      if (!parts[1]) return 'Usage: >>> mkdir <name>';
+      const path = resolvePath(parts[1]);
+      try {
+        await opfs.mkdir(path);
+        if (typeof refreshFileList === 'function') refreshFileList();
+        return 'Created ' + path;
+      } catch (err) {
+        return 'Error: ' + err.message;
+      }
+    }
+  });
+
+  SandpieCommands.register({
+    name: 'cat',
+    module: 'opfs',
+    help: 'View file contents',
+    usage: '>>> cat <path>',
+    async run(text, parts) {
+      if (!parts[1]) return 'Usage: >>> cat <path>';
+      const path = resolvePath(parts[1]);
+      try {
+        const text = await opfs.read(path);
+        return text;
+      } catch (err) {
+        return 'Error: ' + err.message;
+      }
+    }
+  });
+
+  SandpieCommands.register({
+    name: 'rm',
+    module: 'opfs',
+    help: 'Delete file or folder',
+    usage: '>>> rm <path>',
+    async run(text, parts) {
+      if (!parts[1]) return 'Usage: >>> rm <path>';
+      const path = resolvePath(parts[1]);
+      if (!confirm('Delete "' + path + '"?')) return '(cancelled)';
+      try {
+        await opfs.remove(path);
+        if (typeof refreshFileList === 'function') refreshFileList();
+        return 'Deleted ' + path;
+      } catch (err) {
+        return 'Error: ' + err.message;
+      }
+    }
+  });
+})();
+
+
 window.splitPath = splitPath;
 window.joinPath = joinPath;
 
