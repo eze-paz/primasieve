@@ -6,3 +6,6 @@ __pycache__/
 *.swp
 .qwenref/
 docs/_localmodel/
+
+playwright-tests/test-results/
+playwright-tests/playwright-report/
