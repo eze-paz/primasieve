@@ -170,21 +170,33 @@ async function _loadPrompt(name) {
 }
 
 function _parseAgentMd(raw) {
-  // Normalize Windows line endings before parsing
-  const text = raw.replace(/\r\n/g, '\n');
-  const fmEnd = text.indexOf('\n---\n');
-  const body = fmEnd > 0 ? text.slice(fmEnd + 5).trim() : text.trim();
-  const sysMatch = body.match(/^#\s*System\s*\n([^]*?)(?=\n#\s*User\s*\n|$)/im);
-  const usrMatch = body.match(/\n#\s*User\s*\n([^]*)/im);
-  const system = sysMatch ? sysMatch[1].trim() : '';
-  const userTemplate = usrMatch ? usrMatch[1].trim() : body;
+  const text = raw.replace(/\r\n/g, "\n");
+  const lines = text.split("\n");
+  let inFm = false, fmDone = false;
+  const sysLines = [], usrLines = [];
+  let mode = null;
+  for (const line of lines) {
+    if (!fmDone && line.trim() === "---") {
+      if (!inFm) { inFm = true; continue; }
+      inFm = false; fmDone = true; continue;
+    }
+    if (!fmDone) continue;
+    if (/^#\s*System\b/i.test(line)) { mode = "system"; continue; }
+    if (/^#\s*User\b/i.test(line)) { mode = "user"; continue; }
+    if (mode === "system") sysLines.push(line);
+    else if (mode === "user") usrLines.push(line);
+  }
+  const system = sysLines.join("\n").trim();
+  const userTemplate = usrLines.join("\n").trim();
+  console.debug("[zeroshot] parsed agent: sys=" + system.slice(0, 80), "user=" + userTemplate.slice(0, 80));
   return { system, userTemplate };
 }
 
 function _fill(template, vars) {
-  return template.replace(/\\$\\{([^}]+)\\}/g, (_, key) => {
-    if (key in vars) return String(vars[key] ?? '');
-    return '\\n';
+  return template.replace(/\$\{([^}]+)\}/g, (_, key) => {
+    if (key in vars) return String(vars[key] ?? "");
+    console.debug("[zeroshot] _fill: unknown var", key);
+    return "\n";
   });
 }
 
