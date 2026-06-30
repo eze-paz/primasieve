@@ -203,7 +203,7 @@ function _fill(template, vars) {
 const _FALLBACK = {
   planner: {
     system: 'You are the PLANNER. Look at the task and current state. Decide the SINGLE most logical next concrete step. Output ONLY a <PLAN> block. No filler. No tool calls. No greetings.',
-    user: 'TASK:\n\n${task}\n\nCURRENT STATE:\n${state}\n\nAVAILABLE TOOL CATEGORIES:\n- file: read_file, write_file, edit_file, list_files, search\n- web: web_search, read_url\n- compute: run_python\n- artifact: show_artifact\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>'
+    user: 'TASK:\n\n${task}\n\nCURRENT STATE:\n${state}\n\nAVAILABLE TOOLS (full schemas):\n${toolSchemas}\n\nOutput ONLY:\n<PLAN>\nStep: <single concrete next step>\nTool needed: <tool name or none>\nExpected outcome: <what success looks like for this step>\n</PLAN>'
   },
   compressor: {
     system: 'You are the COMPRESSOR. Distill the raw plan into a tight Execution Brief containing ONLY the relevant tool schemas and a spec for the actor. Output ONLY a <BRIEF> block. No chat.',
@@ -215,7 +215,7 @@ const _FALLBACK = {
   },
   evaluator: {
     system: 'You are the EVALUATOR. Review the tool result and task. Output ONLY a JSON object with this exact shape:\n{\"done\":true|false,\"state\":{\"goal\":\"...\",\"progress\":\"...\",\"next\":\"...\",\"errors\":[]},\"reasoning\":\"...\"}\nNo markdown outside the JSON.',
-    user: 'ORIGINAL TASK: ${task}\n\nPREVIOUS STATE:\n\n${state}\n\nEXECUTION BRIEF:\n\n${brief}\n\nTOOL RESULT (first 4000 chars):\n\n${observation}\n\nYour JSON output:'
+    user: 'ORIGINAL TASK: ${task}\n\nPREVIOUS STATE:\n\n${state}\n\nEXECUTION BRIEF:\n\n${brief}\n\nAVAILABLE TOOLS (for reference):\n${toolSchemas}\n\nTOOL RESULT (first 4000 chars):\n\n${observation}\n\nYour JSON output:'
   }
 };
 async function _buildPrompt(name, vars) {
@@ -314,7 +314,7 @@ async function runLoop(convId, task, allTools, stream = null) {
       /* 1. PLANNER */
       _addInfo('Turn ' + turn + ' > Planner', host);
       let planRaw;
-      try { planRaw = await _llmCall({ ...await _buildPrompt('planner', {task, state: typeof state === 'string' ? state : JSON.stringify(state, null, 2)}), temperature: c.plannerTemp, signal: ctrl.signal }); }
+      try { planRaw = await _llmCall({ ...await _buildPrompt('planner', {task, state: typeof state === 'string' ? state : JSON.stringify(state, null, 2), toolSchemas: JSON.stringify(allTools, null, 2)}), temperature: c.plannerTemp, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Planner: ' + e.message; break; }
       const plan = extractBlock((planRaw.content || planRaw), 'PLAN');
       _addAsst('**Planner:**\n\n```\n' + plan + '\n```', host);
@@ -393,7 +393,7 @@ async function runLoop(convId, task, allTools, stream = null) {
 
       /* 5. EVALUATOR */
       let evalRaw;
-      try { evalRaw = await _llmCall({ ...await _buildPrompt('evaluator', {task, brief, observation: String(obs).slice(0, 4000), state: typeof state === 'string' ? state : JSON.stringify(state, null, 2)}), temperature: 0.1, signal: ctrl.signal }); }
+      try { evalRaw = await _llmCall({ ...await _buildPrompt('evaluator', {task, brief, observation: String(obs).slice(0, 4000), state: typeof state === 'string' ? state : JSON.stringify(state, null, 2), toolSchemas: JSON.stringify(allTools, null, 2)}), temperature: 0.1, signal: ctrl.signal }); }
       catch (e) { lastErr = 'Evaluator: ' + e.message; break; }
       const ev = extractJSON(evalRaw.content || evalRaw);
       if (ev) {
