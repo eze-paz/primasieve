@@ -200,6 +200,55 @@ function mountConv(convId) {
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
+/* ---- text commands (>>> rewind [n]) -------------------------------------- */
+function handleRewindCommand(text) {
+  if (!text.startsWith('>>> rewind')) return false;
+
+  const parts = text.slice(3).trim().split(/\s+/);  // ['rewind', '3']
+  const n = parts.length > 1 ? parseInt(parts[1], 10) : 1;
+  if (Number.isNaN(n) || n < 1) {
+    addMsg('info', 'Usage: >>> rewind [N] — removes the last N user-assistant pairs.');
+    return true;
+  }
+
+  const s = activeStream();
+  if (!s || !messages.length) {
+    addMsg('info', 'Nothing to rewind.');
+    return true;
+  }
+
+  // Count how many user messages to go back
+  let userCount = 0;
+  let idx = messages.length;
+  while (idx > 0 && userCount < n) {
+    idx--;
+    if (messages[idx].role === 'user') userCount++;
+  }
+
+  if (userCount === 0) {
+    addMsg('info', 'No user messages found to rewind.');
+    return true;
+  }
+
+  const removed = messages.length - idx;
+  if (!confirm(`Remove the last ${removed} message(s)?`)) return true;
+
+  if (s) {
+    if (s.abort) { s.queueAborted = true; s.abort.abort(); }
+    s.queue.length = 0;
+    updateQueueCount(s);
+  }
+  messages.length = idx;
+  if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
+  clearActiveConvUI();
+  renderConversation(messages, s ? s.compaction : null);
+
+  const messagesEl = $('messages');
+  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
+  saveActiveConv().catch(() => {});
+  return true;
+}
+
 async function loadConv(id) {
   if (id === activeConvId) return;
 
@@ -558,6 +607,7 @@ function setStreamSending(stream, sending) {
 async function handleSubmit() {
   const text = $('input').value.trim();
   if (!text && !SandpieImages.hasAttachment()) return;
+  if (handleRewindCommand(text)) { $('input').value = ''; return; }
   if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
   $('input').value = '';
 
