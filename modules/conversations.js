@@ -233,6 +233,27 @@ function handleRewindCommand(text) {
   const removed = messages.length - idx;
   if (!confirm(`Remove the last ${removed} message(s)?`)) return true;
 
+  // Collect user messages that are about to be removed so we can restore
+  // their text into the input box (accumulated, most recent first).
+  const rewindTexts = [];
+  if (idx < messages.length) {
+    for (let i = messages.length - 1; i >= idx; i--) {
+      const m = messages[i];
+      if (m.role !== 'user' || !m.content) continue;
+      let txt = '';
+      if (typeof m.content === 'string') {
+        txt = m.content;
+      } else if (Array.isArray(m.content)) {
+        // Extract text parts from multimodal content (text + images)
+        txt = m.content
+          .filter(p => p && p.type === 'text' && p.text)
+          .map(p => p.text)
+          .join('\n');
+      }
+      if (txt.trim()) rewindTexts.unshift(txt.trim());
+    }
+  }
+
   if (s) {
     if (s.abort) { s.queueAborted = true; s.abort.abort(); }
     s.queue.length = 0;
@@ -246,6 +267,19 @@ function handleRewindCommand(text) {
   const messagesEl = $('messages');
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   saveActiveConv().catch(() => {});
+
+  // Restore accumulated user text into the input box, auto-selected.
+  if (rewindTexts.length) {
+    const ta = $('input');
+    if (ta) {
+      const combined = rewindTexts.join('\n\n');
+      ta.value = combined;
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+      ta.select();
+      ta.focus();
+    }
+  }
   return true;
 }
 
