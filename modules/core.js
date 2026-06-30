@@ -136,6 +136,59 @@ const SandpieCommands = (() => {
 })();
 window.SandpieCommands = SandpieCommands;
 
+/* ---- built-in commands: help, clear ------------------------------------ */
+(function() {
+  function helpTable() {
+    const cmds = SandpieCommands.list().sort((a, b) => {
+      if (a.module !== b.module) return a.module.localeCompare(b.module);
+      return a.name.localeCompare(b.name);
+    });
+    const maxName = cmds.reduce((m, c) => Math.max(m, (c.usage || c.name).length), 0);
+    let out = '';
+    let lastModule = '';
+    for (const c of cmds) {
+      if (c.module !== lastModule) {
+        if (lastModule) out += '\n';
+        out += '[' + c.module + ']\n';
+        lastModule = c.module;
+      }
+      const name = (c.usage || c.name).padEnd(maxName);
+      out += '  ' + name + '  ' + c.help + '\n';
+    }
+    return out || '(no commands registered)';
+  }
+  function helpDetail(cmdName) {
+    const c = SandpieCommands.get(cmdName);
+    if (!c) return 'Unknown command: ' + cmdName;
+    let out = '';
+    out += 'Command:  ' + c.name + '\n';
+    out += 'Module:   ' + c.module + '\n';
+    out += 'Usage:    ' + (c.usage || c.name) + '\n';
+    out += 'Help:     ' + c.help + '\n';
+    return out;
+  }
+  SandpieCommands.register({
+    name: 'help',
+    module: 'core',
+    help: 'List commands or get help for one',
+    usage: '>>> help [command]',
+    run(text, parts) {
+      if (parts.length > 1) return helpDetail(parts[1]);
+      return helpTable();
+    }
+  });
+  SandpieCommands.register({
+    name: 'clear',
+    module: 'core',
+    help: 'Close the inline output panel',
+    usage: '>>> clear',
+    run() {
+      if (SandpieCommandView) SandpieCommandView.hide();
+      return '';
+    }
+  });
+})();
+
 /* =============================================================================
    SandpieCommandView - Inline output panel controller
    ============================================================================= */
