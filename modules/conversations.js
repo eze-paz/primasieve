@@ -1133,8 +1133,6 @@ function bindBubble(div, msgRef) {
 
   if (!div._listenersAttached) {
     div._listenersAttached = true;
-
-    div.addEventListener('contextmenu', onBubbleContextMenu);
   }
   if (msgRef) div._msg = msgRef;
   return div;
@@ -1747,56 +1745,6 @@ async function maybeResumeFlight(id) {
   sendSingle(ck.text, s, { resume: true });
 }
 
-/* ---- message bubble context menu (rewind / copy / tools / thoughts) ---- */
-let _bubbleMenuTarget = null;
-function onBubbleContextMenu(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  _bubbleMenuTarget = e.currentTarget;
-  const menu = $('bubbleContextMenu');
-  menu.style.display = '';
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
-}
-function hideBubbleMenu() {
-  $('bubbleContextMenu').style.display = 'none';
-  _bubbleMenuTarget = null;
-}
-async function rewindFromMenu() {
-  const target = _bubbleMenuTarget;
-  hideBubbleMenu();
-  if (!target) return;
-
-  if (!target._msg) {
-    const s = activeStream();
-    addMsg('info', 'Tool call still being drafted — hit Stop to cancel this round.', s && s.host);
-    return;
-  }
-  const idx = messages.indexOf(target._msg);
-  if (idx < 0) return;
-  const after = messages.length - idx - 1;
-  const msg = after === 0
-    ? 'Remove this message?'
-    : `Remove this message and ${after} message(s) after it?`;
-  if (!confirm(msg)) return;
-
-  const s = activeStream();
-  if (s) {
-    if (s.abort) { s.queueAborted = true; s.abort.abort(); }
-    s.queue.length = 0;
-    updateQueueCount(s);
-  }
-  messages.length = idx;
-  // Rewinding into (or before) the compacted span invalidates the summary —
-  // drop the compaction so the remaining (now short) history is sent in full.
-  if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
-  clearActiveConvUI();
-  renderConversation(messages, s ? s.compaction : null);
-
-  const messagesEl = $('messages');
-  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
-  await saveActiveConv();
-}
 /* ---- conversation compaction (NON-destructive) ---------------------------
    Compaction never deletes turns. It records a boundary + a summary on the
    conversation (data.compaction = { boundary, summary }) and keeps the FULL
@@ -1846,34 +1794,6 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   // reduced send size instead of a stale-high value that would re-trigger next send.
   try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
   return { ok: true, removed: boundary, kept: messages.length - boundary };
-}
-async function copyFromMenu() {
-  const target = _bubbleMenuTarget;
-  hideBubbleMenu();
-  if (!target) return;
-  let text;
-
-  const expanded = target.querySelector && target.querySelector('.tc-expanded');
-  if (expanded && expanded.textContent) {
-    text = expanded.textContent;
-  } else if (target._msg && typeof target._msg.content === 'string') {
-    text = target._msg.content;
-  } else {
-    text = target.innerText || target.textContent || '';
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch (e) {
-
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); } catch {}
-    ta.remove();
-  }
 }
 
 /* ---- side-by-side conversation panel ---- */
@@ -2186,13 +2106,10 @@ let _localInferring = false;
   tick();
 })();
 
-document.addEventListener('click', hideBubbleMenu);
 
 /* expose moved page-glue for inline handlers (HTML onclick) + the host contract */
 window.maybeResumeFlight = maybeResumeFlight;
 window.anyStreamGenerating = anyStreamGenerating;
-window.rewindFromMenu = rewindFromMenu;
-window.copyFromMenu = copyFromMenu;
 
 /* expose on window for inline script compatibility */
 window.ensureStream = ensureStream;
