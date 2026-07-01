@@ -632,10 +632,13 @@
       }
       setSyncState(state);
 
-      // deletions?.length covers remote deletes of cloud-only (dehydrated) files:
-      // they're removed from the cloud index but never from OPFS, so removedAny
-      // stays false and the file viewer (which renders the index) wouldn't refresh.
-      if (firstSync || toDownload.length || dirty.length || removedAny || (deletions && deletions.length)) {
+      // Any cursor-delta activity should refresh the viewer, which renders the
+      // cloud index in dehydrated mode. Adds of cloud-only files skip download
+      // (toDownload empty) and remote deletes remove nothing from OPFS
+      // (removedAny false), so without delta/deletions here the viewer would only
+      // update on a manual page refresh.
+      const cursorChanged = (delta && delta.length) || (deletions && deletions.length);
+      if (firstSync || toDownload.length || dirty.length || removedAny || cursorChanged) {
         await Sandpie.refreshFiles();
         await Sandpie.refreshConversations();
       }
