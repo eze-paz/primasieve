@@ -412,12 +412,14 @@
       try {
         const result = await listContinue(stored);
         const delta = [];
+        const deletions = [];
         const confirmed = [];
         for (const e of result.entries) {
           const rel = cloudToRel(e.path);
           if (rel == null || rel === '') continue;
           if (e.kind === 'deleted') {
             delete idx[rel];
+            deletions.push(rel);
             // path_lower may differ in case from the original key — try case-insensitive too
             const rl = rel.toLowerCase();
             for (const k of Object.keys(idx)) { if (k.toLowerCase() === rl) { delete idx[k]; break; } }
@@ -426,7 +428,7 @@
         }
         if (confirmed.length) clearPending(confirmed);
         setCursor(result.cursor); setCloudIndex(idx);
-        return { index: idx, delta };
+        return { index: idx, delta, deletions };
       } catch (err) {
         console.warn('[dropbox-full] cursor sync failed, full re-list:', err.message);
         setCursor(null);
@@ -512,7 +514,7 @@
     try {
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
-      const { index: cloud, delta } = await cloudListWorking();
+      const { index: cloud, delta, deletions } = await cloudListWorking();
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
@@ -630,7 +632,10 @@
       }
       setSyncState(state);
 
-      if (firstSync || toDownload.length || dirty.length || removedAny) {
+      // deletions?.length covers remote deletes of cloud-only (dehydrated) files:
+      // they're removed from the cloud index but never from OPFS, so removedAny
+      // stays false and the file viewer (which renders the index) wouldn't refresh.
+      if (firstSync || toDownload.length || dirty.length || removedAny || (deletions && deletions.length)) {
         await Sandpie.refreshFiles();
         await Sandpie.refreshConversations();
       }
