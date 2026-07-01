@@ -620,7 +620,7 @@ const SandpieLiteRTLM = (function () {
       worker.addEventListener('message', onMsg);
       worker.addEventListener('error', onErr);
       if (signal) { if (signal.aborted) { onAbort(); return; } signal.addEventListener('abort', onAbort, { once: true }); }
-      worker.postMessage({ type: 'tool', id, name, args, conversation_file_name: convId, localterm: { token: localStorage.getItem('sandpie:localterm:token') || '', port: +(localStorage.getItem('sandpie:localterm:port')) || 8771 } });
+      worker.postMessage({ type: 'tool', id, name, args, conversation_file_name: convId });
     });
   }
 

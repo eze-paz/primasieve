@@ -124,7 +124,6 @@ self.addEventListener('message', async (event) => {
       emit: (ev) => { try { self.postMessage({ type: 'event', id, event: ev }); } catch (_) {} },
       signal: abortCtl.signal,
       origin: config.origin || '',
-      localterm: config.localterm || null,
     };
     try {
       await runAgent(config, ctx);
@@ -137,8 +136,8 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'tool') {
-    const { id, name, args, conversation_file_name, localterm } = data;
-    const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {}, localterm: localterm || null };
+    const { id, name, args, conversation_file_name } = data;
+    const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
     let out;
     try { out = await runTool(name, args || {}, ctx); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
@@ -1144,7 +1143,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','local_shell','local_fs','local_run'];
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image'];
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -1152,96 +1151,6 @@ async function unknownTool(name) {
     try { await opfsReadBytes('sandpie/skills/' + n + '/SKILL.md'); return { result: 'Error: "' + name + '" is a skill, not a tool. Call load_skill({"name":"' + n + '"}) to use it.' }; } catch {}
   }
   return { result: 'Error: unknown tool "' + name + '". Available tools: ' + KNOWN_TOOLS.join(', ') + '.' };
-}
-
-// local_shell — run a command on the user's OWN machine via the localterm helper
-// (loopback /exec). Token comes from ctx.localterm (passed in the run config; the
-// worker has no localStorage). Graceful, non-looping errors when the helper is down.
-async function tool_local_shell({ command, timeout }, ctx) {
-  const cmd = (command == null) ? '' : String(command);
-  if (!cmd.trim()) return { result: 'Error: "command" is required.' };
-  const lt = ctx && ctx.localterm;
-  if (!lt || !lt.token) return { result: 'Error: the local terminal is not available — the localterm helper is not running or not paired. Tell the user to start it (sandpie Terminal panel → Download), then retry ONCE. Do not retry repeatedly.' };
-  const port = lt.port || 8771;
-  let to = parseInt(timeout, 10); if (!(to > 0)) to = 60; if (to > 300) to = 300;
-  let r;
-  try {
-    r = await fetch(`http://127.0.0.1:${port}/exec?token=${encodeURIComponent(lt.token)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd, timeout: to }),
-      signal: ctx && ctx.signal,
-    });
-  } catch (e) {
-    return { result: `Error: could not reach the localterm helper on 127.0.0.1:${port} (${(e && e.message) || e}). It is likely not running — tell the user to start it (Terminal panel) and STOP, do not retry in a loop.` };
-  }
-  if (!r.ok) {
-    const hint = r.status === 403 ? ' Token rejected (helper may have restarted) — ask the user to reopen sandpie from the helper to re-pair.' : '';
-    return { result: `Error: localterm helper returned HTTP ${r.status}.${hint}` };
-  }
-  let d; try { d = await r.json(); } catch { return { result: 'Error: bad response from the localterm helper.' }; }
-  let out = d.stdout || '';
-  if (d.stderr) out += (out ? '\n' : '') + '[stderr]\n' + d.stderr;
-  if (d.timedOut) out += `\n[timed out after ${to}s — command killed]`;
-  out += `\n[exit code ${d.code != null ? d.code : '?'}]`;
-  const CAP = 20000;
-  if (out.length > CAP) out = out.slice(0, CAP) + `\n…(output truncated; ${out.length} bytes total)`;
-  return { result: out.trim() };
-}
-
-
-
-async function tool_local_fs({ op, path, content_b64, dir }, ctx) {
-  const lt = ctx && ctx.localterm;
-  if (!lt || !lt.token) return { result: 'Error: localterm not running — ask the user to start it (Terminal panel).' };
-  const port = lt.port || 8771;
-  try {
-    const r = await fetch(`http://127.0.0.1:${port}/v2/fs?token=${encodeURIComponent(lt.token)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op, path, content_b64, dir }),
-      signal: ctx && ctx.signal,
-    });
-    if (!r.ok) return { result: `Error: local_fs HTTP ${r.status}` };
-    const d = await r.json();
-    if (d.error) return { result: `Error: ${d.error}` };
-    if (op === 'read' && d.content_b64) {
-      return { result: d.content_b64 };
-    }
-    if (op === 'list' && d.entries) {
-      const lines = d.entries.map(e => `${e.is_dir ? 'd' : '-'} ${String(e.size || 0).padStart(10)} ${e.name}`);
-      return { result: lines.join('\n') };
-    }
-    return { result: JSON.stringify(d) };
-  } catch (e) {
-    return { result: `Error: ${e.message}` };
-  }
-}
-
-async function tool_local_run({ argv, args, stdin_b64, cwd, env, timeout, files }, ctx) {
-  const lt = ctx && ctx.localterm;
-  if (!lt || !lt.token) return { result: 'Error: localterm not running — ask the user to start it (Terminal panel).' };
-  const port = lt.port || 8771;
-  let to = parseInt(timeout, 10); if (!(to > 0)) to = 60; if (to > 300) to = 300;
-  try {
-    const r = await fetch(`http://127.0.0.1:${port}/v2/run?token=${encodeURIComponent(lt.token)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ argv, args, stdin_b64, cwd, env, timeout: to, files }),
-      signal: ctx && ctx.signal,
-    });
-    if (!r.ok) return { result: `Error: local_run HTTP ${r.status}` };
-    const d = await r.json();
-    let out = d.stdout || '';
-    if (d.stderr) out += (out ? '\n' : '') + '[stderr]\n' + d.stderr;
-    if (d.timedOut) out += `\n[timed out after ${to}s]`;
-    out += `\n[exit code ${d.code != null ? d.code : '?'}]`;
-    const CAP = 20000;
-    if (out.length > CAP) out = out.slice(0, CAP) + `\n…(output truncated; ${out.length} bytes total)`;
-    return { result: out.trim() };
-  } catch (e) {
-    return { result: `Error: ${e.message}` };
-  }
 }
 
 async function runTool(name, args, ctx) {
@@ -1258,9 +1167,6 @@ async function runTool(name, args, ctx) {
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
-    case 'local_shell':   return tool_local_shell(args, ctx);
-    case 'local_fs':      return tool_local_fs(args, ctx);
-    case 'local_run':     return tool_local_run(args, ctx);
     default:              return unknownTool(name);
   }
 }

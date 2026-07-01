@@ -141,10 +141,7 @@ function _runToolViaWorker(name, args, convFileName, signal) {
     sw.postMessage({
       type: 'tool', id, name, args,
       conversation_file_name: convFileName || 'unknown',
-      localterm: {
-        token: localStorage.getItem('sandpie:localterm:token') || '',
-        port: +(localStorage.getItem('sandpie:localterm:port')) || 8771,
-      },
+
     });
     setTimeout(() => finish('', 'tool timed out (120s)'), 120000);
   });
