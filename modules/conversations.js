@@ -22,8 +22,8 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const archived = await opfs.exists(convPath(convId, true));
   const path = convPath(convId, archived);
 
-  let prev = {};
-  try { prev = JSON.parse(await opfs.read(path)); } catch {}
+  let prev = {}, prevRaw = null;
+  try { prevRaw = await opfs.read(path); prev = JSON.parse(prevRaw); } catch {}
   const firstUser = msgs.find(m => m.role === 'user');
   let derived = 'Untitled';
   if (firstUser && firstUser.content) {
@@ -41,7 +41,13 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   };
   delete data.compactions;   // legacy restore-stack — superseded by `compaction`
   if (s) { if (s.compaction) data.compaction = s.compaction; else delete data.compaction; }
-  await opfs.write(path, JSON.stringify(data));
+  const newStr = JSON.stringify(data);
+  // No-op guard: switching conversations calls saveActiveConv() on the outgoing
+  // conv even when nothing changed. Writing byte-identical content still bumps
+  // the OPFS mtime and emits file:changed → a spurious Dropbox overwrite. Skip
+  // the write (and the dirty-marking) when the serialized bytes match disk.
+  if (prevRaw !== null && newStr === prevRaw) { await refreshConversationList(); return; }
+  await opfs.write(path, newStr);
   Sandpie.events.emit('file:changed', path);
   await refreshConversationList();
 }
