@@ -600,9 +600,10 @@ function init() {
     html: '<div id="zeroshotBody" style="font-size:0.75rem;line-height:1.4;"></div>',
     onRender() { render(); },
   });
-  intercept();
+  // intercept();   // disabled — zeroshot is console-only
   console.log('[zeroshot] loaded (active=' + Zeroshot.isActive() + ')');
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-else init();
+// init() is no longer auto-called — zeroshot is console-only
+// if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+// else init();
