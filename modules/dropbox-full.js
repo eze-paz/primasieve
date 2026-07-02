@@ -226,7 +226,11 @@
     // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
     // section (default DEFAULT_PARENT = /R+D+I/sandpie, the department folder).
     const local = sanitizeSeg(String(email).split('@')[0]);
-    let parent = (localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT).trim() || DEFAULT_PARENT;
+    // Default parent is inherited from the server (GET /config) so it's managed
+    // centrally; a user override in the Cloud-sync UI (PARENT_KEY) still wins.
+    // Falls back to the hardcoded DEFAULT_PARENT if the server didn't provide one.
+    const defaultParent = (await serverParent()) || DEFAULT_PARENT;
+    let parent = (localStorage.getItem(PARENT_KEY) || defaultParent).trim() || defaultParent;
     if (!parent.startsWith('/')) parent = '/' + parent;
     parent = parent.replace(/\/+$/, '');
     const root = parent + '/' + local;
@@ -752,14 +756,21 @@
   // The key is a PUBLIC PKCE client_id, not a secret. null = not fetched yet;
   // '' = no server / unset → fall back to the user-entered or saved key. Cached.
   let _serverAppKey = null;
-  async function serverAppKey() {
-    if (_serverAppKey !== null) return _serverAppKey;
+  let _serverParent = null;
+  // Fetch GET /config once and cache what the deployment provides: the Dropbox
+  // app key AND the default sync parent (see app.js). Both non-secret. Lets the
+  // panel one-click connect and inherit the org sync root instead of hardcoding it.
+  async function loadServerConfig() {
+    if (_serverAppKey !== null) return;
     try {
       const res = await fetch('/config', { headers: { Accept: 'application/json' } });
-      _serverAppKey = res.ok ? (((await res.json()) || {}).dropboxAppKey || '') : '';
-    } catch { _serverAppKey = ''; }
-    return _serverAppKey;
+      const cfg = res.ok ? ((await res.json()) || {}) : {};
+      _serverAppKey = cfg.dropboxAppKey || '';
+      _serverParent = cfg.dropboxParent || '';
+    } catch { _serverAppKey = ''; _serverParent = ''; }
   }
+  async function serverAppKey() { await loadServerConfig(); return _serverAppKey; }
+  async function serverParent() { await loadServerConfig(); return _serverParent; }
   function saveConfig() {
     const el = document.getElementById('dbxfullAppKey');
     if (el) localStorage.setItem(APPKEY_CFG, el.value || '');
