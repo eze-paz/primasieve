@@ -428,7 +428,10 @@ async function render() {
   // decode-collapse fix). Turn end (clearLiveTokens→notify) recomputes it fresh.
   let b;
   if (T.isLive && T.isLive() && _bdCache) {
-    b = _bdCache;
+    b = { ..._bdCache };
+    const currentSum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
+    const delta = reportedTotal - currentSum;
+    if (delta > 0) b.messages += delta;
   } else {
     b = await computeBreakdown();
     _bdCache = b;
