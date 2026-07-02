@@ -870,9 +870,9 @@ opfs.getLibreOfficeConverter = function() {
         sofficeWasm: sofficeWasmUrl,
         sofficeData: sofficeDataUrl,
         sofficeWorkerJs: BASE + '/soffice.worker.js',
-        verbose: true,
+        verbose: false,
         enableProgressTracking: true,
-      }, 300000);
+      }, 900000);
       console.log('[LO] init done:', initRes);
 
       return {
@@ -884,7 +884,7 @@ opfs.getLibreOfficeConverter = function() {
             file: await file.arrayBuffer(),
             filename: options.filename || 'input.' + ext,
             outputFormat: outFmt,
-          }, 300000);
+          }, 900000);
           console.log('[LO] convert result type:', res.type);
           return res.data || res.result;
         },
