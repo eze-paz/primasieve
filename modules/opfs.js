@@ -847,7 +847,7 @@ opfs.getLibreOfficeConverter = function() {
         async convert(file, options = {}) {
           const ext = (options.filename || 'input.docx').split('.').pop() || 'docx';
           const outFmt = { docx: 'pdf', doc: 'pdf', odt: 'pdf' }[ext] || 'pdf';
-          console.log('[LO] converting to", outFmt);
+          console.log('[LO] converting to', outFmt);
           const res = await send('convert', {
             file: await file.arrayBuffer(),
             filename: options.filename || 'input.' + ext,
