@@ -786,25 +786,32 @@ opfs.getDocxPreview = function() {
 // Lazy-load LibreOffice WASM converter (MPL-2.0). Loads the WASM runtime and
 // browser worker from jsdelivr, initializes once, and provides a convert() method
 // for docx -> pdf conversion with pixel-perfect fidelity.
+
 opfs.getLibreOfficeConverter = function() {
   if (!window._libreOfficePromise) {
     window._libreOfficePromise = (async () => {
       const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
       const workerUrl = BASE + '/browser.worker.global.js';
 
-      // Helper: fetch a .gz asset and decompress it streaming via DecompressionStream
+      // Helper: fetch a .gz asset and decompress it in-browser
       async function fetchGzAsset(url, mimeType) {
-        console.log('[LO] decompressing', url.split('/').pop(), '...');
         const r = await fetch(url);
         if (!r.ok) throw new Error('failed to fetch ' + url + ': ' + r.status);
         const ds = new DecompressionStream('gzip');
         const decompressed = await new Response(r.body.pipeThrough(ds)).arrayBuffer();
         const blob = new Blob([decompressed], { type: mimeType });
-        console.log('[LO]', url.split('/').pop(), 'ready:', blob.size, 'bytes');
         return URL.createObjectURL(blob);
       }
 
-      console.log('[LO] fetching worker...');
+      console.log('[LO] decompressing soffice.wasm...');
+      const sofficeWasmUrl = await fetchGzAsset(BASE + '/soffice.wasm.gz', 'application/wasm');
+      console.log('[LO] soffice.wasm ready');
+
+      console.log('[LO] decompressing soffice.data...');
+      const sofficeDataUrl = await fetchGzAsset(BASE + '/soffice.data.gz', 'application/octet-stream');
+      console.log('[LO] soffice.data ready');
+
+      console.log('[LO] fetching worker script...');
       const workerCode = await (await fetch(workerUrl)).text();
       console.log('[LO] worker size:', workerCode.length);
 
@@ -843,12 +850,6 @@ opfs.getLibreOfficeConverter = function() {
           worker.postMessage({ type, id, ...payload });
         });
       }
-
-      // Decompress WASM and data before passing to worker (they are .gz on CDN)
-      const [sofficeWasmUrl, sofficeDataUrl] = await Promise.all([
-        fetchGzAsset(BASE + '/soffice.wasm.gz', 'application/wasm'),
-        fetchGzAsset(BASE + '/soffice.data.gz', 'application/octet-stream'),
-      ]);
 
       console.log('[LO] init start');
       const initRes = await send('init', {
