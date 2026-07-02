@@ -754,10 +754,19 @@ function openQueueModal(stream) {
 
   modal.querySelectorAll('.qm-cancel').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const idx = +e.target.dataset.idx;
+      const idx = +e.currentTarget.dataset.idx;
       stream.queue.splice(idx, 1);
       updateQueueCount(stream);
-      openQueueModal(stream);
+      const item = e.currentTarget.closest('.qm-item');
+      if (item) item.remove();
+      // Re-index remaining items so subsequent cancels target the right array slot
+      modal.querySelectorAll('.qm-item').forEach((el, newIdx) => {
+        el.dataset.idx = String(newIdx);
+        const num = el.querySelector('.qm-number');
+        if (num) num.textContent = String(newIdx + 1);
+        el.querySelectorAll('.qm-edit, .qm-cancel').forEach(b => b.dataset.idx = String(newIdx));
+      });
+      if (stream.queue.length === 0) closeQueueModal();
     });
   });
 
