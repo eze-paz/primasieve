@@ -792,7 +792,11 @@ opfs.getLibreOfficeConverter = function() {
       const base = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
       const workerUrl = base + '/browser.worker.global.js';
 
-      const worker = new Worker(workerUrl);
+      // Cross-origin Worker() is blocked even under COEP.
+      // Fetch the script, create a blob URL (same-origin), then spawn the worker.
+      const workerCode = await (await fetch(workerUrl)).text();
+      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(workerBlob));
       const reqId = () => 'lo_' + Math.random().toString(36).slice(2);
 
       function send(type, payload) {
