@@ -1068,8 +1068,34 @@ opfs.refreshFileList = async function() {
       menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
       menuItems.push({ label: 'New file', action: () => opfs.createFile() });
       if (it.kind === 'file') {
-        menuItems.push({ label: 'Open in new tab', action: () => window.open('opfs/' + it.fullKey, '_blank') });
-        menuItems.push({ label: 'Download', action: () => window.open('opfs/' + it.fullKey + '?download=1', '_blank') });
+        menuItems.push({
+          label: 'Open in new tab',
+          action: async () => {
+            try {
+              const url = await opfs.toUrl(it.fullKey);
+              window.open(url, '_blank');
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (err) { console.error('[opfs] open in tab failed:', err); }
+          }
+        });
+        menuItems.push({
+          label: 'Download',
+          action: async () => {
+            try {
+              const bytes = await opfs.readBytes(it.fullKey);
+              const ext = it.name.split('.').pop().toLowerCase();
+              const mime = ({html:'text/html', htm:'text/html', svg:'image/svg+xml',
+                png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
+                webp:'image/webp', csv:'text/csv', json:'application/json',
+                txt:'text/plain'})[ext] || 'application/octet-stream';
+              const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+              const a = document.createElement('a');
+              a.href = url; a.download = it.name; a.style.display = 'none';
+              document.body.appendChild(a); a.click();
+              requestAnimationFrame(() => { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
+            } catch (e) { console.error('[opfs] download failed:', e); }
+          }
+        });
       }
       if (it.kind === 'folder') {
         menuItems.push({ label: 'Download as zip', action: () => opfs.downloadFolderZip(it.fullKey) });
