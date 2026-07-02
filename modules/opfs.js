@@ -787,6 +787,7 @@ opfs.getDocxPreview = function() {
 // browser worker from jsdelivr, initializes once, and provides a convert() method
 // for docx -> pdf conversion with pixel-perfect fidelity.
 
+
 opfs.getLibreOfficeConverter = function() {
   if (!window._libreOfficePromise) {
     window._libreOfficePromise = (async () => {
@@ -802,6 +803,17 @@ opfs.getLibreOfficeConverter = function() {
         const blob = new Blob([decompressed], { type: mimeType });
         return URL.createObjectURL(blob);
       }
+
+      // Fetch and cache scripts as blob URLs to avoid cross-origin importScripts issues
+      async function fetchScript(url) {
+        const code = await (await fetch(url)).text();
+        const blob = new Blob([code], { type: 'application/javascript' });
+        return URL.createObjectURL(blob);
+      }
+
+      console.log('[LO] fetching soffice.js...');
+      const sofficeJsUrl = await fetchScript(BASE + '/soffice.js');
+      console.log('[LO] soffice.js ready');
 
       console.log('[LO] decompressing soffice.wasm...');
       const sofficeWasmUrl = await fetchGzAsset(BASE + '/soffice.wasm.gz', 'application/wasm');
@@ -837,6 +849,7 @@ opfs.getLibreOfficeConverter = function() {
           }, timeoutMs);
           const handler = (e) => {
             if (!e.data || e.data.id !== id) return;
+            if (e.data.type === 'progress') return; // ignore progress updates
             clearTimeout(timer);
             worker.removeEventListener('message', handler);
             if (e.data.type === 'error') {
@@ -853,7 +866,7 @@ opfs.getLibreOfficeConverter = function() {
 
       console.log('[LO] init start');
       const initRes = await send('init', {
-        sofficeJs: BASE + '/soffice.js',
+        sofficeJs: sofficeJsUrl,
         sofficeWasm: sofficeWasmUrl,
         sofficeData: sofficeDataUrl,
         sofficeWorkerJs: BASE + '/soffice.worker.js',
@@ -884,7 +897,6 @@ opfs.getLibreOfficeConverter = function() {
   }
   return window._libreOfficePromise;
 };
-
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
 opfs.getSheetJS = function() {
