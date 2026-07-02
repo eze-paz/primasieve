@@ -528,7 +528,7 @@ function init() {
       const section = document.getElementById('contextSection');
       if (section && !section._ctxToggleWired) {
         section._ctxToggleWired = true;
-        section.addEventListener('toggle', () => { if (section.open) render(); });
+        section.addEventListener('toggle', () => { if (section.open) { _bdCache = null; render(); } });
       }
       render();
     }

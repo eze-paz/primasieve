@@ -988,7 +988,7 @@ async function sendSingle(text, stream, opts = {}) {
   // we read the authoritative size.
   if (typeof SandpieTokens !== 'undefined') {
     try { SandpieTokens.clearLiveTokens && SandpieTokens.clearLiveTokens(); } catch (_) {}
-    try { stream.tokBaseline = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; }
+    try { const fromFile = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; const fromMem = SandpieTokens.estimateTokens ? SandpieTokens.estimateTokens(convMessages) : 0; stream.tokBaseline = Math.max(fromFile, fromMem); }
     catch (_) { stream.tokBaseline = 0; }
   }
 
