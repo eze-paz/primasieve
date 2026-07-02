@@ -1072,17 +1072,33 @@ opfs.refreshFileList = async function() {
           label: 'Open in new tab',
           action: async () => {
             try {
-              const url = await opfs.toUrl(it.fullKey);
+              let url;
+              try {
+                url = await opfs.toUrl(it.fullKey);
+              } catch (e) {
+                if (e.name !== 'NotFoundError') throw e;
+                const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+                if (sp && sp.hydrate) await sp.hydrate(it.fullKey);
+                url = await opfs.toUrl(it.fullKey);
+              }
               window.open(url, '_blank');
               setTimeout(() => URL.revokeObjectURL(url), 60000);
-            } catch (err) { console.error('[opfs] open in tab failed:', err); }
+            } catch (err) { console.error('[opfs] open in tab failed:', err); Sandpie.addMsg('err', 'Could not open ' + it.fullKey + ': ' + err.message); }
           }
         });
         menuItems.push({
           label: 'Download',
           action: async () => {
             try {
-              const bytes = await opfs.readBytes(it.fullKey);
+              let bytes;
+              try {
+                bytes = await opfs.readBytes(it.fullKey);
+              } catch (e) {
+                if (e.name !== 'NotFoundError') throw e;
+                const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+                if (sp && sp.hydrate) await sp.hydrate(it.fullKey);
+                bytes = await opfs.readBytes(it.fullKey);
+              }
               const ext = it.name.split('.').pop().toLowerCase();
               const mime = ({html:'text/html', htm:'text/html', svg:'image/svg+xml',
                 png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
@@ -1093,7 +1109,7 @@ opfs.refreshFileList = async function() {
               a.href = url; a.download = it.name; a.style.display = 'none';
               document.body.appendChild(a); a.click();
               requestAnimationFrame(() => { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
-            } catch (e) { console.error('[opfs] download failed:', e); }
+            } catch (e) { console.error('[opfs] download failed:', e); Sandpie.addMsg('err', 'Could not download ' + it.fullKey + ': ' + e.message); }
           }
         });
       }
