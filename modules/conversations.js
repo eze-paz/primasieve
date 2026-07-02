@@ -722,8 +722,8 @@ function openQueueModal(stream) {
         <div class="qm-number">${idx + 1}</div>
         <div class="qm-text">${escapeHtml(text)}</div>
         <div class="qm-actions">
-          <button class="ghost qm-edit" data-idx="${idx}" title="Edit">Edit</button>
-          <button class="ghost qm-cancel" data-idx="${idx}" title="Cancel">Cancel</button>
+          <button type="button" class="ghost qm-edit" data-idx="${idx}" title="Edit">Edit</button>
+          <button type="button" class="ghost qm-cancel" data-idx="${idx}" title="Cancel">Cancel</button>
         </div>
       </div>`;
   }).join('');
@@ -733,11 +733,11 @@ function openQueueModal(stream) {
     '<div class="modal-content" style="max-width:560px; width:90%; max-height:70vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">' +
       '<div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">' +
         '<h3 style="margin:0; font-size:1rem;">Queued Messages (' + stream.queue.length + ')</h3>' +
-        '<button class="ghost qm-close" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
+        '<button type="button" class="ghost qm-close" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
       '</div>' +
       '<div style="flex:1; overflow-y:auto; padding:0.75rem 1rem;">' + items + '</div>' +
       '<div style="padding:0.75rem 1rem; border-top:1px solid var(--sp-border); display:flex; justify-content:flex-end; gap:0.5rem;">' +
-        '<button class="ghost qm-clear">Clear All</button>' +
+        '<button type="button" class="ghost qm-clear">Clear All</button>' +
       '</div>' +
     '</div>';
 
@@ -791,8 +791,8 @@ function enterQueueEditMode(stream, idx, itemEl) {
   itemEl.innerHTML =
     '<textarea class="qm-edit-textarea" style="width:100%; min-height:60px; background:var(--sp-bg); border:1px solid var(--sp-border); border-radius:5px; color:var(--sp-text); padding:0.5rem; font:inherit; resize:vertical;">' + escapeHtml(text) + '</textarea>' +
     '<div style="display:flex; gap:0.4rem; justify-content:flex-end; margin-top:0.4rem;">' +
-      '<button class="ghost qm-save" data-idx="' + idx + '">Save</button>' +
-      '<button class="ghost qm-cancel-edit" data-idx="' + idx + '">Cancel</button>' +
+      '<button type="button" class="ghost qm-save" data-idx="' + idx + '">Save</button>' +
+      '<button type="button" class="ghost qm-cancel-edit" data-idx="' + idx + '">Cancel</button>' +
     '</div>';
 
   const ta = itemEl.querySelector('.qm-edit-textarea');
