@@ -792,17 +792,25 @@ opfs.getLibreOfficeConverter = function() {
       const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
       const workerUrl = BASE + '/browser.worker.global.js';
 
-      console.log('[LO] fetching worker...');
-      const workerCode = await (await fetch(workerUrl)).text();
-      console.log('[LO] worker size:', workerCode.length);
+      console.log('[LO] fetching soffice.js for blob...');
+      const jsCode = await (await fetch(BASE + '/soffice.js')).text();
+      const jsBlob = new Blob([jsCode], { type: 'application/javascript' });
+      const sofficeJsUrl = URL.createObjectURL(jsBlob);
+      console.log('[LO] soffice.js blob ready');
 
-      // Strip source maps
+      console.log('[LO] fetching worker.js for blob...');
+      const wkCode = await (await fetch(BASE + '/soffice.worker.js')).text();
+      const wkBlob = new Blob([wkCode], { type: 'application/javascript' });
+      const sofficeWorkerJsUrl = URL.createObjectURL(wkBlob);
+      console.log('[LO] worker.js blob ready');
+
+      console.log('[LO] fetching worker script...');
+      const workerCode = await (await fetch(workerUrl)).text();
       const cleanCode = workerCode.replace(/\/\/#\s*sourceMappingURL=.*$/gm, '');
       const blob = new Blob([cleanCode], { type: 'application/javascript' });
       const worker = new Worker(URL.createObjectURL(blob));
       console.log('[LO] worker spawned');
 
-      // Log ALL worker messages
       worker.addEventListener('message', (e) => console.log('[LO msg]', e.data));
       worker.addEventListener('error', (e) => console.error('[LO err]', e.message, e.lineno));
       worker.addEventListener('messageerror', (e) => console.error('[LO msgerr]', e));
@@ -834,13 +842,13 @@ opfs.getLibreOfficeConverter = function() {
 
       console.log('[LO] init start');
       const initRes = await send('init', {
-        sofficeJs: BASE + '/soffice.js',
+        sofficeJs: sofficeJsUrl,
         sofficeWasm: BASE + '/soffice.wasm.gz',
         sofficeData: BASE + '/soffice.data.gz',
-        sofficeWorkerJs: BASE + '/soffice.worker.js',
+        sofficeWorkerJs: sofficeWorkerJsUrl,
         verbose: true,
         enableProgressTracking: true,
-      }, 180000);
+      }, 300000);
       console.log('[LO] init done:', initRes);
 
       return {
@@ -852,7 +860,7 @@ opfs.getLibreOfficeConverter = function() {
             file: await file.arrayBuffer(),
             filename: options.filename || 'input.' + ext,
             outputFormat: outFmt,
-          }, 180000);
+          }, 300000);
           console.log('[LO] convert result type:', res.type);
           return res.data || res.result;
         },
@@ -864,7 +872,7 @@ opfs.getLibreOfficeConverter = function() {
     })();
   }
   return window._libreOfficePromise;
-};;
+};;;
 
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
