@@ -792,17 +792,31 @@ opfs.getLibreOfficeConverter = function() {
       const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
       const workerUrl = BASE + '/browser.worker.global.js';
 
-      console.log('[LO] fetching soffice.js for blob...');
-      const jsCode = await (await fetch(BASE + '/soffice.js')).text();
-      const jsBlob = new Blob([jsCode], { type: 'application/javascript' });
-      const sofficeJsUrl = URL.createObjectURL(jsBlob);
-      console.log('[LO] soffice.js blob ready');
+      // Helper: fetch a .gz asset and decompress it in-browser
+      async function fetchGzAsset(url, mimeType) {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('failed to fetch ' + url + ': ' + r.status);
+        const ds = new DecompressionStream('gzip');
+        const decompressed = await new Response(r.body.pipeThrough(ds)).arrayBuffer();
+        const blob = new Blob([decompressed], { type: mimeType });
+        return URL.createObjectURL(blob);
+      }
 
-      console.log('[LO] fetching worker.js for blob...');
-      const wkCode = await (await fetch(BASE + '/soffice.worker.js')).text();
-      const wkBlob = new Blob([wkCode], { type: 'application/javascript' });
-      const sofficeWorkerJsUrl = URL.createObjectURL(wkBlob);
-      console.log('[LO] worker.js blob ready');
+      console.log('[LO] decompressing soffice.js...');
+      const sofficeJsUrl = await fetchGzAsset(BASE + '/soffice.js', 'application/javascript');
+      console.log('[LO] soffice.js ready');
+
+      console.log('[LO] decompressing soffice.worker.js...');
+      const sofficeWorkerJsUrl = await fetchGzAsset(BASE + '/soffice.worker.js', 'application/javascript');
+      console.log('[LO] soffice.worker.js ready');
+
+      console.log('[LO] decompressing soffice.wasm...');
+      const sofficeWasmUrl = await fetchGzAsset(BASE + '/soffice.wasm.gz', 'application/wasm');
+      console.log('[LO] soffice.wasm ready');
+
+      console.log('[LO] decompressing soffice.data...');
+      const sofficeDataUrl = await fetchGzAsset(BASE + '/soffice.data.gz', 'application/octet-stream');
+      console.log('[LO] soffice.data ready');
 
       console.log('[LO] fetching worker script...');
       const workerCode = await (await fetch(workerUrl)).text();
@@ -843,8 +857,8 @@ opfs.getLibreOfficeConverter = function() {
       console.log('[LO] init start');
       const initRes = await send('init', {
         sofficeJs: sofficeJsUrl,
-        sofficeWasm: BASE + '/soffice.wasm.gz',
-        sofficeData: BASE + '/soffice.data.gz',
+        sofficeWasm: sofficeWasmUrl,
+        sofficeData: sofficeDataUrl,
         sofficeWorkerJs: sofficeWorkerJsUrl,
         verbose: true,
         enableProgressTracking: true,
@@ -872,7 +886,7 @@ opfs.getLibreOfficeConverter = function() {
     })();
   }
   return window._libreOfficePromise;
-};;;
+};;;;
 
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
