@@ -729,19 +729,24 @@ function openQueueModal(stream) {
   }).join('');
 
   modal.innerHTML =
-    '<div class="modal-backdrop" onclick="closeQueueModal()"></div>' +
+    '<div class="modal-backdrop"></div>' +
     '<div class="modal-content" style="max-width:560px; width:90%; max-height:70vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">' +
       '<div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">' +
         '<h3 style="margin:0; font-size:1rem;">Queued Messages (' + stream.queue.length + ')</h3>' +
-        '<button class="ghost" onclick="closeQueueModal()" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
+        '<button class="ghost qm-close" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
       '</div>' +
       '<div style="flex:1; overflow-y:auto; padding:0.75rem 1rem;">' + items + '</div>' +
       '<div style="padding:0.75rem 1rem; border-top:1px solid var(--sp-border); display:flex; justify-content:flex-end; gap:0.5rem;">' +
-        '<button class="ghost" onclick="clearQueue(\' + stream.id + \')">Clear All</button>' +
+        '<button class="ghost qm-clear">Clear All</button>' +
       '</div>' +
     '</div>';
 
   document.body.appendChild(modal);
+
+  // Wire up click handlers (module-scoped; inline onclick can't reach them)
+  modal.querySelector('.modal-backdrop').addEventListener('click', closeQueueModal);
+  modal.querySelector('.qm-close').addEventListener('click', closeQueueModal);
+  modal.querySelector('.qm-clear').addEventListener('click', () => clearQueue(stream.id));
 
   const escHandler = (e) => { if (e.key === 'Escape') closeQueueModal(); };
   document.addEventListener('keydown', escHandler);
