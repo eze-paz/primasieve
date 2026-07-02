@@ -704,6 +704,117 @@ function updateQueueCount(stream) {
   queueEl.className = q > 0 ? 'queue-pill' : 'mt-queue';
   queueEl.textContent = q > 0 ? `${q} queued` : '';
 }
+
+function openQueueModal(stream) {
+  if (!stream || stream.queue.length === 0) return;
+  const existing = document.getElementById('queueModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'queueModal';
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+
+  const items = stream.queue.map((item, idx) => {
+    const text = typeof item === 'string' ? item : (item.text || JSON.stringify(item).slice(0, 200));
+    return `
+      <div class="qm-item" data-idx="${idx}">
+        <div class="qm-number">${idx + 1}</div>
+        <div class="qm-text">${escapeHtml(text)}</div>
+        <div class="qm-actions">
+          <button class="ghost qm-edit" data-idx="${idx}" title="Edit">Edit</button>
+          <button class="ghost qm-cancel" data-idx="${idx}" title="Cancel">Cancel</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  modal.innerHTML =
+    '<div class="modal-backdrop" onclick="closeQueueModal()"></div>' +
+    '<div class="modal-content" style="max-width:560px; width:90%; max-height:70vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">' +
+      '<div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">' +
+        '<h3 style="margin:0; font-size:1rem;">Queued Messages (' + stream.queue.length + ')</h3>' +
+        '<button class="ghost" onclick="closeQueueModal()" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
+      '</div>' +
+      '<div style="flex:1; overflow-y:auto; padding:0.75rem 1rem;">' + items + '</div>' +
+      '<div style="padding:0.75rem 1rem; border-top:1px solid var(--sp-border); display:flex; justify-content:flex-end; gap:0.5rem;">' +
+        '<button class="ghost" onclick="clearQueue(\' + stream.id + \')">Clear All</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  const escHandler = (e) => { if (e.key === 'Escape') closeQueueModal(); };
+  document.addEventListener('keydown', escHandler);
+  modal._escHandler = escHandler;
+
+  modal.querySelectorAll('.qm-cancel').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = +e.target.dataset.idx;
+      stream.queue.splice(idx, 1);
+      updateQueueCount(stream);
+      openQueueModal(stream);
+    });
+  });
+
+  modal.querySelectorAll('.qm-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = +e.target.dataset.idx;
+      enterQueueEditMode(stream, idx, e.target.closest('.qm-item'));
+    });
+  });
+}
+
+function closeQueueModal() {
+  const m = document.getElementById('queueModal');
+  if (!m) return;
+  if (m._escHandler) document.removeEventListener('keydown', m._escHandler);
+  m.remove();
+}
+
+function clearQueue(streamId) {
+  const s = convStreams.get(streamId);
+  if (!s) return;
+  s.queue.length = 0;
+  updateQueueCount(s);
+  closeQueueModal();
+}
+
+function enterQueueEditMode(stream, idx, itemEl) {
+  const current = stream.queue[idx];
+  const text = typeof current === 'string' ? current : (current.text || '');
+
+  itemEl.innerHTML =
+    '<textarea class="qm-edit-textarea" style="width:100%; min-height:60px; background:var(--sp-bg); border:1px solid var(--sp-border); border-radius:5px; color:var(--sp-text); padding:0.5rem; font:inherit; resize:vertical;">' + escapeHtml(text) + '</textarea>' +
+    '<div style="display:flex; gap:0.4rem; justify-content:flex-end; margin-top:0.4rem;">' +
+      '<button class="ghost qm-save" data-idx="' + idx + '">Save</button>' +
+      '<button class="ghost qm-cancel-edit" data-idx="' + idx + '">Cancel</button>' +
+    '</div>';
+
+  const ta = itemEl.querySelector('.qm-edit-textarea');
+  ta.focus();
+
+  itemEl.querySelector('.qm-save').addEventListener('click', () => {
+    const newText = ta.value.trim();
+    if (!newText) return;
+    if (typeof current === 'string') {
+      stream.queue[idx] = newText;
+    } else {
+      stream.queue[idx] = Object.assign({}, current, { text: newText });
+    }
+    openQueueModal(stream);
+  });
+
+  itemEl.querySelector('.qm-cancel-edit').addEventListener('click', () => {
+    openQueueModal(stream);
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 async function processQueueFor(stream) {
   if (!stream || stream.isProcessing || stream.queue.length === 0) return;
   stream.isProcessing = true;
@@ -2327,6 +2438,9 @@ function startTotalTimer(stream) {
   const tokEl = el.querySelector('.mt-tok');
   const rateEl = el.querySelector('.mt-rate');
   const queueEl = el.querySelector('.mt-queue');
+  queueEl.style.cursor = 'pointer';
+  queueEl.title = 'Click to view queued messages';
+  queueEl.addEventListener('click', () => openQueueModal(stream));
   const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
 
