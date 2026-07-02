@@ -789,56 +789,72 @@ opfs.getDocxPreview = function() {
 opfs.getLibreOfficeConverter = function() {
   if (!window._libreOfficePromise) {
     window._libreOfficePromise = (async () => {
-      const base = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
-      const workerUrl = base + '/browser.worker.global.js';
+      const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
+      const workerUrl = BASE + '/browser.worker.global.js';
 
-      // Cross-origin Worker() is blocked even under COEP.
-      // Fetch the script, create a blob URL (same-origin), then spawn the worker.
+      console.log('[LO] fetching worker...');
       const workerCode = await (await fetch(workerUrl)).text();
-      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-      const worker = new Worker(URL.createObjectURL(workerBlob));
+      console.log('[LO] worker size:', workerCode.length);
+
+      // Strip source maps
+      const cleanCode = workerCode.replace(/\/\/#\s*sourceMappingURL=.*$/gm, '');
+      const blob = new Blob([cleanCode], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(blob));
+      console.log('[LO] worker spawned');
+
+      // Log ALL worker messages
+      worker.addEventListener('message', (e) => console.log('[LO msg]', e.data));
+      worker.addEventListener('error', (e) => console.error('[LO err]', e.message, e.lineno));
+      worker.addEventListener('messageerror', (e) => console.error('[LO msgerr]', e));
+
       const reqId = () => 'lo_' + Math.random().toString(36).slice(2);
 
-      function send(type, payload) {
+      function send(type, payload, timeoutMs = 120000) {
         const id = reqId();
         return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            worker.removeEventListener('message', handler);
+            reject(new Error('WASM timeout: ' + type));
+          }, timeoutMs);
           const handler = (e) => {
-            if (e.data.id !== id) return;
+            if (!e.data || e.data.id !== id) return;
+            clearTimeout(timer);
             worker.removeEventListener('message', handler);
             if (e.data.type === 'error') {
-              reject(new Error(e.data.error || 'LibreOffice WASM error'));
+              reject(new Error(e.data.error || 'WASM error'));
             } else {
               resolve(e.data);
             }
           };
           worker.addEventListener('message', handler);
+          console.log('[LO send]', type, id);
           worker.postMessage({ type, id, ...payload });
         });
       }
 
-      // Initialize with WASM paths
-      await send('init', {
-        sofficeJs: base + '/soffice.js',
-        sofficeWasm: base + '/soffice.wasm.gz',
-        sofficeData: base + '/soffice.data.gz',
-        sofficeWorkerJs: base + '/soffice.worker.js',
-        verbose: false,
+      console.log('[LO] init start');
+      const initRes = await send('init', {
+        sofficeJs: BASE + '/soffice.js',
+        sofficeWasm: BASE + '/soffice.wasm.gz',
+        sofficeData: BASE + '/soffice.data.gz',
+        sofficeWorkerJs: BASE + '/soffice.worker.js',
+        verbose: true,
         enableProgressTracking: true,
-      });
+      }, 180000);
+      console.log('[LO] init done:', initRes);
 
       return {
         async convert(file, options = {}) {
-          const arrayBuffer = await file.arrayBuffer();
           const ext = (options.filename || 'input.docx').split('.').pop() || 'docx';
-          const formats = { docx: 'pdf', doc: 'pdf', odt: 'pdf', rtf: 'pdf' };
-          const outFormat = formats[ext] || 'pdf';
-
-          const result = await send('convert', {
-            file: arrayBuffer,
+          const outFmt = { docx: 'pdf', doc: 'pdf', odt: 'pdf' }[ext] || 'pdf';
+          console.log('[LO] converting to', outFmt);
+          const res = await send('convert', {
+            file: await file.arrayBuffer(),
             filename: options.filename || 'input.' + ext,
-            outputFormat: outFormat,
-          });
-          return result.data;
+            outputFormat: outFmt,
+          }, 180000);
+          console.log('[LO] convert result type:', res.type);
+          return res.data || res.result;
         },
         destroy() {
           try { worker.terminate(); } catch (_) {}
@@ -848,7 +864,7 @@ opfs.getLibreOfficeConverter = function() {
     })();
   }
   return window._libreOfficePromise;
-};
+};;
 
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
