@@ -290,7 +290,7 @@ const Sandpie = (() => {
     get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
     opfsMtime(path)        { return opfs.lastModified(path); },
-    isGenerating()         { return anyStreamGenerating(); },
+    isGenerating()         { return (typeof anyStreamGenerating === 'function' && anyStreamGenerating()) || (typeof window !== 'undefined' && typeof window.anyStreamGenerating === 'function' && window.anyStreamGenerating()) || false; },
     openFilePath()         { return window._openFilePath; },
     refreshFiles()         { return refreshFileList(); },
     refreshConversations() { return refreshConversationList(); },
