@@ -436,7 +436,12 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close (Esc)';
-  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
+  const convertBtn = document.createElement('button');
+  convertBtn.className = 'mode';
+  convertBtn.textContent = '???PDF';
+  convertBtn.title = 'Convert to PDF (LibreOffice WASM)';
+  convertBtn.style.display = 'none';
+  header.append(title, meta, mdBtn, pencilBtn, saveBtn, convertBtn, closeBtn);
   const body = document.createElement('div');
   body.className = 'body';
   panel.append(header, body);
@@ -524,6 +529,28 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // OOXML → renderAsync throws → the catch shows a download link.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading document viewer…</div>';
     mount(opfs.closeFile);
+    // Show convert-to-PDF button for supported formats
+    convertBtn.style.display = (ext === 'docx' || ext === 'doc' || ext === 'odt') ? '' : 'none';
+    convertBtn.onclick = async () => {
+      convertBtn.disabled = true;
+      convertBtn.textContent = 'Converting...';
+      try {
+        const converter = await opfs.getLibreOfficeConverter();
+        const pdfArray = await converter.convert(file, { filename: name });
+        const pdfBlob = new Blob([pdfArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name.replace(/\.[^.]+$/, '') + '.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error('[opfs] PDF conversion failed:', e);
+        opfs._toast('PDF conversion failed: ' + (e.message || e), 4000);
+      }
+      convertBtn.disabled = false;
+      convertBtn.textContent = '???PDF';
+    };
     try {
       const docx = await opfs.getDocxPreview();
       const container = document.createElement('div');
@@ -754,6 +781,69 @@ opfs.getDocxPreview = function() {
     })();
   }
   return window._docxPreviewPromise;
+};
+
+// Lazy-load LibreOffice WASM converter (MPL-2.0). Loads the WASM runtime and
+// browser worker from jsdelivr, initializes once, and provides a convert() method
+// for docx -> pdf conversion with pixel-perfect fidelity.
+opfs.getLibreOfficeConverter = function() {
+  if (!window._libreOfficePromise) {
+    window._libreOfficePromise = (async () => {
+      const base = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
+      const workerUrl = base + '/browser.worker.global.js';
+
+      const worker = new Worker(workerUrl);
+      const reqId = () => 'lo_' + Math.random().toString(36).slice(2);
+
+      function send(type, payload) {
+        const id = reqId();
+        return new Promise((resolve, reject) => {
+          const handler = (e) => {
+            if (e.data.id !== id) return;
+            worker.removeEventListener('message', handler);
+            if (e.data.type === 'error') {
+              reject(new Error(e.data.error || 'LibreOffice WASM error'));
+            } else {
+              resolve(e.data);
+            }
+          };
+          worker.addEventListener('message', handler);
+          worker.postMessage({ type, id, ...payload });
+        });
+      }
+
+      // Initialize with WASM paths
+      await send('init', {
+        sofficeJs: base + '/soffice.js',
+        sofficeWasm: base + '/soffice.wasm.gz',
+        sofficeData: base + '/soffice.data.gz',
+        sofficeWorkerJs: base + '/soffice.worker.js',
+        verbose: false,
+        enableProgressTracking: true,
+      });
+
+      return {
+        async convert(file, options = {}) {
+          const arrayBuffer = await file.arrayBuffer();
+          const ext = (options.filename || 'input.docx').split('.').pop() || 'docx';
+          const formats = { docx: 'pdf', doc: 'pdf', odt: 'pdf', rtf: 'pdf' };
+          const outFormat = formats[ext] || 'pdf';
+
+          const result = await send('convert', {
+            file: arrayBuffer,
+            filename: options.filename || 'input.' + ext,
+            outputFormat: outFormat,
+          });
+          return result.data;
+        },
+        destroy() {
+          try { worker.terminate(); } catch (_) {}
+          window._libreOfficePromise = null;
+        },
+      };
+    })();
+  }
+  return window._libreOfficePromise;
 };
 
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
