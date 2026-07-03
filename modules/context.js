@@ -39,7 +39,7 @@ const SandpieTokens = (() => {
   // Live override pushed by the streaming loop during generation, so the panel
   // climbs in real time (baseline + generated-so-far) instead of only updating
   // when the turn ends. Cleared when the turn finishes → authoritative wins.
-  let _liveTotal = null, _liveConvId = null, _liveNotifyT = null;
+  let _liveTotal = null, _liveConvId = null, _liveNotifyT = null, _liveDelta = 0;
 
   async function conversationTokens() {
     const convId = localStorage.getItem('sandpie-active-conv');
@@ -72,16 +72,20 @@ const SandpieTokens = (() => {
     return _liveTotal != null && _liveConvId === convId;
   }
 
-  // Streaming loop calls this (throttled internally) with the live running total.
-  function setLiveTokens(convId, total) {
+  // Streaming loop calls this (throttled internally) with the live running total
+  // and the this-turn delta (generated + tool-result tokens), so render() can
+  // grow the cached breakdown by the delta instead of clamping against it.
+  function setLiveTokens(convId, total, delta) {
     _liveConvId = convId;
     _liveTotal = (typeof total === 'number' && total >= 0) ? total : null;
-    if (_liveNotifyT) return;   // coalesce re-renders to ~5/s
-    _liveNotifyT = setTimeout(() => { _liveNotifyT = null; notify(); }, 200);
+    _liveDelta = (typeof delta === 'number' && delta >= 0) ? delta : 0;
+    if (_liveNotifyT) return;   // coalesce re-renders to ~1/s
+    _liveNotifyT = setTimeout(() => { _liveNotifyT = null; notify(); }, 1000);
   }
+  function liveDelta() { return _liveDelta; }
   function clearLiveTokens(convId) {
     if (convId != null && convId !== _liveConvId) return;
-    _liveTotal = null; _liveConvId = null;
+    _liveTotal = null; _liveConvId = null; _liveDelta = 0;
     if (_liveNotifyT) { clearTimeout(_liveNotifyT); _liveNotifyT = null; }
     notify();
   }
@@ -112,8 +116,9 @@ const SandpieTokens = (() => {
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    recordUsage, forget, conversationTokens, isEstimated, isLive, weeklyTotal,
-    contextWindow, subscribe, notify, setLiveTokens, clearLiveTokens,
+    recordUsage, forget, conversationTokens, estimateTokens, isEstimated, isLive,
+    weeklyTotal, contextWindow, subscribe, notify, setLiveTokens, clearLiveTokens,
+    liveDelta,
   };
 })();
 window.SandpieTokens = SandpieTokens;
@@ -426,20 +431,24 @@ async function render() {
   // turn boundaries, so while a turn is streaming reuse the cached breakdown and skip
   // the heavy recompute entirely — see the _bdCache note above (focused-tab
   // decode-collapse fix). Turn end (clearLiveTokens→notify) recomputes it fresh.
-  let b;
+  let b, total;
   if (T.isLive && T.isLive() && _bdCache) {
+    // Live: grow the cached (turn-start) breakdown by the this-turn delta the
+    // streaming HUD reports. Never clamp against the cached sum — the old
+    // max(reported, sum) froze the headline for most of a local run, because
+    // the live baseline misses the system/tools/skills tokens the sum has.
     b = { ..._bdCache };
-    const currentSum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
-    const delta = reportedTotal - currentSum;
-    if (delta > 0) b.messages += delta;
+    b.messages += T.liveDelta ? T.liveDelta() : 0;
+    total = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
   } else {
     b = await computeBreakdown();
     _bdCache = b;
+    const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
+    // When estimating, show whichever is larger — the reported figure or the
+    // breakdown sum — so the headline never reads smaller than its own breakdown.
+    total = estimated ? Math.max(reportedTotal, sum) : reportedTotal;
   }
   const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
-  // When estimating, show whichever is larger — the live/running figure or the
-  // breakdown sum — so the headline never reads smaller than its own breakdown.
-  const total = estimated ? Math.max(reportedTotal, sum) : reportedTotal;
 
   convEl.textContent = fmtTokens(total) + (estimated ? ' ~' : '');
   convEl.title = estimated ? 'Estimated client-side (provider did not report usage)' : 'Reported by the provider';

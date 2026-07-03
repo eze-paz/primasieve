@@ -1268,7 +1268,7 @@ function ensureStream(id) {
       abort: null,
       compaction: null,
       timerEl: null, timerStart: 0, timerInterval: null,
-      genChars: 0, tokTarget: 0, tokShown: 0, rateShown: 0, tokBaseline: 0,
+      genChars: 0, toolChars: 0, tokTarget: 0, tokBaseline: 0,
       generating: false,
     };
     convStreams.set(id, s);
@@ -2441,8 +2441,7 @@ window.dispatchAgentEvent = dispatchAgentEvent;
    background conv keeps ticking against its own bubble host without colliding
    with whichever conv is currently visible.
    ============================================================================= */
-const TIMER_TICK_MS = 66;   // ~15fps: smooth token easing at trivial cost
-const TOK_EASE = 0.2;       // fraction of the remaining gap the shown count closes per tick
+const TIMER_TICK_MS = 1000; // 1s: numeric readouts don't need frame-rate updates
 const TOK_FMT = n => Math.round(n).toLocaleString('en-US');
 const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s';
 
@@ -2456,7 +2455,15 @@ const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s
 // flows to SandpieTokens/Context untouched — this counter is a live HUD, not a
 // billing figure.)
 function accountStreamTokens(stream, ev) {
-  if (!stream || ev.type !== 'delta' || !ev.delta) return;
+  if (!stream) return;
+  // Tool results enter the context on the next round but are NOT generated
+  // tokens: they feed the ctx figure (HUD "ctx" + sidebar live meter), never
+  // the tok/s throughput pair.
+  if (ev.type === 'tool_result') {
+    stream.toolChars = (stream.toolChars || 0) + String(ev.result || '').length;
+    return;
+  }
+  if (ev.type !== 'delta' || !ev.delta) return;
   const d = ev.delta;
   let n = 0;
   if (typeof d.content === 'string') n += d.content.length;
@@ -2476,18 +2483,17 @@ function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
   stream.genChars = 0;
+  stream.toolChars = 0;
   stream.tokTarget = 0;
-  stream.tokShown = 0;
-  stream.rateShown = 0;
 
   const el = document.createElement('div');
   el.className = 'msg-timer';
-  // Built once; the tick mutates the leaf <span>s in place rather than
-  // re-rendering innerHTML ~15×/s (which would thrash layout and the queue pill).
+  // Built once; the tick mutates the leaf <span>s in place.
   el.innerHTML =
     '<span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-tok">0 tok</span>' +
     '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
+    '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
     '<span class="mt-queue"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
@@ -2495,11 +2501,11 @@ function startTotalTimer(stream) {
   const timeEl = el.querySelector('.mt-time');
   const tokEl = el.querySelector('.mt-tok');
   const rateEl = el.querySelector('.mt-rate');
+  const ctxEl = el.querySelector('.mt-ctx');
   const queueEl = el.querySelector('.mt-queue');
   queueEl.style.cursor = 'pointer';
   queueEl.title = 'Click to view queued messages';
   queueEl.addEventListener('click', () => openQueueModal(stream));
-  const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
 
   const paint = () => {
@@ -2507,25 +2513,24 @@ function startTotalTimer(stream) {
     const elapsed = (Date.now() - stream.timerStart) / 1000;
     set(timeEl, fmtElapsed(elapsed));
 
-    // Total tokens — ease the shown value up toward the target so bursty API
-    // chunks or fast local decode read as a smooth climb. Strictly monotonic:
-    // never tick backward.
+    // Generated tokens this interaction (text + tool-call args), and aggregate
+    // throughput. The timer spans tool execution too, so tok/s honestly drops
+    // while a tool runs.
     const target = stream.tokTarget;
-    if (reduce || target <= stream.tokShown) stream.tokShown = target;
-    else stream.tokShown = Math.min(target, stream.tokShown + Math.max((target - stream.tokShown) * TOK_EASE, 1));
-    set(tokEl, TOK_FMT(stream.tokShown) + ' tok');
+    set(tokEl, TOK_FMT(target) + ' tok');
+    set(rateEl, RATE_FMT(elapsed > 0.4 ? target / elapsed : 0));
 
-    // tok/s — aggregate throughput over the interaction. The timer spans tool
-    // execution too, so this honestly eases down while a tool runs.
-    const inst = elapsed > 0.4 ? target / elapsed : 0;
-    stream.rateShown = reduce ? inst : stream.rateShown + (inst - stream.rateShown) * TOK_EASE;
-    set(rateEl, RATE_FMT(stream.rateShown));
+    // Conversation CONTEXT: baseline (all previous turns) + generated this turn
+    // + tool results this turn. Doesn't reset per turn — it's the running size
+    // of what the next request will carry.
+    const turnCtx = target + Math.ceil((stream.toolChars || 0) / 4);
+    set(ctxEl, TOK_FMT((stream.tokBaseline || 0) + turnCtx) + ' ctx');
 
-    // Live CONTEXT meter: baseline + generated-so-far, pushed only for the
-    // visible conversation (SandpieTokens throttles the panel re-render). Cleared
-    // in sendSingle's finally → the panel snaps to the authoritative size.
+    // Push the same figure to the sidebar Context panel, with the this-turn
+    // delta separated so the panel can grow its cached breakdown instead of
+    // clamping against it (the clamp froze the sidebar during local runs).
     if (stream.id === activeConvId && typeof SandpieTokens !== 'undefined' && SandpieTokens.setLiveTokens) {
-      SandpieTokens.setLiveTokens(stream.id, (stream.tokBaseline || 0) + target);
+      SandpieTokens.setLiveTokens(stream.id, (stream.tokBaseline || 0) + turnCtx, turnCtx);
     }
 
     const q = stream.queue.length;
