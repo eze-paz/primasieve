@@ -133,18 +133,19 @@
     const workerCode = await (await fetch(BASE + '/browser.worker.global.js')).text();
 
     // ── 4. Spawn the conversion worker and drive its message protocol ─────
-    // LibreOffice's boot occasionally hits an Emscripten pthread-spawn deadlock
-    // (timing-dependent: the main wasm thread blocks while a pthread worker is
-    // mid-handshake). It normally initializes in well under a minute, so a stall
-    // watchdog (no messages at all for stallMs) terminates the worker and one
-    // retry gets a fresh roll of the dice.
+    // LibreOffice's boot hits a timing-dependent Emscripten pthread-spawn
+    // deadlock on ~half of cold starts here (main wasm thread blocks while a
+    // pthread worker is mid-handshake; goes silent right after the svmain.cxx
+    // boot warnings). Healthy boots reach ready in <40s once assets are cached,
+    // so the stall watchdog (no protocol messages for stallMs) is tight — 45s —
+    // and each retry gets a fresh worker. 4 attempts ≈ 94% success at 50% flake.
     const workerBlobUrl = URL.createObjectURL(new Blob(
       [SHIM + workerCode.replace(/\/\/#\s*sourceMappingURL=.*$/gm, '')],
       { type: 'application/javascript' }));
     const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
     let res = null, worker = null;
 
-    for (let attempt = 1; attempt <= 2 && !res; attempt++) {
+    for (let attempt = 1; attempt <= 4 && !res; attempt++) {
       worker = new Worker(workerBlobUrl);
       worker.addEventListener('error', (e) => status('Worker error: ' + e.message, true));
 
@@ -180,7 +181,7 @@
         status('Initializing LibreOffice…' + (attempt > 1 ? ' (retry)' : ''));
         await send('init', { sofficeJs, sofficeWasm, sofficeData, sofficeWorkerJs,
                              verbose: false, enableProgressTracking: false },
-                   { timeoutMs: 600000, stallMs: 180000 });
+                   { timeoutMs: 600000, stallMs: 45000 });
 
         status('Converting ' + job.name + '…');
         // FS.writeFile in the worker requires a typed array — NOT a raw ArrayBuffer.
@@ -190,7 +191,7 @@
                          { timeoutMs: 600000 }, [inputData.buffer]);
       } catch (e) {
         try { worker.terminate(); } catch (_) {}
-        if (attempt >= 2) throw e;
+        if (attempt >= 4) throw e;
         console.warn('[convert] attempt ' + attempt + ' failed (' + (e && e.message) + '), retrying with a fresh worker');
       }
     }
