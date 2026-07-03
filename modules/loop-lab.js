@@ -17,7 +17,12 @@
  *         temperature?, maxTokens?, saveAs?, mergeScratchpad? },
  *       { name, type: "tool", argsFrom: "<var>", saveAs? },
  *       { name, type: "js",   code: "<body of function(ctx)>" },
+ *       { name, type: "foreach", items: "<js expr over vars/scratchpad returning array>",
+ *         stage: {<inner llm|tool|js stage>}, saveAs? },
  *     ] }
+ *
+ * foreach runs its inner stage once per item; inner templates additionally see
+ * ${item} and ${itemIndex}; outer saveAs collects the per-item results array.
  *
  * Template variables in system/user strings: ${task} ${turn} ${scratchpad}
  * ${toolSchemas} plus any ${var} saved by an earlier stage via saveAs.
@@ -58,17 +63,56 @@
     ]
   };
 
+  /* ---- decision-matrix example: propose k options → foreach-score each on
+     fixed criteria → js stage aggregates (the arithmetic and decision rule are
+     CODE, so the model can't fudge the aggregation). Single-pass. ---- */
+  const MATRIX = {
+    name: 'decision-matrix',
+    maxTurns: 2,
+    scratchpad: { options: [], scores: [], decision: null, done: false },
+    stopWhen: 'scratchpad.done === true',
+    stages: [
+      {
+        name: 'propose', type: 'llm', parse: 'json', temperature: 0.8, mergeScratchpad: true,
+        system: 'You are the PROPOSER. Produce exactly 3 genuinely different approaches to the task — different strategies, not variations of one idea. Output ONLY JSON: {"options":[{"id":"A","summary":"..."},{"id":"B","summary":"..."},{"id":"C","summary":"..."}]}',
+        user: 'TASK:\n${task}\n\nJSON:'
+      },
+      {
+        name: 'score', type: 'foreach', items: 'scratchpad.options', saveAs: 'scores',
+        stage: {
+          name: 'judge', type: 'llm', parse: 'json', temperature: 0.2,
+          system: 'You are the JUDGE. Score ONE option on three criteria, integer 1-5 (5=best): correctness (likely to actually solve the task), cost (5 = cheap and simple to do), verifiability (5 = easy to check it worked). Justify in one line. Identical scores across all criteria are almost always lazy — differentiate unless truly warranted. Output ONLY JSON: {"id":"<option id>","correctness":n,"cost":n,"verifiability":n,"why":"..."}',
+          user: 'TASK:\n${task}\n\nOPTION TO SCORE (judge this one only):\n${item}\n\nJSON:'
+        }
+      },
+      {
+        name: 'aggregate', type: 'js',
+        code: "const rows = ctx.vars.scores || [];\nconst totals = rows.filter(Boolean).map(r => ({ id: r.id, total: (r.correctness||0)+(r.cost||0)+(r.verifiability||0), why: r.why }));\ntotals.sort((a,b) => b.total - a.total);\nconst flat = rows.filter(Boolean).every(r => r.correctness === r.cost && r.cost === r.verifiability);\nctx.scratchpad.scores = rows;\nctx.scratchpad.decision = { winner: totals[0] ? totals[0].id : null, margin: totals.length > 1 ? totals[0].total - totals[1].total : null, ranking: totals, suspicious_uniform_scores: flat };\nctx.scratchpad.done = true;\nctx.log('winner: ' + (totals[0] ? totals[0].id + ' (total ' + totals[0].total + ')' : 'none') + (flat ? ' — WARNING: uniform scores, judge may be lazy' : ''));"
+      }
+    ]
+  };
+
+  const EXAMPLES = [EXAMPLE, MATRIX];
+
   /* ================= persistence ================= */
   function loadLoops() {
     try { return JSON.parse(localStorage.getItem(K_LOOPS) || '{}'); } catch (_) { return {}; }
   }
   function saveLoops(loops) { localStorage.setItem(K_LOOPS, JSON.stringify(loops)); }
+  // Seed each example once (per-name flag), so a user deleting one doesn't get
+  // it resurrected on every open.
   function ensureExample() {
     const loops = loadLoops();
-    if (!Object.keys(loops).length) {
-      loops[EXAMPLE.name] = JSON.stringify(EXAMPLE, null, 2);
-      saveLoops(loops);
+    let changed = false;
+    for (const ex of EXAMPLES) {
+      const flag = 'sandpie:looplab:seeded:' + ex.name;
+      if (!loops[ex.name] && !localStorage.getItem(flag)) {
+        loops[ex.name] = JSON.stringify(ex, null, 2);
+        changed = true;
+      }
+      localStorage.setItem(flag, '1');
     }
+    if (changed) saveLoops(loops);
     return loops;
   }
 
@@ -184,18 +228,110 @@
   }
 
   /* ================= run engine ================= */
-  let _run = null;   // { ctrl, stats }
+  let _run = null;          // { ctrl, stats }
+  let _transcript = [];     // full plain-text record of the last run (Copy button)
+  const rec = (s) => _transcript.push(s);
 
+  function validateStage(st, inner) {
+    if (!st || !st.name) return 'Every stage needs a "name".';
+    const types = inner ? ['llm', 'tool', 'js'] : ['llm', 'tool', 'js', 'foreach'];
+    if (!types.includes(st.type)) return 'Stage "' + st.name + '": type must be ' + types.join(' | ') + '.';
+    if (st.type === 'tool' && !st.argsFrom) return 'Tool stage "' + st.name + '" needs "argsFrom" (a var holding {tool, arguments}).';
+    if (st.type === 'js' && typeof st.code !== 'string') return 'JS stage "' + st.name + '" needs a "code" string.';
+    if (st.type === 'foreach') {
+      if (typeof st.items !== 'string') return 'foreach stage "' + st.name + '" needs "items" (a JS expr over vars/scratchpad returning an array).';
+      if (!st.stage || typeof st.stage !== 'object') return 'foreach stage "' + st.name + '" needs an inner "stage".';
+      return validateStage(st.stage, true);
+    }
+    return null;
+  }
   function validateSpec(spec) {
     if (!spec || typeof spec !== 'object') return 'Spec is not an object.';
     if (!Array.isArray(spec.stages) || !spec.stages.length) return 'Spec needs a non-empty "stages" array.';
-    for (const st of spec.stages) {
-      if (!st.name) return 'Every stage needs a "name".';
-      if (!['llm', 'tool', 'js'].includes(st.type)) return 'Stage "' + st.name + '": type must be llm | tool | js.';
-      if (st.type === 'tool' && !st.argsFrom) return 'Tool stage "' + st.name + '" needs "argsFrom" (a var holding {tool, arguments}).';
-      if (st.type === 'js' && typeof st.code !== 'string') return 'JS stage "' + st.name + '" needs a "code" string.';
-    }
+    for (const st of spec.stages) { const e = validateStage(st, false); if (e) return e; }
     return null;
+  }
+
+  // Execute one stage. ctx = { vars, scratchpad, turnHost, ui, ctrl, stats }.
+  // Returns the stage's output value. saveAs/mergeScratchpad are handled here so
+  // foreach inner stages get the same semantics (merge runs once per item).
+  async function execStage(st, ctx, depth) {
+    const { vars, scratchpad, turnHost, ui, ctrl, stats } = ctx;
+    const t0 = Date.now();
+
+    if (st.type === 'llm') {
+      stats.llmCalls++;
+      ui.stageStart(turnHost, st.name, 'llm');
+      const sys = fill(st.system, vars), usr = fill(st.user, vars);
+      rec('[' + st.name + ' · llm]\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
+      const raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal });
+      let out = raw;
+      if (st.parse === 'json') {
+        out = parseJSON(raw);
+        if (out === null) throw new Error('stage "' + st.name + '": model output is not valid JSON:\n' + raw.slice(0, 400));
+      } else if (st.parse && st.parse.startsWith('block:')) {
+        out = parseBlock(raw, st.parse.slice(6));
+      }
+      rec('OUTPUT (' + st.name + '):\n' + (typeof out === 'string' ? out : JSON.stringify(out, null, 2)));
+      if (st.saveAs) vars[st.saveAs] = out;
+      if (st.mergeScratchpad && out && typeof out === 'object' && !Array.isArray(out)) Object.assign(scratchpad, out);
+      ui.stageDone(turnHost, st.name, out, Date.now() - t0);
+      return out;
+    }
+
+    if (st.type === 'tool') {
+      const call = vars[st.argsFrom];
+      if (!call || typeof call !== 'object' || !call.tool) throw new Error('stage "' + st.name + '": var "' + st.argsFrom + '" does not hold {tool, arguments}.');
+      if (call.tool === 'none' || call.tool === 'done') {
+        if (st.saveAs) vars[st.saveAs] = '(no tool needed)';
+        rec('[' + st.name + ' · tool] none — skipped');
+        ui.stageDone(turnHost, st.name, '(no tool needed — skipped)', Date.now() - t0);
+        return null;
+      }
+      stats.toolCalls++;
+      ui.stageStart(turnHost, st.name, 'tool ' + call.tool);
+      rec('[' + st.name + ' · tool ' + call.tool + ']\nARGS:\n' + JSON.stringify(call.arguments || {}, null, 2));
+      const result = await runTool(call.tool, call.arguments || {}, ctrl.signal);
+      const clipped = String(result).slice(0, st.maxChars || 4000);
+      rec('RESULT (' + st.name + ', first ' + clipped.length + ' chars):\n' + clipped);
+      if (st.saveAs) vars[st.saveAs] = clipped;
+      ui.stageDone(turnHost, st.name + ' (' + call.tool + ')', clipped, Date.now() - t0);
+      return clipped;
+    }
+
+    if (st.type === 'js') {
+      ui.stageStart(turnHost, st.name, 'js');
+      const logs = [];
+      const fn = new Function('ctx', st.code);
+      const ret = fn({ vars, scratchpad, turn: ctx.turn, task: ctx.task, log: (m) => logs.push(String(m)) });
+      rec('[' + st.name + ' · js]\n' + (logs.join('\n') || '(no log output)'));
+      ui.stageDone(turnHost, st.name, (logs.join('\n') || '(ok)') + (ret && ret.stop ? '\n→ stop requested' : ''), Date.now() - t0);
+      return ret;
+    }
+
+    if (st.type === 'foreach') {
+      if (depth > 0) throw new Error('stage "' + st.name + '": nested foreach is not supported.');
+      let items;
+      try { items = new Function('vars', 'scratchpad', 'return (' + st.items + ');')(vars, scratchpad); }
+      catch (e) { throw new Error('foreach "' + st.name + '": items expression failed — ' + e.message); }
+      if (!Array.isArray(items)) throw new Error('foreach "' + st.name + '": items expression did not return an array.');
+      rec('[' + st.name + ' · foreach × ' + items.length + ' over ' + st.items + ']');
+      const results = [];
+      for (let i = 0; i < items.length; i++) {
+        if (ctrl.signal.aborted) break;
+        // Prototype chain: the inner stage sees all outer vars plus item/itemIndex;
+        // its own saveAs writes stay per-item (discarded after the iteration).
+        const subVars = Object.create(vars);
+        subVars.item = items[i];
+        subVars.itemIndex = i;
+        const inner = { ...st.stage, name: (st.stage.name || st.name) + '[' + i + ']' };
+        results.push(await execStage(inner, { ...ctx, vars: subVars }, depth + 1));
+      }
+      if (st.saveAs) vars[st.saveAs] = results;
+      return results;
+    }
+
+    throw new Error('Unknown stage type: ' + st.type);
   }
 
   async function runLoop(spec, task, ui) {
@@ -212,64 +348,31 @@
     try {
       for (let turn = 1; turn <= maxTurns && !stopped; turn++) {
         if (ctrl.signal.aborted) break;
+        rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
           task, turn,
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
+        const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task };
 
         for (const st of spec.stages) {
           if (ctrl.signal.aborted) { stopped = true; break; }
-          const t0 = Date.now();
           try {
-            if (st.type === 'llm') {
-              stats.llmCalls++;
-              ui.stageStart(turnHost, st.name, 'llm');
-              const raw = await llmOnce({
-                system: fill(st.system, vars), user: fill(st.user, vars),
-                temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal,
-              });
-              let out = raw;
-              if (st.parse === 'json') {
-                out = parseJSON(raw);
-                if (out === null) throw new Error('stage "' + st.name + '": model output is not valid JSON:\n' + raw.slice(0, 400));
-              } else if (st.parse && st.parse.startsWith('block:')) {
-                out = parseBlock(raw, st.parse.slice(6));
-              }
-              if (st.saveAs) vars[st.saveAs] = out;
-              if (st.mergeScratchpad && out && typeof out === 'object' && !Array.isArray(out)) Object.assign(scratchpad, out);
-              ui.stageDone(turnHost, st.name, out, Date.now() - t0);
-            } else if (st.type === 'tool') {
-              const call = vars[st.argsFrom];
-              if (!call || typeof call !== 'object' || !call.tool) throw new Error('stage "' + st.name + '": var "' + st.argsFrom + '" does not hold {tool, arguments}.');
-              if (call.tool === 'none' || call.tool === 'done') {
-                if (st.saveAs) vars[st.saveAs] = '(no tool needed)';
-                ui.stageDone(turnHost, st.name, '(no tool needed — skipped)', Date.now() - t0);
-              } else {
-                stats.toolCalls++;
-                ui.stageStart(turnHost, st.name, 'tool ' + call.tool);
-                const result = await runTool(call.tool, call.arguments || {}, ctrl.signal);
-                if (st.saveAs) vars[st.saveAs] = String(result).slice(0, st.maxChars || 4000);
-                ui.stageDone(turnHost, st.name + ' (' + call.tool + ')', String(result).slice(0, 4000), Date.now() - t0);
-              }
-            } else if (st.type === 'js') {
-              ui.stageStart(turnHost, st.name, 'js');
-              const logs = [];
-              const fn = new Function('ctx', st.code);
-              const ret = fn({ vars, scratchpad, turn, task, log: (m) => logs.push(String(m)) });
-              if (ret && ret.stop) stopped = true;
-              ui.stageDone(turnHost, st.name, (logs.join('\n') || '(ok)') + (ret && ret.stop ? '\n→ stop requested' : ''), Date.now() - t0);
-            }
+            const ret = await execStage(st, ctx, 0);
+            if (st.type === 'js' && ret && ret.stop) stopped = true;
           } catch (e) {
             if (e && e.name === 'AbortError') { stopped = true; break; }
             ui.stageError(turnHost, st.name, e.message || String(e));
+            rec('[' + st.name + ' · ERROR]\n' + (e.message || String(e)));
             scratchpad.last_error = String(e.message || e).slice(0, 500);
             break;   // abandon this turn's remaining stages, let the next turn recover
           }
           ui.setScratchpad(scratchpad);
           ui.setStats(stats);
         }
+        rec('SCRATCHPAD after turn ' + turn + ':\n' + JSON.stringify(scratchpad, null, 2));
 
         if (spec.stopWhen && !stopped) {
           try {
@@ -347,6 +450,7 @@
           <strong style="font-size:0.9rem;">Loop Lab</strong>
           <span id="llProvider" style="font-size:0.72rem;color:var(--sp-text-dim,#8b949e);"></span>
           <span id="llStats" style="margin-left:auto;font-size:0.72rem;color:var(--sp-text-dim,#8b949e);"></span>
+          <button class="ll-btn" id="llCopy" title="Copy the full run output — all turns, filled prompts, stage outputs, scratchpad snapshots">⧉ Copy run</button>
           <button class="ll-btn" id="llClose" title="Close (Esc)">✕</button>
         </div>
         <div class="ll-body">
@@ -358,7 +462,7 @@
               <button class="ll-btn danger" id="llDelete" title="Delete selected loop">Del</button>
             </div>
             <textarea id="llSpec" class="ll-spec" spellcheck="false"></textarea>
-            <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
+            <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js | foreach (inner stage sees \${item} \${itemIndex}) · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
             <textarea id="llTask" class="ll-task" placeholder="Task for the loop, e.g. 'List the files in /, read the most interesting one, record 3 facts about it.'"></textarea>
             <div class="ll-row">
               <button class="ll-btn primary" id="llRun">▶ Run</button>
@@ -471,6 +575,7 @@
         this._finish(turnHost, name, 'err', '✖ ' + name + ' — error', msg);
       },
       note(msg) {
+        rec('· ' + msg);
         const el = document.createElement('div');
         el.className = 'll-note';
         el.textContent = msg;
@@ -504,10 +609,26 @@
       if (!task) { $id('llStatus').textContent = 'Enter a task first.'; return; }
       localStorage.setItem(K_TASK, task);
       $id('llTrace').innerHTML = '';
+      _transcript = ['=== LOOP "' + (spec.name || '?') + '" · ' + new Date().toISOString() + ' ===', 'TASK:\n' + task];
       ui.setScratchpad(spec.scratchpad || {});
       try { await runLoop(spec, task, ui); } catch (e) { ui.note('Fatal: ' + (e.message || e)); ui.setRunning(false); }
     };
     $id('llStop').onclick = () => { if (_run) _run.ctrl.abort(); };
+    $id('llCopy').onclick = async () => {
+      const btn = $id('llCopy');
+      const text = _transcript.length ? _transcript.join('\n\n') : '(no run yet)';
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+        // clipboard API can be denied — fall back to a hidden textarea
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          ok = document.execCommand('copy'); ta.remove();
+        } catch (_) {}
+      }
+      btn.textContent = ok ? '✓ Copied' : '✕ Copy failed';
+      setTimeout(() => { btn.textContent = '⧉ Copy run'; }, 1500);
+    };
 
     $id('llClose').onclick = close;
     root.querySelector('.ll-backdrop').onclick = close;
@@ -554,5 +675,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initMenu);
   else initMenu();
 
-  window.SandpieLoopLab = { open, close, runLoop, get running() { return !!_run; } };
+  window.SandpieLoopLab = { open, close, runLoop, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
 })();
