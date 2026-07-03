@@ -838,8 +838,8 @@ opfs.getLibreOfficeConverter = function() {
       console.log('[LO] worker spawned');
 
       // Log ALL worker messages
-      worker.addEventListener('message', (e) => console.log('[LO msg]', e.data));
-      worker.addEventListener('error', (e) => console.error('[LO err]', e.message, e.lineno));
+      worker.addEventListener('message', (e) => { console.log('[LO msg]', e.data); window._loLastMsg = Date.now(); });
+      worker.addEventListener('error', (e) => { console.error('[LO err]', e.message, e.lineno, e.filename); clearInterval(_loHeartbeat); });
       worker.addEventListener('messageerror', (e) => console.error('[LO msgerr]', e));
 
       const reqId = () => 'lo_' + Math.random().toString(36).slice(2);
@@ -868,7 +868,7 @@ opfs.getLibreOfficeConverter = function() {
         });
       }
 
-      console.log('[LO] init start');
+      console.log('[LO] init start'); const _loHeartbeat = setInterval(() => console.log('[LO] still waiting for init...'), 30000);
       const initRes = await send('init', {
         sofficeJs: sofficeJsUrl,
         sofficeWasm: sofficeWasmUrl,
@@ -877,7 +877,7 @@ opfs.getLibreOfficeConverter = function() {
         verbose: false,
         enableProgressTracking: false,
       }, 900000);
-      console.log('[LO] init done:', initRes);
+      clearInterval(_loHeartbeat); console.log('[LO] init done:', initRes);
 
       return {
         async convert(file, options = {}) {
