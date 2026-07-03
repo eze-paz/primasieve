@@ -438,8 +438,8 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
   closeBtn.title = 'Close (Esc)';
   const convertBtn = document.createElement('button');
   convertBtn.className = 'mode';
-  convertBtn.textContent = '???PDF';
-  convertBtn.title = 'Convert to PDF (LibreOffice WASM)';
+  convertBtn.textContent = '→ PDF';
+  convertBtn.title = 'Convert to PDF (LibreOffice WASM, opens in a new tab)';
   convertBtn.style.display = 'none';
   header.append(title, meta, mdBtn, pencilBtn, saveBtn, convertBtn, closeBtn);
   const body = document.createElement('div');
@@ -529,27 +529,26 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // OOXML → renderAsync throws → the catch shows a download link.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading document viewer…</div>';
     mount(opfs.closeFile);
-    // Show convert-to-PDF button for supported formats
-    convertBtn.style.display = (ext === 'docx' || ext === 'doc' || ext === 'odt') ? '' : 'none';
+    // Convert-to-PDF runs in a dedicated popup (convert/index.html): LibreOffice
+    // WASM is a pthreads build that needs crossOriginIsolated, which this page
+    // deliberately isn't (no COOP/COEP; the SW kill-switch evicts root-scope SWs).
+    // The popup gets isolation from its own /convert/-scoped coi-serviceworker.
+    // The document bytes are handed off through IndexedDB (NOT OPFS — the cloud
+    // sync engine watches OPFS and would push scratch files to Dropbox).
+    convertBtn.style.display = '';
     convertBtn.onclick = async () => {
       convertBtn.disabled = true;
-      convertBtn.textContent = 'Converting...';
       try {
-        const converter = await opfs.getLibreOfficeConverter();
-        const pdfArray = await converter.convert(file, { filename: name });
-        const pdfBlob = new Blob([pdfArray], { type: 'application/pdf' });
-        const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name.replace(/\.[^.]+$/, '') + '.pdf';
-        a.click();
-        URL.revokeObjectURL(url);
+        const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+        const bytes = await file.arrayBuffer();
+        await opfs._putConvertJob({ id, name, bytes, ts: Date.now() });
+        const w = window.open('convert/index.html#job=' + id, '_blank');
+        if (!w) opfs._toast('Popup blocked — allow popups for this site to convert to PDF.', 5000);
       } catch (e) {
-        console.error('[opfs] PDF conversion failed:', e);
+        console.error('[opfs] PDF conversion handoff failed:', e);
         opfs._toast('PDF conversion failed: ' + (e.message || e), 4000);
       }
       convertBtn.disabled = false;
-      convertBtn.textContent = '???PDF';
     };
     try {
       const docx = await opfs.getDocxPreview();
@@ -783,123 +782,22 @@ opfs.getDocxPreview = function() {
   return window._docxPreviewPromise;
 };
 
-// Lazy-load LibreOffice WASM converter (MPL-2.0). Loads the WASM runtime and
-// browser worker from jsdelivr, initializes once, and provides a convert() method
-// for docx -> pdf conversion with pixel-perfect fidelity.
-
-
-opfs.getLibreOfficeConverter = function() {
-  if (!window._libreOfficePromise) {
-    window._libreOfficePromise = (async () => {
-      const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
-      const workerUrl = BASE + '/browser.worker.global.js';
-
-      // Helper: fetch a .gz asset and decompress it in-browser
-      async function fetchGzAsset(url, mimeType) {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error('failed to fetch ' + url + ': ' + r.status);
-        const ds = new DecompressionStream('gzip');
-        const decompressed = await new Response(r.body.pipeThrough(ds)).arrayBuffer();
-        const blob = new Blob([decompressed], { type: mimeType });
-        return URL.createObjectURL(blob);
-      }
-
-      // Fetch and cache scripts as blob URLs to avoid cross-origin importScripts issues
-      async function fetchScript(url) {
-        const code = await (await fetch(url)).text();
-        const blob = new Blob([code], { type: 'application/javascript' });
-        return URL.createObjectURL(blob);
-      }
-
-      console.log('[LO] fetching soffice.js...');
-      const sofficeJsUrl = await fetchScript(BASE + '/soffice.js');
-      console.log('[LO] soffice.js ready');
-
-      console.log('[LO] decompressing soffice.wasm...');
-      const sofficeWasmUrl = await fetchGzAsset(BASE + '/soffice.wasm.gz', 'application/wasm');
-      console.log('[LO] soffice.wasm ready');
-
-      console.log('[LO] decompressing soffice.data...');
-      const sofficeDataUrl = await fetchGzAsset(BASE + '/soffice.data.gz', 'application/octet-stream');
-      console.log('[LO] soffice.data ready');
-
-      console.log('[LO] fetching soffice.worker.js...');
-      const sofficeWorkerJsUrl = await fetchScript(BASE + '/soffice.worker.js');
-      console.log('[LO] soffice.worker.js ready');
-
-      console.log('[LO] fetching main worker script...');
-      const workerCode = await (await fetch(workerUrl)).text();
-      console.log('[LO] worker size:', workerCode.length);
-
-      // Strip source maps
-      const cleanCode = workerCode.replace(/\/\/#\s*sourceMappingURL=.*$/gm, '');
-      const blob = new Blob([cleanCode], { type: 'application/javascript' });
-      const worker = new Worker(URL.createObjectURL(blob));
-      console.log('[LO] worker spawned');
-
-      // Log ALL worker messages
-      worker.addEventListener('message', (e) => { console.log('[LO msg]', e.data); window._loLastMsg = Date.now(); });
-      worker.addEventListener('error', (e) => { console.error('[LO err]', e.message, e.lineno, e.filename); clearInterval(_loHeartbeat); });
-      worker.addEventListener('messageerror', (e) => console.error('[LO msgerr]', e));
-
-      const reqId = () => 'lo_' + Math.random().toString(36).slice(2);
-
-      function send(type, payload, timeoutMs = 120000) {
-        const id = reqId();
-        return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            worker.removeEventListener('message', handler);
-            reject(new Error('WASM timeout: ' + type));
-          }, timeoutMs);
-          const handler = (e) => {
-            if (!e.data || e.data.id !== id) return;
-            if (e.data.type === 'progress') return; // ignore progress updates
-            clearTimeout(timer);
-            worker.removeEventListener('message', handler);
-            if (e.data.type === 'error') {
-              reject(new Error(e.data.error || 'WASM error'));
-            } else {
-              resolve(e.data);
-            }
-          };
-          worker.addEventListener('message', handler);
-          console.log('[LO send]', type, id);
-          worker.postMessage({ type, id, ...payload });
-        });
-      }
-
-      console.log('[LO] init start'); const _loHeartbeat = setInterval(() => console.log('[LO] still waiting for init...'), 30000);
-      const initRes = await send('init', {
-        sofficeJs: sofficeJsUrl,
-        sofficeWasm: sofficeWasmUrl,
-        sofficeData: sofficeDataUrl,
-        sofficeWorkerJs: sofficeWorkerJsUrl,
-        verbose: false,
-        enableProgressTracking: false,
-      }, 900000);
-      clearInterval(_loHeartbeat); console.log('[LO] init done:', initRes);
-
-      return {
-        async convert(file, options = {}) {
-          const ext = (options.filename || 'input.docx').split('.').pop() || 'docx';
-          const outFmt = { docx: 'pdf', doc: 'pdf', odt: 'pdf' }[ext] || 'pdf';
-          console.log('[LO] converting to', outFmt);
-          const res = await send('convert', {
-            inputData: await file.arrayBuffer(),
-            inputExt: ext,
-            outputFormat: outFmt,
-          }, 900000);
-          console.log('[LO] convert result type:', res.type);
-          return res.data || res.result;
-        },
-        destroy() {
-          try { worker.terminate(); } catch (_) {}
-          window._libreOfficePromise = null;
-        },
-      };
-    })();
-  }
-  return window._libreOfficePromise;
+// Hand a document off to the /convert/ popup through IndexedDB. The popup (which
+// IS crossOriginIsolated, unlike this page) picks the job up by id from the URL
+// hash, deletes it, and runs the LibreOffice WASM conversion there.
+opfs._putConvertJob = function(job) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open('sandpie-convert', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('jobs', { keyPath: 'id' });
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('jobs', 'readwrite');
+      tx.objectStore('jobs').put(job);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
 };
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
