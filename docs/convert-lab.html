@@ -41,7 +41,9 @@
     URL.createObjectURL(new Blob([prefix + await (await fetch(url)).text()], { type: 'application/javascript' }));
 
   say('fetching assets from ' + BASE + '…');
-  const sofficeJs = await scriptBlob(BASE + '/soffice.js');
+  // Keep the raw text so bootBench can re-blob it with a patched pthread pool.
+  const sofficeJsText = await (await fetch(BASE + '/soffice.js')).text();
+  const sofficeJs = URL.createObjectURL(new Blob([sofficeJsText], { type: 'application/javascript' }));
   const sofficeWorkerJs = await scriptBlob(BASE + '/soffice.worker.js', SHIM);
   const sofficeWasm = await gunzip(BASE + '/soffice.wasm' + (ALT ? '' : '.gz'), 'application/wasm');
   const sofficeData = await gunzip(BASE + '/soffice.data' + (ALT ? '' : '.gz'), 'application/octet-stream');
@@ -89,6 +91,38 @@
       if (timedOut) { say('hung — respawning worker…'); await window.restartWorker(); }
       return { ok: false, error: e.message, ms: Date.now() - t0 };
     }
+  };
+
+  // A/B the boot deadlock: N cold boots, optionally patching the Emscripten
+  // pthread pool (var pthreadPoolSize=4 → poolSize) in soffice.js. Hypothesis:
+  // the ~50% deadlock is pool exhaustion — LO's boot pthread_creates while the
+  // main wasm thread is blocked, and with 0 idle pre-spawned workers the spawn
+  // handshake can never complete. Each boot uses a fresh worker; a boot that
+  // isn't ready within timeoutMs counts as deadlocked.
+  window.bootBench = async (n = 6, poolSize = 0, timeoutMs = 75000) => {
+    const js = poolSize
+      ? sofficeJsText.replace('var pthreadPoolSize=4', 'var pthreadPoolSize=' + poolSize)
+      : sofficeJsText;
+    if (poolSize && js === sofficeJsText) return { error: 'pool patch string not found' };
+    const jsUrl = URL.createObjectURL(new Blob([js], { type: 'application/javascript' }));
+    const results = [];
+    for (let i = 0; i < n; i++) {
+      try { worker.terminate(); } catch (_) {}
+      worker = new Worker(workerUrl);
+      const t0 = Date.now();
+      try {
+        await send('init', { sofficeJs: jsUrl, sofficeWasm, sofficeData, sofficeWorkerJs,
+                             verbose: false, enableProgressTracking: false }, timeoutMs);
+        results.push({ ok: true, ms: Date.now() - t0 });
+      } catch (e) {
+        results.push({ ok: false, ms: Date.now() - t0, err: e.message });
+      }
+      say('bootBench pool=' + poolSize + ': ' + (i + 1) + '/' + n + ' → ' +
+          results.filter(r => r.ok).length + ' ok');
+    }
+    try { worker.terminate(); } catch (_) {}
+    return { poolSize, ok: results.filter(r => r.ok).length, n,
+             times: results.map(r => (r.ok ? r.ms : 'DEADLOCK')) };
   };
 
   await boot();

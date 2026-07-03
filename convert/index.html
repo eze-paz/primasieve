@@ -8,7 +8,14 @@
      page must be crossOriginIsolated. The main sandpie app deliberately runs WITHOUT
      COOP/COEP (and evicts any SW that controls it), so conversion happens here, in a
      dedicated popup whose coi-serviceworker is scoped to /convert/ only — it never
-     touches the app page. The script reloads this page once after the SW takes control. -->
+     touches the app page. The script reloads this page once after the SW takes control.
+
+     Engine: ZetaOffice (allotropia's official LibreOffice-WASM) driven via zetajs
+     (vendored, MIT) from cdn.zetaoffice.net. This replaced the bentopdf npm build,
+     whose soffice.wasm had a Writer layout livelock on real-world docs (header with
+     a behind-text anchored image) AND a ~50% boot deadlock; ZetaOffice showed 7/7
+     clean boots (~8-10s cached) and converts the same docs in seconds. Evaluation
+     harnesses: docs/zeta-lab.html (this engine), docs/convert-lab.html (old one). -->
 <script src="coi-serviceworker.js"></script>
 <style>
   body { margin:0; background:#0d1117; color:#c9d1d9; font:15px/1.5 system-ui, sans-serif;
@@ -18,9 +25,9 @@
   h1 { font-size:1.05rem; margin:0 0 .75rem; color:#e6edf3; }
   #status { min-height:3em; color:#8b949e; overflow-wrap:anywhere; }
   #status.err { color:#f85149; }
-  progress { width:100%; height:8px; accent-color:#58a6ff; }
-  a.dl { display:inline-block; margin-top:.75rem; padding:.45rem 1rem; border-radius:6px;
-         background:#238636; color:#fff; text-decoration:none; font-weight:600; }
+  a.dl, button.retry { display:inline-block; margin-top:.75rem; padding:.45rem 1rem; border-radius:6px;
+         background:#238636; color:#fff; text-decoration:none; font-weight:600; border:0; cursor:pointer; }
+  button.retry { background:#30363d; }
   .hint { font-size:.8rem; color:#6e7681; margin-top:1rem; }
 </style>
 </head>
@@ -28,22 +35,27 @@
 <div class="card">
   <h1>Convert to PDF</h1>
   <div id="status">Starting…</div>
-  <progress id="bar" max="100" value="0" style="display:none"></progress>
   <div id="result"></div>
-  <div class="hint">Runs LibreOffice fully in your browser — the document never leaves this tab.
-    First run downloads ~77&nbsp;MB (cached afterwards).</div>
+  <div class="hint">Runs LibreOffice (ZetaOffice) fully in your browser — the document never
+    leaves this tab. First run downloads ~55&nbsp;MB (cached afterwards).</div>
 </div>
-<script>
-(async () => {
-  const $status = document.getElementById('status');
-  const $bar = document.getElementById('bar');
-  const $result = document.getElementById('result');
-  const status = (msg, err) => { $status.textContent = msg; $status.className = err ? 'err' : ''; };
-  const bar = (pct) => { $bar.style.display = ''; $bar.value = pct; };
+<canvas id="qtcanvas" style="display:none"></canvas>
+<script type="module">
+import { ZetaHelperMain } from './zeta/zetaHelper.js';
 
+const $status = document.getElementById('status');
+const $result = document.getElementById('result');
+const status = (msg, err) => { $status.textContent = msg; $status.className = err ? 'err' : ''; };
+const fail = (msg) => {
+  status(msg, true);
+  const b = document.createElement('button');
+  b.className = 'retry'; b.textContent = 'Retry';
+  b.onclick = () => location.reload();
+  $result.appendChild(b);
+};
+
+(async () => {
   // ── 1. Cross-origin isolation gate ──────────────────────────────────────
-  // coi-serviceworker.js registers + reloads once; if we're still not isolated
-  // after that (its sessionStorage guard is set), isolation is unavailable here.
   if (!crossOriginIsolated) {
     let retried = false;
     try { retried = !!sessionStorage.getItem('coiReloaded'); } catch (_) {}
@@ -62,156 +74,65 @@
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
+  // Read WITHOUT deleting so a Retry (page reload) can pick the job up again;
+  // jobs are cleaned up after success below.
   const job = await new Promise((res, rej) => {
-    const tx = idb.transaction('jobs', 'readwrite');
-    const get = tx.objectStore('jobs').get(jobId);
-    get.onsuccess = () => { if (get.result) tx.objectStore('jobs').delete(jobId); res(get.result); };
+    const get = idb.transaction('jobs', 'readonly').objectStore('jobs').get(jobId);
+    get.onsuccess = () => res(get.result);
     get.onerror = () => rej(get.error);
   });
   if (!job) { status('Conversion job not found (expired?). Close this tab and press "→ PDF" again.', true); return; }
   document.title = 'Converting ' + job.name;
 
-  // ── 3. Fetch LibreOffice WASM assets (blob URLs so the worker can load them) ─
-  // Prefer the same-origin copy (server hosts a newer LOWA build at /convert/wasm/
-  // — the bentopdf npm 2.3.1 soffice.wasm has a Writer layout livelock on some
-  // real-world docs, e.g. headers with anchored images; the newer build fixes it).
-  // Fall back to the npm CDN when self-hosted assets aren't there (local dev).
-  let BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
-  try {
-    const probe = await fetch('wasm/soffice.js', { method: 'HEAD' });
-    if (probe.ok) BASE = new URL('wasm', location.href).href;
-  } catch (_) {}
-  async function fetchProgress(url, label) {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('fetch ' + url + ' → ' + r.status);
-    const total = +r.headers.get('Content-Length') || 0;
-    if (!total || !r.body) return new Uint8Array(await r.arrayBuffer());
-    const reader = r.body.getReader();
-    const chunks = []; let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value); got += value.length;
-      status(`Downloading ${label}… ${(got / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`);
-      bar(Math.round(got / total * 100));
-    }
-    const out = new Uint8Array(got); let o = 0;
-    for (const c of chunks) { out.set(c, o); o += c.length; }
-    return out;
-  }
-  // Debug tap: workers' console output is invisible from the page, so a shim is
-  // prepended to every worker script forwarding console.* + uncaught errors over
-  // a BroadcastChannel. Buffered in window._loLogs for post-mortem inspection.
-  const LOGS = []; window._loLogs = LOGS;
-  new BroadcastChannel('sandpie-convert-debug').onmessage = (e) => {
-    LOGS.push(e.data); if (LOGS.length > 3000) LOGS.shift();
-  };
-  const SHIM = "(()=>{try{const bc=new BroadcastChannel('sandpie-convert-debug');" +
-    "const s=x=>{try{return typeof x==='string'?x:(x&&x.message)||JSON.stringify(x)}catch(_){return String(x)}};" +
-    "['log','warn','error','info'].forEach(l=>{const o=console[l].bind(console);" +
-    "console[l]=(...a)=>{try{bc.postMessage(l+': '+a.map(s).join(' '))}catch(_){}o(...a)}});" +
-    "self.addEventListener('error',e=>{try{bc.postMessage('UNCAUGHT: '+e.message+' @ '+e.filename+':'+e.lineno)}catch(_){}});" +
-    "self.addEventListener('unhandledrejection',e=>{try{bc.postMessage('REJECTION: '+s(e.reason))}catch(_){}});}catch(_){}})();\n";
-  const gunzip = async (bytes, mime) => {
-    const ds = new DecompressionStream('gzip');
-    const buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
-    return URL.createObjectURL(new Blob([buf], { type: mime }));
-  };
-  const scriptBlob = async (url, prefix = '') =>
-    URL.createObjectURL(new Blob([prefix + await (await fetch(url)).text()], { type: 'application/javascript' }));
+  // ── 3. Boot ZetaOffice and convert ───────────────────────────────────────
+  status('Loading LibreOffice… (first run downloads ~55 MB)');
+  const zHM = new ZetaHelperMain('zeta-thread.js', { threadJsType: 'module', wasmPkg: 'free' });
+  const pending = new Map();
+  let seq = 0;
+  const bootTimer = setTimeout(() => fail('LibreOffice did not start within 3 minutes — check your connection and retry.'), 180000);
 
-  try {
-    status('Downloading LibreOffice runtime…');
-    const sofficeJs = await scriptBlob(BASE + '/soffice.js');
-    const sofficeWorkerJs = await scriptBlob(BASE + '/soffice.worker.js', SHIM);
-    const wasmGz = await fetchProgress(BASE + '/soffice.wasm.gz', 'engine (soffice.wasm)');
-    status('Decompressing engine…');
-    const sofficeWasm = await gunzip(wasmGz, 'application/wasm');
-    const dataGz = await fetchProgress(BASE + '/soffice.data.gz', 'filesystem (soffice.data)');
-    status('Decompressing filesystem…');
-    const sofficeData = await gunzip(dataGz, 'application/octet-stream');
-    const workerCode = await (await fetch(BASE + '/browser.worker.global.js')).text();
-
-    // ── 4. Spawn the conversion worker and drive its message protocol ─────
-    // LibreOffice's boot hits a timing-dependent Emscripten pthread-spawn
-    // deadlock on ~half of cold starts here (main wasm thread blocks while a
-    // pthread worker is mid-handshake; goes silent right after the svmain.cxx
-    // boot warnings). Healthy boots reach ready in <40s once assets are cached,
-    // so the stall watchdog (no protocol messages for stallMs) is tight — 45s —
-    // and each retry gets a fresh worker. 4 attempts ≈ 94% success at 50% flake.
-    const workerBlobUrl = URL.createObjectURL(new Blob(
-      [SHIM + workerCode.replace(/\/\/#\s*sourceMappingURL=.*$/gm, '')],
-      { type: 'application/javascript' }));
-    const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
-    let res = null, worker = null;
-
-    for (let attempt = 1; attempt <= 4 && !res; attempt++) {
-      worker = new Worker(workerBlobUrl);
-      worker.addEventListener('error', (e) => status('Worker error: ' + e.message, true));
-
-      const send = (type, payload, { timeoutMs, stallMs = 0 }, transfer) => {
-        const id = 'lo_' + Math.random().toString(36).slice(2);
-        return new Promise((resolve, reject) => {
-          let lastMsg = Date.now();
-          const fail = (why) => { cleanup(); reject(new Error(why + ' waiting for ' + type)); };
-          const timer = setTimeout(() => fail('timeout'), timeoutMs);
-          const stall = stallMs ? setInterval(() => {
-            if (Date.now() - lastMsg > stallMs) fail('stall (no worker activity)');
-          }, 5000) : null;
-          const cleanup = () => { clearTimeout(timer); if (stall) clearInterval(stall); worker.removeEventListener('message', handler); };
-          const handler = (e) => {
-            const d = e.data;
-            if (!d || d.id !== id) return;
-            lastMsg = Date.now();
-            if (d.type === 'progress') {   // init + convert both stream these
-              if (d.progress && d.progress.message) status(d.progress.message);
-              if (d.progress && d.progress.percent != null) bar(d.progress.percent);
-              return;
-            }
-            cleanup();
-            if (d.type === 'error') reject(new Error(d.error || type + ' failed'));
-            else resolve(d);
-          };
-          worker.addEventListener('message', handler);
-          worker.postMessage({ type, id, ...payload }, transfer || []);
-        });
-      };
-
+  const convert = (bytes, ext) => new Promise((resolve) => {
+    const from = '/tmp/input.' + ext, to = '/tmp/output';
+    zHM.FS.writeFile(from, bytes);
+    const id = 'c' + (++seq);
+    const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: 'conversion timed out' }); }, 300000);
+    pending.set(id, (msg) => {
+      clearTimeout(timer);
+      if (msg.cmd === 'error') { resolve({ ok: false, error: msg.error }); return; }
       try {
-        status('Initializing LibreOffice…' + (attempt > 1 ? ' (retry)' : ''));
-        await send('init', { sofficeJs, sofficeWasm, sofficeData, sofficeWorkerJs,
-                             verbose: false, enableProgressTracking: false },
-                   { timeoutMs: 600000, stallMs: 45000 });
+        const data = zHM.FS.readFile(to);
+        try { zHM.FS.unlink(from); } catch (_) {}
+        try { zHM.FS.unlink(to); } catch (_) {}
+        resolve({ ok: true, data });
+      } catch (e) { resolve({ ok: false, error: 'reading output failed: ' + e.message }); }
+    });
+    zHM.thrPort.postMessage({ cmd: 'convert', id, from, to });
+  });
 
+  zHM.start(() => {
+    zHM.thrPort.onmessage = async (e) => {
+      const d = e.data;
+      if (d.cmd === 'ready') {
+        clearTimeout(bootTimer);
         status('Converting ' + job.name + '…');
-        // FS.writeFile in the worker requires a typed array — NOT a raw ArrayBuffer.
-        // Copy (don't transfer) so the bytes survive for a retry attempt.
-        const inputData = new Uint8Array(job.bytes.slice(0));
-        res = await send('convert', { inputData, inputExt: ext, outputFormat: 'pdf' },
-                         { timeoutMs: 600000 }, [inputData.buffer]);
-      } catch (e) {
-        try { worker.terminate(); } catch (_) {}
-        if (attempt >= 4) throw e;
-        console.warn('[convert] attempt ' + attempt + ' failed (' + (e && e.message) + '), retrying with a fresh worker');
+        const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
+        const res = await convert(new Uint8Array(job.bytes), ext);
+        if (!res.ok) { fail('Conversion failed: ' + res.error); return; }
+        const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
+        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
+        $result.appendChild(a);
+        a.click();   // auto-download; the button stays for re-saving
+        status('Done — ' + pdfName + ' downloaded. You can close this tab.');
+        try { idb.transaction('jobs', 'readwrite').objectStore('jobs').delete(jobId); } catch (_) {}
+        return;
       }
-    }
-
-    const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
-    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
-    $result.appendChild(a);
-    a.click();   // auto-download; the button stays for retry
-    bar(100);
-    status('Done — ' + pdfName + ' downloaded. You can close this tab.');
-    // NOTE: don't send {type:'destroy'} — the package's destroy path aborts with
-    // "'PThread' was not exported". Hard-terminate instead; the tab is done anyway.
-    worker.terminate();
-  } catch (e) {
-    console.error('[convert]', e);
-    status('Conversion failed: ' + (e && e.message || e), true);
-  }
-})();
+      const cb = pending.get(d.id);
+      if (cb) { pending.delete(d.id); cb(d); }
+    };
+  });
+})().catch((e) => { console.error('[convert]', e); fail('Unexpected error: ' + (e && e.message || e)); });
 </script>
 </body>
 </html>
