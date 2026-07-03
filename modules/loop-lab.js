@@ -24,6 +24,9 @@
  * foreach runs its inner stage once per item; inner templates additionally see
  * ${item} and ${itemIndex}; outer saveAs collects the per-item results array.
  *
+ * Any top-level stage may carry when: "<js expr over vars/scratchpad/turn>" —
+ * falsy skips the stage for this turn (e.g. frame-once, act-only-if-picked).
+ *
  * Template variables in system/user strings: ${task} ${turn} ${scratchpad}
  * ${toolSchemas} plus any ${var} saved by an earlier stage via saveAs.
  * "js" stages get ctx = { vars, scratchpad, turn, task, log(msg) } and may
@@ -92,7 +95,66 @@
     ]
   };
 
-  const EXAMPLES = [EXAMPLE, MATRIX];
+  /* ---- general-agent: the task-agnostic cycle. The model never plans freely —
+     it fills narrow cells (frame subgoals / propose 3 options / judge one option
+     / evaluate one observation) and code enforces the guarantees: the novelty
+     filter makes repeating a past attempt unrepresentable, and a subgoal is only
+     marked done when the evaluator's evidence quote literally appears in the
+     observation (hallucinated success fails to verify). ---- */
+  const GENERAL = {
+    name: 'general-agent',
+    maxTurns: 12,
+    scratchpad: { framed: false, subgoals: [], facts: [], attempts: [], done: false },
+    stopWhen: 'scratchpad.done === true',
+    stages: [
+      {
+        name: 'frame', type: 'llm', parse: 'json', temperature: 0.4, mergeScratchpad: true,
+        when: '!scratchpad.framed',
+        system: 'You are the FRAMER. Break the task into 2-5 concrete subgoals, ordered, each verifiable from a tool observation. For each, "check" states what evidence in an observation would PROVE it is met. Output ONLY JSON: {"framed":true,"subgoals":[{"id":"g1","desc":"...","check":"..."}]}',
+        user: 'TASK:\n${task}\n\nAVAILABLE TOOLS (names only matter here):\n${toolSchemas}\n\nJSON:'
+      },
+      {
+        name: 'focus', type: 'js',
+        code: "const sp = ctx.scratchpad;\n(sp.subgoals || []).forEach(g => { if (!g.status) g.status = 'open'; });\nconst open = (sp.subgoals || []).filter(g => g.status === 'open');\nif (!open.length) { sp.done = true; ctx.log('all subgoals done'); return { stop: true }; }\nctx.vars.subgoal = open[0];\nctx.log('focus: ' + open[0].id + ' — ' + open[0].desc);"
+      },
+      {
+        name: 'options', type: 'llm', parse: 'json', temperature: 0.8, saveAs: 'options',
+        when: 'vars.subgoal',
+        system: 'You are the OPTION GENERATOR. Propose exactly 3 candidate next actions for the CURRENT SUBGOAL, using at least 2 different tools. You MUST NOT repeat anything in ATTEMPTS SO FAR (same tool with same arguments). args must match the tool schema. Output ONLY JSON: {"options":[{"id":"o1","tool":"<name>","args":{...},"rationale":"one line"}]}',
+        user: 'TASK:\n${task}\n\nCURRENT SUBGOAL:\n${subgoal}\n\nSCRATCHPAD (facts + attempts so far — do not repeat attempts):\n${scratchpad}\n\nTOOLS:\n${toolSchemas}\n\nJSON:'
+      },
+      {
+        name: 'sanitize', type: 'js', when: 'vars.options',
+        code: "const v = ctx.vars, sp = ctx.scratchpad;\nconst opts = ((v.options && v.options.options) || []).filter(o => o && typeof o.tool === 'string');\nconst tried = new Set((sp.attempts || []).map(a => a.tool + '|' + a.args));\nlet names = [];\ntry { names = JSON.parse(v.toolSchemas).map(t => t.function.name); } catch (e) {}\nv.surviving = opts.filter(o => {\n  const key = o.tool + '|' + JSON.stringify(o.args || {}).slice(0, 120);\n  if (tried.has(key)) return false;                 // novelty filter: repeats are unrepresentable\n  if (names.length && !names.includes(o.tool)) return false;  // hallucinated tool\n  return true;\n});\nctx.log(opts.length + ' proposed, ' + v.surviving.length + ' survive (repeat/unknown-tool filtered)');"
+      },
+      {
+        name: 'judge', type: 'foreach', items: 'vars.surviving', saveAs: 'scores',
+        when: 'vars.surviving && vars.surviving.length > 1',
+        stage: {
+          name: 'judge1', type: 'llm', parse: 'json', temperature: 0.1,
+          system: 'You are the JUDGE. Score ONE candidate action for the current subgoal: progress (1-5, how much closer it likely gets us) and risk (1-5, chance it fails or wastes the turn). Output ONLY JSON: {"id":"<option id>","progress":n,"risk":n,"why":"one line"}',
+          user: 'SUBGOAL:\n${subgoal}\n\nCANDIDATE ACTION (judge this one only):\n${item}\n\nKNOWN FACTS:\n${scratchpad}\n\nJSON:'
+        }
+      },
+      {
+        name: 'pick', type: 'js', when: 'vars.surviving && vars.surviving.length',
+        code: "const v = ctx.vars;\nconst scores = (v.scores || []).filter(Boolean);\nlet best = null;\nfor (const s of scores) { const t = (s.progress || 0) - (s.risk || 0); if (!best || t > best.t) best = { t, id: s.id }; }\nconst chosen = (best && v.surviving.find(o => o.id === best.id)) || v.surviving[0];\nv.call = { tool: chosen.tool, arguments: chosen.args || {} };\nctx.log('pick: ' + chosen.tool + (best ? ' (score ' + best.t + ')' : ' (only viable option)'));"
+      },
+      { name: 'act', type: 'tool', argsFrom: 'call', saveAs: 'observation', when: 'vars.call' },
+      {
+        name: 'evaluate', type: 'llm', parse: 'json', temperature: 0.1, saveAs: 'evaluation',
+        when: 'vars.call',
+        system: 'You are the EVALUATOR. Decide if the observation satisfies the check of the subgoal. "evidence" MUST be an exact substring copied verbatim from the observation (it is machine-checked; paraphrase = rejected). Output ONLY JSON: {"met":true|false,"evidence":"<verbatim quote or empty>","fact":"one short useful fact learned","hint":"if not met, what to try next"}',
+        user: 'SUBGOAL:\n${subgoal}\n\nOBSERVATION:\n${observation}\n\nJSON:'
+      },
+      {
+        name: 'commit', type: 'js', when: 'vars.call',
+        code: "const v = ctx.vars, sp = ctx.scratchpad;\nconst ev = v.evaluation || {};\nconst obs = String(v.observation || '');\nconst verified = !!(ev.met && ev.evidence && obs.includes(ev.evidence));   // the write barrier\nconst g = (sp.subgoals || []).find(g => g.id === (v.subgoal && v.subgoal.id));\nif (verified && g) { g.status = 'done'; g.evidence = String(ev.evidence).slice(0, 200); }\nif (ev.fact) sp.facts.push(String(ev.fact).slice(0, 200));\nif (sp.facts.length > 15) sp.facts = sp.facts.slice(-15);\nsp.attempts.push({ turn: ctx.turn, subgoal: v.subgoal ? v.subgoal.id : '?', tool: v.call.tool, args: JSON.stringify(v.call.arguments || {}).slice(0, 120), met: verified, hint: verified ? '' : String(ev.hint || '').slice(0, 150) });\nif (sp.attempts.length > 12) sp.attempts = sp.attempts.slice(-12);\nctx.log(verified ? 'subgoal ' + g.id + ' VERIFIED done' : (ev.met ? 'REJECTED: evidence quote not found verbatim in observation' : 'not met — ' + (ev.hint || 'no hint')));"
+      }
+    ]
+  };
+
+  const EXAMPLES = [EXAMPLE, MATRIX, GENERAL];
 
   /* ================= persistence ================= */
   function loadLoops() {
@@ -359,6 +421,13 @@
 
         for (const st of spec.stages) {
           if (ctrl.signal.aborted) { stopped = true; break; }
+          if (stopped) break;   // a js stage requested stop mid-turn
+          if (st.when) {
+            let go = false;
+            try { go = !!(new Function('vars', 'scratchpad', 'turn', 'return (' + st.when + ');')(vars, scratchpad, turn)); }
+            catch (e) { ui.stageError(turnHost, st.name, 'when-expr error: ' + e.message); rec('[' + st.name + ' · when ERROR] ' + e.message); break; }
+            if (!go) { rec('[' + st.name + ' · skipped] when: ' + st.when); continue; }
+          }
           try {
             const ret = await execStage(st, ctx, 0);
             if (st.type === 'js' && ret && ret.stop) stopped = true;
@@ -462,7 +531,7 @@
               <button class="ll-btn danger" id="llDelete" title="Delete selected loop">Del</button>
             </div>
             <textarea id="llSpec" class="ll-spec" spellcheck="false"></textarea>
-            <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js | foreach (inner stage sees \${item} \${itemIndex}) · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
+            <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js | foreach (inner sees \${item} \${itemIndex}) · per-stage when: skip-guard (JS expr) · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
             <textarea id="llTask" class="ll-task" placeholder="Task for the loop, e.g. 'List the files in /, read the most interesting one, record 3 facts about it.'"></textarea>
             <div class="ll-row">
               <button class="ll-btn primary" id="llRun">▶ Run</button>
