@@ -1022,7 +1022,10 @@ async function sendSingle(text, stream, opts = {}) {
       lastInFlightTool = null;
       try { const m = String(ev.result || '').match(/Created:\s*([^\s]+)/); if (m && typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.getConvMeta(activeConvId).files.add(m[1]); } catch (_) {}
     }
-    if (ev.type === 'usage') Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
+    if (ev.type === 'usage') {
+      Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
+      reportTurnUsage(convId, ev.usage, convMessages.length);
+    }
     dispatchAgentEvent(ev, renderer, host);
   };
   try {
@@ -1167,6 +1170,47 @@ async function buildAgentConfig(convMessages, compaction) {
 
   };
 }
+
+// Report accurate per-turn token usage to the server for the admin analytics
+// panel (conversation_usage table). Best-effort + fire-and-forget: a failure
+// NEVER affects the chat. Fires for EVERY provider that emits a `usage` event
+// (managed or personal), attributed to the signed-in user via the same-origin
+// session cookie. We do NOT send the provider apiKey as a Bearer header — for a
+// personal provider that's the user's own key, which our server must never see;
+// the cookie is the right credential. Anonymous (/guest) sessions have no cookie
+// → the server 401s and we silently ignore it. The server derives the per-turn
+// *incremental* prompt cost from these rows (LAG over turn_index), so we just
+// forward the raw provider usage as reported.
+function reportTurnUsage(convId, usage, turnIndex) {
+  try {
+    if (!convId || !usage || typeof usage.prompt_tokens !== 'number') return;
+    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const details = usage.completion_tokens_details || {};
+    const reasoning = details.reasoning_tokens != null ? details.reasoning_tokens
+                    : (usage.reasoning_tokens != null ? usage.reasoning_tokens : undefined);
+    const body = {
+      conversation_id: convId,
+      turn_index: turnIndex | 0,
+      model: (typeof $ === 'function' && $('model')) ? $('model').value : (usage.model || null),
+      provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
+      usage: {
+        prompt_tokens: usage.prompt_tokens || 0,
+        completion_tokens: usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens != null ? usage.total_tokens
+                      : ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
+        reasoning_tokens: reasoning,
+      },
+    };
+    fetch(new URL('/api/usage/turn', location.href).href, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) { /* analytics must never break the chat */ }
+}
+
 async function readAgentEvents(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
