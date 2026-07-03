@@ -72,7 +72,15 @@
   document.title = 'Converting ' + job.name;
 
   // ── 3. Fetch LibreOffice WASM assets (blob URLs so the worker can load them) ─
-  const BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
+  // Prefer the same-origin copy (server hosts a newer LOWA build at /convert/wasm/
+  // — the bentopdf npm 2.3.1 soffice.wasm has a Writer layout livelock on some
+  // real-world docs, e.g. headers with anchored images; the newer build fixes it).
+  // Fall back to the npm CDN when self-hosted assets aren't there (local dev).
+  let BASE = 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
+  try {
+    const probe = await fetch('wasm/soffice.js', { method: 'HEAD' });
+    if (probe.ok) BASE = new URL('wasm', location.href).href;
+  } catch (_) {}
   async function fetchProgress(url, label) {
     const r = await fetch(url);
     if (!r.ok) throw new Error('fetch ' + url + ' → ' + r.status);

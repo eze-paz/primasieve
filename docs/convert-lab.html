@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LO WASM convert lab</title>
+<!-- Local-only bisection harness for LibreOffice WASM conversion hangs.
+     Boots the LO worker once, then converts arbitrary same-origin URLs via
+     window.convertTest(url, ext, timeoutMs). On a hung convert the worker is
+     terminated and respawned automatically. Not served in prod (docs/ is not
+     in the server allowlist). -->
+<script src="coi-serviceworker.js"></script>
+</head>
+<body style="background:#111;color:#ccc;font:13px monospace;padding:1rem">
+<div id="out">booting…</div>
+<script>
+(async () => {
+  const out = document.getElementById('out');
+  const say = (m) => { out.textContent = m; console.log('[lab]', m); };
+  if (!crossOriginIsolated) { say('waiting for COI reload…'); return; }
+
+  const LOGS = []; window.loLogs = LOGS;
+  new BroadcastChannel('sandpie-convert-debug').onmessage = (e) => {
+    LOGS.push(e.data); if (LOGS.length > 5000) LOGS.shift();
+  };
+  const SHIM = "(()=>{try{const bc=new BroadcastChannel('sandpie-convert-debug');" +
+    "const s=x=>{try{return typeof x==='string'?x:(x&&x.message)||JSON.stringify(x)}catch(_){return String(x)}};" +
+    "['log','warn','error','info'].forEach(l=>{const o=console[l].bind(console);" +
+    "console[l]=(...a)=>{try{bc.postMessage(l+': '+a.map(s).join(' '))}catch(_){}o(...a)}});}catch(_){}})();\n";
+
+  // ?base=<url> switches the whole asset set to an alternate LOWA build that
+  // ships UNcompressed assets (e.g. https://www.docxform.com/wasm). Default =
+  // the bentopdf npm package (gzip'd assets).
+  const ALT = new URLSearchParams(location.search).get('base');
+  const BASE = ALT || 'https://cdn.jsdelivr.net/npm/@bentopdf/libreoffice-wasm@2.3.1/assets';
+  const gunzip = async (url, mime) => {
+    const r = await fetch(url);
+    const body = url.endsWith('.gz') ? new Response(r.body.pipeThrough(new DecompressionStream('gzip'))) : r;
+    return URL.createObjectURL(new Blob([await body.arrayBuffer()], { type: mime }));
+  };
+  const scriptBlob = async (url, prefix = '') =>
+    URL.createObjectURL(new Blob([prefix + await (await fetch(url)).text()], { type: 'application/javascript' }));
+
+  say('fetching assets from ' + BASE + '…');
+  const sofficeJs = await scriptBlob(BASE + '/soffice.js');
+  const sofficeWorkerJs = await scriptBlob(BASE + '/soffice.worker.js', SHIM);
+  const sofficeWasm = await gunzip(BASE + '/soffice.wasm' + (ALT ? '' : '.gz'), 'application/wasm');
+  const sofficeData = await gunzip(BASE + '/soffice.data' + (ALT ? '' : '.gz'), 'application/octet-stream');
+  const workerUrl = await scriptBlob(BASE + '/browser.worker.global.js' + (ALT ? '?v=2' : ''), SHIM);
+
+  let worker = null;
+  function send(type, payload, timeoutMs) {
+    const id = 'lo_' + Math.random().toString(36).slice(2);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { worker.removeEventListener('message', h); reject(new Error('TIMEOUT:' + type)); }, timeoutMs);
+      const h = (e) => {
+        const d = e.data;
+        if (!d || d.id !== id) return;
+        if (d.type === 'progress') { say(type + ': ' + (d.progress && d.progress.message || '')); return; }
+        clearTimeout(timer); worker.removeEventListener('message', h);
+        d.type === 'error' ? reject(new Error(d.error)) : resolve(d);
+      };
+      worker.addEventListener('message', h);
+      worker.postMessage({ type, id, ...payload });
+    });
+  }
+  async function boot() {
+    for (let i = 1; i <= 3; i++) {
+      worker = new Worker(workerUrl);
+      try {
+        say('init attempt ' + i + '…');
+        await send('init', { sofficeJs, sofficeWasm, sofficeData, sofficeWorkerJs, verbose: false, enableProgressTracking: false }, 120000);
+        say('LO ready'); return;
+      } catch (e) { worker.terminate(); say('init failed: ' + e.message); }
+    }
+    throw new Error('init failed 3x');
+  }
+  window.restartWorker = async () => { try { worker.terminate(); } catch (_) {} await boot(); };
+
+  // Convert a same-origin URL; returns {ok, size} or {ok:false, error} and
+  // respawns the worker after a timeout so the next test starts clean.
+  window.convertTest = async (url, ext = 'docx', timeoutMs = 90000) => {
+    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const t0 = Date.now();
+    try {
+      const res = await send('convert', { inputData: bytes, inputExt: ext, outputFormat: 'pdf' }, timeoutMs);
+      return { ok: true, size: res.data.length, ms: Date.now() - t0 };
+    } catch (e) {
+      const timedOut = /TIMEOUT/.test(e.message);
+      if (timedOut) { say('hung — respawning worker…'); await window.restartWorker(); }
+      return { ok: false, error: e.message, ms: Date.now() - t0 };
+    }
+  };
+
+  await boot();
+})();
+</script>
+</body>
+</html>
