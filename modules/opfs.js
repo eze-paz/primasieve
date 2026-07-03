@@ -496,6 +496,10 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // controls. Falls back to a "download to view" message if the CDN is blocked.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading presentation viewer…</div>';
     mount(opfs.closeFile);
+    opfs._wireConvertBtn(convertBtn, file, name, ext);
+    // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to the
+    // lightweight pptx-viewer when isolation is unavailable or the engine fails.
+    if (await opfs._renderOfficePdf(file, ext, name, body, panel)) return;
     try {
       await opfs.getPptxViewer();
       const container = document.createElement('div');
@@ -529,27 +533,11 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // OOXML → renderAsync throws → the catch shows a download link.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading document viewer…</div>';
     mount(opfs.closeFile);
-    // Convert-to-PDF runs in a dedicated popup (convert/index.html): LibreOffice
-    // WASM is a pthreads build that needs crossOriginIsolated, which this page
-    // deliberately isn't (no COOP/COEP; the SW kill-switch evicts root-scope SWs).
-    // The popup gets isolation from its own /convert/-scoped coi-serviceworker.
-    // The document bytes are handed off through IndexedDB (NOT OPFS — the cloud
-    // sync engine watches OPFS and would push scratch files to Dropbox).
-    convertBtn.style.display = '';
-    convertBtn.onclick = async () => {
-      convertBtn.disabled = true;
-      try {
-        const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
-        const bytes = await file.arrayBuffer();
-        await opfs._putConvertJob({ id, name, bytes, ts: Date.now() });
-        const w = window.open('convert/index.html#job=' + id, '_blank');
-        if (!w) opfs._toast('Popup blocked — allow popups for this site to convert to PDF.', 5000);
-      } catch (e) {
-        console.error('[opfs] PDF conversion handoff failed:', e);
-        opfs._toast('PDF conversion failed: ' + (e.message || e), 4000);
-      }
-      convertBtn.disabled = false;
-    };
+    opfs._wireConvertBtn(convertBtn, file, name, ext);
+    // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to
+    // docx-preview (approximate HTML) when isolation is unavailable or the engine
+    // fails (e.g. .doc legacy binary that ZetaOffice can still often open).
+    if (await opfs._renderOfficePdf(file, ext, name, body, panel)) return;
     try {
       const docx = await opfs.getDocxPreview();
       const container = document.createElement('div');
@@ -575,6 +563,10 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // with a tab bar to switch between sheets. Lazy-loaded from CDN on first use.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading spreadsheet viewer…</div>';
     mount(opfs.closeFile);
+    opfs._wireConvertBtn(convertBtn, file, name, ext);
+    // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to the
+    // SheetJS HTML-table viewer when isolation is unavailable or the engine fails.
+    if (await opfs._renderOfficePdf(file, ext, name, body, panel)) return;
     try {
       const XLSX = await opfs.getSheetJS();
       const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
@@ -799,6 +791,127 @@ opfs._putConvertJob = function(job) {
     };
   });
 };
+// In-page office→PDF engine. When the app page is crossOriginIsolated (prod
+// sends COOP/COEP; locally via coiserver.py), we can run ZetaOffice (LibreOffice
+// WASM) directly — no popup. It lives in a hidden same-origin iframe
+// (convert/office-engine.html) which, being a child of a COI top-level, is itself
+// COI. Booted once on first use and kept warm for the session; each conversion is
+// a postMessage round-trip. Returns a promise for { convert(bytes, ext) → PDF
+// ArrayBuffer }, or null when isolation is unavailable (caller falls back to the
+// lightweight docx-preview/SheetJS/pptx-viewer path, or the popup).
+opfs.OFFICE_ENGINE_EXTS = new Set(['docx','doc','odt','rtf','xlsx','xls','ods','csv','pptx','ppt','odp','odg']);
+opfs._officeEngine = function() {
+  if (!self.crossOriginIsolated) return null;
+  if (!opfs._officeEnginePromise) {
+    opfs._officeEnginePromise = new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;left:-9999px;';
+      iframe.src = '/convert/office-engine.html';
+      const pending = new Map();
+      let seq = 0, ready = false;
+      const bootTimer = setTimeout(() => {
+        if (!ready) { cleanup(); reject(new Error('office engine boot timed out')); }
+      }, 180000);
+      const onMsg = (e) => {
+        if (e.source !== iframe.contentWindow) return;
+        const d = e.data || {};
+        if (d.type === 'engine-ready') { ready = true; clearTimeout(bootTimer); resolve(api); return; }
+        if (d.type === 'engine-error') { cleanup(); reject(new Error(d.error || 'office engine error')); return; }
+        if (d.type === 'converted-ok' || d.type === 'converted-err') {
+          const cb = pending.get(d.id);
+          if (cb) { pending.delete(d.id); cb(d); }
+        }
+      };
+      const cleanup = () => {
+        window.removeEventListener('message', onMsg);
+        try { iframe.remove(); } catch (_) {}
+        opfs._officeEnginePromise = null;   // allow a fresh boot next time
+      };
+      const api = {
+        convert(bytes, ext, timeoutMs = 180000) {
+          return new Promise((res, rej) => {
+            const id = 'o' + (++seq);
+            const timer = setTimeout(() => { pending.delete(id); rej(new Error('conversion timed out')); }, timeoutMs);
+            pending.set(id, (msg) => {
+              clearTimeout(timer);
+              if (msg.type === 'converted-ok') res(msg.pdf);
+              else rej(new Error(msg.error || 'conversion failed'));
+            });
+            iframe.contentWindow.postMessage({ type: 'convert', id, bytes, ext }, '*', [bytes]);
+          });
+        },
+      };
+      window.addEventListener('message', onMsg);
+      document.body.appendChild(iframe);
+    });
+  }
+  return opfs._officeEnginePromise;
+};
+
+// Try to render an office file faithfully by converting it to PDF in the engine
+// and showing that PDF inline (reuses the same <iframe> display as native PDFs).
+// Returns true on success, false to signal the caller to fall back to its
+// lightweight viewer. `body` already shows a spinner and the panel is mounted.
+opfs._renderOfficePdf = async function(file, ext, name, body, panel) {
+  if (!self.crossOriginIsolated) return false;
+  try {
+    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">'
+      + 'Rendering with LibreOffice…<br><span style="font-size:.85em;opacity:.7;">'
+      + 'first use downloads the engine (~55&nbsp;MB, then cached)</span></div>';
+    const engine = await opfs._officeEngine();
+    const pdf = await engine.convert(await file.arrayBuffer(), ext);
+    const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+    if (panel) panel.dataset.blobUrl = url;   // revoked by closeFile
+    body.innerHTML = '';
+    const f = document.createElement('iframe');
+    f.setAttribute('data-chrome', '');
+    f.src = url;
+    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
+    body.appendChild(f);
+    return true;
+  } catch (e) {
+    console.warn('[opfs] faithful office render failed, falling back:', e && e.message || e);
+    return false;
+  }
+};
+
+// Wire the "→ PDF" header button for an office file: convert in the in-page
+// engine (COI) or hand off to the popup (non-COI), then download the PDF.
+opfs._wireConvertBtn = function(convertBtn, file, name, ext) {
+  convertBtn.style.display = '';
+  convertBtn.onclick = async () => {
+    convertBtn.disabled = true;
+    const orig = convertBtn.textContent;
+    try {
+      let pdf = null;
+      if (self.crossOriginIsolated) {
+        convertBtn.textContent = 'Converting…';
+        const engine = await opfs._officeEngine();
+        pdf = await engine.convert(await file.arrayBuffer(), ext);
+      }
+      if (pdf) {
+        const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = name.replace(/\.[^.]+$/, '') + '.pdf';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } else {
+        // Non-isolated fallback: hand the file to the /convert/ popup via IndexedDB.
+        const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+        await opfs._putConvertJob({ id, name, bytes: await file.arrayBuffer(), ts: Date.now() });
+        const w = window.open('convert/index.html#job=' + id, '_blank');
+        if (!w) opfs._toast('Popup blocked — allow popups for this site to convert to PDF.', 5000);
+      }
+    } catch (e) {
+      console.error('[opfs] PDF conversion failed:', e);
+      opfs._toast('PDF conversion failed: ' + (e.message || e), 4000);
+    }
+    convertBtn.textContent = orig;
+    convertBtn.disabled = false;
+  };
+};
+
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
 opfs.getSheetJS = function() {

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>sandpie office engine</title>
+<!-- Headless office→PDF engine, embedded as a hidden same-origin iframe by the
+     sandpie app (modules/opfs.js opfs._officeEngine). Runs ZetaOffice (LibreOffice
+     WASM) via vendored zetajs. Requires the embedding top-level page to be
+     crossOriginIsolated (SharedArrayBuffer) — true in prod (server COOP/COEP) and
+     under the local coiserver.py. postMessage protocol with the parent:
+       parent → engine:  {type:'convert', id, bytes:ArrayBuffer, ext}
+       engine → parent:  {type:'engine-ready'} | {type:'engine-error', error}
+                         {type:'converted-ok', id, pdf:ArrayBuffer}
+                         {type:'converted-err', id, error}
+     Also runnable stand-alone (via convert/index.html's flow) for non-COI fallback,
+     but its normal home is the in-app hidden iframe. -->
+</head>
+<body>
+<canvas id="qtcanvas" style="display:none"></canvas>
+<script type="module">
+import { ZetaHelperMain } from './zeta/zetaHelper.js';
+
+// Module-specific PDF export filters, keyed by input extension. Using the wrong
+// module's filter (e.g. writer_pdf_Export on a spreadsheet) makes storeToURL fail.
+const EXT_FILTER = {
+  docx: 'writer_pdf_Export', doc: 'writer_pdf_Export', odt: 'writer_pdf_Export',
+  rtf: 'writer_pdf_Export', txt: 'writer_pdf_Export',
+  xlsx: 'calc_pdf_Export', xls: 'calc_pdf_Export', ods: 'calc_pdf_Export', csv: 'calc_pdf_Export',
+  pptx: 'impress_pdf_Export', ppt: 'impress_pdf_Export', odp: 'impress_pdf_Export',
+  odg: 'draw_pdf_Export',
+};
+const target = () => (window.parent && window.parent !== window ? window.parent : window);
+const post = (msg, transfer) => target().postMessage(msg, '*', transfer || []);
+
+if (!crossOriginIsolated) {
+  post({ type: 'engine-error', error: 'office-engine: page is not cross-origin isolated' });
+} else {
+  const zHM = new ZetaHelperMain('office-thread.js', { threadJsType: 'module', wasmPkg: 'free' });
+  const pending = new Map();
+  let seq = 0;
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || d.type !== 'convert') return;
+    const parentId = d.id;
+    const ext = String(d.ext || 'docx').toLowerCase();
+    const filter = EXT_FILTER[ext] || 'writer_pdf_Export';
+    const from = '/tmp/input.' + ext, to = '/tmp/output.pdf';
+    try {
+      zHM.FS.writeFile(from, new Uint8Array(d.bytes));
+    } catch (err) {
+      post({ type: 'converted-err', id: parentId, error: 'write failed: ' + (err.message || err) });
+      return;
+    }
+    const id = 'c' + (++seq);
+    pending.set(id, (msg) => {
+      if (msg.cmd === 'error') { post({ type: 'converted-err', id: parentId, error: msg.error }); return; }
+      let data;
+      try { data = zHM.FS.readFile(to); }
+      catch (err) { post({ type: 'converted-err', id: parentId, error: 'read output failed: ' + (err.message || err) }); return; }
+      try { zHM.FS.unlink(from); } catch (_) {}
+      try { zHM.FS.unlink(to); } catch (_) {}
+      const buf = data.buffer.slice(0);
+      post({ type: 'converted-ok', id: parentId, pdf: buf }, [buf]);
+    });
+    zHM.thrPort.postMessage({ cmd: 'convert', id, from, to, filter });
+  });
+
+  zHM.start(() => {
+    zHM.thrPort.onmessage = (e) => {
+      const d = e.data;
+      if (d.cmd === 'ready') { post({ type: 'engine-ready' }); return; }
+      const cb = pending.get(d.id);
+      if (cb) { pending.delete(d.id); cb(d); }
+    };
+  });
+}
+</script>
+</body>
+</html>
