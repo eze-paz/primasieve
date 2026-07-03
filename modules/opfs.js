@@ -823,7 +823,11 @@ opfs.getLibreOfficeConverter = function() {
       const sofficeDataUrl = await fetchGzAsset(BASE + '/soffice.data.gz', 'application/octet-stream');
       console.log('[LO] soffice.data ready');
 
-      console.log('[LO] fetching worker script...');
+      console.log('[LO] fetching soffice.worker.js...');
+      const sofficeWorkerJsUrl = await fetchScript(BASE + '/soffice.worker.js');
+      console.log('[LO] soffice.worker.js ready');
+
+      console.log('[LO] fetching main worker script...');
       const workerCode = await (await fetch(workerUrl)).text();
       console.log('[LO] worker size:', workerCode.length);
 
@@ -869,9 +873,9 @@ opfs.getLibreOfficeConverter = function() {
         sofficeJs: sofficeJsUrl,
         sofficeWasm: sofficeWasmUrl,
         sofficeData: sofficeDataUrl,
-        sofficeWorkerJs: BASE + '/soffice.worker.js',
+        sofficeWorkerJs: sofficeWorkerJsUrl,
         verbose: false,
-        enableProgressTracking: true,
+        enableProgressTracking: false,
       }, 900000);
       console.log('[LO] init done:', initRes);
 
