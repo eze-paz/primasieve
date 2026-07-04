@@ -1248,6 +1248,12 @@ function dispatchAgentEvent(ev, renderer, host) {
       }
       return;
     }
+    case 'session_expired': {
+      // Managed SSO session has lapsed for good. Redirect to login instead of
+      // leaving a red 401 error in the conversation.
+      window.location.href = '/auth/login';
+      return;
+    }
   }
 }
 

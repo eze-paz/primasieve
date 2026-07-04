@@ -1222,6 +1222,8 @@ async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
           self.postMessage({ type: 'managed-token-refreshed', token: tok });
           continue;                                      // immediate retry with the fresh token
         }
+        // Re-mint failed — SSO session itself is gone. Signal so page can redirect cleanly.
+        ctx.emit({ type: 'session_expired', message: 'Session expired — redirecting to login…' });
       }
       if (!isRetryableError(e)) throw e;
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
