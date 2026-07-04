@@ -187,6 +187,47 @@ window.SandpieCommands = SandpieCommands;
       return '';
     }
   });
+
+  SandpieCommands.register({
+    name: 'copy',
+    module: 'core',
+    help: 'Copy the entire conversation object to clipboard',
+    usage: '>>> copy',
+    async run() {
+      const s = (typeof activeStream === 'function') ? activeStream() : (convStreams ? convStreams.get(activeConvId) : null);
+      const convMessages = s ? s.messages : messages;
+      if (!convMessages || !convMessages.length) return 'No active conversation to copy.';
+      const firstUser = convMessages.find(m => m.role === 'user');
+      let derived = 'Untitled';
+      if (firstUser && firstUser.content) {
+        const text = typeof firstUser.content === 'string'
+          ? firstUser.content
+          : firstUser.content.filter(p => p.type === 'text').map(p => p.text).join('');
+        derived = text.slice(0, 60);
+      }
+      let sysContent = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
+        ? SandpieSystemPrompt.get()
+        : (localStorage.getItem('sandpie-system-prompt') || 'You are a helpful assistant that reasons through the users requests step-by-step.');
+      if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
+        try { sysContent += SandpieMindframe.systemBlock(convMessages); } catch (_) {}
+      }
+      const payload = {
+        id: activeConvId,
+        title: derived,
+        updated: new Date().toISOString(),
+        messages: convMessages,
+        systemPrompt: { role: 'system', content: sysContent },
+        compaction: s ? s.compaction : null,
+      };
+      const json = JSON.stringify(payload, null, 2);
+      try {
+        await navigator.clipboard.writeText(json);
+        return 'Copied ' + convMessages.length + ' message(s) to clipboard (' + json.length + ' chars).';
+      } catch (e) {
+        return 'Clipboard error: ' + e.message;
+      }
+    }
+  });
 })();
 
 /* =============================================================================
