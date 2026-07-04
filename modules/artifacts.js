@@ -57,10 +57,59 @@ const RENDERABLE_EXTS = new Set([
 // in a bare iframe, so they show a placeholder that opens the side-panel viewer
 // (opfs.openFile), where the lazy-loaded docx-preview / SheetJS / pptx-viewer run.
 const PANEL_ONLY_EXTS = new Set(['pptx', 'docx', 'xlsx', 'xls', 'ods']);
-const PANEL_ONLY_LABELS = {
-  pptx: '📊 PowerPoint presentation', docx: '📘 Word document',
-  xlsx: '📊 Excel spreadsheet', xls: '📊 Excel spreadsheet', ods: '📊 Spreadsheet',
+
+// V2 "preview thumbnail" artifact card — the body for panel-only office files and
+// the collapsed representation of every artifact type: a faux-page preview banner
+// on top, a footer with a type-tinted icon, a human label, and the file size.
+const _ARTIFACT_KIND = {
+  docx: 'doc', doc: 'doc', odt: 'doc', rtf: 'doc', txt: 'doc',
+  pdf: 'pdf', xlsx: 'xls', xls: 'xls', ods: 'xls', csv: 'xls',
+  pptx: 'ppt', ppt: 'ppt', odp: 'ppt',
+  html: 'code', htm: 'code', svg: 'code', json: 'code',
+  png: 'img', jpg: 'img', jpeg: 'img', gif: 'img', webp: 'img',
 };
+const _ARTIFACT_LABEL = {
+  docx: 'Word document', doc: 'Word document', odt: 'Text document', rtf: 'Rich text', txt: 'Text file',
+  pdf: 'PDF document', xlsx: 'Excel spreadsheet', xls: 'Excel spreadsheet', ods: 'Spreadsheet', csv: 'CSV data',
+  pptx: 'PowerPoint', ppt: 'PowerPoint', odp: 'Presentation',
+  html: 'Web page', htm: 'Web page', svg: 'SVG image', json: 'JSON', png: 'Image', jpg: 'Image', jpeg: 'Image', gif: 'Image', webp: 'Image',
+};
+const _ARTIFACT_ICON = {
+  doc: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><line x1="9" y1="9" x2="10" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>',
+  xls: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 13l6 5M15 13l-6 5"/>',
+  ppt: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><rect x="9" y="12" width="6" height="4" rx="1"/>',
+  pdf: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 17v-4h1.5a1.5 1.5 0 0 1 0 3H9"/>',
+  code: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M10 12l-2 2 2 2M14 12l2 2-2 2"/>',
+  img: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+  generic: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/>',
+};
+function buildArtifactCard(clean, ext, onOpen) {
+  const kind = _ARTIFACT_KIND[ext] || 'generic';
+  const label = _ARTIFACT_LABEL[ext] || (ext ? ext.toUpperCase() : 'File');
+  const el = document.createElement('div');
+  el.className = 'artifact-card-body';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.title = 'Open ' + clean.split('/').pop();
+  el.innerHTML =
+    '<div class="ac-thumb"><div class="ac-page"><i class="t"></i><i class="m"></i><i class="s"></i><i class="m"></i><i class="s"></i></div></div>' +
+    '<div class="ac-ft"><div class="ac-ic ac-t-' + kind + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + _ARTIFACT_ICON[kind] + '</svg></div>' +
+    '<span class="ac-sub"></span><span class="ac-go">›</span></div>';
+  el.querySelector('.ac-sub').textContent = label;
+  const open = (e) => { if (e) e.preventDefault(); onOpen(); };
+  el.onclick = open;
+  el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
+  (async () => {
+    try {
+      const { parts, name } = splitPath(clean);
+      const dir = await opfs.resolveDir(parts);
+      const file = await (await dir.getFileHandle(name)).getFile();
+      const sub = el.querySelector('.ac-sub');
+      if (sub && file.size > 0) sub.textContent = label + ' · ' + formatArtifactBytes(file.size);
+    } catch (_) {}
+  })();
+  return el;
+}
 
 function renderArtifact(host, path) {
   const target = host || (_activeStream() && _activeStream().host) || _$('messages');
@@ -169,38 +218,22 @@ function renderArtifact(host, path) {
     return;
   }
 
-  // Office zips (pptx/docx/xlsx/…) can't render in a bare iframe. Show a
-  // placeholder with a button to open in the side panel (where the lazy-loaded
-  // viewer runs). The ⊞ button in the header also does this.
+  // Office zips (pptx/docx/xlsx/…) can't render in a bare iframe — the V2 card is
+  // their whole body; clicking it opens the side-panel viewer. No inline body to
+  // collapse, so drop the collapse toggle (the ⊞ header button also opens it).
   if (PANEL_ONLY_EXTS.has(ext)) {
-    const placeholder = document.createElement('div');
-    placeholder.style.cssText = 'padding:16px 14px;font:12px monospace;color:var(--sp-text-dim);text-align:center;';
-    const btn = document.createElement('button');
-    btn.textContent = '▶ View';
-    btn.style.cssText = 'margin-top:6px;padding:4px 12px;font:12px monospace;background:var(--sp-accent);color:#fff;border:none;border-radius:3px;cursor:pointer;';
-    btn.onclick = () => openArtifactPanel(clean);
-    placeholder.innerHTML = (PANEL_ONLY_LABELS[ext] || '📄 Document') + '<br>';
-    placeholder.appendChild(btn);
-    wrap.appendChild(placeholder);
+    const cb = wrap.querySelector('.artifact-collapse-btn');
+    if (cb) cb.remove();
+    wrap.appendChild(buildArtifactCard(clean, ext, () => openArtifactPanel(clean)));
     target.appendChild(wrap);
     return;
   }
 
+  // Collapsed representation: the same V2 card (click to expand the inline view).
   const metaRow = document.createElement('div');
   metaRow.className = 'artifact-meta-row';
   metaRow.style.display = 'none';
-
-  const showBtn = document.createElement('button');
-  showBtn.className = 'artifact-show-btn';
-  showBtn.textContent = '▼ Show artifact';
-  showBtn.onclick = () => toggleArtifactCollapse(wrap);
-
-  const metaInfo = document.createElement('span');
-  metaInfo.className = 'artifact-meta-info';
-  metaInfo.textContent = clean.split('/').pop();
-
-  metaRow.appendChild(showBtn);
-  metaRow.appendChild(metaInfo);
+  metaRow.appendChild(buildArtifactCard(clean, ext, () => toggleArtifactCollapse(wrap)));
   wrap.appendChild(metaRow);
 
   const frame = document.createElement('iframe');
@@ -254,7 +287,7 @@ function collapseArtifact(wrap) {
   if (frame) frame.style.display = 'none';
   if (colBtn) { colBtn.textContent = '+'; colBtn.title = 'Expand'; }
   if (metaRow) {
-    metaRow.style.display = 'flex';
+    metaRow.style.display = 'block';
 
     const path = wrap.dataset.artifactPath;
     const ts = parseInt(wrap.dataset.artifactCreated || '0', 10);

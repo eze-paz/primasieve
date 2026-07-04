@@ -856,9 +856,7 @@ opfs._officeEngine = function() {
 opfs._renderOfficePdf = async function(file, ext, name, body, panel) {
   if (!self.crossOriginIsolated) return false;
   try {
-    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">'
-      + 'Rendering with LibreOffice…<br><span style="font-size:.85em;opacity:.7;">'
-      + 'first use downloads the engine (~55&nbsp;MB, then cached)</span></div>';
+    body.innerHTML = '<div class="sp-loading">Loading<div class="sp-bar"></div></div>';
     const engine = await opfs._officeEngine();
     const pdf = await engine.convert(await file.arrayBuffer(), ext);
     const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
