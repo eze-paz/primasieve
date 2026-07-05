@@ -36,6 +36,41 @@ const SandpieTokens = (() => {
     return Math.ceil(chars / 4);
   }
 
+  // The per-request scaffold the model always receives but the message-text estimate
+  // misses: the editable system prompt, the serialized tool defs, and the skills
+  // block. Counting it is what makes an ESTIMATE comparable to the provider's
+  // reported usage (which includes all of it) — without this the % swings 2-3× the
+  // moment usage is reported. Chars → tokens at the same ~4:1 heuristic.
+  function overheadChars() {
+    let chars = 0;
+    try { if (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get) chars += (SandpieSystemPrompt.get() || '').length; } catch {}
+    try { if (typeof toolDefs === 'function') chars += JSON.stringify(toolDefs() || []).length; } catch {}
+    try {
+      const st = (typeof SandpieContext !== 'undefined' && SandpieContext.lastState) ? SandpieContext.lastState() : null;
+      if (st && st.exists) { let c = 620; for (const s of (st.skills || [])) { if (s.enabled === false) continue; c += (s.name || '').length + Math.min((s.desc || '').length, 400) + 12; } chars += c; }
+    } catch {}
+    return chars;
+  }
+
+  // Compaction-aware: what actually goes to the model is [summary, …tail], NOT the
+  // full history. A non-destructive compaction keeps every message in the array but
+  // only sends the summary + post-boundary tail (conversations.js buildAgentConfig),
+  // so any "context size" must measure that, or it stays pinned high after a compaction.
+  function sentMessages(msgs, comp) {
+    msgs = msgs || [];
+    if (comp && comp.boundary > 0 && comp.boundary < msgs.length) {
+      return [{ role: 'user', content: comp.summary || '' }, ...msgs.slice(comp.boundary)];
+    }
+    return msgs;
+  }
+
+  // The single source of truth for "tokens actually sent" as an ESTIMATE: overhead
+  // + compaction-aware body. Used by the Context panel, the compaction trigger
+  // (agents.contextPct), and the live-meter baseline, so all three agree.
+  function estimateContextTokens(msgs, comp) {
+    return Math.ceil(overheadChars() / 4) + estimateTokens(sentMessages(msgs, comp));
+  }
+
   // Live override pushed by the streaming loop during generation, so the panel
   // climbs in real time (baseline + generated-so-far) instead of only updating
   // when the turn ends. Cleared when the turn finishes → authoritative wins.
@@ -53,7 +88,7 @@ const SandpieTokens = (() => {
       const text = await window.opfs.read('sandpie/conversations/' + convId + '.json');
       const data = JSON.parse(text);
       if (data.usage) return usageTotal(data.usage);
-      if (data.messages) return estimateTokens(data.messages);
+      if (data.messages) return estimateContextTokens(data.messages, data.compaction || null);
     } catch {}
     return 0;
   }
@@ -116,9 +151,9 @@ const SandpieTokens = (() => {
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    recordUsage, forget, conversationTokens, estimateTokens, isEstimated, isLive,
-    weeklyTotal, contextWindow, subscribe, notify, setLiveTokens, clearLiveTokens,
-    liveDelta,
+    recordUsage, forget, conversationTokens, estimateTokens, estimateContextTokens,
+    isEstimated, isLive, weeklyTotal, contextWindow, subscribe, notify,
+    setLiveTokens, clearLiveTokens, liveDelta,
   };
 })();
 window.SandpieTokens = SandpieTokens;
@@ -382,14 +417,20 @@ async function computeBreakdown() {
       }
     }
   } catch {}
-  let msgs = [];
+  let msgs = [], comp = null;
   try {
     const convId = localStorage.getItem('sandpie-active-conv');
     if (convId && window.opfs) {
       const data = JSON.parse(await opfs.read('sandpie/conversations/' + convId + '.json'));
       if (Array.isArray(data.messages)) msgs = data.messages;
+      comp = data.compaction || null;
     }
   } catch {}
+  // Compaction-aware: count only what's sent — the summary (as a message) + the
+  // post-boundary tail — not the archived head. Keeps the bar + total in step with
+  // the model's real context (and with the compaction trigger) after a compaction.
+  const active = comp && comp.boundary > 0 && comp.boundary < msgs.length;
+  if (active) { b.messages += toTok((comp.summary || '').length); msgs = msgs.slice(comp.boundary); }
   for (const m of msgs) {
     if (!m) continue;
     let textLen = 0;

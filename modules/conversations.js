@@ -988,7 +988,7 @@ async function sendSingle(text, stream, opts = {}) {
   // we read the authoritative size.
   if (typeof SandpieTokens !== 'undefined') {
     try { SandpieTokens.clearLiveTokens && SandpieTokens.clearLiveTokens(); } catch (_) {}
-    try { const fromFile = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; const fromMem = SandpieTokens.estimateTokens ? SandpieTokens.estimateTokens(convMessages) : 0; stream.tokBaseline = Math.max(fromFile, fromMem); }
+    try { const fromFile = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; const fromMem = SandpieTokens.estimateContextTokens ? SandpieTokens.estimateContextTokens(convMessages, stream.compaction) : (SandpieTokens.estimateTokens ? SandpieTokens.estimateTokens(convMessages) : 0); stream.tokBaseline = Math.max(fromFile, fromMem); }
     catch (_) { stream.tokBaseline = 0; }
   }
 
@@ -2588,7 +2588,36 @@ window.endTotalTimer = endTotalTimer;
    restored message can call renderArtifact(). The saved theme is restored
    separately by themes.js.
    ============================================================================= */
+// Compaction progress banner: shown in a conversation's host while a compact-sink
+// agent is summarizing (agents.js emits compaction:start/end). Pre-send compaction
+// is awaited before the turn goes out, so without this the user just sees an
+// unexplained pause. Removed on end (and harmlessly wiped by the post-compaction
+// re-render, whichever comes first).
+function showCompactionProgress(convId) {
+  try {
+    const s = convStreams.get(convId);
+    const host = (s && s.host) || $('messages');
+    if (!host || host.querySelector('.compaction-progress')) return;
+    const el = document.createElement('div');
+    el.className = 'compaction-progress';
+    el.innerHTML = '<span class="cp-spin" aria-hidden="true"></span><span>Summarizing earlier messages to free up context…</span>';
+    host.appendChild(el);
+    if (shouldAutoScroll(host) || isAtBottom(host)) host.scrollTop = host.scrollHeight;
+  } catch (_) {}
+}
+function hideCompactionProgress(convId) {
+  try {
+    const s = convStreams.get(convId);
+    const host = (s && s.host) || $('messages');
+    if (host) host.querySelectorAll('.compaction-progress').forEach(e => e.remove());
+  } catch (_) {}
+}
+
 function bootConversations() {
+  if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+    Sandpie.events.on('compaction:start', ({ convId }) => showCompactionProgress(convId));
+    Sandpie.events.on('compaction:end', ({ convId }) => hideCompactionProgress(convId));
+  }
   (async () => {
     await refreshConversationList();
     if (activeConvId) {

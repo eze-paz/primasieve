@@ -310,17 +310,16 @@ async function contextPct() {
   let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
   if (!w) return null;
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
-  // Measure what's actually SENT: with non-destructive compaction the live array
-  // holds the full history but only [summary + in-context tail] goes to the model.
-  let sent = msgs;
+  // Measure what's actually SENT (overhead + compaction-aware body) using the SAME
+  // estimator the Context panel shows, so the trigger and the displayed % agree.
+  let comp = null;
   try {
-    const comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
+    comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
       ? SandpieConversations.getCompaction(activeConv()) : null;
-    if (comp && comp.boundary > 0 && comp.boundary < msgs.length) {
-      sent = [{ role: 'user', content: comp.summary || '' }, ...msgs.slice(comp.boundary)];
-    }
   } catch {}
-  let used = estimateConvTokens(sent);
+  let used = SandpieTokens.estimateContextTokens
+    ? SandpieTokens.estimateContextTokens(msgs, comp)
+    : estimateConvTokens(msgs);
   try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
   return (used / w) * 100;
 }
@@ -413,12 +412,19 @@ const statusLine = (r) => !r ? 'idle' : (r.status === 'saved' ? `saved → ${r.f
 async function execAgent(a, convId) {
   busy = true; currentAbort = new AbortController();
   status[a.id] = 'running…'; renderAgents();
+  // A compact-sink run is an LLM summarization the user is waiting on (pre-send
+  // compaction is awaited before the turn goes out). Surface it in the conversation
+  // so the pause isn't a mystery — conversations.js renders/removes a banner.
+  const isCompact = a.sink === 'compact';
+  const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
+  if (isCompact) emit('compaction:start');
   try {
     status[a.id] = statusLine(await runAgent(a, convId, currentAbort.signal));
   } catch (e) {
     if (e && e.name === 'AbortError') status[a.id] = 'stopped';
     else { console.warn('[agents] ' + a.id + ' failed:', e); status[a.id] = 'error: ' + String((e && e.message) || e).slice(0, 80); }
   } finally {
+    if (isCompact) emit('compaction:end');
     busy = false; currentAbort = null; renderAgents();
   }
 }
