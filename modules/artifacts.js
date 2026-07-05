@@ -209,11 +209,19 @@ function renderArtifact(host, path) {
   header.appendChild(btns);
   wrap.appendChild(header);
 
+  // File type never blocks showing an artifact: types we can't preview inline
+  // still get the same clickable V2 card, which opens the file in a new tab (the
+  // browser renders it if it can, otherwise downloads) — a link is always useful.
   if (!renderable) {
-    const dlRow = document.createElement('div');
-    dlRow.style.cssText = 'padding:12px 14px;font:12px monospace;color:var(--sp-text-dim);';
-    dlRow.textContent = ext.toUpperCase() + ' file — not previewable in browser. Use ⬇ to download.';
-    wrap.appendChild(dlRow);
+    const cb = wrap.querySelector('.artifact-collapse-btn');
+    if (cb) cb.remove();
+    wrap.appendChild(buildArtifactCard(clean, ext, async () => {
+      try {
+        const url = await opfs.toUrl(clean);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (e) { console.error('[artifact] open failed:', e); }
+    }));
     target.appendChild(wrap);
     return;
   }

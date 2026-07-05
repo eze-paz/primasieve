@@ -976,6 +976,28 @@ opfs.createFile = async function() {
 // Serve an OPFS file as a blob URL — replaces the /opfs/ SW fetch intercept.
 // HTML files get the postMessage resize script injected so artifact iframes
 // auto-size. Call URL.revokeObjectURL() on the returned URL when done.
+// Page-side hydration for a dehydrated (cloud-only) file: pull its bytes down via
+// the sync provider if they aren't local yet. No-op (returns false) when already
+// local or no provider. Reusable — openFile/artifacts/toUrl all need it.
+opfs.hydrate = async function(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  if (sp && sp.hydrate) { try { return await sp.hydrate(clean); } catch (_) {} }
+  return false;
+};
+// Read bytes, hydrating first if the file is missing or a 0-byte cloud placeholder.
+opfs.readBytesHydrating = async function(path) {
+  const clean = String(path).replace(/^\/+/, '');
+  let bytes = null;
+  try { bytes = await this.readBytes(clean); } catch (_) {}
+  if (bytes == null || bytes.length === 0) {
+    const ok = await opfs.hydrate(clean);
+    if (ok || bytes == null) { try { bytes = await this.readBytes(clean); } catch (_) {} }
+  }
+  if (bytes == null) throw new Error('file not found: ' + clean);
+  return bytes;
+};
+
 opfs.toUrl = async function(path) {
   const clean = String(path).replace(/^\/+/, '');
   const ext = (clean.split('.').pop() || '').toLowerCase();
@@ -986,7 +1008,9 @@ opfs.toUrl = async function(path) {
     json:'application/json', txt:'text/plain',
   };
   const mime = mimeMap[ext] || 'application/octet-stream';
-  const bytes = await this.readBytes(clean);
+  // Hydrate a cloud-only artifact on demand — a just-shown or reloaded artifact
+  // may not be local yet; without this the render fails with "file not found".
+  const bytes = await this.readBytesHydrating(clean);
   if (ext === 'html' || ext === 'htm') {
     let text = new TextDecoder().decode(bytes);
     const script = `<script>(function(){` +

@@ -94,14 +94,16 @@ IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them 
     }
   },
   show_artifact: {
-    description: `Render a file from OPFS as a live artifact injected directly into the chat.
-Use this whenever:
-- The user says "show this", "artifact", "add into chat", "inject", "put in the DOM", or similar
-- You have written any visual output (HTML page, plot, SVG, chart, dataframe, image) to OPFS
-The file must already exist in OPFS — write it first with run_python, then call this.
-Supported types: .html (full page, CDN JS works), .svg, .png, .jpg, .gif, .csv, .txt.
-Path is OPFS-relative — do NOT include a leading slash (e.g. "sandpie/artifacts/chart.html").
-Default output folder is sandpie/artifacts/ — use it unless the user specifies a different path.
+    description: `Inject a file from OPFS into the chat as an artifact card.
+File type never blocks this — show any file the user might want:
+- HTML (full page, CDN JS works), SVG, PNG/JPG/GIF/WebP, PDF, CSV, TXT, JSON, and
+  Office docs (docx/xlsx/pptx, rendered in-app via LibreOffice) preview INLINE.
+- Any OTHER type shows a clickable card that opens/downloads the file — still useful.
+Use whenever the user says "show this", "artifact", "add into chat", "inject", or
+after you've written an output file worth surfacing.
+The file must already exist in OPFS — write it first (e.g. with run_python).
+Path is OPFS-relative — no leading slash (e.g. "sandpie/artifacts/chart.html").
+Default output folder is sandpie/artifacts/ — use it unless the user says otherwise.
 Typical flow:
   run_python: open('sandpie/artifacts/chart.html', 'w').write(html)
   show_artifact: { "path": "sandpie/artifacts/chart.html" }`,
