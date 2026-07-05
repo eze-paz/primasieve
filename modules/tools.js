@@ -150,6 +150,30 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
         required: ['src'],
       },
     },
+    write_todos: {
+      description: `Maintain a visible checklist for a multi-step task. Call with the FULL list every time — this REPLACES the previous list (there is no add/complete verb; resend every item with its updated status).
+WHEN: use for any task with 3+ non-trivial steps, or when the user gives several distinct requirements. Skip it for single-step or trivial work.
+RULES: exactly ONE item may be "in_progress" at a time. Mark an item "in_progress" BEFORE you start it and "completed" the moment it's finished — don't batch completions. Only mark "completed" when truly done (file written, script ran clean, etc.); if blocked, keep it "in_progress" and add a new item for what's needed.
+Each item: { "content": imperative step ("Write the parser"), "status": "pending" | "in_progress" | "completed" }.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            description: 'The complete todo list, in order. Resend all items on every call.',
+            items: {
+              type: 'object',
+              properties: {
+                content: { type: 'string', description: 'Imperative description of the step.' },
+                status:  { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Current state of this step.' },
+              },
+              required: ['content', 'status'],
+            },
+          },
+        },
+        required: ['todos'],
+      },
+    },
 
 };
 //// Lets the user (Settings → System prompt) turn tools off and rewrite their

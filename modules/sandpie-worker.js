@@ -58,7 +58,7 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
 
-const WORKER_VERSION = '2.17.0-web-search';
+const WORKER_VERSION = '2.18.0-write-todos';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -577,6 +577,35 @@ async function tool_run_python({ path, args }, ctx) {
 
 
 
+
+// A model-managed checklist. The model resends the WHOLE list each call (there is
+// no add/complete verb), so the list's source of truth is the model's own context;
+// we just validate, normalize, and hand back a magic-prefixed result the main
+// thread renders as a card (like 'artifact:' / 'image:'). The text AFTER the
+// first newline is the plain-text confirmation the MODEL reads back.
+async function tool_write_todos({ todos }) {
+  if (!Array.isArray(todos)) return { result: 'Error: "todos" must be an array of {content, status}.' };
+  const VALID = new Set(['pending', 'in_progress', 'completed']);
+  const clean = [];
+  for (const t of todos) {
+    const content = t && typeof t.content === 'string' ? t.content.trim() : '';
+    if (!content) return { result: 'Error: every todo needs a non-empty "content".' };
+    let status = t && t.status;
+    if (!VALID.has(status)) status = 'pending';
+    clean.push({ content, status });
+  }
+  if (!clean.length) return { result: 'Error: "todos" is empty — send at least one item.' };
+  // Enforce a single in_progress: keep the first, demote the rest to pending.
+  let seen = false;
+  for (const t of clean) {
+    if (t.status === 'in_progress') { if (seen) t.status = 'pending'; else seen = true; }
+  }
+  const done = clean.filter(t => t.status === 'completed').length;
+  const summary = clean.map(t =>
+    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
+  ).join('\n');
+  return { result: 'todos:' + JSON.stringify(clean) + '\n' + `Todo list updated (${done}/${clean.length} done):\n` + summary };
+}
 
 async function tool_show_artifact({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
@@ -1143,7 +1172,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image'];
+const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos'];
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -1167,6 +1196,7 @@ async function runTool(name, args, ctx) {
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
+    case 'write_todos':   return tool_write_todos(args, ctx);
     default:              return unknownTool(name);
   }
 }

@@ -98,11 +98,18 @@ function renderHistoricalMessage(m, host = null) {
       if (path && toolCalls.length > 0) {
         appendToolResultImage(toolCalls[toolCalls.length - 1].dataset.tcId, path, target);
       }
+    } else if (content.startsWith('todos:')) {
+      const nl = content.indexOf('\n');
+      const json = content.slice('todos:'.length, nl < 0 ? undefined : nl);
+      let todos = null;
+      try { todos = JSON.parse(json); } catch (_) {}
+      if (todos && toolCalls.length > 0) {
+        renderTodos(toolCalls[toolCalls.length - 1].dataset.tcId, todos, target);
+      }
     } else if (!content.startsWith('artifact:')) {
-      const t = content;
-      const display = t.length > 500 ? t.slice(0, 500) + '…' : t;
+      // Full result, untruncated — the user sees exactly what the model sees.
       if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, display, target);
+        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, content, target);
       }
     }
 
@@ -857,7 +864,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=27');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=28');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1445,6 +1452,60 @@ function appendToolResult(tcId, result, scopeEl) {
   box.appendChild(resultDiv);
 }
 
+// Render the write_todos checklist inside its tool-call box, in place of a text
+// result. Each write_todos call gets its own card attached to that call, so the
+// history reads as a running log of the plan; replay rebuilds each from the tool
+// message content.
+function renderTodos(tcId, todos, scopeEl) {
+  const root = scopeEl || document;
+  const toolCalls = root.querySelectorAll('.msg.tool-call');
+  let toolCallDiv = null;
+  for (const div of toolCalls) {
+    if (div.dataset.tcId === tcId) { toolCallDiv = div; break; }
+  }
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  const existingTodos = box.querySelector('.tool-todos');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+  if (existingTodos) existingTodos.remove();
+
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  const list = document.createElement('div');
+  list.className = 'tool-todos';
+  const done = (todos || []).filter(t => t && t.status === 'completed').length;
+  const head = document.createElement('div');
+  head.className = 'tool-todos-head';
+  head.textContent = `Checklist · ${done}/${(todos || []).length} done`;
+  list.appendChild(head);
+  for (const t of (todos || [])) {
+    const st = (t && t.status) || 'pending';
+    const row = document.createElement('div');
+    row.className = 'tool-todo tool-todo-' + st;
+    const mark = document.createElement('span');
+    mark.className = 'tool-todo-mark';
+    mark.textContent = st === 'completed' ? '✓' : st === 'in_progress' ? '▸' : '○';
+    const txt = document.createElement('span');
+    txt.className = 'tool-todo-text';
+    txt.textContent = (t && t.content) || '';
+    row.append(mark, txt);
+    list.appendChild(row);
+  }
+  box.appendChild(sep);
+  box.appendChild(list);
+}
+
 // Render a loaded image (load_image tool) inline inside its tool-call box, in
 // place of a text result. The thumbnail is resolved from OPFS page-side.
 function appendToolResultImage(tcId, path, scopeEl) {
@@ -1667,9 +1728,18 @@ class RoundRenderer {
       if (path && idx >= 0 && this.toolCallEls[idx]) appendToolResultImage(tcId, path, this.host);
       return;
     }
-    const display = text.length > 500 ? text.slice(0, 500) + '…' : text;
+
+    if (text.startsWith('todos:')) {
+      const nl = text.indexOf('\n');
+      const json = text.slice('todos:'.length, nl < 0 ? undefined : nl);
+      let todos = null;
+      try { todos = JSON.parse(json); } catch (_) {}
+      if (todos && idx >= 0 && this.toolCallEls[idx]) renderTodos(tcId, todos, this.host);
+      return;
+    }
+    // Show the full tool result — the user sees exactly what the model sees.
     if (idx >= 0 && this.toolCallEls[idx]) {
-      appendToolResult(tcId, display, this.host);
+      appendToolResult(tcId, text, this.host);
     }
   }
   finalize() {
@@ -2497,16 +2567,12 @@ function startTotalTimer(stream) {
   // Built once; the tick mutates the leaf <span>s in place.
   el.innerHTML =
     '<span class="mt-time">0s</span>' +
-    '<span class="mt-sep">·</span><span class="mt-tok">0 tok</span>' +
-    '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
     '<span class="mt-queue"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
 
   const timeEl = el.querySelector('.mt-time');
-  const tokEl = el.querySelector('.mt-tok');
-  const rateEl = el.querySelector('.mt-rate');
   const ctxEl = el.querySelector('.mt-ctx');
   const queueEl = el.querySelector('.mt-queue');
   queueEl.style.cursor = 'pointer';
@@ -2519,12 +2585,9 @@ function startTotalTimer(stream) {
     const elapsed = (Date.now() - stream.timerStart) / 1000;
     set(timeEl, fmtElapsed(elapsed));
 
-    // Generated tokens this interaction (text + tool-call args), and aggregate
-    // throughput. The timer spans tool execution too, so tok/s honestly drops
-    // while a tool runs.
+    // Generated tokens this interaction (text + tool-call args). Not shown in the
+    // timer anymore, but still feeds the running context figure below.
     const target = stream.tokTarget;
-    set(tokEl, TOK_FMT(target) + ' tok');
-    set(rateEl, RATE_FMT(elapsed > 0.4 ? target / elapsed : 0));
 
     // Conversation CONTEXT: baseline (all previous turns) + generated this turn
     // + tool results this turn. Doesn't reset per turn — it's the running size
@@ -2559,19 +2622,12 @@ function endTotalTimer(stream, label) {
     stream.timerEl.remove();
   } else {
     const sec = (Date.now() - stream.timerStart) / 1000;
-    const tok = stream.tokTarget || 0;
-    const rate = sec > 0.05 ? tok / sec : 0;
-    // Settled line: label · elapsed · tokens · rate, dimmed via .done. The token
-    // pair is dropped on a pure-tool round (no text generated) — "0 tok · 0 tok/s"
-    // is noise.
+    // Settled line: label · elapsed, dimmed via .done. Token count + rate removed
+    // per user preference — only elapsed time is kept here.
     const parts = [
       `<span class="mt-label">${label}</span>`,
       `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
     ];
-    if (tok > 0) {
-      parts.push(`<span class="mt-sep">·</span><span class="mt-tok">${TOK_FMT(tok)} tok</span>`);
-      parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
-    }
     stream.timerEl.innerHTML = parts.join('');
     stream.timerEl.classList.add('done');
   }

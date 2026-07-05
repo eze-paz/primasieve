@@ -1299,6 +1299,31 @@
     white-space: pre-wrap;
   }
   .tool-box .tool-result-image { padding: 0.4rem 0.6rem; }
+  .tool-box .tool-todos {
+    padding: 0.35rem 0.6rem 0.45rem;
+    font: 11px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+  }
+  .tool-box .tool-todos-head {
+    color: var(--sp-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    margin-bottom: 0.3rem;
+  }
+  .tool-box .tool-todo {
+    display: flex;
+    gap: 0.45rem;
+    align-items: baseline;
+    padding: 1px 0;
+    color: var(--sp-text);
+  }
+  .tool-box .tool-todo-mark { flex: none; width: 1ch; text-align: center; }
+  .tool-box .tool-todo-completed { color: var(--sp-text-dim); }
+  .tool-box .tool-todo-completed .tool-todo-text { text-decoration: line-through; }
+  .tool-box .tool-todo-completed .tool-todo-mark { color: #3fb950; }
+  .tool-box .tool-todo-in_progress { color: var(--sp-accent); }
+  .tool-box .tool-todo-in_progress .tool-todo-mark { color: var(--sp-accent); }
+  .tool-box .tool-todo-pending .tool-todo-mark { color: var(--sp-text-dim); }
   .tool-box .tool-image {
     max-width: 100%;
     max-height: 320px;
