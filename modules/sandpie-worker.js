@@ -1508,6 +1508,31 @@ function applyEdit(current, oldStr, newStr) {
   return { error: 'old_str not found (tried exact, line-ending, and trailing-whitespace-tolerant matching). Read the file and copy the exact text into old_str.' + (near.length ? '\nClosest lines in the file:\n' + near.join('\n') : '') };
 }
 
+// Build a compact, line-numbered unified diff of a single-region edit for the
+// tool result — so the model (and the user, in the tool box) sees exactly what
+// changed and where, not just "Edited: path". Trims to the changed lines plus
+// `ctx` lines of context; numbers are new-file line numbers (old-file for removed
+// lines). Returns '' when the change is too large to show inline.
+function _editDiff(oldText, newText, ctx = 3) {
+  const o = oldText.split('\n'), n = newText.split('\n');
+  let p = 0;
+  while (p < o.length && p < n.length && o[p] === n[p]) p++;
+  let s = 0;
+  while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
+  const oEnd = o.length - s, nEnd = n.length - s;
+  const removed = oEnd - p, added = nEnd - p;
+  if (removed + added === 0) return '';
+  if (removed + added > 200) return '';   // too big — caller falls back to a summary
+  const pad = String(Math.max(oEnd, nEnd, 1)).length;
+  const num = k => String(k).padStart(pad, ' ');
+  const out = [`@@ -${p + 1},${removed} +${p + 1},${added} @@`];
+  for (let i = Math.max(0, p - ctx); i < p; i++) out.push(`  ${num(i + 1)}  ${n[i]}`);
+  for (let i = p; i < oEnd; i++) out.push(`- ${num(i + 1)}  ${o[i]}`);
+  for (let i = p; i < nEnd; i++) out.push(`+ ${num(i + 1)}  ${n[i]}`);
+  for (let i = nEnd; i < Math.min(n.length, nEnd + ctx); i++) out.push(`  ${num(i + 1)}  ${n[i]}`);
+  return out.join('\n');
+}
+
 async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (!path) return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
@@ -1533,6 +1558,11 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
         catch (e) { console.warn('[sandpie-worker] syncfs after edit_file failed:', e); resolve(); }
       }));
     }
-    return { result: `Edited: ${norm}${res.note ? ' (' + res.note + ')' : ''}` };
+    const head = `Edited ${norm}${res.note ? ' (' + res.note + ')' : ''}`;
+    const diff = _editDiff(current, res.updated);
+    const result = diff
+      ? `${head}\n${diff}`
+      : `${head} — ${Math.abs(res.updated.split('\n').length - current.split('\n').length)} net line change(s); diff too large to show inline.`;
+    return { result };
   } catch (e) { return { result: `Edit failed: ${e.message}` }; }
 }
