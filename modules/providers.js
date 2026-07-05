@@ -223,6 +223,56 @@ function getActiveProvider() {
   return getProviderById(_activeProviderId);
 }
 
+// One-shot, NON-streaming completion — the shared utility path for background
+// summarization (native compactor + memory/note agents). Never touches the
+// conversation stream, so it emits no generation:complete. Routes to whatever
+// provider is active: in-browser LiteRT-LM / WebGPU engines, or a cloud
+// /chat/completions endpoint. Returns the assistant text (may be '').
+async function completeOnce({ system = '', user = '', model = '', maxTokens = 1024, signal } = {}) {
+  const active = getActiveProvider();
+  if (active && active.type === 'litertlm') {
+    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.runConversation) throw new Error('LiteRT-LM engine not loaded');
+    let out = '';
+    await SandpieLiteRTLM.runConversation({
+      provider: { ...active, maxTokens },
+      messages: [{ role: 'user', content: user }],
+      systemPrompt: system, tools: [], convId: null, signal,
+    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
+    return out;
+  }
+  if (active && active.type === 'webgpu') {
+    // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a
+    // utility prompt doesn't load the other model.
+    const isDense = typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
+      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === active.endpoint);
+    const eng = isDense ? SandpieQwen3 : (typeof SandpieQwen35 !== 'undefined' ? SandpieQwen35 : null);
+    if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
+    let out = '';
+    await eng.runConversation({
+      provider: { endpoint: active.endpoint, maxTokens },
+      messages: [{ role: 'user', content: user }],
+      systemPrompt: system, tools: [], convId: null, signal,
+    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
+    return out;
+  }
+  const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
+  const apiKey = document.getElementById('apiKey')?.value || '';
+  const mdl = model || document.getElementById('model')?.value || '';
+  if (!endpoint || !mdl) throw new Error('no provider configured');
+  const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions') : (endpoint + '/chat/completions');
+  const url = new URL(route, location.href).href;
+  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: false, max_tokens: maxTokens };
+  if (active && active.temperature != null) body.temperature = active.temperature;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
+    body: JSON.stringify(body), signal,
+  });
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + (t ? ': ' + t.slice(0, 200) : '')); }
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content || '';
+}
+
 // Push the active provider's connection details into the hidden inputs that
 // conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
@@ -606,6 +656,7 @@ function refreshAiDot() {
 
 window.SandpieProviders = {
   getActive: getActiveProvider,
+  complete: completeOnce,
   load: loadProviders,
   apply: applyActiveProvider,
   ensureUsable,

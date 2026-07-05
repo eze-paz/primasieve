@@ -9,8 +9,7 @@
  *   at_context_pct:             trigger — fire at >= P% of the context window
  *   every_minutes:              trigger — fire every M minutes (best-effort)
  *   input: since_last_run       since_last_run | conversation | last_<n>
- *   sink: memory                memory | note | compact | append:<path>
- *   keep_tail:                  (compact only) recent messages kept verbatim
+ *   sink: memory                memory | note | append:<path>
  *   model:                      optional model override
  *   ---
  *   <the prompt body>           everything below = the zero-shot prompt
@@ -107,8 +106,8 @@ function parseAgent(id, text) {
   if (a.everyMessages == null && a.atContextPct == null && a.everyMinutes == null) {
     errors.push('no trigger (set every_messages, at_context_pct, or every_minutes)');
   }
-  if (!(a.sink === 'memory' || a.sink === 'note' || a.sink === 'compact' || a.sink.startsWith('append:'))) {
-    errors.push(`unknown sink "${a.sink}" — use memory, note, compact, or append:<path>`);
+  if (!(a.sink === 'memory' || a.sink === 'note' || a.sink.startsWith('append:'))) {
+    errors.push(`unknown sink "${a.sink}" — use memory, note, or append:<path>`);
   }
   return a;
 }
@@ -165,29 +164,6 @@ sink: memory
 ${DISTILLER_PROMPT}
 `;
 
-const COMPACTOR_PROMPT = [
-  "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Produce a dense briefing that REPLACES those earlier turns in the live context, so the conversation can continue indefinitely without losing the thread.",
-  "",
-  "Preserve, compactly:",
-  "- The original goal/task and any stated constraints or requirements.",
-  "- Decisions made and why; conclusions reached.",
-  "- Key facts, names, file paths, commands, IDs, and values referenced.",
-  "- Open threads — what is still in progress or unresolved.",
-  "- The user's stated preferences and any corrections they gave.",
-  "",
-  "Drop greetings, small talk, and anything already superseded. Write a tight briefing (headings or bullets are fine) for a future reader with NO access to the omitted turns. Do not invent anything. Output ONLY the summary text — no preamble, no JSON.",
-].join('\n');
-
-const DEFAULT_COMPACTOR = `---
-name: Conversation compactor
-enabled: false
-at_context_pct: 70
-keep_tail: 10
-sink: compact
----
-${COMPACTOR_PROMPT}
-`;
-
 const NEW_AGENT_TEMPLATE = `---
 name: New agent
 enabled: false
@@ -209,68 +185,14 @@ async function ensureDefaults() {
     await writeAgentFile('distiller', DEFAULT_DISTILLER);
     mdNames.add('distiller.md');
   }
-  // Seed the compactor once (disabled). One-time flag so a user's delete sticks.
-  if (!mdNames.has('compactor.md') && !localStorage.getItem('sandpie-agent-seed-compactor')) {
-    await writeAgentFile('compactor', DEFAULT_COMPACTOR);
-    localStorage.setItem('sandpie-agent-seed-compactor', '1');
-  }
 }
 
 // ---- direct (non-streaming) completion — never the SW conversation stream --
+// Thin wrapper over the shared SandpieProviders.complete (which routes to the
+// active in-browser engine or a cloud /chat/completions endpoint).
 async function runPrompt(system, user, { model, signal, maxTokens = 1024 } = {}) {
-  const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  // Local (WebGPU Qwen3.5) provider: run the completion IN-BROWSER. Its "endpoint"
-  // is a model-variant id, not an OpenAI server — never POST <variant>/chat/completions.
-  // runConversation is the only entry point; drive it with no tools and collect the
-  // streamed content deltas into a single string.
-  // Local (LiteRT-LM / Gemma) provider: same story — its "endpoint" is a model URL,
-  // not an OpenAI server. Drive the in-browser engine with no tools and collect the
-  // streamed content deltas. Spread the active provider so contextWindow/reasoning
-  // carry over; override maxTokens for this utility prompt.
-  if (active && active.type === 'litertlm') {
-    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.runConversation) throw new Error('LiteRT-LM engine not loaded');
-    let out = '';
-    await SandpieLiteRTLM.runConversation({
-      provider: { ...active, maxTokens },
-      messages: [{ role: 'user', content: user }],
-      systemPrompt: system,
-      tools: [], convId: null, signal,
-    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
-    return out;
-  }
-  if (active && active.type === 'webgpu') {
-    // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a utility
-    // prompt doesn't load the other model. Match the active model id against the dense set.
-    const isDense = typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
-      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === active.endpoint);
-    const eng = isDense ? SandpieQwen3 : (typeof SandpieQwen35 !== 'undefined' ? SandpieQwen35 : null);
-    if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
-    let out = '';
-    await eng.runConversation({
-      provider: { endpoint: active.endpoint, maxTokens },
-      messages: [{ role: 'user', content: user }],
-      systemPrompt: system,
-      tools: [], convId: null, signal,
-    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
-    return out;
-  }
-  const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
-  const apiKey = document.getElementById('apiKey')?.value || '';
-  const mdl = model || document.getElementById('model')?.value || '';
-  if (!endpoint || !mdl) throw new Error('no provider configured');
-  const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions') : (endpoint + '/chat/completions');
-  const url = new URL(route, location.href).href;
-  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: false, max_tokens: maxTokens };
-  if (active && active.temperature != null) body.temperature = active.temperature;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + (t ? ': ' + t.slice(0, 200) : '')); }
-  const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
+  if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) throw new Error('providers module not loaded');
+  return SandpieProviders.complete({ system, user, model, maxTokens, signal });
 }
 
 // ---- per-(agent,conversation) cursor + per-agent last-run -----------------
@@ -340,13 +262,6 @@ async function shouldRun(a, convId) {
 
 // ---- run + sinks -----------------------------------------------------------
 async function applySink(a, out, convId) {
-  if (a.sink === 'compact') {
-    if (typeof SandpieConversations === 'undefined' || !SandpieConversations.compact) {
-      return { status: 'compaction unavailable (conversations module not ready)' };
-    }
-    const r = await SandpieConversations.compact(convId, { keepTail: a.keepTail || 10, summary: out });
-    return { status: r.ok ? `compacted ${r.removed} → kept ${r.kept}` : 'skipped: ' + (r.reason || '') };
-  }
   if (a.sink === 'note') return { status: 'note: ' + out.trim().replace(/\s+/g, ' ').slice(0, 120) };
   if (a.sink.startsWith('append:')) {
     const path = a.sink.slice(7).trim().replace(/^\/+/, '');
@@ -373,30 +288,14 @@ async function applySink(a, out, convId) {
 async function runAgent(a, convId, signal) {
   const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
   let from = 0, to = msgs.length;
-  let priorSummary = '';
-  if (a.sink === 'compact') {
-    // Summarize the span between the current compaction boundary and the new one
-    // (everything except the protected tail). Build on the prior summary so old
-    // context isn't lost re-summarizing only the newly-aged turns.
-    const keepTail = a.keepTail || 10;
-    to = (typeof SandpieConversations !== 'undefined' && SandpieConversations.safeSplitIndex)
-      ? SandpieConversations.safeSplitIndex(msgs, keepTail)
-      : Math.max(0, msgs.length - keepTail);
-    const comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
-      ? SandpieConversations.getCompaction(convId) : null;
-    from = (comp && comp.boundary) || 0;
-    priorSummary = (comp && comp.summary) || '';
-  } else if (a.input === 'since_last_run') {
+  if (a.input === 'since_last_run') {
     from = cursorOf(a.id, convId);
   } else if (/^last_\d+$/.test(a.input)) {
     from = Math.max(0, msgs.length - parseInt(a.input.slice(5), 10));
   }
-  let transcript = buildTranscript(msgs, from, to);
-  if (a.sink === 'compact' && priorSummary) {
-    transcript = '[Summary of the conversation so far]\n' + priorSummary + '\n\n[New turns to fold into the summary]\n' + transcript;
-  }
+  const transcript = buildTranscript(msgs, from, to);
   if (!transcript.trim()) return { status: 'nothing to process' };
-  const out = await runPrompt(a.prompt, transcript, { model: a.model || undefined, signal, maxTokens: a.sink === 'compact' ? 2048 : 1024 });
+  const out = await runPrompt(a.prompt, transcript, { model: a.model || undefined, signal, maxTokens: 1024 });
   localStorage.setItem(cursorKey(a.id, convId), String(msgs.length));
   localStorage.setItem(lastRunKey(a.id), String(Date.now()));
   return await applySink(a, out, convId);
@@ -412,19 +311,12 @@ const statusLine = (r) => !r ? 'idle' : (r.status === 'saved' ? `saved → ${r.f
 async function execAgent(a, convId) {
   busy = true; currentAbort = new AbortController();
   status[a.id] = 'running…'; renderAgents();
-  // A compact-sink run is an LLM summarization the user is waiting on (pre-send
-  // compaction is awaited before the turn goes out). Surface it in the conversation
-  // so the pause isn't a mystery — conversations.js renders/removes a banner.
-  const isCompact = a.sink === 'compact';
-  const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
-  if (isCompact) emit('compaction:start');
   try {
     status[a.id] = statusLine(await runAgent(a, convId, currentAbort.signal));
   } catch (e) {
     if (e && e.name === 'AbortError') status[a.id] = 'stopped';
     else { console.warn('[agents] ' + a.id + ' failed:', e); status[a.id] = 'error: ' + String((e && e.message) || e).slice(0, 80); }
   } finally {
-    if (isCompact) emit('compaction:end');
     busy = false; currentAbort = null; renderAgents();
   }
 }
@@ -443,28 +335,6 @@ async function onTurnComplete(payload) {
     if (!fire) continue;
     await execAgent(a, convId);
     break; // single-flight
-  }
-}
-
-// Proactive, pre-send compaction. The composer calls this right BEFORE a turn is
-// sent: if an enabled compact-sink agent's context threshold is already met, run
-// it now so the outgoing request stays under the limit. This is what makes the
-// compactor reliable — the reactive generation:complete path only fires AFTER a
-// turn (so it cannot save a turn that itself overflows), and a request that
-// fails on overflow records no usage, so the reactive %-check then reads
-// stale-low and never fires. Awaited by the caller, so the now-smaller context
-// is what gets built into the request.
-async function maybeCompactBeforeSend(convId) {
-  if (busy || !convId || convId !== activeConv()) return;   // compaction mutates the active conversation only
-  if (!agents.length) { try { await loadAgents(); } catch {} }
-  for (const a of agents) {
-    if (!a.enabled || a.errors.length) continue;
-    if (a.sink !== 'compact' || a.atContextPct == null) continue;
-    let p = null;
-    try { p = await contextPct(); } catch {}
-    if (p == null || p < a.atContextPct) continue;
-    await execAgent(a, convId);
-    break; // one compaction per send
   }
 }
 
@@ -615,7 +485,6 @@ if (document.readyState === 'loading') {
 window.SandpieAgents = {
   loadAgents,
   runNow,
-  maybeCompactBeforeSend,
   stopAll,
   get agents() { return agents; },
   _internals: { parseAgent, parseFrontmatter, parseTriggerSummary: triggerSummary, buildTranscript, slugTopic, shouldRun, contextPct, estimateConvTokens, applySink, runAgent, withEnabled, newAgentId },

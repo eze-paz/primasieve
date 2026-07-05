@@ -984,10 +984,8 @@ async function sendSingle(text, stream, opts = {}) {
   // now-smaller context is what gets built below. Runs before startTotalTimer
   // because compaction re-renders the conversation host, which would otherwise
   // drop a timer added first.
-  if (typeof SandpieAgents !== 'undefined' && SandpieAgents.maybeCompactBeforeSend) {
-    try { await SandpieAgents.maybeCompactBeforeSend(convId); }
-    catch (e) { console.warn('[sandpie] pre-send compaction failed:', e); }
-  }
+  try { await maybeAutoCompact(convId); }
+  catch (e) { console.warn('[sandpie] pre-send compaction failed:', e); }
 
   // Snapshot the conversation's token size NOW (after any compaction) as the
   // baseline for the live CONTEXT meter; the paint loop pushes baseline +
@@ -1606,10 +1604,12 @@ function renderTcDone(div, fname) {
     '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
     `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>` +
     '<span class="tc-chevron">▸</span>';
-  // load_image renders the image inside the expanded box, so show it by default
-  // (other tools stay collapsed behind the header toggle). The user can still
-  // collapse it by clicking the header.
-  if (fname === 'load_image') div.classList.add('expanded');
+  // Tools whose result IS the point of the call render it inside the expanded box,
+  // so show it by default (other tools stay collapsed behind the header toggle).
+  // The user can still collapse it by clicking the header.
+  //   load_image  → the loaded image
+  //   write_todos → the checklist card (otherwise the user never sees the todos)
+  if (fname === 'load_image' || fname === 'write_todos') div.classList.add('expanded');
 }
 
 class RoundRenderer {
@@ -1696,6 +1696,7 @@ class RoundRenderer {
   bindMessage(msg) {
     this.convMessages.push(msg);
     if (msg.role === 'assistant') {
+      this._boundMessage = msg;   // so tool boxes created later (leaked calls) can bind too
       if (this.reply) bindBubble(this.reply, msg);
       for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
     } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
@@ -1704,10 +1705,33 @@ class RoundRenderer {
     }
   }
   markToolStarted(tc) {
-    const idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
-    if (idx < 0 || !this.toolCallEls[idx]) return;
+    let idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
+    // No box for this call yet — happens when the model emitted its tool calls as
+    // leaked/Hermes TEXT rather than structured streaming deltas, so _applyToolCallDelta
+    // never ran. Build one now from the authoritative tc (id + name + arguments) so
+    // the call — and its result in markToolDone — actually render. Without this the
+    // tool executes and the model sees the output, but the user sees nothing.
+    if (idx < 0 || !this.toolCallEls[idx]) {
+      idx = this._ensureToolBox(tc);
+      if (idx < 0) return;
+    }
     this.toolCallEls[idx].classList.add('in-flight');
     renderTcRunning(this.toolCallEls[idx], tc.function.name);
+  }
+  // Create a tool-call box for a call that never streamed as deltas. Returns its
+  // index (or -1 if it can't be built). Mirrors _applyToolCallDelta's box setup.
+  _ensureToolBox(tc) {
+    if (!tc || !tc.function || !tc.function.name) return -1;
+    const i = this.toolCalls.length;
+    this.toolCalls[i] = { id: tc.id || '', type: 'function', function: { name: tc.function.name, arguments: tc.function.arguments || '' } };
+    this.toolCallEls[i] = addMsg('tool-call', '→ ' + tc.function.name + '(', this.host);
+    this.toolCallEls[i].dataset.fname = tc.function.name;
+    this.toolCallEls[i].dataset.tcId = tc.id || '';
+    this.toolDisplayed[i] = '';
+    this.toolPending[i] = '';
+    this._paintTool(i);
+    if (this._boundMessage) bindBubble(this.toolCallEls[i], this._boundMessage);
+    return i;
   }
   markToolDone(tcId, result) {
     const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
@@ -1912,7 +1936,9 @@ class RoundRenderer {
 
       const existingBox = expanded.querySelector('.tool-box');
       const existingSep = existingBox ? existingBox.querySelector('.tool-sep') : null;
-      const existingResult = existingBox ? existingBox.querySelector('.tool-result') : null;
+      // Preserve whatever result was already appended — plain text, image, or the
+      // todos checklist card — so a re-paint of the args doesn't wipe it.
+      const existingResult = existingBox ? existingBox.querySelector('.tool-result, .tool-result-image, .tool-todos') : null;
       expanded.innerHTML = '';
       expanded.appendChild(box);
       if (existingSep) box.appendChild(existingSep);
@@ -2130,6 +2156,79 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   // reduced send size instead of a stale-high value that would re-trigger next send.
   try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
   return { ok: true, removed: boundary, kept: messages.length - boundary };
+}
+
+/* ---- native auto-compaction (pre-send) -----------------------------------
+   Promoted from the old opt-in `sink: compact` agent into the harness. Config
+   lives in SandpieCompactor (localStorage, on by default). The composer awaits
+   maybeAutoCompact right before a turn is sent: if context is over the threshold,
+   summarize the aged span and advance the compaction boundary so the outgoing
+   request stays bounded. Pre-send (not reactive) so a chat already at the limit
+   can still continue — a reactive check only fires AFTER a turn, too late to save
+   the turn that overflows. */
+let _autoCompacting = false;
+function _cmpTextOf(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(p => (p && p.type === 'text') ? (p.text || '') : '').join(' ');
+  return '';
+}
+function _cmpTranscript(msgs, fromIdx, uptoIdx) {
+  const out = [];
+  for (let i = fromIdx; i < uptoIdx; i++) {
+    const m = msgs[i];
+    if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
+    const t = _cmpTextOf(m.content).trim();
+    if (t) out.push((m.role === 'user' ? 'USER: ' : 'ASSISTANT: ') + t);
+  }
+  let s = out.join('\n\n');
+  const CAP = 12000;
+  if (s.length > CAP) s = '…[earlier turns truncated]\n\n' + s.slice(s.length - CAP);
+  return s;
+}
+// Current context usage as a % of the active provider's window, or null when the
+// window is unknown. Measures what is actually SENT (overhead + compaction-aware
+// body) via the same estimator the Context panel shows, so the trigger agrees
+// with the displayed %.
+async function _cmpContextPct(convId) {
+  if (typeof SandpieTokens === 'undefined') return null;
+  let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
+  if (!w) return null;
+  const comp = getCompaction(convId);
+  let used = SandpieTokens.estimateContextTokens ? SandpieTokens.estimateContextTokens(messages, comp) : 0;
+  try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
+  return (used / w) * 100;
+}
+async function maybeAutoCompact(convId) {
+  if (_autoCompacting || !convId || convId !== activeConvId) return;
+  if (typeof SandpieCompactor === 'undefined') return;
+  const cfg = SandpieCompactor.config();
+  if (!cfg.enabled) return;
+  let pct = null;
+  try { pct = await _cmpContextPct(convId); } catch {}
+  if (pct == null || pct < cfg.pct) return;
+  // Summarize the span between the current boundary and the new one (everything
+  // except the protected tail), building on any prior summary so old context
+  // isn't lost re-summarizing only newly-aged turns.
+  const to = safeSplitIndex(messages, cfg.keepTail);
+  const comp = getCompaction(convId);
+  const from = (comp && comp.boundary) || 0;
+  if (to <= from) return;   // nothing new to compact
+  let transcript = _cmpTranscript(messages, from, to);
+  if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
+  if (!transcript.trim()) return;
+  const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
+  _autoCompacting = true;
+  emit('compaction:start');
+  try {
+    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
+    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined, maxTokens: 2048 });
+    if (out && out.trim()) await compactConversation(convId, { keepTail: cfg.keepTail, summary: out });
+  } catch (e) {
+    console.warn('[sandpie] auto-compaction failed:', e);
+  } finally {
+    emit('compaction:end');
+    _autoCompacting = false;
+  }
 }
 
 /* ---- side-by-side conversation panel ---- */
@@ -2481,7 +2580,7 @@ window.convPath = convPath;
 window.ensureActiveConv = ensureActiveConv;
 window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
-window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex };
+window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;
@@ -2567,12 +2666,14 @@ function startTotalTimer(stream) {
   // Built once; the tick mutates the leaf <span>s in place.
   el.innerHTML =
     '<span class="mt-time">0s</span>' +
+    '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
     '<span class="mt-queue"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
 
   const timeEl = el.querySelector('.mt-time');
+  const rateEl = el.querySelector('.mt-rate');
   const ctxEl = el.querySelector('.mt-ctx');
   const queueEl = el.querySelector('.mt-queue');
   queueEl.style.cursor = 'pointer';
@@ -2585,9 +2686,11 @@ function startTotalTimer(stream) {
     const elapsed = (Date.now() - stream.timerStart) / 1000;
     set(timeEl, fmtElapsed(elapsed));
 
-    // Generated tokens this interaction (text + tool-call args). Not shown in the
-    // timer anymore, but still feeds the running context figure below.
+    // Generated tokens this interaction (text + tool-call args): drives the tok/s
+    // rate below, and feeds the running context figure. The raw token COUNT is not
+    // shown (mt-tok removed), but the rate is.
     const target = stream.tokTarget;
+    set(rateEl, RATE_FMT(elapsed > 0.4 ? target / elapsed : 0));
 
     // Conversation CONTEXT: baseline (all previous turns) + generated this turn
     // + tool results this turn. Doesn't reset per turn — it's the running size
@@ -2622,12 +2725,16 @@ function endTotalTimer(stream, label) {
     stream.timerEl.remove();
   } else {
     const sec = (Date.now() - stream.timerStart) / 1000;
-    // Settled line: label · elapsed, dimmed via .done. Token count + rate removed
-    // per user preference — only elapsed time is kept here.
+    const tok = stream.tokTarget || 0;
+    const rate = sec > 0.05 ? tok / sec : 0;
+    // Settled line: label · elapsed · rate, dimmed via .done. The raw token COUNT
+    // (mt-tok) is removed per user preference, but the tok/s rate is kept; it's
+    // dropped only on a pure-tool round (no text generated) where it'd read "0".
     const parts = [
       `<span class="mt-label">${label}</span>`,
       `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
     ];
+    if (tok > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
     stream.timerEl.innerHTML = parts.join('');
     stream.timerEl.classList.add('done');
   }
