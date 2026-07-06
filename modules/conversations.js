@@ -872,7 +872,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=30');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=31');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1180,7 +1180,20 @@ async function buildAgentConfig(convMessages, compaction) {
     reasoningEffort: (active && active.reasoningEffort) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
-
+    // Mid-turn compaction: the worker re-checks context at every round and, if the
+    // agentic loop pushes past the threshold DURING a turn, summarizes its own
+    // active message slice in place so a long tool-heavy turn can't overflow.
+    // Pre-send maybeAutoCompact still handles the between-turns case. null = off.
+    compaction: (function () {
+      try {
+        if (typeof SandpieCompactor === 'undefined' || !SandpieCompactor.isEnabled()) return null;
+        let window = null;
+        try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.contextWindow) window = SandpieTokens.contextWindow(); } catch (_) {}
+        if (!window) return null;
+        const c = SandpieCompactor.config();
+        return { enabled: true, pct: c.pct, keepTail: c.keepTail, prompt: c.prompt, model: c.model || '', window, marker: SP_SUMMARY_MARKER };
+      } catch (_) { return null; }
+    })(),
   };
 }
 

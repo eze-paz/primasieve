@@ -22,7 +22,7 @@ const SandpieCompactor = (function () {
   const K_PROMPT   = 'sandpie-compactor-prompt';       // '' = built-in
   const MIGRATED   = 'sandpie-compactor-migrated';     // one-time flag
 
-  const DEFAULTS = { enabled: true, pct: 80, keepTail: 10 };
+  const DEFAULTS = { enabled: true, pct: 70, keepTail: 10 };
 
   const BUILT_IN_PROMPT = [
     "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Produce a dense briefing that REPLACES those earlier turns in the live context, so the conversation can continue indefinitely without losing the thread.",
@@ -33,6 +33,9 @@ const SandpieCompactor = (function () {
     "- Key facts, names, file paths, commands, IDs, and values referenced.",
     "- Open threads — what is still in progress or unresolved.",
     "- The user's stated preferences and any corrections they gave.",
+    "- Any skills loaded via load_skill() in the omitted turns, and whether their guidance is still being actively relied on.",
+    "",
+    "CRITICAL — loaded skills: The full contents returned by load_skill() live in the omitted turns and are LOST after compaction. For every skill that was loaded and whose instructions are still relevant to the ongoing task, name it explicitly and state that it MUST be reloaded with load_skill() immediately before continuing. Do not paraphrase the skill's contents as a substitute — instruct a fresh reload.",
     "",
     "Drop greetings, small talk, and anything already superseded. Write a tight briefing (headings or bullets are fine) for a future reader with NO access to the omitted turns. Do not invent anything. Output ONLY the summary text — no preamble, no JSON.",
   ].join('\n');

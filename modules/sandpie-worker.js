@@ -1226,6 +1226,133 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   return { content, tool_calls: keptToolCalls, usage };
 }
 
+// ============================================================
+// Mid-turn compaction (worker-side)
+// ------------------------------------------------------------
+// The agentic loop can append many bulky tool results within a SINGLE turn,
+// blowing past the context window long before the next user send. Page-side
+// maybeAutoCompact only runs pre-send, so it can't save an in-flight turn.
+// Here the worker re-estimates context at every round and, once over the
+// threshold, summarizes its OWN active message slice in place: it drops the
+// aged span and prepends a fresh summary (folding in any prior summary). Since
+// the worker's `messages` array is already the active slice shipped by
+// buildAgentConfig, previously pushed-out turns are never reintroduced.
+const SP_SUMMARY_MARKER = '[Earlier conversation auto-summarized to preserve context]';
+
+function _cmpTextOf(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(p => (p && p.type === 'text') ? (p.text || '') : '').join(' ');
+  return '';
+}
+
+// Approximate tokens actually SENT this round: text at ~4 chars/token, plus a
+// flat allowance per inline image (base64 length would wildly overcount).
+function _estContextTokens(systemPrompt, messages, tools) {
+  let chars = (systemPrompt && typeof systemPrompt.content === 'string') ? systemPrompt.content.length : 0;
+  try { chars += JSON.stringify(tools || []).length; } catch (_) {}
+  let imgTokens = 0;
+  for (const m of messages) {
+    if (!m) continue;
+    const c = m.content;
+    if (typeof c === 'string') chars += c.length;
+    else if (Array.isArray(c)) {
+      for (const p of c) {
+        if (p && p.type === 'image_url') imgTokens += 1200;
+        else if (p && typeof p.text === 'string') chars += p.text.length;
+      }
+    }
+    if (m.tool_calls) { try { chars += JSON.stringify(m.tool_calls).length; } catch (_) {} }
+  }
+  return Math.ceil(chars / 4) + imgTokens;
+}
+
+// Mirror of conversations.js safeSplitIndex: the kept tail must START on an
+// assistant message so the leading user-role summary preserves alternation and
+// never orphans a role:'tool' result from its assistant tool_calls.
+function _safeSplitIndex(msgs, keepTail) {
+  let split = Math.max(0, msgs.length - (keepTail || 10));
+  while (split < msgs.length && (!msgs[split] || msgs[split].role !== 'assistant')) split++;
+  return split;
+}
+
+function _cmpTranscript(messages, fromIdx, toIdx) {
+  const out = [];
+  for (let i = fromIdx; i < toIdx; i++) {
+    const m = messages[i];
+    if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
+    const t = _cmpTextOf(m.content).trim();
+    if (t) out.push((m.role === 'user' ? 'USER: ' : 'ASSISTANT: ') + t);
+  }
+  let s = out.join('\n\n');
+  const CAP = 12000;
+  if (s.length > CAP) s = '…[earlier turns truncated]\n\n' + s.slice(s.length - CAP);
+  return s;
+}
+
+// Non-streaming summarization call with retry/backoff (requirement: compaction
+// must retry on failure). Returns the summary text, or null if it ultimately
+// fails or is aborted — callers then simply skip compaction for this round.
+async function _summarizeForCompaction(config, transcript, ctx) {
+  const cmp = config.compaction;
+  const body = {
+    model: cmp.model || config.model,
+    messages: [{ role: 'system', content: cmp.prompt }, { role: 'user', content: transcript }],
+    max_tokens: 2048,
+    stream: false,
+  };
+  const BACKOFF_MS = [800, 1500, 3000];
+  for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
+    if (ctx.signal && ctx.signal.aborted) return null;
+    try {
+      const r = await fetch(config.url, { method: 'POST', headers: config.headers, body: JSON.stringify(body), signal: ctx.signal });
+      if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+      const d = await r.json();
+      const txt = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      if (txt && txt.trim()) return txt.trim();
+      throw new Error('empty summary');
+    } catch (e) {
+      if (ctx.signal && ctx.signal.aborted) return null;
+      if (attempt === BACKOFF_MS.length) return null;   // exhausted → skip, don't break the turn
+      await swSleep(BACKOFF_MS[attempt], ctx.signal);
+    }
+  }
+  return null;
+}
+
+// Called at the top of every round. Mutates `messages` in place when over the
+// threshold. Never throws — a failed compaction must not interrupt generation.
+async function maybeCompactMidTurn(config, messages, ctx) {
+  const cmp = config.compaction;
+  if (!cmp || !cmp.enabled || !cmp.window) return;
+  const used = _estContextTokens(config.systemPrompt, messages, config.tools);
+  const pct = (used / cmp.window) * 100;
+  if (pct < (cmp.pct || 70)) return;
+
+  const marker = cmp.marker || SP_SUMMARY_MARKER;
+  const m0 = messages[0];
+  const hasSummary = !!(m0 && m0.role === 'user' && typeof m0.content === 'string' && m0.content.startsWith(marker));
+  const prior = hasSummary ? m0.content.slice(marker.length).replace(/^\s*\n+/, '') : '';
+  const bodyStart = hasSummary ? 1 : 0;
+
+  const split = _safeSplitIndex(messages, cmp.keepTail || 10);
+  // Refuse to compact if it can't reduce the body or would leave no valid tail
+  // (which mid-turn would strip the in-flight round's context).
+  if (split <= bodyStart || split >= messages.length) return;
+
+  let transcript = _cmpTranscript(messages, bodyStart, split);
+  if (!transcript.trim()) return;
+  if (prior) transcript = '[Summary of the conversation so far]\n' + prior + '\n\n[New turns to fold into the summary]\n' + transcript;
+
+  ctx.emit({ type: 'info', message: 'Context over ' + Math.round(cmp.pct) + '% — compacting to continue…' });
+  const summary = await _summarizeForCompaction(config, transcript, ctx);
+  if (summary) {
+    // Drop [0, split) — old summary + aged body — and prepend the fresh, folded summary.
+    messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
+    ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
+  }
+  ctx.emit({ type: 'info', message: null });
+}
+
 async function runAgent(config, ctx) {
   const convFileName = config.conversation_file_name || 'unknown';
   ctx._conversation_file_name = convFileName;
@@ -1238,6 +1365,11 @@ async function runAgent(config, ctx) {
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
   while (true) {
+    if (ctx.signal && ctx.signal.aborted) break;
+    // Mid-turn compaction: if the loop has grown context past the threshold,
+    // summarize the active slice in place before issuing the next round. Guarded
+    // so a compaction failure can never break generation.
+    try { await maybeCompactMidTurn(config, messages, ctx); } catch (e) { console.warn('[sandpie] mid-turn compaction failed:', e); }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
     const reqBody = {
