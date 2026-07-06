@@ -19,11 +19,10 @@ const SandpieCompactor = (function () {
   const K_ENABLED  = 'sandpie-compactor-enabled';    // '0' | '1' (unset = default ON)
   const K_PCT      = 'sandpie-compactor-pct';         // integer %
   const K_KEEPTAIL = 'sandpie-compactor-keeptail';    // integer messages
-  const K_MODEL    = 'sandpie-compactor-model';        // '' = active provider
   const K_PROMPT   = 'sandpie-compactor-prompt';       // '' = built-in
   const MIGRATED   = 'sandpie-compactor-migrated';     // one-time flag
 
-  const DEFAULTS = { enabled: true, pct: 80, keepTail: 10, model: '' };
+  const DEFAULTS = { enabled: true, pct: 80, keepTail: 10 };
 
   const BUILT_IN_PROMPT = [
     "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Produce a dense briefing that REPLACES those earlier turns in the live context, so the conversation can continue indefinitely without losing the thread.",
@@ -47,7 +46,7 @@ const SandpieCompactor = (function () {
       enabled: isEnabled(),
       pct: Math.min(99, Math.max(1, _int(K_PCT, DEFAULTS.pct))),
       keepTail: Math.max(2, _int(K_KEEPTAIL, DEFAULTS.keepTail)),
-      model: localStorage.getItem(K_MODEL) || DEFAULTS.model,
+      model: '',
       prompt: getPrompt(),
     };
   }
@@ -78,7 +77,6 @@ const SandpieCompactor = (function () {
             localStorage.setItem(K_PCT, String(parseInt(fm.at_context_pct, 10) || DEFAULTS.pct));
           if (localStorage.getItem(K_KEEPTAIL) == null && fm.keep_tail != null)
             localStorage.setItem(K_KEEPTAIL, String(parseInt(fm.keep_tail, 10) || DEFAULTS.keepTail));
-          if (localStorage.getItem(K_MODEL) == null && fm.model) localStorage.setItem(K_MODEL, fm.model);
           const body = text.replace(FM_RE, '').trim();
           if (localStorage.getItem(K_PROMPT) == null && body && body !== BUILT_IN_PROMPT) localStorage.setItem(K_PROMPT, body);
         }
@@ -94,7 +92,7 @@ const SandpieCompactor = (function () {
   const HTML = `
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.6rem;">When a conversation grows past the threshold, the earlier turns are auto-summarized into a briefing that replaces them in the model's context — the full history stays visible in the chat. Stored locally in this browser only.</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.6rem;">
-      <input type="checkbox" id="cmpEnabled"> Enable automatic compaction
+      <input type="checkbox" id="cmpEnabled" style="width:auto;"> Enable automatic compaction
     </label>
     <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:0.6rem;">
       <label style="font-size:0.78rem; color:var(--sp-text-dim);">Trigger at
@@ -104,9 +102,7 @@ const SandpieCompactor = (function () {
         <input type="number" id="cmpKeep" min="2" max="100" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;"> messages
       </label>
     </div>
-    <label style="display:block; font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.6rem;">Model override (blank = active provider)
-      <input type="text" id="cmpModel" placeholder="(active provider)" style="width:100%; margin-top:0.25rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.25rem 0.4rem; font:0.8rem 'JetBrains Mono', Consolas, monospace;">
-    </label>
+
     <div class="sp-block">
       <div class="sp-block-head">Compaction prompt</div>
       <p class="sp-block-hint">The instruction sent to the model to produce each briefing.</p>
@@ -125,13 +121,13 @@ const SandpieCompactor = (function () {
     const en = panel.querySelector('#cmpEnabled');
     const pct = panel.querySelector('#cmpPct');
     const keep = panel.querySelector('#cmpKeep');
-    const model = panel.querySelector('#cmpModel');
+
     const prompt = panel.querySelector('#cmpPrompt');
     const reset = panel.querySelector('#cmpPromptReset');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); }); }
     if (pct) { pct.value = cfg.pct; pct.addEventListener('change', () => { const v = Math.min(99, Math.max(1, parseInt(pct.value, 10) || DEFAULTS.pct)); pct.value = v; localStorage.setItem(K_PCT, String(v)); flash('Saved'); }); }
     if (keep) { keep.value = cfg.keepTail; keep.addEventListener('change', () => { const v = Math.max(2, parseInt(keep.value, 10) || DEFAULTS.keepTail); keep.value = v; localStorage.setItem(K_KEEPTAIL, String(v)); flash('Saved'); }); }
-    if (model) { model.value = cfg.model; model.addEventListener('input', () => { const v = model.value.trim(); if (v) localStorage.setItem(K_MODEL, v); else localStorage.removeItem(K_MODEL); flash('Saved'); }); }
+
     if (prompt) { prompt.value = getPrompt(); prompt.addEventListener('input', () => { const v = prompt.value; if (v.trim() === '' || v === BUILT_IN_PROMPT) localStorage.removeItem(K_PROMPT); else localStorage.setItem(K_PROMPT, v); flash('Saved'); }); }
     if (reset) reset.addEventListener('click', () => { localStorage.removeItem(K_PROMPT); if (prompt) prompt.value = BUILT_IN_PROMPT; flash('Reset to default'); });
   }
@@ -139,8 +135,8 @@ const SandpieCompactor = (function () {
   let _retry = 0;
   function init() {
     migrate();
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'compaction', title: 'Context & compaction', order: 16, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('compactionSection', { title: 'Context & compaction', badge: null, open: false, html: HTML, onRender: wire }); return; }
+    if (window.SandpieSettings) { SandpieSettings.register({ id: 'compaction', title: 'Compaction', order: 16, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
+    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('compactionSection', { title: 'Compaction', badge: null, open: false, html: HTML, onRender: wire }); return; }
     if (_retry++ < 40) setTimeout(init, 500);
   }
 
