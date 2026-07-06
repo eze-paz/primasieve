@@ -793,16 +793,33 @@ opfs._putConvertJob = function(job) {
 // lightweight docx-preview/SheetJS/pptx-viewer path, or the popup).
 opfs.OFFICE_ENGINE_EXTS = new Set(['docx','doc','odt','rtf','xlsx','xls','ods','csv','pptx','ppt','odp','odg']);
 
+// Filenames of every font in sandpie/fonts/ — from BOTH the local OPFS listing
+// AND the Dropbox cloud index. Under on-demand (dehydrated) sync the fonts are
+// cloud-only: they show in the UI via the cloud index but are absent from OPFS,
+// so opfs.listDir alone misses them (which is why hydration found nothing).
+opfs._listFontFiles = async function() {
+  const names = new Set();
+  const isFont = n => /\.(ttf|otf|ttc)$/i.test(n);
+  try { for (const e of await opfs.listDir('sandpie/fonts')) if (e.kind === 'file' && isFont(e.name)) names.add(e.name); } catch (_) {}
+  try {
+    const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+    const idx = (sp && sp.cloudIndex) ? sp.cloudIndex() : null;
+    if (idx) for (const key of Object.keys(idx)) {
+      const rel = String(key).replace(/^\/+/, '').replace(/^files\//, '');
+      const m = /^sandpie\/fonts\/([^/]+)$/.exec(rel);
+      if (m && isFont(m[1]) && idx[key] && idx[key].kind === 'file') names.add(m[1]);
+    }
+  } catch (_) {}
+  return [...names];
+};
+
 // Hydrate every font in sandpie/fonts/ so its real bytes are local before the
 // engine boots. The engine (office-engine.html) reads OPFS directly and has no
-// access to the sync provider, so a cloud-only (dehydrated) font would read as a
-// 0-byte placeholder and never get injected. We pull them down here, page-side.
+// access to the sync provider, so a cloud-only (dehydrated) font would otherwise
+// be absent/empty and never get injected. We pull them down here, page-side.
 opfs._hydrateFontsFolder = async function() {
-  let entries = [];
-  try { entries = await opfs.listDir('sandpie/fonts'); } catch (_) { return; }
-  for (const e of entries) {
-    if (e.kind !== 'file' || !/\.(ttf|otf|ttc)$/i.test(e.name)) continue;
-    try { await opfs.readBytesHydrating('sandpie/fonts/' + e.name); } catch (_) {}
+  for (const name of await opfs._listFontFiles()) {
+    try { await opfs.readBytesHydrating('sandpie/fonts/' + name); } catch (_) {}
   }
 };
 
@@ -923,21 +940,18 @@ opfs._fontFamilyNames = function(u8) {
   } catch (_) { return []; }
 };
 
-// Normalized family names of every font file the user has dropped in sandpie/fonts/.
+// Normalized family names of every font in sandpie/fonts/ (local + cloud-only).
 opfs._fontFamiliesInFolder = async function() {
   const fams = new Set();
-  let entries = [];
-  try { entries = await opfs.listDir('sandpie/fonts'); } catch (_) { return fams; }
-  for (const e of entries) {
-    if (e.kind !== 'file' || !/\.(ttf|otf|ttc)$/i.test(e.name)) continue;
+  for (const name of await opfs._listFontFiles()) {
     try {
-      // Hydrate on read: sandpie/fonts/ files can be cloud-only placeholders under
-      // Dropbox on-demand — readBytes alone would return 0 bytes and the name-table
-      // parse would silently fail, so a present-but-dehydrated font looks missing.
-      const bytes = await opfs.readBytesHydrating('sandpie/fonts/' + e.name);
+      // Hydrate on read: under Dropbox on-demand a font may be cloud-only, so
+      // readBytes alone returns nothing and the name-table parse silently fails —
+      // making a present-but-dehydrated font look missing.
+      const bytes = await opfs.readBytesHydrating('sandpie/fonts/' + name);
       for (const f of opfs._fontFamilyNames(bytes)) fams.add(_normFont(f));
     } catch (_) {}
-    fams.add(_normFont(e.name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_ ]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
+    fams.add(_normFont(name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_ ]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
   }
   fams.delete('');
   return fams;
