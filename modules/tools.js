@@ -5,7 +5,7 @@ const tools = {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
 REQUIRED: path must point to a script already saved in OPFS (typically under sandpie/scripts/). Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
-ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it freezes the whole app) — use await asyncio.sleep(n).
+ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it blocks this run's interpreter and burns the timeout) — use await asyncio.sleep(n).
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
 HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
 OUTPUT: write to sandpie/artifacts/, then call show_artifact({"path":"sandpie/artifacts/file.html"}).
@@ -20,6 +20,7 @@ Examples:
       properties: {
         path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "sandpie/scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
+        timeout: { type: 'number', description: 'Max seconds the script may run before it is killed (default 120, max 600). On timeout the run is aborted and its interpreter discarded, so it can never hang the conversation — raise this only for genuinely long computations.' },
       },
       required: ['path'],
     },

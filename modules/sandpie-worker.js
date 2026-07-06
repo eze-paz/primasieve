@@ -155,22 +155,42 @@ const PY_POOL_MAX = (() => {
   const n = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
   return Math.min(3, Math.max(1, n - 1));
 })();
-const _pyPool = [];            // [{ worker, busy }]
-const _pyQueue = [];           // pending run requests waiting for a free worker
-const _pyPending = new Map();  // runId -> resolve
+const PY_DEFAULT_TIMEOUT_MS = 120000;   // a script with no timeout can't run past this…
+const PY_MAX_TIMEOUT_MS = 600000;       // …and can't ask for more than this.
+const _pyPool = [];            // [{ worker, busy, job }]
+const _pyQueue = [];           // jobs waiting for a free worker
 let _pyRunSeq = 0;
+let _pySpawnSeq = 0;
 
 function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessage(msg); } catch (_) {} } }
 
+// Finish a job exactly once (result / timeout / crash all race), clearing its
+// deadline timer and freeing the slot.
+function _pySettle(slot, job, result) {
+  if (!job || job.done) return;
+  job.done = true;
+  if (job.timer) { clearTimeout(job.timer); job.timer = null; }
+  if (slot) { slot.busy = false; slot.job = null; }
+  job.resolve({ result });
+}
+
+// Kill a worker and drop it from the pool — used when a run blows its deadline
+// (an infinite loop can only be stopped by terminating its interpreter) or the
+// worker crashes. The next run lazily spawns a replacement.
+function _pyKillSlot(slot, reason) {
+  const i = _pyPool.indexOf(slot);
+  if (i >= 0) _pyPool.splice(i, 1);
+  try { slot.worker.terminate(); } catch (_) {}
+  console.warn('[sandpie-worker] terminated pyodide-worker:', reason);
+}
+
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=1', { name: 'py' + _pyPool.length });
-  const slot = { worker, busy: false };
+  const worker = new Worker('./pyodide-worker.js?v=1', { name: 'py' + (_pySpawnSeq++) });
+  const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
     if (msg.type === 'python-result') {
-      const resolve = _pyPending.get(msg.id);
-      if (resolve) { _pyPending.delete(msg.id); resolve({ result: msg.result }); }
-      slot.busy = false;
+      if (slot.job && slot.job.id === msg.id) _pySettle(slot, slot.job, msg.result);
       _pyDrainQueue();
       return;
     }
@@ -180,7 +200,13 @@ function _spawnPyWorker() {
       try { self.postMessage(msg); } catch (_) {}
     }
   });
-  worker.addEventListener('error', (e) => { console.error('[sandpie-worker] pyodide-worker error:', e.message || e); });
+  worker.addEventListener('error', (e) => {
+    console.error('[sandpie-worker] pyodide-worker error:', e.message || e);
+    const job = slot.job;
+    _pyKillSlot(slot, 'worker error');
+    if (job) _pySettle(null, job, 'Error: the Python worker crashed — ' + (e.message || 'unknown') + '. A fresh interpreter will start on the next run.');
+    _pyDrainQueue();
+  });
   // Bring the fresh worker up to date with current Dropbox context/index.
   if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated }); } catch (_) {} }
   if (_dbxIndex) { try { worker.postMessage({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt }); } catch (_) {} }
@@ -192,21 +218,32 @@ function _pyDrainQueue() {
   while (_pyQueue.length) {
     let slot = _pyPool.find(s => !s.busy);
     if (!slot && _pyPool.length < PY_POOL_MAX) slot = _spawnPyWorker();
-    if (!slot) return;   // all workers busy and at cap — wait for a python-result
+    if (!slot) return;   // all workers busy and at cap — wait for a slot to free
     const job = _pyQueue.shift();
     slot.busy = true;
-    _pyPending.set(job.id, job.resolve);
+    slot.job = job;
+    // Deadline starts now (on dispatch), so time spent queued behind other runs
+    // doesn't count against the script.
+    job.timer = setTimeout(() => {
+      _pyKillSlot(slot, `run_python exceeded ${Math.round(job.timeoutMs / 1000)}s`);
+      _pySettle(null, job, `Error: run_python timed out after ${Math.round(job.timeoutMs / 1000)}s and was killed. Its interpreter (globals, imports) is gone. If the script is genuinely long-running, pass a larger "timeout" (max ${PY_MAX_TIMEOUT_MS / 1000}s); otherwise it likely has an infinite loop or a blocking call.`);
+      _pyDrainQueue();
+    }, job.timeoutMs);
     try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, args: job.args }); }
-    catch (e) { slot.busy = false; _pyPending.delete(job.id); job.resolve({ result: 'Error dispatching run_python: ' + (e && e.message || e) }); }
+    catch (e) { _pySettle(slot, job, 'Error dispatching run_python: ' + (e && e.message || e)); }
   }
 }
 
 // Run a script on the pool; resolves with { result } (raw/untruncated, as the
-// old in-process tool_run_python did — callers truncate).
-function dispatchPython({ path, args }) {
+// old in-process tool_run_python did — callers truncate). A run that overruns
+// its deadline is killed so it can never hang the conversation.
+function dispatchPython({ path, args, timeout }) {
+  let timeoutMs = PY_DEFAULT_TIMEOUT_MS;
+  const t = Number(timeout);
+  if (isFinite(t) && t > 0) timeoutMs = Math.min(PY_MAX_TIMEOUT_MS, Math.round(t * 1000));
   return new Promise((resolve) => {
-    const id = 'py' + (++_pyRunSeq);
-    _pyQueue.push({ id, path, args, resolve });
+    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false };
+    _pyQueue.push(job);
     _pyDrainQueue();
   });
 }
@@ -350,9 +387,9 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
-async function tool_run_python({ path, args }) {
+async function tool_run_python({ path, args, timeout }) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
-  return dispatchPython({ path, args });
+  return dispatchPython({ path, args, timeout });
 }
 
 // ============================================================
