@@ -436,12 +436,7 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close (Esc)';
-  const convertBtn = document.createElement('button');
-  convertBtn.className = 'mode';
-  convertBtn.textContent = '→ PDF';
-  convertBtn.title = 'Convert to PDF (LibreOffice WASM, opens in a new tab)';
-  convertBtn.style.display = 'none';
-  header.append(title, meta, mdBtn, pencilBtn, saveBtn, convertBtn, closeBtn);
+  header.append(title, meta, mdBtn, pencilBtn, saveBtn, closeBtn);
   const body = document.createElement('div');
   body.className = 'body';
   panel.append(header, body);
@@ -496,7 +491,6 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // controls. Falls back to a "download to view" message if the CDN is blocked.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading presentation viewer…</div>';
     mount(opfs.closeFile);
-    opfs._wireConvertBtn(convertBtn, file, name, ext);
     // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to the
     // lightweight pptx-viewer when isolation is unavailable or the engine fails.
     if (await opfs._renderOfficePdf(file, ext, name, body, panel)) return;
@@ -533,7 +527,6 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // OOXML → renderAsync throws → the catch shows a download link.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading document viewer…</div>';
     mount(opfs.closeFile);
-    opfs._wireConvertBtn(convertBtn, file, name, ext);
     // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to
     // docx-preview (approximate HTML) when isolation is unavailable or the engine
     // fails (e.g. .doc legacy binary that ZetaOffice can still often open).
@@ -563,7 +556,6 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     // with a tab bar to switch between sheets. Lazy-loaded from CDN on first use.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading spreadsheet viewer…</div>';
     mount(opfs.closeFile);
-    opfs._wireConvertBtn(convertBtn, file, name, ext);
     // Faithful path (COI): LibreOffice → PDF, shown inline. Falls back to the
     // SheetJS HTML-table viewer when isolation is unavailable or the engine fails.
     if (await opfs._renderOfficePdf(file, ext, name, body, panel)) return;
@@ -800,10 +792,27 @@ opfs._putConvertJob = function(job) {
 // ArrayBuffer }, or null when isolation is unavailable (caller falls back to the
 // lightweight docx-preview/SheetJS/pptx-viewer path, or the popup).
 opfs.OFFICE_ENGINE_EXTS = new Set(['docx','doc','odt','rtf','xlsx','xls','ods','csv','pptx','ppt','odp','odg']);
+
+// Hydrate every font in sandpie/fonts/ so its real bytes are local before the
+// engine boots. The engine (office-engine.html) reads OPFS directly and has no
+// access to the sync provider, so a cloud-only (dehydrated) font would read as a
+// 0-byte placeholder and never get injected. We pull them down here, page-side.
+opfs._hydrateFontsFolder = async function() {
+  let entries = [];
+  try { entries = await opfs.listDir('sandpie/fonts'); } catch (_) { return; }
+  for (const e of entries) {
+    if (e.kind !== 'file' || !/\.(ttf|otf|ttc)$/i.test(e.name)) continue;
+    try { await opfs.readBytesHydrating('sandpie/fonts/' + e.name); } catch (_) {}
+  }
+};
+
 opfs._officeEngine = function() {
   if (!self.crossOriginIsolated) return null;
   if (!opfs._officeEnginePromise) {
-    opfs._officeEnginePromise = new Promise((resolve, reject) => {
+    opfs._officeEnginePromise = (async () => {
+      // Fonts must be locally present before the engine reads them at boot.
+      await opfs._hydrateFontsFolder();
+      return new Promise((resolve, reject) => {
       const iframe = document.createElement('iframe');
       iframe.setAttribute('aria-hidden', 'true');
       iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;left:-9999px;';
@@ -844,7 +853,8 @@ opfs._officeEngine = function() {
       };
       window.addEventListener('message', onMsg);
       document.body.appendChild(iframe);
-    });
+      });
+    })();
   }
   return opfs._officeEnginePromise;
 };
@@ -921,7 +931,10 @@ opfs._fontFamiliesInFolder = async function() {
   for (const e of entries) {
     if (e.kind !== 'file' || !/\.(ttf|otf|ttc)$/i.test(e.name)) continue;
     try {
-      const bytes = await opfs.readBytes('sandpie/fonts/' + e.name);
+      // Hydrate on read: sandpie/fonts/ files can be cloud-only placeholders under
+      // Dropbox on-demand — readBytes alone would return 0 bytes and the name-table
+      // parse would silently fail, so a present-but-dehydrated font looks missing.
+      const bytes = await opfs.readBytesHydrating('sandpie/fonts/' + e.name);
       for (const f of opfs._fontFamilyNames(bytes)) fams.add(_normFont(f));
     } catch (_) {}
     fams.add(_normFont(e.name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_ ]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
@@ -1063,41 +1076,6 @@ opfs._renderOfficePdf = async function(file, ext, name, body, panel) {
   }
 };
 
-// Wire the "→ PDF" header button for an office file: convert in the in-page
-// engine (COI) or hand off to the popup (non-COI), then download the PDF.
-opfs._wireConvertBtn = function(convertBtn, file, name, ext) {
-  convertBtn.style.display = '';
-  convertBtn.onclick = async () => {
-    convertBtn.disabled = true;
-    const orig = convertBtn.textContent;
-    try {
-      let pdf = null;
-      if (self.crossOriginIsolated) {
-        convertBtn.textContent = 'Converting…';
-        const engine = await opfs._officeEngine();
-        pdf = await engine.convert(await file.arrayBuffer(), ext);
-      }
-      if (pdf) {
-        const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
-        const a = document.createElement('a');
-        a.href = url; a.download = name.replace(/\.[^.]+$/, '') + '.pdf';
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      } else {
-        // Non-isolated fallback: hand the file to the /convert/ popup via IndexedDB.
-        const id = 'job_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
-        await opfs._putConvertJob({ id, name, bytes: await file.arrayBuffer(), ts: Date.now() });
-        const w = window.open('convert/index.html#job=' + id, '_blank');
-        if (!w) opfs._toast('Popup blocked — allow popups for this site to convert to PDF.', 5000);
-      }
-    } catch (e) {
-      console.error('[opfs] PDF conversion failed:', e);
-      opfs._toast('PDF conversion failed: ' + (e.message || e), 4000);
-    }
-    convertBtn.textContent = orig;
-    convertBtn.disabled = false;
-  };
-};
 
 // Lazy-load SheetJS (Apache-2.0, ~900KB UMD). Reads xlsx/xls/ods workbooks
 // client-side; we render each sheet to an HTML table. Exposes window.XLSX.
