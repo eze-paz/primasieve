@@ -807,7 +807,7 @@ opfs._officeEngine = function() {
       const iframe = document.createElement('iframe');
       iframe.setAttribute('aria-hidden', 'true');
       iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;left:-9999px;';
-      iframe.src = '/convert/office-engine.html';
+      iframe.src = '/convert/office-engine.html?v=3';
       const pending = new Map();
       let seq = 0, ready = false;
       const bootTimer = setTimeout(() => {
@@ -849,6 +849,183 @@ opfs._officeEngine = function() {
   return opfs._officeEnginePromise;
 };
 
+// Tear down the warm engine so the next _officeEngine() boots fresh — needed
+// after the user adds fonts to sandpie/fonts/, because LibreOffice caches its
+// font list for the session (a font added to a running engine isn't picked up;
+// the engine injects sandpie/fonts/ at boot via an Emscripten preRun hook).
+opfs._resetOfficeEngine = function() {
+  opfs._officeEnginePromise = null;
+  document.querySelectorAll('iframe[src^="/convert/office-engine.html"]').forEach(f => { try { f.remove(); } catch (_) {} });
+};
+
+/* ---- font availability check (for the office→PDF converter) ---------------- */
+// Fonts LibreOffice-WASM renders acceptably: its bundled families + the ubiquitous
+// MS-core fonts it maps to metric-compatible bundled substitutes (Calibri→Carlito,
+// Cambria→Caladea, Arial/Times/Courier→Liberation). Anything else has no good match
+// → we warn. Names are normalized (lowercase, alnum-only).
+const _normFont = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const _LO_KNOWN_FONTS = new Set([
+  'liberationsans', 'liberationserif', 'liberationmono', 'liberationsansnarrow',
+  'carlito', 'caladea', 'dejavusans', 'dejavusansmono', 'dejavuserif', 'dejavumathtexgyre',
+  'gentiumbasic', 'gentiumbookbasic', 'linuxbiolinumg', 'linuxlibertineg', 'opensymbol',
+  'notosans', 'notoserif', 'notokufiarabic', 'notonaskharabic', 'notosansarabic', 'notosanshebrew',
+  'amiri', 'rubik', 'reemkufi', 'scheherazade', 'alef', 'davidlibre', 'miriamlibre', 'frankruhlhofshi',
+  'calibri', 'calibrilight', 'cambria', 'cambriamath', 'arial', 'timesnewroman', 'couriernew',
+  'symbol', 'wingdings',
+]);
+
+opfs._ensureJSZip = async function() {
+  if (!window.JSZip) await opfs._loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+  if (!window.JSZip) throw new Error('zip library unavailable');
+  return window.JSZip;
+};
+
+// Font family name(s) from an OpenType/TrueType file's `name` table (nameID 1 =
+// family, 16 = typographic family), so we can tell whether a user-supplied font
+// actually covers a referenced family — regardless of how the file is named.
+opfs._fontFamilyNames = function(u8) {
+  try {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let base = 0;
+    if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);   // 'ttcf' → first font
+    const numTables = dv.getUint16(base + 4);
+    let nameOff = 0;
+    for (let i = 0; i < numTables; i++) {
+      const rec = base + 12 + i * 16;
+      if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }   // 'name'
+    }
+    if (!nameOff) return [];
+    const count = dv.getUint16(nameOff + 2);
+    const strBase = nameOff + dv.getUint16(nameOff + 4);
+    const out = new Set();
+    for (let i = 0; i < count; i++) {
+      const r = nameOff + 6 + i * 12;
+      const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
+      if (nameId !== 1 && nameId !== 16) continue;
+      const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
+      let s = '';
+      if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
+      else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
+      s = s.replace(/\0/g, '').trim();
+      if (s) out.add(s);
+    }
+    return [...out];
+  } catch (_) { return []; }
+};
+
+// Normalized family names of every font file the user has dropped in sandpie/fonts/.
+opfs._fontFamiliesInFolder = async function() {
+  const fams = new Set();
+  let entries = [];
+  try { entries = await opfs.listDir('sandpie/fonts'); } catch (_) { return fams; }
+  for (const e of entries) {
+    if (e.kind !== 'file' || !/\.(ttf|otf|ttc)$/i.test(e.name)) continue;
+    try {
+      const bytes = await opfs.readBytes('sandpie/fonts/' + e.name);
+      for (const f of opfs._fontFamilyNames(bytes)) fams.add(_normFont(f));
+    } catch (_) {}
+    fams.add(_normFont(e.name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_ ]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
+  }
+  fams.delete('');
+  return fams;
+};
+
+// Font family names referenced by an office file (parsed from its OOXML/ODF zip).
+opfs._fontsReferenced = async function(bytes, ext) {
+  const JSZip = await opfs._ensureJSZip();
+  const zip = await JSZip.loadAsync(bytes);
+  const names = new Set();
+  const scan = (xml, re) => { let m; while ((m = re.exec(xml || ''))) { const v = (m[1] || '').trim(); if (v) names.add(v); } };
+  const read = async p => { const f = zip.file(p); return f ? await f.async('string') : ''; };
+  ext = String(ext || '').toLowerCase();
+  if (/^doc[xm]$|^dot[xm]$/.test(ext)) {
+    scan(await read('word/fontTable.xml'), /w:font\s+w:name="([^"]+)"/g);
+  } else if (/^xls[xm]$|^xlt[xm]$/.test(ext)) {
+    scan(await read('xl/styles.xml'), /<name\s+val="([^"]+)"/g);
+  } else if (/^ppt[xm]$|^pot[xm]$/.test(ext)) {
+    for (const p of Object.keys(zip.files)) {
+      if (/^ppt\/(theme|slides|slideLayouts|slideMasters)\/.*\.xml$/.test(p)) scan(await zip.file(p).async('string'), /typeface="([^"]+)"/g);
+    }
+  } else {
+    for (const p of ['styles.xml', 'content.xml']) {
+      const x = await read(p);
+      scan(x, /style:font-name="([^"]+)"/g);
+      scan(x, /svg:font-family="([^"]+)"/g);
+    }
+  }
+  const out = [];
+  for (let n of names) { n = n.replace(/^['"]+|['"]+$/g, '').trim(); if (n && !/^\+(mj|mn)-/.test(n)) out.push(n); }
+  return out;
+};
+
+// Referenced fonts that LibreOffice can't match (not bundled, not a mapped MS-core
+// font, not supplied in sandpie/fonts/). [] means "safe to convert as-is". Parse
+// failures return [] — never block a conversion on our own inability to read fonts.
+opfs._missingFonts = async function(bytes, ext) {
+  let referenced;
+  try { referenced = await opfs._fontsReferenced(new Uint8Array(bytes), ext); } catch (_) { return []; }
+  if (!referenced.length) return [];
+  const userFams = await opfs._fontFamiliesInFolder();
+  const seen = new Set(), missing = [];
+  for (const name of referenced) {
+    const n = _normFont(name);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    if (_LO_KNOWN_FONTS.has(n)) continue;
+    let covered = userFams.has(n);
+    if (!covered) for (const uf of userFams) { if (uf && (uf.includes(n) || n.includes(uf))) { covered = true; break; } }
+    if (!covered) missing.push(name);
+  }
+  return missing;
+};
+
+// Ensure sandpie/fonts/ exists (with a short README) so the user has somewhere to
+// drop the fonts we ask for, and it shows up in the Files sidebar.
+opfs._ensureFontsFolder = async function() {
+  try {
+    await opfs.mkdir('sandpie/fonts');
+    if (!(await opfs.exists('sandpie/fonts/README.txt'))) {
+      await opfs.write('sandpie/fonts/README.txt',
+        'Drop .ttf / .otf font files here.\n\nThe in-app document converter (docx / xlsx / pptx → PDF) loads these so files\n' +
+        'render with their intended fonts instead of substitutes. After adding a font,\nclick "Retry" in the converter.\n');
+    }
+    try { opfs.refreshFileList && opfs.refreshFileList(); } catch (_) {}
+    try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', 'sandpie/fonts/README.txt'); } catch (_) {}
+  } catch (_) {}
+};
+
+// The missing-font warning panel: lists the fonts, points at sandpie/fonts/, and
+// offers Retry (re-boots the engine to pick up newly-added fonts) or Proceed
+// (convert now with substitutes). `retry` re-invokes the render.
+opfs._renderFontWarning = function(body, panel, missing, retry) {
+  body.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'font-warning';
+  const title = document.createElement('div');
+  title.className = 'fw-title';
+  title.textContent = '⚠ Missing font' + (missing.length > 1 ? 's' : '');
+  const p1 = document.createElement('p');
+  p1.textContent = "This document uses font" + (missing.length > 1 ? 's' : '') + " that aren't available in the converter:";
+  const ul = document.createElement('ul');
+  for (const f of missing) { const li = document.createElement('li'); li.textContent = f; ul.appendChild(li); }
+  const p2 = document.createElement('p');
+  p2.innerHTML = 'Add the matching <b>.ttf/.otf</b> to the <b>sandpie/fonts</b> folder (Files sidebar), then Retry — ' +
+    'or proceed now and it will be rendered with substitute fonts, which <b>may not look the same</b>.';
+  const actions = document.createElement('div');
+  actions.className = 'fw-actions';
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'fw-retry';
+  retryBtn.textContent = 'I added the fonts — retry';
+  retryBtn.onclick = () => { opfs._resetOfficeEngine(); retry(); };
+  const proceedBtn = document.createElement('button');
+  proceedBtn.className = 'fw-proceed';
+  proceedBtn.textContent = 'Proceed with font substitutions';
+  proceedBtn.onclick = () => { panel._fontProceed = true; retry(); };
+  actions.append(retryBtn, proceedBtn);
+  box.append(title, p1, ul, p2, actions);
+  body.appendChild(box);
+};
+
 // Try to render an office file faithfully by converting it to PDF in the engine
 // and showing that PDF inline (reuses the same <iframe> display as native PDFs).
 // Returns true on success, false to signal the caller to fall back to its
@@ -857,8 +1034,20 @@ opfs._renderOfficePdf = async function(file, ext, name, body, panel) {
   if (!self.crossOriginIsolated) return false;
   try {
     body.innerHTML = '<div class="sp-loading">Loading<div class="sp-bar"></div></div>';
+    const bytes = await file.arrayBuffer();
+    // Font gate: warn (once, unless the user chose to proceed) if the document
+    // references fonts the converter can't match, so output fidelity is a choice.
+    if (panel && !panel._fontProceed) {
+      let missing = [];
+      try { missing = await opfs._missingFonts(bytes, ext); } catch (_) {}
+      if (missing.length) {
+        await opfs._ensureFontsFolder();
+        opfs._renderFontWarning(body, panel, missing, () => opfs._renderOfficePdf(file, ext, name, body, panel));
+        return true;   // handled: warning shown, awaiting the user's choice
+      }
+    }
     const engine = await opfs._officeEngine();
-    const pdf = await engine.convert(await file.arrayBuffer(), ext);
+    const pdf = await engine.convert(bytes, ext);
     const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
     if (panel) panel.dataset.blobUrl = url;   // revoked by closeFile
     body.innerHTML = '';

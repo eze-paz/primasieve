@@ -39,6 +39,33 @@ if (!crossOriginIsolated) {
   const pending = new Map();
   let seq = 0;
 
+  // Inject user fonts (OPFS sandpie/fonts/*.ttf|otf|ttc) into LibreOffice's font
+  // dir BEFORE the runtime scans fonts. Writing them after boot is too late — LO
+  // has already built + cached its font list. window.Module exists (set by
+  // ZetaHelperMain's ctor) before start() imports soffice.js, so we pre-read the
+  // bytes and write them in an Emscripten preRun hook, which runs before main().
+  let injectedFontCount = 0;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const sp = await root.getDirectoryHandle('sandpie').catch(() => null);
+    const dir = sp ? await sp.getDirectoryHandle('fonts').catch(() => null) : null;
+    const fonts = [];
+    if (dir) for await (const [nm, h] of dir.entries()) {
+      if (h.kind === 'file' && /\.(ttf|otf|ttc)$/i.test(nm)) {
+        try { fonts.push({ name: nm.replace(/[^A-Za-z0-9._-]/g, '_'), bytes: new Uint8Array(await (await h.getFile()).arrayBuffer()) }); } catch (_) {}
+      }
+    }
+    if (fonts.length && window.Module) {
+      injectedFontCount = fonts.length;
+      (window.Module.preRun = window.Module.preRun || []).push(function () {
+        const FS = window.FS || (window.Module && window.Module.FS);
+        const d = '/instdir/share/fonts/truetype';
+        try { FS.mkdirTree ? FS.mkdirTree(d) : d.split('/').filter(Boolean).reduce((a, p) => { a += '/' + p; try { FS.mkdir(a); } catch (_) {} return a; }, ''); } catch (_) {}
+        for (const f of fonts) { try { FS.writeFile(d + '/' + f.name, f.bytes); } catch (_) {} }
+      });
+    }
+  } catch (_) {}
+
   window.addEventListener('message', (e) => {
     const d = e.data;
     if (!d || d.type !== 'convert') return;
@@ -69,7 +96,7 @@ if (!crossOriginIsolated) {
   zHM.start(() => {
     zHM.thrPort.onmessage = (e) => {
       const d = e.data;
-      if (d.cmd === 'ready') { post({ type: 'engine-ready' }); return; }
+      if (d.cmd === 'ready') { post({ type: 'engine-ready', fonts: injectedFontCount }); return; }
       const cb = pending.get(d.id);
       if (cb) { pending.delete(d.id); cb(d); }
     };

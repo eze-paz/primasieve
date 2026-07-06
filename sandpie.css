@@ -1373,6 +1373,16 @@
   .compaction-progress { display: flex; align-items: center; gap: 0.5rem; margin: 0.6rem auto; padding: 0.45rem 0.85rem; max-width: max-content; font-size: 0.76rem; color: var(--sp-text-dim); background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 999px; }
   .compaction-progress .cp-spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--sp-border-bright, #484f58); border-top-color: var(--sp-accent); border-radius: 50%; animation: cp-spin 0.7s linear infinite; }
   @keyframes cp-spin { to { transform: rotate(360deg); } }
+  /* Missing-font warning in the office→PDF converter */
+  .font-warning { margin: 1.5rem auto; max-width: 460px; padding: 1rem 1.2rem; background: var(--sp-panel); border: 1px solid var(--sp-border); border-left: 3px solid #d29922; border-radius: 0 8px 8px 0; color: var(--sp-text); font-size: 0.85rem; line-height: 1.5; }
+  .font-warning .fw-title { font-weight: 600; color: #d29922; margin-bottom: 0.5rem; }
+  .font-warning p { margin: 0.5rem 0; color: var(--sp-text-dim); }
+  .font-warning ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+  .font-warning li { color: var(--sp-text); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.8rem; }
+  .font-warning .fw-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+  .font-warning button { padding: 0.4rem 0.9rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--sp-border-bright, #484f58); background: var(--sp-bg); color: var(--sp-text); }
+  .font-warning .fw-retry { background: var(--sp-accent); border-color: var(--sp-accent); color: #0d1117; font-weight: 600; }
+  .font-warning button:hover { filter: brightness(1.1); }
   /* V2 preview-thumbnail artifact card (office body + collapsed representation) */
   .artifact-card-body { cursor: pointer; outline: none; }
   .artifact-card-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sp-accent); }
