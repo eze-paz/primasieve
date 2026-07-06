@@ -38,6 +38,7 @@
     if (args.src) meta.files.add(args.src);
     // Track script references from run_python
     if (name === 'run_python' && args.path) meta.scripts.add(args.path);
+    console.log(`[Aug] start ${name}`, args.path || args.src || '');
   }
 
   function logToolResult(convId, result) {
@@ -52,6 +53,7 @@
     if (written) meta.files.add(written[1]);
     const artifact = text.match(/artifact["']?\s*[:=]\s*["']?([^\s"']+)/i);
     if (artifact) meta.files.add(artifact[1]);
+    console.log(`[Aug] done  ${last ? last.name : '?'}`, `files=${meta.files.size}`);
   }
 
   /* ── post-conversation: rebuild fingerprint from chat log + meta ───── */
@@ -61,6 +63,7 @@
 
     const folder = meta.folder || 'global';
     const fpPath = `${FINGERPRINT_DIR}/fingerprint.json`;
+    console.log(`[Aug] Rebuilding fingerprint for ${folder}: ${meta.toolCalls.length} tool calls, ${meta.files.size} files`);
 
     // 1. Build turn-grouped file touches from logged tool calls
     const turns = new Map(); // turnIndex -> Set(file_paths)
@@ -155,6 +158,7 @@
     }
 
     await opfs.write(fpPath, JSON.stringify(existing, null, 2));
+    console.log(`[Aug] Fingerprint saved: ${fpPath} (${Object.keys(existing.associations).length} associations)`);
   }
 
   /* ── preload advisor: called at turn 0 of a new conversation ───────── */
@@ -212,6 +216,16 @@
     logToolResult,
     rebuildFingerprint,
     getPreloadFiles,
-    _rawMeta: convMeta, // debug
+    stats() {
+      const out = { conversations: convMeta.size, files: new Set(), toolCalls: 0 };
+      for (const m of convMeta.values()) {
+        out.toolCalls += m.toolCalls.length;
+        m.files.forEach(f => out.files.add(f));
+      }
+      out.fileCount = out.files.size;
+      console.log('[Aug] stats:', out);
+      return out;
+    },
+    _rawMeta: convMeta,
   };
 })(window);
