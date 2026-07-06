@@ -872,7 +872,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=31');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=32');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -2138,6 +2138,14 @@ async function buildSystemPrompt(convMessages) {
   if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
     try { content += SandpieMindframe.systemBlock(convMessages); }
     catch (e) { console.warn('[sandpie] mindframe block failed:', e); }
+  }
+  // Optional capability: memory.js injects all durable facts (sandpie/memory/*.md).
+  // maybeConsolidate first so an over-budget store is pruned before it's injected;
+  // it's a cheap no-op when under budget. Returns '' when off/empty ⇒ no change.
+  if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
+    try { await SandpieMemory.maybeConsolidate(); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
+    try { content += await SandpieMemory.systemBlock(); }
+    catch (e) { console.warn('[sandpie] memory block failed:', e); }
   }
   return { role: 'system', content };
 }

@@ -175,6 +175,25 @@ Each item: { "content": imperative step ("Write the parser"), "status": "pending
         required: ['todos'],
       },
     },
+    remember: {
+      description: `Save a durable fact to memory so it survives across conversations (all saved facts are injected into your context automatically — there is no separate recall step).
+Use SPARINGLY, only for facts that are BOTH:
+  (1) durable — true beyond this conversation, and
+  (2) non-derivable — not already recoverable from the code, git history, files, or a loaded skill.
+GOOD: a stable user preference ("prefers terse answers, no preamble"), standing feedback on how to work + the WHY, lasting project context/constraints, a pointer to an external resource. BAD: anything task-local, anything the repo/files already record, or a fact you're unsure will ever matter again.
+If a similar fact may already exist, reuse its exact name to UPDATE it instead of creating a near-duplicate. Keep body to the durable essence (a sentence or two).`,
+      parameters: {
+        type: 'object',
+        properties: {
+          name:        { type: 'string', description: 'Short kebab-case identifier / title (e.g. "user-prefers-terse"). Reuse an existing name to update that fact.' },
+          description: { type: 'string', description: 'One-line summary of the fact — the header shown for it in context.' },
+          type:        { type: 'string', enum: ['user', 'feedback', 'project', 'reference'], description: 'user = who they are/preferences; feedback = how to work + why; project = ongoing context; reference = pointer to a resource.' },
+          body:        { type: 'string', description: 'The fact itself, in full. For feedback/project include the reasoning ("why") so it stays actionable.' },
+          links:       { type: 'array', items: { type: 'string' }, description: 'Optional names of related memories to cross-link.' },
+        },
+        required: ['name', 'body'],
+      },
+    },
 
 };
 //// Lets the user (Settings → System prompt) turn tools off and rewrite their
@@ -197,6 +216,11 @@ function _toolsDescMap() { const m = _toolsReadJson(TOOLS_DESC_KEY, {}); return 
 function _toolAvailable(name) {
   if (name === 'copy_to_workspace') {
     try { const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); return !!(p && p.isConnected && p.isConnected()); }
+    catch (_) { return false; }
+  }
+  // remember is only offered when the memory feature is enabled (Settings → Memory).
+  if (name === 'remember') {
+    try { return !!(window.SandpieMemory && SandpieMemory.isEnabled()); }
     catch (_) { return false; }
   }
   return true;

@@ -274,6 +274,8 @@ async function opfsWriteBytes(path, bytes) {
   await w.write(bytes);
   await w.close();
 }
+async function opfsWriteText(path, text) { await opfsWriteBytes(path, new TextEncoder().encode(text)); }
+async function opfsReadText(path) { return new TextDecoder().decode(await opfsReadBytes(path)); }
 
 // ============================================================
 // Dehydrated Dropbox — opt-in JIT hydration
@@ -1010,6 +1012,7 @@ async function runTool(name, args, ctx) {
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'write_todos':   return tool_write_todos(args, ctx);
+    case 'remember':      return tool_remember(args, ctx);
     default:              return unknownTool(name);
   }
 }
@@ -1351,6 +1354,28 @@ async function maybeCompactMidTurn(config, messages, ctx) {
     ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
   }
   ctx.emit({ type: 'info', message: null });
+}
+
+// ============================================================
+// remember — write a durable fact to sandpie/memory/<slug>.md
+// ------------------------------------------------------------
+// The page injects every memory file into the system prompt (SandpieMemory),
+// so writing the file IS the whole operation; no index to maintain here. If a
+// file with the same slug exists we preserve its `created` date and update.
+function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
+async function tool_remember({ name, description, type, body, links }, ctx) {
+  if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
+  const slug = _memSlug(name);
+  const t = ['user', 'feedback', 'project', 'reference'].includes(type) ? type : 'reference';
+  const today = new Date().toISOString().slice(0, 10);
+  const path = 'sandpie/memory/' + slug + '.md';
+  let created = today, verb = 'Remembered';
+  try { const ex = await opfsReadText(path); const m = /^created:[ \t]*(.+)$/m.exec(ex); if (m) { created = m[1].trim(); verb = 'Updated memory'; } } catch (_) {}
+  const desc = String(description || '').replace(/\s*\n\s*/g, ' ').trim();
+  let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + '---\n' + String(body).trim() + '\n';
+  if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
+  try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }
+  return { result: verb + ' "' + slug + '" (' + t + ').' };
 }
 
 async function runAgent(config, ctx) {
