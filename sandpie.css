@@ -561,7 +561,7 @@
   .msg-timer.done .mt-sep { color: inherit; }
 
   .msg-timer .mt-todos {
-    margin-left: 1.5rem;
+    margin-left: 1rem;
     padding: 0.05rem 0.35rem;
     border-radius: 4px;
     background: var(--sp-accent);
@@ -751,7 +751,7 @@
     background: var(--sp-accent);
     padding: 0.1rem 0.4rem;
     border-radius: 1rem;
-    margin-left: 1.5rem;
+    margin-left: 1rem;
     display: inline-block;
     text-align: center;
     font-weight: 600;
