@@ -1534,30 +1534,35 @@ function renderTodos(tcId, todos, scopeEl) {
       badge.textContent = cur + '/' + todos.length;
       badge.title = (todos[ip] && todos[ip].content) || 'Checklist';
       badge.onclick = () => {
-        const wrap = document.createElement('div');
-        wrap.className = 'tool-todos';
-        const head = document.createElement('div');
-        head.className = 'tool-todos-head';
-        const done = (todos || []).filter(t => t && t.status === 'completed').length;
-        head.textContent = 'Checklist \u00b7 ' + done + '/' + todos.length + ' done';
-        wrap.appendChild(head);
-        for (const t of (todos || [])) {
-          const st = (t && t.status) || 'pending';
-          const row = document.createElement('div');
-          row.className = 'tool-todo tool-todo-' + st;
-          const mark = document.createElement('span');
-          mark.className = 'tool-todo-mark';
-          mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
-          const txt = document.createElement('span');
-          txt.className = 'tool-todo-text';
-          txt.textContent = (t && t.content) || '';
-          row.append(mark, txt);
-          wrap.appendChild(row);
-        }
-        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(wrap, 'Checklist');
+        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(todos), 'Checklist');
       };
     }
   }
+}
+
+// Build a checklist DOM element from a todos array.
+function buildTodosView(todos) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tool-todos';
+  const head = document.createElement('div');
+  head.className = 'tool-todos-head';
+  const done = (todos || []).filter(t => t && t.status === 'completed').length;
+  head.textContent = 'Checklist \u00b7 ' + done + '/' + todos.length + ' done';
+  wrap.appendChild(head);
+  for (const t of (todos || [])) {
+    const st = (t && t.status) || 'pending';
+    const row = document.createElement('div');
+    row.className = 'tool-todo tool-todo-' + st;
+    const mark = document.createElement('span');
+    mark.className = 'tool-todo-mark';
+    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
+    const txt = document.createElement('span');
+    txt.className = 'tool-todo-text';
+    txt.textContent = (t && t.content) || '';
+    row.append(mark, txt);
+    wrap.appendChild(row);
+  }
+  return wrap;
 }
 
 // Render a loaded image (load_image tool) inline inside its tool-call box, in
@@ -2851,8 +2856,21 @@ function endTotalTimer(stream, label) {
       `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
     ];
     if (tok > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+    if (stream.todos && stream.todos.length) {
+      const ip = stream.todos.findIndex(t => t && t.status === 'in_progress');
+      const cur = ip >= 0 ? ip + 1 : stream.todos.filter(t => t && t.status === 'completed').length;
+      parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
+    }
     stream.timerEl.innerHTML = parts.join('');
     stream.timerEl.classList.add('done');
+    if (stream.todos && stream.todos.length) {
+      const badge = stream.timerEl.querySelector('.mt-todos');
+      if (badge) {
+        badge.onclick = () => {
+          if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(stream.todos), 'Checklist');
+        };
+      }
+    }
   }
   stream.timerEl = null;
 }
