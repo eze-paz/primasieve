@@ -1,188 +1,188 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<script>
-// ── Service Worker kill-switch guard ───────────────────────────────────────
-// Runs before ANY other script or asset is requested. A stale SW from an older
-// version (any script name, any scope — the old heavy sandpie.js, a leftover
-// coi-serviceworker.js, etc.) installs a fetch handler that intercepts the
-// sandpie-worker.js request and leaves it "pending" forever. The per-name
-// tombstone (sandpie.js) only evicts a /sandpie.js registration, and the
-// page-side recovery in conversations.js can't run if that very module is
-// served stale by the old SW. This guard closes both holes: if this page is
-// controlled by ANY service worker, unregister every registration and reload
-// into a SW-free (uncontrolled) state, so the worker fetch goes straight to the
-// network. A small sessionStorage counter prevents an infinite reload loop if a
-// browser keeps reassigning the controller across the reload.
-(function () {
-  try {
-    if (!('serviceWorker' in navigator)) return;
-    var KEY = '__sandpie_sw_evict__';
-    if (!navigator.serviceWorker.controller) { sessionStorage.removeItem(KEY); return; }
-    var attempts = +(sessionStorage.getItem(KEY) || 0);
-    if (attempts >= 3) return; // give up; let the tombstone / page recovery take over
-    sessionStorage.setItem(KEY, attempts + 1);
-    navigator.serviceWorker.getRegistrations()
-      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
-      .catch(function () {})
-      .then(function () { location.reload(); });
-  } catch (e) {}
-})();
-</script>
-<meta name="theme-color" content="#58a6ff">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>sandpie</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=44">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
-     \(…\) / \[…\] from message text and swaps in KaTeX HTML. Loaded blocking (like
-     marked/dompurify) so katex is available for the first render. -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-  <script src="modules/core.js"></script>
-  <script src="modules/config.js?v=2"></script>
-  <script src="modules/settings.js"></script>
-  <script src="modules/account.js?v=3"></script>
-  <script src="modules/themes.js"></script>
-  <!-- WebGPU engine runs in a Web Worker (webgpu-worker.js); main thread loads only
-       the shim so the GPU prefill/decode loop can't be starved by page rendering. -->
-  <script src="modules/webgpu-host.js?v=41"></script>
-  <script src="modules/litertlm.js?v=5"></script>
-  <script type="module" src="modules/providers.js?v=32"></script>
-  <script src="modules/console.js"></script>
-  <script src="modules/dropbox-full.js?v=22"></script>
-  <script src="modules/images.js?v=5"></script>
-  <script src="modules/notifications.js?v=2"></script>
-  <script src="modules/speech-to-text.js?v=5"></script>
-  <script src="modules/tools.js?v=23"></script>
-  <script src="modules/opfs.js?v=28"></script>
-  <script src="modules/system-prompt.js?v=1"></script>
-  <script src="modules/compactor.js?v=2"></script>
-  <script src="modules/memory.js?v=2"></script>
-  <script src="modules/loop-lab.js?v=3"></script>
-  <script type="module" src="modules/mobile.js"></script>
-  <script src="modules/augmentations.js?v=1"></script>
-  <script type="module" src="modules/conversations.js?v=76"></script>
-</head>
-<body>
-<header class="mobile-header">
-  <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
-  <span class="brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
-</header>
-<div class="backdrop" onclick="toggleSidebar()"></div>
-<aside>
-  <div class="sidebar-header">
-    <span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
-    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
-  </div>
-  <details class="service" id="convSection" open>
-    <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
-    <div class="service-body">
-      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-      <ul class="fs-list conv-list" id="convList"></ul>
-      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-top:0.5rem;">+ New chat</button>
-    </div>
-  </details>
-
-  <input id="endpoint" type="hidden">
-  <input id="model" type="hidden">
-  <input id="apiKey" type="hidden">
-  <input id="proxyUrl" type="hidden">
-
-    <details class="service" id="filesSection">
-    <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
-    <div class="service-body">
-      <div class="navbar">
-        <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
-        <input id="opfsPath" value="/">
-      </div>
-      <ul class="fs-list" id="fileList"></ul>
-      <div id="persistBanner" class="persist-banner" style="display:none">
-        <span class="persist-icon" id="persistIcon"></span>
-        <span class="persist-msg" id="persistMsg"></span>
-        <button class="persist-btn ghost" id="persistBtn" style="display:none">Protect files</button>
-      </div>
-    </div>
-  </details>
-
-<div style="margin-top:auto; padding:0.5rem; display:flex; flex-direction:column; gap:0.45rem; align-items:stretch;">
-    <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
-  </div>
-</aside>
-<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
-<main>
-
-  <div id="messagesWrap">
-    <div id="messages">
-      <div id="welcome" class="welcome">
-        <div class="welcome-title"><span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span></div>
-        <span class="welcome-by">by GasN2</span>
-        <div class="welcome-rotating" aria-label="security taglines">
-          <span>nothing escapes the tab</span>
-          <span>zero install</span>
-          <span>designed for security</span>
-          <span>contained AI</span>
-        </div>
-      </div>
-    </div>
-    <div id="sideResizer"></div>
-    <div id="messagesSide">
-      <div id="artifactPanelHeader">
-        <span id="artifactPanelTitle"></span>
-        <span style="display:flex;gap:4px;align-items:center;">
-          <a id="artifactOpenLink" class="artifact-icon-btn" target="_blank" title="Open in new tab">↗</a>
-          <button id="artifactPanelClose" class="artifact-icon-btn" title="Close panel" onclick="closeArtifactPanel()">✕</button>
-        </span>
-      </div>
-      <iframe id="artifactPanelFrame" src="about:blank"></iframe>
-    </div>
-  </div>
-  <div id="commandOutput" class="cmd-output" style="display:none;">
-    <div class="cmd-header">
-      <span class="cmd-prompt">>>></span>
-      <button class="cmd-close" type="button" onclick="SandpieCommandView.hide()">x</button>
-    </div>
-    <pre class="cmd-body"></pre>
-  </div>
-  <form onsubmit="event.preventDefault(); handleSubmit();">
-    <input type="file" id="imageInput" multiple style="display:none" >
-    <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <div class="input-wrap">
-      <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
-      <div class="input-bar">
-        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach file">+</button>
-        <div id="modelPicker" class="model-picker"></div>
-        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
-      </div>
-    </div>
-  </form>
-</main>
-
-<!-- Settings modal — a top-level overlay (direct child of <body>). MUST stay
-     outside <aside>: the aurora theme gives the sidebar a backdrop-filter, which
-     would otherwise become the containing block for this position:fixed modal
-     and trap it inside the sidebar. -->
-<div id="settingsModal" class="modal" style="display:none;">
-  <div class="modal-backdrop" onclick="SandpieSettings.close()"></div>
-  <div class="modal-content" style="max-width:680px; width:90%; max-height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">
-      <h3 style="margin:0; font-size:1rem;">Settings</h3>
-      <button class="ghost" onclick="SandpieSettings.close()" title="Close (Esc)" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">✕</button>
-    </div>
-    <div style="display:flex; min-height:240px; flex:1; overflow:hidden;">
-      <nav id="settingsNav" style="flex:0 0 150px; border-right:1px solid var(--sp-border); padding:0.6rem; display:flex; flex-direction:column; gap:0.25rem; overflow-y:auto;"></nav>
-      <div id="settingsPanels" style="flex:1; padding:1rem 1.1rem; overflow-y:auto;"></div>
-    </div>
-  </div>
-</div>
-<script type="module" src="modules/agents.js?v=22"></script>
-  <script type="module" src="modules/context.js?v=7"></script>
-  <script type="module" src="modules/artifacts.js?v=7"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+// ── Service Worker kill-switch guard ───────────────────────────────────────
+// Runs before ANY other script or asset is requested. A stale SW from an older
+// version (any script name, any scope — the old heavy sandpie.js, a leftover
+// coi-serviceworker.js, etc.) installs a fetch handler that intercepts the
+// sandpie-worker.js request and leaves it "pending" forever. The per-name
+// tombstone (sandpie.js) only evicts a /sandpie.js registration, and the
+// page-side recovery in conversations.js can't run if that very module is
+// served stale by the old SW. This guard closes both holes: if this page is
+// controlled by ANY service worker, unregister every registration and reload
+// into a SW-free (uncontrolled) state, so the worker fetch goes straight to the
+// network. A small sessionStorage counter prevents an infinite reload loop if a
+// browser keeps reassigning the controller across the reload.
+(function () {
+  try {
+    if (!('serviceWorker' in navigator)) return;
+    var KEY = '__sandpie_sw_evict__';
+    if (!navigator.serviceWorker.controller) { sessionStorage.removeItem(KEY); return; }
+    var attempts = +(sessionStorage.getItem(KEY) || 0);
+    if (attempts >= 3) return; // give up; let the tombstone / page recovery take over
+    sessionStorage.setItem(KEY, attempts + 1);
+    navigator.serviceWorker.getRegistrations()
+      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+      .catch(function () {})
+      .then(function () { location.reload(); });
+  } catch (e) {}
+})();
+</script>
+<meta name="theme-color" content="#58a6ff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sandpie</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sandpie.css?v=44">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
+     \(…\) / \[…\] from message text and swaps in KaTeX HTML. Loaded blocking (like
+     marked/dompurify) so katex is available for the first render. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="modules/core.js"></script>
+  <script src="modules/config.js?v=2"></script>
+  <script src="modules/settings.js"></script>
+  <script src="modules/account.js?v=3"></script>
+  <script src="modules/themes.js"></script>
+  <!-- WebGPU engine runs in a Web Worker (webgpu-worker.js); main thread loads only
+       the shim so the GPU prefill/decode loop can't be starved by page rendering. -->
+  <script src="modules/webgpu-host.js?v=41"></script>
+  <script src="modules/litertlm.js?v=5"></script>
+  <script type="module" src="modules/providers.js?v=32"></script>
+  <script src="modules/console.js"></script>
+  <script src="modules/dropbox-full.js?v=22"></script>
+  <script src="modules/images.js?v=5"></script>
+  <script src="modules/notifications.js?v=2"></script>
+  <script src="modules/speech-to-text.js?v=5"></script>
+  <script src="modules/tools.js?v=23"></script>
+  <script src="modules/opfs.js?v=28"></script>
+  <script src="modules/system-prompt.js?v=1"></script>
+  <script src="modules/compactor.js?v=2"></script>
+  <script src="modules/memory.js?v=2"></script>
+  <script src="modules/loop-lab.js?v=3"></script>
+  <script type="module" src="modules/mobile.js"></script>
+  <script src="modules/augmentations.js?v=1"></script>
+  <script type="module" src="modules/conversations.js?v=77"></script>
+</head>
+<body>
+<header class="mobile-header">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
+  <span class="brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
+</header>
+<div class="backdrop" onclick="toggleSidebar()"></div>
+<aside>
+  <div class="sidebar-header">
+    <span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
+  </div>
+  <details class="service" id="convSection" open>
+    <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
+    <div class="service-body">
+      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+      <ul class="fs-list conv-list" id="convList"></ul>
+      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-top:0.5rem;">+ New chat</button>
+    </div>
+  </details>
+
+  <input id="endpoint" type="hidden">
+  <input id="model" type="hidden">
+  <input id="apiKey" type="hidden">
+  <input id="proxyUrl" type="hidden">
+
+    <details class="service" id="filesSection">
+    <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
+    <div class="service-body">
+      <div class="navbar">
+        <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
+        <input id="opfsPath" value="/">
+      </div>
+      <ul class="fs-list" id="fileList"></ul>
+      <div id="persistBanner" class="persist-banner" style="display:none">
+        <span class="persist-icon" id="persistIcon"></span>
+        <span class="persist-msg" id="persistMsg"></span>
+        <button class="persist-btn ghost" id="persistBtn" style="display:none">Protect files</button>
+      </div>
+    </div>
+  </details>
+
+<div style="margin-top:auto; padding:0.5rem; display:flex; flex-direction:column; gap:0.45rem; align-items:stretch;">
+    <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
+  </div>
+</aside>
+<button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar">&gt;</button>
+<main>
+
+  <div id="messagesWrap">
+    <div id="messages">
+      <div id="welcome" class="welcome">
+        <div class="welcome-title"><span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span></div>
+        <span class="welcome-by">by GasN2</span>
+        <div class="welcome-rotating" aria-label="security taglines">
+          <span>nothing escapes the tab</span>
+          <span>zero install</span>
+          <span>designed for security</span>
+          <span>contained AI</span>
+        </div>
+      </div>
+    </div>
+    <div id="sideResizer"></div>
+    <div id="messagesSide">
+      <div id="artifactPanelHeader">
+        <span id="artifactPanelTitle"></span>
+        <span style="display:flex;gap:4px;align-items:center;">
+          <a id="artifactOpenLink" class="artifact-icon-btn" target="_blank" title="Open in new tab">↗</a>
+          <button id="artifactPanelClose" class="artifact-icon-btn" title="Close panel" onclick="closeArtifactPanel()">✕</button>
+        </span>
+      </div>
+      <iframe id="artifactPanelFrame" src="about:blank"></iframe>
+    </div>
+  </div>
+  <div id="commandOutput" class="cmd-output" style="display:none;">
+    <div class="cmd-header">
+      <span class="cmd-prompt">>>></span>
+      <button class="cmd-close" type="button" onclick="SandpieCommandView.hide()">x</button>
+    </div>
+    <pre class="cmd-body"></pre>
+  </div>
+  <form onsubmit="event.preventDefault(); handleSubmit();">
+    <input type="file" id="imageInput" multiple style="display:none" >
+    <div id="imagePreview" class="image-preview" style="display:none"></div>
+    <div class="input-wrap">
+      <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
+      <div class="input-bar">
+        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach file">+</button>
+        <div id="modelPicker" class="model-picker"></div>
+        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
+      </div>
+    </div>
+  </form>
+</main>
+
+<!-- Settings modal — a top-level overlay (direct child of <body>). MUST stay
+     outside <aside>: the aurora theme gives the sidebar a backdrop-filter, which
+     would otherwise become the containing block for this position:fixed modal
+     and trap it inside the sidebar. -->
+<div id="settingsModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" onclick="SandpieSettings.close()"></div>
+  <div class="modal-content" style="max-width:680px; width:90%; max-height:80vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">
+      <h3 style="margin:0; font-size:1rem;">Settings</h3>
+      <button class="ghost" onclick="SandpieSettings.close()" title="Close (Esc)" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">✕</button>
+    </div>
+    <div style="display:flex; min-height:240px; flex:1; overflow:hidden;">
+      <nav id="settingsNav" style="flex:0 0 150px; border-right:1px solid var(--sp-border); padding:0.6rem; display:flex; flex-direction:column; gap:0.25rem; overflow-y:auto;"></nav>
+      <div id="settingsPanels" style="flex:1; padding:1rem 1.1rem; overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+<script type="module" src="modules/agents.js?v=22"></script>
+  <script type="module" src="modules/context.js?v=7"></script>
+  <script type="module" src="modules/artifacts.js?v=7"></script>
+  </body>
+</html>
