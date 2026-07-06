@@ -561,7 +561,7 @@
   .msg-timer.done .mt-sep { color: inherit; }
 
   .msg-timer .mt-todos {
-    margin-left: auto;
+    margin-left: 1.5rem;
     padding: 0.05rem 0.35rem;
     border-radius: 4px;
     background: var(--sp-accent);
@@ -571,7 +571,7 @@
     cursor: pointer;
     line-height: 1;
   }
-  .msg-timer.done .mt-todos { display: none; }
+  .msg-timer .mt-todos:empty { display: none; }
 
   aside details.service {
     border: none;
@@ -751,7 +751,7 @@
     background: var(--sp-accent);
     padding: 0.1rem 0.4rem;
     border-radius: 1rem;
-    margin-left: 0.4rem;
+    margin-left: 1.5rem;
     display: inline-block;
     text-align: center;
     font-weight: 600;
@@ -1326,7 +1326,7 @@
   }
   .tool-box .tool-todo {
     display: flex;
-    gap: 0.45rem;
+    gap: 0.65rem;
     align-items: baseline;
     padding: 1px 0;
     color: var(--sp-text);
