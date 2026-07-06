@@ -2264,6 +2264,35 @@ async function _cmpContextPct(convId) {
   try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
   return (used / w) * 100;
 }
+// Summarize the span between the current boundary and the protected tail and
+// advance the compaction boundary — regardless of the % threshold. Shared by
+// the pre-send auto path (gated on %) and the manual `>>> compact` command
+// (no gate). Building on any prior summary so old context isn't lost when only
+// newly-aged turns are re-summarized. Returns {ok, reason?, removed?, kept?}.
+async function _performCompaction(convId, cfg) {
+  const to = safeSplitIndex(messages, cfg.keepTail);
+  const comp = getCompaction(convId);
+  const from = (comp && comp.boundary) || 0;
+  if (to <= from) return { ok: false, reason: 'nothing new to compact' };
+  let transcript = _cmpTranscript(messages, from, to);
+  if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
+  if (!transcript.trim()) return { ok: false, reason: 'nothing to summarize' };
+  const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
+  _autoCompacting = true;
+  emit('compaction:start');
+  try {
+    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return { ok: false, reason: 'no completion provider available' };
+    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined, maxTokens: 2048 });
+    if (!out || !out.trim()) return { ok: false, reason: 'summarizer returned empty' };
+    const r = await compactConversation(convId, { keepTail: cfg.keepTail, summary: out });
+    return (r && r.ok) ? { ok: true, removed: r.removed, kept: r.kept } : { ok: false, reason: (r && r.reason) || 'compaction failed' };
+  } catch (e) {
+    return { ok: false, reason: (e && e.message) || String(e) };
+  } finally {
+    emit('compaction:end');
+    _autoCompacting = false;
+  }
+}
 async function maybeAutoCompact(convId) {
   if (_autoCompacting || !convId || convId !== activeConvId) return;
   if (typeof SandpieCompactor === 'undefined') return;
@@ -2272,30 +2301,39 @@ async function maybeAutoCompact(convId) {
   let pct = null;
   try { pct = await _cmpContextPct(convId); } catch {}
   if (pct == null || pct < cfg.pct) return;
-  // Summarize the span between the current boundary and the new one (everything
-  // except the protected tail), building on any prior summary so old context
-  // isn't lost re-summarizing only newly-aged turns.
-  const to = safeSplitIndex(messages, cfg.keepTail);
-  const comp = getCompaction(convId);
-  const from = (comp && comp.boundary) || 0;
-  if (to <= from) return;   // nothing new to compact
-  let transcript = _cmpTranscript(messages, from, to);
-  if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
-  if (!transcript.trim()) return;
-  const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
-  _autoCompacting = true;
-  emit('compaction:start');
-  try {
-    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
-    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined, maxTokens: 2048 });
-    if (out && out.trim()) await compactConversation(convId, { keepTail: cfg.keepTail, summary: out });
-  } catch (e) {
-    console.warn('[sandpie] auto-compaction failed:', e);
-  } finally {
-    emit('compaction:end');
-    _autoCompacting = false;
-  }
+  try { await _performCompaction(convId, cfg); }
+  catch (e) { console.warn('[sandpie] auto-compaction failed:', e); }
 }
+/* ---- command registration: compact ------------------------------------- */
+// Manually force a compaction NOW, at any context %, ignoring the auto trigger
+// (and even when auto-compaction is disabled). Optional arg overrides keepTail.
+function registerCompactCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'compact',
+    module: 'core',
+    help: 'Compact the conversation now, at any %, ignoring the auto threshold',
+    usage: '>>> compact [keepTail]',
+    async run(text, parts) {
+      if (typeof SandpieCompactor === 'undefined') return 'Compaction is not available.';
+      if (_autoCompacting) return 'A compaction is already in progress — try again in a moment.';
+      if (!activeConvId) return 'No active conversation to compact.';
+      const cfg = SandpieCompactor.config();
+      if (parts.length > 1) {
+        const k = parseInt(parts[1], 10);
+        if (Number.isNaN(k) || k < 2) return 'Usage: >>> compact [keepTail] — keepTail must be a number ≥ 2 (messages to keep verbatim).';
+        cfg.keepTail = k;
+      }
+      let before = null; try { before = await _cmpContextPct(activeConvId); } catch {}
+      const r = await _performCompaction(activeConvId, cfg);
+      if (!r || !r.ok) return 'Nothing compacted: ' + ((r && r.reason) || 'unknown reason') + '.';
+      let after = null; try { after = await _cmpContextPct(activeConvId); } catch {}
+      const delta = (before != null && after != null) ? ` Context ${Math.round(before)}% → ${Math.round(after)}%.` : '';
+      return `Compacted ${r.removed} message(s) into a summary; kept the last ${r.kept} verbatim.${delta}`;
+    }
+  });
+}
+registerCompactCommand();
 
 /* ---- side-by-side conversation panel ---- */
 class SidePanel {
