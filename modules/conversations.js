@@ -93,26 +93,34 @@ function renderHistoricalMessage(m, host = null) {
     const content = String(m.content || '');
     const target = host || $('messages');
     const toolCalls = target.querySelectorAll('.msg.tool-call');
-    if (content.startsWith('image:')) {
-      const path = content.slice('image:'.length);
-      if (path && toolCalls.length > 0) {
-        appendToolResultImage(toolCalls[toolCalls.length - 1].dataset.tcId, path, target);
-      }
-    } else if (content.startsWith('todos:')) {
-      const nl = content.indexOf('\n');
-      const json = content.slice('todos:'.length, nl < 0 ? undefined : nl);
-      let todos = null;
-      try { todos = JSON.parse(json); } catch (_) {}
-      if (todos && toolCalls.length > 0) {
-        renderTodos(toolCalls[toolCalls.length - 1].dataset.tcId, todos, target);
-      }
-    } else if (!content.startsWith('artifact:')) {
-      // Full result, untruncated — the user sees exactly what the model sees.
-      if (toolCalls.length > 0) {
-        appendToolResult(toolCalls[toolCalls.length - 1].dataset.tcId, content, target);
+    // Attach this result to ITS OWN tool call, matched by tool_call_id. The old
+    // code matched positionally to the LAST rendered box, so in a turn with
+    // several tool calls every result but the last landed on the wrong box (and
+    // overwrote it) — e.g. multi-call agent turns like the sandpie_ssh skill,
+    // where all but the final call then showed no output. Fall back to the last
+    // box only when the id is missing/unmatched (older saved data).
+    let tcId = m.tool_call_id || '';
+    if (tcId) {
+      let ok = false;
+      for (const div of toolCalls) if (div.dataset.tcId === tcId) { ok = true; break; }
+      if (!ok) tcId = '';
+    }
+    if (!tcId && toolCalls.length > 0) tcId = toolCalls[toolCalls.length - 1].dataset.tcId;
+    if (tcId) {
+      if (content.startsWith('image:')) {
+        const path = content.slice('image:'.length);
+        if (path) appendToolResultImage(tcId, path, target);
+      } else if (content.startsWith('todos:')) {
+        const nl = content.indexOf('\n');
+        const json = content.slice('todos:'.length, nl < 0 ? undefined : nl);
+        let todos = null;
+        try { todos = JSON.parse(json); } catch (_) {}
+        if (todos) renderTodos(tcId, todos, target);
+      } else if (!content.startsWith('artifact:')) {
+        // Full result, untruncated — the user sees exactly what the model sees.
+        appendToolResult(tcId, content, target);
       }
     }
-
   }
 }
 // Render a whole conversation into `host` (default: the active stream's host),
@@ -1415,16 +1423,21 @@ function tcEscape(s) {
   }[c]));
 }
 
-function appendToolResult(tcId, result, scopeEl) {
+// Resolve a tool-call box. Accepts the element directly (preferred — the live
+// renderer already holds it, so rendering can't be lost to a tcId/dataset
+// mismatch) OR a tcId string (used by history replay), matched against
+// data-tc-id within scope.
+function _toolBoxEl(ref, scopeEl) {
+  if (ref && ref.nodeType === 1) return ref;
   const root = scopeEl || document;
-  const toolCalls = root.querySelectorAll('.msg.tool-call');
-  let toolCallDiv = null;
-  for (const div of toolCalls) {
-    if (div.dataset.tcId === tcId) {
-      toolCallDiv = div;
-      break;
-    }
+  for (const div of root.querySelectorAll('.msg.tool-call')) {
+    if (div.dataset.tcId === ref) return div;
   }
+  return null;
+}
+
+function appendToolResult(tcId, result, scopeEl) {
+  const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
   const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
@@ -1455,12 +1468,7 @@ function appendToolResult(tcId, result, scopeEl) {
 // history reads as a running log of the plan; replay rebuilds each from the tool
 // message content.
 function renderTodos(tcId, todos, scopeEl) {
-  const root = scopeEl || document;
-  const toolCalls = root.querySelectorAll('.msg.tool-call');
-  let toolCallDiv = null;
-  for (const div of toolCalls) {
-    if (div.dataset.tcId === tcId) { toolCallDiv = div; break; }
-  }
+  const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
   const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
@@ -1507,12 +1515,7 @@ function renderTodos(tcId, todos, scopeEl) {
 // Render a loaded image (load_image tool) inline inside its tool-call box, in
 // place of a text result. The thumbnail is resolved from OPFS page-side.
 function appendToolResultImage(tcId, path, scopeEl) {
-  const root = scopeEl || document;
-  const toolCalls = root.querySelectorAll('.msg.tool-call');
-  let toolCallDiv = null;
-  for (const div of toolCalls) {
-    if (div.dataset.tcId === tcId) { toolCallDiv = div; break; }
-  }
+  const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
   const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
@@ -1734,10 +1737,21 @@ class RoundRenderer {
     return i;
   }
   markToolDone(tcId, result) {
-    const idx = this.toolCalls.findIndex(t => t && t.id === tcId);
-    if (idx >= 0 && this.toolCallEls[idx]) {
-      this.toolCallEls[idx].classList.remove('in-flight');
-      renderTcDone(this.toolCallEls[idx], this.toolCalls[idx].function.name);
+    let idx = this.toolCalls.findIndex(t => t && t.id === tcId);
+    let el = idx >= 0 ? this.toolCallEls[idx] : null;
+    // Fallback: if the result's id doesn't match a tracked call (the executed
+    // tool-call id can diverge from what streamed — e.g. leaked/normalized ids),
+    // attach to the box that's still in-flight so the output is NEVER silently
+    // dropped. Without this the tool runs, the model sees the result, and the
+    // user sees an empty tool box.
+    if (!el) {
+      for (let k = this.toolCallEls.length - 1; k >= 0; k--) {
+        if (this.toolCallEls[k] && this.toolCallEls[k].classList.contains('in-flight')) { el = this.toolCallEls[k]; idx = k; break; }
+      }
+    }
+    if (el) {
+      el.classList.remove('in-flight');
+      renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname);
     }
     const text = String(result || '');
 
@@ -1749,7 +1763,7 @@ class RoundRenderer {
 
     if (text.startsWith('image:')) {
       const path = text.slice('image:'.length);
-      if (path && idx >= 0 && this.toolCallEls[idx]) appendToolResultImage(tcId, path, this.host);
+      if (path && el) appendToolResultImage(el, path, this.host);
       return;
     }
 
@@ -1758,13 +1772,11 @@ class RoundRenderer {
       const json = text.slice('todos:'.length, nl < 0 ? undefined : nl);
       let todos = null;
       try { todos = JSON.parse(json); } catch (_) {}
-      if (todos && idx >= 0 && this.toolCallEls[idx]) renderTodos(tcId, todos, this.host);
+      if (todos && el) renderTodos(el, todos, this.host);
       return;
     }
     // Show the full tool result — the user sees exactly what the model sees.
-    if (idx >= 0 && this.toolCallEls[idx]) {
-      appendToolResult(tcId, text, this.host);
-    }
+    if (el) appendToolResult(el, text, this.host);
   }
   finalize() {
 
@@ -1852,6 +1864,12 @@ class RoundRenderer {
       this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
       this.toolDisplayed[i] = '';
       this.toolPending[i] = '';
+    }
+    // The box is created on the first delta that carries a name; the id can arrive
+    // in a later delta. Keep dataset.tcId in sync so the tool_result (matched by
+    // id) still finds this box instead of silently dropping the output.
+    if (this.toolCalls[i].id && this.toolCallEls[i].dataset.tcId !== this.toolCalls[i].id) {
+      this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
     }
     if (tc.function?.arguments) {
       this.toolPending[i] = (this.toolPending[i] || '') + tc.function.arguments;
