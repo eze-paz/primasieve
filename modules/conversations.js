@@ -1510,6 +1510,41 @@ function renderTodos(tcId, todos, scopeEl) {
   }
   box.appendChild(sep);
   box.appendChild(list);
+
+  // Live timer badge: show current checklist progress in the active timer.
+  const ip = (todos || []).findIndex(t => t && t.status === 'in_progress');
+  const liveTimer = (scopeEl || document).querySelector('.msg-timer:not(.done)');
+  if (liveTimer && todos && todos.length) {
+    const badge = liveTimer.querySelector('.mt-todos');
+    if (badge) {
+      const cur = ip >= 0 ? ip + 1 : (todos || []).filter(t => t && t.status === 'completed').length;
+      badge.textContent = cur + '/' + todos.length;
+      badge.title = (todos[ip] && todos[ip].content) || 'Checklist';
+      badge.onclick = () => {
+        const wrap = document.createElement('div');
+        wrap.className = 'tool-todos';
+        const head = document.createElement('div');
+        head.className = 'tool-todos-head';
+        const done = (todos || []).filter(t => t && t.status === 'completed').length;
+        head.textContent = 'Checklist \u00b7 ' + done + '/' + todos.length + ' done';
+        wrap.appendChild(head);
+        for (const t of (todos || [])) {
+          const st = (t && t.status) || 'pending';
+          const row = document.createElement('div');
+          row.className = 'tool-todo tool-todo-' + st;
+          const mark = document.createElement('span');
+          mark.className = 'tool-todo-mark';
+          mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
+          const txt = document.createElement('span');
+          txt.className = 'tool-todo-text';
+          txt.textContent = (t && t.content) || '';
+          row.append(mark, txt);
+          wrap.appendChild(row);
+        }
+        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(wrap, 'Checklist');
+      };
+    }
+  }
 }
 
 // Render a loaded image (load_image tool) inline inside its tool-call box, in
@@ -2686,7 +2721,8 @@ function startTotalTimer(stream) {
     '<span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
-    '<span class="mt-queue"></span>';
+    '<span class="mt-queue"></span>' +
+    '<span class="mt-todos"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
 
@@ -2697,6 +2733,9 @@ function startTotalTimer(stream) {
   queueEl.style.cursor = 'pointer';
   queueEl.title = 'Click to view queued messages';
   queueEl.addEventListener('click', () => openQueueModal(stream));
+  const todosEl = el.querySelector('.mt-todos');
+  stream.todosEl = todosEl;
+  stream.todos = null;
   const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
 
   const paint = () => {

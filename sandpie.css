@@ -560,6 +560,19 @@
   .msg-timer.done .mt-rate,
   .msg-timer.done .mt-sep { color: inherit; }
 
+  .msg-timer .mt-todos {
+    margin-left: auto;
+    padding: 0.05rem 0.35rem;
+    border-radius: 4px;
+    background: var(--sp-accent);
+    color: var(--sp-bg);
+    font-size: 0.65rem;
+    font-weight: 600;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .msg-timer.done .mt-todos { display: none; }
+
   aside details.service {
     border: none;
     background: transparent;
