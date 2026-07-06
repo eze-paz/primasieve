@@ -5,8 +5,8 @@
 //   IN  {type:'tool', id, name, args, ...}  → single tool; sends {type:'tool_result', id, ...}
 //   IN  {type:'abort', id}                  → abort a running agent
 //   IN  {type:'dbx-token', ...}             → update Dropbox context
-//   IN  {type:'opfs-changed', paths}        → sync new OPFS files into Pyodide MEMFS
-//   IN  {type:'opfs-removed', paths}        → drop paths from Pyodide MEMFS
+//   IN  {type:'opfs-changed', paths}        → fan out to the Pyodide worker pool (MEMFS refresh)
+//   IN  {type:'opfs-removed', paths}        → fan out to the Pyodide worker pool (MEMFS drop)
 //   IN  {type:'flush-logs'}                 → replay boot log buffer
 //   OUT {type:'sandpie-worker-log', ...}    → console relay to page
 //   OUT {type:'event', id, event}           → agent event (same NDJSON shapes as SW had)
@@ -74,45 +74,28 @@ self.addEventListener('message', async (event) => {
   if (data.type === 'dbx-token') {
     _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, workingRoot: data.workingRoot || '' };
     _dehydrated = !!data.dehydrated;
+    _pyBroadcast(data);   // keep the Pyodide pool's sync-hydrate context in step
     return;
   }
 
   if (data.type === 'dbx-index') {
     _dbxIndex = data.index || null;
     if (Array.isArray(data.exempt) && data.exempt.length) _dbxExempt = data.exempt;
+    _pyBroadcast(data);
     return;
   }
 
+  // OPFS edits made outside Python (page/SW) are fanned out to every live pool
+  // worker so each interpreter's MEMFS view stays coherent. A newly-spawned
+  // worker instead pulls current OPFS via syncfs(true) at init, so it needs no
+  // back-fill here.
   if (data.type === 'opfs-removed' && Array.isArray(data.paths)) {
-    if (!py) return;
-    await withPy(async () => {
-      for (const rel of data.paths) {
-        const full = '/files/' + String(rel).replace(/^\/+/, '');
-        try {
-          const st = py.FS.stat(full);
-          if (py.FS.isDir(st.mode)) _swRmTree(full);
-          else py.FS.unlink(full);
-        } catch (_) {}
-      }
-    });
+    _pyBroadcast({ type: 'fs-removed', paths: data.paths });
     return;
   }
 
   if (data.type === 'opfs-changed' && Array.isArray(data.paths)) {
-    if (!py || !_nativefs) return;
-    await withPy(async () => {
-      for (const rel of data.paths) {
-        const full = '/files/' + String(rel).replace(/^\/+/, '');
-        try {
-          const bytes = await opfsReadBytes(rel);
-          const dir = full.substring(0, full.lastIndexOf('/'));
-          if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
-          py.FS.writeFile(full, bytes);
-        } catch (e) {
-          console.warn('[sandpie-worker] opfs-changed sync failed for', rel, e);
-        }
-      }
-    });
+    for (const rel of data.paths) _pyBroadcast({ type: 'fs-changed', rel });
     return;
   }
 
@@ -160,79 +143,72 @@ self.addEventListener('message', async (event) => {
 });
 
 // ============================================================
-// Pyodide — lazy-loaded. Web Workers can call importScripts()
-// from inside async functions (unlike Service Workers where it
-// must be at top-level synchronous evaluation time).
+// Pyodide worker pool. Python used to run inline on THIS thread, so a long or
+// blocking run_python (incl. the sync-XHR dehydration fault-in) froze token
+// streaming for every conversation, and runs could never overlap. Now each
+// run_python is dispatched to a dedicated nested worker (pyodide-worker.js) that
+// holds its own interpreter: this thread stays free (other conversations keep
+// streaming) and a small pool gives real parallel execution.
 // ============================================================
-const PYODIDE_INDEX = 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/';
-let _pyodideJsLoaded = false;
-let py = null;
-let pyInitPromise = null;
-let _nativefs = null;
+const PY_POOL_MAX = (() => {
+  try { if (globalThis.__noPyPool) return 1; } catch (_) {}   // debug escape hatch
+  const n = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
+  return Math.min(3, Math.max(1, n - 1));
+})();
+const _pyPool = [];            // [{ worker, busy }]
+const _pyQueue = [];           // pending run requests waiting for a free worker
+const _pyPending = new Map();  // runId -> resolve
+let _pyRunSeq = 0;
 
-async function initPyodide() {
-  if (py) return py;
-  if (pyInitPromise) return pyInitPromise;
-  if (!_pyodideJsLoaded) {
-    try {
-      console.log('[sandpie-worker] importing pyodide.js…');
-      importScripts(PYODIDE_INDEX + 'pyodide.js');
-      console.log('[sandpie-worker] importing pyodide.asm.js…');
-      importScripts(PYODIDE_INDEX + 'pyodide.asm.js');
-      _pyodideJsLoaded = true;
-      console.log('[sandpie-worker] pyodide bootstrap scripts loaded');
-    } catch (e) {
-      console.warn('[sandpie-worker] pyodide bootstrap failed:', e);
-      throw new Error('Pyodide unavailable: failed to load pyodide.js — check network. ' + (e && e.message || e));
+function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessage(msg); } catch (_) {} } }
+
+function _spawnPyWorker() {
+  const worker = new Worker('./pyodide-worker.js?v=1', { name: 'py' + _pyPool.length });
+  const slot = { worker, busy: false };
+  worker.addEventListener('message', (event) => {
+    const msg = event.data; if (!msg) return;
+    if (msg.type === 'python-result') {
+      const resolve = _pyPending.get(msg.id);
+      if (resolve) { _pyPending.delete(msg.id); resolve({ result: msg.result }); }
+      slot.busy = false;
+      _pyDrainQueue();
+      return;
     }
+    // Relay the pool worker's page-bound messages (opfs-deleted-by-python /
+    // sw-opfs-changed / worker-hydrated) and console logs on to the page.
+    if (msg.type === 'forward-to-page' || msg.type === 'sandpie-worker-log') {
+      try { self.postMessage(msg); } catch (_) {}
+    }
+  });
+  worker.addEventListener('error', (e) => { console.error('[sandpie-worker] pyodide-worker error:', e.message || e); });
+  // Bring the fresh worker up to date with current Dropbox context/index.
+  if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated }); } catch (_) {} }
+  if (_dbxIndex) { try { worker.postMessage({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt }); } catch (_) {} }
+  _pyPool.push(slot);
+  return slot;
+}
+
+function _pyDrainQueue() {
+  while (_pyQueue.length) {
+    let slot = _pyPool.find(s => !s.busy);
+    if (!slot && _pyPool.length < PY_POOL_MAX) slot = _spawnPyWorker();
+    if (!slot) return;   // all workers busy and at cap — wait for a python-result
+    const job = _pyQueue.shift();
+    slot.busy = true;
+    _pyPending.set(job.id, job.resolve);
+    try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, args: job.args }); }
+    catch (e) { slot.busy = false; _pyPending.delete(job.id); job.resolve({ result: 'Error dispatching run_python: ' + (e && e.message || e) }); }
   }
-  pyInitPromise = (async () => {
-    try {
-      const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
-      try {
-        const opfsRootDir = await navigator.storage.getDirectory();
-        _nativefs = await p.mountNativeFS('/files', opfsRootDir);
-        p.runPython('import os; os.chdir("/files")');
-        p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
-        try { p.runPython(_HYDRATE_AUDIT_PY); } catch (e) { console.warn('[sandpie-worker] hydrate audit hook install failed:', e); }
-        console.log('[sandpie-worker] OPFS mounted at /files (cwd); FS tracking installed');
-      } catch (e) {
-        _nativefs = null;
-        console.warn('[sandpie-worker] OPFS mount failed (Python /files unavailable):', e);
-      }
-      py = p;
-      return p;
-    } catch (e) {
-      pyInitPromise = null;
-      throw e;
-    }
-  })();
-  return pyInitPromise;
 }
 
-function resetPyodide(reason) {
-  console.warn('[sandpie-worker] resetting Pyodide:', reason);
-  py = null;
-  pyInitPromise = null;
-  _nativefs = null;
-}
-
-function isPyodideFatal(e, msg, stderr) {
-  if (!msg && !stderr.trim()) return true;
-  if (typeof WebAssembly !== 'undefined' && e instanceof WebAssembly.RuntimeError) return true;
-  const sig = ((msg || '') + ' ' + (stderr || '')).toLowerCase();
-  if (sig.includes('aborted(')) return true;
-  if (sig.includes('runtimeerror: abort(')) return true;
-  if (sig.includes('memory access out of bounds')) return true;
-  if (sig.includes('out of memory') && sig.includes('wasm')) return true;
-  return false;
-}
-
-let _pyMutex = Promise.resolve();
-function withPy(fn) {
-  const next = _pyMutex.then(fn, fn);
-  _pyMutex = next.catch(() => {});
-  return next;
+// Run a script on the pool; resolves with { result } (raw/untruncated, as the
+// old in-process tool_run_python did — callers truncate).
+function dispatchPython({ path, args }) {
+  return new Promise((resolve) => {
+    const id = 'py' + (++_pyRunSeq);
+    _pyQueue.push({ id, path, args, resolve });
+    _pyDrainQueue();
+  });
 }
 
 // ---- OPFS helpers ----
@@ -326,61 +302,10 @@ async function hydrateAsync(rel) {
   _hydrating.set(rel, job);
   try { return await job; } finally { _hydrating.delete(rel); }
 }
-// Synchronous hydration for Pyodide: two blocking XHRs (get_temporary_link, then
-// GET), writing THROUGH Pyodide's FS so the just-opened file is visible inline
-// without a syncfs round-trip. Exposed to Python via the run_python audit hook.
-function _syncDownloadBytes(cloudPath) {
-  const x1 = new XMLHttpRequest();
-  x1.open('POST', 'https://api.dropboxapi.com/2/files/get_temporary_link', false);
-  const h = _dbxHeaders(true);
-  for (const k in h) x1.setRequestHeader(k, h[k]);
-  x1.send(JSON.stringify({ path: cloudPath }));
-  if (x1.status !== 200) throw new Error('get_temporary_link ' + x1.status);
-  const link = JSON.parse(x1.responseText).link;
-  const x2 = new XMLHttpRequest();
-  x2.open('GET', link, false);
-  let ab = true;
-  try { x2.responseType = 'arraybuffer'; } catch (_) { ab = false; }   // workers allow this on sync XHR; main thread does not
-  if (!ab) { try { x2.overrideMimeType('text/plain; charset=x-user-defined'); } catch (_) {} }
-  x2.send();
-  if (x2.status !== 200) throw new Error('download ' + x2.status);
-  if (ab && x2.response) return new Uint8Array(x2.response);
-  const s = x2.responseText, b = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
-  return b;
-}
-self._sandpie_hydrate_sync = function (pathStr) {
-  try {
-    if (!_dehydrated || !_dbxIndex || !_dbxCtx || !py) return;
-    let full = String(pathStr || '');
-    if (!full) return;
-    if (!full.startsWith('/')) full = '/files/' + full.replace(/^files\//, '');
-    if (!full.startsWith('/files/')) return;
-    const rel = full.slice('/files/'.length).replace(/^\/+/, '');
-    if (!rel || _relExempt(rel)) return;
-    try { if (py.FS.analyzePath(full).exists) return; } catch (_) {}
-    const entry = _dbxIndex[rel];
-    if (!entry || entry.kind !== 'file') return;
-    const bytes = _syncDownloadBytes(_cloudPathFor(rel, entry));
-    const dir = full.slice(0, full.lastIndexOf('/'));
-    if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
-    py.FS.writeFile(full, bytes);
-    _hydratedSet.add(rel);
-  } catch (e) { console.warn('[sandpie-worker] sync hydrate failed:', pathStr, (e && e.message) || e); }
-};
-// Python preamble: an audit hook that faults in /files paths on open(). Bound
-// once after Pyodide init. Skips stdlib (absolute non-/files) and pseudo-paths.
-const _HYDRATE_AUDIT_PY = `
-import sys
-from js import _sandpie_hydrate_sync as __sp_hydrate
-def __sp_audit(event, args):
-    if event == 'open' and args:
-        p = args[0]
-        if isinstance(p, str) and (p.startswith('/files') or (p[:1] not in ('/', '<'))):
-            try: __sp_hydrate(p)
-            except Exception: pass
-sys.addaudithook(__sp_audit)
-`;
+// The synchronous run_python fault-in (blocking XHR + open() audit hook) now
+// lives in pyodide-worker.js, which owns the interpreter. This worker keeps only
+// the ASYNC hydration above, used by the file tools (read_file/load_image/etc).
+
 // Build a directory listing from the cloud index (no download) for list_files.
 function _indexEntriesUnder(norm, recursive) {
   if (!_dehydrated || !_dbxIndex) return [];
@@ -406,76 +331,8 @@ function _indexEntriesUnder(norm, recursive) {
 // dehydratePurge() on boot) — it knows sync state, so it can skip files with
 // unsynced edits. The worker no longer persists a manifest or wipes on boot.
 
-// ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
-let _capActive = false;
-const _capTouched = new Set();
-const _capDeleted = new Set();
-function _capReset() { _capActive = false; _capTouched.clear(); _capDeleted.clear(); }
-
-function _opfsRelFromFs(fsPath) {
-  const p = String(fsPath);
-  if (p === '/files' || p === '/files/') return null;
-  if (p.startsWith('/files/')) return p.slice('/files/'.length);
-  return null;
-}
-
-function _fsTrackingDelegate() {
-  const touch = (fsPath) => {
-    if (!_capActive) return;
-    const rel = _opfsRelFromFs(fsPath); if (rel == null) return;
-    _capTouched.add(rel); _capDeleted.delete(rel);
-  };
-  const drop = (fsPath) => {
-    if (!_capActive) return;
-    const rel = _opfsRelFromFs(fsPath); if (rel == null) return;
-    _capDeleted.add(rel); _capTouched.delete(rel);
-  };
-  return {
-    onWriteToFile:   (path) => touch(path),
-    onMakeDirectory: (path) => touch(path),
-    onDeletePath:    (path) => drop(path),
-    onMovePath:      (oldPath, newPath) => { drop(oldPath); touch(newPath); },
-  };
-}
-
-async function flushCaptureToOpfs() {
-  const removed = [], written = [];
-  for (const rel of _capDeleted) { if (await swOpfsDelete(rel, true)) removed.push(rel); }
-  for (const rel of _capTouched) {
-    const full = '/files/' + rel;
-    let st; try { st = py.FS.stat(full); } catch (_) { continue; }
-    try {
-      if (py.FS.isDir(st.mode)) await opfsResolveDir(rel.split('/').filter(Boolean), true);
-      else { await opfsWriteBytes(rel, py.FS.readFile(full)); written.push(rel); }
-    } catch (e) { console.warn('[sandpie-worker] OPFS write-back failed:', rel, e); }
-  }
-  return { removed, written };
-}
-
-function _swRmTree(full) {
-  let entries = []; try { entries = py.FS.readdir(full); } catch (_) { return; }
-  for (const name of entries) {
-    if (name === '.' || name === '..') continue;
-    const child = full + '/' + name;
-    try { const st = py.FS.stat(child); if (py.FS.isDir(st.mode)) _swRmTree(child); else py.FS.unlink(child); } catch (_) {}
-  }
-  try { py.FS.rmdir(full); } catch (_) {}
-}
-
-async function swOpfsDelete(relPath, isDir) {
-  const parts = String(relPath).split('/').filter(Boolean);
-  const name = parts.pop();
-  if (!name) return false;
-  try {
-    const dir = await opfsResolveDir(parts);
-    await dir.removeEntry(name, { recursive: !!isDir });
-    console.log('[sandpie-worker] deleted from OPFS:', relPath);
-    return true;
-  } catch (e) {
-    if (e.name !== 'NotFoundError') console.warn('[sandpie-worker] failed to delete from OPFS:', relPath, e);
-    return false;
-  }
-}
+// The FS.trackingDelegate write-back capture and the OPFS delete helpers now
+// live in pyodide-worker.js alongside the interpreter that drives them.
 
 // ============================================================
 // Tool implementations
@@ -488,89 +345,14 @@ function truncateToolResult(result) {
   return new TextDecoder().decode(bytes.slice(0, MAX_TOOL_RESULT_BYTES)) + "\n\n[truncated: tool result exceeded 30kB]";
 }
 
-function sourceFromTraceback(tb, code) {
-  if (!tb || !code) return '';
-  const lines = code.split('\n');
-  const re = /File "(?:<exec>|<string>|<unknown>)", line (\d+)/g;
-  const nums = []; let m;
-  while ((m = re.exec(tb))) { const n = +m[1]; if (n >= 1 && n <= lines.length) nums.push(n); }
-  if (!nums.length) return '';
-  const focus = nums[nums.length - 1];
-  const a = Math.max(1, focus - 3), b = Math.min(lines.length, focus + 3);
-  const out = [];
-  for (let i = a; i <= b; i++) out.push(`${i === focus ? '>' : ' '} ${String(i).padStart(4)} | ${lines[i - 1]}`);
-  return out.join('\n');
-}
-
-async function tool_run_python({ path, args }, ctx) {
+// run_python now runs on the Pyodide worker pool (see the pool manager above).
+// Dispatching to a separate thread keeps this thread free — other conversations
+// keep streaming — and lets several scripts run in parallel. The pool worker
+// owns file-read/hydration, capture write-back, and error formatting; it also
+// posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
+async function tool_run_python({ path, args }) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
-  const scriptArgs = Array.isArray(args) ? args.map(String) : [];
-  const normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-  let code;
-  // The audit hook only hydrates files the script open()s at RUNTIME; the entry
-  // script itself is read here before Python starts, so it needs the same
-  // try-OPFS-then-hydrate-on-miss dance as read_file/load_image. Otherwise a
-  // dehydrated (cloud-only) script reports "could not read".
-  try {
-    let bytes;
-    try { bytes = await opfsReadBytes(normPath); }
-    catch (miss) {
-      if (_indexEntry(normPath)) { await hydrateAsync(normPath); bytes = await opfsReadBytes(normPath); }
-      else throw miss;
-    }
-    code = new TextDecoder().decode(bytes);
-  }
-  catch (e) { return { result: `Error: could not read /files/${normPath}: ${e.message}.` }; }
-  return withPy(async () => {
-    let p;
-    try { p = await initPyodide(); }
-    catch (e) { return { result: 'Error loading Pyodide: ' + (e && e.message || e) }; }
-    let stdout = '', stderr = '';
-    try {
-      p.setStdout({ batched: s => { stdout += s + '\n'; } });
-      p.setStderr({ batched: s => { stderr += s + '\n'; } });
-      if (normPath) {
-        self._sandpie_argv = [normPath, ...scriptArgs];
-        try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
-      }
-      try { await p.loadPackagesFromImports(code); } catch (_) {}
-      _capReset(); _capActive = true;
-      await p.runPythonAsync(code);
-      _capActive = false;
-      let removedPaths = [], writtenPaths = [];
-      if (_nativefs) {
-        try { ({ removed: removedPaths, written: writtenPaths } = await flushCaptureToOpfs()); }
-        catch (e) { console.warn('[sandpie-worker] OPFS write-back after run_python failed:', e); }
-      }
-      if (removedPaths.length || writtenPaths.length) {
-        try {
-          if (removedPaths.length) self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: removedPaths } });
-          if (writtenPaths.length) self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: writtenPaths } });
-        } catch (_) {}
-      }
-      let out = stdout.trimEnd();
-      if (stderr.trim()) out += (out ? '\n' : '') + '--- stderr ---\n' + stderr.trimEnd();
-      return { result: out || '(no output)' };
-    } catch (e) {
-      let msg = '';
-      if (e != null) {
-        if (typeof e === 'string') msg = e;
-        else if (e.message) msg = e.message;
-        else { try { const s = e.toString(); if (s && s !== '[object Object]') msg = s; } catch (_) {} }
-      }
-      const tail = stderr.trim() ? '\n--- stderr ---\n' + stderr.trimEnd() : '';
-      if (isPyodideFatal(e, msg, stderr)) {
-        resetPyodide(msg || stderr.trim() || 'empty exception');
-        return { result: 'FATAL: Pyodide runtime crashed and has been reset. All in-memory state (globals, imports, function defs) is gone — the next run_python call will start a clean interpreter. DO NOT retry the failing code as-is; re-do any imports/setup first.' + (msg ? '\n--- crash signal ---\n' + msg : '') + tail };
-      }
-      const src = sourceFromTraceback(msg, code);
-      return { result: 'Error: ' + (msg || 'unknown (no message)') + (src ? '\n\n--- ' + normPath + ' (around the error) ---\n' + src : '') + tail };
-    } finally {
-      _capActive = false;
-      try { p && p.setStdout({}); } catch (_) {}
-      try { p && p.setStderr({}); } catch (_) {}
-    }
-  });
+  return dispatchPython({ path, args });
 }
 
 // ============================================================
@@ -1142,24 +924,18 @@ async function tool_copy_to_workspace({ src, dest }) {
         await opfsWriteBytes(finalRel, bytes);
         dlOk = true;
 
-        // 1. Record in cloud index so it's known as synced
+        // 1. Record in cloud index so it's known as synced (and push it to the pool)
         if (_dehydrated) {
           if (!_dbxIndex) _dbxIndex = {};
           _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'file', path: finalPath, size: meta.size, rev: meta.rev, cloudMtime: meta.server_modified };
+          _pyBroadcast({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt });
         }
 
         // 2. Notify the page (dropbox-full.js) so file viewer renders it
         _reportHydrated(finalRel);
 
-        // 3. If Pyodide is running, sync the new file into MEMFS so run_python sees it
-        if (py && _nativefs) {
-          await withPy(async () => {
-            const full = '/files/' + finalRel;
-            const dir = full.substring(0, full.lastIndexOf('/'));
-            if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
-            py.FS.writeFile(full, bytes);
-          });
-        }
+        // 3. Sync the new file into every pool worker's MEMFS so run_python sees it
+        _pyBroadcast({ type: 'fs-changed', rel: finalRel });
       }
     }
   } catch (e) {
@@ -1495,12 +1271,9 @@ async function tool_write_file({ path, content, _conv }) {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
     self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
-    if (py && _nativefs) {
-      await withPy(() => new Promise((resolve) => {
-        try { py.FS.syncfs(true, (err) => { if (err) console.warn('[sandpie-worker] syncfs after write_file failed:', err); resolve(); }); }
-        catch (e) { console.warn('[sandpie-worker] syncfs after write_file failed:', e); resolve(); }
-      }));
-    }
+    // Keep the Pyodide pool's MEMFS coherent with this OPFS write so a following
+    // run_python sees it (per-worker FIFO ⇒ this lands before any later run).
+    _pyBroadcast({ type: 'fs-changed', rel: norm });
     return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
 }
@@ -1582,12 +1355,7 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
     await opfsWriteBytes(norm, new TextEncoder().encode(res.updated));
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
     self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
-    if (py && _nativefs) {
-      await withPy(() => new Promise((resolve) => {
-        try { py.FS.syncfs(true, (err) => { if (err) console.warn('[sandpie-worker] syncfs after edit_file failed:', err); resolve(); }); }
-        catch (e) { console.warn('[sandpie-worker] syncfs after edit_file failed:', e); resolve(); }
-      }));
-    }
+    _pyBroadcast({ type: 'fs-changed', rel: norm });
     const head = `Edited ${norm}${res.note ? ' (' + res.note + ')' : ''}`;
     const diff = _editDiff(current, res.updated);
     const result = diff
