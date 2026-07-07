@@ -723,26 +723,17 @@
     _panel.style.display = 'none';
   }
 
-  /* ================= sidebar entry ================= */
-  function initMenu() {
-    if (typeof SandpieMenu === 'undefined') { setTimeout(initMenu, 400); return; }
-    SandpieMenu.add('loopLabSection', {
-      title: 'Loop Lab',
-      badge: null,
-      open: false,
-      html: `<div style="font-size:0.75rem;line-height:1.45;">
-        <p style="color:var(--sp-text-dim);margin:0 0 0.5rem;">Build and test harness loops (small model + systematized scratchpad) in an isolated playground. Nothing here touches conversations or sync.</p>
-        <button class="ghost" id="loopLabOpenBtn" style="width:100%;padding:0.45rem;">Open Loop Lab</button>
-      </div>`,
-      onRender() {
-        const b = document.getElementById('loopLabOpenBtn');
-        if (b) b.onclick = open;
-      },
+  /* Loop Lab: access via >>> loop-lab command */
+
+  if (typeof SandpieCommands !== 'undefined') {
+    SandpieCommands.register({
+      name: 'loop-lab',
+      module: 'loop-lab',
+      help: 'Open the Loop Lab panel',
+      usage: '>>> loop-lab',
+      run() { open(); return 'Loop Lab opened.'; },
     });
-    console.log('[loop-lab] loaded');
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initMenu);
-  else initMenu();
 
   window.SandpieLoopLab = { open, close, runLoop, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
 })();

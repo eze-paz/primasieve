@@ -225,7 +225,28 @@ const SandpieMemory = (function () {
           ? `\n\n(nothing injected — "${DIR}" has no local files. If Dropbox is connected they re-download on sync; otherwise none saved yet.)`
           : '\n\n(nothing injected — files present but none parsed as facts)';
         else injected = '\n\n──────── injected into system prompt ────────' + block;
-        return header + injected;
+        // Also surface the augmentations content that lives in this folder and is
+        // injected via a SEPARATE path (augmentations.systemBlock), not the fact
+        // list: recent-paths (*.recent-paths.json) and lessons (*.lessons.md).
+        // These are NOT memory facts, but they DO feed the prompt — showing them
+        // here so the memory view reflects everything in sandpie/memory/.
+        let aux = '';
+        if (Array.isArray(entries)) {
+          for (const e of entries) {
+            if (e.kind !== 'file') continue;
+            try {
+              if (e.name.endsWith('.recent-paths.json')) {
+                const arr = JSON.parse(await opfs.read(DIR + '/' + e.name) || '[]');
+                if (arr.length) aux += `\n\nRecent paths (${e.name}, injected via augmentations):\n` + arr.slice(0, 20).map(p => '  • ' + p).join('\n');
+              } else if (e.name.endsWith('.lessons.md')) {
+                const body = (await opfs.read(DIR + '/' + e.name) || '').trim();
+                const bullets = body.split(/\r?\n/).filter(l => l.trim().startsWith('- '));
+                if (bullets.length) aux += `\n\nLessons (${e.name}, injected via augmentations):\n` + bullets.slice(0, 20).map(l => '  ' + l.trim()).join('\n');
+              }
+            } catch (_) {}
+          }
+        }
+        return header + injected + aux;
       },
     });
     SandpieCommands.register({
