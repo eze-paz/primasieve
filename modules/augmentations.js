@@ -123,6 +123,8 @@
 
     try { if (localStorage.getItem('sandpie-lessons-enabled') === 'false') return; } catch (_) {}
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
+    const emit = (t) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(t, { convId }); } catch (_) {} };
+    emit('lessons:start');
     try {
       const out = await SandpieProviders.complete({ system: 'You extract lessons from coding sessions.', user: prompt, maxTokens: 512 });
       if (!out || !out.trim()) return;
@@ -139,6 +141,8 @@
       console.log('[Aug] Distilled', bullets.length, 'lessons for', project);
     } catch (e) {
       console.warn('[Aug] Lesson distillation failed:', e);
+    } finally {
+      emit('lessons:end');
     }
   }
 

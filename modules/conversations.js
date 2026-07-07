@@ -3107,10 +3107,40 @@ function hideCompactionProgress(convId) {
   } catch (_) {}
 }
 
+// Generic background-op indicator (reuses the compaction spinner styling). Used
+// for lessons distillation and memory consolidation, which are silent LLM calls
+// the user should see running. Keyed so multiple ops don't collide.
+function showBgProgress(convId, key, text) {
+  try {
+    const s = convStreams.get(convId || activeConvId);
+    const host = (s && s.host) || $('messages');
+    if (!host || host.querySelector('.bg-progress[data-key="' + key + '"]')) return;
+    const el = document.createElement('div');
+    el.className = 'compaction-progress bg-progress';
+    el.dataset.key = key;
+    el.innerHTML = '<span class="cp-spin" aria-hidden="true"></span><span>' + text + '</span>';
+    host.appendChild(el);
+    if (shouldAutoScroll(host) || isAtBottom(host)) host.scrollTop = host.scrollHeight;
+  } catch (_) {}
+}
+function hideBgProgress(convId, key) {
+  try {
+    const s = convStreams.get(convId || activeConvId);
+    const host = (s && s.host) || $('messages');
+    if (host) host.querySelectorAll('.bg-progress[data-key="' + key + '"]').forEach(e => e.remove());
+  } catch (_) {}
+}
+
 function bootConversations() {
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     Sandpie.events.on('compaction:start', ({ convId }) => showCompactionProgress(convId));
     Sandpie.events.on('compaction:end', ({ convId }) => hideCompactionProgress(convId));
+    // Lessons distillation (augmentations.js) — silent post-turn LLM call.
+    Sandpie.events.on('lessons:start', ({ convId }) => showBgProgress(convId, 'lessons', 'Distilling lessons from this session…'));
+    Sandpie.events.on('lessons:end', ({ convId }) => hideBgProgress(convId, 'lessons'));
+    // Memory consolidation (memory.js) — events existed but had no indicator.
+    Sandpie.events.on('memory:consolidate-start', () => showBgProgress(activeConvId, 'consolidate', 'Consolidating memory…'));
+    Sandpie.events.on('memory:consolidate-end', () => hideBgProgress(activeConvId, 'consolidate'));
   }
   (async () => {
     await refreshConversationList();
