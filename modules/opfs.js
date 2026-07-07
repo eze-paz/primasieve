@@ -551,6 +551,13 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     }
     return;
   }
+  if (ext === 'tex') {
+    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Opening LaTeX compiler…</div>';
+    mount(opfs.closeFile);
+    const dirPath = fullKey.replace(/\/[^\/]+$/, '');
+    setTimeout(() => { window.open('/convert_latex/#project=' + encodeURIComponent(dirPath), '_blank'); }, 100);
+    return;
+  }
   if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
     // SheetJS reads the workbook client-side; each sheet renders to an HTML table
     // with a tab bar to switch between sheets. Lazy-loaded from CDN on first use.
@@ -1471,6 +1478,15 @@ opfs.refreshFileList = async function() {
             } catch (e) { console.error('[opfs] download failed:', e); Sandpie.addMsg('err', 'Could not download ' + it.fullKey + ': ' + e.message); }
           }
         });
+        if (it.name.endsWith('.tex')) {
+          menuItems.push({
+            label: 'Compile LaTeX → PDF',
+            action: () => {
+              const dirPath = it.fullKey.replace(/\/[^\/]+$/, '');
+              window.open('/convert_latex/#project=' + encodeURIComponent(dirPath), '_blank');
+            }
+          });
+        }
       }
       if (it.kind === 'folder') {
         menuItems.push({ label: 'Download as zip', action: () => opfs.downloadFolderZip(it.fullKey) });
