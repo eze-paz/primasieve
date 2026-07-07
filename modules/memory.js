@@ -103,6 +103,7 @@ const SandpieMemory = (function () {
     "- RESOLVE contradictions: keep the newer / more-recently-verified fact, drop the loser. Never keep both sides of a contradiction.",
     "- DELETE obsolete facts: superseded, or that point at a file/function/flag/project that has clearly ended.",
     "- DROP derivable facts: anything recoverable from source code or git history does not belong in memory.",
+    "- PROTECT by type: NEVER drop a user or feedback fact merely to save space — they capture who the user is and how they want you to work. This pass may be running because the store exceeded its size budget; when you must shrink it, prune in THIS order: obsolete/stale first, then reference, then project. Drop a user or feedback fact ONLY when it is directly contradicted or clearly obsolete, never just to fit.",
     "- TIGHTEN: compress each body to the durable essence.",
     "- Keep type one of: user, feedback, project, reference. Preserve created; set last_verified to today for any fact you keep or merge.",
     "",

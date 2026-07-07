@@ -176,12 +176,17 @@ Each item: { "content": imperative step ("Write the parser"), "status": "pending
       },
     },
     remember: {
-      description: `Save a durable fact to memory so it survives across conversations (all saved facts are injected into your context automatically — there is no separate recall step).
-Use SPARINGLY, only for facts that are BOTH:
+      description: `Save something you've learned that should persist across conversations. Saved facts are auto-injected into your context every turn — saving IS remembering; there is no recall step.
+WRITE ONE AS SOON AS you learn any of these (capture it the moment it's clear — don't wait for the task to end):
+  - a stable user preference or fact about the user  → type "user"
+  - a correction or instruction on HOW to work, with the reason why  → type "feedback"
+  - durable project context, a constraint, or a decision that will matter later  → type "project"
+  - a pointer to an external resource, or a gotcha worth not rediscovering  → type "reference"
+TWO GATES, BOTH REQUIRED (to keep memory signal-dense):
   (1) durable — true beyond this conversation, and
-  (2) non-derivable — not already recoverable from the code, git history, files, or a loaded skill.
-GOOD: a stable user preference ("prefers terse answers, no preamble"), standing feedback on how to work + the WHY, lasting project context/constraints, a pointer to an external resource. BAD: anything task-local, anything the repo/files already record, or a fact you're unsure will ever matter again.
-If a similar fact may already exist, reuse its exact name to UPDATE it instead of creating a near-duplicate. Keep body to the durable essence (a sentence or two).`,
+  (2) non-derivable — not already recoverable from the code, files, git history, or a loaded skill.
+Skip task-local details, anything the repo/files already record, and low-confidence guesses.
+If a related fact may already exist, reuse its exact name to UPDATE it instead of creating a near-duplicate. Keep the body to the durable essence (1-3 sentences); include the WHY for feedback/project.`,
       parameters: {
         type: 'object',
         properties: {
