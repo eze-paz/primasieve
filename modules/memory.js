@@ -81,8 +81,13 @@ const SandpieMemory = (function () {
   function notify() { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:changed', {}); } catch (_) {} }
 
   async function _tombstone(f) {
-    try { await opfs.write(PRUNED + '/' + f.file, await opfs.read(DIR + '/' + f.file)); } catch (_) {}
-    try { await opfs.remove(DIR + '/' + f.file); } catch (_) {}
+    const src = DIR + '/' + f.file;
+    try { await opfs.write(PRUNED + '/' + f.file, await opfs.read(src)); } catch (_) {}   // local-only recovery copy
+    try { await opfs.remove(src); } catch (_) {}
+    // Propagate the delete to Dropbox — opfs.remove is OPFS-only, so without this
+    // the file stays in the cloud and re-downloads on the next sync (prunes and
+    // >>> forget would silently un-delete). file:deleted → onFileDeleted → del().
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:deleted', src); } catch (_) {}
   }
 
   // ---- injection ------------------------------------------------------------
@@ -150,12 +155,29 @@ const SandpieMemory = (function () {
         const t = VALID_TYPES.includes(f.type) ? f.type : 'reference';
         const desc = String(f.description || '').replace(/\s*\n\s*/g, ' ').trim();
         const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${f.created || today}\nlast_verified: ${today}\n---\n` + String(f.body).trim() + '\n';
-        try { await opfs.write(DIR + '/' + slug + '.md', text); } catch (_) {}
+        const fpath = DIR + '/' + slug + '.md';
+        try {
+          await opfs.write(fpath, text);
+          // Mark dirty so the merged/rewritten fact uploads and survives the sync
+          // orphan-cleanup — same reason tool_remember posts sw-opfs-changed.
+          if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath);
+        } catch (_) {}
       }
-      let removed = 0;
-      for (const f of facts) { if (!keep.has(_slug(f.name))) { await _tombstone(f); removed++; } }
+      // Deletions now propagate to Dropbox (see _tombstone), so an over-aggressive
+      // LLM that drops facts it shouldn't would lose them permanently. Safety guard:
+      // if a single pass wants to remove more than 60% of the store (beyond ~3),
+      // treat the output as untrustworthy — keep the merged improvements we just
+      // wrote, but do NOT delete the originals this pass.
+      const removeList = facts.filter(f => !keep.has(_slug(f.name)));
+      let removed = 0, guarded = false;
+      if (removeList.length > Math.max(3, facts.length * 0.6)) {
+        guarded = true;
+        console.warn('[sandpie] memory consolidation would remove', removeList.length, 'of', facts.length, 'facts — skipping deletion as a safety guard');
+      } else {
+        for (const f of removeList) { await _tombstone(f); removed++; }
+      }
       notify();
-      return { ok: true, before: facts.length, after: keep.size, removed };
+      return { ok: true, before: facts.length, after: keep.size, removed, guarded };
     } catch (e) {
       return { ok: false, reason: (e && e.message) || String(e) };
     } finally {
@@ -181,7 +203,7 @@ const SandpieMemory = (function () {
       help: 'List remembered facts; "show <name>" for one, "consolidate" to prune now',
       usage: '>>> memory [show <name> | consolidate]',
       async run(text, parts) {
-        if (parts[1] === 'consolidate') { const r = await consolidate(); return r.ok ? `Consolidated: ${r.before} → ${r.after} fact(s), ${r.removed} pruned.` : 'Consolidation: ' + (r.reason || 'failed') + '.'; }
+        if (parts[1] === 'consolidate') { const r = await consolidate(); return r.ok ? `Consolidated: ${r.before} → ${r.after} fact(s), ${r.removed} pruned.${r.guarded ? ' (deletion skipped by safety guard — pass looked over-aggressive)' : ''}` : 'Consolidation: ' + (r.reason || 'failed') + '.'; }
         if (parts[1] === 'show') { const f = (await list()).find(x => x.name === parts[2]); return f ? f.body : 'No memory named "' + (parts[2] || '') + '".'; }
         // Default: DIAGNOSE + simulate the real system-prompt injection, so what you
         // see here is exactly what the model gets (systemBlock) — and when it's empty
