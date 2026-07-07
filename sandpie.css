@@ -571,6 +571,30 @@
     cursor: pointer;
     line-height: 1;
   }
+
+  /* ---- neural-net thinking toggle icon ---- */
+  .msg-timer .mt-nn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px;
+    cursor: pointer; color: var(--sp-text-dim);
+    opacity: 0.5;
+    transition: opacity 0.15s, color 0.15s;
+    vertical-align: middle; margin-right: 0.35rem;
+    background: transparent; border: none; padding: 0;
+  }
+  .msg-timer .mt-nn:hover { opacity: 1; }
+  .msg-timer .mt-nn.on { color: var(--sp-accent); opacity: 1; }
+  .msg-timer .mt-nn svg {
+    width: 12px; height: 12px;
+    fill: none; stroke: currentColor;
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+  @keyframes nn-pulse {
+    0%, 100% { opacity: 0.2; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1.25); }
+  }
+  .msg-timer .mt-nn.thinking svg { animation: nn-pulse 1s ease-in-out infinite; }
+  .msg-timer .mt-nn.thinking { opacity: 1; color: var(--sp-accent); }
   .msg-timer .mt-todos:empty { display: none; }
 
   aside details.service {
@@ -1612,6 +1636,10 @@
   /* Hide scrollbar */
   .msg.think .think-body::-webkit-scrollbar { display: none; }
   .msg.think .think-body { scrollbar-width: none; }
+
+  /* ---- Claude-style: thoughts hidden by default ---- */
+  .msg.think { display: none; }
+  body.thoughts-visible .msg.think { display: block; }
 /* ==============================================================================
    RICH THEME SYSTEM — Cyberpunk / Aurora / Electric
    Appended to sandpie.css. Base CSS above is "classic-dark".

@@ -1751,6 +1751,8 @@ class RoundRenderer {
     this.thinkSummary = null;
     this.thinkStart = 0;
     this._thinkDone = false;
+    const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
+    if (nnEl) nnEl.classList.remove('thinking');
   }
   applyDelta(delta) {
     if (!delta) return;
@@ -1911,6 +1913,8 @@ class RoundRenderer {
     det.appendChild(sum);
     det.appendChild(body);
     // Sit the box just above this round's reply bubble so thinking reads first.
+    const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
+    if (nnEl) nnEl.classList.add('thinking');
     if (this.reply && this.reply.parentNode) {
       this.reply.parentNode.insertBefore(det, this.reply);
     } else {
@@ -1926,6 +1930,8 @@ class RoundRenderer {
     const secs = Math.round((performance.now() - this.thinkStart) / 1000);
     this.thinkSummary.textContent = secs > 0 ? ('Thought for ' + secs + 's') : 'Thought';
     this.thinkEl.classList.add('done');
+    const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
+    if (nnEl) nnEl.classList.remove('thinking');
     this.thinkEl.open = false;
   }
 
@@ -2166,6 +2172,18 @@ function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeigh
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
+
+const NN_SVG_INLINE = '<svg viewBox="0 0 24 24"><circle cx="4" cy="6" r="1.6"/><circle cx="4" cy="12" r="1.6"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="6" r="1.6"/><circle cx="20" cy="12" r="1.6"/><circle cx="20" cy="18" r="1.6"/><line x1="5.5" y1="6" x2="18.5" y2="6"/><line x1="5.5" y1="6" x2="18.5" y2="12"/><line x1="5.5" y1="6" x2="18.5" y2="18"/><line x1="5.5" y1="12" x2="18.5" y2="6"/><line x1="5.5" y1="12" x2="18.5" y2="12"/><line x1="5.5" y1="12" x2="18.5" y2="18"/><line x1="5.5" y1="18" x2="18.5" y2="6"/><line x1="5.5" y1="18" x2="18.5" y2="12"/><line x1="5.5" y1="18" x2="18.5" y2="18"/></svg>';
+
+let thoughtsVisible = false;
+function toggleThoughts() {
+  thoughtsVisible = !thoughtsVisible;
+  document.body.classList.toggle('thoughts-visible', thoughtsVisible);
+  document.querySelectorAll('.msg-timer .mt-nn').forEach(el => {
+    el.classList.toggle('on', thoughtsVisible);
+    el.title = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
+  });
+}
 
 /* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
 async function buildSystemPrompt(convMessages) {
@@ -2913,6 +2931,7 @@ function startTotalTimer(stream) {
   el.className = 'msg-timer';
   // Built once; the tick mutates the leaf <span>s in place.
   el.innerHTML =
+    '<button class="mt-nn" title="Show thoughts" onclick="toggleThoughts()">' + NN_SVG_INLINE + '</button>' +
     '<span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
@@ -2982,7 +3001,10 @@ function endTotalTimer(stream, label) {
     // Settled line: label · elapsed · rate, dimmed via .done. The raw token COUNT
     // (mt-tok) is removed per user preference, but the tok/s rate is kept; it's
     // dropped only on a pure-tool round (no text generated) where it'd read "0".
+    const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
+    const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
     const parts = [
+      `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
       `<span class="mt-label">${label}</span>`,
       `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
     ];
@@ -3007,6 +3029,7 @@ function endTotalTimer(stream, label) {
 }
 
 /* expose timer globals for sandpie-test.html inline scripts */
+window.toggleThoughts = toggleThoughts;
 window.startTotalTimer = startTotalTimer;
 window.endTotalTimer = endTotalTimer;
 
