@@ -12,6 +12,24 @@ async function ensureActiveConv() {
   localStorage.setItem('sandpie-active-conv', activeConvId);
 }
 async function saveActiveConv() { return saveConv(activeConvId, { touchUpdated: false }); }
+// Throttled mid-turn persistence. The final saveConv only runs when a turn ends,
+// so a crash/tab-close mid-turn used to lose every round streamed since the last
+// user message. Persist committed rounds as they arrive (bindMessage → here),
+// coalesced to at most one write per conversation per ~1.2s. touchUpdated:false
+// keeps the sidebar timestamp stable until the turn actually completes; the
+// byte-identical no-op guard in saveConv absorbs redundant ticks.
+const _incSaveTimers = new Map();
+function scheduleIncrementalSave(convId) {
+  if (!convId || _incSaveTimers.has(convId)) return;
+  _incSaveTimers.set(convId, setTimeout(() => {
+    _incSaveTimers.delete(convId);
+    saveConv(convId, { touchUpdated: false }).catch(() => {});
+  }, 1200));
+}
+function flushIncrementalSave(convId) {
+  const t = _incSaveTimers.get(convId);
+  if (t) { clearTimeout(t); _incSaveTimers.delete(convId); }
+}
 async function saveConv(convId, { touchUpdated = true } = {}) {
   if (!convId) return;
   const s = convStreams.get(convId);
@@ -1035,7 +1053,7 @@ async function sendSingle(text, stream, opts = {}) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const renderer = new RoundRenderer(host, convMessages, _isLocal);
+  const renderer = new RoundRenderer(host, convMessages, _isLocal, convId);
 
   let agentDoneSeen = false;
   let errorSeen = false;
@@ -1114,6 +1132,7 @@ async function sendSingle(text, stream, opts = {}) {
     // provider-reported size now the turn is done.
     try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.clearLiveTokens) SandpieTokens.clearLiveTokens(convId); } catch (_) {}
     setStreamSending(stream, false);
+    flushIncrementalSave(convId);
     await saveConv(convId);
 
     // Optional capability: notifications.js (if loaded) listens for this and
@@ -1689,10 +1708,11 @@ function renderTcDone(div, fname) {
 }
 
 class RoundRenderer {
-  constructor(host, convMessages, isLocal = false) {
+  constructor(host, convMessages, isLocal = false, convId = null) {
     this.host = host;
     this.convMessages = convMessages;
     this.isLocal = isLocal;
+    this.convId = convId;
 
     this.reply = null;
 
@@ -1771,6 +1791,8 @@ class RoundRenderer {
   }
   bindMessage(msg) {
     this.convMessages.push(msg);
+    // Persist the just-committed round so a mid-turn crash can't lose it.
+    scheduleIncrementalSave(this.convId);
     if (msg.role === 'assistant') {
       this._boundMessage = msg;   // so tool boxes created later (leaked calls) can bind too
       if (this.reply) bindBubble(this.reply, msg);
@@ -2239,30 +2261,59 @@ function getCompaction(convId) {
   const s = convStreams.get(convId);
   return (s && s.compaction) || null;
 }
+// Resolve a conversation's live messages + compaction for compaction, whether it
+// is the active conv, has a warm (but backgrounded) stream, or lives only on
+// disk. For a warm stream we operate on the SAME array the UI/send path uses so
+// the boundary advance is seen immediately; for a cold conv we read the file.
+// Returns { msgs, compaction, stream } or null if the conv can't be found.
+async function _resolveConvForCompaction(convId) {
+  if (!convId) return null;
+  const s = convStreams.get(convId);
+  if (s && Array.isArray(s.messages) && s.messages.length) {
+    return { msgs: s.messages, compaction: s.compaction || null, stream: s };
+  }
+  let data, path = convPath(convId, true);
+  try { data = JSON.parse(await opfs.read(path)); }
+  catch {
+    path = convPath(convId, false);
+    try { data = JSON.parse(await opfs.read(path)); } catch { return null; }
+  }
+  migrateCompactionData(data);
+  return { msgs: (data.messages || []), compaction: data.compaction || null, stream: null };
+}
 async function compactConversation(convId, { keepTail = 10, summary = '' } = {}) {
-  if (!convId || convId !== activeConvId) return { ok: false, reason: 'not the active conversation' };
   const text = String(summary || '').trim();
   if (!text) return { ok: false, reason: 'empty summary' };
-  const s = activeStream();
-  const boundary = safeSplitIndex(messages, keepTail);
-  const prevBoundary = (s && s.compaction && s.compaction.boundary) || 0;
-  if (boundary <= prevBoundary || boundary >= messages.length) return { ok: false, reason: 'nothing new to compact' };
+  const res = await _resolveConvForCompaction(convId);
+  if (!res) return { ok: false, reason: 'conversation not found' };
+  const msgs = res.msgs;
+  const boundary = safeSplitIndex(msgs, keepTail);
+  const prevBoundary = (res.compaction && res.compaction.boundary) || 0;
+  if (boundary <= prevBoundary || boundary >= msgs.length) return { ok: false, reason: 'nothing new to compact' };
   // Non-destructive: keep the full history, just advance the boundary + summary.
   const compaction = { boundary, summary: text, at: new Date().toISOString() };
-  if (s) s.compaction = compaction;
-  await updateConvFile(convId, { compaction, compactions: undefined });
-  // Re-render the whole conversation: pre-boundary span collapsed (not sent),
-  // the rest in context.
-  clearActiveConvUI();
-  renderConversation(messages, compaction);
-  const el = $('messages');
-  if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
-  await saveActiveConv();
+  if (res.stream) {
+    // Warm stream (active or backgrounded): mutate it and persist messages +
+    // compaction together so disk can never disagree with the live boundary.
+    res.stream.compaction = compaction;
+    await saveConv(convId, { touchUpdated: false });
+  } else {
+    // Cold conv — patch only the compaction field on the on-disk file.
+    await updateConvFile(convId, { compaction, compactions: undefined });
+  }
+  // Re-render only when this is the on-screen active conversation; a background
+  // or cold conv has no live UI to refresh (it re-reads compaction on next open).
+  if (convId === activeConvId) {
+    clearActiveConvUI();
+    renderConversation(messages, compaction);
+    const el = $('messages');
+    if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
+  }
   // The recorded usage still reflects the PRE-compaction (larger) context — drop
   // it so the context %-meters (and the compactor's own threshold) read the
   // reduced send size instead of a stale-high value that would re-trigger next send.
   try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch {}
-  return { ok: true, removed: boundary, kept: messages.length - boundary };
+  return { ok: true, removed: boundary, kept: msgs.length - boundary };
 }
 
 /* ---- native auto-compaction (pre-send) -----------------------------------
@@ -2311,11 +2362,14 @@ async function _cmpContextPct(convId) {
 // (no gate). Building on any prior summary so old context isn't lost when only
 // newly-aged turns are re-summarized. Returns {ok, reason?, removed?, kept?}.
 async function _performCompaction(convId, cfg) {
-  const to = safeSplitIndex(messages, cfg.keepTail);
-  const comp = getCompaction(convId);
+  const res = await _resolveConvForCompaction(convId);
+  if (!res) return { ok: false, reason: 'conversation not found' };
+  const msgs = res.msgs;
+  const to = safeSplitIndex(msgs, cfg.keepTail);
+  const comp = res.compaction;
   const from = (comp && comp.boundary) || 0;
   if (to <= from) return { ok: false, reason: 'nothing new to compact' };
-  let transcript = _cmpTranscript(messages, from, to);
+  let transcript = _cmpTranscript(msgs, from, to);
   if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
   if (!transcript.trim()) return { ok: false, reason: 'nothing to summarize' };
   const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
@@ -2365,29 +2419,62 @@ function registerInspectPromptCommand() {
 registerInspectPromptCommand();
 
 
+// Resolve a `>>> compact` argument to a conversation id. Accepts the raw id, the
+// file name (`<id>.json`), or a case-insensitive exact/prefix title match. Returns
+// the id if a conversation file exists, else null.
+async function _resolveConvArg(arg) {
+  if (!arg) return null;
+  let id = String(arg).trim();
+  if (id.toLowerCase().endsWith('.json')) id = id.slice(0, -5);
+  // Direct id / filename hit.
+  try { if (await opfs.exists(convPath(id, false)) || await opfs.exists(convPath(id, true))) return id; } catch {}
+  // Fall back to matching a title.
+  let convs = [];
+  try { convs = await listConversations(); } catch {}
+  const needle = String(arg).trim().toLowerCase();
+  const exact = convs.find(c => (c.title || '').toLowerCase() === needle);
+  if (exact) return exact.id;
+  const pre = convs.filter(c => (c.title || '').toLowerCase().startsWith(needle));
+  if (pre.length === 1) return pre[0].id;
+  return null;
+}
 function registerCompactCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({
     name: 'compact',
     module: 'core',
-    help: 'Compact the conversation now, at any %, ignoring the auto threshold',
-    usage: '>>> compact [keepTail]',
+    help: 'Compact a conversation now, at any %, ignoring the auto threshold. Defaults to the active conversation; pass a conversation file name/id/title to compact another.',
+    usage: '>>> compact [conversation] [keepTail]',
     async run(text, parts) {
       if (typeof SandpieCompactor === 'undefined') return 'Compaction is not available.';
       if (_autoCompacting) return 'A compaction is already in progress — try again in a moment.';
-      if (!activeConvId) return 'No active conversation to compact.';
+
+      // Parse args: an optional conversation name/id and an optional numeric
+      // keepTail, in either order. A bare number is keepTail for the active conv.
       const cfg = SandpieCompactor.config();
-      if (parts.length > 1) {
-        const k = parseInt(parts[1], 10);
-        if (Number.isNaN(k) || k < 2) return 'Usage: >>> compact [keepTail] — keepTail must be a number ≥ 2 (messages to keep verbatim).';
-        cfg.keepTail = k;
+      let targetId = null;
+      const rest = parts.slice(1);
+      for (const p of rest) {
+        const n = parseInt(p, 10);
+        if (String(n) === p && n >= 2) { cfg.keepTail = n; continue; }
+        if (Number.isFinite(n) && String(n) === p) return 'keepTail must be ≥ 2 (messages to keep verbatim).';
+        if (targetId == null) {
+          const rid = await _resolveConvArg(p);
+          if (!rid) return `No conversation matched "${p}". Pass the file name, id, or exact title.`;
+          targetId = rid;
+        }
       }
-      let before = null; try { before = await _cmpContextPct(activeConvId); } catch {}
-      const r = await _performCompaction(activeConvId, cfg);
+      const convId = targetId || activeConvId;
+      if (!convId) return 'No active conversation to compact — pass a conversation file name.';
+
+      const measurable = convId === activeConvId;
+      let before = null; if (measurable) { try { before = await _cmpContextPct(convId); } catch {} }
+      const r = await _performCompaction(convId, cfg);
       if (!r || !r.ok) return 'Nothing compacted: ' + ((r && r.reason) || 'unknown reason') + '.';
-      let after = null; try { after = await _cmpContextPct(activeConvId); } catch {}
+      let after = null; if (measurable) { try { after = await _cmpContextPct(convId); } catch {} }
       const delta = (before != null && after != null) ? ` Context ${Math.round(before)}% → ${Math.round(after)}%.` : '';
-      return `Compacted ${r.removed} message(s) into a summary; kept the last ${r.kept} verbatim.${delta}`;
+      const who = measurable ? '' : ` in ${convId}`;
+      return `Compacted ${r.removed} message(s) into a summary${who}; kept the last ${r.kept} verbatim.${delta}`;
     }
   });
 }
