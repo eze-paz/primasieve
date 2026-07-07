@@ -67,7 +67,9 @@ const SandpieMemory = (function () {
     try { entries = await opfs.listDir(DIR); } catch (_) { return []; }   // dir absent ⇒ empty
     const out = [];
     for (const e of entries) {
-      if (e.kind !== 'file' || !e.name.endsWith('.md') || e.name === 'MEMORY.md') continue;
+      // memory facts only: skip MEMORY.md and the augmentations lessons files
+      // (<project>.lessons.md) that also live in this folder and end in .md.
+      if (e.kind !== 'file' || !e.name.endsWith('.md') || e.name === 'MEMORY.md' || e.name.endsWith('.lessons.md')) continue;
       try { out.push(_parse(await opfs.read(DIR + '/' + e.name), e.name)); } catch (_) {}
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
@@ -173,10 +175,27 @@ const SandpieMemory = (function () {
       async run(text, parts) {
         if (parts[1] === 'consolidate') { const r = await consolidate(); return r.ok ? `Consolidated: ${r.before} → ${r.after} fact(s), ${r.removed} pruned.` : 'Consolidation: ' + (r.reason || 'failed') + '.'; }
         if (parts[1] === 'show') { const f = (await list()).find(x => x.name === parts[2]); return f ? f.body : 'No memory named "' + (parts[2] || '') + '".'; }
+        // Default: DIAGNOSE + simulate the real system-prompt injection, so what you
+        // see here is exactly what the model gets (systemBlock) — and when it's empty
+        // you can tell WHY (disabled / no local files / parse failure).
+        const enabled = isEnabled();
+        let entries = null;                       // null = folder not present locally
+        try { if (typeof opfs !== 'undefined') entries = await opfs.listDir(DIR); } catch (_) { entries = null; }
+        const mdFiles = Array.isArray(entries) ? entries.filter(e => e.kind === 'file' && e.name.endsWith('.md') && e.name !== 'MEMORY.md' && !e.name.endsWith('.lessons.md')) : [];
         const facts = await list();
-        if (!facts.length) return 'No memories yet.';
         const used = _usedTokens(facts);
-        return facts.map(f => `• ${f.name} (${f.type}) — ${f.description}`).join('\n') + `\n\n${facts.length} fact(s), ~${used} tokens (budget ${threshold()}).`;
+        const header =
+          `Memory: ${enabled ? 'ENABLED' : 'DISABLED'}  ·  dir "${DIR}": ` +
+          (entries === null ? 'not present locally' : `${mdFiles.length} fact file(s)`) +
+          `  ·  ${facts.length} parsed  ·  ~${used}/${threshold()} tokens`;
+        const block = await systemBlock();        // the ACTUAL injected text (respects enabled + facts)
+        let injected;
+        if (!enabled) injected = '\n\n(memory is DISABLED → nothing is injected, even if files exist)';
+        else if (!facts.length) injected = entries === null
+          ? `\n\n(nothing injected — "${DIR}" has no local files. If Dropbox is connected they re-download on sync; otherwise none saved yet.)`
+          : '\n\n(nothing injected — files present but none parsed as facts)';
+        else injected = '\n\n──────── injected into system prompt ────────' + block;
+        return header + injected;
       },
     });
     SandpieCommands.register({
