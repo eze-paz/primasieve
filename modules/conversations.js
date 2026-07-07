@@ -2329,6 +2329,22 @@ async function maybeAutoCompact(convId) {
 /* ---- command registration: compact ------------------------------------- */
 // Manually force a compaction NOW, at any context %, ignoring the auto trigger
 // (and even when auto-compaction is disabled). Optional arg overrides keepTail.
+
+function registerInspectPromptCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'inspect-prompt',
+    module: 'core',
+    help: 'Show the complete system prompt that will be sent to the model for the next turn',
+    usage: '>>> inspect-prompt',
+    async run(text, parts) {
+      const prompt = await buildSystemPrompt(messages);
+      return '=== System prompt ===\n\n' + prompt.content;
+    },
+  });
+}
+registerInspectPromptCommand();
+
 function registerCompactCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({

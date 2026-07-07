@@ -649,6 +649,7 @@
     flex-shrink: 0;
   }
   aside .status-dot.ok   { background: var(--sp-accent); box-shadow: 0 0 4px var(--sp-accent-dim); }
+  aside .status-dot.mem  { background: var(--sp-purple, #a78bfa); box-shadow: 0 0 4px rgba(167, 139, 250, 0.4); }
   aside .status-dot.warn { background: var(--sp-warn); box-shadow: 0 0 4px var(--sp-warn-dim); }
   aside .status-dot.err  { background: var(--sp-danger); box-shadow: 0 0 4px var(--sp-danger-dim); }
 

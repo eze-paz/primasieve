@@ -214,15 +214,23 @@ const SandpieMemory = (function () {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
     const th = panel.querySelector('#memThreshold');
-    if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); }); }
+    if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
     if (th) { th.value = cfg.threshold; th.addEventListener('change', () => { const v = Math.max(MIN_THRESHOLD, parseInt(th.value, 10) || DEFAULTS.threshold); th.value = v; localStorage.setItem(K_THRESHOLD, String(v)); flash('Saved'); }); }
   }
 
   let _retry = 0;
+  function setMemoryDot() {
+    const dot = document.getElementById('memoryDot');
+    if (!dot) return;
+    const hasMem = isEnabled();
+    dot.classList.remove('ok', 'warn', 'err', 'busy');
+    dot.classList.add(hasMem ? 'mem' : '');
+  }
+
   function init() {
     registerCommands();
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'memory', title: 'Memory', order: 17, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('memorySection', { title: 'Memory', badge: null, open: false, html: HTML, onRender: wire }); return; }
+    if (window.SandpieSettings) { SandpieSettings.register({ id: 'memory', title: 'Memory', order: 17, dot: 'memoryDot', render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
+    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('memorySection', { title: 'Memory', dot: 'memoryDot', badge: null, open: false, html: HTML, onRender: wire }); return; }
     if (_retry++ < 40) setTimeout(init, 500);
   }
 
