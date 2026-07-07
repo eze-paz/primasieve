@@ -1375,6 +1375,10 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + '---\n' + String(body).trim() + '\n';
   if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
   try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }
+  // Notify the page so sync-state marks this file dirty — otherwise the next
+  // Dropbox reconciliation deletes it as an orphan (not in cloud, not dirty)
+  // BEFORE it's ever pushed. Same mechanism tool_write_file uses.
+  self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } });
   return { result: verb + ' "' + slug + '" (' + t + ').' };
 }
 
