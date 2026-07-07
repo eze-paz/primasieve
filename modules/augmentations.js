@@ -44,10 +44,20 @@
     return prefix.replace(/\/$/, '') || 'global';
   }
 
-  async function trackRecentPath(convId, path) {
-    if (!path) return;
-    const meta = convMeta.get(convId);
-    const project = meta ? getProjectId([...meta.files]) : 'global';
+  // Serialize the read-modify-write: a turn fires many trackRecentPath calls
+  // concurrently, and without a queue they race on the same file and clobber
+  // each other (only the last write survives → paths get lost).
+  let _rpChain = Promise.resolve();
+  function trackRecentPath(convId, path) {
+    if (!path) return _rpChain;
+    _rpChain = _rpChain.then(() => _trackRecentPathInner(path)).catch(() => {});
+    return _rpChain;
+  }
+  async function _trackRecentPathInner(path) {
+    // Use the SAME project id the read side (systemBlock) uses. Deriving it from
+    // meta.files via getProjectId([...]) returned the full file path (incl. name)
+    // and wrote to a garbage nested dir that the reader never looked in.
+    const project = getProjectId();
     const storePath = MEMORY_DIR + '/' + project + '.recent-paths.json';
     let list = [];
     try { const raw = await opfs.read(storePath); if (raw) list = JSON.parse(raw); } catch (_) {}
@@ -56,6 +66,8 @@
     const max = Number(localStorage.getItem('sandpie-recent-paths-count') || '20');
     if (list.length > max) list = list.slice(0, max);
     await opfs.write(storePath, JSON.stringify(list, null, 2));
+    // Mark dirty so it uploads and survives the Dropbox sync orphan-cleanup.
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', storePath); } catch (_) {}
   }
 
   async function getRecentPaths(projectHint) {
@@ -70,7 +82,9 @@
   function summarizeSession(convId) {
     const meta = convMeta.get(convId);
     if (!meta || meta.toolCalls.length === 0) return null;
-    const project = getProjectId([...meta.files]);
+    // Same no-arg project id the reader (lessonSystemBlock) uses — deriving it
+    // from meta.files wrote lessons to a path the reader never looked in.
+    const project = getProjectId();
     const files = [...meta.files];
     const tools = meta.toolCalls.map(tc => {
       const p = tc.args?.path || tc.args?.src || '';
@@ -120,6 +134,7 @@
       const all = updated.trim().split('\n').filter(l => l.trim().startsWith('- '));
       const trimmed = all.slice(-maxLessons).join('\n') + '\n';
       await opfs.write(lessonPath, trimmed);
+      try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', lessonPath); } catch (_) {}
       _distilled.add(convId);
       console.log('[Aug] Distilled', bullets.length, 'lessons for', project);
     } catch (e) {
