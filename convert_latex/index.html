@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sandpie — LaTeX to PDF</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  body {
+    font: 15px/1.5 system-ui, -apple-system, sans-serif;
+    background: #0d1117; color: #c9d1d9;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 1rem;
+  }
+  .card {
+    width: 100%; max-width: 700px;
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 10px; padding: 1.5rem 1.75rem;
+    margin-bottom: 1rem;
+  }
+  h1 { font-size: 1.1rem; color: #e6edf3; margin: 0 0 .75rem; }
+  #dropzone {
+    border: 2px dashed #30363d; border-radius: 8px;
+    padding: 2rem 1rem; text-align: center;
+    color: #8b949e; cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  #dropzone.dragover { border-color: #58a6ff; background: #0d1117; }
+  #dropzone p { margin: .25rem 0; }
+  #filetree { margin-top: .75rem; max-height: 200px; overflow-y: auto; }
+  #filetree ul { list-style: none; padding: 0; margin: .25rem 0; }
+  #filetree li { font-size: .85rem; color: #8b949e; padding: .15rem 0; }
+  #filetree li.master { color: #58a6ff; font-weight: 600; }
+  #filetree li::before { content: "📄 "; }
+  #filetree li.dir::before { content: "📁 "; }
+  button.primary {
+    background: #238636; color: #fff; border: 0; border-radius: 6px;
+    padding: .5rem 1.25rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+  }
+  button.primary:disabled { background: #30363d; cursor: not-allowed; }
+  button.secondary {
+    background: #30363d; color: #c9d1d9; border: 0; border-radius: 6px;
+    padding: .45rem 1rem; font-size: .85rem; cursor: pointer; margin-left: .5rem;
+  }
+  #status { min-height: 2em; color: #8b949e; margin-top: .75rem; white-space: pre-wrap; }
+  #status.err { color: #f85149; }
+  #status.ok  { color: #3fb950; }
+  #result { margin-top: .75rem; }
+  #logpanel {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    margin-top: .75rem; max-height: 250px; overflow-y: auto;
+    font-family: ui-monospace, monospace; font-size: .78rem;
+    white-space: pre-wrap; padding: .75rem; color: #8b949e;
+    display: none;
+  }
+  #logpanel.visible { display: block; }
+  iframe { width: 100%; height: 60vh; border: 1px solid #30363d; border-radius: 6px; }
+  .hint { font-size: .8rem; color: #6e7681; margin-top: 1rem; }
+  .actions { margin-top: 1rem; }
+  a.dl {
+    display: inline-block; background: #238636; color: #fff;
+    text-decoration: none; padding: .5rem 1.25rem; border-radius: 6px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="card" id="stage1">
+  <h1>LaTeX → PDF</h1>
+  <div id="dropzone">
+    <p><strong>Drop a .tex file or project folder here</strong></p>
+    <p>Or click to browse</p>
+    <input type="file" id="filepicker" style="display:none" webkitdirectory directory multiple>
+  </div>
+  <div id="filetree"></div>
+  <div class="actions" id="actions" style="display:none">
+    <button class="primary" id="compileBtn" disabled>Compile</button>
+    <button class="secondary" id="clearBtn">Clear</button>
+  </div>
+  <div id="status"></div>
+  <div id="logpanel"></div>
+</div>
+
+<div class="card" id="stage2" style="display:none">
+  <h1>Result</h1>
+  <div id="result"></div>
+  <div class="hint">Powered by <a href="https://swiftlatex.com" target="_blank" style="color:#8b949e">SwiftLaTeX</a> — runs entirely in your browser.</div>
+</div>
+
+<script src="vendor/XeTeXEngine.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // DOM refs
+  const $drop    = document.getElementById('dropzone');
+  const $picker  = document.getElementById('filepicker');
+  const $tree    = document.getElementById('filetree');
+  const $actions = document.getElementById('actions');
+  const $btn     = document.getElementById('compileBtn');
+  const $clear   = document.getElementById('clearBtn');
+  const $status  = document.getElementById('status');
+  const $log     = document.getElementById('logpanel');
+  const $stage1  = document.getElementById('stage1');
+  const $stage2  = document.getElementById('stage2');
+  const $result  = document.getElementById('result');
+
+  let fileMap = {};   // path -> File
+  let masterFile = '';
+  let engine = null;
+
+  const status = (msg, cls) => { $status.textContent = msg; $status.className = cls || ''; };
+  const logAppend = (txt) => { $log.textContent += txt + '\n'; $log.classList.add('visible'); };
+
+  // ── Drag & Drop ───────────────────────────────────────────────
+  $drop.addEventListener('click', () => $picker.click());
+  $drop.addEventListener('dragover', (e) => { e.preventDefault(); $drop.classList.add('dragover'); });
+  $drop.addEventListener('dragleave', () => $drop.classList.remove('dragover'));
+  $drop.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    $drop.classList.remove('dragover');
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
+    await ingestItems(items);
+  });
+  $picker.addEventListener('change', async () => {
+    const files = Array.from($picker.files);
+    fileMap = {};
+    for (const f of files) fileMap[f.webkitRelativePath || f.name] = f;
+    finalizeIngest();
+  });
+
+  async function ingestItems(items) {
+    fileMap = {};
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) await walkEntry(entry, '');
+    }
+    finalizeIngest();
+  }
+
+  async function walkEntry(entry, prefix) {
+    if (entry.isFile) {
+      const file = await new Promise((res) => entry.file(res));
+      fileMap[prefix + entry.name] = file;
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const entries = await new Promise((res) => reader.readEntries(res));
+      for (const child of entries) await walkEntry(child, prefix + entry.name + '/');
+    }
+  }
+
+  function finalizeIngest() {
+    if (Object.keys(fileMap).length === 0) { status('No files found.', 'err'); return; }
+    detectMaster();
+    renderTree();
+    $actions.style.display = '';
+    $btn.disabled = !masterFile;
+    status(masterFile ? 'Ready to compile.' : 'No master file found (need \\documentclass).', masterFile ? 'ok' : 'err');
+  }
+
+  function detectMaster() {
+    const texFiles = Object.entries(fileMap).filter(([p]) => p.endsWith('.tex'));
+    for (const [path, file] of texFiles) {
+      // We can't read text here synchronously; we'll scan on compile
+      // Quick heuristic: shortest path with \documentclass is likely master
+    }
+    // For now, prefer a file named main.tex, then the shortest path
+    masterFile = '';
+    for (const [path] of texFiles) {
+      if (/\bmain\.tex$/i.test(path)) { masterFile = path; break; }
+    }
+    if (!masterFile && texFiles.length) {
+      // Read first file to check for \documentclass
+      // We'll do this async in compile step
+      masterFile = texFiles[0][0];
+    }
+  }
+
+  function renderTree() {
+    const dirs = new Set();
+    const html = ['<ul>'];
+    for (const path of Object.keys(fileMap).sort()) {
+      const parts = path.split('/');
+      const name  = parts.pop();
+      const isMaster = path === masterFile;
+      html.push(`<li class="${isMaster ? 'master' : ''}">${path}</li>`);
+    }
+    html.push('</ul>');
+    $tree.innerHTML = html.join('');
+  }
+
+  $clear.addEventListener('click', () => {
+    fileMap = {}; masterFile = '';
+    $tree.innerHTML = ''; $actions.style.display = 'none';
+    $status.textContent = ''; $status.className = '';
+    $log.textContent = ''; $log.classList.remove('visible');
+    $result.innerHTML = '';
+    $stage1.style.display = ''; $stage2.style.display = 'none';
+    if (engine) { try { engine.closeWorker(); } catch (_) {} engine = null; }
+  });
+
+  // ── Compilation ───────────────────────────────────────────────
+  $btn.addEventListener('click', async () => {
+    $btn.disabled = true;
+    $log.textContent = '';
+    status('Loading XeTeX engine…');
+
+    try {
+      if (!engine) {
+        engine = new XeTeXEngine();
+        await engine.loadEngine();
+      }
+      status('Files → engine…');
+
+      // Verify master by scanning for \documentclass
+      const masterText = await fileMap[masterFile].text();
+      if (!/^\s*\\documentclass[\[{]/m.test(masterText)) {
+        status('Selected file does not contain \\documentclass. Scanning others…');
+        const texFiles = Object.entries(fileMap).filter(([p]) => p.endsWith('.tex'));
+        let found = false;
+        for (const [path, f] of texFiles) {
+          const text = await f.text();
+          if (/^\s*\\documentclass[\[{]/m.test(text)) { masterFile = path; found = true; break; }
+        }
+        if (!found) { status('No master file with \\documentclass found.', 'err'); $btn.disabled = false; return; }
+      }
+
+      engine.flushCache();
+      for (const [path, file] of Object.entries(fileMap)) {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        engine.writeMemFSFile(path, buf);
+      }
+      engine.setEngineMainFile(masterFile);
+
+      status('Compiling (may download packages on first run)…');
+      const res = await engine.compileLaTeX();
+
+      if (res.status !== 0 || !res.pdf) {
+        logAppend(res.log);
+        status('Compilation failed. See log below.', 'err');
+        $btn.disabled = false;
+        return;
+      }
+
+      logAppend(res.log);
+      status('Done!', 'ok');
+
+      const blob = new Blob([res.pdf], { type: 'application/pdf' });
+      const url  = URL.createObjectURL(blob);
+      const outName = (masterFile.split('/').pop() || 'output').replace(/\.tex$/i, '.pdf');
+
+      $stage1.style.display = 'none';
+      $stage2.style.display = '';
+      $result.innerHTML = `
+        <iframe src="${url}" type="application/pdf"></iframe>
+        <div style="margin-top:.75rem">
+          <a class="dl" href="${url}" download="${outName}">Download ${outName}</a>
+          <button class="secondary" id="backBtn">← Back</button>
+        </div>
+      `;
+      document.getElementById('backBtn').addEventListener('click', () => {
+        $stage2.style.display = 'none';
+        $stage1.style.display = '';
+        $btn.disabled = false;
+      });
+
+    } catch (e) {
+      status('Error: ' + (e.message || e), 'err');
+      $btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
