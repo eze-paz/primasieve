@@ -71,7 +71,6 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   await opfs.write(path, newStr);
   Sandpie.events.emit('file:changed', path);
   await refreshConversationList();
-  if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.rebuildFingerprint(convId).catch(() => {});
   if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.distillLessons(convId).catch(() => {});
 }
 function renderHistoricalMessage(m, host = null) {
