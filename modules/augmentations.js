@@ -324,71 +324,26 @@
   }
 
 
-  /* ── settings panel ──────────────────────────────────────────────── */
-  const RP_HTML = [
-    '<div class="settings-group">',
-    '  <label class="settings-row"><input type="checkbox" id="sp-rp-enabled"> Enable recent-paths memory</label>',
-    '  <div class="settings-row">',
-    '    <label for="sp-rp-count">Paths to remember (5-100):</label>',
-    '    <input type="number" id="sp-rp-count" min="5" max="100" style="width:4em;margin-left:0.5em">',
-    '  </div>',
-    '  <p class="settings-hint">Tracks files you recently read or edited, per project. Injected into the system prompt.</p>',
-    '</div>',
-  ].join("\n");
-
-  const LESSONS_HTML = [
-    '<div class="settings-group">',
-    '  <label class="settings-row"><input type="checkbox" id="sp-rp-enabled"> Enable recent-paths memory</label>',
-    '  <div class="settings-row">',
-    '    <label for="sp-rp-count">Paths to remember (5–100):</label>',
-    '    <input type="number" id="sp-rp-count" min="5" max="100" style="width:4em;margin-left:0.5em">',
-    '  </div>',
-    '  <p class="settings-hint">Tracks files you recently read or edited, per project. Injected into the system prompt.</p>',
-    '</div>',
-    '<div class="settings-group">',
-    '  <label class="settings-row"><input type="checkbox" id="sp-lessons-enabled"> Enable lesson distillation</label>',
-    '  <div class="settings-row">',
-    '    <label for="sp-lessons-max">Max lessons per project (5–30):</label>',
-    '    <input type="number" id="sp-lessons-max" min="5" max="30" style="width:4em;margin-left:0.5em">',
-    '  </div>',
-    '  <p class="settings-hint">After each session, the AI extracts 0–3 project-specific lessons. Injected into future prompts.</p>',
-    '</div>',
-  ].join('\n');
-
-  function wireRPSettings(panel) {
-    const cb = panel.querySelector('#sp-rp-enabled');
-    const num = panel.querySelector('#sp-rp-count');
-    if (!cb) return;
-    cb.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
-    num.value = localStorage.getItem('sandpie-recent-paths-count') || '20';
-    cb.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', cb.checked ? 'true' : 'false'));
-    num.addEventListener('change', () => {
-      let v = parseInt(num.value, 10);
-      if (!Number.isFinite(v) || v < 5) v = 5;
-      if (v > 100) v = 100;
-      num.value = v;
-      localStorage.setItem('sandpie-recent-paths-count', String(v));
-    });
+  
+  /* ── system prompt injection block ─────────────────────────────────── */
+  async function systemBlock() {
+    let block = '';
+    const project = getProjectId();
+    // Recent paths
+    if (localStorage.getItem('sandpie-recent-paths-enabled') !== 'false') {
+      const paths = await getRecentPaths(project);
+      if (paths.length) {
+        block += '\n\n## Recent paths\n\nFiles touched recently in this project:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
+      }
+    }
+    // Lessons
+    if (localStorage.getItem('sandpie-lessons-enabled') !== 'false') {
+      const lessons = await lessonSystemBlock(project);
+      if (lessons) block += lessons;
+    }
+    return block;
   }
-
-  function wireLessonsSettings(panel) {
-    const cb = panel.querySelector('#sp-lessons-enabled');
-    const num = panel.querySelector('#sp-lessons-max');
-    if (!cb) return;
-    cb.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
-    num.value = localStorage.getItem('sandpie-lessons-max') || '20';
-    cb.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', cb.checked ? 'true' : 'false'));
-    num.addEventListener('change', () => {
-      let v = parseInt(num.value, 10);
-      if (!Number.isFinite(v) || v < 5) v = 5;
-      if (v > 30) v = 30;
-      num.value = v;
-      localStorage.setItem('sandpie-lessons-max', String(v));
-    });
-  }
-
-
-  /* ── public API ───────────────────────────────────────────────────── */
+/* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
     getProjectId,
     trackRecentPath,
@@ -400,6 +355,7 @@
     logToolResult,
     rebuildFingerprint,
     getPreloadFiles,
+    systemBlock,
     stats() {
       const out = { conversations: convMeta.size, files: new Set(), toolCalls: 0 };
       for (const m of convMeta.values()) {
