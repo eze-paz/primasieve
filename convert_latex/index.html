@@ -205,6 +205,12 @@
     return `
 const BUSYTEX_BASE = '${BUSYTEX_BASE}';
 
+self.Module = {
+  locateFile: function(path, prefix) {
+    return BUSYTEX_BASE + path;
+  }
+};
+
 importScripts(BUSYTEX_BASE + 'busytex_pipeline.js');
 
 self.pipeline = null;
