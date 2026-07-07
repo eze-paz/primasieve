@@ -47,6 +47,15 @@
     display: none;
   }
   #logpanel.visible { display: block; }
+  #progressBar {
+    width: 100%; height: 6px; background: #30363d; border-radius: 3px;
+    margin-top: .5rem; overflow: hidden; display: none;
+  }
+  #progressBar .bar {
+    height: 100%; width: 0%; background: #238636; border-radius: 3px;
+    transition: width .3s ease;
+  }
+  #progressBar.visible { display: block; }
   iframe { width: 100%; height: 60vh; border: 1px solid #30363d; border-radius: 6px; }
   .hint { font-size: .8rem; color: #6e7681; margin-top: 1rem; }
   .actions { margin-top: 1rem; }
@@ -67,19 +76,21 @@
     <button class="secondary" id="clearBtn">Clear</button>
   </div>
   <div id="status"></div>
+  <div id="progressBar"><div class="bar" id="progressFill"></div></div>
   <div id="logpanel"></div>
 </div>
 
 <div class="card" id="stage2" style="display:none">
   <h1>Result</h1>
   <div id="result"></div>
-  <div class="hint">Powered by <a href="https://swiftlatex.com" target="_blank" style="color:#8b949e">SwiftLaTeX</a> — runs entirely in your browser.</div>
+  <div class="hint">Powered by <a href="https://github.com/busytex/busytex" target="_blank" style="color:#8b949e">BusyTeX</a> — runs entirely in your browser. First compile downloads ~120 MB of LaTeX packages.</div>
 </div>
 
-<script src="vendor/XeTeXEngine.js"></script>
 <script>
 (() => {
   'use strict';
+
+  const BUSYTEX_BASE = 'https://busytex.github.io/dist/';
 
   const $path    = document.getElementById('projectPath');
   const $tree    = document.getElementById('filetree');
@@ -91,13 +102,16 @@
   const $stage1  = document.getElementById('stage1');
   const $stage2  = document.getElementById('stage2');
   const $result  = document.getElementById('result');
+  const $progBar = document.getElementById('progressBar');
+  const $progFill = document.getElementById('progressFill');
 
-  let fileMap   = {}; // path -> Uint8Array
+  let fileMap    = {};
   let masterFile = '';
-  let engine     = null;
+  let worker     = null;
 
-  const status = (msg, cls) => { $status.textContent = msg; $status.className = cls || ''; };
+  const setStatus = (msg, cls) => { $status.textContent = msg; $status.className = cls || ''; };
   const logAppend = (txt) => { $log.textContent += txt + '\n'; $log.classList.add('visible'); };
+  const setProgress = (pct) => { $progFill.style.width = Math.min(100, Math.max(0, pct)) + '%'; };
 
   // ===== OPFS helpers =====
   async function getDb() {
@@ -135,132 +149,228 @@
     return new Uint8Array(await f.arrayBuffer());
   }
 
-  async function readFileText(path, maxBytes = 4096) {
-    const buf = await readFileBytes(path);
-    const len = Math.min(buf.length, maxBytes);
-    return new TextDecoder().decode(buf.slice(0, len));
-  }
-
   // ===== Project loading =====
   async function loadProject(projectPath) {
-    if (!projectPath) { status('No project specified.', 'err'); return; }
+    if (!projectPath) { setStatus('No project specified.', 'err'); return; }
     fileMap = {};
     masterFile = '';
     $path.textContent = '/' + projectPath;
-    status('Scanning project…');
+    setStatus('Scanning project…');
+    $progBar.classList.remove('visible');
+    $log.textContent = ''; $log.classList.remove('visible');
 
     try {
       const rootDir = await resolveDir(projectPath.split('/').filter(Boolean));
       const out = { files: [], dirs: [], texFiles: [] };
       await walkDir(rootDir, '', out);
 
-      // Read all .tex file contents for master detection
-      const texContents = {};
-      for (const p of out.texFiles) {
-        texContents[p] = await readFileText(projectPath + '/' + p, 8192);
-        fileMap[p] = await readFileBytes(projectPath + '/' + p);
-      }
-
-      // Read non-.tex files lazily (for the compile step)
       for (const p of out.files) {
-        if (!p.endsWith('.tex')) {
-          fileMap[p] = await readFileBytes(projectPath + '/' + p);
-        }
+        const bytes = await readFileBytes(projectPath + '/' + p);
+        fileMap[p] = bytes;
       }
 
-      // Auto-detect master file: prefers main.tex, then first with \documentclass
+      masterFile = '';
       for (const p of out.texFiles) {
         if (/\bmain\.tex$/i.test(p)) { masterFile = p; break; }
       }
       if (!masterFile) {
         for (const p of out.texFiles) {
-          if (/\\\s*documentclass\s*[\[{]/m.test(texContents[p])) { masterFile = p; break; }
+          const text = new TextDecoder().decode(fileMap[p].slice(0, 8192));
+          if (/^\s*\\\s*documentclass\s*[\[{]/m.test(text)) { masterFile = p; break; }
         }
       }
-      if (!masterFile && out.texFiles.length) {
-        masterFile = out.texFiles[0];
-      }
+      if (!masterFile && out.texFiles.length) masterFile = out.texFiles[0];
 
       renderTree(out);
       $actions.style.display = '';
       $btn.disabled = !masterFile;
-      status(masterFile ? `Found master: /${projectPath}/${masterFile}` : 'No master file found (need \\documentclass).', masterFile ? 'ok' : 'err');
+      setStatus(masterFile ? 'Found master: /' + projectPath + '/' + masterFile : 'No master file with \\documentclass found.', masterFile ? 'ok' : 'err');
     } catch (e) {
-      status('Error loading project: ' + (e && e.message), 'err');
+      setStatus('Error loading project: ' + (e && e.message), 'err');
     }
   }
 
   function renderTree(out) {
     const html = ['<ul>'];
-    for (const p of out.files.sort()) {
-      const isMaster = p === masterFile;
-      html.push(`<li class="${isMaster ? 'master' : ''}">${p}</li>`);
-    }
+    out.dirs.sort().forEach(d => html.push('<li class="dir">' + d + '/</li>'));
+    out.files.sort().forEach(p => {
+      html.push('<li class="' + (p === masterFile ? 'master' : '') + '">' + p + '</li>');
+    });
     html.push('</ul>');
     $tree.innerHTML = html.join('');
+  }
+
+  // ===== BusyTeX Worker =====
+  function makeWorkerCode() {
+    return `
+const BUSYTEX_BASE = '${BUSYTEX_BASE}';
+
+importScripts(BUSYTEX_BASE + 'busytex_pipeline.js');
+
+self.pipeline = null;
+self.data_packages_js = [
+  BUSYTEX_BASE + 'texlive-basic.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-base.js'
+];
+self.preload_data_packages_js = [
+  BUSYTEX_BASE + 'texlive-basic.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js'
+];
+
+onmessage = async ({data}) => {
+  const {action, files, main_tex_path, bibtex, verbose, driver} = data;
+
+  if (action === 'init') {
+    try {
+      self.pipeline = new BusytexPipeline(
+        BUSYTEX_BASE + 'busytex.js',
+        BUSYTEX_BASE + 'busytex.wasm',
+        self.data_packages_js,
+        self.preload_data_packages_js,
+        [],
+        msg => postMessage({type: 'print', text: msg}),
+        applet_versions => postMessage({type: 'initialized', versions: applet_versions}),
+        true,
+        BusytexPipeline.ScriptLoaderWorker
+      );
+    } catch (err) {
+      postMessage({type: 'error', text: 'Init error: ' + err.message + '\\n' + err.stack});
+    }
+    return;
+  }
+
+  if (action === 'compile') {
+    if (!self.pipeline) {
+      postMessage({type: 'error', text: 'Pipeline not initialized'});
+      return;
+    }
+    try {
+      postMessage({type: 'print', text: 'Resolving packages ( analysing \\usepackage ) ...'});
+      const result = await self.pipeline.compile(
+        files, main_tex_path,
+        bibtex === null ? null : !!bibtex,
+        verbose || 'silent',
+        driver || 'xetex_bibtex8_dvipdfmx',
+        self.data_packages_js
+      );
+      postMessage({
+        type: 'done',
+        pdf: result.pdf,
+        log: result.log,
+        exit_code: result.exit_code,
+        logs: result.logs
+      });
+    } catch (err) {
+      postMessage({type: 'error', text: 'Compile error: ' + err.message + '\\n' + err.stack});
+    }
+  }
+};
+`;
+  }
+
+  function getOrCreateWorker() {
+    if (worker) return worker;
+    const code = makeWorkerCode();
+    const blob = new Blob([code], {type: 'application/javascript'});
+    const url = URL.createObjectURL(blob);
+    worker = new Worker(url);
+    return worker;
+  }
+
+  function terminateWorker() {
+    if (worker) { worker.terminate(); worker = null; }
   }
 
   // ===== Compilation =====
   $btn.addEventListener('click', async () => {
     $btn.disabled = true;
-    $log.textContent = '';
-    status('Loading XeTeX engine…');
+    $progBar.classList.add('visible');
+    setProgress(0);
+    $log.textContent = ''; $log.classList.remove('visible');
+    setStatus('Initializing BusyTeX compiler (first run ~120 MB download)…');
+
+    let logs = [];
 
     try {
-      if (!engine) {
-        engine = new XeTeXEngine();
-        await engine.loadEngine();
-      }
-      status('Writing files to virtual FS…');
+      const w = getOrCreateWorker();
 
-      // Verify master by scanning for \documentclass
-      const projectPath = getProjectPath();
-      const masterText = await readFileText(projectPath + '/' + masterFile, 8192);
-      if (!/^\s*\\\s*documentclass\s*[\[{]/m.test(masterText)) {
-        status('Selected file does not contain \\documentclass. Scanning others…');
-        const out = { files: [], dirs: [], texFiles: [] };
-        const rootDir = await resolveDir(projectPath.split('/').filter(Boolean));
-        await walkDir(rootDir, '', out);
-        let found = false;
-        for (const p of out.texFiles) {
-          const text = await readFileText(projectPath + '/' + p, 8192);
-          if (/^\s*\\\s*documentclass\s*[\[{]/m.test(text)) { masterFile = p; found = true; break; }
+      // Initialize pipeline
+      w.postMessage({action: 'init'});
+      await new Promise((resolve, reject) => {
+        const onMsg = (e) => {
+          const d = e.data;
+          if (d.type === 'error') { w.removeEventListener('message', onMsg); reject(new Error(d.text)); return; }
+          if (d.type === 'print') { logs.push(d.text); setStatus(d.text); }
+          if (d.type === 'initialized') { w.removeEventListener('message', onMsg); resolve(); }
+        };
+        w.addEventListener('message', onMsg);
+      });
+
+      setStatus('Reading project files…');
+      setProgress(20);
+
+      // Build files array for BusyTeX
+      const files = [];
+      const BINARY_RE = /\.(png|jpe?g|gif|bmp|pdf|ttf|otf|woff2?)$/i;
+      for (const [relPath, bytes] of Object.entries(fileMap)) {
+        const isBinary = BINARY_RE.test(relPath);
+        files.push({
+          path: relPath,
+          contents: isBinary ? bytes : new TextDecoder().decode(bytes)
+        });
+      }
+
+      let hasBib = false;
+      for (const f of files) {
+        if (typeof f.contents === 'string' && /\\(bibliography|printbibliography|addbibresource)\b/.test(f.contents)) {
+          hasBib = true; break;
         }
-        if (!found) { status('No master file with \\documentclass found.', 'err'); $btn.disabled = false; return; }
       }
 
-      engine.flushCache();
-      for (const [path, bytes] of Object.entries(fileMap)) {
-        engine.writeMemFSFile(path, bytes);
-      }
-      engine.setEngineMainFile(masterFile);
+      setStatus('Compiling (XeLaTeX)…');
+      setProgress(30);
+      logAppend('=== BusyTeX compilation started ===');
 
-      status('Compiling (may download packages on first run)…');
-      const res = await engine.compileLaTeX();
+      w.postMessage({
+        action: 'compile',
+        files: files,
+        main_tex_path: masterFile,
+        bibtex: hasBib ? null : false,
+        verbose: 'silent',
+        driver: 'xetex_bibtex8_dvipdfmx'
+      });
 
-      if (res.status !== 0 || !res.pdf) {
-        logAppend(res.log);
-        status('Compilation failed. See log below.', 'err');
+      const result = await new Promise((resolve, reject) => {
+        const onMsg = (e) => {
+          const d = e.data;
+          if (d.type === 'error') { w.removeEventListener('message', onMsg); reject(new Error(d.text)); return; }
+          if (d.type === 'print') { logs.push(d.text); setStatus(d.text); if (/Preparing|downloads complete/i.test(d.text)) setProgress(30 + Math.min(60, logs.length)); }
+          if (d.type === 'done') { w.removeEventListener('message', onMsg); resolve(d); }
+        };
+        w.addEventListener('message', onMsg);
+      });
+
+      setProgress(100);
+      logAppend(result.log);
+
+      if (result.exit_code !== 0 || !result.pdf || result.pdf.length === 0) {
+        setStatus('Compilation failed (exit ' + result.exit_code + '). See log below.', 'err');
         $btn.disabled = false;
         return;
       }
 
-      logAppend(res.log);
-      status('Done!', 'ok');
-
-      const blob = new Blob([res.pdf], { type: 'application/pdf' });
+      setStatus('Done!', 'ok');
+      const blob = new Blob([result.pdf], { type: 'application/pdf' });
       const url  = URL.createObjectURL(blob);
       const outName = (masterFile.split('/').pop() || 'output').replace(/\.tex$/i, '.pdf');
 
       $stage1.style.display = 'none';
       $stage2.style.display = '';
-      $result.innerHTML = `
-        <iframe src="${url}" type="application/pdf"></iframe>
-        <div style="margin-top:.75rem">
-          <a class="dl" href="${url}" download="${outName}">Download ${outName}</a>
-          <button class="secondary" id="backBtn">↺ Back</button>
-        </div>
-      `;
+      $result.innerHTML = '<iframe src="' + url + '" type="application/pdf"></iframe><div style="margin-top:.75rem"><a class="dl" href="' + url + '" download="' + outName + '">Download ' + outName + '</a><button class="secondary" id="backBtn">↺ Back</button></div>';
       document.getElementById('backBtn').addEventListener('click', () => {
         $stage2.style.display = 'none';
         $stage1.style.display = '';
@@ -268,8 +378,11 @@
       });
 
     } catch (e) {
-      status('Error: ' + (e && e.message || e), 'err');
+      setStatus('Error: ' + (e && e.message || e), 'err');
+      logAppend(logs.join('\n'));
       $btn.disabled = false;
+    } finally {
+      $progBar.classList.remove('visible');
     }
   });
 
@@ -280,7 +393,7 @@
     $log.textContent = ''; $log.classList.remove('visible');
     $result.innerHTML = '';
     $stage1.style.display = ''; $stage2.style.display = 'none';
-    if (engine) { try { engine.closeWorker(); } catch (_) {} engine = null; }
+    terminateWorker();
     $path.textContent = '(cleared)';
   });
 
@@ -290,15 +403,10 @@
     return m ? decodeURIComponent(m[1]) : '';
   }
 
-  // Auto-load if project is specified
   const initialPath = getProjectPath();
-  if (initialPath) {
-    loadProject(initialPath);
-  } else {
-    $path.textContent = 'No project selected. Open a .tex file from the file browser.';
-  }
+  if (initialPath) loadProject(initialPath);
+  else $path.textContent = 'No project selected. Open a .tex file from the file browser.';
 
-  // Re-load on hash change (e.g. user opens a different project)
   window.addEventListener('hashchange', () => {
     const p = getProjectPath();
     if (p) loadProject(p);
