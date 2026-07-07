@@ -1343,7 +1343,11 @@ async function _summarizeForCompaction(config, transcript, ctx) {
 async function maybeCompactMidTurn(config, messages, ctx) {
   const cmp = config.compaction;
   if (!cmp || !cmp.enabled || !cmp.window) return;
-  const used = _estContextTokens(config.systemPrompt, messages, config.tools);
+  const raw = _estContextTokens(config.systemPrompt, messages, config.tools);
+  // Scale the char/4 estimate by the provider-calibrated ratio (set from the last
+  // round's real prompt_tokens) so this trigger agrees with the context meter's %.
+  // Falls back to the raw estimate on the first round, before any usage is seen.
+  const used = (ctx._cmpCalib && ctx._cmpCalib > 0) ? raw * ctx._cmpCalib : raw;
   const pct = (used / cmp.window) * 100;
   if (pct < (cmp.pct || 70)) return;
 
@@ -1444,9 +1448,20 @@ async function runAgent(config, ctx) {
     if (config.maxTokens != null) reqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
+    // Char-estimate of exactly what we're sending this round, paired with the
+    // provider's reported prompt_tokens below to calibrate the mid-turn trigger.
+    const _estAtSend = _estContextTokens(config.systemPrompt, messages, config.tools);
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
-    if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
+    if (round.usage) {
+      ctx.emit({ type: 'usage', usage: round.usage });
+      // Calibrate ~4-chars/token against the provider's real tokenizer so the
+      // worker's threshold matches the % the context meter shows. char/4 badly
+      // undercounts dense content (tool-def JSON, code, tool output), which left
+      // mid-turn compaction dormant while the meter already read >70%.
+      const pt = round.usage.prompt_tokens;
+      if (pt > 0 && _estAtSend > 0) ctx._cmpCalib = pt / _estAtSend;
+    }
     if (!round.tool_calls.length) {
       if (round.content) {
         const m = { role: 'assistant', content: round.content };
