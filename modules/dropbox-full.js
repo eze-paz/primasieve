@@ -46,7 +46,7 @@
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
-  const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata: always eagerly synced. (sandpie/scripts, sandpie/artifacts, sandpie/memory are NOT exempt — dehydratable.)
+  const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/memory'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. (sandpie/scripts, sandpie/artifacts stay dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -332,8 +332,8 @@
   // One-time move of the app folders under a single sandpie/ folder:
   //   _conversations -> sandpie/conversations,  agents -> sandpie/agents,  skills -> sandpie/skills,
   //   scripts -> sandpie/scripts,  artifacts -> sandpie/artifacts,  memory -> sandpie/memory.
-  // (conversations/agents/skills are exempt = eager; scripts/artifacts/memory stay
-  // dehydratable — they're just relocated, NOT added to EXEMPT_PREFIXES.)
+  // (conversations/agents/skills/memory are exempt = eager; scripts/artifacts stay
+  // dehydratable — they're just relocated.)
   // Dropbox side uses move_v2 (ATOMIC — the source is preserved if it fails), and
   // if it can't complete we abort WITHOUT touching local, so local and Dropbox
   // never diverge (no data loss, no duplication); we retry next boot. Only after
