@@ -1603,6 +1603,12 @@ function appendToolResultImage(tcId, path, scopeEl) {
 }
 
 function buildToolBox(args, toolName) {
+  const name = toolName || 'tool';
+  const box = document.createElement('div');
+  box.className = 'tool-box';
+  // write_todos renders the result as a checklist card; raw JSON is noise.
+  if (name === 'write_todos') return box;
+
   let code = '';
   try {
     const parsed = JSON.parse(args);
@@ -1615,9 +1621,6 @@ function buildToolBox(args, toolName) {
   }
   const lines = code.split('\n').filter(l => l.trim());
   const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
-  const name = toolName || 'tool';
-  const box = document.createElement('div');
-  box.className = 'tool-box';
   box.innerHTML = `<div class="tool-code">${codeHtml}</div>`;
   return box;
 }
