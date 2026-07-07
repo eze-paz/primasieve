@@ -205,7 +205,23 @@ const SandpieMemory = (function () {
         <input type="number" id="memThreshold" min="500" step="500" style="width:6rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;"> tokens
       </label>
       <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); align-self:center;"></span>
-    </div>`;
+    </div>
+    <hr style="border:none; border-top:1px solid var(--sp-border); margin:0.8rem 0;">
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt.</p>
+    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
+      <input type="checkbox" id="rpEnabled" style="width:auto;"> Enable recent-paths memory
+    </label>
+    <label style="font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.6rem;">Max paths (5–100):
+      <input type="number" id="rpCount" min="5" max="100" step="5" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;">
+    </label>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Lessons</strong> &mdash; distilled patterns from past sessions (what worked / what failed).</p>
+    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
+      <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable lesson distillation
+    </label>
+    <label style="font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.2rem;">Max lessons (5–30):
+      <input type="number" id="lessonsMax" min="5" max="30" step="5" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;">
+    </label>
+    `;
 
   let _flashT = null;
   function flash(msg) { const el = document.getElementById('memStatus'); if (!el) return; el.textContent = msg; clearTimeout(_flashT); _flashT = setTimeout(() => { if (el) el.textContent = ''; }, 1500); }
@@ -214,8 +230,24 @@ const SandpieMemory = (function () {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
     const th = panel.querySelector('#memThreshold');
+    const rpEn = panel.querySelector('#rpEnabled');
+    const rpCnt = panel.querySelector('#rpCount');
+    const lsEn = panel.querySelector('#lessonsEnabled');
+    const lsMax = panel.querySelector('#lessonsMax');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
-    if (th) { th.value = cfg.threshold; th.addEventListener('change', () => { const v = Math.max(MIN_THRESHOLD, parseInt(th.value, 10) || DEFAULTS.threshold); th.value = v; localStorage.setItem(K_THRESHOLD, String(v)); flash('Saved'); }); }
+    if (th) { th.value = cfg.threshold; th.addEventListener('change', () => { const v = Math.max(MIN_THRESHOLD, parseInt(th.value || '', 10) || DEFAULTS.threshold); th.value = v; localStorage.setItem(K_THRESHOLD, String(v)); flash('Saved'); }); }
+    if (rpEn) {
+      rpEn.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
+      rpCnt.value = localStorage.getItem('sandpie-recent-paths-count') || '20';
+      rpEn.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', rpEn.checked ? 'true' : 'false'));
+      rpCnt.addEventListener('change', () => { let v = parseInt(rpCnt.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 100) v = 100; rpCnt.value = v; localStorage.setItem('sandpie-recent-paths-count', String(v)); });
+    }
+    if (lsEn) {
+      lsEn.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
+      lsMax.value = localStorage.getItem('sandpie-lessons-max') || '20';
+      lsEn.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', lsEn.checked ? 'true' : 'false'));
+      lsMax.addEventListener('change', () => { let v = parseInt(lsMax.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 30) v = 30; lsMax.value = v; localStorage.setItem('sandpie-lessons-max', String(v)); });
+    }
   }
 
   let _retry = 0;

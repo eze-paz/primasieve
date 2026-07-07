@@ -2364,6 +2364,7 @@ function registerInspectPromptCommand() {
 }
 registerInspectPromptCommand();
 
+
 function registerCompactCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({

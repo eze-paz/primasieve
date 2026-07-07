@@ -387,25 +387,6 @@
     });
   }
 
-  function initSettings() {
-    if (typeof SandpieSettings !== 'undefined') {
-      SandpieSettings.register({ id: 'recentPaths', title: 'Recent paths', order: 18,
-        render(panel) { panel.innerHTML = RP_HTML; wireRPSettings(panel); }
-      });
-      SandpieSettings.register({ id: 'lessons', title: 'Lessons', order: 19,
-        render(panel) { panel.innerHTML = LESSONS_HTML; wireLessonsSettings(panel); }
-      });
-      return;
-    }
-    if (typeof SandpieMenu !== 'undefined') {
-      SandpieMenu.add('recentPathsSection', { title: 'Recent paths', open: false, html: RP_HTML, onRender: wireRPSettings });
-      return;
-    }
-    setTimeout(initSettings, 500);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSettings);
-  else initSettings();
 
   /* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
