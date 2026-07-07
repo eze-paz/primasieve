@@ -131,14 +131,24 @@ const SandpieCommands = (() => {
       }
       if (matches.length === 0) return null;
       return matches.slice(0, 6).map(c => c.usage || c.name).join(' \u00B7 ');
+    },
+    complete(text) {
+      const t = text.slice(3).trimStart();
+      const matches = [];
+      for (const c of commands.values()) {
+        if (c.name.startsWith(t)) matches.push(c.name);
+      }
+      if (matches.length === 0) return null;
+      matches.sort();
+      let prefix = matches[0];
+      for (let i = 1; i < matches.length; i++) {
+        let j = 0;
+        while (j < prefix.length && j < matches[i].length && prefix[j] === matches[i][j]) j++;
+        prefix = prefix.slice(0, j);
+      }
+      return { matches, prefix, single: matches.length === 1 };
     }
   };
-})();
-window.SandpieCommands = SandpieCommands;
-
-/* ---- built-in commands: help, clear ------------------------------------ */
-(function() {
-  function helpTable() {
     const cmds = SandpieCommands.list().sort((a, b) => {
       if (a.module !== b.module) return a.module.localeCompare(b.module);
       return a.name.localeCompare(b.name);

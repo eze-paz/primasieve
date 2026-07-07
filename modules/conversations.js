@@ -2675,7 +2675,13 @@ let sidePanel = null;
     ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
     if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
   }
-  ta.addEventListener('input', autosize);
+  ta.addEventListener('input', () => {
+    autosize();
+    if (lastTabMatches && !ta.value.startsWith('>>>')) {
+      lastTabMatches = null;
+      if (SandpieCommandView) SandpieCommandView.hide();
+    }
+  });
 
   const searchInput = $('convSearch');
   if (searchInput) {
@@ -2692,7 +2698,35 @@ let sidePanel = null;
   }
   setupScrollTracking($('messages'));
   setupScrollTracking($('messagesSide'));
+  // ---- Tab completion for >>> commands ----
+  let lastTabMatches = null;
   ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && ta.value.startsWith('>>>')) {
+      e.preventDefault();
+      if (typeof SandpieCommands === 'undefined' || !SandpieCommands.complete) return;
+      const result = SandpieCommands.complete(ta.value);
+      if (!result) {
+        lastTabMatches = null;
+        if (SandpieCommandView) SandpieCommandView.hide();
+        return;
+      }
+      const typed = ta.value.slice(3).trim();
+      if (result.prefix !== typed) {
+        ta.value = '>>> ' + result.prefix;
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+      }
+      if (result.single) {
+        ta.value = '>>> ' + result.matches[0] + ' ';
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+        if (SandpieCommandView) SandpieCommandView.hide();
+        lastTabMatches = null;
+      } else {
+        const list = result.matches.map(m => '  >>> ' + m).join('\n');
+        if (SandpieCommandView) SandpieCommandView.show(list, 'commands');
+        lastTabMatches = result.matches;
+      }
+      return;
+    }
     if (e.key !== 'Enter' || e.isComposing) return;
     // Alt+Enter → newline, same as Shift+Enter. Browsers insert a newline for
     // Shift+Enter natively but NOT for Alt+Enter, so do it explicitly here.
