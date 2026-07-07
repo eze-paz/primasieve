@@ -2233,7 +2233,7 @@ function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
 function shouldAutoScroll(el) { return _scrollLocked.has(el); }
 
-const NN_SVG_INLINE = '<svg viewBox="0 0 24 24"><circle cx="4" cy="6" r="1.6"/><circle cx="4" cy="12" r="1.6"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="6" r="1.6"/><circle cx="20" cy="12" r="1.6"/><circle cx="20" cy="18" r="1.6"/><line x1="5.5" y1="6" x2="18.5" y2="6"/><line x1="5.5" y1="6" x2="18.5" y2="12"/><line x1="5.5" y1="6" x2="18.5" y2="18"/><line x1="5.5" y1="12" x2="18.5" y2="6"/><line x1="5.5" y1="12" x2="18.5" y2="12"/><line x1="5.5" y1="12" x2="18.5" y2="18"/><line x1="5.5" y1="18" x2="18.5" y2="6"/><line x1="5.5" y1="18" x2="18.5" y2="12"/><line x1="5.5" y1="18" x2="18.5" y2="18"/></svg>';
+const NN_SVG_INLINE = '<svg viewBox="0 0 24 24" class="ripple"><circle cx="12" cy="12" r="1.2" class="r-c"/><circle cx="12" cy="12" r="4" class="r r1"/><circle cx="12" cy="12" r="7" class="r r2"/><circle cx="12" cy="12" r="10" class="r r3"/></svg>';
 
 let thoughtsVisible = false;
 function toggleThoughts() {
