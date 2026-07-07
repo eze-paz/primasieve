@@ -51,6 +51,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   Sandpie.events.emit('file:changed', path);
   await refreshConversationList();
   if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.rebuildFingerprint(convId).catch(() => {});
+  if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.distillLessons(convId).catch(() => {});
 }
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
@@ -2152,6 +2153,10 @@ async function buildSystemPrompt(convMessages) {
     try { await SandpieMemory.maybeConsolidate(); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
     try { content += await SandpieMemory.systemBlock(); }
     catch (e) { console.warn('[sandpie] memory block failed:', e); }
+  }
+  if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {
+    try { content += await SandpieAugmentations.systemBlock(); }
+    catch (e) { console.warn('[sandpie] augmentations block failed:', e); }
   }
   return { role: 'system', content };
 }

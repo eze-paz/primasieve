@@ -5,6 +5,7 @@
   'use strict';
 
   const FINGERPRINT_DIR = '.sandpie';
+  const MEMORY_DIR = 'sandpie/memory';
   const META_NS = '_sp_augment';
 
   /* ── per-conversation scratchpad (ephemeral, lives in RAM) ────────── */
@@ -26,6 +27,119 @@
     return null;
   }
 
+
+  /* ── project ID from paths ────────────────────────────────────────── */
+  function getProjectId(paths) {
+    if (!paths || !paths.length) {
+      try { return localStorage.getItem('sandpie-active-folder') || 'global'; } catch (_) { return 'global'; }
+    }
+    const ps = paths.filter(Boolean).map(p => p.replace(/\\/g, '/'));
+    if (!ps.length) return 'global';
+    const parts = ps[0].split('/');
+    let prefix = '';
+    for (let i = 0; i < parts.length; i++) {
+      const cand = prefix + parts[i];
+      if (ps.every(p => p.startsWith(cand + '/') || p === cand)) { prefix = cand + '/'; }
+      else break;
+    }
+    return prefix.replace(/\/$/, '') || 'global';
+  }
+
+  async function trackRecentPath(convId, path) {
+    if (!path) return;
+    const meta = convMeta.get(convId);
+    const project = meta ? getProjectId([...meta.files]) : 'global';
+    const storePath = MEMORY_DIR + '/' + project + '.recent-paths.json';
+    let list = [];
+    try { const raw = await opfs.read(storePath); if (raw) list = JSON.parse(raw); } catch (_) {}
+    list = list.filter(p => p !== path);
+    list.unshift(path);
+    const max = Number(localStorage.getItem('sandpie-recent-paths-count') || '20');
+    if (list.length > max) list = list.slice(0, max);
+    await opfs.write(storePath, JSON.stringify(list, null, 2));
+  }
+
+  async function getRecentPaths(projectHint) {
+    const project = projectHint || 'global';
+    try { const raw = await opfs.read(MEMORY_DIR + '/' + project + '.recent-paths.json'); if (raw) return JSON.parse(raw); } catch (_) {}
+    return [];
+  }
+
+  /* ── lessons (distilled project-specific patterns) ─────────────────── */
+  const _distilled = new Set(); // convId -> guard against duplicate distillation
+
+  function summarizeSession(convId) {
+    const meta = convMeta.get(convId);
+    if (!meta || meta.toolCalls.length === 0) return null;
+    const project = getProjectId([...meta.files]);
+    const files = [...meta.files];
+    const tools = meta.toolCalls.map(tc => {
+      const p = tc.args?.path || tc.args?.src || '';
+      return '- ' + tc.name + (p ? ' "' + p + '"' : '');
+    });
+    return { project, files, tools };
+  }
+
+  async function distillLessons(convId) {
+    if (_distilled.has(convId)) return;
+    const summary = summarizeSession(convId);
+    if (!summary || summary.tools.length < 2) return;
+    const project = summary.project;
+    const lessonPath = MEMORY_DIR + '/' + project + '.lessons.md';
+    let existing = '';
+    try { existing = await opfs.read(lessonPath) || ''; } catch (_) {}
+
+    const prompt = [
+      'You are a lesson distiller. Given a session summary, extract 0-3 NEW lessons not already covered below.',
+      '',
+      'A lesson is:',
+      '- SPECIFIC to this project (not generic coding advice)',
+      '- AVOID something that failed, or WHEN to do something that worked',
+      '- 1 sentence, actionable',
+      '- Do NOT state the obvious',
+      '',
+      'Session:',
+      'Project: ' + project,
+      'Files: ' + (summary.files.join(', ') || 'none'),
+      'Tools:',
+      summary.tools.join('\n'),
+      existing ? '\nExisting lessons:\n' + existing : '',
+      '',
+      'Output ONLY markdown bullets (max 3 new ones). No prose, no markdown fences.',
+    ].join('\n');
+
+    try { if (localStorage.getItem('sandpie-lessons-enabled') === 'false') return; } catch (_) {}
+    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
+    try {
+      const out = await SandpieProviders.complete({ system: 'You extract lessons from coding sessions.', user: prompt, maxTokens: 512 });
+      if (!out || !out.trim()) return;
+      const bullets = out.trim().split('\n').filter(l => l.trim().startsWith('- '));
+      if (!bullets.length) return;
+      const block = bullets.join('\n') + '\n';
+      const updated = existing + (existing ? '\n' : '') + block;
+      const maxLessons = Number(localStorage.getItem('sandpie-lessons-max') || '20');
+      const all = updated.trim().split('\n').filter(l => l.trim().startsWith('- '));
+      const trimmed = all.slice(-maxLessons).join('\n') + '\n';
+      await opfs.write(lessonPath, trimmed);
+      _distilled.add(convId);
+      console.log('[Aug] Distilled', bullets.length, 'lessons for', project);
+    } catch (e) {
+      console.warn('[Aug] Lesson distillation failed:', e);
+    }
+  }
+
+  async function lessonSystemBlock(projectHint) {
+    const project = projectHint || 'global';
+    try {
+      const raw = await opfs.read(MEMORY_DIR + '/' + project + '.lessons.md');
+      if (!raw) return '';
+      const maxLessons = Number(localStorage.getItem('sandpie-lessons-max') || '20');
+      const bullets = raw.trim().split('\n').filter(l => l.trim().startsWith('- ')).slice(0, maxLessons);
+      if (!bullets.length) return '';
+      return '\n\n## Project lessons\n\n' + bullets.join('\n') + '\n\nThese are verified patterns specific to this project. Trust them.\n';
+    } catch (_) { return ''; }
+  }
+
   /* ── tool-call logging (called from conversations.js dispatch loop) ── */
   function logToolStarted(convId, tc) {
     const meta = getMeta(convId);
@@ -34,8 +148,8 @@
     try { args = JSON.parse(tc?.function?.arguments || '{}'); } catch (_) {}
     meta.toolCalls.push({ name, args, phase: 'started', turn: meta.toolCalls.length + 1, ts: Date.now() });
     // Track file args
-    if (args.path) meta.files.add(args.path);
-    if (args.src) meta.files.add(args.src);
+    if (args.path) { meta.files.add(args.path); trackRecentPath(convId, args.path); }
+    if (args.src) { meta.files.add(args.src); trackRecentPath(convId, args.src); }
     // Track script references from run_python
     if (name === 'run_python' && args.path) meta.scripts.add(args.path);
     console.log(`[Aug] start ${name}`, args.path || args.src || '');
@@ -209,8 +323,83 @@
     return paths;
   }
 
+
+  /* ── settings panel ──────────────────────────────────────────────── */
+  const SETTINGS_HTML = [
+    '<div class="settings-group">',
+    '  <label class="settings-row"><input type="checkbox" id="sp-rp-enabled"> Enable recent-paths memory</label>',
+    '  <div class="settings-row">',
+    '    <label for="sp-rp-count">Paths to remember (5–100):</label>',
+    '    <input type="number" id="sp-rp-count" min="5" max="100" style="width:4em;margin-left:0.5em">',
+    '  </div>',
+    '  <p class="settings-hint">Tracks files you recently read or edited, per project. Injected into the system prompt.</p>',
+    '</div>',
+    '<div class="settings-group">',
+    '  <label class="settings-row"><input type="checkbox" id="sp-lessons-enabled"> Enable lesson distillation</label>',
+    '  <div class="settings-row">',
+    '    <label for="sp-lessons-max">Max lessons per project (5–30):</label>',
+    '    <input type="number" id="sp-lessons-max" min="5" max="30" style="width:4em;margin-left:0.5em">',
+    '  </div>',
+    '  <p class="settings-hint">After each session, the AI extracts 0–3 project-specific lessons. Injected into future prompts.</p>',
+    '</div>',
+  ].join('\n');
+
+  function wireSettings(panel) {
+    const cbLessons = panel.querySelector('#sp-lessons-enabled');
+    const numLessons = panel.querySelector('#sp-lessons-max');
+    if (cbLessons) {
+      cbLessons.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
+      numLessons.value = localStorage.getItem('sandpie-lessons-max') || '20';
+      cbLessons.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', cbLessons.checked ? 'true' : 'false'));
+      numLessons.addEventListener('change', () => {
+        let v = parseInt(numLessons.value, 10);
+        if (!Number.isFinite(v) || v < 5) v = 5;
+        if (v > 30) v = 30;
+        numLessons.value = v;
+        localStorage.setItem('sandpie-lessons-max', String(v));
+      });
+    }
+    const cb = panel.querySelector('#sp-rp-enabled');
+    const num = panel.querySelector('#sp-rp-count');
+    cb.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
+    num.value = localStorage.getItem('sandpie-recent-paths-count') || '20';
+    cb.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', cb.checked ? 'true' : 'false'));
+    num.addEventListener('change', () => {
+      let v = parseInt(num.value, 10);
+      if (!Number.isFinite(v) || v < 5) v = 5;
+      if (v > 100) v = 100;
+      num.value = v;
+      localStorage.setItem('sandpie-recent-paths-count', String(v));
+    });
+  }
+
+  function initSettings() {
+    if (typeof SandpieSettings !== 'undefined') {
+      SandpieSettings.register({ id: 'recentPaths', title: 'Recent paths', order: 18,
+        render(panel) { panel.innerHTML = SETTINGS_HTML; wireSettings(panel); }
+      });
+      SandpieSettings.register({ id: 'lessons', title: 'Lessons', order: 19,
+        render(panel) { panel.innerHTML = SETTINGS_HTML; wireSettings(panel); }
+      });
+      return;
+    }
+    if (typeof SandpieMenu !== 'undefined') {
+      SandpieMenu.add('recentPathsSection', { title: 'Recent paths', open: false, html: SETTINGS_HTML, onRender: wireSettings });
+      return;
+    }
+    setTimeout(initSettings, 500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSettings);
+  else initSettings();
+
   /* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
+    getProjectId,
+    trackRecentPath,
+    getRecentPaths,
+    distillLessons,
+    lessonSystemBlock,
     getConvMeta: getMeta,
     logToolStarted,
     logToolResult,
