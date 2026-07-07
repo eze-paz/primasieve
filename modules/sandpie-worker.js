@@ -1561,29 +1561,79 @@ function applyEdit(current, oldStr, newStr) {
   return { error: 'old_str not found (tried exact, line-ending, and trailing-whitespace-tolerant matching). Read the file and copy the exact text into old_str.' + (near.length ? '\nClosest lines in the file:\n' + near.join('\n') : '') };
 }
 
-// Build a compact, line-numbered unified diff of a single-region edit for the
-// tool result — so the model (and the user, in the tool box) sees exactly what
-// changed and where, not just "Edited: path". Trims to the changed lines plus
-// `ctx` lines of context; numbers are new-file line numbers (old-file for removed
-// lines). Returns '' when the change is too large to show inline.
-function _editDiff(oldText, newText, ctx = 3) {
+// Longest-common-subsequence line diff (classic DP + backtrack). Returns an
+// ordered op list: {t:' '|'-'|'+', s}. Only ever run on the differing CORE of an
+// edit (common prefix/suffix already trimmed), so the table stays small.
+function _lcsDiff(o, n) {
+  const m = o.length, k = n.length;
+  const dp = Array.from({ length: m + 1 }, () => new Int32Array(k + 1));
+  for (let i = m - 1; i >= 0; i--)
+    for (let j = k - 1; j >= 0; j--)
+      dp[i][j] = o[i] === n[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < m && j < k) {
+    if (o[i] === n[j]) { ops.push({ t: ' ', s: o[i] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ t: '-', s: o[i] }); i++; }
+    else { ops.push({ t: '+', s: n[j] }); j++; }
+  }
+  while (i < m) { ops.push({ t: '-', s: o[i++] }); }
+  while (j < k) { ops.push({ t: '+', s: n[j++] }); }
+  return ops;
+}
+
+// Line-level report for a single edit_file change, for the tool result — so the
+// model (and the user, in the tool box) sees exactly what changed and where.
+// Trims the common prefix/suffix (cheap, O(n)) then LCS-diffs only the differing
+// core, so interior unchanged lines render as CONTEXT rather than bogus -/+ churn
+// and `added`/`removed` are the true minimal line counts. Returns
+// { added, removed, diff } where `diff` is a unified-style, line-numbered hunk
+// (counts in the @@ header include context, per convention), or '' when there's
+// nothing to show (identical) or the change is too large to diff/print inline —
+// in which case `added`/`removed` still carry accurate (or, for a very large
+// core, upper-bound) counts for the caller's summary.
+function _editReport(oldText, newText, ctx = 3) {
   const o = oldText.split('\n'), n = newText.split('\n');
   let p = 0;
   while (p < o.length && p < n.length && o[p] === n[p]) p++;
   let s = 0;
   while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
   const oEnd = o.length - s, nEnd = n.length - s;
-  const removed = oEnd - p, added = nEnd - p;
-  if (removed + added === 0) return '';
-  if (removed + added > 200) return '';   // too big — caller falls back to a summary
-  const pad = String(Math.max(oEnd, nEnd, 1)).length;
+  const oCore = o.slice(p, oEnd), nCore = n.slice(p, nEnd);
+  if (!oCore.length && !nCore.length) return { added: 0, removed: 0, diff: '' };
+  // Guard the O(m·k) LCS table: on a huge differing core, skip the diff and
+  // return the coarse prefix/suffix span (an upper bound) as the counts.
+  if (oCore.length * nCore.length > 250000) return { added: nCore.length, removed: oCore.length, diff: '' };
+
+  const ops = _lcsDiff(oCore, nCore);
+  let added = 0, removed = 0;
+  for (const op of ops) { if (op.t === '+') added++; else if (op.t === '-') removed++; }
+  if (added + removed === 0) return { added: 0, removed: 0, diff: '' };
+  if (added + removed > 200) return { added, removed, diff: '' };   // too big — caller summarizes
+
+  const lead = Math.min(ctx, p), trail = Math.min(ctx, o.length - oEnd);
+  const body = [];
+  let oi = p - lead, ni = p - lead;
+  for (let i = 0; i < lead; i++) { body.push({ t: ' ', s: o[oi], oi, ni }); oi++; ni++; }
+  for (const op of ops) {
+    if (op.t === ' ') { body.push({ t: ' ', s: op.s, oi, ni }); oi++; ni++; }
+    else if (op.t === '-') { body.push({ t: '-', s: op.s, oi }); oi++; }
+    else { body.push({ t: '+', s: op.s, ni }); ni++; }
+  }
+  for (let i = 0; i < trail; i++) { body.push({ t: ' ', s: o[oEnd + i], oi: oEnd + i, ni: nEnd + i }); }
+
+  const oldLen = body.reduce((a, b) => a + (b.t !== '+' ? 1 : 0), 0);
+  const newLen = body.reduce((a, b) => a + (b.t !== '-' ? 1 : 0), 0);
+  const start = (p - lead) + 1;
+  const pad = String(Math.max(oEnd, nEnd, 1) + trail).length;
   const num = k => String(k).padStart(pad, ' ');
-  const out = [`@@ -${p + 1},${removed} +${p + 1},${added} @@`];
-  for (let i = Math.max(0, p - ctx); i < p; i++) out.push(`  ${num(i + 1)}  ${n[i]}`);
-  for (let i = p; i < oEnd; i++) out.push(`- ${num(i + 1)}  ${o[i]}`);
-  for (let i = p; i < nEnd; i++) out.push(`+ ${num(i + 1)}  ${n[i]}`);
-  for (let i = nEnd; i < Math.min(n.length, nEnd + ctx); i++) out.push(`  ${num(i + 1)}  ${n[i]}`);
-  return out.join('\n');
+  const out = [`@@ -${start},${oldLen} +${start},${newLen} @@`];
+  for (const b of body) {
+    if (b.t === ' ') out.push(`  ${num(b.ni + 1)}  ${b.s}`);
+    else if (b.t === '-') out.push(`- ${num(b.oi + 1)}  ${b.s}`);
+    else out.push(`+ ${num(b.ni + 1)}  ${b.s}`);
+  }
+  return { added, removed, diff: out.join('\n') };
 }
 
 async function tool_edit_file({ path, old_str, new_str = '' }) {
@@ -1607,10 +1657,11 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
     self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
     _pyBroadcast({ type: 'fs-changed', rel: norm });
     const head = `Edited ${norm}${res.note ? ' (' + res.note + ')' : ''}`;
-    const diff = _editDiff(current, res.updated);
-    const result = diff
-      ? `${head}\n${diff}`
-      : `${head} — ${Math.abs(res.updated.split('\n').length - current.split('\n').length)} net line change(s); diff too large to show inline.`;
+    const rep = _editReport(current, res.updated);
+    let result;
+    if (rep.added === 0 && rep.removed === 0) result = `${head} — no line changes (content is identical).`;
+    else if (rep.diff) result = `${head} (+${rep.added} -${rep.removed})\n${rep.diff}`;
+    else result = `${head} — +${rep.added} -${rep.removed} line(s); diff too large to show inline.`;
     return { result };
   } catch (e) { return { result: `Edit failed: ${e.message}` }; }
 }
