@@ -325,7 +325,18 @@
 
 
   /* ── settings panel ──────────────────────────────────────────────── */
-  const SETTINGS_HTML = [
+  const RP_HTML = [
+    '<div class="settings-group">',
+    '  <label class="settings-row"><input type="checkbox" id="sp-rp-enabled"> Enable recent-paths memory</label>',
+    '  <div class="settings-row">',
+    '    <label for="sp-rp-count">Paths to remember (5-100):</label>',
+    '    <input type="number" id="sp-rp-count" min="5" max="100" style="width:4em;margin-left:0.5em">',
+    '  </div>',
+    '  <p class="settings-hint">Tracks files you recently read or edited, per project. Injected into the system prompt.</p>',
+    '</div>',
+  ].join("\n");
+
+  const LESSONS_HTML = [
     '<div class="settings-group">',
     '  <label class="settings-row"><input type="checkbox" id="sp-rp-enabled"> Enable recent-paths memory</label>',
     '  <div class="settings-row">',
@@ -344,23 +355,10 @@
     '</div>',
   ].join('\n');
 
-  function wireSettings(panel) {
-    const cbLessons = panel.querySelector('#sp-lessons-enabled');
-    const numLessons = panel.querySelector('#sp-lessons-max');
-    if (cbLessons) {
-      cbLessons.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
-      numLessons.value = localStorage.getItem('sandpie-lessons-max') || '20';
-      cbLessons.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', cbLessons.checked ? 'true' : 'false'));
-      numLessons.addEventListener('change', () => {
-        let v = parseInt(numLessons.value, 10);
-        if (!Number.isFinite(v) || v < 5) v = 5;
-        if (v > 30) v = 30;
-        numLessons.value = v;
-        localStorage.setItem('sandpie-lessons-max', String(v));
-      });
-    }
+  function wireRPSettings(panel) {
     const cb = panel.querySelector('#sp-rp-enabled');
     const num = panel.querySelector('#sp-rp-count');
+    if (!cb) return;
     cb.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
     num.value = localStorage.getItem('sandpie-recent-paths-count') || '20';
     cb.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', cb.checked ? 'true' : 'false'));
@@ -373,18 +371,34 @@
     });
   }
 
+  function wireLessonsSettings(panel) {
+    const cb = panel.querySelector('#sp-lessons-enabled');
+    const num = panel.querySelector('#sp-lessons-max');
+    if (!cb) return;
+    cb.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
+    num.value = localStorage.getItem('sandpie-lessons-max') || '20';
+    cb.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', cb.checked ? 'true' : 'false'));
+    num.addEventListener('change', () => {
+      let v = parseInt(num.value, 10);
+      if (!Number.isFinite(v) || v < 5) v = 5;
+      if (v > 30) v = 30;
+      num.value = v;
+      localStorage.setItem('sandpie-lessons-max', String(v));
+    });
+  }
+
   function initSettings() {
     if (typeof SandpieSettings !== 'undefined') {
       SandpieSettings.register({ id: 'recentPaths', title: 'Recent paths', order: 18,
-        render(panel) { panel.innerHTML = SETTINGS_HTML; wireSettings(panel); }
+        render(panel) { panel.innerHTML = RP_HTML; wireRPSettings(panel); }
       });
       SandpieSettings.register({ id: 'lessons', title: 'Lessons', order: 19,
-        render(panel) { panel.innerHTML = SETTINGS_HTML; wireSettings(panel); }
+        render(panel) { panel.innerHTML = LESSONS_HTML; wireLessonsSettings(panel); }
       });
       return;
     }
     if (typeof SandpieMenu !== 'undefined') {
-      SandpieMenu.add('recentPathsSection', { title: 'Recent paths', open: false, html: SETTINGS_HTML, onRender: wireSettings });
+      SandpieMenu.add('recentPathsSection', { title: 'Recent paths', open: false, html: RP_HTML, onRender: wireRPSettings });
       return;
     }
     setTimeout(initSettings, 500);
