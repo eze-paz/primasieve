@@ -697,6 +697,15 @@ async function handleSubmit() {
       $('input').value = '';
       return;
     }
+    // >>> is reserved. If it's not a real command, reject and show help.
+    const rest = text.slice(3).trim();
+    const cmdName = rest.split(/\s+/)[0] || '???';
+    if (SandpieCommandView) {
+      SandpieCommandView.show('"' + cmdName + '" is not a command.', 'help');
+      SandpieCommands.dispatch('>>> help');
+    }
+    $('input').value = '';
+    return;
   }
   if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
   // Clear command output on normal chat submit

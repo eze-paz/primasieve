@@ -555,7 +555,7 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Opening LaTeX compiler…</div>';
     mount(opfs.closeFile);
     const dirPath = fullKey.replace(/\/[^\/]+$/, '');
-    setTimeout(() => { window.open('/convert_latex/#project=' + encodeURIComponent(dirPath), '_blank'); }, 100);
+    setTimeout(() => { window.open('/convert_latex/index.html#project=' + encodeURIComponent(dirPath), '_blank'); }, 100);
     return;
   }
   if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
@@ -1483,7 +1483,7 @@ opfs.refreshFileList = async function() {
             label: 'Compile LaTeX → PDF',
             action: () => {
               const dirPath = it.fullKey.replace(/\/[^\/]+$/, '');
-              window.open('/convert_latex/#project=' + encodeURIComponent(dirPath), '_blank');
+              window.open('/convert_latex/index.html#project=' + encodeURIComponent(dirPath), '_blank');
             }
           });
         }
