@@ -40,7 +40,10 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
     messages: msgs,
   };
   delete data.compactions;   // legacy restore-stack — superseded by `compaction`
-  if (s) { if (s.compaction) data.compaction = s.compaction; else delete data.compaction; }
+  if (s) {
+    if (s.compaction) data.compaction = s.compaction; else delete data.compaction;
+    if (s.todos) data.todos = s.todos; else delete data.todos;
+  }
   const newStr = JSON.stringify(data);
   // No-op guard: switching conversations calls saveActiveConv() on the outgoing
   // conv even when nothing changed. Writing byte-identical content still bumps
@@ -117,7 +120,11 @@ function renderHistoricalMessage(m, host = null) {
         const json = content.slice('todos:'.length, nl < 0 ? undefined : nl);
         let todos = null;
         try { todos = JSON.parse(json); } catch (_) {}
-        if (todos) renderTodos(tcId, todos, target);
+        const box = _toolBoxEl(tcId, target);
+        if (todos) {
+          if (box) { renderTodos(tcId, todos, target); }
+          else { target.appendChild(buildTodosView(todos)); }
+        }
       } else if (!content.startsWith('artifact:')) {
         // Full result, untruncated — the user sees exactly what the model sees.
         appendToolResult(tcId, content, target);
@@ -131,9 +138,16 @@ function renderHistoricalMessage(m, host = null) {
 // place — and messages from the boundary on render normally (in context).
 function renderConversation(msgs, compaction, host = null) {
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
-  if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); return; }
-  renderCompactionBlock(comp, msgs, host);
-  for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host);
+  if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
+  else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host); }
+  // If the stream carries saved todos that never attached to a tool-call box
+  // (orphaned by tcId mismatch on replay), append them as a standalone card.
+  const s = activeStream();
+  if (s && s.todos && s.todos.length) {
+    const target = host || (activeStream() && activeStream().host) || $('messages');
+    const hasTodos = !!(target && target.querySelector('.tool-todos'));
+    if (!hasTodos) target.appendChild(buildTodosView(s.todos));
+  }
 }
 
 function renderCompactionBlock(comp, msgs, host) {
@@ -194,6 +208,7 @@ function hydrateStreamFromData(s, data) {
   migrateCompactionData(data);
   s.messages = (data.messages || []).slice();
   s.compaction = data.compaction || null;
+  s.todos = data.todos || null;
 }
 
 function clearActiveConvUI() {
@@ -1830,6 +1845,10 @@ class RoundRenderer {
       const json = text.slice('todos:'.length, nl < 0 ? undefined : nl);
       let todos = null;
       try { todos = JSON.parse(json); } catch (_) {}
+      if (todos) {
+        const s = activeStream();
+        if (s) s.todos = todos;
+      }
       if (todos && el) renderTodos(el, todos, this.host);
       return;
     }
