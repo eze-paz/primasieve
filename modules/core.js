@@ -149,6 +149,12 @@ const SandpieCommands = (() => {
       return { matches, prefix, single: matches.length === 1 };
     }
   };
+})();
+window.SandpieCommands = SandpieCommands;
+
+/* ---- built-in commands: help, clear ------------------------------------ */
+(function() {
+  function helpTable() {
     const cmds = SandpieCommands.list().sort((a, b) => {
       if (a.module !== b.module) return a.module.localeCompare(b.module);
       return a.name.localeCompare(b.name);
