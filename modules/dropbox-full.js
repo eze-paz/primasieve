@@ -44,7 +44,7 @@
   const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
-  const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // opt-in: don't bulk-download; the AI hydrates files on demand (worker)
+  const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata: always eagerly synced. (sandpie/scripts, sandpie/artifacts, sandpie/memory are NOT exempt — dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
@@ -269,7 +269,7 @@
   function setSyncState(s) { localStorage.setItem(STATE_KEY, JSON.stringify(s)); }
   function cloudIndex() { try { return JSON.parse(localStorage.getItem(INDEX_KEY) || '{}'); } catch { return {}; } }
   function setCloudIndex(i) { localStorage.setItem(INDEX_KEY, JSON.stringify(i)); }
-  function dehydrated() { return localStorage.getItem(DEHYDRATED_KEY) === '1'; }
+  function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
     return EXEMPT_PREFIXES.some(p => { const pl = p.toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
@@ -891,11 +891,7 @@
         <input id="dbxfullParent" autocomplete="off" placeholder="${DEFAULT_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
-        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.78rem; margin-top:0.7rem; cursor:pointer;">
-          <input type="checkbox" id="dbxfullDehydrated" style="flex:none; width:16px; height:16px; margin:0; padding:0;">
-          <span>On-demand file access</span>
-        </label>
-        <div style="font-size:0.63rem; color:var(--sp-text-dim); margin:0.2rem 0 0 1.5rem; line-height:1.35;">The AI sees your whole Dropbox tree and fetches a file only when it reads or runs it — no bulk download. the <code>sandpie/</code> folder (conversations, agents, skills) stays fully synced. Fetched files are cleared on reload.</div>
+
       `;
   function wireCloudPanel(body) {
     const input = body.querySelector('#dbxfullAppKey');
@@ -917,28 +913,6 @@
       });
     }
     body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
-    const dehyd = body.querySelector('#dbxfullDehydrated');
-    if (dehyd) {
-      dehyd.checked = dehydrated();
-      dehyd.addEventListener('change', async () => {
-        const on = dehyd.checked;
-        if (on) {
-          const idx = cloudIndex();
-          const n = Object.keys(idx).filter(r => idx[r] && idx[r].kind === 'file' && !isExemptRel(r)).length;
-          const ok = confirm(`Enable on-demand file access?\n\nLocal copies of ~${n} Dropbox file(s) will be removed from this browser so the AI fetches them only when it needs them. Your files stay safe in Dropbox — nothing is deleted there. Your sandpie/ folder (conversations, agents, skills) stays fully synced, and any unsaved local changes are kept.`);
-          if (!ok) { dehyd.checked = false; return; }
-        }
-        localStorage.setItem(DEHYDRATED_KEY, on ? '1' : '0');
-        pushDbxTokenToSW();
-        if (on) {
-          try { const res = await dehydratePurge(); console.info('[dropbox-full] dehydrate purge:', res); }
-          catch (e) { console.warn('[dropbox-full] dehydrate purge failed:', e); }
-          try { if (typeof window.refreshFileList === 'function') window.refreshFileList(); } catch (_) {}
-        }
-        pushDbxIndexToSW();
-        sync({ full: true }).catch(() => {});
-      });
-    }
     renderCloudState();   // paint the live connection state on (re)render — the fix
   }
   // Prefer the gear modal (SandpieSettings); fall back to the sidebar. The
@@ -1078,7 +1052,7 @@
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
         await migrateExemptToSandpie();
-        if (dehydrated()) { try { await dehydratePurge(); } catch (_) {} }   // ephemeral: flush last session's clean hydrated copies (skips unsynced edits)
+        // On-demand mode is now default; ephemeral purge happens in sync cycle
         sync();
       })();
     } else {
