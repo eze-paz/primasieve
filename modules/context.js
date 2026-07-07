@@ -49,6 +49,10 @@ const SandpieTokens = (() => {
       const st = (typeof SandpieContext !== 'undefined' && SandpieContext.lastState) ? SandpieContext.lastState() : null;
       if (st && st.exists) { let c = 620; for (const s of (st.skills || [])) { if (s.enabled === false) continue; c += (s.name || '').length + Math.min((s.desc || '').length, 400) + 12; } chars += c; }
     } catch {}
+    // The durable-memory block buildSystemPrompt appends (sandpie/memory/*.md). Its
+    // char length is cached by SandpieMemory.systemBlock() on every send, so this
+    // stays in step with what's actually sent without an async OPFS read here.
+    try { if (typeof SandpieMemory !== 'undefined' && SandpieMemory.blockChars) chars += SandpieMemory.blockChars() || 0; } catch {}
     return chars;
   }
 
@@ -387,6 +391,7 @@ const CTX_CATS = [
   ['system',      'System prompt',     '#58a6ff'],
   ['tools',       'Tool descriptions', '#a371f7'],
   ['skills',      'Skills',            '#3fb950'],
+  ['memory',      'Memory',            '#39c5cf'],
   ['messages',    'Messages',          '#d29922'],
   ['toolCalls',   'Tool calls',        '#f778ba'],
   ['toolResults', 'Tool results',      '#ff7b72'],
@@ -404,7 +409,7 @@ let _bdCache = null;
 
 async function computeBreakdown() {
   const toTok = c => Math.ceil((c || 0) / 4);
-  const b = { system: 0, tools: 0, skills: 0, messages: 0, toolCalls: 0, toolResults: 0, images: 0 };
+  const b = { system: 0, tools: 0, skills: 0, memory: 0, messages: 0, toolCalls: 0, toolResults: 0, images: 0 };
   try { if (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get) b.system = toTok((SandpieSystemPrompt.get() || '').length); } catch {}
   try { if (typeof toolDefs === 'function') b.tools = toTok(JSON.stringify(toolDefs() || []).length); } catch {}
   try {
@@ -417,6 +422,10 @@ async function computeBreakdown() {
       }
     }
   } catch {}
+  // Durable-memory block (sandpie/memory/*.md). Recompute it fresh here — this runs
+  // only at turn boundaries / on expand (never during live streaming, which reuses
+  // _bdCache), and it refreshes the sync char cache overheadChars() reads.
+  try { if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) b.memory = toTok((await SandpieMemory.systemBlock()).length); } catch {}
   let msgs = [], comp = null;
   try {
     const convId = localStorage.getItem('sandpie-active-conv');

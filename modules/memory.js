@@ -86,14 +86,22 @@ const SandpieMemory = (function () {
   }
 
   // ---- injection ------------------------------------------------------------
+  // Char length of the block last produced by systemBlock(), so the (synchronous)
+  // context-token estimator in context.js can attribute memory's context cost
+  // without re-reading OPFS. buildSystemPrompt calls systemBlock() every send, so
+  // this stays fresh; 0 when memory is off/empty.
+  let _lastBlockChars = 0;
+  function blockChars() { return _lastBlockChars; }
   async function systemBlock() {
-    if (!isEnabled()) return '';
+    if (!isEnabled()) { _lastBlockChars = 0; return ''; }
     const facts = await list();
-    if (!facts.length) return '';
+    if (!facts.length) { _lastBlockChars = 0; return ''; }
     const lines = ['', '', '# Memory',
       "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — if a fact names a file, function, or flag, verify it still exists before relying on it. When you learn something durable and non-derivable (a stable user preference, standing feedback, lasting project context), save it with remember."];
     for (const f of facts) lines.push('', `## ${f.description} _(${f.type})_`, f.body);
-    return lines.join('\n');
+    const block = lines.join('\n');
+    _lastBlockChars = block.length;
+    return block;
   }
 
   // ---- consolidation / prune ------------------------------------------------
@@ -289,6 +297,6 @@ const SandpieMemory = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { config, isEnabled, threshold, list, systemBlock, maybeConsolidate, consolidate, notify, init };
+  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, notify, init };
 })();
 window.SandpieMemory = SandpieMemory;
