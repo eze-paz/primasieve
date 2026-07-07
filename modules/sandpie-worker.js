@@ -57,6 +57,9 @@ let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills']; 
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
+// Steering: user messages sent mid-turn are buffered here per agent id and
+// spliced into the running loop at the next round boundary (see runAgent).
+const _agentSteers = new Map();   // id -> [content, ...]
 
 const WORKER_VERSION = '2.18.0-write-todos';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
@@ -107,6 +110,7 @@ self.addEventListener('message', async (event) => {
       emit: (ev) => { try { self.postMessage({ type: 'event', id, event: ev }); } catch (_) {} },
       signal: abortCtl.signal,
       origin: config.origin || '',
+      agentId: id,
     };
     try {
       await runAgent(config, ctx);
@@ -114,7 +118,19 @@ self.addEventListener('message', async (event) => {
       ctx.emit({ type: 'error', message: (e && e.message) || String(e), status: e && e.status });
     } finally {
       _agentAborts.delete(id);
+      _agentSteers.delete(id);
     }
+    return;
+  }
+
+  // Steer: a user message sent while this agent's turn is still running. Buffer
+  // it; runAgent drains the buffer at its next round boundary and continues the
+  // loop so the model sees it without the turn having to end first.
+  if (data.type === 'steer') {
+    if (data.id == null) return;
+    const arr = _agentSteers.get(data.id) || [];
+    arr.push(data.content);
+    _agentSteers.set(data.id, arr);
     return;
   }
 
@@ -1393,8 +1409,25 @@ async function runAgent(config, ctx) {
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
+  // Drain any user messages steered in since the last round and splice them into
+  // the loop as user turns. Called at the round boundary — after the previous
+  // round's tool results are already appended — so a steer can never land between
+  // an assistant tool_calls message and its tool results. Each is echoed back as
+  // message_added (flagged _steer) so the page renders + persists it in order.
+  const drainSteers = () => {
+    const arr = _agentSteers.get(ctx.agentId);
+    if (!arr || !arr.length) return false;
+    _agentSteers.set(ctx.agentId, []);
+    for (const content of arr) {
+      const m = { role: 'user', content };
+      messages.push(m);
+      ctx.emit({ type: 'message_added', message: { ...m, _steer: true } });
+    }
+    return true;
+  };
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
+    drainSteers();
     // Mid-turn compaction: if the loop has grown context past the threshold,
     // summarize the active slice in place before issuing the next round. Guarded
     // so a compaction failure can never break generation.
@@ -1419,6 +1452,10 @@ async function runAgent(config, ctx) {
         const m = { role: 'assistant', content: round.content };
         messages.push(m); ctx.emit({ type: 'message_added', message: m });
       }
+      // The model is done, but if the user steered a message in during this round
+      // (or while it was finishing) keep the loop alive so that message gets
+      // answered instead of stranded until a fresh turn. Otherwise the turn ends.
+      if (!ctx.signal?.aborted && ((_agentSteers.get(ctx.agentId) || []).length)) { drainSteers(); continue; }
       break;
     }
     const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };

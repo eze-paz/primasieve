@@ -732,9 +732,36 @@ async function enqueueForActive(content) {
   const s = ensureStream(activeConvId);
 
   if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+  // Steer instead of queue: if a turn is already streaming via the worker, inject
+  // this message into the running agent loop rather than waiting for the turn to
+  // finish. The worker splices it in at the next round boundary — a safe point
+  // that can't orphan a tool result — and echoes it back as message_added, so
+  // array ordering + persistence stay worker-authoritative (see RoundRenderer).
+  if (s.generating && s.agentId && _canSteerActive()) {
+    steerActive(s, content);
+    return;
+  }
+  // No active worker turn (idle, or a local-model turn with no steer channel):
+  // fall back to the queue, which sends immediately when idle.
   s.queue.push(content);
   updateQueueCount(s);
   processQueueFor(s);
+}
+// Local in-page engines (LiteRT-LM / WebGPU) run their own loop with no steer
+// channel, so a mid-turn send there falls back to the queue.
+function _canSteerActive() {
+  try {
+    const a = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+    return !a || (a.type !== 'litertlm' && a.type !== 'webgpu');
+  } catch (_) { return true; }
+}
+function steerActive(s, content) {
+  // Render a provisional bubble now for immediate feedback; the authoritative
+  // array insert + persistence happen when the worker echoes it back as a
+  // message_added event (RoundRenderer.bindMessage reconciles against this list).
+  const el = addMsg('user', content, s.host);
+  (s._pendingSteer = s._pendingSteer || []).push({ el, content, msg: null });
+  try { getSandpieWorker().postMessage({ type: 'steer', id: s.agentId, content }); } catch (_) {}
 }
 function handleButtonClick() {
   const btn = $('sendBtn');
@@ -915,7 +942,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=33');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=34');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1104,6 +1131,7 @@ async function sendSingle(text, stream, opts = {}) {
     } else {
     const worker = getSandpieWorker();
     const _agentId = Math.random().toString(36).slice(2);
+    stream.agentId = _agentId;   // steer target: enqueueForActive posts {type:'steer', id} here
     worker.postMessage({ type: 'agent', id: _agentId, config });
     const workerStream = workerAgentStream(worker, _agentId, ctrl.signal);
     await readAgentEvents(workerStream, dispatch);
@@ -1132,7 +1160,19 @@ async function sendSingle(text, stream, opts = {}) {
     flightClear(convId);
 
     _localInferring = false;
+    stream.agentId = null;   // no longer steerable once the loop has ended
     renderer.finalize();
+    // Reconcile any steer messages the loop never got to inject (turn aborted or
+    // the worker died before the next round boundary): keep them in the history
+    // so the user's input isn't lost — the next send will include them. Their
+    // provisional bubbles are already on screen.
+    if (stream._pendingSteer && stream._pendingSteer.length) {
+      for (const p of stream._pendingSteer) {
+        const already = stream.messages.includes(p.msg);
+        if (!already) { const m = { role: 'user', content: p.content }; bindBubble(p.el, m); stream.messages.push(m); }
+      }
+      stream._pendingSteer = [];
+    }
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
@@ -1803,6 +1843,17 @@ class RoundRenderer {
     this.convMessages.push(msg);
     // Persist the just-committed round so a mid-turn crash can't lose it.
     scheduleIncrementalSave(this.convId);
+    // A steered mid-turn user message the worker just spliced into its loop and
+    // echoed back. Bind it to the provisional bubble steerActive() already put on
+    // screen (FIFO), or render one if none is pending; mark it reconciled so the
+    // finally-block cleanup won't re-add it.
+    if (msg.role === 'user' && msg._steer) {
+      const s = convStreams.get(this.convId);
+      const pend = s && s._pendingSteer && s._pendingSteer.find(p => !p.msg);
+      if (pend) { pend.msg = msg; bindBubble(pend.el, msg); }
+      else bindBubble(addMsg('user', msg.content, this.host), msg);
+      return;
+    }
     if (msg.role === 'assistant') {
       this._boundMessage = msg;   // so tool boxes created later (leaked calls) can bind too
       if (this.reply) bindBubble(this.reply, msg);
