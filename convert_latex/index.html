@@ -361,7 +361,7 @@ onmessage = async ({data}) => {
       }
 
       setStatus('Compiling (XeLaTeX)…');
-      setProgress(30);
+      setProgress(25);
       logAppend('=== BusyTeX compilation started ===');
 
       w.postMessage({
@@ -369,15 +369,95 @@ onmessage = async ({data}) => {
         files: files,
         main_tex_path: masterFile,
         bibtex: hasBib ? null : false,
-        verbose: 'silent',
+        verbose: 'verbose',
         driver: 'xetex_bibtex8_dvipdfmx'
       });
+
+      // Track milestones for live progress
+      let compileStage = '';
+      let resolveCount = 0;
+      let lastPage = 0;
 
       const result = await new Promise((resolve, reject) => {
         const onMsg = (e) => {
           const d = e.data;
           if (d.type === 'error') { w.removeEventListener('message', onMsg); reject(new Error(d.text)); return; }
-          if (d.type === 'print') { logs.push(d.text); setStatus(d.text); if (/Preparing|downloads complete/i.test(d.text)) setProgress(30 + Math.min(60, logs.length)); }
+
+          if (d.type === 'print') {
+            logs.push(d.text);
+            for (const raw of d.text.split(/\r?\n/)) {
+              const line = raw.trim();
+              if (!line) continue;
+
+              // Data-package preloading messages
+              if (/Preparing|download|initialized/i.test(line)) {
+                setStatus(line);
+                continue;
+              }
+
+              // Package resolution
+              if (/Resolving packages/i.test(line)) {
+                compileStage = 'resolve';
+                resolveCount = 0;
+                setStatus('Resolving LaTeX packages (first run ~120 MB)...');
+                setProgress(25);
+                continue;
+              }
+              if (compileStage === 'resolve' && /^resolving\s+\//i.test(line)) {
+                resolveCount++;
+                setProgress(25 + Math.min(15, resolveCount * 0.4));
+                continue;
+              }
+
+              // XeLaTeX engine start
+              if (/busytex\s+xelatex/i.test(line)) {
+                compileStage = 'xelatex';
+                lastPage = 0;
+                setStatus('XeLaTeX: starting first pass...');
+                setProgress(45);
+                continue;
+              }
+              // BibTeX engine start
+              if (/busytex\s+bibtex8/i.test(line)) {
+                compileStage = 'bibtex';
+                setStatus('BibTeX: processing references...');
+                setProgress(72);
+                continue;
+              }
+              // PDF generation (dvipdfmx)
+              if (/dvipdfmx|converting\s+xdv|generating\s+pdf/i.test(line)) {
+                compileStage = 'pdf';
+                setStatus('Generating PDF (dvipdfmx)...');
+                setProgress(88);
+                continue;
+              }
+
+              // XeLaTeX page numbers: [1] [2] [3]
+              if (compileStage === 'xelatex') {
+                const pm = line.match(/^\[(\d+)\+?\]$/);
+                if (pm) {
+                  lastPage = parseInt(pm[1], 10);
+                  setStatus(`XeLaTeX: processing page ${lastPage}...`);
+                  // 2% per page, capped at 85% (unknown total page count)
+                  setProgress(Math.min(85, 45 + lastPage * 2));
+                  continue;
+                }
+                // Show current file being loaded (before first page)
+                const fm = line.match(/^\(([^)\s]+)/);
+                if (fm && lastPage === 0) {
+                  const fname = fm[1].split('/').pop();
+                  setStatus(`XeLaTeX: loading ${fname}...`);
+                }
+              }
+
+              // Final output file written
+              if (/^Output written\s+on/i.test(line)) {
+                setStatus('Finalizing PDF...');
+                setProgress(95);
+              }
+            }
+          }
+
           if (d.type === 'done') { w.removeEventListener('message', onMsg); resolve(d); }
         };
         w.addEventListener('message', onMsg);
