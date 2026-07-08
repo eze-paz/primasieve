@@ -2520,6 +2520,7 @@ body.sp-decoding *::after {
 
 
 [data-theme="clear"] {
+  .user::before { display: none; }
   aside input, aside button { clip-path: none; }
   .user .bubble { clip-path: none; }
   .user::before { clip-path: none; }
