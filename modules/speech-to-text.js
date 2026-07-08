@@ -53,7 +53,9 @@ const SandpieSpeech = (function () {
                               //    every tick over a barely-grown window is the main source of lag.
   const SILENCE_TAIL_SEC = 0.6; // a trailing pause this long = phrase boundary → transcribe + commit
   const SILENCE_PEAK = 0.01;    // peak amplitude below this counts as silence
-  const COMMIT_SEC = 12;      // hard cap: commit + slide a run-on window before whisper's 30s field
+  const COMMIT_SEC = 6;       // hard cap: commit + slide a run-on window. Shorter = fewer decode
+                              //    tokens per re-transcribe (decode cost scales with window length),
+                              //    so each pass is faster. Pause-commit still cuts on clean boundaries.
 
   // ── Professional mic glyph (inline SVG, inherits the button's currentColor).
   // Outline mic for idle, filled square for the stop/recording state. ──
@@ -89,8 +91,9 @@ const SandpieSpeech = (function () {
   // (Bump ?v when editing stt-worker.js: it isn't a <script> in the HTML, so the
   // page cache-buster doesn't cover it.)
   // ============================================================
-  const WORKER_URL = 'modules/stt-worker.js?v=5';
+  const WORKER_URL = 'modules/stt-worker.js?v=6';
   let _worker = null, _seq = 0, _progressCb = null;
+  let _sttDevice = null;   // 'webgpu' | 'wasm' — set on the worker's 'ready' reply
   function getWorker() {
     if (!_worker) {
       _worker = new Worker(WORKER_URL, { type: 'module' });
@@ -130,7 +133,7 @@ const SandpieSpeech = (function () {
       const onMsg = (e) => {
         const m = e.data || {};
         if (m.type === 'progress') { try { onProgress && onProgress(m.data); } catch (_) {} return; }
-        if (m.type === 'ready') { cleanup(); resolve(m.device || null); return; }
+        if (m.type === 'ready') { _sttDevice = m.device || null; console.info('[stt] running on', _sttDevice, '— WASM here means no WebGPU adapter (much slower).'); cleanup(); resolve(m.device || null); return; }
         if (m.type === 'error') { cleanup(); reject(new Error(m.message || 'stt worker error')); return; }
       };
       worker.addEventListener('message', onMsg);
@@ -449,7 +452,7 @@ const SandpieSpeech = (function () {
     setTimeout(init, 500);   // composer or a host not ready yet — retry
   }
 
-  return { init, supported, startRecording, stopRecording, _internals: { resampleLinear, transcribeAudio } };
+  return { init, supported, startRecording, stopRecording, device: () => _sttDevice, _internals: { resampleLinear, transcribeAudio } };
 })();
 
 if (typeof window !== 'undefined') window.SandpieSpeech = SandpieSpeech;

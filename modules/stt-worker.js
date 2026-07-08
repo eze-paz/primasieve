@@ -57,24 +57,32 @@ async function ensureModel(modelId, dtype) {
   const { pipeline } = await lib();
   const progress_callback = postProgress;
 
-  let transcriber;
-  try {
-    transcriber = await pipeline('automatic-speech-recognition', modelId, {
-      device: 'webgpu',
-      dtype: dtype || { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-      progress_callback,
-    });
-    _device = 'webgpu';
-  } catch (gpuErr) {
-    // No usable WebGPU adapter — CPU/WASM fallback (quantised to fit the ~2 GB
-    // WASM heap). Slower, but works everywhere.
-    transcriber = await pipeline('automatic-speech-recognition', modelId, {
-      device: 'wasm',
-      dtype: 'q8',
-      progress_callback,
-    });
+  let transcriber = null;
+  // WebGPU dtype ladder. fp16 encoder is ~2× faster than fp32 on adapters with
+  // f16 (Iris Xe gen-12, most modern GPUs) and halves memory bandwidth — the
+  // encoder is a FIXED ~30s cost per call, so this is the single biggest speed
+  // lever. Fall back to fp32 if the fp16 shaders fail to compile on this adapter.
+  const gpuDtypes = dtype ? [dtype] : [
+    { encoder_model: 'fp16', decoder_model_merged: 'q4' },
+    { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+  ];
+  for (const dt of gpuDtypes) {
+    try {
+      transcriber = await pipeline('automatic-speech-recognition', modelId, { device: 'webgpu', dtype: dt, progress_callback });
+      _device = 'webgpu';
+      break;
+    } catch (gpuErr) {
+      console.warn('[stt-worker] webgpu dtype failed:', JSON.stringify(dt), (gpuErr && gpuErr.message) || gpuErr);
+    }
+  }
+  if (!transcriber) {
+    // No usable WebGPU adapter — CPU/WASM fallback (q8 to fit the ~2 GB heap).
+    // This path is MUCH slower; the device is reported on 'ready' so the UI/user
+    // can tell they're on CPU (the usual cause of "STT is really slow").
+    transcriber = await pipeline('automatic-speech-recognition', modelId, { device: 'wasm', dtype: 'q8', progress_callback });
     _device = 'wasm';
   }
+  console.log('[stt-worker] model ready on', _device);
 
   _transcriber = transcriber;
   _currentModelId = modelId;
