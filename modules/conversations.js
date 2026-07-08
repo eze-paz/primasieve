@@ -1,3 +1,4 @@
+import { streamDiff } from './streamdiff.js';
 const CONV_DIR = 'sandpie/conversations';
 const ARCHIVED_DIR = 'sandpie/conversations/archived';
 function newConvId() {
@@ -1954,7 +1955,7 @@ class RoundRenderer {
     this._finishThinking();
     // Full markdown render deferred from local inference — do it once now, then scroll
     if (this.isLocal && this.reply && this.displayed) {
-      this.reply.innerHTML = renderMd(this.displayed);
+      streamDiff(this.reply, renderMd(this.displayed));
     }
     if (this.isLocal) {
       const sh = this._scrollHost();
@@ -2018,7 +2019,7 @@ class RoundRenderer {
       bubble.textContent = this.displayed;
       return;
     }
-    this.reply.innerHTML = renderMd(this.displayed);
+    streamDiff(this.reply, renderMd(this.displayed));
   }
   _applyToolCallDelta(tc) {
     const i = tc.index || 0;
