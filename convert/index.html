@@ -40,6 +40,7 @@
     leaves this tab. First run downloads ~55&nbsp;MB (cached afterwards).</div>
 </div>
 <canvas id="qtcanvas" style="display:none"></canvas>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
 import { ZetaHelperMain } from './zeta/zetaHelper.js';
 
@@ -53,6 +54,146 @@ const fail = (msg) => {
   b.onclick = () => location.reload();
   $result.appendChild(b);
 };
+
+// ---- font availability check (shared logic with modules/opfs.js) ----
+const _normFont = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+const _LO_KNOWN_FONTS = new Set([
+  'liberationsans', 'liberationserif', 'liberationmono', 'liberationsansnarrow',
+  'carlito', 'caladea', 'dejavusans', 'dejavusansmono', 'dejavuserif', 'dejavumathtexgyre',
+  'gentiumbasic', 'gentiumbookbasic', 'linuxbiolinumg', 'linuxlibertineg', 'opensymbol',
+  'notosans', 'notoserif', 'notokufiarabic', 'notonaskharabic', 'notosansarabic', 'notosanshebrew',
+  'amiri', 'rubik', 'reemkufi', 'scheherazade', 'alef', 'davidlibre', 'miriamlibre', 'frankruhlhofshi',
+  'calibri', 'calibrilight', 'cambria', 'cambriamath', 'arial', 'timesnewroman', 'couriernew',
+  'symbol', 'wingdings',
+]);
+
+function _fontFamilyNames(u8) {
+  try {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let base = 0;
+    if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);
+    const numTables = dv.getUint16(base + 4);
+    let nameOff = 0;
+    for (let i = 0; i < numTables; i++) {
+      const rec = base + 12 + i * 16;
+      if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }
+    }
+    if (!nameOff) return [];
+    const count = dv.getUint16(nameOff + 2);
+    const strBase = nameOff + dv.getUint16(nameOff + 4);
+    const out = new Set();
+    for (let i = 0; i < count; i++) {
+      const r = nameOff + 6 + i * 12;
+      const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
+      if (nameId !== 1 && nameId !== 16) continue;
+      const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
+      let s = '';
+      if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
+      else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
+      s = s.replace(/\0/g, '').trim();
+      if (s) out.add(s);
+    }
+    return [...out];
+  } catch (_) { return []; }
+}
+
+async function _fontsReferenced(bytes, ext) {
+  const zip = await JSZip.loadAsync(bytes);
+  const names = new Set();
+  const scan = (xml, re) => { let m; while ((m = re.exec(xml || ''))) { const v = (m[1] || '').trim(); if (v) names.add(v); } };
+  const read = async p => { const f = zip.file(p); return f ? await f.async('string') : ''; };
+  ext = String(ext || '').toLowerCase();
+  if (/^doc[xm]$|^dot[xm]$/.test(ext)) {
+    scan(await read('word/fontTable.xml'), /w:font\s+w:name="([^"]+)"/g);
+  } else if (/^xls[xm]$|^xlt[xm]$/.test(ext)) {
+    scan(await read('xl/styles.xml'), /<name\s+val="([^"]+)"/g);
+  } else if (/^ppt[xm]$|^pot[xm]$/.test(ext)) {
+    for (const p of Object.keys(zip.files)) {
+      if (/^ppt\/(theme|slides|slideLayouts|slideMasters)\/.*\.xml$/.test(p)) scan(await zip.file(p).async('string'), /typeface="([^"]+)"/g);
+    }
+  } else {
+    for (const p of ['styles.xml', 'content.xml']) {
+      const x = await read(p);
+      scan(x, /style:font-name="([^"]+)"/g);
+      scan(x, /svg:font-family="([^"]+)"/g);
+    }
+  }
+  const out = [];
+  for (let n of names) { n = n.replace(/^['"]+|['"]+$/g, '').trim(); if (n && !/^\+(mj|mn)-/.test(n)) out.push(n); }
+  return out;
+}
+
+async function _userFontFamilies() {
+  const fams = new Set();
+  try {
+    const root = await navigator.storage.getDirectory();
+    const sp = await root.getDirectoryHandle('sandpie').catch(() => null);
+    const dir = sp ? await sp.getDirectoryHandle('fonts').catch(() => null) : null;
+    if (dir) {
+      for await (const [name, handle] of dir.entries()) {
+        if (handle.kind === 'file' && /\.(ttf|otf|ttc)$/i.test(name)) {
+          try {
+            const file = await handle.getFile();
+            const buf = new Uint8Array(await file.arrayBuffer());
+            for (const f of _fontFamilyNames(buf)) fams.add(_normFont(f));
+          } catch (_) {}
+          fams.add(_normFont(name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
+        }
+      }
+    }
+  } catch (_) {}
+  fams.delete('');
+  return fams;
+}
+
+async function missingFonts(bytes, ext) {
+  let referenced;
+  try { referenced = await _fontsReferenced(new Uint8Array(bytes), ext); } catch (_) { return []; }
+  if (!referenced.length) return [];
+  const userFams = await _userFontFamilies();
+  const seen = new Set(), missing = [];
+  for (const name of referenced) {
+    const n = _normFont(name);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    if (_LO_KNOWN_FONTS.has(n)) continue;
+    let covered = userFams.has(n);
+    if (!covered) for (const uf of userFams) { if (uf && (uf.includes(n) || n.includes(uf))) { covered = true; break; } }
+    if (!covered) missing.push(name);
+  }
+  return missing;
+}
+
+function renderFontWarning(missing, onRetry, onProceed) {
+  $result.innerHTML = '';
+  const box = document.createElement('div');
+  box.style.cssText = 'padding:1.5rem; text-align:left;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;color:#e6edf3;';
+  title.textContent = 'Missing font' + (missing.length > 1 ? 's' : '');
+  const p1 = document.createElement('p');
+  p1.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
+  p1.textContent = "This document uses font" + (missing.length > 1 ? 's' : '') + " that aren't available in the converter:";
+  const ul = document.createElement('ul');
+  ul.style.cssText = 'margin:0.3rem 0;padding-left:1.3rem;';
+  for (const f of missing) { const li = document.createElement('li'); li.style.cssText = 'margin:0.15rem 0;'; li.textContent = f; ul.appendChild(li); }
+  const p2 = document.createElement('p');
+  p2.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
+  p2.innerHTML = 'Add the matching <b>.ttf/.otf</b> to the <b>sandpie/fonts</b> folder, then Retry - or proceed now with substitute fonts, which <b>may not look the same</b>.';
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem;';
+  const retryBtn = document.createElement('button');
+  retryBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#238636;color:#fff;';
+  retryBtn.textContent = 'I added the fonts - retry';
+  retryBtn.onclick = () => { onRetry(); };
+  const proceedBtn = document.createElement('button');
+  proceedBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#30363d;color:#c9d1d9;';
+  proceedBtn.textContent = 'Proceed with font substitutions';
+  proceedBtn.onclick = () => { onProceed(); };
+  actions.append(retryBtn, proceedBtn);
+  box.append(title, p1, ul, p2, actions);
+  $result.appendChild(box);
+}
 
 (async () => {
   // ── 1. Cross-origin isolation gate ──────────────────────────────────────
@@ -109,23 +250,41 @@ const fail = (msg) => {
     zHM.thrPort.postMessage({ cmd: 'convert', id, from, to });
   });
 
+  async function doConvert(skipFontCheck) {
+    const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
+    if (!skipFontCheck) {
+      status('Checking fonts…');
+      try {
+        const missing = await missingFonts(job.bytes, ext);
+        if (missing.length) {
+          status('Missing fonts detected');
+          renderFontWarning(missing,
+            () => { location.reload(); },
+            () => { doConvert(true); }
+          );
+          return;
+        }
+      } catch (_) {}
+    }
+    status('Converting ' + job.name + '…');
+    const res = await convert(new Uint8Array(job.bytes), ext);
+    if (!res.ok) { fail('Conversion failed: ' + res.error); return; }
+    const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
+    $result.appendChild(a);
+    a.click();
+    status('Done — ' + pdfName + ' downloaded. You can close this tab.');
+    try { idb.transaction('jobs', 'readwrite').objectStore('jobs').delete(jobId); } catch (_) {}
+  }
+
   zHM.start(() => {
     zHM.thrPort.onmessage = async (e) => {
       const d = e.data;
       if (d.cmd === 'ready') {
         clearTimeout(bootTimer);
-        status('Converting ' + job.name + '…');
-        const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
-        const res = await convert(new Uint8Array(job.bytes), ext);
-        if (!res.ok) { fail('Conversion failed: ' + res.error); return; }
-        const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
-        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-        const a = document.createElement('a');
-        a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
-        $result.appendChild(a);
-        a.click();   // auto-download; the button stays for re-saving
-        status('Done — ' + pdfName + ' downloaded. You can close this tab.');
-        try { idb.transaction('jobs', 'readwrite').objectStore('jobs').delete(jobId); } catch (_) {}
+        await doConvert(false);
         return;
       }
       const cb = pending.get(d.id);
