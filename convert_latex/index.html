@@ -165,9 +165,11 @@
       await walkDir(rootDir, '', out);
 
       // -- Hydrate any dehydrated subdir files the cloud index knows about --
-      const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
-      if (sp && sp.isDehydrated && sp.isDehydrated()) {
-        const idx = sp.cloudIndex ? sp.cloudIndex() : null;
+      const getSandpie = () => window.Sandpie || (window.opener && window.opener.Sandpie) || null;
+      const spObj = getSandpie();
+      const sp = spObj && spObj.syncProvider ? spObj.syncProvider() : null;
+      if (sp && sp.cloudIndex && sp.hydrate) {
+        const idx = sp.cloudIndex();
         if (idx) {
           const prefix = projectPath.replace(/^\/+/, '') + '/';
           for (const [key, entry] of Object.entries(idx)) {
