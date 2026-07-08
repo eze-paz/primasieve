@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sandpie — Office Viewer</title>
+<!-- Cross-origin isolation is required for the LibreOffice WASM engine.
+     The coi-serviceworker.js is scoped to /convert/ only. -->
+<script src="coi-serviceworker.js"></script>
+<style>
+  html, body { margin:0; padding:0; height:100%; }
+  body { background:#0d1117; color:#c9d1d9; font:15px/1.5 system-ui, -apple-system, sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .viewer { max-width:1000px; width:95%; background:#161b22; border:1px solid #30363d; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; max-height:95vh; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding:0.6rem 0.85rem; border-bottom:1px solid #30363d; }
+  .title { font:0.85rem 'JetBrains Mono', Consolas, monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .meta { color:#6e7681; font-size:0.78rem; white-space:nowrap; }
+  .body { flex:1; min-height:60vh; position:relative; }
+  /* Inherit loading spinner from main app */
+  .sp-loading { text-align:center; padding:2rem; color:var(--sp-text-dim, #8b949e); }
+  .sp-bar { width:120px; height:4px; background:var(--sp-border, #30363d); margin:0.5rem auto 0; border-radius:2px; overflow:hidden; }
+  .sp-bar::after { content:''; display:block; width:40%; height:100%; background:#58a6ff; animation:sp-slide 1s infinite ease-in-out; }
+  @keyframes sp-slide { 0%{transform:translateX(-100%);} 100%{transform:translateX(250%);} }
+  .viewer-err { padding:1.5rem; color:#f85149; text-align:center; }
+  .viewer-err a { color:#58a6ff; }
+  /* Font warning styles (copied from sandpie.css) */
+  .font-warning { padding:1.5rem; }
+  .fw-title { font-size:1.1rem; font-weight:600; margin-bottom:0.5rem; color:#e6edf3; }
+  .font-warning p { margin:0.4rem 0; line-height:1.5; }
+  .font-warning ul { margin:0.3rem 0; padding-left:1.3rem; }
+  .font-warning li { margin:0.15rem 0; }
+  .fw-actions { display:flex; gap:0.5rem; margin-top:0.75rem; }
+  .fw-retry, .fw-proceed { padding:0.4rem 0.9rem; border-radius:6px; border:0; cursor:pointer; font:0.82rem system-ui; }
+  .fw-retry { background:#238636; color:#fff; }
+  .fw-proceed { background:#30363d; color:#c9d1d9; }
+  iframe { width:100%; height:70vh; border:0; background:#fff; display:block; }
+</style>
+<script src="/modules/opfs.js"></script>
+</head>
+<body>
+<div class="viewer">
+  <header>
+    <span class="title" id="title"></span>
+    <span class="meta" id="meta"></span>
+  </header>
+  <div class="body" id="body"></div>
+</div>
+<script>
+(async function() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const fullKey = params.get('file');
+  if (!fullKey) {
+    document.getElementById('body').innerHTML = '<div class="viewer-err">No file specified.</div>';
+    return;
+  }
+
+  const name = fullKey.split('/').pop();
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  document.getElementById('title').textContent = '/' + fullKey;
+  document.title = name;
+
+  if (!opfs.OFFICE_ENGINE_EXTS.has(ext)) {
+    document.getElementById('body').innerHTML = '<div class="viewer-err">Not an office file.</div>';
+    return;
+  }
+
+  const body = document.getElementById('body');
+  const panel = document.querySelector('.viewer');
+
+  try {
+    let bytes;
+    try {
+      bytes = await opfs.readBytesHydrating(fullKey);
+    } catch (e) {
+      if (e.name !== 'NotFoundError') throw e;
+      const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+      if (sp && sp.hydrate) {
+        try { await sp.hydrate(fullKey); } catch (_) {}
+        bytes = await opfs.readBytesHydrating(fullKey);
+      }
+    }
+    if (!bytes) { throw new Error('File not found'); }
+    const file = new File([bytes], name);
+
+    // Set file size in header
+    document.getElementById('meta').textContent = file.size.toLocaleString() + ' bytes';
+
+    if (!self.crossOriginIsolated) {
+      body.innerHTML = '<div class="viewer-err">Cross-origin isolation is required to render office documents. The page will reload when the service worker is ready.</div>';
+      return;
+    }
+
+    const ok = await opfs._renderOfficePdf(file, ext, name, body, panel);
+    if (!ok) {
+      throw new Error('Could not render document — the WASM engine may not be available or the conversion failed.');
+    }
+  } catch (err) {
+    const msg = (err && err.message) || String(err);
+    console.error('[office-viewer]', err);
+    body.innerHTML = '<div class="viewer-err"><div>' +
+      'Could not open document: ' + msg +
+      '</div><br><a href="#" id="dl" style="color:#58a6ff;">Download original</a></div>';
+    document.getElementById('dl').onclick = async function(e) {
+      e.preventDefault();
+      try {
+        const b = await opfs.readBytesHydrating(fullKey);
+        const blob = new Blob([b], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e2) {
+        alert('Download failed: ' + e2.message);
+      }
+    };
+  }
+})();
+</script>
+</body>
+</html>

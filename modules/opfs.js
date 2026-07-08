@@ -1433,24 +1433,34 @@ opfs.refreshFileList = async function() {
       menuItems.push({ label: 'New folder', action: () => opfs.createFolder() });
       menuItems.push({ label: 'New file', action: () => opfs.createFile() });
       if (it.kind === 'file') {
-        menuItems.push({
-          label: 'Open in new tab',
-          action: async () => {
-            try {
-              let url;
+const itExt = (it.name.split('.').pop() || '').toLowerCase();
+        if (opfs.OFFICE_ENGINE_EXTS.has(itExt)) {
+          menuItems.push({
+            label: 'Open in new tab',
+            action: () => {
+              window.open('/convert/office-viewer.html#file=' + encodeURIComponent(it.fullKey), '_blank');
+            }
+          });
+        } else {
+          menuItems.push({
+            label: 'Open in new tab',
+            action: async () => {
               try {
-                url = await opfs.toUrl(it.fullKey);
-              } catch (e) {
-                if (e.name !== 'NotFoundError') throw e;
-                const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
-                if (sp && sp.hydrate) await sp.hydrate(it.fullKey);
-                url = await opfs.toUrl(it.fullKey);
-              }
-              window.open(url, '_blank');
-              setTimeout(() => URL.revokeObjectURL(url), 60000);
-            } catch (err) { console.error('[opfs] open in tab failed:', err); Sandpie.addMsg('err', 'Could not open ' + it.fullKey + ': ' + err.message); }
-          }
-        });
+                let url;
+                try {
+                  url = await opfs.toUrl(it.fullKey);
+                } catch (e) {
+                  if (e.name !== 'NotFoundError') throw e;
+                  const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+                  if (sp && sp.hydrate) await sp.hydrate(it.fullKey);
+                  url = await opfs.toUrl(it.fullKey);
+                }
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+              } catch (err) { console.error('[opfs] open in tab failed:', err); Sandpie.addMsg('err', 'Could not open ' + it.fullKey + ': ' + err.message); }
+            }
+          });
+        }
         menuItems.push({
           label: 'Download',
           action: async () => {
