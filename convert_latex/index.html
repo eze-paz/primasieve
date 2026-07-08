@@ -254,7 +254,7 @@ onmessage = async ({data}) => {
       return;
     }
     try {
-      postMessage({type: 'print', text: 'Resolving packages ( analysing \\usepackage ) ...'});
+      postMessage({type: 'print', text: 'Resolving packages ( analysing \\\\usepackage ) ...'});
       const result = await self.pipeline.compile(
         files, main_tex_path,
         bibtex === null ? null : !!bibtex,
