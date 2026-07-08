@@ -1966,7 +1966,7 @@ class RoundRenderer {
   _appendReasoning(chunk) {
     if (!this.thinkEl) this._createThinkBox();
     this.reasoning += chunk;
-    this.thinkBody.textContent = this.reasoning;
+    if (this.thinkBody.textContent !== this.reasoning) this.thinkBody.textContent = this.reasoning;
     const sh = this._scrollHost();
     if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
   }
@@ -2016,7 +2016,7 @@ class RoundRenderer {
       // Skip marked+DOMPurify per token — main thread stays free for GPU inference.
       // Full markdown render happens once in finalize() when generation is done.
       const bubble = this.reply.querySelector('.bubble') || this.reply;
-      bubble.textContent = this.displayed;
+      streamDiff(bubble, `<div>${this.displayed}</div>`);
       return;
     }
     streamDiff(this.reply, renderMd(this.displayed));
