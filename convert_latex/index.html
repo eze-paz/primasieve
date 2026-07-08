@@ -165,7 +165,18 @@
       await walkDir(rootDir, '', out);
 
       for (const p of out.files) {
-        const bytes = await readFileBytes(projectPath + '/' + p);
+        let bytes;
+        try {
+          bytes = await readFileBytes(projectPath + '/' + p);
+        } catch (e) {
+          if (e.name === 'NotFoundError') {
+            const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+            if (sp && sp.hydrate) {
+              await sp.hydrate(projectPath + '/' + p);
+              bytes = await readFileBytes(projectPath + '/' + p);
+            } else { throw e; }
+          } else { throw e; }
+        }
         fileMap[p] = bytes;
       }
 
