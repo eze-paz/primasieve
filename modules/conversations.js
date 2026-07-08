@@ -3161,10 +3161,29 @@ function hideCompactionProgress(convId) {
 // Generic background-op indicator (reuses the compaction spinner styling). Used
 // for lessons distillation and memory consolidation, which are silent LLM calls
 // the user should see running. Keyed so multiple ops don't collide.
+// Short title for a conversation (first user message, clipped), from its live
+// stream. Returns '' if the stream is gone — the banner then omits the name.
+function _shortConvTitle(convId) {
+  try {
+    const s = convStreams.get(convId);
+    const msgs = s && s.messages;
+    const fu = msgs && msgs.find(m => m.role === 'user');
+    if (!fu) return '';
+    const t = typeof fu.content === 'string'
+      ? fu.content
+      : (Array.isArray(fu.content) ? fu.content.filter(p => p && p.type === 'text').map(p => p.text).join(' ') : '');
+    const clipped = (t || '').trim().slice(0, 40);
+    return clipped && (t.trim().length > 40) ? clipped + '…' : clipped;
+  } catch (_) { return ''; }
+}
 function showBgProgress(convId, key, text) {
   try {
-    const s = convStreams.get(convId || activeConvId);
-    const host = (s && s.host) || $('messages');
+    const s = convStreams.get(convId);
+    // Render only in the conversation this op belongs to. Fall back to the visible
+    // #messages ONLY when it IS the active conversation — otherwise a background op
+    // (e.g. lessons for a conv you just switched away from) would leak its banner
+    // into the unrelated conversation you're now viewing (e.g. a fresh + New chat).
+    const host = (s && s.host) || (convId === activeConvId ? $('messages') : null);
     if (!host || host.querySelector('.bg-progress[data-key="' + key + '"]')) return;
     const el = document.createElement('div');
     el.className = 'compaction-progress bg-progress';
@@ -3186,8 +3205,13 @@ function bootConversations() {
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     Sandpie.events.on('compaction:start', ({ convId }) => showCompactionProgress(convId));
     Sandpie.events.on('compaction:end', ({ convId }) => hideCompactionProgress(convId));
-    // Lessons distillation (augmentations.js) — silent post-turn LLM call.
-    Sandpie.events.on('lessons:start', ({ convId }) => showBgProgress(convId, 'lessons', 'Distilling lessons from this session…'));
+    // Lessons distillation (augmentations.js) — silent post-turn LLM call. Name
+    // the conversation so it's clear WHICH one is being distilled (it may not be
+    // the one currently on screen).
+    Sandpie.events.on('lessons:start', ({ convId }) => {
+      const t = _shortConvTitle(convId);
+      showBgProgress(convId, 'lessons', 'Distilling lessons' + (t ? ` from “${t}”` : ' from this session') + '…');
+    });
     Sandpie.events.on('lessons:end', ({ convId }) => hideBgProgress(convId, 'lessons'));
     // Memory consolidation (memory.js) — events existed but had no indicator.
     Sandpie.events.on('memory:consolidate-start', () => showBgProgress(activeConvId, 'consolidate', 'Consolidating memory…'));
