@@ -244,9 +244,9 @@ self.data_packages_js = [
 ];
 self.preload_data_packages_js = [
   BUSYTEX_BASE + 'texlive-basic.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js'
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
 ];
-
 onmessage = async ({data}) => {
   const {action, files, main_tex_path, bibtex, verbose, driver} = data;
 
