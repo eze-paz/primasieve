@@ -490,23 +490,6 @@
     transform: scale(0.78);
     transition: transform 0.06s ease-out;
   }
-  .send-btn.sending {
-    background: linear-gradient(135deg, var(--sp-accent-neg), var(--sp-danger)) !important;
-    box-shadow: 0 2px 8px rgba(248, 81, 73, 0.35) !important;
-    cursor: pointer;
-    text-shadow: none !important;
-  }
-  .send-btn.sending:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(248, 81, 73, 0.45) !important;
-    text-shadow:
-      -4px 0 0 rgba(255, 200, 0, 0.8),
-       4px 0 0 rgba(255, 0, 255, 0.8) !important;
-  }
-  .send-btn.sending:active {
-    transform: scale(0.78);
-    transition: transform 0.06s ease-out;
-  }
   .send-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -2133,26 +2116,6 @@ ul.conv-list li.active {
 [data-theme="aurora"] .attach-btn:hover { background: rgba(255,255,255,0.05) !important; color: #38bdf8 !important; }
 [data-theme="aurora"] .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, #38bdf8, #818cf8) !important; border: none !important; border-radius: 12px; color: #fff !important; box-shadow: 0 2px 12px rgba(56,189,248,0.25); }
 [data-theme="aurora"] .send-btn:hover { background: linear-gradient(135deg, #38bdf8, #c084fc) !important; box-shadow: 0 4px 20px rgba(56,189,248,0.35); transform: translateY(-1px); }
-[data-theme="aurora"] .send-btn.sending { background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(129,140,248,0.2)) !important; }
-[data-theme="aurora"] .ctx-menu { background: rgba(15,23,42,0.8); border: 1px solid rgba(148,163,184,0.08); backdrop-filter: blur(16px); }
-[data-theme="aurora"] .ctx-menu .context-item:hover { background: rgba(15,23,42,0.6); }
-[data-theme="aurora"] .context-menu { background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-[data-theme="aurora"] .context-item:hover { background: rgba(56,189,248,0.08); }
-[data-theme="aurora"] ::-webkit-scrollbar { width: 5px; height: 5px; }
-[data-theme="aurora"] ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.15); border-radius: 10px; }
-[data-theme="aurora"] ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
-
-/* Aurora modals: the theme's --sp-surface is rgba(15,23,42,0.6) (60% opacity glass),
-   which is fine for the sidebar (it has backdrop-filter:blur) but makes modal content
-   hard to read — text shows the page behind it. Override modal-content to be near-opaque
-   with a blur so the glass aesthetic is kept but content is legible. */
-[data-theme="aurora"] .modal-content {
-  background: rgba(15,23,42,0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-color: rgba(148,163,184,0.15);
-  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-}
 [data-theme="aurora"] .modal-backdrop {
   background: rgba(7,11,20,0.7);
 }
@@ -2451,14 +2414,6 @@ ul.conv-list li.active {
   text-shadow: none !important;
 }
 [data-theme="electric"] .send-btn:active { transform: scale(0.85); transition: transform 0.06s ease-out; }
-[data-theme="electric"] .send-btn.sending {
-  background: linear-gradient(135deg, var(--sp-accent-2), var(--sp-accent)) !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 35%, transparent) !important;
-}
-[data-theme="electric"] .send-btn.sending:hover {
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--sp-accent) 45%, transparent) !important;
-  text-shadow: none !important;
-}
 [data-theme="electric"] .ctx-menu { background: var(--sp-surface); border-color: var(--sp-border); }
 [data-theme="electric"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
 [data-theme="electric"] .context-menu { background: var(--sp-surface); border-color: var(--sp-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
@@ -2885,14 +2840,6 @@ body.sp-decoding *::after {
   text-shadow: none !important;
 }
 [data-theme="clear"] .send-btn:active { transform: scale(0.85); transition: transform 0.06s ease-out; }
-[data-theme="clear"] .send-btn.sending {
-  background: linear-gradient(135deg, var(--sp-accent-2), var(--sp-accent)) !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 35%, transparent) !important;
-}
-[data-theme="clear"] .send-btn.sending:hover {
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--sp-accent) 45%, transparent) !important;
-  text-shadow: none !important;
-}
 [data-theme="clear"] .ctx-menu { background: var(--sp-surface); border-color: var(--sp-border); }
 [data-theme="clear"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
 [data-theme="clear"] .context-menu { background: var(--sp-surface); border-color: var(--sp-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
