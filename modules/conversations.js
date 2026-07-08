@@ -159,9 +159,12 @@ function renderConversation(msgs, compaction, host = null) {
   else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host); }
   // If the stream carries saved todos that never attached to a tool-call box
   // (orphaned by tcId mismatch on replay), append them as a standalone card.
-  const s = activeStream();
+  // Resolve the stream from the conversation being RENDERED (its host carries
+  // dataset.convId), not activeStream() — otherwise rendering a non-active conv
+  // (side panel, or mid-switch) staples the active conv's checklist onto it.
+  const target = host || (activeStream() && activeStream().host) || $('messages');
+  const s = convStreams.get(target && target.dataset && target.dataset.convId) || activeStream();
   if (s && s.todos && s.todos.length) {
-    const target = host || (activeStream() && activeStream().host) || $('messages');
     const hasTodos = !!(target && target.querySelector('.tool-todos'));
     if (!hasTodos) target.appendChild(buildTodosView(s.todos));
   }
@@ -1930,7 +1933,11 @@ class RoundRenderer {
       let todos = null;
       try { todos = JSON.parse(json); } catch (_) {}
       if (todos) {
-        const s = activeStream();
+        // Attribute todos to the conversation that PRODUCED them (this renderer's
+        // own conv), not whatever is active now — otherwise switching away as a
+        // turn finishes (or background/side-panel generation) leaks the checklist
+        // onto the active conversation.
+        const s = convStreams.get(this.convId);
         if (s) s.todos = todos;
       }
       if (todos && el) renderTodos(el, todos, this.host);
@@ -3114,8 +3121,12 @@ function endTotalTimer(stream, label) {
     if (stream.todos && stream.todos.length) {
       const badge = stream.timerEl.querySelector('.mt-todos');
       if (badge) {
+        // Snapshot THIS turn's checklist so the finished badge always shows the
+        // state at turn-end, immune to later turns reassigning/clearing
+        // stream.todos (startTotalTimer resets it to null next turn).
+        const snapshot = stream.todos.slice();
         badge.onclick = () => {
-          if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(stream.todos), 'Checklist');
+          if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(snapshot), 'Checklist');
         };
       }
     }
