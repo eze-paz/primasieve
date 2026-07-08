@@ -164,19 +164,27 @@
       const out = { files: [], dirs: [], texFiles: [] };
       await walkDir(rootDir, '', out);
 
-      for (const p of out.files) {
-        let bytes;
-        try {
-          bytes = await readFileBytes(projectPath + '/' + p);
-        } catch (e) {
-          if (e.name === 'NotFoundError') {
-            const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
-            if (sp && sp.hydrate) {
-              await sp.hydrate(projectPath + '/' + p);
-              bytes = await readFileBytes(projectPath + '/' + p);
-            } else { throw e; }
-          } else { throw e; }
+      // -- Hydrate any dehydrated subdir files the cloud index knows about --
+      const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+      if (sp && sp.isDehydrated && sp.isDehydrated()) {
+        const idx = sp.cloudIndex ? sp.cloudIndex() : null;
+        if (idx) {
+          const prefix = projectPath.replace(/^\/+/, '') + '/';
+          for (const [key, entry] of Object.entries(idx)) {
+            if (entry.kind !== 'file' || !key.startsWith(prefix)) continue;
+            const rel = key.slice(prefix.length);
+            if (out.files.includes(rel)) continue;
+            try {
+              await sp.hydrate(key);
+              out.files.push(rel);
+              if (rel.endsWith('.tex')) out.texFiles.push(rel);
+            } catch (_) { /* skip files we can't hydrate */ }
+          }
         }
+      }
+
+      for (const p of out.files) {
+        const bytes = await readFileBytes(projectPath + '/' + p);
         fileMap[p] = bytes;
       }
 
