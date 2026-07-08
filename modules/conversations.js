@@ -1955,7 +1955,7 @@ class RoundRenderer {
     this._finishThinking();
     // Full markdown render deferred from local inference — do it once now, then scroll
     if (this.isLocal && this.reply && this.displayed) {
-      streamDiff(this.reply, renderMd(this.displayed));
+      streamDiff(this.reply.querySelector('.bubble') || this.reply, renderMd(this.displayed));
     }
     if (this.isLocal) {
       const sh = this._scrollHost();
@@ -2019,7 +2019,7 @@ class RoundRenderer {
       streamDiff(bubble, `<div>${this.displayed}</div>`);
       return;
     }
-    streamDiff(this.reply, renderMd(this.displayed));
+    streamDiff(this.reply.querySelector('.bubble') || this.reply, renderMd(this.displayed));
   }
   _applyToolCallDelta(tc) {
     const i = tc.index || 0;
