@@ -552,13 +552,12 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     return;
   }
   if (ext === 'tex') {
-    body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Opening LaTeX compiler…</div>';
+    const dirPath = fullKey.replace(/\[^\/]+$/, '');
+    body.innerHTML = '<iframe src="/convert_latex/index.html#project=' + encodeURIComponent(dirPath) + '" style="width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;"></iframe>';
     mount(opfs.closeFile);
-    const dirPath = fullKey.replace(/\/[^\/]+$/, '');
-    setTimeout(() => { window.open('/convert_latex/index.html#project=' + encodeURIComponent(dirPath), '_blank'); }, 100);
     return;
   }
-  if (ext === 'xlsx' || ext === 'xls' || ext === 'ods') {
+  if (ext === 'xlsx'' || ext === 'xls' || ext === 'ods') {
     // SheetJS reads the workbook client-side; each sheet renders to an HTML table
     // with a tab bar to switch between sheets. Lazy-loaded from CDN on first use.
     body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading spreadsheet viewer…</div>';

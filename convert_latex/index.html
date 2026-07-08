@@ -165,7 +165,7 @@
       await walkDir(rootDir, '', out);
 
       // ── Hydrate any dehydrated subdir files the cloud index knows about ──
-      const getSandpie = () => window.Sandpie || (window.opener && window.opener.Sandpie) || null;
+      const getSandpie = () => window.Sandpie || (window.opener && window.opener.Sandpie) || (window.parent && window.parent !== window && window.parent.Sandpie) || null;
       const spObj = getSandpie();
       const sp = spObj && spObj.syncProvider ? spObj.syncProvider() : null;
       if (sp && sp.cloudIndex && sp.hydrate) {
