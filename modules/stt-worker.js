@@ -21,6 +21,7 @@
 //   worker → page:
 //     { type:'progress', data:{loaded,total,progress} }         // model download
 //     { type:'ready', modelId }                                 // model loaded + warmed
+//     { type:'partial', id, text }                              // streaming transcript (per token)
 //     { type:'result', id, text }                               // transcript, done
 //     { type:'error', id?, message }
 
@@ -108,6 +109,27 @@ async function transcribe(id, audio, lang) {
   const opts = { chunk_length_s: 30, stride_length_s: 5, return_timestamps: false, task: 'transcribe' };
   const langName = LANG_NAMES[lang || 'auto'];
   if (langName) opts.language = langName;
+
+  // Token-level streaming: emit partial text as the decoder produces each token,
+  // so the composer fills in smoothly instead of jumping only when the whole
+  // window finishes decoding. Best-effort — if the runtime ignores `streamer`
+  // (older builds), we simply fall back to the final 'result' below. The page
+  // guards partials to only move forward, so a re-transcribe never rewinds text.
+  try {
+    const { TextStreamer } = await lib();
+    if (TextStreamer && _transcriber.tokenizer) {
+      let streamed = '';
+      opts.streamer = new TextStreamer(_transcriber.tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: (t) => {
+          if (!t) return;
+          streamed += t;
+          self.postMessage({ type: 'partial', id, text: streamed.trim() });
+        },
+      });
+    }
+  } catch (_) { /* streaming optional */ }
 
   const out = await _transcriber(audio, opts);
   let text = '';

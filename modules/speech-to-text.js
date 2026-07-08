@@ -89,7 +89,7 @@ const SandpieSpeech = (function () {
   // (Bump ?v when editing stt-worker.js: it isn't a <script> in the HTML, so the
   // page cache-buster doesn't cover it.)
   // ============================================================
-  const WORKER_URL = 'modules/stt-worker.js?v=4';
+  const WORKER_URL = 'modules/stt-worker.js?v=5';
   let _worker = null, _seq = 0, _progressCb = null;
   function getWorker() {
     if (!_worker) {
@@ -99,7 +99,7 @@ const SandpieSpeech = (function () {
     return _worker;
   }
 
-  function transcribeAudio(audio) {
+  function transcribeAudio(audio, onPartial) {
     const worker = getWorker();
     const id = ++_seq;
     return new Promise((resolve, reject) => {
@@ -108,6 +108,7 @@ const SandpieSpeech = (function () {
         const m = e.data || {};
         if (m.type === 'progress') { try { _progressCb && _progressCb(m.data); } catch (_) {} return; }
         if (m.type === 'ready')    { try { _progressCb && _progressCb({ progress: 1, ready: true }); } catch (_) {} return; }
+        if (m.type === 'partial' && m.id === id) { try { onPartial && onPartial(m.text || ''); } catch (_) {} return; }
         if (m.type === 'result' && m.id === id) { cleanup(); resolve(m.text || ''); return; }
         if (m.type === 'error') { cleanup(); reject(new Error(m.message || 'stt worker error')); return; }
       };
@@ -211,7 +212,14 @@ const SandpieSpeech = (function () {
     if (!final && newSecs < MIN_NEW_SEC && !tailQuiet) return;
 
     let txt;
-    try { txt = await transcribeAudio(audio); }
+    try {
+      // Stream tokens into the box as they decode. Forward-only guard: while a
+      // grown window re-transcribes from the start, ignore partials shorter than
+      // what's already shown so the text never visibly rewinds/flickers.
+      txt = await transcribeAudio(audio, (partial) => {
+        if ((partial || '').length >= _windowText.length) { _windowText = partial; renderLive(); }
+      });
+    }
     catch (e) { if (final) flashError('Transcription failed'); console.warn('[stt] transcribe failed:', (e && e.message) || e); return; }
     _windowText = txt;
     _lastTxLen = audio.length;
