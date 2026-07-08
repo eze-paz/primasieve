@@ -2567,6 +2567,15 @@ body.sp-decoding *::after {
 
 
 [data-theme="clear"] {
+  aside input, aside button { clip-path: none; }
+  .user .bubble { clip-path: none; }
+  .user::before { clip-path: none; }
+  aside details.service::before { clip-path: none; }
+  aside details.service summary { clip-path: none; }
+  .sidebar-brand::before { clip-path: none; }
+  .sidebar-brand::after { clip-path: none; }
+  .mobile-header .brand::before { clip-path: none; }
+  .mobile-header .brand::after { clip-path: none; }
 
   --sp-bg: #FFFFFF;
 
