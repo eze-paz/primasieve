@@ -551,6 +551,7 @@ function buildConvLi(c, idx) {
   const li = document.createElement('li');
   li.dataset.cid = c.id;
   if (c.id === activeConvId) li.classList.add('active');
+  if (sidePanel?.isOpen && c.id === sidePanel.sideId) li.classList.add('in-panel');
   if (c.archived) li.classList.add('archived');
   const num = document.createElement('span');
   num.className = 'conv-num';
