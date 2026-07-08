@@ -519,8 +519,6 @@
     color: var(--sp-text);
     cursor: pointer;
   }
-  form > button.sending { background: #6e7681; }
-  form > button.sending:hover { background: var(--sp-text-dim); }
   form > button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .msg-timer {
