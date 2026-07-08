@@ -29,6 +29,12 @@ const _themePalettes = {
     accent: '#77C078', text: '#fafafa', textDim: '#888',
     border: '#2a2a2a', borderBright: '#444',
     success: '#00e676', danger: '#ff1744', warn: '#ffc400'
+  },
+  'clear': {
+    bg: '#ffffff', surface: '#ffffff', panel: '#ffffff',
+    accent: '#000000', text: '#000000', textDim: '#666666',
+    border: '#000000', borderBright: '#000000',
+    success: '#000000', danger: '#000000', warn: '#000000'
   }
 };
 const _paletteLabels = {
@@ -334,6 +340,7 @@ var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
       <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
       <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
+      <button class="ghost theme-btn" data-t="clear" onclick="setTheme('clear')" title="Clear minimal">Clear</button>
     </div>
     <div id="themeCustomize" style="display:none;flex-direction:column;gap:0.5rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
       <div id="themePaletteRows" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
