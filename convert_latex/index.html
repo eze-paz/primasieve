@@ -164,7 +164,7 @@
       const out = { files: [], dirs: [], texFiles: [] };
       await walkDir(rootDir, '', out);
 
-      // -- Hydrate any dehydrated subdir files the cloud index knows about --
+      // ── Hydrate any dehydrated subdir files the cloud index knows about ──
       const getSandpie = () => window.Sandpie || (window.opener && window.opener.Sandpie) || null;
       const spObj = getSandpie();
       const sp = spObj && spObj.syncProvider ? spObj.syncProvider() : null;
@@ -240,13 +240,16 @@ self.data_packages_js = [
   BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
   BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
   BUSYTEX_BASE + 'ubuntu-texlive-science.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
 ];
 self.preload_data_packages_js = [
   BUSYTEX_BASE + 'texlive-basic.js',
   BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
   BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
 ];
+
 onmessage = async ({data}) => {
   const {action, files, main_tex_path, bibtex, verbose, driver} = data;
 
