@@ -77,56 +77,86 @@
   }
 
   /* ── lessons (distilled project-specific patterns) ─────────────────── */
-  const _distilled = new Set(); // convId -> guard against duplicate distillation
+  // convId -> number of tool calls already examined. Cursor, NOT a boolean: the
+  // distiller re-runs at each turn end over only the tool calls accrued since,
+  // so a long session keeps learning (the old boolean ran once, early, forever).
+  const _distillCursor = new Map();
+  const MIN_NEW_TOOLCALLS = 2;   // don't bother distilling a turn with <2 new actions
 
-  function summarizeSession(convId) {
+  function summarizeSession(convId, fromIdx = 0) {
     const meta = convMeta.get(convId);
     if (!meta || meta.toolCalls.length === 0) return null;
     // Same no-arg project id the reader (lessonSystemBlock) uses — deriving it
     // from meta.files wrote lessons to a path the reader never looked in.
     const project = getProjectId();
     const files = [...meta.files];
-    const tools = meta.toolCalls.map(tc => {
-      const p = tc.args?.path || tc.args?.src || '';
+    // Only the tool calls SINCE the last distill (fromIdx) — the "what just
+    // happened" the distiller reasons over. total is returned so the caller can
+    // advance its cursor.
+    const tools = meta.toolCalls.slice(fromIdx).map(tc => {
+      const p = tc.args?.path || tc.args?.src || tc.args?.cwd || '';
       return '- ' + tc.name + (p ? ' "' + p + '"' : '');
     });
-    return { project, files, tools };
+    return { project, files, tools, total: meta.toolCalls.length };
   }
 
+  // Called at each TURN END (conversations.js gates on touchUpdated). Distills
+  // lessons from the tool calls accrued since the last run, deduped against both
+  // existing lessons AND saved memory facts, and advances the cursor so the same
+  // turns are never re-examined. Silent + guarded — never breaks the turn.
   async function distillLessons(convId) {
-    if (_distilled.has(convId)) return;
-    const summary = summarizeSession(convId);
-    if (!summary || summary.tools.length < 2) return;
+    const meta = convMeta.get(convId);
+    if (!meta) return;
+    const total = meta.toolCalls.length;
+    const cursor = _distillCursor.get(convId) || 0;
+    if (total - cursor < MIN_NEW_TOOLCALLS) return;   // not enough new activity this turn
+    if (localStorage.getItem('sandpie-lessons-enabled') === 'false') return;
+    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
+
+    const summary = summarizeSession(convId, cursor);
+    if (!summary || !summary.tools.length) return;
     const project = summary.project;
     const lessonPath = MEMORY_DIR + '/' + project + '.lessons.md';
     let existing = '';
     try { existing = await opfs.read(lessonPath) || ''; } catch (_) {}
 
+    // Dedup against saved memory facts too, so a lesson never restates something
+    // the remember tool already captured.
+    let memHint = '';
+    try {
+      if (typeof window !== 'undefined' && window.SandpieMemory && SandpieMemory.list) {
+        const facts = await SandpieMemory.list();
+        if (facts.length) memHint = '\nAlready in memory (do NOT restate these):\n' + facts.map(f => '- ' + f.description).join('\n');
+      }
+    } catch (_) {}
+
     const prompt = [
-      'You are a lesson distiller. Given a session summary, extract 0-3 NEW lessons not already covered below.',
+      'You are a lesson distiller. From the RECENT actions below, extract 0-3 NEW lessons not already covered by the existing lessons or memory.',
       '',
       'A lesson is:',
       '- SPECIFIC to this project (not generic coding advice)',
       '- AVOID something that failed, or WHEN to do something that worked',
       '- 1 sentence, actionable',
-      '- Do NOT state the obvious',
+      '- Do NOT state the obvious, and do NOT repeat anything already listed below',
       '',
-      'Session:',
       'Project: ' + project,
       'Files: ' + (summary.files.join(', ') || 'none'),
-      'Tools:',
+      'Recent actions:',
       summary.tools.join('\n'),
       existing ? '\nExisting lessons:\n' + existing : '',
+      memHint,
       '',
-      'Output ONLY markdown bullets (max 3 new ones). No prose, no markdown fences.',
+      'Output ONLY markdown bullets (max 3 new ones), or nothing if there is no genuinely new lesson. No prose, no fences.',
     ].join('\n');
 
-    try { if (localStorage.getItem('sandpie-lessons-enabled') === 'false') return; } catch (_) {}
-    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
     const emit = (t) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(t, { convId }); } catch (_) {} };
     emit('lessons:start');
     try {
       const out = await SandpieProviders.complete({ system: 'You extract lessons from coding sessions.', user: prompt, maxTokens: 512 });
+      // Advance the cursor on a SUCCESSFUL call even if it yielded no bullets —
+      // those turns simply had nothing to learn; don't re-examine them. On an
+      // exception we leave the cursor put so the next turn retries.
+      _distillCursor.set(convId, total);
       if (!out || !out.trim()) return;
       const bullets = out.trim().split('\n').filter(l => l.trim().startsWith('- '));
       if (!bullets.length) return;
@@ -137,8 +167,7 @@
       const trimmed = all.slice(-maxLessons).join('\n') + '\n';
       await opfs.write(lessonPath, trimmed);
       try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', lessonPath); } catch (_) {}
-      _distilled.add(convId);
-      console.log('[Aug] Distilled', bullets.length, 'lessons for', project);
+      console.log('[Aug] Distilled', bullets.length, 'lessons for', project, '(tools', cursor, '→', total + ')');
     } catch (e) {
       console.warn('[Aug] Lesson distillation failed:', e);
     } finally {

@@ -72,7 +72,10 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   await opfs.write(path, newStr);
   Sandpie.events.emit('file:changed', path);
   await refreshConversationList();
-  if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.distillLessons(convId).catch(() => {});
+  // Distill lessons only on a turn-end save (touchUpdated:true) — never on the
+  // ~1.2s mid-turn tick, which would snapshot a half-finished turn. The distiller
+  // itself is cursor-gated so it re-runs each turn over only the NEW activity.
+  if (touchUpdated && typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.distillLessons(convId).catch(() => {});
 }
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
