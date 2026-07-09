@@ -437,6 +437,18 @@ async function tool_write_todos({ todos }, ctx) {
   for (const t of clean) {
     if (t.status === 'in_progress') { if (seen) t.status = 'pending'; else seen = true; }
   }
+  // Timestamp each item (ISO 8601, UTC). The model resends the whole list every
+  // call, so we diff by content against the previous list (ctx._todos): carry the
+  // original `created`, stamp `completed` the first time an item flips to done
+  // (cleared if it later reopens). These persist in the todos: payload and back
+  // the "a prior session left these open (date)" cross-conversation surfacing.
+  const now = new Date().toISOString();
+  const prev = (ctx && Array.isArray(ctx._todos)) ? ctx._todos : [];
+  for (const t of clean) {
+    const was = prev.find(p => p.content === t.content);
+    t.created = (was && was.created) || now;
+    if (t.status === 'completed') t.completed = (was && was.completed) || now;
+  }
   // Surface the current list to runAgent so it can drive the drift-reminder and
   // the "don't stop with open todos" guard. This is the loop's only view of the
   // checklist (the tool otherwise just echoes text back to the model).

@@ -974,7 +974,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=41');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=42');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -2307,6 +2307,14 @@ async function buildSystemPrompt(convMessages) {
   let content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
     ? SandpieSystemPrompt.get()
     : (localStorage.getItem('sandpie-system-prompt') || 'You are a helpful assistant that reasons through the users requests step-by-step.');
+  // Current local time, prepended and rebuilt every turn, so the model can reason
+  // about "now" (dates, staleness of recalled state, scheduling).
+  try {
+    const now = new Date();
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const stamp = now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    content = 'The current local date and time is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as "now".\n\n' + content;
+  } catch (_) {}
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill
   // tool when relevant). Module absent ⇒ plain memory prompt.
