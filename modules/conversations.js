@@ -974,7 +974,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=40');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=41');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1297,6 +1297,9 @@ async function buildAgentConfig(convMessages, compaction) {
     reasoningEffort: (active && active.reasoningEffort) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
+    // Base URL of the local relay the `shell` tool runs commands through (run it
+    // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
+    shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',
     // Mid-turn compaction: the worker re-checks context at every round and, if the
     // agentic loop pushes past the threshold DURING a turn, summarizes its own
     // active message slice in place so a long tool-heavy turn can't overflow.

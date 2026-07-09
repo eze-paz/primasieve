@@ -175,20 +175,21 @@ Each item: { "content": imperative step ("Write the parser"), "status": "pending
         required: ['todos'],
       },
     },
-    http_request: {
-      description: `Make an HTTP request and get back the status + response body. Streams straight from the browser — do NOT wrap HTTP calls in run_python/pyfetch.
-Use it to hit local services, dev servers, webhooks, JSON APIs, and the sandpie_ssh relay (which turns HTTP into shell/file operations on its host). For running shell commands: load the sandpie_ssh skill — it documents POSTing to the relay's /shell/exec (e.g. body {"command":"cargo test"} runs bash on the relay host).
-Cross-origin requests need the target to allow CORS. Credentials are omitted by default. Response body is returned as text (truncated if large).`,
+    shell: {
+      description: `Run a shell command and get back its stdout, stderr, and exit code. This is a real terminal on the machine hosting the sandpie relay — run the relay INSIDE your target environment (e.g. WSL) so commands land where your project lives.
+EVERYTHING IS JUST A COMMAND: local work ("cargo test"), a different machine over SSH ("ssh myserver 'systemctl restart app'"), file transfer ("scp myserver:/var/log/x.log /tmp/"). ssh/scp use the relay host's own ~/.ssh — there is no key setup or target switch here.
+WRITE A FILE WITH ZERO ESCAPING: pipe the content through stdin instead of a heredoc — {"command":"cat > /path/file.rs", "stdin":"<the entire file content>"}. The content never touches the command line, so quotes, $, backticks, (parens) and newlines survive verbatim. Read it back with {"command":"cat /path/file.rs"}. NEVER build cat<<EOF / sed one-liners for file content — use stdin.
+LONG JOBS (>~120s: full builds, kernel boots): a call is killed at ~120s, so launch detached and poll a log — {"command":"nohup cargo build --release >/tmp/b.log 2>&1 & echo $!"} then {"command":"tail -40 /tmp/b.log"}.
+Requires the local relay running; on a connection error, tell the user to start it and do NOT retry in a loop.`,
       parameters: {
         type: 'object',
         properties: {
-          url:     { type: 'string', description: 'Absolute URL (http/https), e.g. "http://localhost:8765/shell/exec".' },
-          method:  { type: 'string', description: 'HTTP method (default GET). GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS.' },
-          headers: { type: 'object', description: 'Optional request headers as a { name: value } map (e.g. {"Content-Type":"application/json"}).' },
-          body:    { type: 'string', description: 'Optional request body as a string (for POST/PUT/PATCH). For JSON, pass the stringified JSON and set Content-Type.' },
-          timeout: { type: 'number', description: 'Max seconds before the request is aborted (default 30, max 300).' },
+          command: { type: 'string', description: 'The command / script to run (bash). May contain &&, |, $, quotes, multiple lines.' },
+          stdin:   { type: 'string', description: 'Optional data piped to the command\'s stdin (use with "cat > file" to write a file verbatim — no escaping).' },
+          cwd:     { type: 'string', description: 'Optional working directory to run in.' },
+          timeout: { type: 'number', description: 'Max seconds before the command is killed (default 30, max 300).' },
         },
-        required: ['url'],
+        required: ['command'],
       },
     },
     remember: {
@@ -225,7 +226,13 @@ const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: custo
 const TOOLS_ENABLED_KEY  = 'sandpie-tools-enabled';    // JSON array of explicitly-ON names (for default-off tools)
 // Tools that stay OFF until the user explicitly turns them on. They NEVER auto-enable:
 // isEnabled returns false unless the name is in TOOLS_ENABLED_KEY (set only by setEnabled).
-const TOOLS_DEFAULT_OFF  = new Set(['http_request']);   // network egress; off until the user opts in
+const TOOLS_DEFAULT_OFF  = new Set(['shell']);   // relay-backed shell; off until the user opts in
+const SHELL_RELAY_URL_KEY = 'sandpie-shell-relay-url';
+const SHELL_RELAY_DEFAULT = 'http://localhost:8765';
+function shellRelayUrl() {
+  try { const v = (localStorage.getItem(SHELL_RELAY_URL_KEY) || '').trim(); return v || SHELL_RELAY_DEFAULT; }
+  catch (_) { return SHELL_RELAY_DEFAULT; }
+}
 function _toolsReadJson(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
   catch { return fallback; }
@@ -286,6 +293,8 @@ const SandpieTools = {
       available: _toolAvailable(name),
     }));
   },
+  shellRelayUrl() { return shellRelayUrl(); },
+  setShellRelayUrl(url) { try { localStorage.setItem(SHELL_RELAY_URL_KEY, String(url || '').trim()); } catch (_) {} },
   schemas() { return toolDefs(); },
   schemaFor(name) { const s = toolDefs(); return s.find(t => t.function && t.function.name === name); },
 };

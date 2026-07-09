@@ -1007,43 +1007,45 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','http_request','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos'];
 
 // ============================================================
-// http_request — a generic fetch, straight from the worker (no Pyodide).
+// shell — a real terminal on the relay host, straight from the worker (no Pyodide).
 // ------------------------------------------------------------
-// The primitive behind "call a local service / API / webhook" and behind shell
-// execution (POST to the sandpie_ssh relay's /shell/exec). Kept deliberately
-// general: the relay's contract lives in that skill's docs, not here.
-const _HTTP_METHODS = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
-const HTTP_RESULT_CAP = 100 * 1024;   // response body chars kept (truncateToolResult trims further)
-async function tool_http_request({ url, method, headers, body, timeout }, ctx) {
-  if (!url || !/^https?:\/\//i.test(String(url))) return { result: 'Error: "url" must be an absolute http(s) URL.' };
-  const m = String(method || 'GET').toUpperCase();
-  if (!_HTTP_METHODS.has(m)) return { result: 'Error: unsupported method "' + method + '".' };
+// One tool for everything: local commands, `ssh …` / `scp …` (the relay host's
+// own shell + ~/.ssh do the work — nothing special here), and file writes via
+// stdin. The command is sent as a bash -lc argv element so bash is the ONLY
+// parser (exactly like typing at a prompt — no PowerShell, no wsl wrap, no tool
+// re-splitting). Optional file/stdin content rides a separate base64 stdin field,
+// so writing a file (`cat > f`, stdin=content) is escaping-proof.
+function _shq(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
+function _b64utf8(s) { try { return btoa(unescape(encodeURIComponent(s))); } catch (_) { return btoa(s); } }
+async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
+  if (!command || !String(command).trim()) return { result: 'Error: "command" is required.' };
+  const base = ((ctx && ctx._shellRelayUrl) || 'http://localhost:8765').replace(/\/+$/, '');
+  const url = base + '/shell/exec';
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 30; t = Math.min(300, Math.round(t));
-  const hdrs = (headers && typeof headers === 'object' && !Array.isArray(headers)) ? headers : undefined;
-  const init = { method: m, credentials: 'omit', headers: hdrs };
-  if (body != null && m !== 'GET' && m !== 'HEAD') init.body = typeof body === 'string' ? body : JSON.stringify(body);
-  // Own timeout controller, also chained to the turn's abort signal.
+  const cmd = cwd ? ('cd ' + _shq(cwd) + ' || exit 1\n' + command) : String(command);
+  const payload = { argv: ['bash', '-lc', cmd], timeout: t };
+  if (stdin != null && stdin !== '') payload.stdin = _b64utf8(String(stdin));
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), t * 1000);
+  const timer = setTimeout(() => ctl.abort(), (t + 5) * 1000);
   if (ctx && ctx.signal) { if (ctx.signal.aborted) ctl.abort(); else ctx.signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
-  init.signal = ctl.signal;
   let r;
   try {
-    r = await fetch(url, init);
+    r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctl.signal });
   } catch (e) {
     clearTimeout(timer);
-    const aborted = ctx && ctx.signal && ctx.signal.aborted;
-    if (aborted) return { result: 'Error: request aborted.' };
-    return { result: 'Error: request failed (' + ((e && e.message) || e) + '). If this targets a local relay, is it running and reachable (e.g. started inside WSL)? Cross-origin hosts must also send CORS headers.' };
+    if (ctx && ctx.signal && ctx.signal.aborted) return { result: 'Error: command aborted.' };
+    return { result: 'Error: cannot reach the relay at ' + base + ' — is it running? Start it inside your target env (e.g. WSL): `node server.js` in the relay folder. Do NOT retry in a loop; ask the user. (' + ((e && e.message) || e) + ')' };
   }
   clearTimeout(timer);
-  let text = ''; try { text = await r.text(); } catch (_) {}
-  const ct = r.headers && r.headers.get ? (r.headers.get('content-type') || '') : '';
-  let out = 'HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : '') + (ct ? ' · ' + ct : '') + '\n';
-  out += text.length > HTTP_RESULT_CAP ? text.slice(0, HTTP_RESULT_CAP) + '\n…[response body truncated at ' + HTTP_RESULT_CAP + ' chars]' : text;
+  let data; try { data = await r.json(); } catch (_) { data = null; }
+  if (!r.ok || !data) return { result: 'Error: relay HTTP ' + r.status + (data && data.error ? ' — ' + data.error : '') };
+  let out = '';
+  if (data.stdout) out += String(data.stdout).replace(/\n+$/, '');
+  if (data.stderr) out += (out ? '\n' : '') + '--- stderr ---\n' + String(data.stderr).replace(/\n+$/, '');
+  out += (out ? '\n' : '') + '[exit ' + (data.code != null ? data.code : '?') + (data.signal ? ' signal=' + data.signal : '') + ']';
   return { result: out };
 }
 
@@ -1059,7 +1061,7 @@ async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
-    case 'http_request':  return tool_http_request(args, ctx);
+    case 'shell':         return tool_shell(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
@@ -1456,6 +1458,8 @@ async function runAgent(config, ctx) {
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
+  // Relay base URL for the `shell` tool (worker has no localStorage).
+  ctx._shellRelayUrl = config.shellRelayUrl || 'http://localhost:8765';
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
   // round's tool results are already appended — so a steer can never land between
