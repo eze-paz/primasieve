@@ -1041,15 +1041,20 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
   const payload = { argv: ['bash', '-lc', cmd], timeout: t };
   if (stdin != null && stdin !== '') payload.stdin = _b64utf8(String(stdin));
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), (t + 5) * 1000);
+  // Track WHY the fetch ends so we don't mislabel a timeout/turn-abort as a dead
+  // relay. Client timeout = server deadline (t+3s) + a little slack.
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, (t + 6) * 1000);
   if (ctx && ctx.signal) { if (ctx.signal.aborted) ctl.abort(); else ctx.signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
   let r;
   try {
     r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctl.signal });
   } catch (e) {
     clearTimeout(timer);
-    if (ctx && ctx.signal && ctx.signal.aborted) return { result: 'Error: command aborted.' };
-    return { result: 'Error: cannot reach the relay at ' + base + ' — is it running? Start it inside your target env (e.g. WSL): `node server.js` in the relay folder. Do NOT retry in a loop; ask the user. (' + ((e && e.message) || e) + ')' };
+    // Three distinct outcomes — don't conflate them:
+    if (ctx && ctx.signal && ctx.signal.aborted && !timedOut) return { result: 'Error: command aborted (turn stopped).' };
+    if (timedOut) return { result: 'Error: command did not return within ' + t + 's and was abandoned client-side — it MAY STILL BE RUNNING on the relay. Do not assume it failed. For a long job, background it so the call returns immediately: `setsid <cmd> >/tmp/job.log 2>&1 & echo $!` then poll the log with another shell call. To wait longer inline, raise "timeout" (max 300).' };
+    return { result: 'Error: cannot reach the relay at ' + base + ' — it appears down. Start it in your target env (e.g. WSL): `node server.js` in the relay folder. Do NOT retry in a loop; ask the user. (' + ((e && e.message) || e) + ')' };
   }
   clearTimeout(timer);
   let data; try { data = await r.json(); } catch (_) { data = null; }
