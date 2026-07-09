@@ -259,6 +259,32 @@ function mountConv(convId) {
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
 }
+/* ---- harness-reminder note visibility (drift / no-plan / stop guard) ----- */
+// The agentic loop emits `reminder` events when its guards fire. They are never
+// stored or sent; this just controls whether they're drawn in the transcript.
+// Hidden by default (debug-only); toggle with the `>>> drift` command.
+function _reminderNotesVisible() {
+  try { return localStorage.getItem('sandpie-show-reminders') === '1'; } catch (_) { return false; }
+}
+function registerDriftCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'drift',
+    module: 'core',
+    help: 'Toggle visibility of harness reminder notes (drift / no-plan / stop guard)',
+    usage: '>>> drift [on|off]',
+    run(text, parts) {
+      let on;
+      if (parts.length > 1) on = /^(on|1|true|yes|show)$/i.test(parts[1]);
+      else on = !_reminderNotesVisible();   // no arg → toggle
+      try { localStorage.setItem('sandpie-show-reminders', on ? '1' : '0'); } catch (_) {}
+      return 'Harness reminder notes are now ' + (on ? 'VISIBLE' : 'hidden')
+        + '.\n(drift / no-plan / stop-guard events. They still fire and log to the console either way;'
+        + ' this only controls whether they appear in the transcript. Applies to reminders from here on.)';
+    }
+  });
+}
+
 /* ---- command registration: rewind -------------------------------------- */
 function registerRewindCommand() {
   if (typeof SandpieCommands === 'undefined') return;
@@ -336,6 +362,7 @@ function registerRewindCommand() {
   });
 }
 registerRewindCommand();
+registerDriftCommand();
 
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -1370,8 +1397,12 @@ function dispatchAgentEvent(ev, renderer, host) {
       // pushed into convMessages — it is never persisted or resent (addMsg only
       // touches the DOM). Prefixed so it's unmistakably a harness event.
       const label = ev.kind === 'stop-block' ? 'stop guard' : ev.kind === 'stop-anyway' ? 'stop guard (gave up)' : ev.kind === 'drift' ? 'drift reminder' : ev.kind === 'no-plan' ? 'no-plan reminder' : 'reminder';
-      addMsg('info', '⟳ ' + label + (ev.meta && ev.meta.attempt ? ' ' + ev.meta.attempt : '') + ': ' + (ev.text || '').replace(/<\/?system-reminder>/g, '').trim(), host);
       try { console.debug('[sandpie reminder]', ev.kind, ev.meta || '', ev.text); } catch (_) {}
+      // Hidden by default — toggle with the `>>> drift` command. When off, the
+      // guard still fires and is logged to the console; it just isn't rendered.
+      if (_reminderNotesVisible()) {
+        addMsg('info', '⟳ ' + label + (ev.meta && ev.meta.attempt ? ' ' + ev.meta.attempt : '') + ': ' + (ev.text || '').replace(/<\/?system-reminder>/g, '').trim(), host);
+      }
       return;
     }
     case 'session_expired': {
