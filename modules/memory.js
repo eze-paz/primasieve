@@ -100,10 +100,17 @@ const SandpieMemory = (function () {
   async function systemBlock() {
     if (!isEnabled()) { _lastBlockChars = 0; return ''; }
     const facts = await list();
-    if (!facts.length) { _lastBlockChars = 0; return ''; }
+    // Inject the instruction ALWAYS — even with an empty store. Gating it behind
+    // "facts already exist" was a cold-start dead zone: no facts → no instruction
+    // → the model never saved the first one → memory stayed empty forever. The
+    // capability + expectation must be visible from turn one.
     const lines = ['', '', '# Memory',
-      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — if a fact names a file, function, or flag, verify it still exists before relying on it. When you learn something durable and non-derivable (a stable user preference, standing feedback, lasting project context), save it with remember."];
-    for (const f of facts) lines.push('', `## ${f.description} _(${f.type})_`, f.body);
+      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — if a fact names a file, function, or flag, verify it still exists before relying on it. As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
+    if (!facts.length) {
+      lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
+    } else {
+      for (const f of facts) lines.push('', `## ${f.description} _(${f.type})_`, f.body);
+    }
     const block = lines.join('\n');
     _lastBlockChars = block.length;
     return block;

@@ -159,6 +159,26 @@
   }
 
   /* ── tool-call logging (called from conversations.js dispatch loop) ── */
+  // Pull the files a `shell` command WRITES (output redirects + tee) plus its
+  // cwd. shell args are {command, cwd, …} with no `path`, so without this every
+  // shell-driven edit is invisible to the file/recent-path trackers. We only
+  // extract unambiguous WRITE targets (not every path-looking token) to stay
+  // robust — matching whole bash commands for filenames is a fragile game.
+  function _shellFileTargets(cmd) {
+    const out = new Set();
+    if (typeof cmd !== 'string' || !cmd) return [];
+    // > file / >> file / 2> file  (skip fd-dups like 2>&1 and /dev/*)
+    for (const m of cmd.matchAll(/\d*>>?\s*("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
+      const t = m[1].replace(/^['"]|['"]$/g, '');
+      if (t && !t.startsWith('&') && !/^\/dev\//.test(t)) out.add(t);
+    }
+    // tee [-a] file
+    for (const m of cmd.matchAll(/\btee\s+(?:-a\s+)?("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
+      out.add(m[1].replace(/^['"]|['"]$/g, ''));
+    }
+    return [...out].slice(0, 8);
+  }
+
   function logToolStarted(convId, tc) {
     const meta = getMeta(convId);
     const name = tc?.function?.name || 'unknown';
@@ -168,9 +188,15 @@
     // Track file args
     if (args.path) { meta.files.add(args.path); trackRecentPath(convId, args.path); }
     if (args.src) { meta.files.add(args.src); trackRecentPath(convId, args.src); }
+    // shell() has no path arg — capture its cwd + the files it writes so shell
+    // work isn't invisible to recent-paths / lessons.
+    if (name === 'shell') {
+      if (args.cwd) { meta.files.add(args.cwd); trackRecentPath(convId, args.cwd); }
+      for (const p of _shellFileTargets(args.command)) { meta.files.add(p); trackRecentPath(convId, p); }
+    }
     // Track script references from run_python
     if (name === 'run_python' && args.path) meta.scripts.add(args.path);
-    console.log(`[Aug] start ${name}`, args.path || args.src || '');
+    console.log(`[Aug] start ${name}`, args.path || args.src || args.cwd || '');
   }
 
   function logToolResult(convId, result) {
