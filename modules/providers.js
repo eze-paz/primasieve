@@ -44,6 +44,7 @@ const AI_HTML = `
         <input id="spContextWindow" type="number" min="1" autocomplete="off" placeholder="Context window (e.g. 128000)">
         <input id="spMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional)">
         <input id="spTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
+        <input id="spTopP" type="number" min="0" max="1" step="0.05" autocomplete="off" placeholder="top_p (optional, 0–1)">
         <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
         <div style="display:flex; gap:0.35rem;">
@@ -113,7 +114,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spReasoningEffort']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -465,6 +466,7 @@ function loadFormFor(id) {
   set('spName', p.name); set('spEndpoint', p.endpoint); set('spModel', p.model);
   set('spApiKey', p.apiKey); set('spProxyUrl', p.proxyUrl);
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
+  set('spTopP', p.topP);
   set('spReasoningEffort', p.reasoningEffort);
   set('spType', p.type || 'openai');
   const lr = document.getElementById('spLiteRTLMModel');
@@ -491,6 +493,7 @@ function applyTypeUI() {
   // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
   show('spTemperature', !local);
+  show('spTopP', !local);
   // Reasoning select: only LiteRT-LM exposes a Gemma thinking toggle.
   let rsn = document.getElementById('spReasoning');
   if (!rsn && litertlm) {
@@ -528,6 +531,7 @@ function commitForm() {
   const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else delete p.contextWindow;
   const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
+  const pp = num('spTopP');          if (pp != null && pp >= 0) p.topP = pp;        else delete p.topP;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();

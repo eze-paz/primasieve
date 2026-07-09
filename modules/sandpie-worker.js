@@ -1246,7 +1246,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     if (typeof tc.function.name === 'string') tc.function.name = scrubFramingTokens(tc.function.name).trim().replace(/^functions\./, '');
     tc.function.arguments = normalizeToolArgs(tc.function.arguments);
   }
-  return { content, tool_calls: keptToolCalls, usage };
+  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText };
 }
 
 // ============================================================
@@ -1510,6 +1510,7 @@ async function runAgent(config, ctx) {
     };
     if (config.maxTokens != null) reqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
+    if (config.topP != null) reqBody.top_p = config.topP;
     if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
     // Char-estimate of exactly what we're sending this round, paired with the
     // provider's reported prompt_tokens below to calibrate the mid-turn trigger.
@@ -1558,6 +1559,12 @@ async function runAgent(config, ctx) {
       break;
     }
     const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
+    // Preserve the model's reasoning on the tool-call turn and resend it. Reasoning
+    // models served over an OpenAI-compatible API (Kimi K2.6, DeepSeek) require the
+    // assistant message's reasoning_content to stay in context across multi-step
+    // tool calls — dropping it makes the provider error on the next round. Attached
+    // only when non-empty, so providers that don't emit reasoning never see the field.
+    if (round.reasoning_content) asstMsg.reasoning_content = round.reasoning_content;
     messages.push(asstMsg); ctx.emit({ type: 'message_added', message: asstMsg });
     const loadedImages = [];
     let touchedTodo = false;
