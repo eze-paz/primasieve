@@ -947,7 +947,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=37');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=38');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1368,7 +1368,7 @@ function dispatchAgentEvent(ev, renderer, host) {
       // give-up). Shown so the mechanism is observable while debugging, but NOT
       // pushed into convMessages — it is never persisted or resent (addMsg only
       // touches the DOM). Prefixed so it's unmistakably a harness event.
-      const label = ev.kind === 'stop-block' ? 'stop guard' : ev.kind === 'stop-anyway' ? 'stop guard (gave up)' : ev.kind === 'drift' ? 'drift reminder' : 'reminder';
+      const label = ev.kind === 'stop-block' ? 'stop guard' : ev.kind === 'stop-anyway' ? 'stop guard (gave up)' : ev.kind === 'drift' ? 'drift reminder' : ev.kind === 'no-plan' ? 'no-plan reminder' : 'reminder';
       addMsg('info', '⟳ ' + label + (ev.meta && ev.meta.attempt ? ' ' + ev.meta.attempt : '') + ': ' + (ev.text || '').replace(/<\/?system-reminder>/g, '').trim(), host);
       try { console.debug('[sandpie reminder]', ev.kind, ev.meta || '', ev.text); } catch (_) {}
       return;

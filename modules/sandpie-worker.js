@@ -1464,12 +1464,26 @@ async function runAgent(config, ctx) {
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
     if (drainSteers()) ctx._stopBlocks = 0;   // fresh user input → reset the stop guard
-    // Drift reminder (only if nothing more urgent is already queued this round).
-    if (!pendingReminder && ctx._roundsSinceTodo >= REMIND_AFTER_ROUNDS && hasOpenTodos()) {
-      setReminder('drift',
-        '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds without updating your plan. '
-        + 'Current todos:\n' + renderTodos() + '\n\nRe-read them, then either update the list with write_todos '
-        + 'or state your next concrete step before continuing. Do not drift from the task.</system-reminder>');
+    // Reminder assembly (only if nothing more urgent is already queued this round).
+    // Two variants keyed off whether a plan exists yet:
+    //   • open todos  → drift nudge (re-read/update the list).
+    //   • no todos at all → "no-plan" nudge (consider laying out a plan first).
+    // Reset the counter whenever the threshold is reached so we re-nag on the same
+    // cadence rather than every round (roundsSinceTodo never resets on its own when
+    // the model simply never calls write_todos).
+    if (!pendingReminder && ctx._roundsSinceTodo >= REMIND_AFTER_ROUNDS) {
+      if (hasOpenTodos()) {
+        setReminder('drift',
+          '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds without updating your plan. '
+          + 'Current todos:\n' + renderTodos() + '\n\nRe-read them, then either update the list with write_todos '
+          + 'or state your next concrete step before continuing. Do not drift from the task.</system-reminder>');
+      } else if (ctx._todos.length === 0) {
+        setReminder('no-plan',
+          '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds but have not set up a task list. '
+          + 'If this is a multi-step task, STRONGLY consider laying out a plan with write_todos before proceeding — '
+          + 'it keeps you from drifting and lets progress be tracked and verified. If the task is genuinely trivial '
+          + 'and single-step, you may ignore this.</system-reminder>');
+      }
       ctx._roundsSinceTodo = 0;
     }
     // Mid-turn compaction: if the loop has grown context past the threshold,
