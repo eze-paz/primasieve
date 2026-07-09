@@ -1,1138 +1,1138 @@
-<!DOCTYPE html>
-
-
-
-<html lang="en">
-
-
-
-<head>
-
-
-
-<meta charset="UTF-8">
-
-
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-
-
-<title>sandpie — PDF converter</title>
-
-
-
-<!-- COI bootstrap: LibreOffice WASM is a pthreads (SharedArrayBuffer) build, so this
-
-
-
-     page must be crossOriginIsolated. The main sandpie app deliberately runs WITHOUT
-
-
-
-     COOP/COEP (and evicts any SW that controls it), so conversion happens here, in a
-
-
-
-     dedicated popup whose coi-serviceworker is scoped to /convert/ only — it never
-
-
-
-     touches the app page. The script reloads this page once after the SW takes control.
-
-
-
-
-
-
-
-     Engine: ZetaOffice (allotropia's official LibreOffice-WASM) driven via zetajs
-
-
-
-     (vendored, MIT) from cdn.zetaoffice.net. This replaced the bentopdf npm build,
-
-
-
-     whose soffice.wasm had a Writer layout livelock on real-world docs (header with
-
-
-
-     a behind-text anchored image) AND a ~50% boot deadlock; ZetaOffice showed 7/7
-
-
-
-     clean boots (~8-10s cached) and converts the same docs in seconds. Evaluation
-
-
-
-     harnesses: docs/zeta-lab.html (this engine), docs/convert-lab.html (old one). -->
-
-
-
-<script src="coi-serviceworker.js"></script>
-
-
-
-<style>
-
-
-
-  body { margin:0; background:#0d1117; color:#c9d1d9; font:15px/1.5 system-ui, sans-serif;
-
-
-
-         display:flex; align-items:center; justify-content:center; min-height:100vh; }
-
-
-
-  .card { max-width:440px; width:90%; background:#161b22; border:1px solid #30363d;
-
-
-
-          border-radius:10px; padding:1.5rem 1.75rem; }
-
-
-
-  h1 { font-size:1.05rem; margin:0 0 .75rem; color:#e6edf3; }
-
-
-
-  #status { min-height:3em; color:#8b949e; overflow-wrap:anywhere; }
-
-
-
-  #status.err { color:#f85149; }
-
-
-
-  a.dl, button.retry { display:inline-block; margin-top:.75rem; padding:.45rem 1rem; border-radius:6px;
-
-
-
-         background:#238636; color:#fff; text-decoration:none; font-weight:600; border:0; cursor:pointer; }
-
-
-
-  button.retry { background:#30363d; }
-
-
-
-  .hint { font-size:.8rem; color:#6e7681; margin-top:1rem; }
-
-
-
-</style>
-
-
-
-</head>
-
-
-
-<body>
-
-
-
-<div class="card">
-
-
-
-  <h1>Convert to PDF</h1>
-
-
-
-  <div id="status">Starting…</div>
-
-
-
-  <div id="result"></div>
-
-
-
-  <div class="hint">Runs LibreOffice (ZetaOffice) fully in your browser — the document never
-
-
-
-    leaves this tab. First run downloads ~55&nbsp;MB (cached afterwards).</div>
-
-
-
-</div>
-
-
-
-<canvas id="qtcanvas" style="display:none"></canvas>
-
-
-
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-
-
-<script type="module">
-
-
-
-import { ZetaHelperMain } from './zeta/zetaHelper.js';
-
-
-
-
-
-
-
-const $status = document.getElementById('status');
-
-
-
-const $result = document.getElementById('result');
-
-
-
-const status = (msg, err) => { $status.textContent = msg; $status.className = err ? 'err' : ''; };
-
-
-
-const fail = (msg) => {
-
-
-
-  status(msg, true);
-
-
-
-  const b = document.createElement('button');
-
-
-
-  b.className = 'retry'; b.textContent = 'Retry';
-
-
-
-  b.onclick = () => location.reload();
-
-
-
-  $result.appendChild(b);
-
-
-
-};
-
-
-
-
-
-
-
-// ---- font availability check (shared logic with modules/opfs.js) ----
-
-
-
-const _normFont = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-
-
-
-const _LO_KNOWN_FONTS = new Set([
-
-
-
-  'liberationsans', 'liberationserif', 'liberationmono', 'liberationsansnarrow',
-
-
-
-  'carlito', 'caladea', 'dejavusans', 'dejavusansmono', 'dejavuserif', 'dejavumathtexgyre',
-
-
-
-  'gentiumbasic', 'gentiumbookbasic', 'linuxbiolinumg', 'linuxlibertineg', 'opensymbol',
-
-
-
-  'notosans', 'notoserif', 'notokufiarabic', 'notonaskharabic', 'notosansarabic', 'notosanshebrew',
-
-
-
-  'amiri', 'rubik', 'reemkufi', 'scheherazade', 'alef', 'davidlibre', 'miriamlibre', 'frankruhlhofshi',
-
-
-
-  'calibri', 'calibrilight', 'cambria', 'cambriamath', 'arial', 'timesnewroman', 'couriernew',
-
-
-
-  'symbol', 'wingdings',
-
-
-
-]);
-
-
-
-
-
-
-
-function _fontFamilyNames(u8) {
-
-
-
-  try {
-
-
-
-    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
-
-
-
-    let base = 0;
-
-
-
-    if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);
-
-
-
-    const numTables = dv.getUint16(base + 4);
-
-
-
-    let nameOff = 0;
-
-
-
-    for (let i = 0; i < numTables; i++) {
-
-
-
-      const rec = base + 12 + i * 16;
-
-
-
-      if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }
-
-
-
-    }
-
-
-
-    if (!nameOff) return [];
-
-
-
-    const count = dv.getUint16(nameOff + 2);
-
-
-
-    const strBase = nameOff + dv.getUint16(nameOff + 4);
-
-
-
-    const out = new Set();
-
-
-
-    for (let i = 0; i < count; i++) {
-
-
-
-      const r = nameOff + 6 + i * 12;
-
-
-
-      const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
-
-
-
-      if (nameId !== 1 && nameId !== 4 && nameId !== 16) continue;
-
-
-
-      const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
-
-
-
-      let s = '';
-
-
-
-      if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
-
-
-
-      else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
-
-
-
-      s = s.replace(/\0/g, '').trim();
-
-
-
-      if (s) out.add(s);
-
-
-
-    }
-
-
-
-    return [...out];
-
-
-
-  } catch (_) { return []; }
-
-
-
-}
-
-
-
-
-
-
-
-async function _fontsReferenced(bytes, ext) {
-
-
-
-  const zip = await JSZip.loadAsync(bytes);
-
-
-
-  const names = new Set();
-
-
-
-  const scan = (xml, re) => { let m; while ((m = re.exec(xml || ''))) { const v = (m[1] || '').trim(); if (v) names.add(v); } };
-
-
-
-  const read = async p => { const f = zip.file(p); return f ? await f.async('string') : ''; };
-
-
-
-  ext = String(ext || '').toLowerCase();
-
-
-
-  if (/^doc[xm]$|^dot[xm]$/.test(ext)) {
-
-
-
-    scan(await read('word/fontTable.xml'), /w:font\s+w:name="([^"]+)"/g);
-
-
-
-  } else if (/^xls[xm]$|^xlt[xm]$/.test(ext)) {
-
-
-
-    scan(await read('xl/styles.xml'), /<name\s+val="([^"]+)"/g);
-
-
-
-  } else if (/^ppt[xm]$|^pot[xm]$/.test(ext)) {
-
-
-
-    for (const p of Object.keys(zip.files)) {
-
-
-
-      if (/^ppt\/(theme|slides|slideLayouts|slideMasters)\/.*\.xml$/.test(p)) scan(await zip.file(p).async('string'), /typeface="([^"]+)"/g);
-
-
-
-    }
-
-
-
-  } else {
-
-
-
-    for (const p of ['styles.xml', 'content.xml']) {
-
-
-
-      const x = await read(p);
-
-
-
-      scan(x, /style:font-name="([^"]+)"/g);
-
-
-
-      scan(x, /svg:font-family="([^"]+)"/g);
-
-
-
-    }
-
-
-
-  }
-
-
-
-  const out = [];
-
-
-
-  for (let n of names) { n = n.replace(/^['"]+|['"]+$/g, '').trim(); if (n && !/^\+(mj|mn)-/.test(n)) out.push(n); }
-
-
-
-  return out;
-
-
-
-}
-
-
-
-
-
-
-
-async function _userFontFamilies() {
-
-
-
-  const fams = new Set();
-
-
-
-  try {
-
-
-
-    const root = await navigator.storage.getDirectory();
-
-
-
-    const sp = await root.getDirectoryHandle('sandpie').catch(() => null);
-
-
-
-    const dir = sp ? await sp.getDirectoryHandle('fonts').catch(() => null) : null;
-
-
-
-    if (dir) {
-
-
-
-      for await (const [name, handle] of dir.entries()) {
-
-
-
-        if (handle.kind === 'file' && /\.(ttf|otf|ttc)$/i.test(name)) {
-
-
-
-          try {
-
-
-
-            const file = await handle.getFile();
-
-
-
-            const buf = new Uint8Array(await file.arrayBuffer());
-
-
-
-            for (const f of _fontFamilyNames(buf)) fams.add(_normFont(f));
-
-
-
-          } catch (_) {}
-
-
-
-          fams.add(_normFont(name.replace(/\.(ttf|otf|ttc)$/i, '').replace(/[-_]?(regular|bold|italic|oblique|light|medium|semibold|demibold|thin|black|book|heavy|condensed)+/gi, '')));
-
-
-
-        }
-
-
-
-      }
-
-
-
-    }
-
-
-
-  } catch (_) {}
-
-
-
-  fams.delete('');
-
-
-
-  return fams;
-
-
-
-}
-
-
-
-
-
-
-
-async function missingFonts(bytes, ext) {
-  let referenced;
-  try { referenced = await _fontsReferenced(new Uint8Array(bytes), ext); } catch (_) { return []; }
-  if (!referenced.length) return [];
-  const userFams = await _userFontFamilies();
-  const seen = new Set(), missing = [];
-  for (const name of referenced) {
-    const n = _normFont(name);
-    if (!n || seen.has(n)) continue;
-    seen.add(n);
-    if (_LO_KNOWN_FONTS.has(n)) continue;
-    if (!userFams.has(n)) missing.push(name);
-  }
-  return missing;
-}
-
-
-
-
-
-
-
-function renderFontWarning(missing, onRetry, onProceed) {
-
-
-
-  $result.innerHTML = '';
-
-
-
-  const box = document.createElement('div');
-
-
-
-  box.style.cssText = 'padding:1.5rem; text-align:left;';
-
-
-
-  const title = document.createElement('div');
-
-
-
-  title.style.cssText = 'font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;color:#e6edf3;';
-
-
-
-  title.textContent = 'Missing font' + (missing.length > 1 ? 's' : '');
-
-
-
-  const p1 = document.createElement('p');
-
-
-
-  p1.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
-
-
-
-  p1.textContent = "This document uses font" + (missing.length > 1 ? 's' : '') + " that aren't available in the converter:";
-
-
-
-  const ul = document.createElement('ul');
-
-
-
-  ul.style.cssText = 'margin:0.3rem 0;padding-left:1.3rem;';
-
-
-
-  for (const f of missing) { const li = document.createElement('li'); li.style.cssText = 'margin:0.15rem 0;'; li.textContent = f; ul.appendChild(li); }
-
-
-
-  const p2 = document.createElement('p');
-
-
-
-  p2.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
-
-
-
-  p2.innerHTML = 'Add the matching <b>.ttf/.otf</b> to the <b>sandpie/fonts</b> folder, then Retry - or proceed now with substitute fonts, which <b>may not look the same</b>.';
-
-
-
-  const actions = document.createElement('div');
-
-
-
-  actions.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem;';
-
-
-
-  const retryBtn = document.createElement('button');
-
-
-
-  retryBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#238636;color:#fff;';
-
-
-
-  retryBtn.textContent = 'I added the fonts - retry';
-
-
-
-  retryBtn.onclick = () => { onRetry(); };
-
-
-
-  const proceedBtn = document.createElement('button');
-
-
-
-  proceedBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#30363d;color:#c9d1d9;';
-
-
-
-  proceedBtn.textContent = 'Proceed with font substitutions';
-
-
-
-  proceedBtn.onclick = () => { onProceed(); };
-
-
-
-  actions.append(retryBtn, proceedBtn);
-
-
-
-  box.append(title, p1, ul, p2, actions);
-
-
-
-  $result.appendChild(box);
-
-
-
-}
-
-
-
-
-
-
-
-(async () => {
-
-
-
-  // ── 1. Cross-origin isolation gate ──────────────────────────────────────
-
-
-
-  if (!crossOriginIsolated) {
-
-
-
-    let retried = false;
-
-
-
-    try { retried = !!sessionStorage.getItem('coiReloaded'); } catch (_) {}
-
-
-
-    status(retried
-
-
-
-      ? 'Could not enable cross-origin isolation (service worker blocked?). Conversion needs SharedArrayBuffer.'
-
-
-
-      : 'Enabling cross-origin isolation — the page will reload once…', retried);
-
-
-
-    return;
-
-
-
-  }
-
-
-
-
-
-
-
-  // ── 2. Pick up the job the app handed us via IndexedDB ──────────────────
-
-
-
-  const jobId = new URLSearchParams(location.hash.slice(1)).get('job');
-
-
-
-  if (!jobId) { status('No conversion job — open a document in sandpie and press "→ PDF".', true); return; }
-
-
-
-  const idb = await new Promise((res, rej) => {
-
-
-
-    const r = indexedDB.open('sandpie-convert', 1);
-
-
-
-    r.onupgradeneeded = () => r.result.createObjectStore('jobs', { keyPath: 'id' });
-
-
-
-    r.onsuccess = () => res(r.result);
-
-
-
-    r.onerror = () => rej(r.error);
-
-
-
-  });
-
-
-
-  // Read WITHOUT deleting so a Retry (page reload) can pick the job up again;
-
-
-
-  // jobs are cleaned up after success below.
-
-
-
-  const job = await new Promise((res, rej) => {
-
-
-
-    const get = idb.transaction('jobs', 'readonly').objectStore('jobs').get(jobId);
-
-
-
-    get.onsuccess = () => res(get.result);
-
-
-
-    get.onerror = () => rej(get.error);
-
-
-
-  });
-
-
-
-  if (!job) { status('Conversion job not found (expired?). Close this tab and press "→ PDF" again.', true); return; }
-
-
-
-  document.title = 'Converting ' + job.name;
-
-
-
-
-
-
-
-  // ── 3. Boot ZetaOffice and convert ───────────────────────────────────────
-
-
-
-  status('Loading LibreOffice… (first run downloads ~55 MB)');
-
-
-
-  const zHM = new ZetaHelperMain('zeta-thread.js', { threadJsType: 'module', wasmPkg: 'free' });
-
-
-
-  const pending = new Map();
-
-
-
-  let seq = 0;
-
-
-
-  const bootTimer = setTimeout(() => fail('LibreOffice did not start within 3 minutes — check your connection and retry.'), 180000);
-
-
-
-
-
-
-
-  const convert = (bytes, ext) => new Promise((resolve) => {
-
-
-
-    const from = '/tmp/input.' + ext, to = '/tmp/output';
-
-
-
-    zHM.FS.writeFile(from, bytes);
-
-
-
-    const id = 'c' + (++seq);
-
-
-
-    const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: 'conversion timed out' }); }, 300000);
-
-
-
-    pending.set(id, (msg) => {
-
-
-
-      clearTimeout(timer);
-
-
-
-      if (msg.cmd === 'error') { resolve({ ok: false, error: msg.error }); return; }
-
-
-
-      try {
-
-
-
-        const data = zHM.FS.readFile(to);
-
-
-
-        try { zHM.FS.unlink(from); } catch (_) {}
-
-
-
-        try { zHM.FS.unlink(to); } catch (_) {}
-
-
-
-        resolve({ ok: true, data });
-
-
-
-      } catch (e) { resolve({ ok: false, error: 'reading output failed: ' + e.message }); }
-
-
-
-    });
-
-
-
-    zHM.thrPort.postMessage({ cmd: 'convert', id, from, to });
-
-
-
-  });
-
-
-
-
-
-
-
-  async function doConvert(skipFontCheck) {
-
-
-
-    const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
-
-
-
-    if (!skipFontCheck) {
-
-
-
-      status('Checking fonts…');
-
-
-
-      try {
-
-
-
-        const missing = await missingFonts(job.bytes, ext);
-
-
-
-        if (missing.length) {
-
-
-
-          status('Missing fonts detected');
-
-
-
-          renderFontWarning(missing,
-
-
-
-            () => { location.reload(); },
-
-
-
-            () => { doConvert(true); }
-
-
-
-          );
-
-
-
-          return;
-
-
-
-        }
-
-
-
-      } catch (_) {}
-
-
-
-    }
-
-
-
-    status('Converting ' + job.name + '…');
-
-
-
-    const res = await convert(new Uint8Array(job.bytes), ext);
-
-
-
-    if (!res.ok) { fail('Conversion failed: ' + res.error); return; }
-
-
-
-    const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
-
-
-
-    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-
-
-
-    const a = document.createElement('a');
-
-
-
-    a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
-
-
-
-    $result.appendChild(a);
-
-
-
-    a.click();
-
-
-
-    status('Done — ' + pdfName + ' downloaded. You can close this tab.');
-
-
-
-    try { idb.transaction('jobs', 'readwrite').objectStore('jobs').delete(jobId); } catch (_) {}
-
-
-
-  }
-
-
-
-
-
-
-
-  zHM.start(() => {
-
-
-
-    zHM.thrPort.onmessage = async (e) => {
-
-
-
-      const d = e.data;
-
-
-
-      if (d.cmd === 'ready') {
-
-
-
-        clearTimeout(bootTimer);
-
-
-
-        await doConvert(false);
-
-
-
-        return;
-
-
-
-      }
-
-
-
-      const cb = pending.get(d.id);
-
-
-
-      if (cb) { pending.delete(d.id); cb(d); }
-
-
-
-    };
-
-
-
-  });
-
-
-
-})().catch((e) => { console.error('[convert]', e); fail('Unexpected error: ' + (e && e.message || e)); });
-
-
-
-</script>
-
-
-
-</body>
-
-
-
-</html>
-
-
-
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+
+
+
+<head>
+
+
+
+<meta charset="UTF-8">
+
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+<title>sandpie — PDF converter</title>
+
+
+
+<!-- COI bootstrap: LibreOffice WASM is a pthreads (SharedArrayBuffer) build, so this
+
+
+
+     page must be crossOriginIsolated. The main sandpie app deliberately runs WITHOUT
+
+
+
+     COOP/COEP (and evicts any SW that controls it), so conversion happens here, in a
+
+
+
+     dedicated popup whose coi-serviceworker is scoped to /convert/ only — it never
+
+
+
+     touches the app page. The script reloads this page once after the SW takes control.
+
+
+
+
+
+
+
+     Engine: ZetaOffice (allotropia's official LibreOffice-WASM) driven via zetajs
+
+
+
+     (vendored, MIT) from cdn.zetaoffice.net. This replaced the bentopdf npm build,
+
+
+
+     whose soffice.wasm had a Writer layout livelock on real-world docs (header with
+
+
+
+     a behind-text anchored image) AND a ~50% boot deadlock; ZetaOffice showed 7/7
+
+
+
+     clean boots (~8-10s cached) and converts the same docs in seconds. Evaluation
+
+
+
+     harnesses: docs/zeta-lab.html (this engine), docs/convert-lab.html (old one). -->
+
+
+
+<script src="coi-serviceworker.js"></script>
+
+
+
+<style>
+
+
+
+  body { margin:0; background:#0d1117; color:#c9d1d9; font:15px/1.5 system-ui, sans-serif;
+
+
+
+         display:flex; align-items:center; justify-content:center; min-height:100vh; }
+
+
+
+  .card { max-width:440px; width:90%; background:#161b22; border:1px solid #30363d;
+
+
+
+          border-radius:10px; padding:1.5rem 1.75rem; }
+
+
+
+  h1 { font-size:1.05rem; margin:0 0 .75rem; color:#e6edf3; }
+
+
+
+  #status { min-height:3em; color:#8b949e; overflow-wrap:anywhere; }
+
+
+
+  #status.err { color:#f85149; }
+
+
+
+  a.dl, button.retry { display:inline-block; margin-top:.75rem; padding:.45rem 1rem; border-radius:6px;
+
+
+
+         background:#238636; color:#fff; text-decoration:none; font-weight:600; border:0; cursor:pointer; }
+
+
+
+  button.retry { background:#30363d; }
+
+
+
+  .hint { font-size:.8rem; color:#6e7681; margin-top:1rem; }
+
+
+
+</style>
+
+
+
+</head>
+
+
+
+<body>
+
+
+
+<div class="card">
+
+
+
+  <h1>Convert to PDF</h1>
+
+
+
+  <div id="status">Starting…</div>
+
+
+
+  <div id="result"></div>
+
+
+
+  <div class="hint">Runs LibreOffice (ZetaOffice) fully in your browser — the document never
+
+
+
+    leaves this tab. First run downloads ~55&nbsp;MB (cached afterwards).</div>
+
+
+
+</div>
+
+
+
+<canvas id="qtcanvas" style="display:none"></canvas>
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+
+
+<script type="module">
+
+
+
+import { ZetaHelperMain } from './zeta/zetaHelper.js';
+
+
+
+
+
+
+
+const $status = document.getElementById('status');
+
+
+
+const $result = document.getElementById('result');
+
+
+
+const status = (msg, err) => { $status.textContent = msg; $status.className = err ? 'err' : ''; };
+
+
+
+const fail = (msg) => {
+
+
+
+  status(msg, true);
+
+
+
+  const b = document.createElement('button');
+
+
+
+  b.className = 'retry'; b.textContent = 'Retry';
+
+
+
+  b.onclick = () => location.reload();
+
+
+
+  $result.appendChild(b);
+
+
+
+};
+
+
+
+
+
+
+
+// ---- font availability check (shared logic with modules/opfs.js) ----
+
+
+
+const _normFont = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+
+
+const _LO_KNOWN_FONTS = new Set([
+
+
+
+  'liberationsans', 'liberationserif', 'liberationmono', 'liberationsansnarrow',
+
+
+
+  'carlito', 'caladea', 'dejavusans', 'dejavusansmono', 'dejavuserif', 'dejavumathtexgyre',
+
+
+
+  'gentiumbasic', 'gentiumbookbasic', 'linuxbiolinumg', 'linuxlibertineg', 'opensymbol',
+
+
+
+  'notosans', 'notoserif', 'notokufiarabic', 'notonaskharabic', 'notosansarabic', 'notosanshebrew',
+
+
+
+  'amiri', 'rubik', 'reemkufi', 'scheherazade', 'alef', 'davidlibre', 'miriamlibre', 'frankruhlhofshi',
+
+
+
+  'calibri', 'calibrilight', 'cambria', 'cambriamath', 'arial', 'timesnewroman', 'couriernew',
+
+
+
+  'symbol', 'wingdings',
+
+
+
+]);
+
+
+
+
+
+
+
+function _fontFamilyNames(u8) {
+
+
+
+  try {
+
+
+
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+
+
+
+    let base = 0;
+
+
+
+    if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);
+
+
+
+    const numTables = dv.getUint16(base + 4);
+
+
+
+    let nameOff = 0;
+
+
+
+    for (let i = 0; i < numTables; i++) {
+
+
+
+      const rec = base + 12 + i * 16;
+
+
+
+      if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }
+
+
+
+    }
+
+
+
+    if (!nameOff) return [];
+
+
+
+    const count = dv.getUint16(nameOff + 2);
+
+
+
+    const strBase = nameOff + dv.getUint16(nameOff + 4);
+
+
+
+    const out = new Set();
+
+
+
+    for (let i = 0; i < count; i++) {
+
+
+
+      const r = nameOff + 6 + i * 12;
+
+
+
+      const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
+
+
+
+      if (nameId !== 1 && nameId !== 4 && nameId !== 16) continue;
+
+
+
+      const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
+
+
+
+      let s = '';
+
+
+
+      if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
+
+
+
+      else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
+
+
+
+      s = s.replace(/\0/g, '').trim();
+
+
+
+      if (s) out.add(s);
+
+
+
+    }
+
+
+
+    return [...out];
+
+
+
+  } catch (_) { return []; }
+
+
+
+}
+
+
+
+
+
+
+
+async function _fontsReferenced(bytes, ext) {
+
+
+
+  const zip = await JSZip.loadAsync(bytes);
+
+
+
+  const names = new Set();
+
+
+
+  const scan = (xml, re) => { let m; while ((m = re.exec(xml || ''))) { const v = (m[1] || '').trim(); if (v) names.add(v); } };
+
+
+
+  const read = async p => { const f = zip.file(p); return f ? await f.async('string') : ''; };
+
+
+
+  ext = String(ext || '').toLowerCase();
+
+
+
+  if (/^doc[xm]$|^dot[xm]$/.test(ext)) {
+
+
+
+    scan(await read('word/fontTable.xml'), /w:font\s+w:name="([^"]+)"/g);
+
+
+
+  } else if (/^xls[xm]$|^xlt[xm]$/.test(ext)) {
+
+
+
+    scan(await read('xl/styles.xml'), /<name\s+val="([^"]+)"/g);
+
+
+
+  } else if (/^ppt[xm]$|^pot[xm]$/.test(ext)) {
+
+
+
+    for (const p of Object.keys(zip.files)) {
+
+
+
+      if (/^ppt\/(theme|slides|slideLayouts|slideMasters)\/.*\.xml$/.test(p)) scan(await zip.file(p).async('string'), /typeface="([^"]+)"/g);
+
+
+
+    }
+
+
+
+  } else {
+
+
+
+    for (const p of ['styles.xml', 'content.xml']) {
+
+
+
+      const x = await read(p);
+
+
+
+      scan(x, /style:font-name="([^"]+)"/g);
+
+
+
+      scan(x, /svg:font-family="([^"]+)"/g);
+
+
+
+    }
+
+
+
+  }
+
+
+
+  const out = [];
+
+
+
+  for (let n of names) { n = n.replace(/^['"]+|['"]+$/g, '').trim(); if (n && !/^\+(mj|mn)-/.test(n)) out.push(n); }
+
+
+
+  return out;
+
+
+
+}
+
+
+
+
+
+
+
+async function _userFontFamilies() {
+
+
+
+  const fams = new Set();
+
+
+
+  try {
+
+
+
+    const root = await navigator.storage.getDirectory();
+
+
+
+    const sp = await root.getDirectoryHandle('sandpie').catch(() => null);
+
+
+
+    const dir = sp ? await sp.getDirectoryHandle('fonts').catch(() => null) : null;
+
+
+
+    if (dir) {
+
+
+
+      for await (const [name, handle] of dir.entries()) {
+
+
+
+        if (handle.kind === 'file' && /\.(ttf|otf|ttc)$/i.test(name)) {
+
+
+
+          try {
+
+
+
+            const file = await handle.getFile();
+
+
+
+            const buf = new Uint8Array(await file.arrayBuffer());
+
+
+
+            for (const f of _fontFamilyNames(buf)) fams.add(_normFont(f));
+
+
+
+          } catch (_) {}
+
+
+
+
+
+
+
+        }
+
+
+
+      }
+
+
+
+    }
+
+
+
+  } catch (_) {}
+
+
+
+  fams.delete('');
+
+
+
+  return fams;
+
+
+
+}
+
+
+
+
+
+
+
+async function missingFonts(bytes, ext) {
+  let referenced;
+  try { referenced = await _fontsReferenced(new Uint8Array(bytes), ext); } catch (_) { return []; }
+  if (!referenced.length) return [];
+  const userFams = await _userFontFamilies();
+  const seen = new Set(), missing = [];
+  for (const name of referenced) {
+    const n = _normFont(name);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    if (_LO_KNOWN_FONTS.has(n)) continue;
+    if (!userFams.has(n)) missing.push(name);
+  }
+  return missing;
+}
+
+
+
+
+
+
+
+function renderFontWarning(missing, onRetry, onProceed) {
+
+
+
+  $result.innerHTML = '';
+
+
+
+  const box = document.createElement('div');
+
+
+
+  box.style.cssText = 'padding:1.5rem; text-align:left;';
+
+
+
+  const title = document.createElement('div');
+
+
+
+  title.style.cssText = 'font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;color:#e6edf3;';
+
+
+
+  title.textContent = 'Missing font' + (missing.length > 1 ? 's' : '');
+
+
+
+  const p1 = document.createElement('p');
+
+
+
+  p1.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
+
+
+
+  p1.textContent = "This document uses font" + (missing.length > 1 ? 's' : '') + " that aren't available in the converter:";
+
+
+
+  const ul = document.createElement('ul');
+
+
+
+  ul.style.cssText = 'margin:0.3rem 0;padding-left:1.3rem;';
+
+
+
+  for (const f of missing) { const li = document.createElement('li'); li.style.cssText = 'margin:0.15rem 0;'; li.textContent = f; ul.appendChild(li); }
+
+
+
+  const p2 = document.createElement('p');
+
+
+
+  p2.style.cssText = 'margin:0.4rem 0;line-height:1.5;';
+
+
+
+  p2.innerHTML = 'Add the matching <b>.ttf/.otf</b> to the <b>sandpie/fonts</b> folder, then Retry - or proceed now with substitute fonts, which <b>may not look the same</b>.';
+
+
+
+  const actions = document.createElement('div');
+
+
+
+  actions.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.75rem;';
+
+
+
+  const retryBtn = document.createElement('button');
+
+
+
+  retryBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#238636;color:#fff;';
+
+
+
+  retryBtn.textContent = 'I added the fonts - retry';
+
+
+
+  retryBtn.onclick = () => { onRetry(); };
+
+
+
+  const proceedBtn = document.createElement('button');
+
+
+
+  proceedBtn.style.cssText = 'padding:0.4rem 0.9rem;border-radius:6px;border:0;cursor:pointer;font:0.82rem system-ui;background:#30363d;color:#c9d1d9;';
+
+
+
+  proceedBtn.textContent = 'Proceed with font substitutions';
+
+
+
+  proceedBtn.onclick = () => { onProceed(); };
+
+
+
+  actions.append(retryBtn, proceedBtn);
+
+
+
+  box.append(title, p1, ul, p2, actions);
+
+
+
+  $result.appendChild(box);
+
+
+
+}
+
+
+
+
+
+
+
+(async () => {
+
+
+
+  // ── 1. Cross-origin isolation gate ──────────────────────────────────────
+
+
+
+  if (!crossOriginIsolated) {
+
+
+
+    let retried = false;
+
+
+
+    try { retried = !!sessionStorage.getItem('coiReloaded'); } catch (_) {}
+
+
+
+    status(retried
+
+
+
+      ? 'Could not enable cross-origin isolation (service worker blocked?). Conversion needs SharedArrayBuffer.'
+
+
+
+      : 'Enabling cross-origin isolation — the page will reload once…', retried);
+
+
+
+    return;
+
+
+
+  }
+
+
+
+
+
+
+
+  // ── 2. Pick up the job the app handed us via IndexedDB ──────────────────
+
+
+
+  const jobId = new URLSearchParams(location.hash.slice(1)).get('job');
+
+
+
+  if (!jobId) { status('No conversion job — open a document in sandpie and press "→ PDF".', true); return; }
+
+
+
+  const idb = await new Promise((res, rej) => {
+
+
+
+    const r = indexedDB.open('sandpie-convert', 1);
+
+
+
+    r.onupgradeneeded = () => r.result.createObjectStore('jobs', { keyPath: 'id' });
+
+
+
+    r.onsuccess = () => res(r.result);
+
+
+
+    r.onerror = () => rej(r.error);
+
+
+
+  });
+
+
+
+  // Read WITHOUT deleting so a Retry (page reload) can pick the job up again;
+
+
+
+  // jobs are cleaned up after success below.
+
+
+
+  const job = await new Promise((res, rej) => {
+
+
+
+    const get = idb.transaction('jobs', 'readonly').objectStore('jobs').get(jobId);
+
+
+
+    get.onsuccess = () => res(get.result);
+
+
+
+    get.onerror = () => rej(get.error);
+
+
+
+  });
+
+
+
+  if (!job) { status('Conversion job not found (expired?). Close this tab and press "→ PDF" again.', true); return; }
+
+
+
+  document.title = 'Converting ' + job.name;
+
+
+
+
+
+
+
+  // ── 3. Boot ZetaOffice and convert ───────────────────────────────────────
+
+
+
+  status('Loading LibreOffice… (first run downloads ~55 MB)');
+
+
+
+  const zHM = new ZetaHelperMain('zeta-thread.js', { threadJsType: 'module', wasmPkg: 'free' });
+
+
+
+  const pending = new Map();
+
+
+
+  let seq = 0;
+
+
+
+  const bootTimer = setTimeout(() => fail('LibreOffice did not start within 3 minutes — check your connection and retry.'), 180000);
+
+
+
+
+
+
+
+  const convert = (bytes, ext) => new Promise((resolve) => {
+
+
+
+    const from = '/tmp/input.' + ext, to = '/tmp/output';
+
+
+
+    zHM.FS.writeFile(from, bytes);
+
+
+
+    const id = 'c' + (++seq);
+
+
+
+    const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: 'conversion timed out' }); }, 300000);
+
+
+
+    pending.set(id, (msg) => {
+
+
+
+      clearTimeout(timer);
+
+
+
+      if (msg.cmd === 'error') { resolve({ ok: false, error: msg.error }); return; }
+
+
+
+      try {
+
+
+
+        const data = zHM.FS.readFile(to);
+
+
+
+        try { zHM.FS.unlink(from); } catch (_) {}
+
+
+
+        try { zHM.FS.unlink(to); } catch (_) {}
+
+
+
+        resolve({ ok: true, data });
+
+
+
+      } catch (e) { resolve({ ok: false, error: 'reading output failed: ' + e.message }); }
+
+
+
+    });
+
+
+
+    zHM.thrPort.postMessage({ cmd: 'convert', id, from, to });
+
+
+
+  });
+
+
+
+
+
+
+
+  async function doConvert(skipFontCheck) {
+
+
+
+    const ext = (job.name.split('.').pop() || 'docx').toLowerCase();
+
+
+
+    if (!skipFontCheck) {
+
+
+
+      status('Checking fonts…');
+
+
+
+      try {
+
+
+
+        const missing = await missingFonts(job.bytes, ext);
+
+
+
+        if (missing.length) {
+
+
+
+          status('Missing fonts detected');
+
+
+
+          renderFontWarning(missing,
+
+
+
+            () => { location.reload(); },
+
+
+
+            () => { doConvert(true); }
+
+
+
+          );
+
+
+
+          return;
+
+
+
+        }
+
+
+
+      } catch (_) {}
+
+
+
+    }
+
+
+
+    status('Converting ' + job.name + '…');
+
+
+
+    const res = await convert(new Uint8Array(job.bytes), ext);
+
+
+
+    if (!res.ok) { fail('Conversion failed: ' + res.error); return; }
+
+
+
+    const pdfName = job.name.replace(/\.[^.]+$/, '') + '.pdf';
+
+
+
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+
+
+
+    const a = document.createElement('a');
+
+
+
+    a.href = url; a.download = pdfName; a.className = 'dl'; a.textContent = 'Save ' + pdfName;
+
+
+
+    $result.appendChild(a);
+
+
+
+    a.click();
+
+
+
+    status('Done — ' + pdfName + ' downloaded. You can close this tab.');
+
+
+
+    try { idb.transaction('jobs', 'readwrite').objectStore('jobs').delete(jobId); } catch (_) {}
+
+
+
+  }
+
+
+
+
+
+
+
+  zHM.start(() => {
+
+
+
+    zHM.thrPort.onmessage = async (e) => {
+
+
+
+      const d = e.data;
+
+
+
+      if (d.cmd === 'ready') {
+
+
+
+        clearTimeout(bootTimer);
+
+
+
+        await doConvert(false);
+
+
+
+        return;
+
+
+
+      }
+
+
+
+      const cb = pending.get(d.id);
+
+
+
+      if (cb) { pending.delete(d.id); cb(d); }
+
+
+
+    };
+
+
+
+  });
+
+
+
+})().catch((e) => { console.error('[convert]', e); fail('Unexpected error: ' + (e && e.message || e)); });
+
+
+
+</script>
+
+
+
+</body>
+
+
+
+</html>
+
+
+
