@@ -420,7 +420,7 @@ async function tool_run_python({ path, args, timeout }) {
 // we just validate, normalize, and hand back a magic-prefixed result the main
 // thread renders as a card (like 'artifact:' / 'image:'). The text AFTER the
 // first newline is the plain-text confirmation the MODEL reads back.
-async function tool_write_todos({ todos }) {
+async function tool_write_todos({ todos }, ctx) {
   if (!Array.isArray(todos)) return { result: 'Error: "todos" must be an array of {content, status}.' };
   const VALID = new Set(['pending', 'in_progress', 'completed']);
   const clean = [];
@@ -437,6 +437,10 @@ async function tool_write_todos({ todos }) {
   for (const t of clean) {
     if (t.status === 'in_progress') { if (seen) t.status = 'pending'; else seen = true; }
   }
+  // Surface the current list to runAgent so it can drive the drift-reminder and
+  // the "don't stop with open todos" guard. This is the loop's only view of the
+  // checklist (the tool otherwise just echoes text back to the model).
+  if (ctx) ctx._todos = clean;
   const done = clean.filter(t => t.status === 'completed').length;
   const summary = clean.map(t =>
     (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
@@ -1429,18 +1433,63 @@ async function runAgent(config, ctx) {
     }
     return true;
   };
+
+  // ---- Drift guard + "don't stop with open todos" state ---------------------
+  // A model-managed checklist (write_todos) is the loop's clearest signal of
+  // whether the task is actually finished. Two mechanisms use it:
+  //   • Drift reminder: after too many tool rounds without touching the list,
+  //     inject an EPHEMERAL system-reminder (request-only, never persisted) that
+  //     re-shows the todos and nudges an update.
+  //   • Stop guard: when the model tries to end the turn with items still open,
+  //     don't let it — re-prompt and continue. Only a real user stop (abort) or
+  //     genuine progress stalling out (MAX_STOP_BLOCKS) ends the turn.
+  ctx._todos = ctx._todos || [];
+  ctx._roundsSinceTodo = 0;
+  ctx._stopBlocks = 0;
+  ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
+  const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
+  const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
+  const openTodos = () => ctx._todos.filter(t => t.status !== 'completed');
+  const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
+  const renderTodos = () => ctx._todos.map(t =>
+    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
+  ).join('\n');
+  // Ephemeral, request-only reminder for the NEXT round. Never pushed into
+  // `messages`, so it is neither persisted nor resent on later rounds; it is
+  // echoed to the page as a `reminder` event purely so the user can watch the
+  // guard fire while debugging.
+  let pendingReminder = null;
+  const setReminder = (kind, text, meta) => { pendingReminder = { kind, text, meta: meta || null }; };
+
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
-    drainSteers();
+    if (drainSteers()) ctx._stopBlocks = 0;   // fresh user input → reset the stop guard
+    // Drift reminder (only if nothing more urgent is already queued this round).
+    if (!pendingReminder && ctx._roundsSinceTodo >= REMIND_AFTER_ROUNDS && hasOpenTodos()) {
+      setReminder('drift',
+        '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds without updating your plan. '
+        + 'Current todos:\n' + renderTodos() + '\n\nRe-read them, then either update the list with write_todos '
+        + 'or state your next concrete step before continuing. Do not drift from the task.</system-reminder>');
+      ctx._roundsSinceTodo = 0;
+    }
     // Mid-turn compaction: if the loop has grown context past the threshold,
     // summarize the active slice in place before issuing the next round. Guarded
     // so a compaction failure can never break generation.
     try { await maybeCompactMidTurn(config, messages, ctx); } catch (e) { console.warn('[sandpie] mid-turn compaction failed:', e); }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
+    // Consume the ephemeral reminder for exactly this round: append it to the
+    // request body only (never to `messages`), and echo it to the page so the
+    // guard is observable without polluting the stored conversation.
+    let reminderMsg = null;
+    if (pendingReminder) {
+      reminderMsg = { role: 'user', content: pendingReminder.text };
+      ctx.emit({ type: 'reminder', kind: pendingReminder.kind, text: pendingReminder.text, meta: pendingReminder.meta });
+      pendingReminder = null;
+    }
     const reqBody = {
       model: config.model,
-      messages: [config.systemPrompt, ...messages].filter(Boolean),
+      messages: [config.systemPrompt, ...messages, reminderMsg].filter(Boolean),
       stream: true,
       stream_options: { include_usage: true },
       tools: config.tools,
@@ -1471,11 +1520,33 @@ async function runAgent(config, ctx) {
       // (or while it was finishing) keep the loop alive so that message gets
       // answered instead of stranded until a fresh turn. Otherwise the turn ends.
       if (!ctx.signal?.aborted && ((_agentSteers.get(ctx.agentId) || []).length)) { drainSteers(); continue; }
+      // Don't let the model end the turn with todos still open — a finished task
+      // is often just left unmarked, or the provider dropped the closing round.
+      // Re-prompt and continue, unless the user stopped it (abort) or we've hit
+      // MAX_STOP_BLOCKS re-prompts with no new item completed (a genuine stall).
+      if (!ctx.signal?.aborted && hasOpenTodos()) {
+        if (ctx._stopBlocks < MAX_STOP_BLOCKS) {
+          ctx._stopBlocks++;
+          setReminder('stop-block',
+            '<system-reminder>You tried to end the turn, but these todo items are still open:\n'
+            + renderTodos() + '\n\nUnless the user stopped you, keep going and finish the remaining work. '
+            + 'When an item is genuinely done, mark it completed with write_todos. Only stop once every item '
+            + 'is completed. (auto-continue ' + ctx._stopBlocks + '/' + MAX_STOP_BLOCKS + ')</system-reminder>',
+            { open: openTodos().length, attempt: ctx._stopBlocks });
+          continue;
+        }
+        // Stalled: hit the cap with no new completions. Stop anyway, but surface
+        // why so it's clear the turn ended with work still open.
+        ctx.emit({ type: 'reminder', kind: 'stop-anyway',
+          text: 'Ended with ' + openTodos().length + ' open todo(s) after ' + MAX_STOP_BLOCKS
+            + ' auto-continues without progress.' });
+      }
       break;
     }
     const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
     messages.push(asstMsg); ctx.emit({ type: 'message_added', message: asstMsg });
     const loadedImages = [];
+    let touchedTodo = false;
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
@@ -1484,11 +1555,22 @@ async function runAgent(config, ctx) {
       let toolOut;
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
+      if (tc.function.name === 'write_todos') touchedTodo = true;
       const safeResult = truncateToolResult(toolOut.result);
       ctx.emit({ type: 'tool_result', id: tc.id, result: safeResult });
       const toolMsg = { role: 'tool', tool_call_id: tc.id, content: safeResult };
       messages.push(toolMsg); ctx.emit({ type: 'message_added', message: toolMsg });
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
+    }
+    // Drift counter: reset when the plan was touched, else advance. Only a NEW
+    // completion clears the stop guard, so a model that keeps finishing items is
+    // helped indefinitely while one that merely rewrites the list without progress
+    // still hits MAX_STOP_BLOCKS.
+    ctx._roundsSinceTodo = touchedTodo ? 0 : ctx._roundsSinceTodo + 1;
+    if (touchedTodo) {
+      const done = ctx._todos.filter(t => t.status === 'completed').length;
+      if (done > ctx._lastTodoDone) ctx._stopBlocks = 0;
+      ctx._lastTodoDone = done;
     }
     if (loadedImages.length) {
       messages.push({ role: 'user', content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: im.dataUrl } })) });
