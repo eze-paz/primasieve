@@ -175,6 +175,22 @@ Each item: { "content": imperative step ("Write the parser"), "status": "pending
         required: ['todos'],
       },
     },
+    http_request: {
+      description: `Make an HTTP request and get back the status + response body. Streams straight from the browser — do NOT wrap HTTP calls in run_python/pyfetch.
+Use it to hit local services, dev servers, webhooks, JSON APIs, and the sandpie_ssh relay (which turns HTTP into shell/file operations on its host). For running shell commands: load the sandpie_ssh skill — it documents POSTing to the relay's /shell/exec (e.g. body {"command":"cargo test"} runs bash on the relay host).
+Cross-origin requests need the target to allow CORS. Credentials are omitted by default. Response body is returned as text (truncated if large).`,
+      parameters: {
+        type: 'object',
+        properties: {
+          url:     { type: 'string', description: 'Absolute URL (http/https), e.g. "http://localhost:8765/shell/exec".' },
+          method:  { type: 'string', description: 'HTTP method (default GET). GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS.' },
+          headers: { type: 'object', description: 'Optional request headers as a { name: value } map (e.g. {"Content-Type":"application/json"}).' },
+          body:    { type: 'string', description: 'Optional request body as a string (for POST/PUT/PATCH). For JSON, pass the stringified JSON and set Content-Type.' },
+          timeout: { type: 'number', description: 'Max seconds before the request is aborted (default 30, max 300).' },
+        },
+        required: ['url'],
+      },
+    },
     remember: {
       description: `Save something you've learned that should persist across conversations. Saved facts are auto-injected into your context every turn — saving IS remembering; there is no recall step.
 WRITE ONE AS SOON AS you learn any of these (capture it the moment it's clear — don't wait for the task to end):
@@ -209,7 +225,7 @@ const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: custo
 const TOOLS_ENABLED_KEY  = 'sandpie-tools-enabled';    // JSON array of explicitly-ON names (for default-off tools)
 // Tools that stay OFF until the user explicitly turns them on. They NEVER auto-enable:
 // isEnabled returns false unless the name is in TOOLS_ENABLED_KEY (set only by setEnabled).
-const TOOLS_DEFAULT_OFF  = new Set();
+const TOOLS_DEFAULT_OFF  = new Set(['http_request']);   // network egress; off until the user opts in
 function _toolsReadJson(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? fallback : v; }
   catch { return fallback; }

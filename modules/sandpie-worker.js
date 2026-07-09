@@ -1007,7 +1007,45 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos'];
+const KNOWN_TOOLS = ['run_python','http_request','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos'];
+
+// ============================================================
+// http_request — a generic fetch, straight from the worker (no Pyodide).
+// ------------------------------------------------------------
+// The primitive behind "call a local service / API / webhook" and behind shell
+// execution (POST to the sandpie_ssh relay's /shell/exec). Kept deliberately
+// general: the relay's contract lives in that skill's docs, not here.
+const _HTTP_METHODS = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
+const HTTP_RESULT_CAP = 100 * 1024;   // response body chars kept (truncateToolResult trims further)
+async function tool_http_request({ url, method, headers, body, timeout }, ctx) {
+  if (!url || !/^https?:\/\//i.test(String(url))) return { result: 'Error: "url" must be an absolute http(s) URL.' };
+  const m = String(method || 'GET').toUpperCase();
+  if (!_HTTP_METHODS.has(m)) return { result: 'Error: unsupported method "' + method + '".' };
+  let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 30; t = Math.min(300, Math.round(t));
+  const hdrs = (headers && typeof headers === 'object' && !Array.isArray(headers)) ? headers : undefined;
+  const init = { method: m, credentials: 'omit', headers: hdrs };
+  if (body != null && m !== 'GET' && m !== 'HEAD') init.body = typeof body === 'string' ? body : JSON.stringify(body);
+  // Own timeout controller, also chained to the turn's abort signal.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), t * 1000);
+  if (ctx && ctx.signal) { if (ctx.signal.aborted) ctl.abort(); else ctx.signal.addEventListener('abort', () => ctl.abort(), { once: true }); }
+  init.signal = ctl.signal;
+  let r;
+  try {
+    r = await fetch(url, init);
+  } catch (e) {
+    clearTimeout(timer);
+    const aborted = ctx && ctx.signal && ctx.signal.aborted;
+    if (aborted) return { result: 'Error: request aborted.' };
+    return { result: 'Error: request failed (' + ((e && e.message) || e) + '). If this targets a local relay, is it running and reachable (e.g. started inside WSL)? Cross-origin hosts must also send CORS headers.' };
+  }
+  clearTimeout(timer);
+  let text = ''; try { text = await r.text(); } catch (_) {}
+  const ct = r.headers && r.headers.get ? (r.headers.get('content-type') || '') : '';
+  let out = 'HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : '') + (ct ? ' · ' + ct : '') + '\n';
+  out += text.length > HTTP_RESULT_CAP ? text.slice(0, HTTP_RESULT_CAP) + '\n…[response body truncated at ' + HTTP_RESULT_CAP + ' chars]' : text;
+  return { result: out };
+}
 
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -1021,6 +1059,7 @@ async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
+    case 'http_request':  return tool_http_request(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
