@@ -977,7 +977,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=45');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=46');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1127,6 +1127,9 @@ async function sendSingle(text, stream, opts = {}) {
   const dispatch = (ev) => {
     if (ev.type === 'agent_done')  agentDoneSeen = true;
     if (ev.type === 'error')        errorSeen = true;
+    // Worker mid-turn compaction uses the SAME spinner as pre-send compaction.
+    if (ev.type === 'compaction_start') { showCompactionProgress(convId); return; }
+    if (ev.type === 'compaction_end')   { hideCompactionProgress(convId); return; }
     if (ev.type === 'tool_started') {
       lastInFlightTool = ev.tc?.function?.name || 'unknown';
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolStarted(activeConvId, ev.tc);

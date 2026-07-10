@@ -1415,12 +1415,15 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
   if (!transcript.trim()) return;
   if (prior) transcript = '[Summary of the conversation so far]\n' + prior + '\n\n[New turns to fold into the summary]\n' + transcript;
 
-  ctx.emit({ type: 'info', message: 'Context over ' + Math.round(cmp.pct) + '% — compacting to continue…' });
+  // Same UI as pre-send compaction: the .compaction-progress spinner + "Summarizing
+  // earlier messages to free up context…" (page maps compaction_start/end to
+  // show/hideCompactionProgress). No separate "Context over X%" info bubble.
+  ctx.emit({ type: 'compaction_start' });
   let summary = null;
   try {
     summary = await _summarizeForCompaction(config, transcript, ctx);
   } catch (e) {
-    ctx.emit({ type: 'info', message: null });
+    ctx.emit({ type: 'compaction_end' });
     throw new CompactionFailure('Context is over ' + Math.round(cmp.pct) + '% and must be compacted to continue, but summarizing the earlier turns failed: ' + ((e && e.message) || e) + '. Generation stopped.');
   }
   if (summary) {
@@ -1428,7 +1431,7 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
     messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
     ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
   }
-  ctx.emit({ type: 'info', message: null });
+  ctx.emit({ type: 'compaction_end' });
 }
 
 // ============================================================
