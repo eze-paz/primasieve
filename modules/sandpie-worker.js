@@ -61,6 +61,84 @@ const _agentAborts = new Map();
 // spliced into the running loop at the next round boundary (see runAgent).
 const _agentSteers = new Map();   // id -> [content, ...]
 
+// ═══ METACOG TRIGGERS ═══════════════════════════════════════════════════════
+// Self-contained metacognition nudges (grind / reuse-a-tool / remember). To
+// fully remove: delete this block + the 3 hooks in runAgent (marked METACOG) +
+// the `metacog:` line in buildAgentConfig. Kill at runtime: globalThis.__noMetacog
+// = true, or `>>> metacog off`. Fires via the same pendingReminder path as the
+// drift/stop guards (>>> drift toggles the note's visibility). Session state is
+// keyed by conversation and lives for the worker's lifetime.
+const _convStats = new Map();   // convId -> stats
+function _statsFor(id) {
+  let s = _convStats.get(id);
+  if (!s) { s = { calls: 0, since: 0, gaps: [], done: 0, shapes: new Map(),
+                  remembers: 0, firedShapes: new Set(), grindArmed: 0, remindedRemember: false };
+            _convStats.set(id, s); }
+  return s;
+}
+function _shellShape(cmd) {
+  if (typeof cmd !== 'string') return null;
+  let c = cmd.trim();
+  for (let i = 0; i < 5; i++) { const m = c.match(/^cd\s+\S+\s*(&&|;)\s*/); if (m) c = c.slice(m[0].length); else break; }
+  c = c.replace(/0x[0-9a-fA-F]+/g, 'ADDR').replace(/\d+/g, 'N').replace(/\s+/g, ' ').trim();
+  return c.slice(0, 120);   // structural skeleton + target file survive normalization
+}
+// Only inline-AUTHORING commands count toward the "reuse-a-tool" signal — a
+// heredoc or `cat >` builds a throwaway probe. Re-running a saved file
+// (`python foo.py`) or a test (`cargo test`) is USING a tool, not rebuilding one,
+// so it must NOT trigger "save this as a script" (that was a sim false-positive).
+function _isAuthoring(cmd) {
+  if (typeof cmd !== 'string') return false;
+  let c = cmd.trim();
+  for (let i = 0; i < 5; i++) { const m = c.match(/^cd\s+\S+\s*(&&|;)\s*/); if (m) c = c.slice(m[0].length); else break; }
+  return /^cat\s*>>?\s*\S/.test(c) || /<<\s*['"]?\w+/.test(c);
+}
+// Observe one executed tool call.
+function _metacogObserve(s, name, args) {
+  s.calls++; s.since++;
+  if (name === 'remember') s.remembers++;
+  if (name === 'shell' && _isAuthoring(args && args.command)) {
+    const sh = _shellShape(args.command); if (sh) s.shapes.set(sh, (s.shapes.get(sh) || 0) + 1);
+  }
+}
+function _median(a) { if (!a.length) return 0; const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; }
+// Returns {kind,text,meta} or null. Never throws.
+function _metacogReminder(s, cfg) {
+  if ((typeof globalThis !== 'undefined' && globalThis.__noMetacog) || !cfg || !cfg.enabled) return null;
+  // A) grind — RELATIVE to this session's own completion rhythm (no absolute magic number)
+  const K = cfg.grindK || 3, FLOOR = cfg.grindFloor || 12, COLD = cfg.grindCold || 40;
+  const med = _median(s.gaps);
+  const grindHit = s.gaps.length >= 3
+    ? (s.since > FLOOR && s.since > K * med && s.since >= s.grindArmed)
+    : (s.since > COLD && s.since >= s.grindArmed);
+  if (grindHit) {
+    s.grindArmed = s.since + Math.max(FLOOR, K * med);   // debounce: don't re-fire until it grows again
+    return { kind: 'grind', meta: { since: s.since, median: med },
+      text: '<system-reminder>You have made ' + s.since + ' tool calls since your last completed todo'
+        + (med ? (' — about ' + Math.round(s.since / Math.max(1, med)) + '× your usual for this task') : '')
+        + '. Step back: are you genuinely converging, or is it time to change approach, build a reusable instrument, or split the problem? Judge honestly and say which.</system-reminder>' };
+  }
+  // B) disposable tool — exact-repeat of the same command shape (task-independent)
+  for (const [sh, n] of s.shapes) {
+    if (n >= (cfg.shapeN || 4) && !s.firedShapes.has(sh)) {
+      s.firedShapes.add(sh);
+      return { kind: 'reuse', meta: { shape: sh, n },
+        text: '<system-reminder>You have rebuilt the same command ' + n + ' times: `' + sh.slice(0, 80)
+          + '`. If it will recur, save it once as a reusable script under sandpie/tools/ and remember() it — then it is one call, not a rewrite, next time.</system-reminder>' };
+    }
+  }
+  // C) remember() encouragement — once per session
+  if (!s.remindedRemember && s.remembers === 0
+      && s.done >= (cfg.rememberAfterDone || 3) && s.calls >= (cfg.rememberAfterCalls || 30)) {
+    s.remindedRemember = true;
+    return { kind: 'remember', meta: { done: s.done },
+      text: '<system-reminder>You have closed ' + s.done + ' items this session but saved nothing to memory. '
+        + 'If you learned anything durable and non-derivable (a root cause, a gotcha, where something lives), remember() it now so future sessions start ahead.</system-reminder>' };
+  }
+  return null;
+}
+// ═══ END METACOG ════════════════════════════════════════════════════════════
+
 const WORKER_VERSION = '2.18.0-write-todos';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
@@ -1542,6 +1620,11 @@ async function runAgent(config, ctx) {
       }
       ctx._roundsSinceTodo = 0;
     }
+    // METACOG (c): grind / reuse-a-tool / remember nudges, if nothing more urgent queued.
+    if (!pendingReminder) {
+      try { const mc = _metacogReminder(_statsFor(convFileName), config.metacog); if (mc) setReminder(mc.kind, mc.text, mc.meta); }
+      catch (_) {}
+    }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
     // Consume the ephemeral reminder for exactly this round: append it to the
@@ -1618,6 +1701,7 @@ async function runAgent(config, ctx) {
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
       if (tc.function.name === 'write_todos') touchedTodo = true;
+      try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
       const safeResult = truncateToolResult(toolOut.result);
       ctx.emit({ type: 'tool_result', id: tc.id, result: safeResult });
       const toolMsg = { role: 'tool', tool_call_id: tc.id, content: safeResult };
@@ -1633,6 +1717,8 @@ async function runAgent(config, ctx) {
       const done = ctx._todos.filter(t => t.status === 'completed').length;
       if (done > ctx._lastTodoDone) ctx._stopBlocks = 0;
       ctx._lastTodoDone = done;
+      // METACOG (b): a completion resets the grind gap; record the span it took.
+      try { const s = _statsFor(convFileName); if (done > s.done) { s.gaps.push(s.since); s.since = 0; s.done = done; } } catch (_) {}
     }
     if (loadedImages.length) {
       messages.push({ role: 'user', content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: im.dataUrl } })) });

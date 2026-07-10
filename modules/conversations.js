@@ -402,6 +402,25 @@ function registerDriftCommand() {
   });
 }
 
+/* ---- metacognition triggers on/off (grind / reuse-tool / remember) ------- */
+function registerMetacogCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'metacog',
+    module: 'core',
+    help: 'Enable/disable the metacognition nudges (grind / reuse-a-tool / remember)',
+    usage: '>>> metacog [on|off]',
+    run(text, parts) {
+      let on;
+      if (parts.length > 1) on = /^(on|1|true|yes)$/i.test(parts[1]);
+      else { try { on = localStorage.getItem('sandpie-metacog') === 'off'; } catch (_) { on = true; } }  // toggle
+      try { localStorage.setItem('sandpie-metacog', on ? 'on' : 'off'); } catch (_) {}
+      return 'Metacognition nudges are now ' + (on ? 'ON' : 'OFF')
+        + '.\n(grind / reuse-a-tool / remember. Takes effect on the next turn. `>>> drift` controls whether their notes are shown.)';
+    }
+  });
+}
+
 /* ---- command registration: rewind -------------------------------------- */
 function registerRewindCommand() {
   if (typeof SandpieCommands === 'undefined') return;
@@ -480,6 +499,7 @@ function registerRewindCommand() {
 }
 registerRewindCommand();
 registerDriftCommand();
+registerMetacogCommand();
 
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -1099,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=46');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=47');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1427,6 +1447,12 @@ async function buildAgentConfig(convMessages, compaction) {
     // Base URL of the local relay the `shell` tool runs commands through (run it
     // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
     shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',
+    // Metacognition nudges (grind / reuse-a-tool / remember). Enabled unless the
+    // user turns them off with `>>> metacog off`. Tunable knobs live here.
+    metacog: (function () {
+      try { return { enabled: localStorage.getItem('sandpie-metacog') !== 'off', grindK: 3, grindFloor: 12, grindCold: 40, shapeN: 4, rememberAfterDone: 3, rememberAfterCalls: 30 }; }
+      catch (_) { return { enabled: true, grindK: 3, grindFloor: 12, grindCold: 40, shapeN: 4, rememberAfterDone: 3, rememberAfterCalls: 30 }; }
+    })(),
     // Mid-turn compaction: the worker re-checks context at every round and, if the
     // agentic loop pushes past the threshold DURING a turn, summarizes its own
     // active message slice in place so a long tool-heavy turn can't overflow.
@@ -1526,7 +1552,8 @@ function dispatchAgentEvent(ev, renderer, host) {
       // give-up). Shown so the mechanism is observable while debugging, but NOT
       // pushed into convMessages — it is never persisted or resent (addMsg only
       // touches the DOM). Prefixed so it's unmistakably a harness event.
-      const label = ev.kind === 'stop-block' ? 'stop guard' : ev.kind === 'stop-anyway' ? 'stop guard (gave up)' : ev.kind === 'drift' ? 'drift reminder' : ev.kind === 'no-plan' ? 'no-plan reminder' : 'reminder';
+      const _rl = { 'stop-block': 'stop guard', 'stop-anyway': 'stop guard (gave up)', 'drift': 'drift reminder', 'no-plan': 'no-plan reminder', 'grind': 'grind nudge', 'reuse': 'reuse-a-tool nudge', 'remember': 'remember nudge' };
+      const label = _rl[ev.kind] || 'reminder';
       try { console.debug('[sandpie reminder]', ev.kind, ev.meta || '', ev.text); } catch (_) {}
       // Hidden by default — toggle with the `>>> drift` command. When off, the
       // guard still fires and is logged to the console; it just isn't rendered.
