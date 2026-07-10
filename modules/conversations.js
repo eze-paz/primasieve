@@ -7,6 +7,103 @@ function newConvId() {
 function convPath(id, archived = false) {
   return archived ? `${ARCHIVED_DIR}/${id}.json` : `${CONV_DIR}/${id}.json`;
 }
+
+/* ===========================================================================
+   Conversation storage — meta sidecar + append-only JSONL.
+
+   Each conversation is TWO files:
+     <id>.meta.json  — small, mutable metadata (title/updated/pinned/compaction/…)
+     <id>.jsonl      — append-only message log, one message object per line
+   Rename/pin/archive/compaction rewrite only the tiny meta; appending a message
+   appends one line (O(new bytes)) instead of re-serializing the whole chat; and
+   the sidebar list reads only the tiny meta files instead of every chat in full.
+
+   Legacy monolithic <id>.json files are still READ (fallback), and MIGRATED on
+   first save (a new pair is written alongside) but are NEVER deleted — they remain
+   as frozen backups. convLocation() prefers the new format when both exist.
+   =========================================================================== */
+const META_SUFFIX = '.meta.json';
+function metaPath(id, archived = false) { return `${archived ? ARCHIVED_DIR : CONV_DIR}/${id}${META_SUFFIX}`; }
+function jsonlPath(id, archived = false) { return `${archived ? ARCHIVED_DIR : CONV_DIR}/${id}.jsonl`; }
+
+function _convText(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.filter(p => p && p.type === 'text').map(p => p.text || '').join(' ');
+  return '';
+}
+function _parseJsonl(text) {
+  const out = [];
+  for (const line of String(text).split('\n')) {
+    const t = line.trim(); if (!t) continue;
+    try { out.push(JSON.parse(t)); } catch (_) { /* tolerate a torn trailing line (crash mid-append) */ }
+  }
+  return out;
+}
+function _serializeJsonl(msgs) { return msgs.length ? msgs.map(m => JSON.stringify(m)).join('\n') + '\n' : ''; }
+function _deriveTitle(msgs) {
+  const firstUser = (msgs || []).find(m => m.role === 'user');
+  if (firstUser && firstUser.content) return (_convText(firstUser.content).slice(0, 60)) || 'Untitled';
+  return 'Untitled';
+}
+
+// Where a conversation lives + its format. Prefers the new meta format; falls back
+// to a legacy .json. Returns { archived, format: 'new' | 'old' | null }.
+async function convLocation(id) {
+  if (await opfs.exists(metaPath(id, false))) return { archived: false, format: 'new' };
+  if (await opfs.exists(metaPath(id, true)))  return { archived: true,  format: 'new' };
+  if (await opfs.exists(convPath(id, false))) return { archived: false, format: 'old' };
+  if (await opfs.exists(convPath(id, true)))  return { archived: true,  format: 'old' };
+  return { archived: false, format: null };
+}
+
+// Unified loader → { id, title, updated, pinned, archived, compaction, todos,
+// usage, messages, _format } or null. Callers don't care about on-disk format.
+async function readConvData(id) {
+  const loc = await convLocation(id);
+  if (loc.format === 'new') {
+    let meta = {}; try { meta = JSON.parse(await opfs.read(metaPath(id, loc.archived))); } catch {}
+    let messages = []; try { messages = _parseJsonl(await opfs.read(jsonlPath(id, loc.archived))); } catch {}
+    return { ...meta, id, archived: loc.archived, messages, _format: 'new' };
+  }
+  if (loc.format === 'old') {
+    let data; try { data = JSON.parse(await opfs.read(convPath(id, loc.archived))); } catch { return null; }
+    migrateCompactionData(data);
+    data.id = id; data.archived = loc.archived; data._format = 'old';
+    if (!Array.isArray(data.messages)) data.messages = [];
+    return data;
+  }
+  return null;
+}
+
+// Lightweight list row. New format → read only the tiny meta file. Legacy → read
+// the whole .json (unavoidable until it migrates). Message text for search is only
+// pulled when a query is active.
+async function readConvMetaRow(id, archived, format, wantSearch) {
+  try {
+    if (format === 'new') {
+      const meta = JSON.parse(await opfs.read(metaPath(id, archived)));
+      const row = { id: meta.id || id, title: meta.title || '(no title)', updated: meta.updated || '', pinned: !!meta.pinned, archived };
+      if (wantSearch) { try { row.messageContent = _parseJsonl(await opfs.read(jsonlPath(id, archived))).map(m => _convText(m.content)).join(' ').toLowerCase(); } catch {} }
+      return row;
+    }
+    const data = JSON.parse(await opfs.read(convPath(id, archived)));
+    const row = { id: data.id || id, title: data.title || '(no title)', updated: data.updated || '', pinned: !!data.pinned, archived };
+    if (wantSearch) row.messageContent = (data.messages || []).map(m => _convText(m.content)).join(' ').toLowerCase();
+    return row;
+  } catch { return null; }
+}
+
+async function rewriteConvJsonl(id, archived, messages) {
+  const p = jsonlPath(id, archived);
+  await opfs.write(p, _serializeJsonl(messages || []));
+  Sandpie.events.emit('file:changed', p);
+}
+async function appendConvMessages(id, archived, msgs) {
+  if (!msgs || !msgs.length) return;
+  const p = jsonlPath(id, archived);
+  await opfs.append(p, _serializeJsonl(msgs));
+  Sandpie.events.emit('file:changed', p);
+}
 async function ensureActiveConv() {
   if (activeConvId) return;
   activeConvId = newConvId();
@@ -37,40 +134,53 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
 
-  // Preserve archived location if the conv is already in archived folder.
-  const archived = await opfs.exists(convPath(convId, true));
-  const path = convPath(convId, archived);
+  const loc = await convLocation(convId);
+  const archived = loc.archived;
 
-  let prev = {}, prevRaw = null;
-  try { prevRaw = await opfs.read(path); prev = JSON.parse(prevRaw); } catch {}
-  const firstUser = msgs.find(m => m.role === 'user');
-  let derived = 'Untitled';
-  if (firstUser && firstUser.content) {
-    const text = typeof firstUser.content === 'string'
-      ? firstUser.content
-      : firstUser.content.filter(p => p.type === 'text').map(p => p.text).join('');
-    derived = text.slice(0, 60);
+  // Previous metadata + the raw meta bytes (for a no-op guard). For a legacy conv
+  // we read its .json ONCE here to carry title/created/usage forward; the write
+  // below migrates it to the new pair (the old .json is left as a frozen backup).
+  let prevMeta = null, prevMetaRaw = null;
+  if (loc.format === 'new') { try { prevMetaRaw = await opfs.read(metaPath(convId, archived)); prevMeta = JSON.parse(prevMetaRaw); } catch {} }
+  else if (loc.format === 'old') { try { prevMeta = JSON.parse(await opfs.read(convPath(convId, archived))); } catch {} }
+
+  // How many messages are already in the JSONL on disk. null on a freshly-created
+  // or legacy-loaded stream → treat as 0 so the first save writes them all.
+  if (s && s.persistedCount == null) s.persistedCount = (loc.format === 'new') ? msgs.length : 0;
+  const persisted = s ? s.persistedCount : (loc.format === 'new' ? msgs.length : 0);
+
+  // Append the new tail, or rewrite when history was truncated (rewind) or a full
+  // rewrite was requested. A legacy conv (persisted 0, no jsonl) migrates via the
+  // append-from-0 path, which creates the .jsonl with every message.
+  if ((s && s._forceJsonlRewrite) || persisted > msgs.length) {
+    await rewriteConvJsonl(convId, archived, msgs);
+  } else if (persisted < msgs.length) {
+    await appendConvMessages(convId, archived, msgs.slice(persisted));
   }
-  const data = {
-    ...prev,
+  if (s) { s.persistedCount = msgs.length; s._forceJsonlRewrite = false; }
+
+  // Build + write the (tiny) meta. Guarded so a no-op save (e.g. saveActiveConv on
+  // focus switch) writes nothing and emits no spurious file:changed → no Dropbox churn.
+  const meta = {
     id: convId,
-    title: prev.title || derived,
-    updated: touchUpdated ? new Date().toISOString() : (prev.updated || new Date().toISOString()),
-    messages: msgs,
+    title: (prevMeta && prevMeta.title) || _deriveTitle(msgs),
+    created: (prevMeta && (prevMeta.created || prevMeta.updated)) || new Date().toISOString(),
+    updated: touchUpdated ? new Date().toISOString() : ((prevMeta && prevMeta.updated) || new Date().toISOString()),
+    pinned: prevMeta ? !!prevMeta.pinned : false,
+    msgCount: msgs.length,
   };
-  delete data.compactions;   // legacy restore-stack — superseded by `compaction`
-  if (s) {
-    if (s.compaction) data.compaction = s.compaction; else delete data.compaction;
-    if (s.todos) data.todos = s.todos; else delete data.todos;
+  const comp = s ? s.compaction : (prevMeta && prevMeta.compaction);
+  const todos = s ? s.todos : (prevMeta && prevMeta.todos);
+  if (comp) meta.compaction = comp;
+  if (todos) meta.todos = todos;
+  if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
+
+  const metaStr = JSON.stringify(meta);
+  if (metaStr !== prevMetaRaw) {
+    await opfs.write(metaPath(convId, archived), metaStr);
+    Sandpie.events.emit('file:changed', metaPath(convId, archived));
   }
-  const newStr = JSON.stringify(data);
-  // No-op guard: switching conversations calls saveActiveConv() on the outgoing
-  // conv even when nothing changed. Writing byte-identical content still bumps
-  // the OPFS mtime and emits file:changed → a spurious Dropbox overwrite. Skip
-  // the write (and the dirty-marking) when the serialized bytes match disk.
-  if (prevRaw !== null && newStr === prevRaw) { await refreshConversationList(); return; }
-  await opfs.write(path, newStr);
-  Sandpie.events.emit('file:changed', path);
+
   await refreshConversationList();
   // Distill lessons only on a turn-end save (touchUpdated:true) — never on the
   // ~1.2s mid-turn tick, which would snapshot a half-finished turn. The distiller
@@ -233,6 +343,10 @@ function hydrateStreamFromData(s, data) {
   s.messages = (data.messages || []).slice();
   s.compaction = data.compaction || null;
   s.todos = data.todos || null;
+  // Messages loaded from the new JSONL are already persisted; those from a legacy
+  // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
+  s.persistedCount = (data && data._format === 'new') ? s.messages.length : 0;
+  s._forceJsonlRewrite = false;
 }
 
 function clearActiveConvUI() {
@@ -377,18 +491,11 @@ async function loadConv(id) {
   if (convStreams.has(id)) {
     mountConv(id);
   } else {
-    let data;
-    // Try archived path first, then active.
-    let path = convPath(id, true);
-    try { data = JSON.parse(await opfs.read(path)); }
-    catch {
-      path = convPath(id, false);
-      try { data = JSON.parse(await opfs.read(path)); }
-      catch (e) {
-        if (activeConvId) mountConv(activeConvId);
-        addMsg('err', 'Failed to load conversation: ' + e.message);
-        return;
-      }
+    const data = await readConvData(id);
+    if (!data) {
+      if (activeConvId) mountConv(activeConvId);
+      addMsg('err', 'Failed to load conversation.');
+      return;
     }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
@@ -415,37 +522,32 @@ async function newConversation() {
   await refreshConversationList();
 }
 async function listConversations() {
-  let entries = [];
-  try { entries = await opfs.listDir(CONV_DIR); } catch { /* empty */ }
-  let archivedEntries = [];
-  try { archivedEntries = await opfs.listDir(ARCHIVED_DIR); } catch { /* empty */ }
-
   const searchActive = !!($('convSearch')?.value.trim());
 
-  const reads = [entries, archivedEntries]
-    .flatMap((list, idx) =>
-      list.filter(e => e.kind === 'file' && e.name.endsWith('.json'))
-        .map(async (e) => {
-          const id = e.name.slice(0, -5);
-          const archived = idx === 1;
-          try {
-            const data = JSON.parse(await opfs.read(convPath(id, archived)));
-            const row = {
-              id: data.id || id,
-              title: data.title || '(no title)',
-              updated: data.updated || '',
-              pinned: !!data.pinned,
-              archived,
-            };
-            if (searchActive) {
-              const messages = data.messages || [];
-              row.messageContent = messages.map(m => m.content || '').join(' ').toLowerCase();
-            }
-            return row;
-          } catch { return null; }
-        })
-    );
-  const out = (await Promise.all(reads)).filter(Boolean);
+  // Scan both dirs, collecting one entry per conversation id. A conv may have a new
+  // meta file AND a legacy .json (kept as a backup); prefer the new format. Skip
+  // .jsonl (reached via its meta) and classify .meta.json BEFORE plain .json (since
+  // ".meta.json" also ends with ".json"). The list reads only the tiny meta files
+  // for migrated convs — no more parsing every conversation in full.
+  const found = new Map();   // id -> { archived, format }
+  for (const [dir, archived] of [[CONV_DIR, false], [ARCHIVED_DIR, true]]) {
+    let entries = [];
+    try { entries = await opfs.listDir(dir); } catch { /* empty */ }
+    for (const e of entries) {
+      if (e.kind !== 'file') continue;
+      let id = null, format = null;
+      if (e.name.endsWith(META_SUFFIX)) { id = e.name.slice(0, -META_SUFFIX.length); format = 'new'; }
+      else if (e.name.endsWith('.json')) { id = e.name.slice(0, -5); format = 'old'; }
+      else continue;
+      const prev = found.get(id);
+      if (!prev || (prev.format === 'old' && format === 'new')) found.set(id, { archived, format });
+    }
+  }
+
+  const rows = await Promise.all(
+    [...found.entries()].map(([id, loc]) => readConvMetaRow(id, loc.archived, loc.format, searchActive)),
+  );
+  const out = rows.filter(Boolean);
 
   for (const c of out) {
     if (!convLastViewed.has(c.id)) convLastViewed.set(c.id, c.updated || '');
@@ -453,17 +555,30 @@ async function listConversations() {
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
 let archivedExpanded = false;
+// Patch conversation metadata (title / pinned / archived / compaction / …). New
+// format → rewrite ONLY the tiny meta file (O(1), regardless of chat size — this
+// is what makes rename/pin instant). Legacy → patch the .json in place (still O(N)
+// until the conv migrates on its next full save/open). Never touches messages.
 async function updateConvFile(id, patch) {
-  let data, path = convPath(id, true);
-  try { data = JSON.parse(await opfs.read(path)); }
-  catch {
-    path = convPath(id, false);
-    try { data = JSON.parse(await opfs.read(path)); }
-    catch { return; }
+  const loc = await convLocation(id);
+  if (loc.format === 'new') {
+    let meta = {}; try { meta = JSON.parse(await opfs.read(metaPath(id, loc.archived))); } catch { return; }
+    Object.assign(meta, patch);
+    const p = metaPath(id, loc.archived);
+    await opfs.write(p, JSON.stringify(meta));
+    Sandpie.events.emit('file:changed', p);
+    // Keep a warm stream's mirrored fields in step so its next save doesn't revert them.
+    const s = convStreams.get(id);
+    if (s && 'compaction' in patch) s.compaction = patch.compaction || null;
+    return;
   }
-  Object.assign(data, patch);
-  await opfs.write(path, JSON.stringify(data));
-  Sandpie.events.emit('file:changed', path);
+  if (loc.format === 'old') {
+    const p = convPath(id, loc.archived);
+    let data; try { data = JSON.parse(await opfs.read(p)); } catch { return; }
+    Object.assign(data, patch);
+    await opfs.write(p, JSON.stringify(data));
+    Sandpie.events.emit('file:changed', p);
+  }
 }
 async function renameConv(id, current) {
   const next = prompt('Rename conversation', current);
@@ -478,51 +593,58 @@ async function togglePinConv(id, currentlyPinned) {
   await refreshConversationList();
 }
 async function toggleArchiveConv(id, currentlyArchived) {
-  // Archive is now a folder move, not a JSON property.
-  const fromPath = convPath(id, currentlyArchived);
-  const toPath = convPath(id, !currentlyArchived);
-  let data;
-  try { data = JSON.parse(await opfs.read(fromPath)); }
-  catch { return; }
-  // Keep the old JSON property for backward compatibility during transition.
-  data.archived = !currentlyArchived;
-  delete data.pinned;             // archived convs cannot stay pinned
-  try {
-    await opfs.write(toPath, JSON.stringify(data));
-    Sandpie.events.emit('file:changed', toPath);
-    await opfs.remove(fromPath);
-    Sandpie.events.emit('file:deleted', fromPath);
-  } catch (e) { console.warn('toggleArchiveConv failed:', e); }
+  // Archive is a folder move. Relocate every file that exists for this conv (new
+  // meta + jsonl, and/or a legacy .json backup) from one dir to the other, patching
+  // the archived/pinned flags inside the JSON-shaped ones. Not data loss — a move.
+  const from = currentlyArchived, to = !currentlyArchived;
+  const pairs = [
+    [metaPath(id, from), metaPath(id, to)],
+    [jsonlPath(id, from), jsonlPath(id, to)],
+    [convPath(id, from), convPath(id, to)],
+  ];
+  for (const [src, dst] of pairs) {
+    let content; try { content = await opfs.read(src); } catch { continue; }
+    if (src.endsWith(META_SUFFIX) || src.endsWith('.json')) {
+      try { const o = JSON.parse(content); o.archived = to; if (to) delete o.pinned; content = JSON.stringify(o); } catch {}
+    }
+    try {
+      await opfs.write(dst, content); Sandpie.events.emit('file:changed', dst);
+      await opfs.remove(src); Sandpie.events.emit('file:deleted', src);
+    } catch (e) { console.warn('toggleArchiveConv move failed:', src, e); }
+  }
   await refreshConversationList();
 }
 async function duplicateConv(id, title) {
-  let data;
-  // Try archived path first.
-  let srcPath = convPath(id, true);
-  try { data = JSON.parse(await opfs.read(srcPath)); }
-  catch {
-    srcPath = convPath(id, false);
-    try { data = JSON.parse(await opfs.read(srcPath)); }
-    catch (e) { addMsg('err', 'Failed to duplicate: ' + e.message); return; }
-  }
+  const data = await readConvData(id);
+  if (!data) { addMsg('err', 'Failed to duplicate conversation.'); return; }
   const newId = newConvId();
-  data.id = newId;
-  data.title = (data.title || title || '(no title)') + ' (copy)';
-  data.pinned = false;
-  data.archived = false;
-  data.updated = new Date().toISOString();
-  await opfs.write(convPath(newId, false), JSON.stringify(data));
-  Sandpie.events.emit('file:changed', convPath(newId, false));
+  const now = new Date().toISOString();
+  await rewriteConvJsonl(newId, false, data.messages || []);
+  const meta = {
+    id: newId,
+    title: (data.title || title || '(no title)') + ' (copy)',
+    created: now, updated: now, pinned: false,
+    msgCount: (data.messages || []).length,
+  };
+  if (data.compaction) meta.compaction = data.compaction;
+  if (data.todos) meta.todos = data.todos;
+  const mp = metaPath(newId, false);
+  await opfs.write(mp, JSON.stringify(meta));
+  Sandpie.events.emit('file:changed', mp);
   await refreshConversationList();
 }
 async function deleteConv(id, title) {
   const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
-  // Try archived path first, then active.
-  let path = convPath(id, true);
-  if (!(await opfs.exists(path))) path = convPath(id, false);
-  try { await opfs.remove(path); } catch {}
-  Sandpie.events.emit('file:deleted', path);
+  // Explicit user delete removes EVERY file for this id in both dirs — the new pair
+  // AND any legacy .json backup. Leaving the .json behind would resurrect the conv
+  // on the next list scan. (This is the one place old files are intentionally
+  // removed; migration never does.)
+  for (const archived of [false, true]) {
+    for (const p of [metaPath(id, archived), jsonlPath(id, archived), convPath(id, archived)]) {
+      try { if (await opfs.exists(p)) { await opfs.remove(p); Sandpie.events.emit('file:deleted', p); } } catch {}
+    }
+  }
 
   const stream = convStreams.get(id);
   if (stream) {
@@ -1441,6 +1563,9 @@ function ensureStream(id) {
       timerEl: null, timerStart: 0, timerInterval: null,
       lastUsage: null,
       generating: false,
+      // JSONL persistence: how many messages are already on disk, and a flag that
+      // forces a full rewrite (rewind/edit) instead of an append on the next save.
+      persistedCount: 0, _forceJsonlRewrite: false,
     };
     convStreams.set(id, s);
   }
@@ -2362,13 +2487,8 @@ async function maybeResumeFlight(id) {
   const ck = flightRead(id);
   if (!ck) return;
   if (Date.now() - ck.t > 5 * 60 * 1000) { flightClear(id); return; }
-  let data;
-  let path = convPath(id, true);
-  try { data = JSON.parse(await opfs.read(path)); }
-  catch {
-    path = convPath(id, false);
-    try { data = JSON.parse(await opfs.read(path)); } catch { flightClear(id); return; }
-  }
+  const data = await readConvData(id);
+  if (!data) { flightClear(id); return; }
   const s = ensureStream(id);
   hydrateStreamFromData(s, data);
   if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
@@ -2416,13 +2536,8 @@ async function _resolveConvForCompaction(convId) {
   if (s && Array.isArray(s.messages) && s.messages.length) {
     return { msgs: s.messages, compaction: s.compaction || null, stream: s };
   }
-  let data, path = convPath(convId, true);
-  try { data = JSON.parse(await opfs.read(path)); }
-  catch {
-    path = convPath(convId, false);
-    try { data = JSON.parse(await opfs.read(path)); } catch { return null; }
-  }
-  migrateCompactionData(data);
+  const data = await readConvData(convId);
+  if (!data) return null;
   return { msgs: (data.messages || []), compaction: data.compaction || null, stream: null };
 }
 async function compactConversation(convId, { keepTail = 10, summary = '' } = {}) {
@@ -2728,16 +2843,10 @@ class SidePanel {
 
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
-    let data;
-    let path = convPath(id, true);
-    try { data = JSON.parse(await opfs.read(path)); }
-    catch {
-      path = convPath(id, false);
-      try { data = JSON.parse(await opfs.read(path)); }
-      catch (e) { addMsg('err', 'Failed to load conv: ' + e.message); throw e; }
-    }
+    const data = await readConvData(id);
+    if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
     const s = ensureStream(id);
-    s.messages = (data.messages || []).slice();
+    hydrateStreamFromData(s, data);
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
@@ -3328,14 +3437,8 @@ function bootConversations() {
       activeConvId = null;
       const s = ensureStream(restoreId);
       try {
-        let path = convPath(restoreId, true);
-        let data;
-        try { data = JSON.parse(await opfs.read(path)); }
-        catch {
-          path = convPath(restoreId, false);
-          data = JSON.parse(await opfs.read(path));
-        }
-        hydrateStreamFromData(s, data);
+        const data = await readConvData(restoreId);
+        if (data) hydrateStreamFromData(s, data);
       } catch {  }
       mountConv(restoreId);
       renderConversation(s.messages, s.compaction);

@@ -37,11 +37,15 @@ const SandpieTokens = (() => {
       const stored = localStorage.getItem(USAGE_PREFIX + convId);
       if (stored) return usageTotal(JSON.parse(stored));
     } catch {}
-    try {
-      const text = await window.opfs.read('sandpie/conversations/' + convId + '.json');
-      const data = JSON.parse(text);
-      if (data.usage) return usageTotal(data.usage);
-    } catch {}
+    // Disk fallback: new format stores usage in the meta sidecar; legacy convs in
+    // the monolithic .json. Try both (archived paths included).
+    const base = 'sandpie/conversations/';
+    for (const rel of [convId + '.meta.json', 'archived/' + convId + '.meta.json', convId + '.json', 'archived/' + convId + '.json']) {
+      try {
+        const data = JSON.parse(await window.opfs.read(base + rel));
+        if (data && data.usage) return usageTotal(data.usage);
+      } catch {}
+    }
     return 0;
   }
 
