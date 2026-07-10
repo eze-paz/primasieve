@@ -279,81 +279,23 @@ window.SandpieContext = SandpieContext;
 /**
  * Context Module for Sandpie
  *
- * Registers a "Context" section in the sidebar via SandpieMenu and renders the
- * conversation's token usage (with a context-window percentage when the model's
- * window is known) plus a rolling 7-day token total. The numbers come from
- * SandpieTokens, which the page populates from real provider usage.
- * Below the usage block it renders the skill index (SandpieContext): every
- * indexed skill, validation errors, and which skills the active conversation
- * has loaded.
+ * Wires provider-reported token usage into SandpieTokens (via the tokens:record
+ * event). There is no sidebar section: per-conversation context size lives in a
+ * click popup on each chat's own ctx counter (conversations.js openContextPopup),
+ * driven by SandpieTokens.conversationTokens — real reported usage, never an
+ * estimate.
  *
  * Usage: <script type="module" src="modules/context.js"></script>
  */
 
-let _unsubscribe = null;
-
-function fmtTokens(n) {
-  n = Math.max(0, Math.round(n || 0));
-  if (n < 1000) return String(n);
-  if (n < 1000000) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + 'k';
-  return (n / 1000000).toFixed(1) + 'M';
-}
-
-const escHtml = s => String(s).replace(/[&<>"']/g, c => (
-  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-));
-
-// Sidebar "Context" section. The per-conversation breakdown moved OUT of the
-// sidebar into a click popup on each conversation's live ctx counter (see
-// conversations.js openContextPopup). What remains here is the 7-day rolling
-// total (a global stat) plus a badge showing the active conversation's % of the
-// window — both derived from REAL provider-reported usage, never an estimate.
-async function render() {
-  const T = SandpieTokens;
-  if (typeof T === 'undefined') return;
-
-  const weekEl = document.getElementById('ctxWeekTokens');
-  const total = await T.conversationTokens();
-  const window_ = T.contextWindow();
-
-  if (weekEl) weekEl.textContent = fmtTokens(T.weeklyTotal());
-
-  let badge = total ? fmtTokens(total) : '—';
-  if (window_ && total) badge = `${Math.min(100, (total / window_) * 100).toFixed(0)}%`;
-  if (typeof SandpieMenu !== 'undefined') SandpieMenu.updateBadge('contextSection', badge);
-}
-
 function init() {
-  if (typeof SandpieMenu === 'undefined') {
-    console.warn('Context module: SandpieMenu not found, retrying in 500ms...');
-    setTimeout(init, 500);
-    return;
-  }
-
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
-    Sandpie.events.on('tokens:record', ({convId, usage}) => {
+    Sandpie.events.on('tokens:record', ({ convId, usage }) => {
       SandpieTokens.recordUsage(convId, usage);
     });
+    return;
   }
-
-  SandpieMenu.add('contextSection', {
-    title: 'Context',
-    badge: '—',
-    open: false,
-    html: `
-      <p style="font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.55rem;">Per-conversation context size is shown on each chat's live counter — click it for details.</p>
-      <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
-        <span style="color:var(--sp-text-dim);">This week (7d)</span>
-        <span id="ctxWeekTokens" style="font-variant-numeric:tabular-nums;">–</span>
-      </div>
-    `,
-    onRender(bodyEl) {
-      if (!_unsubscribe) _unsubscribe = SandpieTokens.subscribe(render);
-      render();
-    }
-  });
-
-  console.log('Context module registered');
+  setTimeout(init, 500);   // Sandpie.events not ready yet
 }
 
 if (document.readyState === 'loading') {

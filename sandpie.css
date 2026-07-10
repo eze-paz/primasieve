@@ -534,7 +534,7 @@
   .msg-timer .mt-tok,
   .msg-timer .mt-rate,
   .msg-timer .mt-ctx { color: var(--sp-text-dim); }
-  .msg-timer .mt-ctx { text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
+  .msg-timer .mt-ctx { cursor: pointer; }
   .msg-timer .mt-ctx:hover { color: var(--sp-accent); }
   .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }
