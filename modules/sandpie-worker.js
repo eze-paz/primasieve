@@ -1388,20 +1388,16 @@ class CompactionFailure extends Error {
   constructor(msg) { super(msg); this.name = 'CompactionFailure'; this.compactionFailed = true; }
 }
 
-// Called at the top of every round. Mutates `messages` in place when over the
-// threshold. The trigger is the SIMPLE reported-token gate: the provider's real
-// prompt_tokens from the previous round ÷ the context window ≥ pct. No estimate,
-// no calibration. When compaction is required it MUST succeed — a failure throws
-// CompactionFailure so the turn halts loudly instead of silently continuing.
-async function maybeCompactMidTurn(config, messages, ctx) {
+// Called at a round boundary, given the round's REAL reported prompt_tokens.
+// The single, simple condition: reported prompt_tokens ÷ context window ≥ pct →
+// pause and compact before the next round. No estimate, no stored state. Mutates
+// `messages` in place. When compaction is required it MUST succeed — a failure
+// throws CompactionFailure so the turn halts loudly instead of silently continuing.
+async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
   const cmp = config.compaction;
   if (!cmp || !cmp.enabled || !cmp.window) return;
-  // Reported-only: the last round's authoritative prompt_tokens. Before any round
-  // has reported (first round of a turn), there's no real number — the pre-send
-  // maybeAutoCompact already gated that case, so skip here.
-  const used = ctx._lastPromptTokens || 0;
-  if (!used) return;
-  const pct = (used / cmp.window) * 100;
+  if (!promptTokens || promptTokens <= 0) return;   // no reported number → nothing to gate on
+  const pct = (promptTokens / cmp.window) * 100;
   if (pct < (cmp.pct || 70)) return;
 
   const marker = cmp.marker || SP_SUMMARY_MARKER;
@@ -1430,10 +1426,6 @@ async function maybeCompactMidTurn(config, messages, ctx) {
   if (summary) {
     // Drop [0, split) — old summary + aged body — and prepend the fresh, folded summary.
     messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
-    // Real reported size of the retained context is now unknown until the next
-    // round reports — clear the stale (pre-compaction) figure so the gate doesn't
-    // immediately re-fire on the same number.
-    ctx._lastPromptTokens = 0;
     ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
   }
   ctx.emit({ type: 'info', message: null });
@@ -1547,19 +1539,6 @@ async function runAgent(config, ctx) {
       }
       ctx._roundsSinceTodo = 0;
     }
-    // Mid-turn compaction: if the loop has grown context past the threshold,
-    // summarize the active slice in place before issuing the next round. Compaction
-    // is never skipped — if it is required but fails, halt the turn with a visible
-    // error instead of shipping an over-limit request.
-    try {
-      await maybeCompactMidTurn(config, messages, ctx);
-    } catch (e) {
-      if (e && e.compactionFailed) {
-        ctx.emit({ type: 'error', message: (e && e.message) || 'Compaction failed.' });
-        break;
-      }
-      console.warn('[sandpie] mid-turn compaction error:', e);
-    }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
     // Consume the ephemeral reminder for exactly this round: append it to the
@@ -1584,12 +1563,7 @@ async function runAgent(config, ctx) {
     if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
-    if (round.usage) {
-      ctx.emit({ type: 'usage', usage: round.usage });
-      // Authoritative context size for the reported-only mid-turn compaction gate:
-      // the provider's real prompt_tokens for the round just sent.
-      if (round.usage.prompt_tokens > 0) ctx._lastPromptTokens = round.usage.prompt_tokens;
-    }
+    if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
     if (!round.tool_calls.length) {
       if (round.content) {
         const m = { role: 'assistant', content: round.content };
@@ -1660,6 +1634,19 @@ async function runAgent(config, ctx) {
     if (loadedImages.length) {
       messages.push({ role: 'user', content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: im.dataUrl } })) });
       ctx.emit({ type: 'message_added', message: { role: 'user', _loadedImage: true, content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: 'opfs://' + im.path } })) } });
+    }
+    // End of round, and another round WILL follow (this round called tools). If the
+    // request we just sent was already over the threshold, pause and compact before
+    // issuing the next one. Gated on the round's REAL reported prompt_tokens — the
+    // one and only mid-turn condition. Never skipped: a required compaction that
+    // fails halts the turn loudly rather than shipping an over-limit request. We
+    // don't do this on the turn's final (no-tool) round — worker compaction is
+    // ephemeral (not persisted), so it would be a wasted summarizer call.
+    try {
+      await maybeCompactMidTurn(config, messages, ctx, round.usage && round.usage.prompt_tokens);
+    } catch (e) {
+      if (e && e.compactionFailed) { ctx.emit({ type: 'error', message: (e && e.message) || 'Compaction failed.' }); break; }
+      console.warn('[sandpie] mid-turn compaction error:', e);
     }
   }
   ctx.emit({ type: 'agent_done' });
