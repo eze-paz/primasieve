@@ -1326,27 +1326,6 @@ function _cmpTextOf(content) {
   return '';
 }
 
-// Approximate tokens actually SENT this round: text at ~4 chars/token, plus a
-// flat allowance per inline image (base64 length would wildly overcount).
-function _estContextTokens(systemPrompt, messages, tools) {
-  let chars = (systemPrompt && typeof systemPrompt.content === 'string') ? systemPrompt.content.length : 0;
-  try { chars += JSON.stringify(tools || []).length; } catch (_) {}
-  let imgTokens = 0;
-  for (const m of messages) {
-    if (!m) continue;
-    const c = m.content;
-    if (typeof c === 'string') chars += c.length;
-    else if (Array.isArray(c)) {
-      for (const p of c) {
-        if (p && p.type === 'image_url') imgTokens += 1200;
-        else if (p && typeof p.text === 'string') chars += p.text.length;
-      }
-    }
-    if (m.tool_calls) { try { chars += JSON.stringify(m.tool_calls).length; } catch (_) {} }
-  }
-  return Math.ceil(chars / 4) + imgTokens;
-}
-
 // Mirror of conversations.js safeSplitIndex: the kept tail must START on an
 // assistant message so the leading user-role summary preserves alternation and
 // never orphans a role:'tool' result from its assistant tool_calls.
@@ -1372,7 +1351,8 @@ function _cmpTranscript(messages, fromIdx, toIdx) {
 
 // Non-streaming summarization call with retry/backoff (requirement: compaction
 // must retry on failure). Returns the summary text, or null if it ultimately
-// fails or is aborted — callers then simply skip compaction for this round.
+// is aborted (returns null). On genuine failure it retries with backoff and, if
+// still failing, THROWS — compaction is never silently skipped (see caller).
 async function _summarizeForCompaction(config, transcript, ctx) {
   const cmp = config.compaction;
   const body = {
@@ -1382,6 +1362,7 @@ async function _summarizeForCompaction(config, transcript, ctx) {
     stream: false,
   };
   const BACKOFF_MS = [800, 1500, 3000];
+  let lastErr = null;
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
     if (ctx.signal && ctx.signal.aborted) return null;
     try {
@@ -1390,26 +1371,36 @@ async function _summarizeForCompaction(config, transcript, ctx) {
       const d = await r.json();
       const txt = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
       if (txt && txt.trim()) return txt.trim();
-      throw new Error('empty summary');
+      throw new Error('summarizer returned an empty response');
     } catch (e) {
       if (ctx.signal && ctx.signal.aborted) return null;
-      if (attempt === BACKOFF_MS.length) return null;   // exhausted → skip, don't break the turn
+      lastErr = e;
+      if (attempt === BACKOFF_MS.length) break;
       await swSleep(BACKOFF_MS[attempt], ctx.signal);
     }
   }
-  return null;
+  throw lastErr || new Error('compaction summarizer failed');
+}
+
+// A compaction that was required but could not be produced. The round loop stops
+// the turn on this rather than shipping an over-limit request.
+class CompactionFailure extends Error {
+  constructor(msg) { super(msg); this.name = 'CompactionFailure'; this.compactionFailed = true; }
 }
 
 // Called at the top of every round. Mutates `messages` in place when over the
-// threshold. Never throws — a failed compaction must not interrupt generation.
+// threshold. The trigger is the SIMPLE reported-token gate: the provider's real
+// prompt_tokens from the previous round ÷ the context window ≥ pct. No estimate,
+// no calibration. When compaction is required it MUST succeed — a failure throws
+// CompactionFailure so the turn halts loudly instead of silently continuing.
 async function maybeCompactMidTurn(config, messages, ctx) {
   const cmp = config.compaction;
   if (!cmp || !cmp.enabled || !cmp.window) return;
-  const raw = _estContextTokens(config.systemPrompt, messages, config.tools);
-  // Scale the char/4 estimate by the provider-calibrated ratio (set from the last
-  // round's real prompt_tokens) so this trigger agrees with the context meter's %.
-  // Falls back to the raw estimate on the first round, before any usage is seen.
-  const used = (ctx._cmpCalib && ctx._cmpCalib > 0) ? raw * ctx._cmpCalib : raw;
+  // Reported-only: the last round's authoritative prompt_tokens. Before any round
+  // has reported (first round of a turn), there's no real number — the pre-send
+  // maybeAutoCompact already gated that case, so skip here.
+  const used = ctx._lastPromptTokens || 0;
+  if (!used) return;
   const pct = (used / cmp.window) * 100;
   if (pct < (cmp.pct || 70)) return;
 
@@ -1420,8 +1411,8 @@ async function maybeCompactMidTurn(config, messages, ctx) {
   const bodyStart = hasSummary ? 1 : 0;
 
   const split = _safeSplitIndex(messages, cmp.keepTail || 10);
-  // Refuse to compact if it can't reduce the body or would leave no valid tail
-  // (which mid-turn would strip the in-flight round's context).
+  // Can't reduce the body / no valid tail: nothing to do (not a failure — the
+  // protected tail alone is already over the window; only a bigger window helps).
   if (split <= bodyStart || split >= messages.length) return;
 
   let transcript = _cmpTranscript(messages, bodyStart, split);
@@ -1429,10 +1420,20 @@ async function maybeCompactMidTurn(config, messages, ctx) {
   if (prior) transcript = '[Summary of the conversation so far]\n' + prior + '\n\n[New turns to fold into the summary]\n' + transcript;
 
   ctx.emit({ type: 'info', message: 'Context over ' + Math.round(cmp.pct) + '% — compacting to continue…' });
-  const summary = await _summarizeForCompaction(config, transcript, ctx);
+  let summary = null;
+  try {
+    summary = await _summarizeForCompaction(config, transcript, ctx);
+  } catch (e) {
+    ctx.emit({ type: 'info', message: null });
+    throw new CompactionFailure('Context is over ' + Math.round(cmp.pct) + '% and must be compacted to continue, but summarizing the earlier turns failed: ' + ((e && e.message) || e) + '. Generation stopped.');
+  }
   if (summary) {
     // Drop [0, split) — old summary + aged body — and prepend the fresh, folded summary.
     messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
+    // Real reported size of the retained context is now unknown until the next
+    // round reports — clear the stale (pre-compaction) figure so the gate doesn't
+    // immediately re-fire on the same number.
+    ctx._lastPromptTokens = 0;
     ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
   }
   ctx.emit({ type: 'info', message: null });
@@ -1547,9 +1548,18 @@ async function runAgent(config, ctx) {
       ctx._roundsSinceTodo = 0;
     }
     // Mid-turn compaction: if the loop has grown context past the threshold,
-    // summarize the active slice in place before issuing the next round. Guarded
-    // so a compaction failure can never break generation.
-    try { await maybeCompactMidTurn(config, messages, ctx); } catch (e) { console.warn('[sandpie] mid-turn compaction failed:', e); }
+    // summarize the active slice in place before issuing the next round. Compaction
+    // is never skipped — if it is required but fails, halt the turn with a visible
+    // error instead of shipping an over-limit request.
+    try {
+      await maybeCompactMidTurn(config, messages, ctx);
+    } catch (e) {
+      if (e && e.compactionFailed) {
+        ctx.emit({ type: 'error', message: (e && e.message) || 'Compaction failed.' });
+        break;
+      }
+      console.warn('[sandpie] mid-turn compaction error:', e);
+    }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
     // Consume the ephemeral reminder for exactly this round: append it to the
@@ -1572,19 +1582,13 @@ async function runAgent(config, ctx) {
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
     if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
-    // Char-estimate of exactly what we're sending this round, paired with the
-    // provider's reported prompt_tokens below to calibrate the mid-turn trigger.
-    const _estAtSend = _estContextTokens(config.systemPrompt, messages, config.tools);
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (round.usage) {
       ctx.emit({ type: 'usage', usage: round.usage });
-      // Calibrate ~4-chars/token against the provider's real tokenizer so the
-      // worker's threshold matches the % the context meter shows. char/4 badly
-      // undercounts dense content (tool-def JSON, code, tool output), which left
-      // mid-turn compaction dormant while the meter already read >70%.
-      const pt = round.usage.prompt_tokens;
-      if (pt > 0 && _estAtSend > 0) ctx._cmpCalib = pt / _estAtSend;
+      // Authoritative context size for the reported-only mid-turn compaction gate:
+      // the provider's real prompt_tokens for the round just sent.
+      if (round.usage.prompt_tokens > 0) ctx._lastPromptTokens = round.usage.prompt_tokens;
     }
     if (!round.tool_calls.length) {
       if (round.content) {

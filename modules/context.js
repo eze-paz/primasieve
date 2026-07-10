@@ -22,68 +22,17 @@ const SandpieTokens = (() => {
     return prune(loadLog()).reduce((a, e) => a + (e.tokens || 0), 0);
   }
 
-  function textOf(content) {
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) return content.map(p => p && p.type === 'text' ? (p.text || '') : '').join(' ');
-    return '';
-  }
-  function estimateTokens(msgs) {
-    let chars = 0;
-    for (const m of (msgs || [])) {
-      chars += textOf(m.content).length;
-      if (m.tool_calls) for (const tc of m.tool_calls) chars += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
-    }
-    return Math.ceil(chars / 4);
-  }
-
-  // The per-request scaffold the model always receives but the message-text estimate
-  // misses: the editable system prompt, the serialized tool defs, and the skills
-  // block. Counting it is what makes an ESTIMATE comparable to the provider's
-  // reported usage (which includes all of it) — without this the % swings 2-3× the
-  // moment usage is reported. Chars → tokens at the same ~4:1 heuristic.
-  function overheadChars() {
-    let chars = 0;
-    try { if (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get) chars += (SandpieSystemPrompt.get() || '').length; } catch {}
-    try { if (typeof toolDefs === 'function') chars += JSON.stringify(toolDefs() || []).length; } catch {}
-    try {
-      const st = (typeof SandpieContext !== 'undefined' && SandpieContext.lastState) ? SandpieContext.lastState() : null;
-      if (st && st.exists) { let c = 620; for (const s of (st.skills || [])) { if (s.enabled === false) continue; c += (s.name || '').length + Math.min((s.desc || '').length, 400) + 12; } chars += c; }
-    } catch {}
-    // The durable-memory block buildSystemPrompt appends (sandpie/memory/*.md). Its
-    // char length is cached by SandpieMemory.systemBlock() on every send, so this
-    // stays in step with what's actually sent without an async OPFS read here.
-    try { if (typeof SandpieMemory !== 'undefined' && SandpieMemory.blockChars) chars += SandpieMemory.blockChars() || 0; } catch {}
-    return chars;
-  }
-
-  // Compaction-aware: what actually goes to the model is [summary, …tail], NOT the
-  // full history. A non-destructive compaction keeps every message in the array but
-  // only sends the summary + post-boundary tail (conversations.js buildAgentConfig),
-  // so any "context size" must measure that, or it stays pinned high after a compaction.
-  function sentMessages(msgs, comp) {
-    msgs = msgs || [];
-    if (comp && comp.boundary > 0 && comp.boundary < msgs.length) {
-      return [{ role: 'user', content: comp.summary || '' }, ...msgs.slice(comp.boundary)];
-    }
-    return msgs;
-  }
-
-  // The single source of truth for "tokens actually sent" as an ESTIMATE: overhead
-  // + compaction-aware body. Used by the Context panel, the compaction trigger
-  // (agents.contextPct), and the live-meter baseline, so all three agree.
-  function estimateContextTokens(msgs, comp) {
-    return Math.ceil(overheadChars() / 4) + estimateTokens(sentMessages(msgs, comp));
-  }
-
-  // Live override pushed by the streaming loop during generation, so the panel
-  // climbs in real time (baseline + generated-so-far) instead of only updating
-  // when the turn ends. Cleared when the turn finishes → authoritative wins.
-  let _liveTotal = null, _liveConvId = null, _liveNotifyT = null, _liveDelta = 0;
-
-  async function conversationTokens() {
-    const convId = localStorage.getItem('sandpie-active-conv');
+  // Reported-only conversation size. Returns the provider's authoritative token
+  // usage for a conversation (its last-turn prompt+completion), or 0 when the
+  // provider has not reported any usage yet. There is NO client-side estimate:
+  // every backend that has a real tokenizer (the API providers AND the local
+  // WebGPU engine) emits a `usage` event, which recordUsage() persists here.
+  // convId defaults to the active conversation so existing call sites keep working;
+  // pass an explicit id to measure a BACKGROUND conversation (compaction runs per
+  // conversation regardless of which one is on screen).
+  async function conversationTokens(convId) {
+    convId = convId || localStorage.getItem('sandpie-active-conv');
     if (!convId) return 0;
-    if (_liveTotal != null && _liveConvId === convId) return _liveTotal;
     try {
       const stored = localStorage.getItem(USAGE_PREFIX + convId);
       if (stored) return usageTotal(JSON.parse(stored));
@@ -92,41 +41,20 @@ const SandpieTokens = (() => {
       const text = await window.opfs.read('sandpie/conversations/' + convId + '.json');
       const data = JSON.parse(text);
       if (data.usage) return usageTotal(data.usage);
-      if (data.messages) return estimateContextTokens(data.messages, data.compaction || null);
     } catch {}
     return 0;
   }
 
-  function isEstimated() {
-    const convId = localStorage.getItem('sandpie-active-conv');
-    if (_liveTotal != null && _liveConvId === convId) return true;   // live = estimate
-    return !convId || !localStorage.getItem(USAGE_PREFIX + convId);
-  }
-
-  // True while a turn is actively streaming into the visible conversation (the live
-  // running total is being pushed by the HUD). render() uses this to DEFER the heavy
-  // per-type breakdown to turn end instead of recomputing it on every streamed frame.
-  function isLive() {
-    const convId = localStorage.getItem('sandpie-active-conv');
-    return _liveTotal != null && _liveConvId === convId;
-  }
-
-  // Streaming loop calls this (throttled internally) with the live running total
-  // and the this-turn delta (generated + tool-result tokens), so render() can
-  // grow the cached breakdown by the delta instead of clamping against it.
-  function setLiveTokens(convId, total, delta) {
-    _liveConvId = convId;
-    _liveTotal = (typeof total === 'number' && total >= 0) ? total : null;
-    _liveDelta = (typeof delta === 'number' && delta >= 0) ? delta : 0;
-    if (_liveNotifyT) return;   // coalesce re-renders to ~1/s
-    _liveNotifyT = setTimeout(() => { _liveNotifyT = null; notify(); }, 1000);
-  }
-  function liveDelta() { return _liveDelta; }
-  function clearLiveTokens(convId) {
-    if (convId != null && convId !== _liveConvId) return;
-    _liveTotal = null; _liveConvId = null; _liveDelta = 0;
-    if (_liveNotifyT) { clearTimeout(_liveNotifyT); _liveNotifyT = null; }
-    notify();
+  // The single source of truth for "how full is the context window" — reported
+  // tokens ÷ the active provider's window, as a percentage. null when the window
+  // is unknown or nothing has been reported. The compaction trigger, the live ctx
+  // counter, and the context popup all read this so they can never disagree.
+  async function contextPct(convId) {
+    const w = contextWindow();
+    if (!w) return null;
+    const used = await conversationTokens(convId);
+    if (!used) return null;
+    return (used / w) * 100;
   }
 
   function contextWindow() {
@@ -155,9 +83,8 @@ const SandpieTokens = (() => {
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    recordUsage, forget, conversationTokens, estimateTokens, estimateContextTokens,
-    isEstimated, isLive, weeklyTotal, contextWindow, subscribe, notify,
-    setLiveTokens, clearLiveTokens, liveDelta,
+    recordUsage, forget, conversationTokens, contextPct,
+    weeklyTotal, contextWindow, subscribe, notify,
   };
 })();
 window.SandpieTokens = SandpieTokens;
@@ -376,178 +303,24 @@ const escHtml = s => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
 
-// Estimate the conversation's token usage split by TYPE (a client-side estimate
-// at ~4 chars/token, like SandpieTokens.estimateTokens). The provider only gives
-// a single total, so the per-type split is necessarily approximate.
-//  - system prompt   : the editable base prompt (SandpieSystemPrompt)
-//  - tool descriptions: the serialized tool defs sent every request (toolDefs)
-//  - skills          : the skills block appended to the system prompt (from the
-//                      cached scan, so we don't re-read OPFS on every tick)
-//  - messages        : user + assistant text
-//  - tool calls      : assistant tool_calls (name + arguments)
-//  - tool results    : tool-role message content
-//  - images          : counted (their token cost is provider/size-specific)
-const CTX_CATS = [
-  ['system',      'System prompt',     '#58a6ff'],
-  ['tools',       'Tool descriptions', '#a371f7'],
-  ['skills',      'Skills',            '#3fb950'],
-  ['memory',      'Memory',            '#39c5cf'],
-  ['messages',    'Messages',          '#d29922'],
-  ['toolCalls',   'Tool calls',        '#f778ba'],
-  ['toolResults', 'Tool results',      '#ff7b72'],
-];
-
-// Cache the last full per-type breakdown. computeBreakdown() reads OPFS + JSON.parses
-// the whole conversation + JSON.stringify(toolDefs) on every call; the streaming HUD
-// ticks setLiveTokens at ~15fps → notify() ~5×/s, so during in-tab decode this ran on
-// the main thread 5×/s and starved the WebGPU/Gemma worker on the shared iGPU
-// (focused-tab decode collapse: GPU ~30% focused / 100% backgrounded). The breakdown
-// only changes when a turn completes, so render() computes it ONCE per turn: while a
-// turn streams (SandpieTokens.isLive()) it reuses this cache, and clearLiveTokens()→
-// notify() at turn end recomputes it fresh against the saved conversation.
-let _bdCache = null;
-
-async function computeBreakdown() {
-  const toTok = c => Math.ceil((c || 0) / 4);
-  const b = { system: 0, tools: 0, skills: 0, memory: 0, messages: 0, toolCalls: 0, toolResults: 0, images: 0 };
-  try { if (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get) b.system = toTok((SandpieSystemPrompt.get() || '').length); } catch {}
-  try { if (typeof toolDefs === 'function') b.tools = toTok(JSON.stringify(toolDefs() || []).length); } catch {}
-  try {
-    if (typeof SandpieContext !== 'undefined' && SandpieContext.lastState) {
-      const st = SandpieContext.lastState();
-      if (st && st.exists) {
-        let chars = 620;  // the fixed instruction/header in the skills block
-        for (const s of (st.skills || [])) { if (s.enabled === false) continue; chars += (s.name || '').length + Math.min((s.desc || '').length, 400) + 12; }
-        b.skills = toTok(chars);
-      }
-    }
-  } catch {}
-  // Durable-memory block (sandpie/memory/*.md). Recompute it fresh here — this runs
-  // only at turn boundaries / on expand (never during live streaming, which reuses
-  // _bdCache), and it refreshes the sync char cache overheadChars() reads.
-  try { if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) b.memory = toTok((await SandpieMemory.systemBlock()).length); } catch {}
-  let msgs = [], comp = null;
-  try {
-    const convId = localStorage.getItem('sandpie-active-conv');
-    if (convId && window.opfs) {
-      const data = JSON.parse(await opfs.read('sandpie/conversations/' + convId + '.json'));
-      if (Array.isArray(data.messages)) msgs = data.messages;
-      comp = data.compaction || null;
-    }
-  } catch {}
-  // Compaction-aware: count only what's sent — the summary (as a message) + the
-  // post-boundary tail — not the archived head. Keeps the bar + total in step with
-  // the model's real context (and with the compaction trigger) after a compaction.
-  const active = comp && comp.boundary > 0 && comp.boundary < msgs.length;
-  if (active) { b.messages += toTok((comp.summary || '').length); msgs = msgs.slice(comp.boundary); }
-  for (const m of msgs) {
-    if (!m) continue;
-    let textLen = 0;
-    const c = m.content;
-    if (typeof c === 'string') textLen += c.length;
-    else if (Array.isArray(c)) for (const p of c) {
-      if (p && p.type === 'text') textLen += (p.text || '').length;
-      else if (p && /image/.test(String(p.type || ''))) b.images++;
-    }
-    if (m.role === 'tool') b.toolResults += toTok(textLen); else b.messages += toTok(textLen);
-    if (Array.isArray(m.tool_calls)) {
-      let t = 0;
-      for (const tc of m.tool_calls) { const f = tc.function || {}; t += (f.name || '').length + (f.arguments || '').length; }
-      b.toolCalls += toTok(t);
-    }
-  }
-  return b;
-}
-
+// Sidebar "Context" section. The per-conversation breakdown moved OUT of the
+// sidebar into a click popup on each conversation's live ctx counter (see
+// conversations.js openContextPopup). What remains here is the 7-day rolling
+// total (a global stat) plus a badge showing the active conversation's % of the
+// window — both derived from REAL provider-reported usage, never an estimate.
 async function render() {
   const T = SandpieTokens;
   if (typeof T === 'undefined') return;
 
-  const convEl = document.getElementById('ctxConvTokens');
-  if (!convEl) return;
-  const pctEl = document.getElementById('ctxConvPct');
   const weekEl = document.getElementById('ctxWeekTokens');
-  const barEl = document.getElementById('ctxStackBar');
-  const legEl = document.getElementById('ctxBreakdown');
-  const section = document.getElementById('contextSection');
-  const open = !section || section.open;
-
-  const reportedTotal = await T.conversationTokens();
+  const total = await T.conversationTokens();
   const window_ = T.contextWindow();
-  const estimated = T.isEstimated();
 
-  // The per-type breakdown is also a fuller estimate: it counts the system prompt,
-  // tool defs, and skills that the message-only estimate misses. It only changes at
-  // turn boundaries, so while a turn is streaming reuse the cached breakdown and skip
-  // the heavy recompute entirely — see the _bdCache note above (focused-tab
-  // decode-collapse fix). Turn end (clearLiveTokens→notify) recomputes it fresh.
-  let b, total;
-  if (T.isLive && T.isLive() && _bdCache) {
-    // Live: grow the cached (turn-start) breakdown by the this-turn delta the
-    // streaming HUD reports. Never clamp against the cached sum — the old
-    // max(reported, sum) froze the headline for most of a local run, because
-    // the live baseline misses the system/tools/skills tokens the sum has.
-    b = { ..._bdCache };
-    b.messages += T.liveDelta ? T.liveDelta() : 0;
-    total = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
-  } else {
-    b = await computeBreakdown();
-    _bdCache = b;
-    const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
-    // When estimating, show whichever is larger — the reported figure or the
-    // breakdown sum — so the headline never reads smaller than its own breakdown.
-    total = estimated ? Math.max(reportedTotal, sum) : reportedTotal;
-  }
-  const sum = CTX_CATS.reduce((a, [k]) => a + (b[k] || 0), 0);
-
-  convEl.textContent = fmtTokens(total) + (estimated ? ' ~' : '');
-  convEl.title = estimated ? 'Estimated client-side (provider did not report usage)' : 'Reported by the provider';
-
-  let badge = fmtTokens(total);
-  if (window_) {
-    const pct = Math.min(100, (total / window_) * 100);
-    badge = `${pct.toFixed(0)}%`;
-    if (pctEl) pctEl.textContent = `${pct.toFixed(pct < 10 ? 1 : 0)}% of ${fmtTokens(window_)} window · ${fmtTokens(Math.max(0, window_ - total))} left`;
-  } else if (pctEl) {
-    pctEl.textContent = 'Context window unknown for this model';
-  }
   if (weekEl) weekEl.textContent = fmtTokens(T.weeklyTotal());
+
+  let badge = total ? fmtTokens(total) : '—';
+  if (window_ && total) badge = `${Math.min(100, (total / window_) * 100).toFixed(0)}%`;
   if (typeof SandpieMenu !== 'undefined') SandpieMenu.updateBadge('contextSection', badge);
-
-  // Only the bar/legend DOM is skipped when collapsed (the totals above stay live);
-  // the toggle handler re-runs render() when the section is expanded.
-  if (!open || (!barEl && !legEl)) return;
-
-  const present = CTX_CATS.filter(([k]) => b[k] > 0);
-  // The bar represents the WHOLE context window: coloured "used" segments fill
-  // total/window of it, and the rest stays as the bar's --sp-border background =
-  // the free/unused window. Without a known window we fall back to pure
-  // composition (segments fill 100%, no "Free").
-  const haveWin = window_ > 0;
-  const usedFrac = haveWin ? Math.min(1, total / window_) : 1;
-  const freeTokens = haveWin ? Math.max(0, window_ - total) : 0;
-  const segPct = k => (sum > 0 ? (b[k] / sum) * usedFrac * 100 : 0);   // segment width as % of the whole bar
-
-  if (barEl) {
-    barEl.innerHTML = sum > 0
-      ? present.map(([k, label, color]) => `<div title="${label}: ${fmtTokens(b[k])}" style="width:${segPct(k).toFixed(2)}%;background:${color};height:100%;"></div>`).join('')
-      : '';
-  }
-  if (legEl) {
-    const pf = p => (p > 0 && p < 0.5) ? '<1%' : Math.round(p) + '%';   // never show 0% for a non-zero row
-    const row = (color, label, toks, pct, free) =>
-      `<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.72rem;line-height:1.55;">
-        <span style="width:9px;height:9px;border-radius:2px;background:${color};flex:0 0 auto;${free ? 'border:1px solid var(--sp-border-bright,#484f58);' : ''}"></span>
-        <span style="color:var(--sp-text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>
-        <span style="font-variant-numeric:tabular-nums;color:${free ? 'var(--sp-text-dim)' : 'var(--sp-text)'};">${toks}</span>
-        <span style="color:var(--sp-text-dim);min-width:2.6em;text-align:right;">${pf(pct)}</span>
-      </div>`;
-    // % is of the whole window when known (so type rows + Free sum to 100%), else share of used.
-    let rows = present.map(([k, label, color]) => row(color, label, fmtTokens(b[k]), (b[k] / sum) * (haveWin ? usedFrac : 1) * 100, false)).join('');
-    if (haveWin) rows += row('var(--sp-border)', 'Free', fmtTokens(freeTokens), Math.max(0, (1 - usedFrac) * 100), true);
-    const imgNote = b.images ? `<div style="font-size:0.68rem;color:var(--sp-text-dim);margin-top:0.2rem;">+ ${b.images} image${b.images > 1 ? 's' : ''} (size not estimated)</div>` : '';
-    legEl.innerHTML = sum > 0 ? rows + imgNote : '<div style="font-size:0.72rem;color:var(--sp-text-dim);">No messages yet.</div>';
-  }
 }
 
 function init() {
@@ -568,27 +341,14 @@ function init() {
     badge: '—',
     open: false,
     html: `
-      <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.3rem;">
-        <span style="color:var(--sp-text-dim);">Conversation</span>
-        <span id="ctxConvTokens" style="font-variant-numeric:tabular-nums;">–</span>
-      </div>
-      <div id="ctxStackBar" title="Estimated breakdown by type" style="display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--sp-border);"></div>
-      <p id="ctxConvPct" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.35rem 0 0.55rem;"></p>
-      <div id="ctxBreakdown" style="display:flex; flex-direction:column; gap:0.1rem;"></div>
-      <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:0.7rem;">
+      <p style="font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.55rem;">Per-conversation context size is shown on each chat's live counter — click it for details.</p>
+      <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
         <span style="color:var(--sp-text-dim);">This week (7d)</span>
         <span id="ctxWeekTokens" style="font-variant-numeric:tabular-nums;">–</span>
       </div>
     `,
     onRender(bodyEl) {
       if (!_unsubscribe) _unsubscribe = SandpieTokens.subscribe(render);
-      // Recompute the breakdown when the user expands the (collapsed-by-default)
-      // section, since render() skips the heavy part while it's closed.
-      const section = document.getElementById('contextSection');
-      if (section && !section._ctxToggleWired) {
-        section._ctxToggleWired = true;
-        section.addEventListener('toggle', () => { if (section.open) { _bdCache = null; render(); } });
-      }
       render();
     }
   });

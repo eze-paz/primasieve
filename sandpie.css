@@ -534,6 +534,8 @@
   .msg-timer .mt-tok,
   .msg-timer .mt-rate,
   .msg-timer .mt-ctx { color: var(--sp-text-dim); }
+  .msg-timer .mt-ctx { text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
+  .msg-timer .mt-ctx:hover { color: var(--sp-accent); }
   .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }
   /* once settled, the whole line dims to one tone */
@@ -581,6 +583,45 @@
   .msg-timer .mt-nn.thinking svg .r-c { animation: ring-center 1.6s ease-in-out infinite; }
   .msg-timer .mt-nn.thinking { opacity: 1; color: var(--sp-accent); }
   .msg-timer .mt-todos:empty { display: none; }
+
+  /* ---- per-conversation context popup (anchored to the ctx counter) ---- */
+  .ctx-popup {
+    position: fixed;
+    z-index: 1000;
+    min-width: 200px;
+    max-width: 280px;
+    padding: 0.6rem 0.7rem;
+    background: var(--sp-panel);
+    border: 1px solid var(--sp-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    font: 0.74rem 'JetBrains Mono', Consolas, monospace;
+    color: var(--sp-text);
+  }
+  .ctx-popup-title {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--sp-text-dim);
+    margin-bottom: 0.4rem;
+  }
+  .ctx-popup-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    line-height: 1.7;
+    color: var(--sp-text-dim);
+  }
+  .ctx-popup-row b { color: var(--sp-text); font-weight: 600; }
+  .ctx-popup-note { color: var(--sp-text-dim); line-height: 1.5; }
+  .ctx-popup-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--sp-border);
+    overflow: hidden;
+    margin: 0.35rem 0;
+  }
+  .ctx-popup-bar > div { height: 100%; background: var(--sp-accent); }
 
   aside details.service {
     border: none;

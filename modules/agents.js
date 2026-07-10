@@ -206,44 +206,15 @@ function emitChanged(path) {
 }
 
 // ---- triggers --------------------------------------------------------------
-// Estimate the live conversation size in tokens (chars/4 — the same heuristic
-// SandpieTokens uses). Counts the CURRENT messages array, so it already includes
-// a turn the user just typed but hasn't sent yet.
-function estimateConvTokens(msgs) {
-  let chars = 0;
-  for (const m of msgs || []) {
-    chars += textOf(m.content).length;
-    if (Array.isArray(m.tool_calls)) for (const tc of m.tool_calls) {
-      chars += ((tc.function && tc.function.arguments) || '').length + ((tc.function && tc.function.name) || '').length;
-    }
-  }
-  return Math.ceil(chars / 4);
-}
-
 // Current context usage as a % of the active provider's window, or null when the
 // window is unknown (no way to compute a %, so the at_context_pct trigger can't
-// fire — the provider needs a context window set). Takes the LARGER of the
-// authoritative last-turn usage and a fresh estimate of the live array: the
-// estimate catches a big turn before it is sent (last usage only reflects the
-// PREVIOUS turn, and is stale after a compaction), while the authoritative figure
-// accounts for the system prompt + tools the estimate can't see.
+// fire — the provider needs a context window set) or nothing has been reported.
+// Reported provider usage only; no client-side estimate.
 async function contextPct() {
-  if (typeof SandpieTokens === 'undefined') return null;
-  let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
-  if (!w) return null;
-  const msgs = (typeof messages !== 'undefined' && Array.isArray(messages)) ? messages : [];
-  // Measure what's actually SENT (overhead + compaction-aware body) using the SAME
-  // estimator the Context panel shows, so the trigger and the displayed % agree.
-  let comp = null;
-  try {
-    comp = (typeof SandpieConversations !== 'undefined' && SandpieConversations.getCompaction)
-      ? SandpieConversations.getCompaction(activeConv()) : null;
-  } catch {}
-  let used = SandpieTokens.estimateContextTokens
-    ? SandpieTokens.estimateContextTokens(msgs, comp)
-    : estimateConvTokens(msgs);
-  try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
-  return (used / w) * 100;
+  if (typeof SandpieTokens === 'undefined' || !SandpieTokens.contextPct) return null;
+  // Reported-only: real provider usage ÷ the context window. No client-side
+  // estimate — see context.js SandpieTokens.contextPct.
+  try { return await SandpieTokens.contextPct(activeConv()); } catch { return null; }
 }
 
 async function shouldRun(a, convId) {
@@ -487,5 +458,5 @@ window.SandpieAgents = {
   runNow,
   stopAll,
   get agents() { return agents; },
-  _internals: { parseAgent, parseFrontmatter, parseTriggerSummary: triggerSummary, buildTranscript, slugTopic, shouldRun, contextPct, estimateConvTokens, applySink, runAgent, withEnabled, newAgentId },
+  _internals: { parseAgent, parseFrontmatter, parseTriggerSummary: triggerSummary, buildTranscript, slugTopic, shouldRun, contextPct, applySink, runAgent, withEnabled, newAgentId },
 };

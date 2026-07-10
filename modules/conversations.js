@@ -977,7 +977,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=43');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=44');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1091,23 +1091,19 @@ async function sendSingle(text, stream, opts = {}) {
   requestWakeLock();
   setStreamSending(stream, true);
 
-  // Proactive compaction: if a compactor agent's context threshold is met, run
-  // it BEFORE this turn goes out so we never ship an over-limit request (and a
-  // conversation already at the limit can still continue). Awaited so the
-  // now-smaller context is what gets built below. Runs before startTotalTimer
-  // because compaction re-renders the conversation host, which would otherwise
-  // drop a timer added first.
-  try { await maybeAutoCompact(convId); }
-  catch (e) { console.warn('[sandpie] pre-send compaction failed:', e); }
-
-  // Snapshot the conversation's token size NOW (after any compaction) as the
-  // baseline for the live CONTEXT meter; the paint loop pushes baseline +
-  // generated-so-far while the turn runs. Clear any stale live override first so
-  // we read the authoritative size.
-  if (typeof SandpieTokens !== 'undefined') {
-    try { SandpieTokens.clearLiveTokens && SandpieTokens.clearLiveTokens(); } catch (_) {}
-    try { const fromFile = SandpieTokens.conversationTokens ? await SandpieTokens.conversationTokens() : 0; const fromMem = SandpieTokens.estimateContextTokens ? SandpieTokens.estimateContextTokens(convMessages, stream.compaction) : (SandpieTokens.estimateTokens ? SandpieTokens.estimateTokens(convMessages) : 0); stream.tokBaseline = Math.max(fromFile, fromMem); }
-    catch (_) { stream.tokBaseline = 0; }
+  // Proactive compaction: if the context threshold is met, run it BEFORE this turn
+  // goes out so we never ship an over-limit request (and a conversation already at
+  // the limit can still continue). Awaited so the now-smaller context is what gets
+  // built below. Runs before startTotalTimer because compaction re-renders the
+  // conversation host, which would otherwise drop a timer added first.
+  // Compaction is NEVER skipped: if it was triggered but failed, halt the send with
+  // a visible error rather than silently shipping an over-limit request.
+  const _cmp = await maybeAutoCompact(convId);
+  if (_cmp && _cmp.triggered && !_cmp.ok) {
+    addMsg('err', 'Context is over the compaction threshold but summarizing the earlier turns failed (' + (_cmp.reason || 'unknown error') + '). The message was not sent — try again, or shorten the conversation.', host);
+    setStreamSending(stream, false);
+    releaseWakeLock();
+    return;
   }
 
   startTotalTimer(stream);
@@ -1129,7 +1125,6 @@ async function sendSingle(text, stream, opts = {}) {
   let errorSeen = false;
   let lastInFlightTool = null;
   const dispatch = (ev) => {
-    accountStreamTokens(stream, ev);
     if (ev.type === 'agent_done')  agentDoneSeen = true;
     if (ev.type === 'error')        errorSeen = true;
     if (ev.type === 'tool_started') {
@@ -1141,6 +1136,7 @@ async function sendSingle(text, stream, opts = {}) {
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolResult(activeConvId, ev.result);
     }
     if (ev.type === 'usage') {
+      stream.lastUsage = ev.usage;   // authoritative counts → settled tok/s + ctx counter
       Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
       reportTurnUsage(convId, ev.usage, convMessages.length);
     }
@@ -1211,9 +1207,9 @@ async function sendSingle(text, stream, opts = {}) {
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
-    // Drop the live CONTEXT override so the panel shows the authoritative
-    // provider-reported size now the turn is done.
-    try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.clearLiveTokens) SandpieTokens.clearLiveTokens(convId); } catch (_) {}
+    // Refresh the context readouts (sidebar week total + badge, and any open ctx
+    // popup) now the provider has reported this turn's authoritative usage.
+    try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.notify) SandpieTokens.notify(); } catch (_) {}
     setStreamSending(stream, false);
     flushIncrementalSave(convId);
     await saveConv(convId);
@@ -1437,7 +1433,7 @@ function ensureStream(id) {
       abort: null,
       compaction: null,
       timerEl: null, timerStart: 0, timerInterval: null,
-      genChars: 0, toolChars: 0, tokTarget: 0, tokBaseline: 0,
+      lastUsage: null,
       generating: false,
     };
     convStreams.set(id, s);
@@ -2465,8 +2461,14 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
    summarize the aged span and advance the compaction boundary so the outgoing
    request stays bounded. Pre-send (not reactive) so a chat already at the limit
    can still continue — a reactive check only fires AFTER a turn, too late to save
-   the turn that overflows. */
-let _autoCompacting = false;
+   the turn that overflows.
+
+   The lock is PER-CONVERSATION (a Set of convIds), not a single global flag:
+   several conversations can be generating in the background at once, and each
+   must be free to compact when IT crosses the threshold regardless of which one
+   is on screen. Focus/active-ness affects only what the UI renders, never whether
+   a conversation compacts. */
+const _compacting = new Set();
 function _cmpTextOf(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) return content.map(p => (p && p.type === 'text') ? (p.text || '') : '').join(' ');
@@ -2486,17 +2488,12 @@ function _cmpTranscript(msgs, fromIdx, uptoIdx) {
   return s;
 }
 // Current context usage as a % of the active provider's window, or null when the
-// window is unknown. Measures what is actually SENT (overhead + compaction-aware
-// body) via the same estimator the Context panel shows, so the trigger agrees
-// with the displayed %.
+// window is unknown or nothing has been reported. Reported provider usage only
+// (SandpieTokens.contextPct) — no client-side estimate — and per conversation, so
+// a BACKGROUND conversation is measured against its own reported size.
 async function _cmpContextPct(convId) {
-  if (typeof SandpieTokens === 'undefined') return null;
-  let w; try { w = SandpieTokens.contextWindow(); } catch { w = null; }
-  if (!w) return null;
-  const comp = getCompaction(convId);
-  let used = SandpieTokens.estimateContextTokens ? SandpieTokens.estimateContextTokens(messages, comp) : 0;
-  try { const t = await SandpieTokens.conversationTokens(); if (t > used) used = t; } catch {}
-  return (used / w) * 100;
+  if (typeof SandpieTokens === 'undefined' || !SandpieTokens.contextPct) return null;
+  try { return await SandpieTokens.contextPct(convId); } catch { return null; }
 }
 // Summarize the span between the current boundary and the protected tail and
 // advance the compaction boundary — regardless of the % threshold. Shared by
@@ -2515,7 +2512,7 @@ async function _performCompaction(convId, cfg) {
   if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
   if (!transcript.trim()) return { ok: false, reason: 'nothing to summarize' };
   const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
-  _autoCompacting = true;
+  _compacting.add(convId);
   emit('compaction:start');
   try {
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return { ok: false, reason: 'no completion provider available' };
@@ -2527,19 +2524,31 @@ async function _performCompaction(convId, cfg) {
     return { ok: false, reason: (e && e.message) || String(e) };
   } finally {
     emit('compaction:end');
-    _autoCompacting = false;
+    _compacting.delete(convId);
   }
 }
+// Returns { triggered, ok, reason? }. triggered=false means the threshold was not
+// met (no compaction attempted). triggered=true + ok=false means it WAS needed but
+// failed — the caller must not ship the over-limit turn. NOTE: no active-conv gate
+// — any conversation compacts when it crosses the threshold, foreground or not.
 async function maybeAutoCompact(convId) {
-  if (_autoCompacting || !convId || convId !== activeConvId) return;
-  if (typeof SandpieCompactor === 'undefined') return;
+  if (!convId || _compacting.has(convId)) return { triggered: false, ok: true };
+  if (typeof SandpieCompactor === 'undefined') return { triggered: false, ok: true };
   const cfg = SandpieCompactor.config();
-  if (!cfg.enabled) return;
+  if (!cfg.enabled) return { triggered: false, ok: true };
   let pct = null;
   try { pct = await _cmpContextPct(convId); } catch {}
-  if (pct == null || pct < cfg.pct) return;
-  try { await _performCompaction(convId, cfg); }
-  catch (e) { console.warn('[sandpie] auto-compaction failed:', e); }
+  if (pct == null || pct < cfg.pct) return { triggered: false, ok: true };
+  try {
+    const r = await _performCompaction(convId, cfg);
+    // "nothing new to compact" means the aged span is already summarized — the
+    // threshold is met but there's nothing left to do, so don't block the send.
+    if (r && !r.ok && r.reason && /nothing (new to compact|to summarize)/.test(r.reason)) return { triggered: false, ok: true };
+    return { triggered: true, ok: !!(r && r.ok), reason: r && r.reason };
+  } catch (e) {
+    console.warn('[sandpie] auto-compaction failed:', e);
+    return { triggered: true, ok: false, reason: (e && e.message) || String(e) };
+  }
 }
 /* ---- command registration: compact ------------------------------------- */
 // Manually force a compaction NOW, at any context %, ignoring the auto trigger
@@ -2589,7 +2598,6 @@ function registerCompactCommand() {
     usage: '>>> compact [conversation] [keepTail]',
     async run(text, parts) {
       if (typeof SandpieCompactor === 'undefined') return 'Compaction is not available.';
-      if (_autoCompacting) return 'A compaction is already in progress — try again in a moment.';
 
       // Parse args: an optional conversation name/id and an optional numeric
       // keepTail, in either order. A bare number is keepTail for the active conv.
@@ -2608,14 +2616,14 @@ function registerCompactCommand() {
       }
       const convId = targetId || activeConvId;
       if (!convId) return 'No active conversation to compact — pass a conversation file name.';
+      if (_compacting.has(convId)) return 'A compaction is already in progress for that conversation — try again in a moment.';
 
-      const measurable = convId === activeConvId;
-      let before = null; if (measurable) { try { before = await _cmpContextPct(convId); } catch {} }
+      let before = null; try { before = await _cmpContextPct(convId); } catch {}
       const r = await _performCompaction(convId, cfg);
       if (!r || !r.ok) return 'Nothing compacted: ' + ((r && r.reason) || 'unknown reason') + '.';
-      let after = null; if (measurable) { try { after = await _cmpContextPct(convId); } catch {} }
+      let after = null; try { after = await _cmpContextPct(convId); } catch {}
       const delta = (before != null && after != null) ? ` Context ${Math.round(before)}% → ${Math.round(after)}%.` : '';
-      const who = measurable ? '' : ` in ${convId}`;
+      const who = convId === activeConvId ? '' : ` in ${convId}`;
       return `Compacted ${r.removed} message(s) into a summary${who}; kept the last ${r.kept} verbatim.${delta}`;
     }
   });
@@ -3045,67 +3053,47 @@ const TIMER_TICK_MS = 1000; // 1s: numeric readouts don't need frame-rate update
 const TOK_FMT = n => Math.round(n).toLocaleString('en-US');
 const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s';
 
-// Generated-token bookkeeping for the live counter. Every backend (the local
-// WebGPU engine AND the SW/API path) funnels its stream through sendSingle's
-// `dispatch`, so counting here is universal. The local backend emits no `usage`
-// events, so a chars/4 estimate — the same heuristic
-// SandpieTokens.estimateTokens uses — is the only signal available; we use it
-// for every backend so the readout behaves identically everywhere. genChars
-// only grows, so tokTarget is monotonic. (Authoritative provider usage still
-// flows to SandpieTokens/Context untouched — this counter is a live HUD, not a
-// billing figure.)
-function accountStreamTokens(stream, ev) {
-  if (!stream) return;
-  // Tool results enter the context on the next round but are NOT generated
-  // tokens: they feed the ctx figure (HUD "ctx" + sidebar live meter), never
-  // the tok/s throughput pair.
-  if (ev.type === 'tool_result') {
-    stream.toolChars = (stream.toolChars || 0) + String(ev.result || '').length;
-    return;
-  }
-  if (ev.type !== 'delta' || !ev.delta) return;
-  const d = ev.delta;
-  let n = 0;
-  if (typeof d.content === 'string') n += d.content.length;
-  if (typeof d.reasoning_content === 'string') n += d.reasoning_content.length;
-  else if (typeof d.reasoning === 'string') n += d.reasoning.length;
-  if (Array.isArray(d.tool_calls)) {
-    for (const tc of d.tool_calls) {
-      n += (tc.function?.arguments || '').length + (tc.function?.name || '').length;
-    }
-  }
-  if (!n) return;
-  stream.genChars += n;
-  stream.tokTarget = Math.ceil(stream.genChars / 4);
+// The ctx counter shows the conversation's REAL context size — the provider's
+// last-reported prompt+completion tokens (see SandpieTokens.conversationTokens),
+// never a client-side estimate. It only changes when a turn reports usage, so it
+// is refreshed once when the timer is (re)built and stays put during generation
+// (no live-growing estimate). Clicking it opens the per-conversation context popup.
+function _wireCtxCounter(el, convId) {
+  const c = el && el.querySelector('.mt-ctx');
+  if (!c) return;
+  c.style.cursor = 'pointer';
+  c.title = 'Conversation context — click for details';
+  c.addEventListener('click', (e) => { e.stopPropagation(); openContextPopup(convId, c); });
+  Promise.resolve(
+    (typeof SandpieTokens !== 'undefined' && SandpieTokens.conversationTokens)
+      ? SandpieTokens.conversationTokens(convId) : 0,
+  ).then(t => { if (c.isConnected) c.textContent = t ? (TOK_FMT(t) + ' ctx') : '– ctx'; }).catch(() => {});
 }
 
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
-  stream.genChars = 0;
-  stream.toolChars = 0;
-  stream.tokTarget = 0;
 
   const el = document.createElement('div');
   el.className = 'msg-timer';
-  // Built once; the tick mutates the leaf <span>s in place.
+  // Built once; the tick mutates the leaf <span>s in place. No live tok/s — with
+  // estimation removed there is no per-turn token count until the provider reports
+  // usage at turn end (local WebGPU models report via the engine; see endTotalTimer).
   el.innerHTML =
     '<button class="mt-nn" title="Show thoughts" onclick="toggleThoughts()">' + NN_SVG_INLINE + '</button>' +
     '<span class="mt-time">0s</span>' +
-    '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
-    '<span class="mt-sep">·</span><span class="mt-ctx" title="Conversation context: previous turns + generated + tool results">0 ctx</span>' +
+    '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
     '<span class="mt-queue"></span>' +
     '<span class="mt-todos"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
 
   const timeEl = el.querySelector('.mt-time');
-  const rateEl = el.querySelector('.mt-rate');
-  const ctxEl = el.querySelector('.mt-ctx');
   const queueEl = el.querySelector('.mt-queue');
   queueEl.style.cursor = 'pointer';
   queueEl.title = 'Click to view queued messages';
   queueEl.addEventListener('click', () => openQueueModal(stream));
+  _wireCtxCounter(el, stream.id);
   const todosEl = el.querySelector('.mt-todos');
   stream.todosEl = todosEl;
   stream.todos = null;
@@ -3113,28 +3101,7 @@ function startTotalTimer(stream) {
 
   const paint = () => {
     if (!stream.timerEl) return;
-    const elapsed = (Date.now() - stream.timerStart) / 1000;
-    set(timeEl, fmtElapsed(elapsed));
-
-    // Generated tokens this interaction (text + tool-call args): drives the tok/s
-    // rate below, and feeds the running context figure. The raw token COUNT is not
-    // shown (mt-tok removed), but the rate is.
-    const target = stream.tokTarget;
-    set(rateEl, RATE_FMT(elapsed > 0.4 ? target / elapsed : 0));
-
-    // Conversation CONTEXT: baseline (all previous turns) + generated this turn
-    // + tool results this turn. Doesn't reset per turn — it's the running size
-    // of what the next request will carry.
-    const turnCtx = target + Math.ceil((stream.toolChars || 0) / 4);
-    set(ctxEl, TOK_FMT((stream.tokBaseline || 0) + turnCtx) + ' ctx');
-
-    // Push the same figure to the sidebar Context panel, with the this-turn
-    // delta separated so the panel can grow its cached breakdown instead of
-    // clamping against it (the clamp froze the sidebar during local runs).
-    if (stream.id === activeConvId && typeof SandpieTokens !== 'undefined' && SandpieTokens.setLiveTokens) {
-      SandpieTokens.setLiveTokens(stream.id, (stream.tokBaseline || 0) + turnCtx, turnCtx);
-    }
-
+    set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
     const q = stream.queue.length;
     if (queueEl.dataset.q !== String(q)) {
       queueEl.dataset.q = String(q);
@@ -3155,11 +3122,12 @@ function endTotalTimer(stream, label) {
     stream.timerEl.remove();
   } else {
     const sec = (Date.now() - stream.timerStart) / 1000;
-    const tok = stream.tokTarget || 0;
-    const rate = sec > 0.05 ? tok / sec : 0;
-    // Settled line: label · elapsed · rate, dimmed via .done. The raw token COUNT
-    // (mt-tok) is removed per user preference, but the tok/s rate is kept; it's
-    // dropped only on a pure-tool round (no text generated) where it'd read "0".
+    // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. tok/s comes
+    // ONLY from the provider's reported completion_tokens (no estimate); omitted
+    // when the provider reported no usage (e.g. some local paths).
+    const u = stream.lastUsage;
+    const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
+    const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
     const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
     const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
     const parts = [
@@ -3167,7 +3135,8 @@ function endTotalTimer(stream, label) {
       `<span class="mt-label">${label}</span>`,
       `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
     ];
-    if (tok > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+    if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+    parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
     if (stream.todos && stream.todos.length) {
       const ip = stream.todos.findIndex(t => t && t.status === 'in_progress');
       const cur = ip >= 0 ? ip + 1 : stream.todos.filter(t => t && t.status === 'completed').length;
@@ -3175,6 +3144,7 @@ function endTotalTimer(stream, label) {
     }
     stream.timerEl.innerHTML = parts.join('');
     stream.timerEl.classList.add('done');
+    _wireCtxCounter(stream.timerEl, stream.id);
     if (stream.todos && stream.todos.length) {
       const badge = stream.timerEl.querySelector('.mt-todos');
       if (badge) {
@@ -3189,6 +3159,56 @@ function endTotalTimer(stream, label) {
     }
   }
   stream.timerEl = null;
+}
+
+// Per-conversation context popup — the breakdown that used to live in the sidebar,
+// now anchored to the conversation's own ctx counter. Reported tokens only: size,
+// % of the window, and headroom. Dismisses on outside click / Escape / scroll.
+let _ctxPopupEl = null, _ctxPopupCleanup = null;
+function _closeContextPopup() {
+  if (_ctxPopupCleanup) { try { _ctxPopupCleanup(); } catch (_) {} _ctxPopupCleanup = null; }
+  if (_ctxPopupEl) { _ctxPopupEl.remove(); _ctxPopupEl = null; }
+}
+async function openContextPopup(convId, anchorEl) {
+  if (_ctxPopupEl) { _closeContextPopup(); return; }   // toggle off if already open
+  const T = (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null;
+  let used = 0, win = null;
+  if (T) { try { used = await T.conversationTokens(convId); } catch (_) {} try { win = T.contextWindow(); } catch (_) {} }
+
+  const pop = document.createElement('div');
+  pop.className = 'ctx-popup';
+  const rows = [];
+  if (!used) {
+    rows.push('<div class="ctx-popup-note">No token usage reported for this conversation yet.</div>');
+  } else {
+    rows.push(`<div class="ctx-popup-row"><span>Context size</span><b>${TOK_FMT(used)} tokens</b></div>`);
+    if (win) {
+      const pct = Math.min(100, (used / win) * 100);
+      rows.push(`<div class="ctx-popup-bar"><div style="width:${pct.toFixed(1)}%"></div></div>`);
+      rows.push(`<div class="ctx-popup-row"><span>${pct.toFixed(pct < 10 ? 1 : 0)}% of ${TOK_FMT(win)}</span><span>${TOK_FMT(Math.max(0, win - used))} left</span></div>`);
+    } else {
+      rows.push('<div class="ctx-popup-note">Context window unknown for this model.</div>');
+    }
+  }
+  pop.innerHTML = `<div class="ctx-popup-title">Context</div>${rows.join('')}`;
+  document.body.appendChild(pop);
+  _ctxPopupEl = pop;
+
+  // Position above the anchor, clamped to the viewport.
+  const r = anchorEl.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let top = r.top - pr.height - 8;
+  if (top < 8) top = r.bottom + 8;                         // flip below if no room above
+  let left = Math.min(Math.max(8, r.left), window.innerWidth - pr.width - 8);
+  pop.style.top = top + 'px';
+  pop.style.left = left + 'px';
+
+  const onDocClick = (e) => { if (_ctxPopupEl && !_ctxPopupEl.contains(e.target) && e.target !== anchorEl) _closeContextPopup(); };
+  const onKey = (e) => { if (e.key === 'Escape') _closeContextPopup(); };
+  setTimeout(() => document.addEventListener('mousedown', onDocClick), 0);
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('scroll', _closeContextPopup, { capture: true, once: true });
+  _ctxPopupCleanup = () => { document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey); };
 }
 
 /* expose timer globals for sandpie-test.html inline scripts */
