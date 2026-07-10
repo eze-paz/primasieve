@@ -1139,6 +1139,9 @@ async function sendSingle(text, stream, opts = {}) {
       stream.lastUsage = ev.usage;   // authoritative counts → settled tok/s + ctx counter
       Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
       reportTurnUsage(convId, ev.usage, convMessages.length);
+      // Round boundary: recordUsage just wrote the fresh reported size, so repaint
+      // the live ctx counter now instead of waiting for the whole turn to end.
+      if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
     }
     dispatchAgentEvent(ev, renderer, host);
   };
@@ -3058,16 +3061,25 @@ const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s
 // never a client-side estimate. It only changes when a turn reports usage, so it
 // is refreshed once when the timer is (re)built and stays put during generation
 // (no live-growing estimate). Clicking it opens the per-conversation context popup.
+// Repaint just the number from the latest reported usage. Called at turn start,
+// at turn end, and — via the dispatch usage handler — at every ROUND boundary, so
+// a multi-round tool turn climbs the counter as each round reports (not only when
+// the whole turn finishes).
+function _paintCtxCounter(el, convId) {
+  const c = el && el.querySelector('.mt-ctx');
+  if (!c) return;
+  Promise.resolve(
+    (typeof SandpieTokens !== 'undefined' && SandpieTokens.conversationTokens)
+      ? SandpieTokens.conversationTokens(convId) : 0,
+  ).then(t => { if (c.isConnected) c.textContent = t ? (TOK_FMT(t) + ' ctx') : '– ctx'; }).catch(() => {});
+}
 function _wireCtxCounter(el, convId) {
   const c = el && el.querySelector('.mt-ctx');
   if (!c) return;
   c.style.cursor = 'pointer';
   c.title = 'Conversation context — click for details';
   c.addEventListener('click', (e) => { e.stopPropagation(); openContextPopup(convId, c); });
-  Promise.resolve(
-    (typeof SandpieTokens !== 'undefined' && SandpieTokens.conversationTokens)
-      ? SandpieTokens.conversationTokens(convId) : 0,
-  ).then(t => { if (c.isConnected) c.textContent = t ? (TOK_FMT(t) + ' ctx') : '– ctx'; }).catch(() => {});
+  _paintCtxCounter(el, convId);
 }
 
 function startTotalTimer(stream) {
