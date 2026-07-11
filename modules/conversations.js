@@ -1854,28 +1854,7 @@ function renderTodos(tcId, todos, scopeEl) {
 
   const sep = document.createElement('div');
   sep.className = 'tool-sep';
-  const list = document.createElement('div');
-  list.className = 'tool-todos';
-  const done = (todos || []).filter(t => t && t.status === 'completed').length;
-  const head = document.createElement('div');
-  head.className = 'tool-todos-head';
-  head.textContent = `Checklist · ${done}/${(todos || []).length} done`;
-  list.appendChild(head);
-  for (const t of (todos || [])) {
-    const st = (t && t.status) || 'pending';
-    const row = document.createElement('div');
-    row.className = 'tool-todo tool-todo-' + st;
-    const depth = t && t.id ? (String(t.id).match(/\./g) || []).length : 0;   // subtask indent
-    if (depth) row.style.marginLeft = (depth * 16) + 'px';
-    const mark = document.createElement('span');
-    mark.className = 'tool-todo-mark';
-    mark.textContent = st === 'completed' ? '✓' : st === 'in_progress' ? '▸' : st === 'withdrawn' ? '⊘' : '○';
-    const txt = document.createElement('span');
-    txt.className = 'tool-todo-text';
-    txt.textContent = (t && t.content) || '';
-    row.append(mark, txt);
-    list.appendChild(row);
-  }
+  const list = buildTodosView(todos || []);
   box.appendChild(sep);
   box.appendChild(list);
 
@@ -1917,6 +1896,20 @@ function buildTodosView(todos) {
     txt.className = 'tool-todo-text';
     txt.textContent = (t && t.content) || '';
     row.append(mark, txt);
+    // Claims: badge (CLAIM → CONFIRMED/REFUTED) plus the cited evidence ids.
+    if (t && t.kind === 'claim') {
+      const badge = document.createElement('span');
+      badge.className = 'tool-todo-claim-badge' + (t.verdict ? ' claim-' + t.verdict : '');
+      badge.textContent = t.verdict ? t.verdict.toUpperCase() : 'CLAIM';
+      row.appendChild(badge);
+      if (Array.isArray(t.evidence) && t.evidence.length) {
+        const ev = document.createElement('span');
+        ev.className = 'tool-todo-evidence';
+        ev.textContent = t.evidence.join(' ');
+        ev.title = 'Evidence: tool results cited to close this claim';
+        row.appendChild(ev);
+      }
+    }
     wrap.appendChild(row);
   }
   return wrap;
