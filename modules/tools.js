@@ -160,6 +160,7 @@ THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it)
   {"op":"complete","id":"3"}       mark done — ONLY when truly done, and it's PERMANENT (re-add if you were wrong). Blocked while it has open subtasks.
   {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping (kept on the record, greyed).
+CLAIMS: when you form a hypothesis or diagnosis ("the bug is X", "the config means Y"), add it with "kind":"claim". A claim closes ONLY via {"op":"complete","id":"…","verdict":"confirmed"|"refuted","evidence":["r12",…]} citing the [rN] ids stamped on tool results — reasoning alone cannot close a claim; run a tool whose output settles it, then cite that output. A refuted claim is progress, not failure: it prunes the search.
 IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or withdraw them first.`,
       parameters: {
         type: 'object',
@@ -173,8 +174,11 @@ IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch seve
                 op:     { type: 'string', enum: ['add', 'start', 'complete', 'withdraw'], description: 'The operation.' },
                 text:   { type: 'string', description: 'For "add": the task text (imperative).' },
                 parent: { type: 'string', description: 'For "add": parent task id to make this a subtask (e.g. "3").' },
+                kind:   { type: 'string', enum: ['claim'], description: 'For "add": mark this item as a CLAIM (hypothesis/diagnosis) that must be settled with evidence.' },
                 id:     { type: 'string', description: 'For start/complete/withdraw: the target task id.' },
                 reason: { type: 'string', description: 'For "withdraw": optional short reason.' },
+                verdict:  { type: 'string', enum: ['confirmed', 'refuted'], description: 'For "complete" of a claim: how the evidence settled it.' },
+                evidence: { type: 'array', items: { type: 'string' }, description: 'For "complete" of a claim: [rN] ids of tool results that settle it (e.g. ["r12","r15"]).' },
               },
               required: ['op'],
             },
@@ -187,6 +191,7 @@ IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch seve
               properties: {
                 content: { type: 'string', description: 'Imperative description of the task.' },
                 status:  { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
+                kind:    { type: 'string', enum: ['claim'], description: 'Mark this item as a CLAIM (hypothesis) that must be closed with verdict + evidence.' },
               },
               required: ['content'],
             },

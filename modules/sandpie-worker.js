@@ -511,7 +511,9 @@ function _todoNextId(tree, parent) {
 function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed })); }
 function _todoSummary(tree) {
   const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'withdrawn' ? '[-]' : '[ ]';
-  return tree.map(t => '  '.repeat((t.id.match(/\./g) || []).length) + mark(t.status) + ' ' + t.id + ' ' + t.content).join('\n');
+  return tree.map(t => '  '.repeat((t.id.match(/\./g) || []).length) + mark(t.status) + ' ' + t.id + ' '
+    + (t.kind === 'claim' ? 'CLAIM' + (t.verdict ? ' ' + t.verdict.toUpperCase() + ' (' + (t.evidence || []).join(',') + ')' : '') + ': ' : '')
+    + t.content).join('\n');
 }
 async function tool_write_todos({ ops, todos }, ctx) {
   const tree = (ctx && Array.isArray(ctx._todoTree)) ? ctx._todoTree : (ctx ? (ctx._todoTree = []) : []);
@@ -533,6 +535,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       if (!content) continue;
       const status = _TODO_ALL.includes(t.status) ? t.status : 'pending';
       const task = { id: _todoNextId(tree, null), content, status, parent: null, created: now };
+      if (t.kind === 'claim') task.kind = 'claim';
       if (status === 'completed') task.completed = now;
       tree.push(task);
     }
@@ -561,6 +564,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       if (parent && !byId.has(parent)) { errs.push('add: unknown parent "' + parent + '"'); continue; }
       if (parent && byId.get(parent).status === 'completed') { errs.push('add: parent "' + parent + '" is completed'); continue; }
       const task = { id: _todoNextId(tree, parent), content, status: 'pending', parent, created: now };
+      if (op.kind === 'claim') task.kind = 'claim';
       tree.push(task); byId.set(task.id, task); added.push(task.id);
     } else if (k === 'start' || k === 'complete' || k === 'withdraw') {
       const t = byId.get(op.id);
@@ -573,6 +577,23 @@ async function tool_write_todos({ ops, todos }, ctx) {
         if (t.status === 'withdrawn') { errs.push('complete "' + op.id + '": withdrawn tasks cannot be completed'); continue; }
         const openKids = tree.filter(x => x.parent === t.id && _TODO_OPEN.has(x.status));
         if (openKids.length) { errs.push('complete "' + op.id + '": ' + openKids.length + ' open subtask(s) (' + openKids.map(x => x.id).join(', ') + ') — close them first'); continue; }
+        // Claims close only with a verdict backed by citable evidence: reasoning
+        // alone cannot settle a claim, only tool output ([rN] ids) can. The
+        // rejection text is the teaching signal — it tells the model HOW to
+        // convert a belief into a checkable fact.
+        if (t.kind === 'claim') {
+          const verdict = String(op.verdict || '').toLowerCase();
+          if (verdict !== 'confirmed' && verdict !== 'refuted') {
+            errs.push('complete "' + op.id + '": this is a CLAIM — close it with "verdict":"confirmed"|"refuted" plus "evidence":["rN",…]. If you have not tested it yet, run a command whose output settles it first.'); continue;
+          }
+          const ev = Array.isArray(op.evidence) ? op.evidence.map(String) : [];
+          const known = ctx && ctx._resultIds;
+          const bad = known ? ev.filter(id => !known.has(id)) : ev.filter(id => !/^r\d+$/.test(id));
+          if (!ev.length || bad.length) {
+            errs.push('complete "' + op.id + '": a claim cannot be closed on reasoning alone. Cite the [rN] ids of tool results that settle it' + (bad.length ? ' (unknown: ' + bad.join(', ') + ')' : '') + '. Run a tool whose output decides this claim, then cite its id.'); continue;
+          }
+          t.verdict = verdict; t.evidence = ev;
+        }
         t.status = 'completed'; t.completed = now;
       } else { // withdraw — cascades to open descendants
         if (t.status === 'completed') { errs.push('withdraw "' + op.id + '": completed tasks cannot be withdrawn'); continue; }
@@ -1621,6 +1642,7 @@ async function runAgent(config, ctx) {
     status: _TODO_ALL.includes(t.status) ? t.status : 'pending',
     parent: t.parent || null,
     created: t.created, completed: t.completed, withdrawn: t.withdrawn, reason: t.reason,
+    kind: t.kind === 'claim' ? 'claim' : undefined, verdict: t.verdict, evidence: t.evidence,
   }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
@@ -1649,6 +1671,16 @@ async function runAgent(config, ctx) {
   //     don't let it — re-prompt and continue. Only a real user stop (abort) or
   //     genuine progress stalling out (MAX_STOP_BLOCKS) ends the turn.
   ctx._todos = _todoFlat(ctx._todoTree);   // flat view of the seeded tree
+  // Citable result ids (F1): every tool result is prefixed "[rN]" so the model
+  // can cite it as evidence when closing a claim-todo. Recover the counter and
+  // the set of already-issued ids from the persisted transcript, so claims can
+  // cite evidence produced in earlier turns of this conversation.
+  ctx._resultIds = new Set(); ctx._resultSeq = 0;
+  for (const m of messages) {
+    if (!m || m.role !== 'tool' || typeof m.content !== 'string') continue;
+    const rm = /^\[r(\d+)\]/.exec(m.content);
+    if (rm) { ctx._resultIds.add('r' + rm[1]); const n = +rm[1]; if (n > ctx._resultSeq) ctx._resultSeq = n; }
+  }
   ctx._roundsSinceTodo = 0;
   ctx._stopBlocks = 0;
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
@@ -1774,7 +1806,16 @@ async function runAgent(config, ctx) {
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
       if (tc.function.name === 'write_todos') touchedTodo = true;
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
-      const safeResult = truncateToolResult(toolOut.result);
+      let safeResult = truncateToolResult(toolOut.result);
+      // Citable result id (F1): tag the result so the model can cite it as
+      // evidence ("r7") when closing a claim-todo. write_todos output is
+      // checklist bookkeeping, not observations of the world — never tagged,
+      // so a claim can't cite the checklist as proof of itself.
+      if (tc.function.name !== 'write_todos') {
+        const rid = 'r' + (++ctx._resultSeq);
+        (ctx._resultIds || (ctx._resultIds = new Set())).add(rid);
+        safeResult = '[' + rid + '] ' + safeResult;
+      }
       ctx.emit({ type: 'tool_result', id: tc.id, result: safeResult });
       const toolMsg = { role: 'tool', tool_call_id: tc.id, content: safeResult };
       messages.push(toolMsg); ctx.emit({ type: 'message_added', message: toolMsg });
