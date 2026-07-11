@@ -35,7 +35,16 @@ const post = (msg, transfer) => target().postMessage(msg, '*', transfer || []);
 if (!crossOriginIsolated) {
   post({ type: 'engine-error', error: 'office-engine: page is not cross-origin isolated' });
 } else {
-  const zHM = new ZetaHelperMain('office-thread.js', { threadJsType: 'module', wasmPkg: 'free' });
+  // Load the LibreOffice WASM through our OWN origin via the same-origin /proxy/
+  // instead of hitting cdn.zetaoffice.net directly. The CDN sends CORS headers but
+  // no Cross-Origin-Resource-Policy, so under COEP it only loads on browsers that
+  // support `credentialless` (desktop Chrome). Mobile (iOS Safari, etc.) refuses
+  // the cross-origin fetch → "refused to connect" and a dead converter. Routing
+  // through same-origin /proxy/ sidesteps COEP entirely and always tracks the CDN's
+  // current build (the vendored convert/wasm/ copy is a stale, mismatched build).
+  // /proxy/ is auth-gated, but in-app requests are same-origin and carry the session
+  // cookie, so they authorize. Same fix applies to the LaTeX engine (texlive host).
+  const zHM = new ZetaHelperMain('office-thread.js', { threadJsType: 'module', wasmPkg: 'url:/proxy/cdn.zetaoffice.net/zetaoffice_latest/' });
   const pending = new Map();
   let seq = 0;
 
