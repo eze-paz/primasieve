@@ -1507,7 +1507,13 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
   if (summary) {
     // Drop [0, split) — old summary + aged body — and prepend the fresh, folded summary.
     messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
-    ctx.emit({ type: 'message_compacted', kept: messages.length - 1 });
+    // Tell the PAGE to advance its persisted compaction boundary. `kept` = the tail
+    // messages retained (everything after the summary); since the worker's tail is
+    // the newest messages, the page maps this to boundary = convMessages.length -
+    // kept. Without this the page keeps the stale pre-turn boundary and the NEXT
+    // send re-ships everything this turn accumulated (the "sends way more than the
+    // active context" bug). `summary` is the raw folded text (no marker).
+    ctx.emit({ type: 'message_compacted', kept: messages.length - 1, summary });
   }
   ctx.emit({ type: 'compaction_end' });
 }

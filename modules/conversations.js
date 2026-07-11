@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=47');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=48');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1272,6 +1272,23 @@ async function sendSingle(text, stream, opts = {}) {
     // Worker mid-turn compaction uses the SAME spinner as pre-send compaction.
     if (ev.type === 'compaction_start') { showCompactionProgress(convId); return; }
     if (ev.type === 'compaction_end')   { hideCompactionProgress(convId); return; }
+    // Worker compacted its active slice mid-turn — advance the PAGE's persisted
+    // boundary to match, so the NEXT send ships only [summary, …tail] and not
+    // everything this turn piled up (the "sends way more than the active context"
+    // bug). The worker keeps its NEWEST `kept` messages; those are the last `kept`
+    // of convMessages, so boundary = convMessages.length - kept. Persisted by the
+    // turn-end saveConv (reads stream.compaction).
+    if (ev.type === 'message_compacted') {
+      const kept = Math.max(0, ev.kept | 0);
+      const boundary = convMessages.length - kept;
+      if (boundary > 0 && ev.summary) {
+        stream.compaction = { boundary, summary: ev.summary, at: new Date().toISOString() };
+        // The stale reported usage still reflects the pre-compaction size; drop it so
+        // the context meter + the pre-send trigger read the reduced send size.
+        try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.forget) SandpieTokens.forget(convId); } catch (_) {}
+      }
+      return;
+    }
     if (ev.type === 'tool_started') {
       lastInFlightTool = ev.tc?.function?.name || 'unknown';
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolStarted(activeConvId, ev.tc);
