@@ -152,27 +152,47 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     write_todos: {
-      description: `Maintain a visible checklist for a multi-step task. Call with the FULL list every time — this REPLACES the previous list (there is no add/complete verb; resend every item with its updated status).
-WHEN: use for any task with 3+ non-trivial steps, or when the user gives several distinct requirements. Skip it for single-step or trivial work.
-RULES: exactly ONE item may be "in_progress" at a time. Mark an item "in_progress" BEFORE you start it and "completed" the moment it's finished — don't batch completions. Only mark "completed" when truly done (file written, script ran clean, etc.); if blocked, keep it "in_progress" and add a new item for what's needed.
-Each item: { "content": imperative step ("Write the parser"), "status": "pending" | "in_progress" | "completed" }.`,
+      description: `Maintain a visible checklist for a multi-step task, as a task TREE you update with deterministic OPS — you do NOT resend or rewrite the whole list (that silently erased work in the past). The harness holds the tree; you send operations against task IDs and it returns the current state.
+WHEN: any task with 3+ non-trivial steps, or several distinct requirements. Skip for trivial work.
+FIRST plan: send a full list once — {"todos":[{"content":"…","status":"pending"}, …]} — accepted only when there is no checklist yet.
+THEN update with ops: {"ops":[ … ]}. Each op:
+  {"op":"add","text":"Write the parser","parent":"<id>"?}   add a task; with parent = a SUBTASK (decompose hard tasks!)
+  {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it)
+  {"op":"complete","id":"3"}       mark done — ONLY when truly done, and it's PERMANENT (re-add if you were wrong). Blocked while it has open subtasks.
+  {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping (kept on the record, greyed).
+IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or withdraw them first.`,
       parameters: {
         type: 'object',
         properties: {
-          todos: {
+          ops: {
             type: 'array',
-            description: 'The complete todo list, in order. Resend all items on every call.',
+            description: 'Operations to apply, in order. Use this to update an existing checklist.',
             items: {
               type: 'object',
               properties: {
-                content: { type: 'string', description: 'Imperative description of the step.' },
-                status:  { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Current state of this step.' },
+                op:     { type: 'string', enum: ['add', 'start', 'complete', 'withdraw'], description: 'The operation.' },
+                text:   { type: 'string', description: 'For "add": the task text (imperative).' },
+                parent: { type: 'string', description: 'For "add": parent task id to make this a subtask (e.g. "3").' },
+                id:     { type: 'string', description: 'For start/complete/withdraw: the target task id.' },
+                reason: { type: 'string', description: 'For "withdraw": optional short reason.' },
               },
-              required: ['content', 'status'],
+              required: ['op'],
+            },
+          },
+          todos: {
+            type: 'array',
+            description: 'Full list — ONLY for the initial plan, or a reset when every task is completed/withdrawn. Refused while any task is open.',
+            items: {
+              type: 'object',
+              properties: {
+                content: { type: 'string', description: 'Imperative description of the task.' },
+                status:  { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
+              },
+              required: ['content'],
             },
           },
         },
-        required: ['todos'],
+        required: [],
       },
     },
     shell: {

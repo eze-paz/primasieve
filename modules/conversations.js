@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=48');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=49');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1251,7 +1251,7 @@ async function sendSingle(text, stream, opts = {}) {
   startTotalTimer(stream);
   flightWrite(convId, text);
 
-  const config = await buildAgentConfig(convMessages, stream.compaction);
+  const config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
 
   const ctrl = new AbortController();
   stream.requestId = ctrl;
@@ -1407,7 +1407,7 @@ async function resolveFilePart(f) {
   }
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
-async function buildAgentConfig(convMessages, compaction) {
+async function buildAgentConfig(convMessages, compaction, curTodos) {
   const endpoint = $('endpoint').value.replace(/\/$/, '');
   const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   // Non-destructive compaction: send [summary, …in-context tail] in place of the
@@ -1461,6 +1461,9 @@ async function buildAgentConfig(convMessages, compaction) {
     reasoningEffort: (active && active.reasoningEffort) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
+    // Current checklist (task tree) so the worker can apply write_todos ops to it
+    // instead of the model resending/overwriting the whole list.
+    todos: Array.isArray(curTodos) ? curTodos : [],
     // Base URL of the local relay the `shell` tool runs commands through (run it
     // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
     shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',
@@ -1820,9 +1823,11 @@ function renderTodos(tcId, todos, scopeEl) {
     const st = (t && t.status) || 'pending';
     const row = document.createElement('div');
     row.className = 'tool-todo tool-todo-' + st;
+    const depth = t && t.id ? (String(t.id).match(/\./g) || []).length : 0;   // subtask indent
+    if (depth) row.style.marginLeft = (depth * 16) + 'px';
     const mark = document.createElement('span');
     mark.className = 'tool-todo-mark';
-    mark.textContent = st === 'completed' ? '✓' : st === 'in_progress' ? '▸' : '○';
+    mark.textContent = st === 'completed' ? '✓' : st === 'in_progress' ? '▸' : st === 'withdrawn' ? '⊘' : '○';
     const txt = document.createElement('span');
     txt.className = 'tool-todo-text';
     txt.textContent = (t && t.content) || '';
@@ -1861,9 +1866,11 @@ function buildTodosView(todos) {
     const st = (t && t.status) || 'pending';
     const row = document.createElement('div');
     row.className = 'tool-todo tool-todo-' + st;
+    const depth = t && t.id ? (String(t.id).match(/\./g) || []).length : 0;
+    if (depth) row.style.marginLeft = (depth * 16) + 'px';
     const mark = document.createElement('span');
     mark.className = 'tool-todo-mark';
-    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
+    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : st === 'withdrawn' ? '\u2298' : '\u25cb';
     const txt = document.createElement('span');
     txt.className = 'tool-todo-text';
     txt.textContent = (t && t.content) || '';

@@ -493,49 +493,104 @@ async function tool_run_python({ path, args, timeout }) {
 
 
 
-// A model-managed checklist. The model resends the WHOLE list each call (there is
-// no add/complete verb), so the list's source of truth is the model's own context;
-// we just validate, normalize, and hand back a magic-prefixed result the main
-// thread renders as a card (like 'artifact:' / 'image:'). The text AFTER the
-// first newline is the plain-text confirmation the MODEL reads back.
-async function tool_write_todos({ todos }, ctx) {
-  if (!Array.isArray(todos)) return { result: 'Error: "todos" must be an array of {content, status}.' };
-  const VALID = new Set(['pending', 'in_progress', 'completed']);
-  const clean = [];
-  for (const t of todos) {
-    const content = t && typeof t.content === 'string' ? t.content.trim() : '';
-    if (!content) return { result: 'Error: every todo needs a non-empty "content".' };
-    let status = t && t.status;
-    if (!VALID.has(status)) status = 'pending';
-    clean.push({ content, status });
-  }
-  if (!clean.length) return { result: 'Error: "todos" is empty — send at least one item.' };
-  // Enforce a single in_progress: keep the first, demote the rest to pending.
-  let seen = false;
-  for (const t of clean) {
-    if (t.status === 'in_progress') { if (seen) t.status = 'pending'; else seen = true; }
-  }
-  // Timestamp each item (ISO 8601, UTC). The model resends the whole list every
-  // call, so we diff by content against the previous list (ctx._todos): carry the
-  // original `created`, stamp `completed` the first time an item flips to done
-  // (cleared if it later reopens). These persist in the todos: payload and back
-  // the "a prior session left these open (date)" cross-conversation surfacing.
+// A model-managed checklist as a TASK TREE with deterministic, id-based ops.
+// There is NO blind full-replace (that let the model silently overwrite/erase the
+// list — measured 146 vanished items / 80 lost completions in one session), so the
+// checklist cannot be clobbered. States: pending → in_progress → completed
+// (terminal); pending/in_progress → withdrawn (terminal). Tasks decompose via
+// `parent`. The tree lives on ctx._todoTree (seeded from config.todos each turn)
+// and is echoed as a 'todos:' payload the page renders + persists as before.
+const _TODO_OPEN = new Set(['pending', 'in_progress']);
+const _TODO_ALL = ['pending', 'in_progress', 'completed', 'withdrawn'];
+function _todoNextId(tree, parent) {
+  if (!parent) { let mx = 0; for (const t of tree) if (!t.parent) { const n = parseInt(t.id, 10); if (n > mx) mx = n; } return String(mx + 1); }
+  const pre = parent + '.'; let mx = 0;
+  for (const t of tree) if (t.parent === parent) { const n = parseInt(t.id.slice(pre.length), 10); if (n > mx) mx = n; }
+  return pre + (mx + 1);
+}
+function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed })); }
+function _todoSummary(tree) {
+  const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'withdrawn' ? '[-]' : '[ ]';
+  return tree.map(t => '  '.repeat((t.id.match(/\./g) || []).length) + mark(t.status) + ' ' + t.id + ' ' + t.content).join('\n');
+}
+async function tool_write_todos({ ops, todos }, ctx) {
+  const tree = (ctx && Array.isArray(ctx._todoTree)) ? ctx._todoTree : (ctx ? (ctx._todoTree = []) : []);
   const now = new Date().toISOString();
-  const prev = (ctx && Array.isArray(ctx._todos)) ? ctx._todos : [];
-  for (const t of clean) {
-    const was = prev.find(p => p.content === t.content);
-    t.created = (was && was.created) || now;
-    if (t.status === 'completed') t.completed = (was && was.completed) || now;
+  const byId = new Map(tree.map(t => [t.id, t]));
+  const openCount = () => tree.filter(t => _TODO_OPEN.has(t.status)).length;
+
+  // ── Full-list form: accepted ONLY as an initial plan (empty tree) or a reset
+  //    when EVERY current task is completed/withdrawn. Never a mid-work overwrite.
+  if (Array.isArray(todos) && !Array.isArray(ops)) {
+    if (tree.length && openCount() > 0) {
+      return { result: 'Error: cannot replace the checklist while ' + openCount() + ' task(s) are still open. '
+        + 'Use ops — {"ops":[{"op":"complete","id":"…"}, …]} — to update it, or complete/withdraw the open tasks first. '
+        + 'A full new list is only accepted when the current one is entirely completed/withdrawn.' };
+    }
+    tree.length = 0; byId.clear();
+    for (const t of todos) {
+      const content = t && typeof t.content === 'string' ? t.content.trim() : '';
+      if (!content) continue;
+      const status = _TODO_ALL.includes(t.status) ? t.status : 'pending';
+      const task = { id: _todoNextId(tree, null), content, status, parent: null, created: now };
+      if (status === 'completed') task.completed = now;
+      tree.push(task);
+    }
+    if (!tree.length) return { result: 'Error: empty checklist — send at least one task.' };
+    if (ctx) ctx._todos = _todoFlat(tree);
+    return { result: 'todos:' + JSON.stringify(tree) + '\nNew checklist (' + tree.length + ' tasks):\n' + _todoSummary(tree) };
   }
-  // Surface the current list to runAgent so it can drive the drift-reminder and
-  // the "don't stop with open todos" guard. This is the loop's only view of the
-  // checklist (the tool otherwise just echoes text back to the model).
-  if (ctx) ctx._todos = clean;
-  const done = clean.filter(t => t.status === 'completed').length;
-  const summary = clean.map(t =>
-    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
-  ).join('\n');
-  return { result: 'todos:' + JSON.stringify(clean) + '\n' + `Todo list updated (${done}/${clean.length} done):\n` + summary };
+
+  if (!Array.isArray(ops)) {
+    return { result: 'Error: send {"ops":[…]}. Ops (IDs are shown in the checklist; subtasks look like "3.1"):\n'
+      + '  {"op":"add","text":"…","parent":"<id>"?}   add a task (or a subtask under parent)\n'
+      + '  {"op":"start","id":"…"}                     pending → in_progress\n'
+      + '  {"op":"complete","id":"…"}                  → completed (blocked while it has open subtasks)\n'
+      + '  {"op":"withdraw","id":"…","reason":"…"?}    abandon a pending/in_progress task\n'
+      + 'Completed is permanent (re-add if you were wrong); completed tasks cannot be withdrawn. '
+      + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/withdrawn.' };
+  }
+
+  const errs = [], added = [];
+  for (const op of ops) {
+    const k = op && op.op;
+    if (k === 'add') {
+      const content = String(op.text || op.content || '').trim();
+      if (!content) { errs.push('add: empty text'); continue; }
+      const parent = op.parent || null;
+      if (parent && !byId.has(parent)) { errs.push('add: unknown parent "' + parent + '"'); continue; }
+      if (parent && byId.get(parent).status === 'completed') { errs.push('add: parent "' + parent + '" is completed'); continue; }
+      const task = { id: _todoNextId(tree, parent), content, status: 'pending', parent, created: now };
+      tree.push(task); byId.set(task.id, task); added.push(task.id);
+    } else if (k === 'start' || k === 'complete' || k === 'withdraw') {
+      const t = byId.get(op.id);
+      if (!t) { errs.push(k + ': unknown id "' + op.id + '"'); continue; }
+      if (k === 'start') {
+        if (t.status !== 'pending') { errs.push('start "' + op.id + '": only a pending task can start (is ' + t.status + ')'); continue; }
+        t.status = 'in_progress';
+      } else if (k === 'complete') {
+        if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
+        if (t.status === 'withdrawn') { errs.push('complete "' + op.id + '": withdrawn tasks cannot be completed'); continue; }
+        const openKids = tree.filter(x => x.parent === t.id && _TODO_OPEN.has(x.status));
+        if (openKids.length) { errs.push('complete "' + op.id + '": ' + openKids.length + ' open subtask(s) (' + openKids.map(x => x.id).join(', ') + ') — close them first'); continue; }
+        t.status = 'completed'; t.completed = now;
+      } else { // withdraw — cascades to open descendants
+        if (t.status === 'completed') { errs.push('withdraw "' + op.id + '": completed tasks cannot be withdrawn'); continue; }
+        if (t.status === 'withdrawn') { errs.push('withdraw "' + op.id + '": already withdrawn'); continue; }
+        const stack = [t.id], kill = new Set();
+        while (stack.length) { const pid = stack.pop(); for (const x of tree) if (x.parent === pid && _TODO_OPEN.has(x.status)) { kill.add(x.id); stack.push(x.id); } }
+        t.status = 'withdrawn'; t.withdrawn = now; if (op.reason) t.reason = String(op.reason).slice(0, 200);
+        for (const x of tree) if (kill.has(x.id)) { x.status = 'withdrawn'; x.withdrawn = now; }
+      }
+    } else { errs.push('unknown op "' + k + '" (use add/start/complete/withdraw)'); }
+  }
+  if (ctx) ctx._todos = _todoFlat(tree);
+  const done = tree.filter(t => t.status === 'completed').length;
+  let out = 'todos:' + JSON.stringify(tree) + '\n'
+    + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + tree.length + ' total'
+    + (added.length ? ' · added ' + added.join(', ') : '') + '\n' + _todoSummary(tree);
+  if (errs.length) out += '\n\nREJECTED (not applied):\n- ' + errs.join('\n- ');
+  return { result: out };
 }
 
 async function tool_show_artifact({ path }, ctx) {
@@ -1557,6 +1612,15 @@ async function runAgent(config, ctx) {
   ctx._authRefreshUrl = config.authRefreshUrl || null;
   // Relay base URL for the `shell` tool (worker has no localStorage).
   ctx._shellRelayUrl = config.shellRelayUrl || 'http://localhost:8765';
+  // Seed the task tree from the persisted checklist (page passes config.todos).
+  // Migrate legacy flat items (no id) → sequential ids so write_todos ops apply.
+  ctx._todoTree = (Array.isArray(config.todos) ? config.todos : []).map((t, i) => ({
+    id: t.id || String(i + 1),
+    content: t.content || '',
+    status: _TODO_ALL.includes(t.status) ? t.status : 'pending',
+    parent: t.parent || null,
+    created: t.created, completed: t.completed, withdrawn: t.withdrawn, reason: t.reason,
+  }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
   // round's tool results are already appended — so a steer can never land between
@@ -1583,16 +1647,17 @@ async function runAgent(config, ctx) {
   //   • Stop guard: when the model tries to end the turn with items still open,
   //     don't let it — re-prompt and continue. Only a real user stop (abort) or
   //     genuine progress stalling out (MAX_STOP_BLOCKS) ends the turn.
-  ctx._todos = ctx._todos || [];
+  ctx._todos = _todoFlat(ctx._todoTree);   // flat view of the seeded tree
   ctx._roundsSinceTodo = 0;
   ctx._stopBlocks = 0;
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
-  const openTodos = () => ctx._todos.filter(t => t.status !== 'completed');
+  // "Open" = pending or in_progress. completed AND withdrawn are both closed.
+  const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
   const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
   const renderTodos = () => ctx._todos.map(t =>
-    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
+    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'withdrawn' ? '[-]' : '[ ]') + ' ' + t.content
   ).join('\n');
   // Ephemeral, request-only reminder for the NEXT round. Never pushed into
   // `messages`, so it is neither persisted nor resent on later rounds; it is
