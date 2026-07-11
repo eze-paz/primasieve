@@ -3304,6 +3304,11 @@ function startTotalTimer(stream) {
 
   const paint = () => {
     if (!stream.timerEl) return;
+    // Self-heal: a mid-turn host re-render (e.g. a compaction that clears
+    // s.host.innerHTML) detaches the live timer, and startTotalTimer's guard
+    // then never rebuilds it — so it vanishes for the rest of the turn. If it's
+    // been orphaned, re-append it to the (rebuilt) host at the next tick.
+    if (!stream.timerEl.isConnected && stream.host) stream.host.appendChild(stream.timerEl);
     set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
     const q = stream.queue.length;
     if (queueEl.dataset.q !== String(q)) {
