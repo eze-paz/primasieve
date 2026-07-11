@@ -57,6 +57,23 @@
   f.src = '/convert/office-engine.html?diag=1';
   document.getElementById('frames').appendChild(f);
   setTimeout(() => log('(3s) crossOriginIsolated still ' + self.crossOriginIsolated + ' — note if the box above says "refused to connect"'), 3000);
+
+  // *** THE REAL TEST: can this browser show a blob: PDF in an iframe? ***
+  // (That is exactly how the converter displays its result. Android Chrome has no
+  //  inline PDF viewer, so this iframe is expected to say "refused to connect".)
+  const MINI_PDF = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 46>>stream\nBT /F1 24 Tf 30 100 Td (PDF OK) Tj ET\nendstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+  const pdfUrl = URL.createObjectURL(new Blob([MINI_PDF], { type: 'application/pdf' }));
+  log('embedding a blob: PDF in an iframe (this is the converter\'s display step) ...');
+  const hdr2 = document.createElement('div');
+  hdr2.style.cssText = 'margin-top:12px;font:bold 13px monospace';
+  hdr2.textContent = 'blob PDF iframe (if THIS says "refused to connect", that is the bug):';
+  document.body.appendChild(hdr2);
+  const pf = document.createElement('iframe');
+  pf.style.cssText = 'width:280px;height:160px;border:2px solid #d33;';
+  pf.onload = () => log('blob-PDF iframe: onload fired (may still render blank on Android)');
+  pf.onerror = (e) => log('blob-PDF iframe: ONERROR ' + e);
+  pf.src = pdfUrl;
+  document.body.appendChild(pf);
 </script>
 </body>
 </html>
