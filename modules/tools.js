@@ -158,9 +158,9 @@ FIRST plan: send a full list once — {"todos":[{"content":"…","status":"pendi
 THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"add","text":"Write the parser","parent":"<id>"?}   add a task; with parent = a SUBTASK (decompose hard tasks!)
   {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it)
-  {"op":"complete","id":"3"}       mark done — ONLY when truly done, and it's PERMANENT (re-add if you were wrong). Blocked while it has open subtasks.
-  {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping (kept on the record, greyed).
-CLAIMS: when you form a hypothesis or diagnosis ("the bug is X", "the config means Y"), add it with "kind":"claim". A claim closes ONLY via {"op":"complete","id":"…","verdict":"confirmed"|"refuted","evidence":["r12",…]} citing the [rN] ids stamped on tool results — reasoning alone cannot close a claim; run a tool whose output settles it, then cite that output. A refuted claim is progress, not failure: it prunes the search.
+  {"op":"complete","id":"3","evidence":["r12",…]}   mark done, citing the [rN] ids stamped on tool results that SHOW it is done. EVERY completion requires evidence — no task closes on assertion alone; if no tool output demonstrates it yet, run the command/check that would, then cite it. Permanent (re-add if you were wrong); blocked while it has open subtasks.
+  {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping, or that turned out not to need doing (kept on the record, greyed).
+CLAIMS: when a step is a hypothesis or diagnosis ("the bug is X", "the config means Y") rather than an action, add it with "kind":"claim". Closing a claim additionally requires "verdict":"confirmed"|"refuted" — how the cited evidence settled it. A refuted claim is progress, not failure: it prunes the search.
 IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or withdraw them first.`,
       parameters: {
         type: 'object',
@@ -178,7 +178,7 @@ IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch seve
                 id:     { type: 'string', description: 'For start/complete/withdraw: the target task id.' },
                 reason: { type: 'string', description: 'For "withdraw": optional short reason.' },
                 verdict:  { type: 'string', enum: ['confirmed', 'refuted'], description: 'For "complete" of a claim: how the evidence settled it.' },
-                evidence: { type: 'array', items: { type: 'string' }, description: 'For "complete" of a claim: [rN] ids of tool results that settle it (e.g. ["r12","r15"]).' },
+                evidence: { type: 'array', items: { type: 'string' }, description: 'For "complete" (REQUIRED, every task): [rN] ids of tool results that show it is done (e.g. ["r12","r15"]).' },
               },
               required: ['op'],
             },

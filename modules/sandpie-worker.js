@@ -512,8 +512,9 @@ function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t
 function _todoSummary(tree) {
   const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'withdrawn' ? '[-]' : '[ ]';
   return tree.map(t => '  '.repeat((t.id.match(/\./g) || []).length) + mark(t.status) + ' ' + t.id + ' '
-    + (t.kind === 'claim' ? 'CLAIM' + (t.verdict ? ' ' + t.verdict.toUpperCase() + ' (' + (t.evidence || []).join(',') + ')' : '') + ': ' : '')
-    + t.content).join('\n');
+    + (t.kind === 'claim' ? 'CLAIM' + (t.verdict ? ' ' + t.verdict.toUpperCase() : '') + ': ' : '')
+    + t.content
+    + (Array.isArray(t.evidence) && t.evidence.length ? ' [' + t.evidence.join(',') + ']' : '')).join('\n');
 }
 async function tool_write_todos({ ops, todos }, ctx) {
   const tree = (ctx && Array.isArray(ctx._todoTree)) ? ctx._todoTree : (ctx ? (ctx._todoTree = []) : []);
@@ -577,23 +578,26 @@ async function tool_write_todos({ ops, todos }, ctx) {
         if (t.status === 'withdrawn') { errs.push('complete "' + op.id + '": withdrawn tasks cannot be completed'); continue; }
         const openKids = tree.filter(x => x.parent === t.id && _TODO_OPEN.has(x.status));
         if (openKids.length) { errs.push('complete "' + op.id + '": ' + openKids.length + ' open subtask(s) (' + openKids.map(x => x.id).join(', ') + ') — close them first'); continue; }
-        // Claims close only with a verdict backed by citable evidence: reasoning
-        // alone cannot settle a claim, only tool output ([rN] ids) can. The
-        // rejection text is the teaching signal — it tells the model HOW to
-        // convert a belief into a checkable fact.
+        // EVERY completion must cite evidence — the [rN] ids of tool results
+        // that show the work was done / the question settled. No task closes on
+        // reasoning or assertion alone; the model does not get to decide which
+        // items deserve verification. The rejection text is the teaching
+        // signal — it tells the model HOW to convert a belief into a fact.
+        const ev = Array.isArray(op.evidence) ? op.evidence.map(String) : [];
+        const known = ctx && ctx._resultIds;
+        const bad = known ? ev.filter(id => !known.has(id)) : ev.filter(id => !/^r\d+$/.test(id));
+        if (!ev.length || bad.length) {
+          errs.push('complete "' + op.id + '": a task cannot be closed without evidence. Cite the [rN] ids of the tool results that show it is done' + (bad.length ? ' (unknown: ' + bad.join(', ') + ')' : '') + ' — e.g. {"op":"complete","id":"' + op.id + '","evidence":["r12"]}. If no tool output demonstrates it yet, run the command/check that would, then cite it. If the item turned out not to need doing, withdraw it instead.'); continue;
+        }
+        // Claims additionally record HOW the evidence settled them.
         if (t.kind === 'claim') {
           const verdict = String(op.verdict || '').toLowerCase();
           if (verdict !== 'confirmed' && verdict !== 'refuted') {
-            errs.push('complete "' + op.id + '": this is a CLAIM — close it with "verdict":"confirmed"|"refuted" plus "evidence":["rN",…]. If you have not tested it yet, run a command whose output settles it first.'); continue;
+            errs.push('complete "' + op.id + '": this is a CLAIM — also pass "verdict":"confirmed"|"refuted" saying how the evidence settled it.'); continue;
           }
-          const ev = Array.isArray(op.evidence) ? op.evidence.map(String) : [];
-          const known = ctx && ctx._resultIds;
-          const bad = known ? ev.filter(id => !known.has(id)) : ev.filter(id => !/^r\d+$/.test(id));
-          if (!ev.length || bad.length) {
-            errs.push('complete "' + op.id + '": a claim cannot be closed on reasoning alone. Cite the [rN] ids of tool results that settle it' + (bad.length ? ' (unknown: ' + bad.join(', ') + ')' : '') + '. Run a tool whose output decides this claim, then cite its id.'); continue;
-          }
-          t.verdict = verdict; t.evidence = ev;
+          t.verdict = verdict;
         }
+        t.evidence = ev;
         t.status = 'completed'; t.completed = now;
       } else { // withdraw — cascades to open descendants
         if (t.status === 'completed') { errs.push('withdraw "' + op.id + '": completed tasks cannot be withdrawn'); continue; }

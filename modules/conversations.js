@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=53');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=54');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1896,19 +1896,20 @@ function buildTodosView(todos) {
     txt.className = 'tool-todo-text';
     txt.textContent = (t && t.content) || '';
     row.append(mark, txt);
-    // Claims: badge (CLAIM → CONFIRMED/REFUTED) plus the cited evidence ids.
+    // Claims get a badge (CLAIM → CONFIRMED/REFUTED); ANY task closed with
+    // cited evidence shows the [rN] ids it cited.
     if (t && t.kind === 'claim') {
       const badge = document.createElement('span');
       badge.className = 'tool-todo-claim-badge' + (t.verdict ? ' claim-' + t.verdict : '');
       badge.textContent = t.verdict ? t.verdict.toUpperCase() : 'CLAIM';
       row.appendChild(badge);
-      if (Array.isArray(t.evidence) && t.evidence.length) {
-        const ev = document.createElement('span');
-        ev.className = 'tool-todo-evidence';
-        ev.textContent = t.evidence.join(' ');
-        ev.title = 'Evidence: tool results cited to close this claim';
-        row.appendChild(ev);
-      }
+    }
+    if (t && Array.isArray(t.evidence) && t.evidence.length) {
+      const ev = document.createElement('span');
+      ev.className = 'tool-todo-evidence';
+      ev.textContent = t.evidence.join(' ');
+      ev.title = 'Evidence: tool results cited to close this task';
+      row.appendChild(ev);
     }
     wrap.appendChild(row);
   }
