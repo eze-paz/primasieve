@@ -1446,29 +1446,19 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
 
 
   if (ext === 'pdf') {
-
-
-    const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
-
-
-    const f = document.createElement('iframe');
-
-
-    f.setAttribute('data-chrome', '');
-
-
-    f.src = url;
-
-
-    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
-
-
-    body.appendChild(f);
-
-
-    mount(opfs.closeFile); return;
-
-
+    body.innerHTML = '';
+    mount(opfs.closeFile);
+    try {
+      await opfs._renderPdfInto(new Uint8Array(await file.arrayBuffer()), body);
+    } catch (_e) {
+      const url = URL.createObjectURL(file); panel.dataset.blobUrl = url;
+      const f = document.createElement('iframe');
+      f.setAttribute('data-chrome', '');
+      f.src = url;
+      f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
+      body.innerHTML = ''; body.appendChild(f);
+    }
+    return;
   }
 
 
@@ -2411,6 +2401,40 @@ opfs._putConvertJob = function(job) {
 // lightweight docx-preview/SheetJS/pptx-viewer path, or the popup).
 
 
+opfs._pdfjsReady = null;
+opfs._ensurePdfjs = function () {
+  if (!opfs._pdfjsReady) {
+    opfs._pdfjsReady = opfs._loadScript('/modules/vendor/pdfjs/pdf.min.js').then(function () {
+      if (!window.pdfjsLib) throw new Error('pdf.js failed to load');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js';
+    });
+  }
+  return opfs._pdfjsReady;
+};
+// Render PDF bytes into `container` as stacked <canvas> pages via pdf.js. Native
+// <iframe src="blob:...pdf"> works on desktop Chrome (PDFium) but Android Chrome
+// has no inline PDF viewer and shows "refused to connect", so we rasterize here.
+opfs._renderPdfInto = async function (bytes, container) {
+  await opfs._ensurePdfjs();
+  const data = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
+  const doc = await window.pdfjsLib.getDocument({ data: data.slice(0) }).promise;
+  container.innerHTML = '';
+  container.style.cssText = 'width:100%;height:70vh;overflow:auto;background:#525659;padding:8px 0;';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = (container.clientWidth || container.offsetWidth || 800) - 16;
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.max(0.2, cw / base.width);
+    const vp = page.getViewport({ scale: scale * dpr });
+    const canvas = document.createElement('canvas');
+    canvas.width = vp.width; canvas.height = vp.height;
+    canvas.style.cssText = 'display:block;margin:0 auto 8px;width:' + Math.round(vp.width / dpr) + 'px;max-width:100%;box-shadow:0 1px 4px rgba(0,0,0,.4);background:#fff';
+    container.appendChild(canvas);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  }
+};
+
 opfs.OFFICE_ENGINE_EXTS = new Set(['docx','doc','odt','rtf','xlsx','xls','ods','csv','pptx','ppt','odp','odg']);
 
 
@@ -3263,28 +3287,18 @@ opfs._renderOfficePdf = async function(file, ext, name, body, panel) {
     const pdf = await engine.convert(bytes, ext);
 
 
-    const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
-
-
-    if (panel) panel.dataset.blobUrl = url;   // revoked by closeFile
-
-
-    body.innerHTML = '';
-
-
-    const f = document.createElement('iframe');
-
-
-    f.setAttribute('data-chrome', '');
-
-
-    f.src = url;
-
-
-    f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
-
-
-    body.appendChild(f);
+    try {
+      await opfs._renderPdfInto(pdf, body);
+    } catch (_e) {
+      const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+      if (panel) panel.dataset.blobUrl = url;
+      body.innerHTML = '';
+      const f = document.createElement('iframe');
+      f.setAttribute('data-chrome', '');
+      f.src = url;
+      f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff';
+      body.appendChild(f);
+    }
 
 
     return true;

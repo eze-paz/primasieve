@@ -74,6 +74,31 @@
   pf.onerror = (e) => log('blob-PDF iframe: ONERROR ' + e);
   pf.src = pdfUrl;
   document.body.appendChild(pf);
+
+  // *** THE FIX: render the same PDF with pdf.js into a canvas (works on Android) ***
+  const hdr3 = document.createElement('div');
+  hdr3.style.cssText = 'margin-top:12px;font:bold 13px monospace';
+  hdr3.textContent = 'pdf.js canvas (THE FIX — should show the PDF, not "refused"):';
+  document.body.appendChild(hdr3);
+  const pjBox = document.createElement('div');
+  pjBox.style.cssText = 'border:2px solid #2a2; min-height:60px; background:#fff;';
+  document.body.appendChild(pjBox);
+  (async () => {
+    try {
+      log('pdf.js: loading /modules/vendor/pdfjs/pdf.min.js ...');
+      await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/modules/vendor/pdfjs/pdf.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('pdf.min.js load failed')); document.head.appendChild(sc); });
+      if (!window.pdfjsLib) throw new Error('pdfjsLib undefined after load');
+      log('pdf.js: lib loaded, setting worker ...');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js';
+      const doc = await window.pdfjsLib.getDocument({ data: new TextEncoder().encode(MINI_PDF) }).promise;
+      log('pdf.js: doc opened, numPages=' + doc.numPages);
+      const page = await doc.getPage(1);
+      const vp = page.getViewport({ scale: 1 });
+      const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; pjBox.appendChild(c);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      log('pdf.js: RENDER OK — the fix works on this device');
+    } catch (err) { log('pdf.js: FAILED -> ' + (err && err.message || err)); }
+  })();
 </script>
 </body>
 </html>
