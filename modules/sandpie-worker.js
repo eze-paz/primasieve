@@ -1721,6 +1721,16 @@ async function runAgent(config, ctx) {
           + 'If this is a multi-step task, STRONGLY consider laying out a plan with write_todos before proceeding — '
           + 'it keeps you from drifting and lets progress be tracked and verified. If the task is genuinely trivial '
           + 'and single-step, you may ignore this.</system-reminder>');
+      } else {
+        // Checklist exists but every task is completed/withdrawn — yet the model
+        // is still making tool calls. Unplanned work is the same drift risk as
+        // no plan at all: make it either extend the plan or wrap up.
+        setReminder('plan-exhausted',
+          '<system-reminder>Your checklist is fully closed, yet you have run ' + ctx._roundsSinceTodo
+          + ' more tool rounds since. Whatever you are doing now is NOT on the plan. Either add the remaining '
+          + 'work to the checklist with write_todos (a full new {"todos":[…]} list is accepted now that every '
+          + 'task is closed) so it can be tracked, or stop and report your results. Do not keep working '
+          + 'unplanned.</system-reminder>');
       }
       ctx._roundsSinceTodo = 0;
     }
