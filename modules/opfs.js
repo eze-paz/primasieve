@@ -1669,7 +1669,7 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     const dirPath = fullKey.replace(/\/[^\/]+$/, '');
 
 
-    body.innerHTML = '<iframe src="/convert_latex/index.html?v=2#project=' + encodeURIComponent(dirPath) + '" style="width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;"></iframe>';
+    body.innerHTML = '<iframe src="/convert_latex/index.html?v=3#project=' + encodeURIComponent(dirPath) + '" style="width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;"></iframe>';
 
 
     mount(opfs.closeFile);
@@ -4482,7 +4482,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
               const dirPath = it.fullKey.replace(/\/[^\/]+$/, '');
 
 
-              window.open('/convert_latex/index.html?v=2#project=' + encodeURIComponent(dirPath), '_blank');
+              window.open('/convert_latex/index.html?v=3#project=' + encodeURIComponent(dirPath), '_blank');
 
 
             }

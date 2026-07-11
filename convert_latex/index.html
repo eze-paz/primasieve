@@ -479,7 +479,8 @@ onmessage = async ({data}) => {
 
       $stage1.style.display = 'none';
       $stage2.style.display = '';
-      $result.innerHTML = '<iframe src="' + url + '" type="application/pdf"></iframe><div style="margin-top:.75rem"><a class="dl" href="' + url + '" download="' + outName + '">Download ' + outName + '</a><button class="secondary" id="backBtn">↺ Back</button></div>';
+      $result.innerHTML = '<div id="pdfPages" style="max-height:70vh;overflow:auto;background:#525659;padding:8px 0;border-radius:6px"></div><div style="margin-top:.75rem"><a class="dl" href="' + url + '" download="' + outName + '">Download ' + outName + '</a><button class="secondary" id="backBtn">↺ Back</button></div>';
+      renderLatexPdf(result.pdf, document.getElementById('pdfPages'));
       document.getElementById('backBtn').addEventListener('click', () => {
         $stage2.style.display = 'none';
         $stage1.style.display = '';
@@ -521,6 +522,34 @@ onmessage = async ({data}) => {
     if (p) loadProject(p);
   });
 })();
+</script>
+<script>
+window.renderLatexPdf = async function (bytes, container) {
+  if (!window.__pdfjsP) {
+    window.__pdfjsP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/modules/vendor/pdfjs/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('pdf.js load failed')); document.head.appendChild(s); })
+      .then(() => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js'; });
+  }
+  try {
+    await window.__pdfjsP;
+    const data = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
+    const doc = await window.pdfjsLib.getDocument({ data: data.slice(0) }).promise;
+    container.innerHTML = '';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cw = (container.clientWidth || 800) - 16;
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.max(0.2, cw / base.width);
+      const vp = page.getViewport({ scale: scale * dpr });
+      const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+      c.style.cssText = 'display:block;margin:0 auto 8px;width:' + Math.round(vp.width / dpr) + 'px;max-width:100%;box-shadow:0 1px 4px rgba(0,0,0,.4);background:#fff';
+      container.appendChild(c);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    }
+  } catch (e) {
+    container.innerHTML = '<div style="color:#f85149;padding:1rem">Preview failed: ' + (e && e.message || e) + '. Use the Download link.</div>';
+  }
+};
 </script>
 </body>
 </html>
