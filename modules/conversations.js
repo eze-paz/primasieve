@@ -1272,12 +1272,26 @@ async function sendSingle(text, stream, opts = {}) {
   // on its next send (the advanced boundary is saved).
   if (typeof SandpieCompactor !== 'undefined' && SandpieCompactor.isEnabled && SandpieCompactor.isEnabled()) {
     const base = SandpieCompactor.config();
+    // Fit budget = the TIGHTER of the ~1 MB gateway cap and the provider's context
+    // WINDOW (converted to bytes at ~4 bytes/token, targeting base.pct% of it). The
+    // token window is usually far tighter than the gateway — which is why a chat can
+    // blow the model's context while sitting well under the 1 MB byte limit.
+    let budget = SEND_BYTE_BUDGET;
+    try { const win = SandpieTokens.contextWindow && SandpieTokens.contextWindow(); if (win) budget = Math.min(budget, Math.round(win * (base.pct / 100) * 4)); } catch (_) {}
+    // Shrink the kept tail until the request fits. keepTail=10 is only a STARTING
+    // point: if the last 10 messages alone exceed the budget (big tool outputs),
+    // halve it (10→5→2) so the boundary advances PAST them. "nothing to compact"
+    // means the current keepTail still protects the whole over-budget slice → shrink
+    // and retry, don't give up. Only stop on a real summarizer failure or at the
+    // keepTail=2 floor (can't drop the current turn's own request/response).
     let keep = base.keepTail;
-    for (let i = 0; i < 6 && _sentRequestBytes(config) > SEND_BYTE_BUDGET; i++) {
+    for (let i = 0; i < 8; i++) {
+      if (_sentRequestBytes(config) <= budget) break;
       const r = await _performCompaction(convId, { ...base, keepTail: keep });
-      if (!r || !r.ok) break;                        // boundary can't advance further
-      keep = Math.max(2, Math.floor(keep / 2));       // still too big → keep an even smaller tail next pass
+      if (r && !r.ok && !/nothing/.test(r.reason || '')) break;   // real failure (e.g. summarizer down)
       config = await buildAgentConfig(stream.messages, stream.compaction, stream.todos);
+      if (keep <= 2) break;                                        // already at the floor
+      keep = Math.max(2, Math.floor(keep / 2));
     }
   }
 
