@@ -3299,7 +3299,12 @@ function startTotalTimer(stream) {
   _wireCtxCounter(el, stream.id);
   const todosEl = el.querySelector('.mt-todos');
   stream.todosEl = todosEl;
-  stream.todos = null;
+  // Do NOT reset stream.todos here. It is the persistent checklist (task tree),
+  // carried across turns + reloads (meta.todos → hydrate → s.todos) and seeded
+  // into the worker via config.todos so write_todos OPS apply to the existing
+  // tree. Nulling it (a relic of the old full-replace design) detached the
+  // checklist every turn — buildAgentConfig, called right after this, would read
+  // null → empty tree → the model rewrites and loses state.
   const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
 
   const paint = () => {
