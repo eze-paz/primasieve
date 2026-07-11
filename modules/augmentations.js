@@ -196,14 +196,23 @@
   function _shellFileTargets(cmd) {
     const out = new Set();
     if (typeof cmd !== 'string' || !cmd) return [];
-    // > file / >> file / 2> file  (skip fd-dups like 2>&1 and /dev/*)
-    for (const m of cmd.matchAll(/\d*>>?\s*("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
+    // Strip heredoc BODIES first: `cat > f << 'EOF' … EOF` embeds FILE CONTENT
+    // (code full of >, =>, generics, comparisons) that must NOT be scanned for
+    // redirects — otherwise `=> {`, `x > 21`, `=> panic!` get captured as targets.
+    let scan = cmd.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[ \t]*\2[ \t]*$/gm, ' <<HEREDOC ');
+    scan = scan.replace(/<<-?\s*(['"]?)\w+\1[\s\S]*$/g, ' <<HEREDOC ');   // unterminated heredoc
+    // Only keep PATH-SHAPED tokens (contain "/" or end in a file extension) — this
+    // rejects the junk (21, len, panic!, {, =, {:#x}) that a bare `>` before a code
+    // token would otherwise yield.
+    const keep = t => t && !t.startsWith('&') && !/^\/dev\//.test(t)
+      && (t.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(t));
+    for (const m of scan.matchAll(/\d*>>?\s*("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
       const t = m[1].replace(/^['"]|['"]$/g, '');
-      if (t && !t.startsWith('&') && !/^\/dev\//.test(t)) out.add(t);
+      if (keep(t)) out.add(t);
     }
-    // tee [-a] file
-    for (const m of cmd.matchAll(/\btee\s+(?:-a\s+)?("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
-      out.add(m[1].replace(/^['"]|['"]$/g, ''));
+    for (const m of scan.matchAll(/\btee\s+(?:-a\s+)?("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) {
+      const t = m[1].replace(/^['"]|['"]$/g, '');
+      if (keep(t)) out.add(t);
     }
     return [...out].slice(0, 8);
   }
@@ -257,7 +266,10 @@
     const project = getProjectId();
     // Recent paths
     if (localStorage.getItem('sandpie-recent-paths-enabled') !== 'false') {
-      const paths = await getRecentPaths(project);
+      // Path-shape filter: cleans any pre-existing junk entries (21, len, panic!,
+      // {, {:#x}) written before the _shellFileTargets fix, so they never reach the
+      // prompt. The stored file self-heals via its 20-cap as real paths push them out.
+      const paths = (await getRecentPaths(project)).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
       if (paths.length) {
         block += '\n\n## Recent paths\n\nFiles touched recently in this project:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
       }
