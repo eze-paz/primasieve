@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=56');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=57');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1506,6 +1506,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],
+    // Auto adversarial audit on every checklist `complete`. KILL SWITCH: run
+    // localStorage.setItem('sandpie-auto-adversary','off') in the console if it
+    // ever locks a run in an audit loop — no code change / redeploy needed.
+    autoAdversary: (function () { try { return localStorage.getItem('sandpie-auto-adversary') !== 'off'; } catch (_) { return true; } })(),
     // Base URL of the local relay the `shell` tool runs commands through (run it
     // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
     shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',

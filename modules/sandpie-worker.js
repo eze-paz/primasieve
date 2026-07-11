@@ -555,7 +555,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/withdrawn.' };
   }
 
-  const errs = [], added = [];
+  const errs = [], added = [], notes = [];
   for (const op of ops) {
     const k = op && op.op;
     if (k === 'add') {
@@ -605,8 +605,21 @@ async function tool_write_todos({ ops, todos }, ctx) {
           }
           t.verdict = verdict;
         }
+        // ── Auto adversarial audit on EVERY close (kill switch: set localStorage
+        //    sandpie-auto-adversary = 'off', or flip AUTO_ADVERSARY_ON_COMPLETE).
+        //    The adversary sees only task text + justification + cited evidence
+        //    (same info asymmetry as the manual tool). A non-supported verdict
+        //    REJECTS the close with the audit text as the teaching signal.
+        //    Loop guards: (a) a close whose citations already include a passing
+        //    manual ADVERSARY AUDIT is not re-audited; (b) after 2 failed audits
+        //    on the same item the 3rd close attempt passes with a warning, so a
+        //    stubborn adversary can never lock the run in an infinite loop;
+        //    (c) transport failure fails OPEN (close proceeds, noted).
+        const auditNote = await _autoAdversaryOnComplete(t, op, ev, ctx);
+        if (auditNote && auditNote.rejected) { errs.push(auditNote.text); continue; }
         t.evidence = ev;
         t.status = 'completed'; t.completed = now;
+        if (auditNote && auditNote.text) { t.auditNote = auditNote.text; notes.push('"' + t.id + '": ' + auditNote.text); }
       } else { // withdraw — cascades to open descendants
         if (t.status === 'completed') { errs.push('withdraw "' + op.id + '": completed tasks cannot be withdrawn'); continue; }
         if (t.status === 'withdrawn') { errs.push('withdraw "' + op.id + '": already withdrawn'); continue; }
@@ -622,6 +635,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
   let out = 'todos:' + JSON.stringify(tree) + '\n'
     + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + tree.length + ' total'
     + (added.length ? ' · added ' + added.join(', ') : '') + '\n' + _todoSummary(tree);
+  if (notes.length) out += '\n\nAUDIT:\n- ' + notes.join('\n- ');
   if (errs.length) out += '\n\nREJECTED (not applied):\n- ' + errs.join('\n- ');
   return { result: out };
 }
@@ -1573,14 +1587,8 @@ Reply in exactly this format:
 VERDICT: supported | unsupported | needs_tangible
 MISSING: (only if needs_tangible) one line per missing check, phrased as a runnable action
 REASONING: 2-5 sentences.`;
-async function tool_adversary_check({ claim, justification, evidence }, ctx) {
-  const cfg = ctx && ctx._agentConfig;
-  if (!cfg || !cfg.url) return { result: 'Error: adversary_check is only available during an agent run.' };
-  const claimTxt = String(claim || '').trim();
-  const justTxt = String(justification || '').trim();
-  if (!claimTxt) return { result: 'Error: pass the claim to audit — {"claim":"…","justification":"why you believe it","evidence":["r12",…]?}.' };
-  if (!justTxt) return { result: 'Error: pass your justification — the adversary audits WHY you believe the claim, so state your reasoning and what you ran.' };
-  // Resolve cited [rN] ids to their result text so the audit is semantic.
+// Resolve cited [rN] ids to their result text in the live transcript.
+function _adversaryResolveEvidence(evidence, ctx) {
   const cited = [];
   for (const id of (Array.isArray(evidence) ? evidence.map(String) : [])) {
     let found = null;
@@ -1589,6 +1597,14 @@ async function tool_adversary_check({ claim, justification, evidence }, ctx) {
     }
     cited.push(found ? found : '[' + id + '] (id not found in this conversation)');
   }
+  return cited;
+}
+// Core adversary call, shared by the explicit tool and the auto-audit that
+// write_todos runs on every `complete`. Returns the raw audit text; throws on
+// transport failure (callers decide fail-open vs fail-closed).
+async function _adversaryCall(claimTxt, justTxt, evidence, ctx) {
+  const cfg = ctx._agentConfig;
+  const cited = _adversaryResolveEvidence(evidence, ctx);
   const pkg = 'CLAIM:\n' + claimTxt + '\n\nJUSTIFICATION:\n' + justTxt.slice(0, 4000)
     + (cited.length ? '\n\nCITED EVIDENCE:\n' + cited.join('\n\n---\n\n') : '\n\nCITED EVIDENCE: (none cited)');
   const body = {
@@ -1600,22 +1616,73 @@ async function tool_adversary_check({ claim, justification, evidence }, ctx) {
   const BACKOFF_MS = [800, 2000];
   let lastErr = null;
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
-    if (ctx.signal && ctx.signal.aborted) return { result: 'Error: aborted.' };
+    if (ctx.signal && ctx.signal.aborted) throw new Error('aborted');
     try {
       const r = await fetch(cfg.url, { method: 'POST', headers: cfg.headers, body: JSON.stringify(body), signal: ctx.signal });
       if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
       const d = await r.json();
       const txt = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-      if (txt && txt.trim()) return { result: 'ADVERSARY AUDIT\n' + txt.trim() };
+      if (txt && txt.trim()) return txt.trim();
       throw new Error('adversary returned an empty response');
     } catch (e) {
-      if (ctx.signal && ctx.signal.aborted) return { result: 'Error: aborted.' };
+      if (ctx.signal && ctx.signal.aborted) throw new Error('aborted');
       lastErr = e;
       if (attempt === BACKOFF_MS.length) break;
       await swSleep(BACKOFF_MS[attempt], ctx.signal);
     }
   }
-  return { result: 'Error: adversary_check failed: ' + ((lastErr && lastErr.message) || lastErr) };
+  throw (lastErr instanceof Error ? lastErr : new Error(String(lastErr)));
+}
+// ── Auto adversarial audit on checklist close ───────────────────────────────
+// EASY UNDO: flip this to false (or set localStorage sandpie-auto-adversary =
+// 'off' in the page — no redeploy) and write_todos `complete` behaves exactly
+// as before this feature.
+const AUTO_ADVERSARY_ON_COMPLETE = true;
+const AUTO_ADVERSARY_MAX_FAILS = 2;   // failed audits per item before the close is let through anyway
+async function _autoAdversaryOnComplete(t, op, ev, ctx) {
+  if (!AUTO_ADVERSARY_ON_COMPLETE) return null;
+  const cfg = ctx && ctx._agentConfig;
+  if (!cfg || !cfg.url || cfg.autoAdversary === false) return null;
+  // (a) already manually audited: a cited result that IS a passing adversary
+  // audit means this close was pre-cleared — don't burn a second call on it.
+  for (const c of _adversaryResolveEvidence(ev, ctx)) {
+    if (c.includes('ADVERSARY AUDIT') && /VERDICT:\s*supported/i.test(c)) return { text: 'auto-audit skipped (cited evidence includes a passing adversary audit)' };
+  }
+  // (b) escape hatch: after N failed audits the item closes anyway, loudly.
+  if ((t.auditFails || 0) >= AUTO_ADVERSARY_MAX_FAILS) {
+    return { text: 'auto-audit OVERRIDDEN after ' + t.auditFails + ' failed audits — closed on the model\'s judgment; treat this item as weakly verified' };
+  }
+  const justTxt = String(op.justification || '').trim()
+    || 'No justification given. The claimant closed this checklist item citing the evidence below as sufficient proof that the task is done.';
+  let audit;
+  try {
+    audit = await _adversaryCall('Checklist item claimed complete: ' + t.content, justTxt, ev, ctx);
+  } catch (e) {
+    // (c) transport failure fails OPEN — never lock the loop on a flaky endpoint.
+    return { text: 'auto-audit unavailable (' + ((e && e.message) || e) + ') — closed without audit' };
+  }
+  const m = /VERDICT:\s*(supported|unsupported|needs_tangible)/i.exec(audit);
+  const verdict = m ? m[1].toLowerCase() : null;
+  if (verdict === 'supported') return { text: 'auto-audit: supported' };
+  t.auditFails = (t.auditFails || 0) + 1;
+  return { rejected: true, text: 'complete "' + op.id + '": REJECTED by automatic adversarial audit (attempt ' + t.auditFails + '/' + AUTO_ADVERSARY_MAX_FAILS + ' — after ' + AUTO_ADVERSARY_MAX_FAILS + ' the close will be allowed through as weakly-verified).\n'
+    + audit + '\n'
+    + 'Run the missing checks it names, cite the new [rN] ids, and retry — optionally add "justification":"…" to the complete op to state your reasoning. If the item turned out not to need doing, withdraw it instead.' };
+}
+async function tool_adversary_check({ claim, justification, evidence }, ctx) {
+  const cfg = ctx && ctx._agentConfig;
+  if (!cfg || !cfg.url) return { result: 'Error: adversary_check is only available during an agent run.' };
+  const claimTxt = String(claim || '').trim();
+  const justTxt = String(justification || '').trim();
+  if (!claimTxt) return { result: 'Error: pass the claim to audit — {"claim":"…","justification":"why you believe it","evidence":["r12",…]?}.' };
+  if (!justTxt) return { result: 'Error: pass your justification — the adversary audits WHY you believe the claim, so state your reasoning and what you ran.' };
+  try {
+    const txt = await _adversaryCall(claimTxt, justTxt, evidence, ctx);
+    return { result: 'ADVERSARY AUDIT\n' + txt };
+  } catch (e) {
+    if (ctx.signal && ctx.signal.aborted) return { result: 'Error: aborted.' };
+    return { result: 'Error: adversary_check failed: ' + ((e && e.message) || e) };
+  }
 }
 
 // A compaction that was required but could not be produced. The round loop stops
@@ -1728,6 +1795,7 @@ async function runAgent(config, ctx) {
     parent: t.parent || null,
     created: t.created, completed: t.completed, withdrawn: t.withdrawn, reason: t.reason,
     kind: t.kind === 'claim' ? 'claim' : undefined, verdict: t.verdict, evidence: t.evidence,
+    auditFails: t.auditFails, auditNote: t.auditNote,
   }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
