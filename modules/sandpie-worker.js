@@ -572,6 +572,14 @@ async function tool_write_todos({ ops, todos }, ctx) {
       if (!t) { errs.push(k + ': unknown id "' + op.id + '"'); continue; }
       if (k === 'start') {
         if (t.status !== 'pending') { errs.push('start "' + op.id + '": only a pending task can start (is ' + t.status + ')'); continue; }
+        // Enforce step-by-step: at most one task in progress at a time. The only
+        // allowed overlap is drilling into a SUBTASK of the task you are already
+        // on (an ancestor may stay in_progress). Any other in_progress task must
+        // be completed or withdrawn first — no working several things at once.
+        const ancestors = new Set();
+        { let p = t.parent; while (p) { ancestors.add(p); p = (byId.get(p) || {}).parent; } }
+        const blocker = tree.find(x => x.status === 'in_progress' && x.id !== t.id && !ancestors.has(x.id));
+        if (blocker) { errs.push('start "' + op.id + '": task "' + blocker.id + '" is already in progress — finish or withdraw it before starting another (step-by-step: one active task at a time)'); continue; }
         t.status = 'in_progress';
       } else if (k === 'complete') {
         if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
@@ -1758,10 +1766,18 @@ async function runAgent(config, ctx) {
     const rm = /^\[r(\d+)\]/.exec(m.content);
     if (rm) { ctx._resultIds.add('r' + rm[1]); const n = +rm[1]; if (n > ctx._resultSeq) ctx._resultSeq = n; }
   }
-  ctx._roundsSinceTodo = 0;
+  ctx._roundsSinceTodo = 0;   // CUMULATIVE rounds since the last real write_todos; only reset by touchedTodo
+  ctx._lastNagAt = 0;         // value of _roundsSinceTodo at the last nag (cadence gate, does NOT reset the count)
   ctx._stopBlocks = 0;
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
+  // Escalating preamble keyed to how long the plan has actually gone stale — a
+  // reminder that always said "6 rounds" was trivial to keep ignoring.
+  const driftPreamble = (n) => {
+    if (n >= 50) return 'STOP. You have run ' + n + ' tool rounds without touching your plan — you are ignoring this reminder and drifting badly. Before ANY further tool call, update the checklist with write_todos or explicitly withdraw what you have abandoned.';
+    if (n >= 20) return 'You have now run ' + n + ' tool rounds without updating your plan. This is well past drift. Update the checklist with write_todos NOW before continuing.';
+    return 'You have run ' + n + ' tool rounds without updating your plan.';
+  };
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
   // "Open" = pending or in_progress. completed AND withdrawn are both closed.
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
@@ -1786,15 +1802,20 @@ async function runAgent(config, ctx) {
     // Reset the counter whenever the threshold is reached so we re-nag on the same
     // cadence rather than every round (roundsSinceTodo never resets on its own when
     // the model simply never calls write_todos).
-    if (!pendingReminder && ctx._roundsSinceTodo >= REMIND_AFTER_ROUNDS) {
+    // Fire when the plan has been stale for REMIND_AFTER_ROUNDS since the LAST
+    // nag — cadence gate only. We do NOT reset _roundsSinceTodo here (that is the
+    // cumulative staleness, reset solely by a real write_todos), so the count
+    // shown keeps climbing and the tone escalates until the model actually acts.
+    if (!pendingReminder && ctx._roundsSinceTodo - ctx._lastNagAt >= REMIND_AFTER_ROUNDS) {
+      const n = ctx._roundsSinceTodo;
       if (hasOpenTodos()) {
         setReminder('drift',
-          '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds without updating your plan. '
+          '<system-reminder>' + driftPreamble(n) + ' '
           + 'Current todos:\n' + renderTodos() + '\n\nRe-read them, then either update the list with write_todos '
           + 'or state your next concrete step before continuing. Do not drift from the task.</system-reminder>');
       } else if (ctx._todos.length === 0) {
         setReminder('no-plan',
-          '<system-reminder>You have run ' + ctx._roundsSinceTodo + ' tool rounds but have not set up a task list. '
+          '<system-reminder>You have run ' + n + ' tool rounds but have not set up a task list. '
           + 'If this is a multi-step task, STRONGLY consider laying out a plan with write_todos before proceeding — '
           + 'it keeps you from drifting and lets progress be tracked and verified. If the task is genuinely trivial '
           + 'and single-step, you may ignore this.</system-reminder>');
@@ -1803,13 +1824,13 @@ async function runAgent(config, ctx) {
         // is still making tool calls. Unplanned work is the same drift risk as
         // no plan at all: make it either extend the plan or wrap up.
         setReminder('plan-exhausted',
-          '<system-reminder>Your checklist is fully closed, yet you have run ' + ctx._roundsSinceTodo
+          '<system-reminder>Your checklist is fully closed, yet you have run ' + n
           + ' more tool rounds since. Whatever you are doing now is NOT on the plan. Either add the remaining '
           + 'work to the checklist with write_todos (a full new {"todos":[…]} list is accepted now that every '
           + 'task is closed) so it can be tracked, or stop and report your results. Do not keep working '
           + 'unplanned.</system-reminder>');
       }
-      ctx._roundsSinceTodo = 0;
+      ctx._lastNagAt = ctx._roundsSinceTodo;
     }
     // METACOG (c): grind / reuse-a-tool / remember nudges, if nothing more urgent queued.
     if (!pendingReminder) {
@@ -1913,6 +1934,7 @@ async function runAgent(config, ctx) {
     // helped indefinitely while one that merely rewrites the list without progress
     // still hits MAX_STOP_BLOCKS.
     ctx._roundsSinceTodo = touchedTodo ? 0 : ctx._roundsSinceTodo + 1;
+    if (touchedTodo) ctx._lastNagAt = 0;   // real plan update clears the escalation baseline
     if (touchedTodo) {
       const done = ctx._todos.filter(t => t.status === 'completed').length;
       if (done > ctx._lastTodoDone) ctx._stopBlocks = 0;

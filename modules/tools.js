@@ -157,7 +157,7 @@ WHEN: any task with 3+ non-trivial steps, or several distinct requirements. Skip
 FIRST plan: send a full list once — {"todos":[{"content":"…","status":"pending"}, …]} — accepted only when there is no checklist yet.
 THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"add","text":"Write the parser","parent":"<id>"?}   add a task; with parent = a SUBTASK (decompose hard tasks!)
-  {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it)
+  {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it). ONE task in progress at a time — finish or withdraw the current one before starting another (you may start a subtask of the task you're on).
   {"op":"complete","id":"3","evidence":["r12",…]}   mark done, citing the [rN] ids stamped on tool results that SHOW it is done. EVERY completion requires evidence — no task closes on assertion alone; if no tool output demonstrates it yet, run the command/check that would, then cite it. Permanent (re-add if you were wrong); blocked while it has open subtasks.
   {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping, or that turned out not to need doing (kept on the record, greyed).
 CLAIMS: when a step is a hypothesis or diagnosis ("the bug is X", "the config means Y") rather than an action, add it with "kind":"claim". Closing a claim additionally requires "verdict":"confirmed"|"refuted" — how the cited evidence settled it. A refuted claim is progress, not failure: it prunes the search.
