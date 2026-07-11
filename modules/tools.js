@@ -200,6 +200,21 @@ IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch seve
         required: [],
       },
     },
+    adversary_check: {
+      description: `Get a fast independent audit of a conclusion BEFORE you act on it. You send a claim, why you believe it, and the [rN] evidence you'd cite; a separate adversarial reviewer (which sees only your package, not the conversation) checks one thing: is this backed by tangible, produced artifacts — and if not, EXACTLY which cheap check (command, test, file read) would settle it. You get back supported / unsupported / needs_tangible plus a concrete list of what to run next.
+WHY USE IT ROUTINELY: it is much cheaper than being wrong. A needs_tangible answer hands you your next tool call for free; a supported answer is itself a tagged [rN] result you can cite as evidence when completing the todo. Diagnoses that skip this step have a long history of being confidently wrong.
+USE WHEN: you are about to close a claim-todo; about to say "the bug is X" / "the root cause is Y"; about to make a destructive or hard-to-reverse change based on a belief; or two explanations fit the data and you've picked one.
+DON'T USE for trivial facts you can check directly with one command — just run the command.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          claim:         { type: 'string', description: 'The conclusion to audit, stated precisely (one sentence if possible).' },
+          justification: { type: 'string', description: 'Why you believe it: your reasoning AND what you actually ran/observed.' },
+          evidence:      { type: 'array', items: { type: 'string' }, description: '[rN] ids of the tool results you would cite (the auditor reads their text).' },
+        },
+        required: ['claim', 'justification'],
+      },
+    },
     shell: {
       description: `Run a shell command and get back its stdout, stderr, and exit code. This is a real terminal on the machine hosting the sandpie relay — run the relay INSIDE your target environment (e.g. WSL) so commands land where your project lives.
 EVERYTHING IS JUST A COMMAND: local work ("cargo test"), a different machine over SSH ("ssh myserver 'systemctl restart app'"), file transfer ("scp myserver:/var/log/x.log /tmp/"). ssh/scp use the relay host's own ~/.ssh — there is no key setup or target switch here.
