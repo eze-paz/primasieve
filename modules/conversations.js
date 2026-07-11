@@ -1908,6 +1908,24 @@ function buildTodosView(todos) {
       badge.textContent = t.verdict ? t.verdict.toUpperCase() : 'CLAIM';
       row.appendChild(badge);
     }
+    // Auto-adversary outcome. Completed items carry auditNote (pass/override/
+    // skip/unavailable); open items carry auditFails when a close attempt was
+    // rejected by the audit. Hover the badge for the full audit text.
+    if (t && t.auditNote) {
+      const a = document.createElement('span');
+      const pass = /^auto-audit: supported/.test(t.auditNote);
+      const over = t.auditNote.includes('OVERRIDDEN');
+      a.className = 'tool-todo-audit-badge' + (pass ? ' audit-pass' : over ? ' audit-override' : '');
+      a.textContent = pass ? 'AUDIT ✓' : over ? 'AUDIT !' : 'AUDIT ·';
+      a.title = t.auditNote;
+      row.appendChild(a);
+    } else if (t && t.auditFails && t.status !== 'completed' && t.status !== 'withdrawn') {
+      const a = document.createElement('span');
+      a.className = 'tool-todo-audit-badge audit-fail';
+      a.textContent = 'AUDIT ×' + t.auditFails;
+      a.title = 'Close attempt(s) rejected by the automatic adversarial audit';
+      row.appendChild(a);
+    }
     if (t && Array.isArray(t.evidence) && t.evidence.length) {
       const ev = document.createElement('span');
       ev.className = 'tool-todo-evidence';
