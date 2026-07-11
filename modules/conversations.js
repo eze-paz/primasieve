@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=50');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=51');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1199,6 +1199,15 @@ function workerAgentStream(worker, id, signal) {
   });
 }
 
+// Byte size of what will actually be sent (system prompt + resolved messages +
+// tool defs), and the budget that keeps it under the upstream gateway's ~1 MB cap.
+// Used to decide whether the compaction boundary needs advancing before a send.
+const SEND_BYTE_BUDGET = 900 * 1024;
+function _sentRequestBytes(config) {
+  try { return new Blob([JSON.stringify(config.messages || []) + JSON.stringify(config.systemPrompt || '') + JSON.stringify(config.tools || [])]).size; }
+  catch { try { return (JSON.stringify(config.messages || []) || '').length; } catch { return 0; } }
+}
+
 async function sendSingle(text, stream, opts = {}) {
   const { id: convId, messages: convMessages, host } = stream;
 
@@ -1251,7 +1260,26 @@ async function sendSingle(text, stream, opts = {}) {
   startTotalTimer(stream);
   flightWrite(convId, text);
 
-  const config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
+  let config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
+  // Reactive boundary correction. If the BUILT request is still over the gateway's
+  // ~1 MB cap, the compaction boundary is behind where it should be — e.g. an older
+  // chat whose mid-turn compactions never persisted a boundary, so buildAgentConfig
+  // sliced from a stale point and loaded far more than the compacted tail. Advance
+  // the boundary with a REAL compaction (summarize the aged span + persist it), then
+  // rebuild so we send only [summary, …tail] — the content that's supposed to load,
+  // not the whole history. Shrink the kept tail each pass until it fits or the
+  // boundary can no longer advance. This permanently fixes an already-bloated chat
+  // on its next send (the advanced boundary is saved).
+  if (typeof SandpieCompactor !== 'undefined' && SandpieCompactor.isEnabled && SandpieCompactor.isEnabled()) {
+    const base = SandpieCompactor.config();
+    let keep = base.keepTail;
+    for (let i = 0; i < 6 && _sentRequestBytes(config) > SEND_BYTE_BUDGET; i++) {
+      const r = await _performCompaction(convId, { ...base, keepTail: keep });
+      if (!r || !r.ok) break;                        // boundary can't advance further
+      keep = Math.max(2, Math.floor(keep / 2));       // still too big → keep an even smaller tail next pass
+      config = await buildAgentConfig(stream.messages, stream.compaction, stream.todos);
+    }
+  }
 
   const ctrl = new AbortController();
   stream.requestId = ctrl;

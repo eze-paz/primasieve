@@ -632,28 +632,6 @@ function _imageB64InMessages(msgs) {
   return n;
 }
 
-function _bodyBytes(body) {
-  try { return new Blob([JSON.stringify(body)]).size; } catch (_) { try { return JSON.stringify(body).length; } catch (_2) { return 0; } }
-}
-// Replace the OLDEST inlined image (a data: URL part) with a short text placeholder,
-// in place. The image stays on disk in the conversation (the page keeps its opfs://
-// reference) — only THIS request drops it. Returns true if one was shed. Used to
-// reactively fit an over-cap request instead of failing the turn.
-const _SHED_IMG_PLACEHOLDER = '[older image omitted to keep this request within the size limit — it is still saved in the conversation; ask to reload it if you need it]';
-function _shedOneOldestImage(messages) {
-  for (const m of (messages || [])) {
-    const c = m && m.content;
-    if (!Array.isArray(c)) continue;
-    for (let i = 0; i < c.length; i++) {
-      const p = c[i];
-      if (p && p.type === 'image_url' && p.image_url && typeof p.image_url.url === 'string' && p.image_url.url.startsWith('data:')) {
-        c[i] = { type: 'text', text: _SHED_IMG_PLACEHOLDER };
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 // Downscale + re-encode an image (in the worker, via OffscreenCanvas) until its
 // base64 size is at or under `targetB64`. The upstream gateway caps the whole
@@ -1741,20 +1719,6 @@ async function runAgent(config, ctx) {
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
     if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
-    // Reactive fit-to-limit: never ship an over-cap body (the ~1 MB gateway would
-    // 413 it). If oversized — almost always accumulated images — shed the OLDEST
-    // images one at a time (kept on disk; the model sees a placeholder) until it
-    // fits or none remain. This self-heals already-bloated conversations on send
-    // instead of failing the turn. A pure-text overflow (no images left) still
-    // trips streamOneRound's guard as a last resort.
-    if (_bodyBytes(reqBody) > MAX_REQUEST_BYTES) {
-      let shed = 0;
-      while (_bodyBytes(reqBody) > MAX_REQUEST_BYTES && _shedOneOldestImage(messages)) {
-        shed++;
-        reqBody.messages = [config.systemPrompt, ...messages, reminderMsg].filter(Boolean);
-      }
-      if (shed) ctx.emit({ type: 'reminder', kind: 'fit', text: 'Trimmed ' + shed + ' older image' + (shed > 1 ? 's' : '') + ' from the context to keep this request under the size limit (still saved in the conversation).' });
-    }
     const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
