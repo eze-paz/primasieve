@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>converter diagnostics</title>
+</head>
+<body style="font:13px/1.4 monospace; padding:10px; margin:0; word-break:break-all;">
+<h3 style="font:bold 15px monospace">converter diag — screenshot this whole page</h3>
+<pre id="out" style="white-space:pre-wrap;"></pre>
+<div style="margin-top:12px;font:bold 13px monospace">office-engine iframe (watch for "refused to connect" here):</div>
+<div id="frames"></div>
+<script>
+  const out = document.getElementById('out');
+  const log = (...a) => { const s = a.join(' '); out.textContent += s + '\n'; try { console.log('[DIAG]', s); } catch (_) {} };
+
+  log('time         : ' + new Date().toISOString());
+  log('UA           : ' + navigator.userAgent);
+  log('origin       : ' + location.origin);
+  log('href         : ' + location.href);
+  log('crossOriginIsolated : ' + self.crossOriginIsolated);
+  log('isSecureContext     : ' + self.isSecureContext);
+  log('SharedArrayBuffer   : ' + (typeof SharedArrayBuffer !== 'undefined'));
+  log('deviceMemory(GB)    : ' + (navigator.deviceMemory ?? 'n/a'));
+  log('serviceWorker ctrl  : ' + (('serviceWorker' in navigator) ? !!navigator.serviceWorker.controller : 'no SW API'));
+  log('----------------------------------------');
+
+  // catch anything that would otherwise be silent
+  addEventListener('securitypolicyviolation', e =>
+    log('CSP VIOLATION: directive=' + e.violatedDirective + ' blocked=' + e.blockedURI + ' src=' + e.sourceFile));
+  addEventListener('error', e => log('window error: ' + (e.message || e.type) + ' @ ' + (e.filename || '')));
+  addEventListener('unhandledrejection', e => log('unhandledrejection: ' + (e.reason && (e.reason.message || e.reason))));
+  addEventListener('message', e => { const d = e.data; if (d && d.type) log('postMessage from engine: ' + JSON.stringify(d).slice(0, 240)); });
+
+  // fetch probes (status tells us what the network layer allows)
+  async function probe(label, url, opts) {
+    try {
+      const r = await fetch(url, Object.assign({ method: 'GET' }, opts || {}));
+      log('FETCH ' + label + ' -> HTTP ' + r.status + ' ct=' + (r.headers.get('content-type') || '?'));
+    } catch (err) { log('FETCH ' + label + ' -> FAILED: ' + (err && err.message || err)); }
+  }
+  (async () => {
+    await probe('proxy/soffice.js', '/proxy/cdn.zetaoffice.net/zetaoffice_latest/soffice.js');
+    await probe('direct-CDN/soffice.js (cors)', 'https://cdn.zetaoffice.net/zetaoffice_latest/soffice.js');
+    await probe('direct-CDN/soffice.js (no-cors)', 'https://cdn.zetaoffice.net/zetaoffice_latest/soffice.js', { mode: 'no-cors' });
+    await probe('proxy/texlive', '/proxy/texlive2.swiftlatex.com/');
+    await probe('same-origin office-engine.html', '/convert/office-engine.html');
+    log('---- fetch probes done ----');
+  })();
+
+  // reproduce the actual embed that fails
+  log('embedding /convert/office-engine.html as iframe ...');
+  const f = document.createElement('iframe');
+  f.style.cssText = 'width:280px;height:120px;border:2px solid #888;';
+  f.onload = () => log('office iframe: onload fired');
+  f.onerror = (e) => log('office iframe: ONERROR ' + e);
+  f.src = '/convert/office-engine.html?diag=1';
+  document.getElementById('frames').appendChild(f);
+  setTimeout(() => log('(3s) crossOriginIsolated still ' + self.crossOriginIsolated + ' — note if the box above says "refused to connect"'), 3000);
+</script>
+</body>
+</html>
