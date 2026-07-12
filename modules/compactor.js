@@ -25,19 +25,27 @@ const SandpieCompactor = (function () {
   const DEFAULTS = { enabled: true, pct: 70, keepTail: 10 };
 
   const BUILT_IN_PROMPT = [
-    "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Produce a dense briefing that REPLACES those earlier turns in the live context, so the conversation can continue indefinitely without losing the thread.",
+    "You are sandpie's conversation compactor. You receive the EARLIER part of an ongoing chat — the most recent turns are kept verbatim and are NOT shown to you. Write a continuation briefing that REPLACES those earlier turns in the live context, so you (or another instance of yourself) can resume work efficiently with NO access to the omitted turns.",
     "",
-    "Preserve, compactly:",
-    "- The original goal/task and any stated constraints or requirements.",
-    "- Decisions made and why; conclusions reached.",
-    "- Key facts, names, file paths, commands, IDs, and values referenced.",
-    "- Open threads — what is still in progress or unresolved.",
-    "- The user's stated preferences and any corrections they gave.",
-    "- Any skills loaded via load_skill() in the omitted turns, and whether their guidance is still being actively relied on.",
+    "Output EXACTLY these five sections, with these headings, in this order. Under each, use tight bullets. If a section has nothing, write \"(none)\" — never drop a heading.",
     "",
-    "CRITICAL — loaded skills: The full contents returned by load_skill() live in the omitted turns and are LOST after compaction. For every skill that was loaded and whose instructions are still relevant to the ongoing task, name it explicitly and state that it MUST be reloaded with load_skill() immediately before continuing. Do not paraphrase the skill's contents as a substitute — instruct a fresh reload.",
+    "## Task Overview",
+    "The original request/goal, the success criteria, and any stated constraints or requirements.",
     "",
-    "Drop greetings, small talk, and anything already superseded. Write a tight briefing (headings or bullets are fine) for a future reader with NO access to the omitted turns. Do not invent anything. Output ONLY the summary text — no preamble, no JSON.",
+    "## Current State",
+    "What has been completed so far. Files created or modified (with their exact paths), and any artifacts, commands, IDs, or values produced that later work depends on.",
+    "",
+    "## Important Discoveries",
+    "Constraints uncovered, decisions made AND their rationale, errors hit and how they were fixed — and, critically, DEAD-ENDS: approaches already tried that did NOT work and why, so they are not blindly re-attempted.",
+    "",
+    "## Next Steps",
+    "The remaining actions in priority order, plus anything currently blocking them. Mirror the write_todos checklist if one exists.",
+    "",
+    "## Context to Preserve",
+    "The user's stated preferences, style, and any corrections they gave; non-obvious domain details; and any promises or commitments made to the user that are not yet fulfilled.",
+    "SKILLS (belongs here): the full contents returned by load_skill() live in the omitted turns and are LOST after compaction. For every skill that was loaded and whose instructions are still relevant, name it explicitly and state that it MUST be reloaded with load_skill() immediately before continuing. Do NOT paraphrase a skill's contents as a substitute — instruct a fresh reload.",
+    "",
+    "Drop greetings, small talk, and anything already superseded. Do not invent anything — if you did not observe it, do not state it. Output ONLY the five sections — no preamble, no JSON.",
   ].join('\n');
 
   const _int = (key, fallback) => { const v = parseInt(localStorage.getItem(key) || '', 10); return Number.isFinite(v) ? v : fallback; };
