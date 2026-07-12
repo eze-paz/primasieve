@@ -307,8 +307,9 @@
 
   // Local backends run the agent loop in-worker already; pass the real tools + a
   // STABLE convId so any conversation-scoped OPFS area persists across iterations.
-  async function localAgent(engine, prov, { system, user, tools, signal, onStep, onDelta, convId }) {
+  async function localAgent(engine, prov, { system, user, tools, signal, onEvent, onDelta, convId }) {
     let out = '';
+    const names = {};   // tool_call_id → name (tool_result carries only the id)
     await engine.runConversation(
       { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: tools || [], convId: convId || 'loop-lab-ralph', signal },
       (ev) => {
@@ -318,14 +319,16 @@
           if (ev.delta.reasoning) onDelta(ev.delta.reasoning);
           if (ev.delta.content) onDelta(ev.delta.content);
         }
-        // Surface tool activity in the live stream too (agents spend most time here).
-        if (ev.type === 'tool_started' && onDelta) {
-          const nm = ev.tc && ev.tc.function && ev.tc.function.name;
-          onDelta('\n  ⚙ calling ' + (nm || 'tool') + '…\n');
+        // Structured tool activity → onEvent (the UI renders full args, result body, images).
+        if (ev.type === 'tool_started' && ev.tc) {
+          const nm = ev.tc.function && ev.tc.function.name;
+          if (ev.tc.id) names[ev.tc.id] = nm;
+          if (onEvent) onEvent({ kind: 'toolCall', name: nm, args: (ev.tc.function && ev.tc.function.arguments) || '{}' });
         }
-        if (ev.type === 'tool_result' && onDelta) onDelta('  ✓ tool result (' + String(ev.result || '').length + ' chars)\n');
+        if (ev.type === 'tool_result' && onEvent) {
+          onEvent({ kind: 'toolResult', name: names[ev.id] || '', result: ev.result, artifacts: ev.artifacts });
+        }
         if (ev.type === 'message_added' && ev.message && ev.message.role === 'assistant') out += contentToText(ev.message.content) + '\n';
-        if (onStep) { try { onStep(ev); } catch (_) {} }
       },
     );
     return stripThink(out);
@@ -333,7 +336,7 @@
 
   // Cloud: a compact, self-contained OpenAI-style tool loop (kept here, not routed
   // through conversations.js, to preserve Loop Lab's zero-blast-radius contract).
-  async function httpAgent({ system, user, tools, maxRounds, signal, onStep, onDelta, convId }) {
+  async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId }) {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
     const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
@@ -368,16 +371,16 @@
       messages.push(msg);
       if (msg.content) { text += contentToText(msg.content) + '\n'; if (onDelta) onDelta(contentToText(msg.content) + '\n'); }
       const calls = msg.tool_calls || [];
-      if (onStep) { try { onStep({ content: msg.content, tool_calls: calls }); } catch (_) {} }
       if (!calls.length) break;   // no more tools → turn complete
       for (const tc of calls) {
+        const nm = tc.function && tc.function.name;
         let args = {};
         try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
-        if (onDelta) onDelta('\n  ⚙ calling ' + (tc.function && tc.function.name) + '…\n');
+        if (onEvent) onEvent({ kind: 'toolCall', name: nm, args: (tc.function && tc.function.arguments) || '{}' });
         let result;
-        try { result = await runTool(tc.function.name, args, signal, convId); }
+        try { result = await runTool(nm, args, signal, convId); }
         catch (e) { result = 'Error: ' + (e.message || e); }
-        if (onDelta) onDelta('  ✓ tool result (' + String(result).length + ' chars)\n');
+        if (onEvent) onEvent({ kind: 'toolResult', name: nm, result });
         messages.push({ role: 'tool', tool_call_id: tc.id, content: String(result).slice(0, 8000) });
       }
     }
@@ -498,11 +501,21 @@
       const out = await agentTurn({
         system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal, convId: ctx.convId,
         onDelta: (c) => ui.stageStream(turnHost, st.name, c),
-        onStep: (ev) => { if (ev && (ev.type === 'tool_started' || (ev.tool_calls && ev.tool_calls.length))) stats.toolCalls++; },
+        onEvent: (e) => {
+          if (!e) return;
+          if (e.kind === 'toolCall') {
+            stats.toolCalls++;
+            ui.agentToolCall(turnHost, e.name, e.args);
+            rec('[tool call] ' + e.name + ' ' + (typeof e.args === 'string' ? e.args : JSON.stringify(e.args)));
+          } else if (e.kind === 'toolResult') {
+            ui.agentToolResult(turnHost, e.name, e.result);
+            rec('[tool result] ' + (e.name || '') + ': ' + String(e.result == null ? '' : e.result).slice(0, 600));
+          }
+        },
       });
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
-      ui.stageDone(turnHost, st.name, out, Date.now() - t0);
+      ui.agentDone(turnHost, st.name, Date.now() - t0);
       return out;
     }
 
@@ -676,6 +689,17 @@
     #loopLabOverlay .ll-pad pre { flex:1; margin:0 0.5rem 0.5rem; padding:0.45rem; overflow:auto; background:var(--sp-panel,#161b22);
       border-radius:6px; font-size:0.72rem; white-space:pre-wrap; }
     #loopLabOverlay .ll-note { color:var(--sp-text-dim,#8b949e); font-size:0.72rem; padding:0.15rem 0.2rem; }
+    #loopLabOverlay .ll-live-body { display:flex; flex-direction:column; gap:0.25rem; }
+    #loopLabOverlay pre.ll-text { margin:0.2rem 0; padding:0.4rem; background:var(--sp-panel,#161b22); border-radius:6px;
+      white-space:pre-wrap; word-break:break-word; max-height:260px; overflow-y:auto; font-size:0.72rem; }
+    #loopLabOverlay details.ll-tc summary { color:var(--sp-accent,#58a6ff); }
+    #loopLabOverlay details.ll-tr summary { color:var(--sp-text-dim,#8b949e); }
+    #loopLabOverlay details.ll-tc pre, #loopLabOverlay details.ll-tr pre { margin:0.25rem 0; padding:0.4rem;
+      background:var(--sp-panel,#161b22); border-radius:6px; white-space:pre-wrap; word-break:break-word;
+      max-height:240px; overflow-y:auto; font-size:0.72rem; }
+    #loopLabOverlay .ll-tr-img { margin:0.25rem 0; }
+    #loopLabOverlay .ll-tr-cap { font-size:0.7rem; color:var(--sp-text-dim,#8b949e); margin-bottom:0.15rem; word-break:break-all; }
+    #loopLabOverlay img.ll-img { max-width:100%; max-height:320px; border:1px solid var(--sp-border,#30363d); border-radius:6px; display:block; }
   `;
 
   function buildPanel() {
@@ -799,12 +823,11 @@
         turnHost.appendChild(el);
         el.scrollIntoView({ block: 'end' });
       },
-      // Live token stream: on the first chunk, replace the pending placeholder with
-      // an open <details> and then append deltas to its <pre> as they arrive, so the
-      // user watches generation happen. _finish() later swaps this live element for
-      // the clean final one. Only one stage streams at a time (stages are sequential).
-      stageStream(turnHost, name, chunk) {
-        if (!chunk) return;
+      // The live element for the currently-running stage: an open <details> whose
+      // body holds interleaved blocks (streamed text <pre>, tool-call/result boxes,
+      // images) in arrival order. Created lazily on first output; agentDone() freezes
+      // it in place (keeping all blocks), _finish() replaces it (text-only stages).
+      _liveBody(turnHost, name) {
         let live = turnHost.querySelector('details.ll-live');
         if (!live) {
           const pending = turnHost.querySelector('[data-pending]');
@@ -814,14 +837,79 @@
           live.open = true;
           const sum = document.createElement('summary');
           sum.textContent = '▶ ' + name + ' (generating…)';
-          const pre = document.createElement('pre');
-          live.appendChild(sum); live.appendChild(pre);
+          const bodyEl = document.createElement('div');
+          bodyEl.className = 'll-live-body';
+          live.appendChild(sum); live.appendChild(bodyEl);
           turnHost.appendChild(live);
         }
-        const pre = live.querySelector('pre');
-        const nearBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+        return live.querySelector('.ll-live-body');
+      },
+      // Streamed text tokens → the trailing text <pre> (a new one starts after any
+      // tool block, so text and tool activity stay in order).
+      stageStream(turnHost, name, chunk) {
+        if (!chunk) return;
+        const body = this._liveBody(turnHost, name);
+        let pre = body.lastElementChild;
+        if (!pre || !pre.classList || !pre.classList.contains('ll-text')) {
+          pre = document.createElement('pre'); pre.className = 'll-text'; body.appendChild(pre);
+        }
         pre.textContent += chunk;
-        if (nearBottom) pre.scrollTop = pre.scrollHeight;   // follow the stream unless the user scrolled up
+        body.parentElement.scrollIntoView({ block: 'end' });
+      },
+      // A tool call: collapsible box with the tool name + full arguments (pretty JSON).
+      agentToolCall(turnHost, name, args) {
+        const body = this._liveBody(turnHost, name);
+        const d = document.createElement('details');
+        d.className = 'll-tc';
+        const s = document.createElement('summary');
+        s.textContent = '⚙ ' + (name || 'tool');
+        const pre = document.createElement('pre');
+        let a = args;
+        try { a = JSON.stringify(typeof args === 'string' ? JSON.parse(args) : args, null, 2); } catch (_) { a = String(args); }
+        pre.textContent = a;
+        d.appendChild(s); d.appendChild(pre); body.appendChild(d);
+        body.parentElement.scrollIntoView({ block: 'end' });
+      },
+      // A tool result: image:PATH → inline <img> (resolved from OPFS, same convention
+      // as the main chat); artifact:PATH → labelled path; otherwise the result body.
+      agentToolResult(turnHost, name, result) {
+        const body = this._liveBody(turnHost, name);
+        const txt = String(result == null ? '' : result);
+        if (txt.startsWith('image:')) {
+          const path = txt.slice(6);
+          const wrap = document.createElement('div'); wrap.className = 'll-tr-img';
+          const cap = document.createElement('div'); cap.className = 'll-tr-cap'; cap.textContent = '🖼 ' + (name || 'image') + ' → ' + path;
+          const img = document.createElement('img'); img.className = 'll-img'; img.alt = path;
+          wrap.appendChild(cap); wrap.appendChild(img); body.appendChild(wrap);
+          try {
+            if (typeof SandpieImages !== 'undefined' && SandpieImages.dataUrlFromPath) {
+              SandpieImages.dataUrlFromPath(path).then(u => { if (u) img.src = u; else cap.textContent += ' (not found)'; }).catch(() => { cap.textContent += ' (load failed)'; });
+            } else { cap.textContent += ' (image renderer unavailable)'; }
+          } catch (_) {}
+          body.parentElement.scrollIntoView({ block: 'end' });
+          return;
+        }
+        const d = document.createElement('details');
+        d.className = 'll-tr';
+        const s = document.createElement('summary');
+        const isArtifact = txt.startsWith('artifact:');
+        s.textContent = (isArtifact ? '📄 artifact ' : '↩ result ') + (name || '') + ' · ' + txt.length + ' chars';
+        const pre = document.createElement('pre');
+        pre.textContent = txt.length > 4000 ? txt.slice(0, 4000) + '\n…(' + (txt.length - 4000) + ' more chars)' : txt;
+        d.appendChild(s); d.appendChild(pre); body.appendChild(d);
+        body.parentElement.scrollIntoView({ block: 'end' });
+      },
+      // Freeze the agent stage's live element in place (do NOT discard — it holds the
+      // tool-call/result/image blocks the user wants to keep). Falls back to a plain
+      // done entry if nothing streamed (e.g. empty output).
+      agentDone(turnHost, name, ms) {
+        const pending = turnHost.querySelector('[data-pending]');
+        if (pending) pending.remove();
+        const live = turnHost.querySelector('details.ll-live');
+        if (!live) { this.stageDone(turnHost, name, '(no output)', ms); return; }
+        live.classList.remove('ll-live');
+        const sum = live.querySelector('summary');
+        if (sum) sum.textContent = '✔ ' + name + ' · ' + (ms / 1000).toFixed(1) + 's';
       },
       _finish(turnHost, name, cls, summaryText, body) {
         const pending = turnHost.querySelector('[data-pending]');
