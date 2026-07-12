@@ -155,79 +155,105 @@
   };
 
   /* ---- ralph: the REAL "Ralph Wiggum" loop (Geoffrey Huntley) for long-running SWE
-     tasks. True to spec: the MODEL owns and edits the progress file — its own plan, in
-     its own words, re-read every fresh-context iteration. The harness makes the
-     protocol un-skippable instead of doing the model's job:
-       · pre-creates ${ralphFile} before turn 1 (model only ever edit_file's it — the
-         create-only write_file trap is structurally impossible),
-       · reads the file fresh each turn and INJECTS it into the prompt (${progress}),
-         so "forgot to read" can't happen,
-       · detects stalls (file unchanged after an iteration → escalating warning
-         injected via ${memory}; 3 stale iterations → stop),
-       · and NEVER trusts RALPH_DONE: a skeptical VERIFIER agent with tools must issue
-         VERDICT: PASS, else the claim is rejected and the objection injected.
-     maxRounds is a harness guardrail, NOT Ralph spec (official Ralph has no round cap
-     — one iteration = one full agent session). Cloud honors 24; local backends cap at
-     their own internal 8. maxTurns 40 = hard backstop for long tasks. ---- */
+     tasks, DECOMPOSED into role subagents so no single step can crowd out the others
+     (a single all-in-one agent kept exploring and NEVER recorded progress). Each turn:
+       1. PLAN   (llm)   — read the injected progress file, pick the ONE next action
+                           (or declare allDone). Cheap, focused.
+       2. WORK   (agent) — do that ONE action with tools. Its tool-call trace is
+                           captured (its final text is usually empty).
+       3. SCRIBE (llm)   — rewrite the FULL progress file from {old file + work trace};
+                           the HARNESS writes it (persistProgress) so it CANNOT be
+                           skipped — the repeated real-world failure we saw.
+       4. VERIFY (agent) — only when PLAN says allDone: a skeptic re-checks with tools.
+       5. VERDICT(js)    — PASS → done; FAIL → reopen + inject the objection.
+     Two filesystems: `shell` runs on the REAL machine; read_file/write_file/edit_file
+     are browser OPFS (separate disk). The harness owns the OPFS progress file entirely,
+     so the model never has to touch it. maxRounds is a harness guardrail (official Ralph
+     has none); cloud honors it, local backends cap at their internal 8. ---- */
   const RALPH = {
     name: 'ralph',
     maxTurns: 40,
     memory: { file: '${ralphFile}' },
-    scratchpad: { iteration: 0, done: false, claimedDone: false, lessons: [], recentPaths: [], log: [] },
+    scratchpad: { iteration: 0, done: false, allDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
     stages: [
       {
-        name: 'ralph', type: 'agent', saveAs: 'out', maxRounds: 24,
+        // 1. PLAN — decide the single next action from the current progress file.
+        name: 'plan', type: 'llm', saveAs: 'planRaw', temperature: 0.2,
         system: [
-          'You are ONE iteration of an endless loop working on a long software task. Every iteration starts with a FRESH context: you remember NOTHING from previous iterations. The progress file `${ralphFile}` is your ONLY memory — anything not written there is lost forever.',
+          'You are the PLANNER for one iteration of a long software task. You have NO memory; the progress file below is the whole state. Pick the SINGLE next concrete action — small and verifiable. Do NOT do the work; just decide it.',
           '',
-          'CURRENT PROGRESS FILE (read for you just now — this is your memory):',
+          'PROGRESS FILE:',
           '${progress}',
           '',
-          'HARNESS NOTES (auto-tracked warnings, verifier objections, recent paths):',
+          'HARNESS NOTES (recent paths, verifier objections):',
           '${memory}',
           '',
-          'THIS ITERATION:',
-          '1. Study the progress file above and pick the SINGLE next item from "## Next" / the checklist. If the file is still the bootstrap skeleton, THIS iteration = explore the codebase and write the real plan into the file.',
-          '2. Do that ONE item with your tools. Verify it actually worked (read files back, run code). Never assume — check.',
-          '3. MANDATORY before finishing: update `${ralphFile}` with edit_file (write_file refuses to overwrite existing files). Check off what you completed, record key facts/paths/decisions and lessons, and rewrite "## Next" with exactly what the next iteration should do first. An iteration that does not update the file is a FAILED iteration — its work never happened.',
-          '',
-          'Rules:',
-          '- ONE item per iteration. Small verified steps beat big unverified ones.',
-          '- Search the codebase before building anything new — never assume something is missing.',
-          '- Scratch files go under `${ralphDir}/`.',
-          '- When EVERY checklist item is complete and verified, output RALPH_DONE alone on the final line. A skeptical verifier will check your claim with tools — false claims are rejected and waste an iteration.',
-          '',
-          'Update `${ralphFile}` before you finish. This is the most important rule.',
+          'If the file is still the bootstrap skeleton, the next action is to explore the codebase and draft the real checklist. Set "allDone" true ONLY if every checklist item is complete AND there are no unresolved verifier objections above.',
+          'Output ONLY JSON: {"allDone": false, "next": "<one concrete action, imperative, one sentence>", "why": "<one line>"}',
         ].join('\n'),
-        user: '${task}',
+        user: 'TASK:\n${task}\n\nJSON:',
       },
       {
-        // Record the iteration + detect the completion CLAIM (verified separately).
-        // recentPaths are captured live from tool calls (execStage agent onEvent);
-        // file read/injection/stall detection is harness code in runLoop.
-        name: 'harvest', type: 'js',
-        code: "const out = String(ctx.vars.out || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nsp.log.push('T' + ctx.turn + ': ' + out.replace(/\\s+/g, ' ').trim().slice(0, 120));\nif (sp.log.length > 20) sp.log = sp.log.slice(-20);\nsp.claimedDone = /(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out);\nctx.log(sp.claimedDone ? 'RALPH_DONE claimed — running verifier' : 'iteration ' + ctx.turn + ' recorded');",
+        // Extract the action + allDone defensively (a JSON hiccup must not waste a turn).
+        name: 'pick', type: 'js',
+        code: "const raw = String(ctx.vars.planRaw || '');\nlet p = {};\ntry { const s = raw.indexOf('{'), e = raw.lastIndexOf('}'); if (s >= 0 && e > s) p = JSON.parse(raw.slice(s, e + 1)); } catch (_) {}\nctx.vars.planNext = (p.next && String(p.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';\nctx.scratchpad.allDone = !!p.allDone;\nctx.scratchpad.iteration = ctx.turn;\nctx.scratchpad.log.push('T' + ctx.turn + ': ' + (p.allDone ? '[claims done] ' : '') + ctx.vars.planNext.slice(0, 110));\nif (ctx.scratchpad.log.length > 20) ctx.scratchpad.log = ctx.scratchpad.log.slice(-20);\nctx.log(p.allDone ? 'planner claims DONE — verifying' : 'next: ' + ctx.vars.planNext.slice(0, 80));",
       },
       {
-        // Skeptical verification of the completion claim — fresh context, full tools.
-        name: 'verify', type: 'agent', saveAs: 'verdictOut', maxRounds: 10,
-        when: 'scratchpad.claimedDone === true && scratchpad.done !== true',
+        // 2. WORK — execute that ONE action. Trace captured for the scribe.
+        name: 'work', type: 'agent', saveAs: 'workOut', traceAs: 'workTrace', maxRounds: 24,
+        when: '!scratchpad.allDone',
         system: [
-          'You are the VERIFIER. A previous agent claims this software task is COMPLETE. Distrust it — your job is to find what is missing, broken, or unverified.',
+          'You are the WORKER for one iteration of a long software task. Do EXACTLY the ONE action below — nothing more. Verify it actually worked (read files back, run code). Do not try to finish the whole task.',
           '',
-          'ITS PROGRESS FILE (the claim of what was done):',
+          'THE ACTION FOR THIS ITERATION:',
+          '${planNext}',
+          '',
+          'CONTEXT — the current progress file:',
           '${progress}',
           '',
-          'Spot-check the claim with your tools: read the files it says it changed, run the code or tests where possible. Be concrete — check the strongest evidence, not the file’s prose.',
-          'End your reply with exactly ONE line: "VERDICT: PASS" if the task is genuinely complete and verified, or "VERDICT: FAIL — <one-line concrete reason>" otherwise. No verdict line counts as FAIL.',
+          'IMPORTANT — two separate filesystems:',
+          '- `shell` runs on the REAL machine (where the project source lives, e.g. /home/...). Use it to explore, build, run, and test real code. Prefer absolute paths.',
+          '- `read_file`/`write_file`/`edit_file` are a SEPARATE browser sandbox (OPFS) and will NOT see /home paths — do not use them to read the project. Use `shell` (cat/sed/grep) for real files.',
+          '- You do NOT need to update any progress file — a separate step records your work. Just do the action and report what you did.',
+          '',
+          'Scratch space (if you need it) is the shell working area. Report concretely what you changed and what you verified.',
+        ].join('\n'),
+        user: 'Do this one action now:\n${planNext}',
+      },
+      {
+        // 3. SCRIBE — rewrite the full progress file; the HARNESS persists it
+        // (saveAs progressUpdate → runLoop.persistProgress). Cannot be skipped.
+        name: 'scribe', type: 'llm', saveAs: 'progressUpdate', temperature: 0.1,
+        when: '!scratchpad.allDone',
+        system: [
+          'You are the SCRIBE. Produce the UPDATED progress file for a long software task, so the next fresh-context iteration inherits an accurate plan. Output ONLY the file content (Markdown) — no commentary, no code fences.',
+          '',
+          'Keep the structure: "# PROGRESS", "## Task", "## Checklist" (- [ ] / - [x]), "## Lessons", "## Next".',
+          'Update it truthfully from what the worker just did: check off ONLY genuinely-completed+verified items, add concrete facts/paths and any lesson/gotcha, and rewrite "## Next" with the single most important next action. Preserve everything still relevant; do not invent progress.',
+        ].join('\n'),
+        user: 'CURRENT PROGRESS FILE:\n${progress}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nOutput the full updated progress file now:',
+      },
+      {
+        // 4. VERIFY — skeptic gate, only when the planner declared completion.
+        name: 'verify', type: 'agent', saveAs: 'verdictOut', maxRounds: 12,
+        when: 'scratchpad.allDone === true && scratchpad.done !== true',
+        system: [
+          'You are the VERIFIER. The planner claims this software task is COMPLETE. Distrust it — find what is missing, broken, or unverified. `shell` runs the REAL machine (build/run/test there); read_file/edit_file are a separate OPFS sandbox.',
+          '',
+          'PROGRESS FILE (the claim):',
+          '${progress}',
+          '',
+          'Spot-check with tools: build/run/test the real code where possible; read the files it says it changed. Check the strongest evidence, not the prose.',
+          'End with exactly ONE line: "VERDICT: PASS" if genuinely complete and verified, else "VERDICT: FAIL — <one concrete reason>". No verdict line = FAIL.',
         ].join('\n'),
         user: 'TASK:\n${task}\n\nVerify the completion claim now.',
       },
       {
+        // 5. VERDICT — apply the verifier's ruling.
         name: 'verdict', type: 'js',
-        when: 'scratchpad.claimedDone === true && scratchpad.done !== true',
-        code: "const v = String(ctx.vars.verdictOut || '');\nconst sp = ctx.scratchpad;\nif (/VERDICT:\\s*PASS/i.test(v)) { sp.done = true; ctx.log('\\u2705 verifier PASSED — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse {\n  const m = v.match(/VERDICT:\\s*FAIL\\s*[\\u2014-]*\\s*(.*)/i);\n  const reason = ((m && m[1]) || 'verifier gave no explicit verdict — treated as FAIL').slice(0, 200);\n  sp.claimedDone = false;\n  sp.lessons.push('Verifier REJECTED completion at iteration ' + ctx.turn + ': ' + reason);\n  if (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\n  ctx.log('\\u274c verifier rejected the claim: ' + reason);\n}",
+        when: 'scratchpad.allDone === true && scratchpad.done !== true',
+        code: "const v = String(ctx.vars.verdictOut || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nif (/VERDICT:\\s*PASS/i.test(v)) { sp.done = true; ctx.log('\\u2705 verifier PASSED — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse {\n  const m = v.match(/VERDICT:\\s*FAIL\\s*[\\u2014-]*\\s*(.*)/i);\n  const reason = ((m && m[1]) || 'no explicit verdict — treated as FAIL').slice(0, 200);\n  sp.allDone = false;\n  sp.lessons.push('Verifier REJECTED completion at iteration ' + ctx.turn + ': ' + reason);\n  if (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\n  ctx.log('\\u274c verifier rejected: ' + reason);\n}",
       },
     ],
   };
@@ -244,10 +270,11 @@
   // ralph: the pre-per-run-file version hardcoded `ralph/PROGRESS.md` and had no
   // `${ralphFile}` var → upgrade it to the per-run-isolated prompt.
   const UPGRADES = {
-    // Upgrade any shipped ralph (has the RALPH_DONE sentinel) that predates the
-    // real-Ralph rework (lacks the ${progress} injection). A user who removed
-    // RALPH_DONE (heavy rewrite) is left untouched.
-    ralph: (s) => /RALPH_DONE/.test(s) && !s.includes('${progress}'),
+    // Upgrade any shipped ralph that predates the decomposed pipeline (no scribe stage).
+    // Matched by the injected ${progress} var (all shipped ralphs since per-run had it)
+    // AND absence of the scribe. A user who removed ${progress} (heavy rewrite) is left
+    // untouched.
+    ralph: (s) => s.includes('${progress}') && !s.includes('SCRIBE'),
   };
   // Seed each example once (per-name flag), so a user deleting one doesn't get
   // it resurrected on every open.
@@ -595,6 +622,7 @@
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
       const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
       rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
+      const trace = [];   // compact record of what the agent DID (its final text is often empty)
       const out = await agentTurn({
         system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal, convId: ctx.convId,
         onDelta: (c) => ui.stageStream(turnHost, st.name, c),
@@ -604,16 +632,20 @@
             stats.toolCalls++;
             ui.agentToolCall(turnHost, e.name, e.args);
             rec('[tool call] ' + e.name + ' ' + (typeof e.args === 'string' ? e.args : JSON.stringify(e.args)));
-            // Auto-track touched paths into harness memory (model-independent).
             if (Array.isArray(scratchpad.recentPaths)) for (const p of extractPaths(e.args)) pushMru(scratchpad.recentPaths, p, 15);
+            const as = typeof e.args === 'string' ? e.args : JSON.stringify(e.args || {});
+            trace.push('· ' + e.name + ' ' + as.slice(0, 160));
           } else if (e.kind === 'toolResult') {
             ui.agentToolResult(turnHost, e.name, e.result);
-            rec('[tool result] ' + (e.name || '') + ': ' + String(e.result == null ? '' : e.result).slice(0, 600));
+            const r = String(e.result == null ? '' : e.result);
+            rec('[tool result] ' + (e.name || '') + ': ' + r.slice(0, 600));
+            if (trace.length) trace[trace.length - 1] += '  → ' + r.replace(/\s+/g, ' ').slice(0, 220);
           }
         },
       });
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
+      if (st.traceAs) vars[st.traceAs] = (trace.join('\n') + (out ? '\n\nFinal note: ' + out : '')).slice(0, 6000) || '(no tool calls made)';
       ui.agentDone(turnHost, st.name, Date.now() - t0);
       return out;
     }
@@ -694,14 +726,11 @@
     const ralphFile = ralphDir + '/PROGRESS.md';
     ui.note('run ' + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
 
-    // Model-owned progress file (opt-in via spec.memory). The harness makes the Ralph
-    // protocol un-skippable without doing the model's job:
-    //   · pre-creates ${ralphFile} (bootstrap skeleton) so the model only ever
-    //     edit_file's it — the create-only write_file trap can't eat an update;
-    //   · re-reads the file at the START of every turn and injects it (${progress});
-    //   · detects stalls: file unchanged after an iteration → escalating warning
-    //     pushed into scratchpad.lessons (→ ${memory}); 3 stale iterations → stop.
-    let _progressBody = '', _prevBody = null, _stale = 0;
+    // Progress file (opt-in via spec.memory). The MODEL never touches it — a dedicated
+    // scribe stage emits the full updated content and the HARNESS writes it, so a
+    // persist can't be skipped (the repeated failure we saw). At turn start we read +
+    // inject it (${progress}); after the turn we write the scribe's output ourselves.
+    let _curBody = null, _progressBody = '', _stale = 0;
     const PROGRESS_CLAMP = 8000;
     // read_file returns "<path> — N lines, X bytes" then "n\tline" rows; strip both.
     function stripReadFile(res) {
@@ -711,38 +740,49 @@
       if (lines.length && /—\s*\d+\s*lines?,/.test(lines[0])) lines.shift();
       return lines.map(l => l.replace(/^\s*\d+\t/, '')).join('\n');
     }
-    // Returns false when the run has stalled (3 iterations without a file update).
-    async function syncProgress(turn) {
+    function clampForPrompt(body) {
+      return body.length > PROGRESS_CLAMP
+        ? body.slice(0, PROGRESS_CLAMP - 1500) + '\n…[middle clipped — file is ' + body.length + ' chars]…\n' + body.slice(-1400)
+        : body;
+    }
+    // START of turn: read the file (bootstrap if missing) and stage it for ${progress}.
+    async function loadProgress() {
       let body = null;
       try { body = stripReadFile(await runTool('read_file', { path: ralphFile }, ctrl.signal, runId)); } catch (_) {}
       if (body === null) {
         body = bootstrapMd(task);
         try { await runTool('write_file', { path: ralphFile, content: body }, ctrl.signal, runId); ui.note('progress file created (bootstrap): ' + ralphFile); }
         catch (e) { ui.note('progress bootstrap failed: ' + ((e && e.message) || e)); }
-      } else if (_prevBody !== null) {
-        if (body === _prevBody) {
-          _stale++;
-          scratchpad.lessons.push('⚠ Iteration ' + (turn - 1) + ' did NOT update ' + ralphFile + ' — its work is INVISIBLE to you now. Update the file (edit_file) THIS iteration, immediately after any real work.');
-          if (scratchpad.lessons.length > 12) scratchpad.lessons = scratchpad.lessons.slice(-12);
-          ui.note('⚠ progress file unchanged after turn ' + (turn - 1) + ' (stale ×' + _stale + ')');
-        } else { _stale = 0; ui.note('progress file updated (' + body.length + ' B)'); }
       }
-      _prevBody = body;
-      _progressBody = body.length > PROGRESS_CLAMP
-        ? body.slice(0, PROGRESS_CLAMP - 1500) + '\n…[middle clipped — file is ' + body.length + ' chars]…\n' + body.slice(-1400)
-        : body;
-      return _stale < 3;
+      _curBody = body;
+      _progressBody = clampForPrompt(body);
+    }
+    // END of turn: write the scribe's new content ourselves (edit_file with old_str =
+    // the exact current body, which only the harness writes → guaranteed match).
+    // Returns false when the run has stalled (3 turns producing no progress update).
+    async function persistProgress(nextRaw, turn) {
+      let next = (typeof nextRaw === 'string' ? nextRaw : '').trim();
+      next = next.replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '').trim();   // strip stray fences
+      if (!next) {
+        _stale++;
+        ui.note('⚠ no progress update produced this turn (stale ×' + _stale + ')');
+        return _stale < 3;
+      }
+      if (next === _curBody) { _stale = 0; ui.note('progress unchanged this turn'); return true; }
+      try {
+        await runTool('edit_file', { path: ralphFile, old_str: _curBody, new_str: next }, ctrl.signal, runId);
+        _curBody = next; _stale = 0;
+        ui.note('✓ progress persisted by harness (' + next.length + ' B)');
+      } catch (e) { ui.note('progress persist failed: ' + ((e && e.message) || e)); }
+      return true;
     }
 
     try {
       for (let turn = 1; turn <= maxTurns && !stopped; turn++) {
         if (ctrl.signal.aborted) break;
-        // ENFORCED protocol (spec.memory): fresh read + injection of the model-owned
-        // progress file BEFORE the turn, stall-stop when the model stops updating it.
-        if (spec.memory) {
-          const alive = await syncProgress(turn);
-          if (!alive) { ui.note('STALLED: 3 iterations without a progress-file update — stopping (rerun to continue from ' + ralphFile + ').'); break; }
-        }
+        // ENFORCED protocol (spec.memory): read + inject the progress file BEFORE the
+        // turn; the scribe stage's output is persisted by the harness AFTER (below).
+        if (spec.memory) await loadProgress();
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
@@ -777,6 +817,14 @@
           ui.setStats(stats);
         }
         rec('SCRATCHPAD after turn ' + turn + ':\n' + JSON.stringify(scratchpad, null, 2));
+
+        // GUARANTEED persist: the harness writes the scribe's updated progress file
+        // (vars.progressUpdate). Can't be skipped by the model. Stall-stop after 3
+        // turns with no update produced.
+        if (spec.memory && !ctrl.signal.aborted && !stopped) {
+          const alive = await persistProgress(vars.progressUpdate, turn);
+          if (!alive) { ui.note('STALLED: 3 turns without a progress update — stopping (rerun to resume from ' + ralphFile + ').'); break; }
+        }
 
         if (spec.stopWhen && !stopped) {
           try {
