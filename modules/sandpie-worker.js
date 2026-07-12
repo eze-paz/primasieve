@@ -264,6 +264,7 @@ function _pySettle(slot, job, result) {
   if (!job || job.done) return;
   job.done = true;
   if (job.timer) { clearTimeout(job.timer); job.timer = null; }
+  if (job.cleanup) { try { job.cleanup(); } catch (_) {} job.cleanup = null; }
   if (slot) { slot.busy = false; slot.job = null; }
   job.resolve({ result });
 }
@@ -331,12 +332,29 @@ function _pyDrainQueue() {
 // Run a script on the pool; resolves with { result } (raw/untruncated, as the
 // old in-process tool_run_python did — callers truncate). A run that overruns
 // its deadline is killed so it can never hang the conversation.
-function dispatchPython({ path, args, timeout }) {
+function dispatchPython({ path, args, timeout, signal }) {
   let timeoutMs = PY_DEFAULT_TIMEOUT_MS;
   const t = Number(timeout);
   if (isFinite(t) && t > 0) timeoutMs = Math.min(PY_MAX_TIMEOUT_MS, Math.round(t * 1000));
   return new Promise((resolve) => {
-    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false };
+    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null };
+    // Turn stopped → abandon the run. Pyodide can't be interrupted mid-execution,
+    // so a job already running in a slot has its interpreter TERMINATED (same as a
+    // deadline overrun); a still-queued job is just dropped. Either way the tool
+    // returns at once instead of waiting out the (up to PY_MAX_TIMEOUT_MS) deadline.
+    if (signal) {
+      const onAbort = () => {
+        if (job.done) return;
+        const qi = _pyQueue.indexOf(job); if (qi >= 0) _pyQueue.splice(qi, 1);
+        const slot = _pyPool.find(s => s.job === job);
+        if (slot) _pyKillSlot(slot, 'run_python aborted (turn stopped)');
+        _pySettle(slot || null, job, 'Error: run_python aborted — the turn was stopped. Its interpreter was terminated.');
+        _pyDrainQueue();
+      };
+      if (signal.aborted) { onAbort(); return; }   // never enqueue an already-aborted turn
+      signal.addEventListener('abort', onAbort, { once: true });
+      job.cleanup = () => { try { signal.removeEventListener('abort', onAbort); } catch (_) {} };
+    }
     _pyQueue.push(job);
     _pyDrainQueue();
   });
@@ -483,9 +501,9 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
-async function tool_run_python({ path, args, timeout }) {
+async function tool_run_python({ path, args, timeout }, ctx) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
-  return dispatchPython({ path, args, timeout });
+  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal });
 }
 
 // ============================================================

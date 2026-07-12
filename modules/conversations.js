@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=61');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=62');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -2409,7 +2409,18 @@ class RoundRenderer {
     }
   }
   _scheduleDrain() {
-    if (this.drainTimer == null) this.drainTimer = setTimeout(() => this._drainTick(), 16);
+    if (this.drainTimer != null) return;
+    // Each drain re-renders the WHOLE message — _extractMath + marked.parse +
+    // DOMPurify.sanitize over all accumulated text (see renderMd). At a fixed 16ms
+    // that is O(n²) across a long stream and burns a core on large responses.
+    // Stretch the interval as the message grows so the expensive full re-render
+    // (esp. the DOMPurify pass) runs far less often once content is big; the final
+    // clean render still happens once at endRound, and streamDiff preserves the
+    // user's text selection at any cadence. Cloud only — local defers markdown to
+    // finalize (_paintContent), so its drains are already cheap.
+    const n = this.isLocal ? 0 : this.displayed.length;
+    const delay = n > 120000 ? 400 : n > 40000 ? 200 : n > 12000 ? 80 : 16;
+    this.drainTimer = setTimeout(() => this._drainTick(), delay);
   }
   _drainTick() {
     this.drainTimer = null;
