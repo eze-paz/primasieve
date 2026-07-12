@@ -1001,13 +1001,41 @@
     };
 
     /* run UI adapter */
+    const MAX_DOM_TURNS = 5;   // keep only the last N turns in the DOM (rest → Copy run)
     const ui = {
+      _atBottom: true,
+      _scrollRAF: 0,
+      // Coalesced autoscroll: at most once per frame, and only if the user is already
+      // near the bottom (so scrolling up to read isn't yanked back). Sets scrollTop
+      // directly — far cheaper than scrollIntoView (no forced full-document layout).
+      _scroll() {
+        if (this._atBottom === false || this._scrollRAF) return;
+        this._scrollRAF = requestAnimationFrame(() => {
+          this._scrollRAF = 0;
+          const t = $id('llTrace'); if (t) t.scrollTop = t.scrollHeight;
+        });
+      },
       addTurn(n) {
+        const trace = $id('llTrace');
         const d = document.createElement('div');
         d.className = 'll-turn';
         d.innerHTML = '<div class="ll-turn-title">TURN ' + n + '</div>';
-        $id('llTrace').appendChild(d);
-        d.scrollIntoView({ block: 'end' });
+        trace.appendChild(d);
+        // Bound DOM growth: drop the oldest turns beyond MAX_DOM_TURNS. This is the
+        // fix for the loop getting slower over time — the trace no longer accumulates
+        // thousands of nodes. Full history is preserved in the Copy-run transcript.
+        const turns = trace.querySelectorAll('.ll-turn');
+        if (turns.length > MAX_DOM_TURNS) {
+          for (let i = 0; i < turns.length - MAX_DOM_TURNS; i++) turns[i].remove();
+          if (!this._pruned) {
+            this._pruned = true;
+            const b = document.createElement('div');
+            b.className = 'll-note';
+            b.textContent = '(older turns hidden to keep the UI fast — full detail in ⧉ Copy run)';
+            trace.insertBefore(b, trace.firstChild);
+          }
+        }
+        this._scroll();
         return d;
       },
       stageStart(turnHost, name, kind) {
@@ -1016,7 +1044,7 @@
         el.dataset.pending = name;
         el.textContent = '⏳ ' + name + ' (' + kind + ')…';
         turnHost.appendChild(el);
-        el.scrollIntoView({ block: 'end' });
+        this._scroll();
       },
       // The live element for the currently-running stage: an open <details> whose
       // body holds interleaved blocks (streamed text <pre>, tool-call/result boxes,
@@ -1048,8 +1076,10 @@
         if (!pre || !pre.classList || !pre.classList.contains('ll-text')) {
           pre = document.createElement('pre'); pre.className = 'll-text'; body.appendChild(pre);
         }
-        pre.textContent += chunk;
-        body.parentElement.scrollIntoView({ block: 'end' });
+        // Append a text node (O(1)) rather than `textContent +=` (which re-serializes
+        // the whole node every token → O(n²) over a long stream).
+        pre.appendChild(document.createTextNode(chunk));
+        this._scroll();
       },
       // A tool call: collapsible box with the tool name + full arguments (pretty JSON).
       agentToolCall(turnHost, name, args) {
@@ -1063,7 +1093,7 @@
         try { a = JSON.stringify(typeof args === 'string' ? JSON.parse(args) : args, null, 2); } catch (_) { a = String(args); }
         pre.textContent = a;
         d.appendChild(s); d.appendChild(pre); body.appendChild(d);
-        body.parentElement.scrollIntoView({ block: 'end' });
+        this._scroll();
       },
       // A tool result: image:PATH → inline <img> (resolved from OPFS, same convention
       // as the main chat); artifact:PATH → labelled path; otherwise the result body.
@@ -1081,7 +1111,7 @@
               SandpieImages.dataUrlFromPath(path).then(u => { if (u) img.src = u; else cap.textContent += ' (not found)'; }).catch(() => { cap.textContent += ' (load failed)'; });
             } else { cap.textContent += ' (image renderer unavailable)'; }
           } catch (_) {}
-          body.parentElement.scrollIntoView({ block: 'end' });
+          this._scroll();
           return;
         }
         const d = document.createElement('details');
@@ -1092,7 +1122,7 @@
         const pre = document.createElement('pre');
         pre.textContent = txt.length > 4000 ? txt.slice(0, 4000) + '\n…(' + (txt.length - 4000) + ' more chars)' : txt;
         d.appendChild(s); d.appendChild(pre); body.appendChild(d);
-        body.parentElement.scrollIntoView({ block: 'end' });
+        this._scroll();
       },
       // Freeze the agent stage's live element in place (do NOT discard — it holds the
       // tool-call/result/image blocks the user wants to keep). Falls back to a plain
@@ -1119,7 +1149,7 @@
         pre.textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
         det.appendChild(sum); det.appendChild(pre);
         turnHost.appendChild(det);
-        det.scrollIntoView({ block: 'end' });
+        this._scroll();
       },
       stageDone(turnHost, name, out, ms) {
         this._finish(turnHost, name, '', '✔ ' + name + ' · ' + (ms / 1000).toFixed(1) + 's', out ?? '(empty)');
@@ -1133,7 +1163,7 @@
         el.className = 'll-note';
         el.textContent = msg;
         $id('llTrace').appendChild(el);
-        el.scrollIntoView({ block: 'end' });
+        this._scroll();
       },
       setScratchpad(sp) {
         const json = JSON.stringify(sp, null, 2);
@@ -1152,6 +1182,14 @@
       },
     };
 
+    // Track whether the user is near the bottom so autoscroll only follows when they
+    // haven't scrolled up to read. Programmatic scrollTop writes also fire this and
+    // keep _atBottom true. Reset to bottom-follow at the start of each run.
+    $id('llTrace').addEventListener('scroll', () => {
+      const t = $id('llTrace'); if (!t) return;
+      ui._atBottom = (t.scrollHeight - t.scrollTop - t.clientHeight) < 80;
+    }, { passive: true });
+
     $id('llRun').onclick = async () => {
       if (_run) return;
       let spec;
@@ -1162,6 +1200,7 @@
       if (!task) { $id('llStatus').textContent = 'Enter a task first.'; return; }
       localStorage.setItem(K_TASK, task);
       $id('llTrace').innerHTML = '';
+      ui._atBottom = true; ui._pruned = false;   // fresh run: follow the bottom again
       _transcript = ['=== LOOP "' + (spec.name || '?') + '" · ' + new Date().toISOString() + ' ===', 'TASK:\n' + task];
       ui.setScratchpad(spec.scratchpad || {});
       try { await runLoop(spec, task, ui); } catch (e) { ui.note('Fatal: ' + (e.message || e)); ui.setRunning(false); }
