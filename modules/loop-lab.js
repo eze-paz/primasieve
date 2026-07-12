@@ -154,7 +154,44 @@
     ]
   };
 
-  const EXAMPLES = [EXAMPLE, MATRIX, GENERAL];
+  /* ---- ralph: the "Ralph Wiggum" loop (Geoffrey Huntley). Re-run the SAME
+     prompt in a FRESH context every iteration; the agent's ONLY memory between
+     iterations is the filesystem (OPFS ralph/PROGRESS.md). Each turn is a full
+     autonomous tool-calling agent turn (type:'agent') that reads the progress
+     file, does ONE unit of work, and writes it back. Deliberately dumb + durable:
+     context never grows, and maxTurns is the hard safety backstop if the model
+     never emits the RALPH_DONE sentinel. Stop = sentinel seen (checked in code). ---- */
+  const RALPH = {
+    name: 'ralph',
+    maxTurns: 20,
+    scratchpad: { iteration: 0, done: false },
+    stopWhen: 'scratchpad.done === true',
+    stages: [
+      {
+        name: 'ralph', type: 'agent', saveAs: 'out', maxRounds: 12,
+        system: [
+          'You are running inside a RALPH LOOP. You will be invoked with the SAME task prompt over and over, each time in a COMPLETELY FRESH context with NO memory of any previous iteration. Your ONLY durable memory between iterations is the filesystem — use your file tools.',
+          '',
+          'EVERY iteration, in order:',
+          '1. Read the progress file `ralph/PROGRESS.md`. If it does not exist, create it: restate the task, break it into a concrete checklist, and mark everything not-done.',
+          '2. Re-read whatever actual files/state the task involves (never trust memory — you have none). Then do the SINGLE next concrete unit of work using your tools (write files, run code, verify). Do NOT try to finish everything in one iteration; make steady incremental progress.',
+          '3. Update `ralph/PROGRESS.md`: check off what you just completed, record key facts/decisions/paths, and write exactly what the NEXT iteration should do first. Keep it concise and accurate — it is the ONLY thing the next iteration will see.',
+          '',
+          'Rules:',
+          '- Always re-read PROGRESS.md and the real files before acting; assume nothing.',
+          '- Prefer verifying your own work (read files back, run tests) over assuming success.',
+          '- Output the exact token RALPH_DONE on its OWN line, as the LAST line of your reply, ONLY when the ENTIRE task is fully complete AND verified. Never output it otherwise.',
+        ].join('\n'),
+        user: '${task}',
+      },
+      {
+        name: 'check', type: 'js',
+        code: "const out = String(ctx.vars.out || '');\nctx.scratchpad.iteration = ctx.turn;\nif (/(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out)) { ctx.scratchpad.done = true; ctx.log('RALPH_DONE sentinel seen — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse { ctx.log('iteration ' + ctx.turn + ' complete; no sentinel — continuing (fresh context next turn, state in ralph/PROGRESS.md)'); }",
+      },
+    ],
+  };
+
+  const EXAMPLES = [EXAMPLE, MATRIX, GENERAL, RALPH];
 
   /* ================= persistence ================= */
   function loadLoops() {
@@ -245,6 +282,87 @@
     return httpOnce(opts);
   }
 
+  /* ================= agent adapter (full tool-calling turn) ================= */
+  // Unlike llmOnce (single completion, no tools), an agent turn runs the WHOLE
+  // multi-round tool loop on ONE prompt, so the model can autonomously read/write
+  // OPFS files and do real work — the unit a Ralph iteration needs. Fresh context
+  // every call (messages rebuilt from system+user); durable state lives in files.
+
+  // Local backends run the agent loop in-worker already; pass the real tools + a
+  // STABLE convId so any conversation-scoped OPFS area persists across iterations.
+  async function localAgent(engine, prov, { system, user, tools, signal, onStep }) {
+    let out = '';
+    await engine.runConversation(
+      { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: tools || [], convId: 'loop-lab-ralph', signal },
+      (ev) => {
+        if (!ev) return;
+        if (ev.type === 'message_added' && ev.message && ev.message.role === 'assistant') out += contentToText(ev.message.content) + '\n';
+        if (onStep) { try { onStep(ev); } catch (_) {} }
+      },
+    );
+    return stripThink(out);
+  }
+
+  // Cloud: a compact, self-contained OpenAI-style tool loop (kept here, not routed
+  // through conversations.js, to preserve Loop Lab's zero-blast-radius contract).
+  async function httpAgent({ system, user, tools, maxRounds, signal, onStep }) {
+    const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
+    const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
+    if (!endpoint || !model) throw new Error('No provider endpoint or model selected.');
+    let url = endpoint + '/chat/completions';
+    const proxy = window.$('proxyUrl') ? window.$('proxyUrl').value : '';
+    if (proxy) { try { const u = new URL(proxy); u.searchParams.set('url', url); url = u.href; } catch (_) {} }
+    const auth = 'Bearer ' + ((window.$('apiKey') ? window.$('apiKey').value : '') || '');
+
+    const messages = [];
+    if (system) messages.push({ role: 'system', content: system });
+    messages.push({ role: 'user', content: user });
+    const hasTools = !!(tools && tools.length);
+    const rounds = Math.max(1, Math.min(20, maxRounds || 12));
+    let text = '';
+    for (let r = 0; r < rounds; r++) {
+      if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+      const body = {
+        model, messages, stream: false, max_tokens: 4096,
+        tools: hasTools ? tools : undefined,
+        tool_choice: hasTools ? 'auto' : undefined,
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: auth },
+        body: JSON.stringify(body), signal,
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + (await res.text().catch(() => '')).slice(0, 300));
+      const data = await res.json();
+      if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
+      const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+      messages.push(msg);
+      if (msg.content) text += contentToText(msg.content) + '\n';
+      const calls = msg.tool_calls || [];
+      if (onStep) { try { onStep({ content: msg.content, tool_calls: calls }); } catch (_) {} }
+      if (!calls.length) break;   // no more tools → turn complete
+      for (const tc of calls) {
+        let args = {};
+        try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+        let result;
+        try { result = await runTool(tc.function.name, args, signal); }
+        catch (e) { result = 'Error: ' + (e.message || e); }
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: String(result).slice(0, 8000) });
+      }
+    }
+    return stripThink(text);
+  }
+
+  async function agentTurn(opts) {
+    const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    if (isDenseWebgpu(prov)) return localAgent(SandpieQwen3, prov, opts);
+    if (prov && prov.type === 'litertlm' && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
+      return localAgent(SandpieLiteRTLM, prov, opts);
+    }
+    return httpAgent(opts);
+  }
+
   /* ================= tool runner (shared worker RPC) ================= */
   function runTool(name, args, signal) {
     return new Promise((resolve, reject) => {
@@ -296,7 +414,7 @@
 
   function validateStage(st, inner) {
     if (!st || !st.name) return 'Every stage needs a "name".';
-    const types = inner ? ['llm', 'tool', 'js'] : ['llm', 'tool', 'js', 'foreach'];
+    const types = inner ? ['llm', 'tool', 'js'] : ['llm', 'tool', 'js', 'foreach', 'agent'];
     if (!types.includes(st.type)) return 'Stage "' + st.name + '": type must be ' + types.join(' | ') + '.';
     if (st.type === 'tool' && !st.argsFrom) return 'Tool stage "' + st.name + '" needs "argsFrom" (a var holding {tool, arguments}).';
     if (st.type === 'js' && typeof st.code !== 'string') return 'JS stage "' + st.name + '" needs a "code" string.';
@@ -337,6 +455,22 @@
       rec('OUTPUT (' + st.name + '):\n' + (typeof out === 'string' ? out : JSON.stringify(out, null, 2)));
       if (st.saveAs) vars[st.saveAs] = out;
       if (st.mergeScratchpad && out && typeof out === 'object' && !Array.isArray(out)) Object.assign(scratchpad, out);
+      ui.stageDone(turnHost, st.name, out, Date.now() - t0);
+      return out;
+    }
+
+    if (st.type === 'agent') {
+      stats.llmCalls++;
+      ui.stageStart(turnHost, st.name, 'agent');
+      const sys = fill(st.system, vars), usr = fill(st.user, vars);
+      const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
+      rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
+      const out = await agentTurn({
+        system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal,
+        onStep: (ev) => { if (ev && (ev.tool_calls || (ev.type === 'tool_started'))) stats.toolCalls++; },
+      });
+      rec('OUTPUT (' + st.name + '):\n' + out);
+      if (st.saveAs) vars[st.saveAs] = out;
       ui.stageDone(turnHost, st.name, out, Date.now() - t0);
       return out;
     }
