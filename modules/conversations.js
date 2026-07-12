@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=57');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=58');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1910,21 +1910,32 @@ function buildTodosView(todos) {
     }
     // Auto-adversary outcome. Completed items carry auditNote (pass/override/
     // skip/unavailable); open items carry auditFails when a close attempt was
-    // rejected by the audit. Hover the badge for the full audit text.
-    if (t && t.auditNote) {
+    // rejected by the audit. Click a badge to read the full audit transcript
+    // (t.auditLog, kept by the worker — last 4 entries incl. rejections).
+    const _auditBadge = (cls, label, title) => {
       const a = document.createElement('span');
+      a.className = 'tool-todo-audit-badge' + (cls ? ' ' + cls : '');
+      a.textContent = label;
+      a.title = title;
+      const log = Array.isArray(t.auditLog) && t.auditLog.length ? t.auditLog : (t.auditNote ? [t.auditNote] : null);
+      if (log && typeof SandpieCommandView !== 'undefined') {
+        a.classList.add('audit-clickable');
+        a.onclick = (e) => {
+          e.stopPropagation();
+          const pre = document.createElement('pre');
+          pre.className = 'tool-todo-audit-log';
+          pre.textContent = log.join('\n\n' + '─'.repeat(40) + '\n\n');
+          SandpieCommandView.show(pre, 'Adversary audit — ' + ((t.content || '').slice(0, 60) || t.id));
+        };
+      }
+      row.appendChild(a);
+    };
+    if (t && t.auditNote) {
       const pass = /^auto-audit: supported/.test(t.auditNote);
       const over = t.auditNote.includes('OVERRIDDEN');
-      a.className = 'tool-todo-audit-badge' + (pass ? ' audit-pass' : over ? ' audit-override' : '');
-      a.textContent = pass ? 'AUDIT ✓' : over ? 'AUDIT !' : 'AUDIT ·';
-      a.title = t.auditNote;
-      row.appendChild(a);
+      _auditBadge(pass ? 'audit-pass' : over ? 'audit-override' : '', pass ? 'AUDIT ✓' : over ? 'AUDIT !' : 'AUDIT ·', t.auditNote);
     } else if (t && t.auditFails && t.status !== 'completed' && t.status !== 'withdrawn') {
-      const a = document.createElement('span');
-      a.className = 'tool-todo-audit-badge audit-fail';
-      a.textContent = 'AUDIT ×' + t.auditFails;
-      a.title = 'Close attempt(s) rejected by the automatic adversarial audit';
-      row.appendChild(a);
+      _auditBadge('audit-fail', 'AUDIT ×' + t.auditFails, 'Close attempt(s) rejected by the automatic adversarial audit — click for the full audit');
     }
     if (t && Array.isArray(t.evidence) && t.evidence.length) {
       const ev = document.createElement('span');

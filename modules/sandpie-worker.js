@@ -1639,6 +1639,11 @@ async function _adversaryCall(claimTxt, justTxt, evidence, ctx) {
 // as before this feature.
 const AUTO_ADVERSARY_ON_COMPLETE = true;
 const AUTO_ADVERSARY_MAX_FAILS = 2;   // failed audits per item before the close is let through anyway
+// Full audit transcripts kept on the task (capped) so the UI badge can show
+// the complete VERDICT/MISSING/REASONING text on click, including rejections.
+function _auditLogPush(t, entry) {
+  t.auditLog = (Array.isArray(t.auditLog) ? t.auditLog : []).concat(entry.slice(0, 4000)).slice(-4);
+}
 async function _autoAdversaryOnComplete(t, op, ev, ctx) {
   if (!AUTO_ADVERSARY_ON_COMPLETE) return null;
   const cfg = ctx && ctx._agentConfig;
@@ -1646,10 +1651,14 @@ async function _autoAdversaryOnComplete(t, op, ev, ctx) {
   // (a) already manually audited: a cited result that IS a passing adversary
   // audit means this close was pre-cleared — don't burn a second call on it.
   for (const c of _adversaryResolveEvidence(ev, ctx)) {
-    if (c.includes('ADVERSARY AUDIT') && /VERDICT:\s*supported/i.test(c)) return { text: 'auto-audit skipped (cited evidence includes a passing adversary audit)' };
+    if (c.includes('ADVERSARY AUDIT') && /VERDICT:\s*supported/i.test(c)) {
+      _auditLogPush(t, 'SKIPPED — cited evidence already includes a passing manual adversary audit:\n' + c);
+      return { text: 'auto-audit skipped (cited evidence includes a passing adversary audit)' };
+    }
   }
   // (b) escape hatch: after N failed audits the item closes anyway, loudly.
   if ((t.auditFails || 0) >= AUTO_ADVERSARY_MAX_FAILS) {
+    _auditLogPush(t, 'OVERRIDDEN — closed on the model\'s judgment after ' + t.auditFails + ' failed audits (see rejections above); treat as weakly verified.');
     return { text: 'auto-audit OVERRIDDEN after ' + t.auditFails + ' failed audits — closed on the model\'s judgment; treat this item as weakly verified' };
   }
   const justTxt = String(op.justification || '').trim()
@@ -1659,12 +1668,17 @@ async function _autoAdversaryOnComplete(t, op, ev, ctx) {
     audit = await _adversaryCall('Checklist item claimed complete: ' + t.content, justTxt, ev, ctx);
   } catch (e) {
     // (c) transport failure fails OPEN — never lock the loop on a flaky endpoint.
+    _auditLogPush(t, 'UNAVAILABLE — adversary call failed (' + ((e && e.message) || e) + '); closed without audit.');
     return { text: 'auto-audit unavailable (' + ((e && e.message) || e) + ') — closed without audit' };
   }
   const m = /VERDICT:\s*(supported|unsupported|needs_tangible)/i.exec(audit);
   const verdict = m ? m[1].toLowerCase() : null;
-  if (verdict === 'supported') return { text: 'auto-audit: supported' };
+  if (verdict === 'supported') {
+    _auditLogPush(t, 'PASSED\n' + audit);
+    return { text: 'auto-audit: supported' };
+  }
   t.auditFails = (t.auditFails || 0) + 1;
+  _auditLogPush(t, 'REJECTED (attempt ' + t.auditFails + '/' + AUTO_ADVERSARY_MAX_FAILS + ')\n' + audit);
   return { rejected: true, text: 'complete "' + op.id + '": REJECTED by automatic adversarial audit (attempt ' + t.auditFails + '/' + AUTO_ADVERSARY_MAX_FAILS + ' — after ' + AUTO_ADVERSARY_MAX_FAILS + ' the close will be allowed through as weakly-verified).\n'
     + audit + '\n'
     + 'Run the missing checks it names, cite the new [rN] ids, and retry — optionally add "justification":"…" to the complete op to state your reasoning. If the item turned out not to need doing, withdraw it instead.' };
@@ -1795,7 +1809,7 @@ async function runAgent(config, ctx) {
     parent: t.parent || null,
     created: t.created, completed: t.completed, withdrawn: t.withdrawn, reason: t.reason,
     kind: t.kind === 'claim' ? 'claim' : undefined, verdict: t.verdict, evidence: t.evidence,
-    auditFails: t.auditFails, auditNote: t.auditNote,
+    auditFails: t.auditFails, auditNote: t.auditNote, auditLog: t.auditLog,
   }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
