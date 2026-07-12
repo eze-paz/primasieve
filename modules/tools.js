@@ -152,16 +152,16 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     write_todos: {
-      description: `Maintain a visible checklist for a multi-step task, as a task TREE you update with deterministic OPS — you do NOT resend or rewrite the whole list (that silently erased work in the past). The harness holds the tree; you send operations against task IDs and it returns the current state.
+      description: `Maintain a visible checklist for a multi-step task as a FLAT list you update with deterministic OPS against task IDs — you do NOT resend or rewrite the whole list (that silently erased work in the past). The harness holds the list; you send operations and it returns the current state.
 WHEN: any task with 3+ non-trivial steps, or several distinct requirements. Skip for trivial work.
-FIRST plan: send a full list once — {"todos":[{"content":"…","status":"pending"}, …]} — accepted only when there is no checklist yet.
+FIRST plan: send a full list once — {"todos":[{"content":"…"}, …]} — accepted only when there is no checklist yet.
 THEN update with ops: {"ops":[ … ]}. Each op:
-  {"op":"add","text":"Write the parser","parent":"<id>"?}   add a task; with parent = a SUBTASK (decompose hard tasks!)
-  {"op":"start","id":"3"}          mark in_progress (do this BEFORE you begin it). ONE task in progress at a time — finish or withdraw the current one before starting another (you may start a subtask of the task you're on).
-  {"op":"complete","id":"3","evidence":["r12",…]}   mark done, citing the [rN] ids stamped on tool results that SHOW it is done. EVERY completion requires evidence — no task closes on assertion alone; if no tool output demonstrates it yet, run the command/check that would, then cite it. Permanent (re-add if you were wrong); blocked while it has open subtasks.
-  {"op":"withdraw","id":"3","reason":"…"?}   abandon a task whose approach you're dropping, or that turned out not to need doing (kept on the record, greyed).
-CLAIMS: when a step is a hypothesis or diagnosis ("the bug is X", "the config means Y") rather than an action, add it with "kind":"claim". Closing a claim additionally requires "verdict":"confirmed"|"refuted" — how the cited evidence settled it. A refuted claim is progress, not failure: it prunes the search.
-IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or withdraw them first.`,
+  {"op":"add","text":"Write the parser","blockedBy":["2"]?}   add a task. blockedBy lists ids that must finish first — use it to express ORDERING (a blocked task can't start until they close) instead of forcing the work into one big sequence.
+  {"op":"start","id":"3"}          mark in_progress (do this before you begin it). Refused while the task still has an open blocker. Several tasks may be in progress at once if nothing blocks them.
+  {"op":"complete","id":"3"}       mark done.
+  {"op":"delete","id":"3"}         drop a task you're no longer doing — it is removed from the list (and from any other task's blockedBy).
+  {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add or remove dependency edges after creation.
+IDs are shown in the returned checklist. You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or delete them first.`,
       parameters: {
         type: 'object',
         properties: {
@@ -171,27 +171,26 @@ IDs are shown in the returned checklist ("3", subtask "3.1"). You can batch seve
             items: {
               type: 'object',
               properties: {
-                op:     { type: 'string', enum: ['add', 'start', 'complete', 'withdraw'], description: 'The operation.' },
-                text:   { type: 'string', description: 'For "add": the task text (imperative).' },
-                parent: { type: 'string', description: 'For "add": parent task id to make this a subtask (e.g. "3").' },
-                kind:   { type: 'string', enum: ['claim'], description: 'For "add": mark this item as a CLAIM (hypothesis/diagnosis) that must be settled with evidence.' },
-                id:     { type: 'string', description: 'For start/complete/withdraw: the target task id.' },
-                reason: { type: 'string', description: 'For "withdraw": optional short reason.' },
-                verdict:  { type: 'string', enum: ['confirmed', 'refuted'], description: 'For "complete" of a claim: how the evidence settled it.' },
-                evidence: { type: 'array', items: { type: 'string' }, description: 'For "complete" (REQUIRED, every task): [rN] ids of tool results that show it is done (e.g. ["r12","r15"]).' },
+                op:        { type: 'string', enum: ['add', 'start', 'complete', 'delete', 'block', 'unblock'], description: 'The operation.' },
+                text:      { type: 'string', description: 'For "add": the task text (imperative).' },
+                blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": ids of tasks that must finish before this one can start (e.g. ["2","3"]).' },
+                activeForm:{ type: 'string', description: 'For "add": optional present-continuous label shown while the task is in progress (e.g. "Writing the parser").' },
+                id:        { type: 'string', description: 'For start/complete/delete/block/unblock: the target task id.' },
+                by:        { type: 'array', items: { type: 'string' }, description: 'For block/unblock: the blocker task ids to add or remove.' },
               },
               required: ['op'],
             },
           },
           todos: {
             type: 'array',
-            description: 'Full list — ONLY for the initial plan, or a reset when every task is completed/withdrawn. Refused while any task is open.',
+            description: 'Full list — ONLY for the initial plan, or a reset when every task is completed/deleted. Refused while any task is open.',
             items: {
               type: 'object',
               properties: {
-                content: { type: 'string', description: 'Imperative description of the task.' },
-                status:  { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
-                kind:    { type: 'string', enum: ['claim'], description: 'Mark this item as a CLAIM (hypothesis) that must be closed with verdict + evidence.' },
+                content:   { type: 'string', description: 'Imperative description of the task.' },
+                status:    { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
+                blockedBy: { type: 'array', items: { type: 'string' }, description: 'Ids (from this same list) that must finish before this task can start.' },
+                activeForm:{ type: 'string', description: 'Optional present-continuous label shown while in progress.' },
               },
               required: ['content'],
             },

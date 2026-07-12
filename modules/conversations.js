@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=58');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=59');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1889,17 +1889,30 @@ function buildTodosView(todos) {
   wrap.appendChild(head);
   for (const t of (todos || [])) {
     const st = (t && t.status) || 'pending';
+    if (st === 'deleted' || st === 'withdrawn') continue;   // dropped from the flat view
     const row = document.createElement('div');
     row.className = 'tool-todo tool-todo-' + st;
-    const depth = t && t.id ? (String(t.id).match(/\./g) || []).length : 0;
-    if (depth) row.style.marginLeft = (depth * 16) + 'px';
     const mark = document.createElement('span');
     mark.className = 'tool-todo-mark';
-    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : st === 'withdrawn' ? '\u2298' : '\u25cb';
+    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
     const txt = document.createElement('span');
     txt.className = 'tool-todo-text';
-    txt.textContent = (t && t.content) || '';
+    txt.textContent = (t && (st === 'in_progress' && t.activeForm ? t.activeForm : t.content)) || '';
     row.append(mark, txt);
+    // Dependency indicator: tasks still waiting on an open blocker.
+    if (t && Array.isArray(t.blockedBy) && t.blockedBy.length) {
+      const openBlk = t.blockedBy.filter(id => {
+        const b = (todos || []).find(x => x && String(x.id) === String(id));
+        return b && (b.status === 'pending' || b.status === 'in_progress');
+      });
+      if (openBlk.length) {
+        const bb = document.createElement('span');
+        bb.className = 'tool-todo-blocked';
+        bb.textContent = '\u26d3 ' + openBlk.join(', ');
+        bb.title = 'Blocked by task(s) ' + openBlk.join(', ');
+        row.appendChild(bb);
+      }
+    }
     // Claims get a badge (CLAIM → CONFIRMED/REFUTED); ANY task closed with
     // cited evidence shows the [rN] ids it cited.
     if (t && t.kind === 'claim') {

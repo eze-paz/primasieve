@@ -1405,6 +1405,8 @@ ul.conv-list li.active {
   .tool-box .tool-todo-claim-badge.claim-confirmed { border-color: #3fb950; color: #3fb950; }
   .tool-box .tool-todo-claim-badge.claim-refuted { border-color: #f85149; color: #f85149; }
   .tool-box .tool-todo-evidence { flex: none; font-size: 10px; color: var(--sp-text-dim); align-self: center; }
+  /* Blocked-by dependency indicator (⛓ + blocker ids). */
+  .tool-box .tool-todo-blocked { flex: none; font-size: 10px; color: var(--sp-text-dim); align-self: center; opacity: .8; }
   /* Auto-adversary audit badges: ✓ pass, ! overridden after repeated fails,
      · skipped/unavailable, ×N close rejected N times. Hover for full text. */
   .tool-box .tool-todo-audit-badge {

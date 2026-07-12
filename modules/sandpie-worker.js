@@ -493,28 +493,28 @@ async function tool_run_python({ path, args, timeout }) {
 
 
 
-// A model-managed checklist as a TASK TREE with deterministic, id-based ops.
-// There is NO blind full-replace (that let the model silently overwrite/erase the
-// list — measured 146 vanished items / 80 lost completions in one session), so the
-// checklist cannot be clobbered. States: pending → in_progress → completed
-// (terminal); pending/in_progress → withdrawn (terminal). Tasks decompose via
-// `parent`. The tree lives on ctx._todoTree (seeded from config.todos each turn)
-// and is echoed as a 'todos:' payload the page renders + persists as before.
+// A model-managed checklist as a FLAT task list with deterministic, id-based ops
+// (modelled on the Claude Agent SDK Task tools). There is NO blind full-replace
+// (that let the model silently overwrite/erase the list — measured 146 vanished
+// items / 80 lost completions in one session), so the checklist cannot be
+// clobbered. States: pending → in_progress → completed (terminal); any open task
+// → deleted (removed). Ordering is expressed by a `blockedBy` dependency list,
+// NOT by nesting: a task with an open blocker cannot start. The list lives on
+// ctx._todoTree (seeded from config.todos each turn) and is echoed as a 'todos:'
+// payload the page renders + persists.
 const _TODO_OPEN = new Set(['pending', 'in_progress']);
-const _TODO_ALL = ['pending', 'in_progress', 'completed', 'withdrawn'];
-function _todoNextId(tree, parent) {
-  if (!parent) { let mx = 0; for (const t of tree) if (!t.parent) { const n = parseInt(t.id, 10); if (n > mx) mx = n; } return String(mx + 1); }
-  const pre = parent + '.'; let mx = 0;
-  for (const t of tree) if (t.parent === parent) { const n = parseInt(t.id.slice(pre.length), 10); if (n > mx) mx = n; }
-  return pre + (mx + 1);
-}
-function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed })); }
+const _TODO_ALL = ['pending', 'in_progress', 'completed', 'deleted'];
+function _todoNextId(tree) { let mx = 0; for (const t of tree) { const n = parseInt(t.id, 10); if (n > mx) mx = n; } return String(mx + 1); }
+function _todoBlockers(t, byId) { return (Array.isArray(t.blockedBy) ? t.blockedBy : []).filter(id => { const b = byId.get(id); return b && _TODO_OPEN.has(b.status); }); }
+function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed, blockedBy: t.blockedBy, activeForm: t.activeForm })); }
 function _todoSummary(tree) {
-  const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'withdrawn' ? '[-]' : '[ ]';
-  return tree.map(t => '  '.repeat((t.id.match(/\./g) || []).length) + mark(t.status) + ' ' + t.id + ' '
-    + (t.kind === 'claim' ? 'CLAIM' + (t.verdict ? ' ' + t.verdict.toUpperCase() : '') + ': ' : '')
-    + t.content
-    + (Array.isArray(t.evidence) && t.evidence.length ? ' [' + t.evidence.join(',') + ']' : '')).join('\n');
+  const byId = new Map(tree.map(t => [t.id, t]));
+  const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'deleted' ? '[-]' : '[ ]';
+  return tree.filter(t => t.status !== 'deleted').map(t => {
+    const open = _todoBlockers(t, byId);
+    return mark(t.status) + ' ' + t.id + ' ' + t.content
+      + (open.length ? ' (blocked by ' + open.join(', ') + ')' : '');
+  }).join('\n');
 }
 async function tool_write_todos({ ops, todos }, ctx) {
   const tree = (ctx && Array.isArray(ctx._todoTree)) ? ctx._todoTree : (ctx ? (ctx._todoTree = []) : []);
@@ -523,119 +523,94 @@ async function tool_write_todos({ ops, todos }, ctx) {
   const openCount = () => tree.filter(t => _TODO_OPEN.has(t.status)).length;
 
   // ── Full-list form: accepted ONLY as an initial plan (empty tree) or a reset
-  //    when EVERY current task is completed/withdrawn. Never a mid-work overwrite.
+  //    when EVERY current task is completed/deleted. Never a mid-work overwrite.
   if (Array.isArray(todos) && !Array.isArray(ops)) {
     if (tree.length && openCount() > 0) {
       return { result: 'Error: cannot replace the checklist while ' + openCount() + ' task(s) are still open. '
-        + 'Use ops — {"ops":[{"op":"complete","id":"…"}, …]} — to update it, or complete/withdraw the open tasks first. '
-        + 'A full new list is only accepted when the current one is entirely completed/withdrawn.' };
+        + 'Use ops — {"ops":[{"op":"complete","id":"…"}, …]} — to update it, or complete/delete the open tasks first. '
+        + 'A full new list is only accepted when the current one is entirely completed/deleted.' };
     }
     tree.length = 0; byId.clear();
-    for (const t of todos) {
+    // Two-pass: assign ids by position first so blockedBy can reference siblings.
+    const ids = todos.map((_, i) => String(i + 1));
+    todos.forEach((t, i) => {
       const content = t && typeof t.content === 'string' ? t.content.trim() : '';
-      if (!content) continue;
+      if (!content) return;
       const status = _TODO_ALL.includes(t.status) ? t.status : 'pending';
-      const task = { id: _todoNextId(tree, null), content, status, parent: null, created: now };
-      if (t.kind === 'claim') task.kind = 'claim';
+      const task = { id: ids[i], content, status, created: now };
+      if (Array.isArray(t.blockedBy) && t.blockedBy.length) task.blockedBy = t.blockedBy.map(String).filter(x => ids.includes(x) && x !== ids[i]);
+      if (typeof t.activeForm === 'string' && t.activeForm.trim()) task.activeForm = t.activeForm.trim();
       if (status === 'completed') task.completed = now;
       tree.push(task);
-    }
+    });
+    // Renumber compactly (skipped-empty items leave gaps) and remap blockedBy.
+    const remap = {}; tree.forEach((t, i) => { remap[t.id] = String(i + 1); });
+    tree.forEach(t => { t.id = remap[t.id]; if (t.blockedBy) t.blockedBy = t.blockedBy.map(x => remap[x]).filter(Boolean); });
     if (!tree.length) return { result: 'Error: empty checklist — send at least one task.' };
     if (ctx) ctx._todos = _todoFlat(tree);
     return { result: 'todos:' + JSON.stringify(tree) + '\nNew checklist (' + tree.length + ' tasks):\n' + _todoSummary(tree) };
   }
 
   if (!Array.isArray(ops)) {
-    return { result: 'Error: send {"ops":[…]}. Ops (IDs are shown in the checklist; subtasks look like "3.1"):\n'
-      + '  {"op":"add","text":"…","parent":"<id>"?}   add a task (or a subtask under parent)\n'
-      + '  {"op":"start","id":"…"}                     pending → in_progress\n'
-      + '  {"op":"complete","id":"…"}                  → completed (blocked while it has open subtasks)\n'
-      + '  {"op":"withdraw","id":"…","reason":"…"?}    abandon a pending/in_progress task\n'
-      + 'Completed is permanent (re-add if you were wrong); completed tasks cannot be withdrawn. '
-      + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/withdrawn.' };
+    return { result: 'Error: send {"ops":[…]}. Ops (IDs are shown in the checklist):\n'
+      + '  {"op":"add","text":"…","blockedBy":["2"]?}  add a task (blockedBy = ids that must finish first)\n'
+      + '  {"op":"start","id":"…"}                      pending → in_progress (refused while blocked)\n'
+      + '  {"op":"complete","id":"…"}                   → completed\n'
+      + '  {"op":"delete","id":"…"}                     remove a task from the list\n'
+      + '  {"op":"block","id":"…","by":["1"]} / {"op":"unblock","id":"…","by":["1"]}   adjust dependencies\n'
+      + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/deleted.' };
   }
 
-  const errs = [], added = [], notes = [];
+  const errs = [], added = [];
   for (const op of ops) {
     const k = op && op.op;
     if (k === 'add') {
       const content = String(op.text || op.content || '').trim();
       if (!content) { errs.push('add: empty text'); continue; }
-      const parent = op.parent || null;
-      if (parent && !byId.has(parent)) { errs.push('add: unknown parent "' + parent + '"'); continue; }
-      if (parent && byId.get(parent).status === 'completed') { errs.push('add: parent "' + parent + '" is completed'); continue; }
-      const task = { id: _todoNextId(tree, parent), content, status: 'pending', parent, created: now };
-      if (op.kind === 'claim') task.kind = 'claim';
+      const task = { id: _todoNextId(tree), content, status: 'pending', created: now };
+      if (Array.isArray(op.blockedBy) && op.blockedBy.length) {
+        const bb = op.blockedBy.map(String);
+        const unknown = bb.filter(id => !byId.has(id));
+        if (unknown.length) { errs.push('add "' + content.slice(0, 30) + '": unknown blocker id(s) ' + unknown.join(', ')); continue; }
+        task.blockedBy = bb.filter(id => id !== task.id);
+      }
+      if (typeof op.activeForm === 'string' && op.activeForm.trim()) task.activeForm = op.activeForm.trim();
       tree.push(task); byId.set(task.id, task); added.push(task.id);
-    } else if (k === 'start' || k === 'complete' || k === 'withdraw') {
+    } else if (k === 'start' || k === 'complete' || k === 'delete' || k === 'block' || k === 'unblock') {
       const t = byId.get(op.id);
       if (!t) { errs.push(k + ': unknown id "' + op.id + '"'); continue; }
       if (k === 'start') {
         if (t.status !== 'pending') { errs.push('start "' + op.id + '": only a pending task can start (is ' + t.status + ')'); continue; }
-        // Enforce step-by-step: at most one task in progress at a time. The only
-        // allowed overlap is drilling into a SUBTASK of the task you are already
-        // on (an ancestor may stay in_progress). Any other in_progress task must
-        // be completed or withdrawn first — no working several things at once.
-        const ancestors = new Set();
-        { let p = t.parent; while (p) { ancestors.add(p); p = (byId.get(p) || {}).parent; } }
-        const blocker = tree.find(x => x.status === 'in_progress' && x.id !== t.id && !ancestors.has(x.id));
-        if (blocker) { errs.push('start "' + op.id + '": task "' + blocker.id + '" is already in progress — finish or withdraw it before starting another (step-by-step: one active task at a time)'); continue; }
+        // Ordering is enforced by blockers, not by a one-at-a-time lock: a task
+        // cannot start while any task in its blockedBy is still open.
+        const open = _todoBlockers(t, byId);
+        if (open.length) { errs.push('start "' + op.id + '": blocked by open task(s) ' + open.join(', ') + ' — finish or delete them first, or {"op":"unblock","id":"' + op.id + '","by":["' + open[0] + '"]} if that dependency no longer applies'); continue; }
         t.status = 'in_progress';
       } else if (k === 'complete') {
         if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
-        if (t.status === 'withdrawn') { errs.push('complete "' + op.id + '": withdrawn tasks cannot be completed'); continue; }
-        const openKids = tree.filter(x => x.parent === t.id && _TODO_OPEN.has(x.status));
-        if (openKids.length) { errs.push('complete "' + op.id + '": ' + openKids.length + ' open subtask(s) (' + openKids.map(x => x.id).join(', ') + ') — close them first'); continue; }
-        // EVERY completion must cite evidence — the [rN] ids of tool results
-        // that show the work was done / the question settled. No task closes on
-        // reasoning or assertion alone; the model does not get to decide which
-        // items deserve verification. The rejection text is the teaching
-        // signal — it tells the model HOW to convert a belief into a fact.
-        const ev = Array.isArray(op.evidence) ? op.evidence.map(String) : [];
-        const known = ctx && ctx._resultIds;
-        const bad = known ? ev.filter(id => !known.has(id)) : ev.filter(id => !/^r\d+$/.test(id));
-        if (!ev.length || bad.length) {
-          errs.push('complete "' + op.id + '": a task cannot be closed without evidence. Cite the [rN] ids of the tool results that show it is done' + (bad.length ? ' (unknown: ' + bad.join(', ') + ')' : '') + ' — e.g. {"op":"complete","id":"' + op.id + '","evidence":["r12"]}. If no tool output demonstrates it yet, run the command/check that would, then cite it. If the item turned out not to need doing, withdraw it instead.'); continue;
-        }
-        // Claims additionally record HOW the evidence settled them.
-        if (t.kind === 'claim') {
-          const verdict = String(op.verdict || '').toLowerCase();
-          if (verdict !== 'confirmed' && verdict !== 'refuted') {
-            errs.push('complete "' + op.id + '": this is a CLAIM — also pass "verdict":"confirmed"|"refuted" saying how the evidence settled it.'); continue;
-          }
-          t.verdict = verdict;
-        }
-        // ── Auto adversarial audit on EVERY close (kill switch: set localStorage
-        //    sandpie-auto-adversary = 'off', or flip AUTO_ADVERSARY_ON_COMPLETE).
-        //    The adversary sees only task text + justification + cited evidence
-        //    (same info asymmetry as the manual tool). A non-supported verdict
-        //    REJECTS the close with the audit text as the teaching signal.
-        //    Loop guards: (a) a close whose citations already include a passing
-        //    manual ADVERSARY AUDIT is not re-audited; (b) after 2 failed audits
-        //    on the same item the 3rd close attempt passes with a warning, so a
-        //    stubborn adversary can never lock the run in an infinite loop;
-        //    (c) transport failure fails OPEN (close proceeds, noted).
-        const auditNote = await _autoAdversaryOnComplete(t, op, ev, ctx);
-        if (auditNote && auditNote.rejected) { errs.push(auditNote.text); continue; }
-        t.evidence = ev;
+        if (t.status === 'deleted') { errs.push('complete "' + op.id + '": deleted tasks cannot be completed'); continue; }
         t.status = 'completed'; t.completed = now;
-        if (auditNote && auditNote.text) { t.auditNote = auditNote.text; notes.push('"' + t.id + '": ' + auditNote.text); }
-      } else { // withdraw — cascades to open descendants
-        if (t.status === 'completed') { errs.push('withdraw "' + op.id + '": completed tasks cannot be withdrawn'); continue; }
-        if (t.status === 'withdrawn') { errs.push('withdraw "' + op.id + '": already withdrawn'); continue; }
-        const stack = [t.id], kill = new Set();
-        while (stack.length) { const pid = stack.pop(); for (const x of tree) if (x.parent === pid && _TODO_OPEN.has(x.status)) { kill.add(x.id); stack.push(x.id); } }
-        t.status = 'withdrawn'; t.withdrawn = now; if (op.reason) t.reason = String(op.reason).slice(0, 200);
-        for (const x of tree) if (kill.has(x.id)) { x.status = 'withdrawn'; x.withdrawn = now; }
+      } else if (k === 'block' || k === 'unblock') {
+        const by = (Array.isArray(op.by) ? op.by : []).map(String);
+        if (!by.length) { errs.push(k + ' "' + op.id + '": pass "by":["<id>", …]'); continue; }
+        const unknown = by.filter(id => !byId.has(id) || id === t.id);
+        if (unknown.length) { errs.push(k + ' "' + op.id + '": unknown/self blocker id(s) ' + unknown.join(', ')); continue; }
+        const set = new Set(Array.isArray(t.blockedBy) ? t.blockedBy : []);
+        if (k === 'block') by.forEach(id => set.add(id)); else by.forEach(id => set.delete(id));
+        t.blockedBy = [...set];
+      } else { // delete — drop the task and detach it from other tasks' blockers
+        if (t.status === 'completed') { errs.push('delete "' + op.id + '": completed tasks stay on the record; delete is for tasks you are dropping'); continue; }
+        t.status = 'deleted'; t.deleted = now;
+        for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
       }
-    } else { errs.push('unknown op "' + k + '" (use add/start/complete/withdraw)'); }
+    } else { errs.push('unknown op "' + k + '" (use add/start/complete/delete/block/unblock)'); }
   }
   if (ctx) ctx._todos = _todoFlat(tree);
   const done = tree.filter(t => t.status === 'completed').length;
+  const live = tree.filter(t => t.status !== 'deleted').length;
   let out = 'todos:' + JSON.stringify(tree) + '\n'
-    + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + tree.length + ' total'
+    + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + live + ' total'
     + (added.length ? ' · added ' + added.join(', ') : '') + '\n' + _todoSummary(tree);
-  if (notes.length) out += '\n\nAUDIT:\n- ' + notes.join('\n- ');
   if (errs.length) out += '\n\nREJECTED (not applied):\n- ' + errs.join('\n- ');
   return { result: out };
 }
@@ -1633,56 +1608,11 @@ async function _adversaryCall(claimTxt, justTxt, evidence, ctx) {
   }
   throw (lastErr instanceof Error ? lastErr : new Error(String(lastErr)));
 }
-// ── Auto adversarial audit on checklist close ───────────────────────────────
-// EASY UNDO: flip this to false (or set localStorage sandpie-auto-adversary =
-// 'off' in the page — no redeploy) and write_todos `complete` behaves exactly
-// as before this feature.
-const AUTO_ADVERSARY_ON_COMPLETE = true;
-const AUTO_ADVERSARY_MAX_FAILS = 2;   // failed audits per item before the close is let through anyway
-// Full audit transcripts kept on the task (capped) so the UI badge can show
-// the complete VERDICT/MISSING/REASONING text on click, including rejections.
-function _auditLogPush(t, entry) {
-  t.auditLog = (Array.isArray(t.auditLog) ? t.auditLog : []).concat(entry.slice(0, 4000)).slice(-4);
-}
-async function _autoAdversaryOnComplete(t, op, ev, ctx) {
-  if (!AUTO_ADVERSARY_ON_COMPLETE) return null;
-  const cfg = ctx && ctx._agentConfig;
-  if (!cfg || !cfg.url || cfg.autoAdversary === false) return null;
-  // (a) already manually audited: a cited result that IS a passing adversary
-  // audit means this close was pre-cleared — don't burn a second call on it.
-  for (const c of _adversaryResolveEvidence(ev, ctx)) {
-    if (c.includes('ADVERSARY AUDIT') && /VERDICT:\s*supported/i.test(c)) {
-      _auditLogPush(t, 'SKIPPED — cited evidence already includes a passing manual adversary audit:\n' + c);
-      return { text: 'auto-audit skipped (cited evidence includes a passing adversary audit)' };
-    }
-  }
-  // (b) escape hatch: after N failed audits the item closes anyway, loudly.
-  if ((t.auditFails || 0) >= AUTO_ADVERSARY_MAX_FAILS) {
-    _auditLogPush(t, 'OVERRIDDEN — closed on the model\'s judgment after ' + t.auditFails + ' failed audits (see rejections above); treat as weakly verified.');
-    return { text: 'auto-audit OVERRIDDEN after ' + t.auditFails + ' failed audits — closed on the model\'s judgment; treat this item as weakly verified' };
-  }
-  const justTxt = String(op.justification || '').trim()
-    || 'No justification given. The claimant closed this checklist item citing the evidence below as sufficient proof that the task is done.';
-  let audit;
-  try {
-    audit = await _adversaryCall('Checklist item claimed complete: ' + t.content, justTxt, ev, ctx);
-  } catch (e) {
-    // (c) transport failure fails OPEN — never lock the loop on a flaky endpoint.
-    _auditLogPush(t, 'UNAVAILABLE — adversary call failed (' + ((e && e.message) || e) + '); closed without audit.');
-    return { text: 'auto-audit unavailable (' + ((e && e.message) || e) + ') — closed without audit' };
-  }
-  const m = /VERDICT:\s*(supported|unsupported|needs_tangible)/i.exec(audit);
-  const verdict = m ? m[1].toLowerCase() : null;
-  if (verdict === 'supported') {
-    _auditLogPush(t, 'PASSED\n' + audit);
-    return { text: 'auto-audit: supported' };
-  }
-  t.auditFails = (t.auditFails || 0) + 1;
-  _auditLogPush(t, 'REJECTED (attempt ' + t.auditFails + '/' + AUTO_ADVERSARY_MAX_FAILS + ')\n' + audit);
-  return { rejected: true, text: 'complete "' + op.id + '": REJECTED by automatic adversarial audit (attempt ' + t.auditFails + '/' + AUTO_ADVERSARY_MAX_FAILS + ' — after ' + AUTO_ADVERSARY_MAX_FAILS + ' the close will be allowed through as weakly-verified).\n'
-    + audit + '\n'
-    + 'Run the missing checks it names, cite the new [rN] ids, and retry — optionally add "justification":"…" to the complete op to state your reasoning. If the item turned out not to need doing, withdraw it instead.' };
-}
+// NOTE: the automatic adversarial audit that used to gate every checklist close
+// was removed — an A/B over real transcripts showed it caused withdrawal thrash
+// and gate-dodging on long debugging runs without improving convergence. The
+// adversary is now a VOLUNTARY tool (below) the model calls when it wants an
+// independent second opinion, which was the one clean win.
 async function tool_adversary_check({ claim, justification, evidence }, ctx) {
   const cfg = ctx && ctx._agentConfig;
   if (!cfg || !cfg.url) return { result: 'Error: adversary_check is only available during an agent run.' };
@@ -1800,16 +1730,16 @@ async function runAgent(config, ctx) {
   ctx._authRefreshUrl = config.authRefreshUrl || null;
   // Relay base URL for the `shell` tool (worker has no localStorage).
   ctx._shellRelayUrl = config.shellRelayUrl || 'http://localhost:8765';
-  // Seed the task tree from the persisted checklist (page passes config.todos).
-  // Migrate legacy flat items (no id) → sequential ids so write_todos ops apply.
+  // Seed the task list from the persisted checklist (page passes config.todos).
+  // Migrate legacy items: flat items (no id) → sequential ids; the retired
+  // 'withdrawn' status → 'deleted'; drop dead tree/evidence/audit fields.
   ctx._todoTree = (Array.isArray(config.todos) ? config.todos : []).map((t, i) => ({
     id: t.id || String(i + 1),
     content: t.content || '',
-    status: _TODO_ALL.includes(t.status) ? t.status : 'pending',
-    parent: t.parent || null,
-    created: t.created, completed: t.completed, withdrawn: t.withdrawn, reason: t.reason,
-    kind: t.kind === 'claim' ? 'claim' : undefined, verdict: t.verdict, evidence: t.evidence,
-    auditFails: t.auditFails, auditNote: t.auditNote, auditLog: t.auditLog,
+    status: t.status === 'withdrawn' ? 'deleted' : (_TODO_ALL.includes(t.status) ? t.status : 'pending'),
+    created: t.created, completed: t.completed,
+    blockedBy: Array.isArray(t.blockedBy) ? t.blockedBy.map(String) : undefined,
+    activeForm: t.activeForm,
   }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
@@ -1856,16 +1786,16 @@ async function runAgent(config, ctx) {
   // Escalating preamble keyed to how long the plan has actually gone stale — a
   // reminder that always said "6 rounds" was trivial to keep ignoring.
   const driftPreamble = (n) => {
-    if (n >= 50) return 'STOP. You have run ' + n + ' tool rounds without touching your plan — you are ignoring this reminder and drifting badly. Before ANY further tool call, update the checklist with write_todos or explicitly withdraw what you have abandoned.';
+    if (n >= 50) return 'STOP. You have run ' + n + ' tool rounds without touching your plan — you are ignoring this reminder and drifting badly. Before ANY further tool call, update the checklist with write_todos or delete what you have abandoned.';
     if (n >= 20) return 'You have now run ' + n + ' tool rounds without updating your plan. This is well past drift. Update the checklist with write_todos NOW before continuing.';
     return 'You have run ' + n + ' tool rounds without updating your plan.';
   };
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
-  // "Open" = pending or in_progress. completed AND withdrawn are both closed.
+  // "Open" = pending or in_progress. completed AND deleted are both closed.
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
   const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
-  const renderTodos = () => ctx._todos.map(t =>
-    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'withdrawn' ? '[-]' : '[ ]') + ' ' + t.content
+  const renderTodos = () => ctx._todos.filter(t => t.status !== 'deleted').map(t =>
+    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
   ).join('\n');
   // Ephemeral, request-only reminder for the NEXT round. Never pushed into
   // `messages`, so it is neither persisted nor resent on later rounds; it is
