@@ -231,12 +231,18 @@
 
   // Local backends run the whole agent loop in-worker; with tools:[] that is one
   // assistant message → agent_done, i.e. a single-shot completion.
-  async function localOnce(engine, prov, { system, user, signal }) {
+  async function localOnce(engine, prov, { system, user, signal, onDelta }) {
     let out = '';
     await engine.runConversation(
       { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: [], convId: 'loop-lab', signal },
       (ev) => {
-        if (ev && ev.type === 'message_added' && ev.message && ev.message.role === 'assistant') {
+        if (!ev) return;
+        // Live tokens: content + reasoning deltas → onDelta (so the UI streams).
+        if (ev.type === 'delta' && ev.delta && onDelta) {
+          if (ev.delta.reasoning) onDelta(ev.delta.reasoning);
+          if (ev.delta.content) onDelta(ev.delta.content);
+        }
+        if (ev.type === 'message_added' && ev.message && ev.message.role === 'assistant') {
           out += contentToText(ev.message.content);
         }
       },
@@ -279,7 +285,9 @@
     if (prov && prov.type === 'litertlm' && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       return localOnce(SandpieLiteRTLM, prov, opts);
     }
-    return httpOnce(opts);
+    const out = await httpOnce(opts);
+    if (opts && opts.onDelta && out) { try { opts.onDelta(out); } catch (_) {} }   // cloud is non-streaming → show the full text once
+    return out;
   }
 
   /* ================= agent adapter (full tool-calling turn) ================= */
@@ -290,12 +298,23 @@
 
   // Local backends run the agent loop in-worker already; pass the real tools + a
   // STABLE convId so any conversation-scoped OPFS area persists across iterations.
-  async function localAgent(engine, prov, { system, user, tools, signal, onStep }) {
+  async function localAgent(engine, prov, { system, user, tools, signal, onStep, onDelta }) {
     let out = '';
     await engine.runConversation(
       { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: tools || [], convId: 'loop-lab-ralph', signal },
       (ev) => {
         if (!ev) return;
+        // Live tokens (content + reasoning) so the UI streams during the agent turn.
+        if (ev.type === 'delta' && ev.delta && onDelta) {
+          if (ev.delta.reasoning) onDelta(ev.delta.reasoning);
+          if (ev.delta.content) onDelta(ev.delta.content);
+        }
+        // Surface tool activity in the live stream too (agents spend most time here).
+        if (ev.type === 'tool_started' && onDelta) {
+          const nm = ev.tc && ev.tc.function && ev.tc.function.name;
+          onDelta('\n  ⚙ calling ' + (nm || 'tool') + '…\n');
+        }
+        if (ev.type === 'tool_result' && onDelta) onDelta('  ✓ tool result (' + String(ev.result || '').length + ' chars)\n');
         if (ev.type === 'message_added' && ev.message && ev.message.role === 'assistant') out += contentToText(ev.message.content) + '\n';
         if (onStep) { try { onStep(ev); } catch (_) {} }
       },
@@ -305,7 +324,7 @@
 
   // Cloud: a compact, self-contained OpenAI-style tool loop (kept here, not routed
   // through conversations.js, to preserve Loop Lab's zero-blast-radius contract).
-  async function httpAgent({ system, user, tools, maxRounds, signal, onStep }) {
+  async function httpAgent({ system, user, tools, maxRounds, signal, onStep, onDelta }) {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
     const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
@@ -338,16 +357,18 @@
       if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
       const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
       messages.push(msg);
-      if (msg.content) text += contentToText(msg.content) + '\n';
+      if (msg.content) { text += contentToText(msg.content) + '\n'; if (onDelta) onDelta(contentToText(msg.content) + '\n'); }
       const calls = msg.tool_calls || [];
       if (onStep) { try { onStep({ content: msg.content, tool_calls: calls }); } catch (_) {} }
       if (!calls.length) break;   // no more tools → turn complete
       for (const tc of calls) {
         let args = {};
         try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+        if (onDelta) onDelta('\n  ⚙ calling ' + (tc.function && tc.function.name) + '…\n');
         let result;
         try { result = await runTool(tc.function.name, args, signal); }
         catch (e) { result = 'Error: ' + (e.message || e); }
+        if (onDelta) onDelta('  ✓ tool result (' + String(result).length + ' chars)\n');
         messages.push({ role: 'tool', tool_call_id: tc.id, content: String(result).slice(0, 8000) });
       }
     }
@@ -444,7 +465,7 @@
       ui.stageStart(turnHost, st.name, 'llm');
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
       rec('[' + st.name + ' · llm]\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
-      const raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal });
+      const raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
       let out = raw;
       if (st.parse === 'json') {
         out = parseJSON(raw);
@@ -467,7 +488,8 @@
       rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
       const out = await agentTurn({
         system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal,
-        onStep: (ev) => { if (ev && (ev.tool_calls || (ev.type === 'tool_started'))) stats.toolCalls++; },
+        onDelta: (c) => ui.stageStream(turnHost, st.name, c),
+        onStep: (ev) => { if (ev && (ev.type === 'tool_started' || (ev.tool_calls && ev.tool_calls.length))) stats.toolCalls++; },
       });
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
@@ -758,9 +780,35 @@
         turnHost.appendChild(el);
         el.scrollIntoView({ block: 'end' });
       },
+      // Live token stream: on the first chunk, replace the pending placeholder with
+      // an open <details> and then append deltas to its <pre> as they arrive, so the
+      // user watches generation happen. _finish() later swaps this live element for
+      // the clean final one. Only one stage streams at a time (stages are sequential).
+      stageStream(turnHost, name, chunk) {
+        if (!chunk) return;
+        let live = turnHost.querySelector('details.ll-live');
+        if (!live) {
+          const pending = turnHost.querySelector('[data-pending]');
+          if (pending) pending.remove();
+          live = document.createElement('details');
+          live.className = 'll-stage ll-live';
+          live.open = true;
+          const sum = document.createElement('summary');
+          sum.textContent = '▶ ' + name + ' (generating…)';
+          const pre = document.createElement('pre');
+          live.appendChild(sum); live.appendChild(pre);
+          turnHost.appendChild(live);
+        }
+        const pre = live.querySelector('pre');
+        const nearBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+        pre.textContent += chunk;
+        if (nearBottom) pre.scrollTop = pre.scrollHeight;   // follow the stream unless the user scrolled up
+      },
       _finish(turnHost, name, cls, summaryText, body) {
         const pending = turnHost.querySelector('[data-pending]');
         if (pending) pending.remove();
+        const live = turnHost.querySelector('details.ll-live');   // drop the live stream; the clean final details replaces it
+        if (live) live.remove();
         const det = document.createElement('details');
         det.className = 'll-stage' + (cls ? ' ' + cls : '');
         const sum = document.createElement('summary');
