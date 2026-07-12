@@ -154,51 +154,80 @@
     ]
   };
 
-  /* ---- ralph: the "Ralph Wiggum" loop (Geoffrey Huntley), HARNESS-ENFORCED. Re-run
-     the SAME task in a FRESH context every iteration. The model no longer manages a
-     progress file (it forgot to, and write_file is create-only) — instead the HARNESS
-     owns durable MEMORY: it auto-tracks the paths the agent touches, harvests the
-     agent's <NEXT>/<LESSON> tags, and WRITES the memory to OPFS after EVERY turn
-     (spec.memory), then INJECTS it back into the next prompt via ${memory}. So memory
-     advances even if the model writes nothing. maxTurns = hard backstop; stop =
-     RALPH_DONE harvested from the output. ---- */
+  /* ---- ralph: the REAL "Ralph Wiggum" loop (Geoffrey Huntley) for long-running SWE
+     tasks. True to spec: the MODEL owns and edits the progress file — its own plan, in
+     its own words, re-read every fresh-context iteration. The harness makes the
+     protocol un-skippable instead of doing the model's job:
+       · pre-creates ${ralphFile} before turn 1 (model only ever edit_file's it — the
+         create-only write_file trap is structurally impossible),
+       · reads the file fresh each turn and INJECTS it into the prompt (${progress}),
+         so "forgot to read" can't happen,
+       · detects stalls (file unchanged after an iteration → escalating warning
+         injected via ${memory}; 3 stale iterations → stop),
+       · and NEVER trusts RALPH_DONE: a skeptical VERIFIER agent with tools must issue
+         VERDICT: PASS, else the claim is rejected and the objection injected.
+     maxRounds is a harness guardrail, NOT Ralph spec (official Ralph has no round cap
+     — one iteration = one full agent session). Cloud honors 24; local backends cap at
+     their own internal 8. maxTurns 40 = hard backstop for long tasks. ---- */
   const RALPH = {
     name: 'ralph',
-    maxTurns: 20,
-    // Harness-owned memory (persisted + injected each turn). recentPaths is auto-filled
-    // from the agent's tool calls; nextStep/lessons are harvested from its output.
+    maxTurns: 40,
     memory: { file: '${ralphFile}' },
-    scratchpad: { iteration: 0, done: false, nextStep: '', lessons: [], recentPaths: [], log: [] },
+    scratchpad: { iteration: 0, done: false, claimedDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
     stages: [
       {
-        name: 'ralph', type: 'agent', saveAs: 'out', maxRounds: 12,
+        name: 'ralph', type: 'agent', saveAs: 'out', maxRounds: 24,
         system: [
-          'You are ONE iteration of a RALPH LOOP working on a long task. Each iteration runs in a FRESH context with NO memory of previous ones — but the SYSTEM maintains your durable MEMORY for you and shows it below. You do NOT manage a progress file yourself; just do work and report via the tags at the end.',
+          'You are ONE iteration of an endless loop working on a long software task. Every iteration starts with a FRESH context: you remember NOTHING from previous iterations. The progress file `${ralphFile}` is your ONLY memory — anything not written there is lost forever.',
           '',
-          'MEMORY (maintained by the system across iterations):',
+          'CURRENT PROGRESS FILE (read for you just now — this is your memory):',
+          '${progress}',
+          '',
+          'HARNESS NOTES (auto-tracked warnings, verifier objections, recent paths):',
           '${memory}',
           '',
           'THIS ITERATION:',
-          '1. Re-read the real files/state you need (never trust memory blindly — verify against actual files). The Recent paths above are where you (probably) were.',
-          '2. Do the SINGLE next concrete unit of work using your tools (read/edit files, run code, verify). Do NOT try to finish everything at once — steady incremental progress.',
-          '3. End your reply with these tags so the system can update memory (the ONLY thing the next iteration inherits):',
-          '   <NEXT>the single most important thing the next iteration should do first</NEXT>',
-          '   <LESSON>one durable, reusable insight — a verified fact, a key path, a gotcha. Omit the tag entirely if nothing worth keeping this turn.</LESSON>',
+          '1. Study the progress file above and pick the SINGLE next item from "## Next" / the checklist. If the file is still the bootstrap skeleton, THIS iteration = explore the codebase and write the real plan into the file.',
+          '2. Do that ONE item with your tools. Verify it actually worked (read files back, run code). Never assume — check.',
+          '3. MANDATORY before finishing: update `${ralphFile}` with edit_file (write_file refuses to overwrite existing files). Check off what you completed, record key facts/paths/decisions and lessons, and rewrite "## Next" with exactly what the next iteration should do first. An iteration that does not update the file is a FAILED iteration — its work never happened.',
           '',
           'Rules:',
-          '- Verify your own work (read files back, run tests) instead of assuming success.',
-          '- You MAY create scratch files under `${ralphDir}/`, but do NOT hand-maintain the progress file — the system persists memory automatically.',
-          '- Output the exact token RALPH_DONE on its OWN final line ONLY when the ENTIRE task is complete AND verified. Never otherwise.',
+          '- ONE item per iteration. Small verified steps beat big unverified ones.',
+          '- Search the codebase before building anything new — never assume something is missing.',
+          '- Scratch files go under `${ralphDir}/`.',
+          '- When EVERY checklist item is complete and verified, output RALPH_DONE alone on the final line. A skeptical verifier will check your claim with tools — false claims are rejected and waste an iteration.',
+          '',
+          'Update `${ralphFile}` before you finish. This is the most important rule.',
         ].join('\n'),
         user: '${task}',
       },
       {
-        // Harvest the agent's tags into harness memory. recentPaths were already
-        // captured live from tool calls (see execStage agent onEvent). Persist to OPFS
-        // happens in runLoop after this stage (async), so it can't be skipped.
+        // Record the iteration + detect the completion CLAIM (verified separately).
+        // recentPaths are captured live from tool calls (execStage agent onEvent);
+        // file read/injection/stall detection is harness code in runLoop.
         name: 'harvest', type: 'js',
-        code: "const out = String(ctx.vars.out || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nconst nx = out.match(/<NEXT>([\\s\\S]*?)<\\/NEXT>/i);\nif (nx && nx[1].trim()) sp.nextStep = nx[1].trim();\nconst rx = /<LESSON>([\\s\\S]*?)<\\/LESSON>/gi; let m;\nwhile ((m = rx.exec(out)) !== null) { const l = m[1].trim(); if (l && !sp.lessons.includes(l)) sp.lessons.push(l); }\nif (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\nconst clean = out.replace(/<NEXT>[\\s\\S]*?<\\/NEXT>/gi,'').replace(/<LESSON>[\\s\\S]*?<\\/LESSON>/gi,'').replace(/RALPH_DONE/g,'').trim();\nsp.log.push('T' + ctx.turn + ': ' + (sp.nextStep || clean.slice(0,110)).replace(/\\s+/g,' ').slice(0,120));\nif (sp.log.length > 20) sp.log = sp.log.slice(-20);\nif (/(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out)) { sp.done = true; ctx.log('RALPH_DONE — complete after ' + ctx.turn + ' iteration(s)'); }\nelse { ctx.log('harvested T' + ctx.turn + ': ' + sp.recentPaths.length + ' paths, ' + sp.lessons.length + ' lessons; next = ' + (sp.nextStep || '(none)').slice(0,60)); }",
+        code: "const out = String(ctx.vars.out || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nsp.log.push('T' + ctx.turn + ': ' + out.replace(/\\s+/g, ' ').trim().slice(0, 120));\nif (sp.log.length > 20) sp.log = sp.log.slice(-20);\nsp.claimedDone = /(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out);\nctx.log(sp.claimedDone ? 'RALPH_DONE claimed — running verifier' : 'iteration ' + ctx.turn + ' recorded');",
+      },
+      {
+        // Skeptical verification of the completion claim — fresh context, full tools.
+        name: 'verify', type: 'agent', saveAs: 'verdictOut', maxRounds: 10,
+        when: 'scratchpad.claimedDone === true && scratchpad.done !== true',
+        system: [
+          'You are the VERIFIER. A previous agent claims this software task is COMPLETE. Distrust it — your job is to find what is missing, broken, or unverified.',
+          '',
+          'ITS PROGRESS FILE (the claim of what was done):',
+          '${progress}',
+          '',
+          'Spot-check the claim with your tools: read the files it says it changed, run the code or tests where possible. Be concrete — check the strongest evidence, not the file’s prose.',
+          'End your reply with exactly ONE line: "VERDICT: PASS" if the task is genuinely complete and verified, or "VERDICT: FAIL — <one-line concrete reason>" otherwise. No verdict line counts as FAIL.',
+        ].join('\n'),
+        user: 'TASK:\n${task}\n\nVerify the completion claim now.',
+      },
+      {
+        name: 'verdict', type: 'js',
+        when: 'scratchpad.claimedDone === true && scratchpad.done !== true',
+        code: "const v = String(ctx.vars.verdictOut || '');\nconst sp = ctx.scratchpad;\nif (/VERDICT:\\s*PASS/i.test(v)) { sp.done = true; ctx.log('\\u2705 verifier PASSED — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse {\n  const m = v.match(/VERDICT:\\s*FAIL\\s*[\\u2014-]*\\s*(.*)/i);\n  const reason = ((m && m[1]) || 'verifier gave no explicit verdict — treated as FAIL').slice(0, 200);\n  sp.claimedDone = false;\n  sp.lessons.push('Verifier REJECTED completion at iteration ' + ctx.turn + ': ' + reason);\n  if (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\n  ctx.log('\\u274c verifier rejected the claim: ' + reason);\n}",
       },
     ],
   };
@@ -216,9 +245,9 @@
   // `${ralphFile}` var → upgrade it to the per-run-isolated prompt.
   const UPGRADES = {
     // Upgrade any shipped ralph (has the RALPH_DONE sentinel) that predates the
-    // harness-owned-memory rework (lacks the ${memory} injection). A user who removed
+    // real-Ralph rework (lacks the ${progress} injection). A user who removed
     // RALPH_DONE (heavy rewrite) is left untouched.
-    ralph: (s) => /RALPH_DONE/.test(s) && !s.includes('${memory}'),
+    ralph: (s) => /RALPH_DONE/.test(s) && !s.includes('${progress}'),
   };
   // Seed each example once (per-name flag), so a user deleting one doesn't get
   // it resurrected on every open.
@@ -365,7 +394,7 @@
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: user });
     const hasTools = !!(tools && tools.length);
-    const rounds = Math.max(1, Math.min(20, maxRounds || 12));
+    const rounds = Math.max(1, Math.min(40, maxRounds || 12));
     let text = '';
     for (let r = 0; r < rounds; r++) {
       if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
@@ -475,27 +504,35 @@
     list.push(item);
     if (list.length > cap) list.splice(0, list.length - cap);
   }
-  // The memory block INJECTED into the agent prompt each turn (${memory}).
+  // The harness-notes block INJECTED into the agent prompt each turn (${memory}):
+  // auto-tracked warnings/objections + recent paths + a short iteration log. The
+  // MODEL-owned progress file is injected separately as ${progress}.
   function renderMemoryForPrompt(sp) {
     const L = [];
     L.push('Iterations so far: ' + (sp.iteration || 0));
-    L.push('Next step (planned last iteration): ' + (sp.nextStep || '(none yet — this is the first step)'));
-    L.push('Lessons learned:' + (sp.lessons && sp.lessons.length ? '\n' + sp.lessons.map(x => '  - ' + x).join('\n') : ' (none yet)'));
-    L.push('Recent paths touched:' + (sp.recentPaths && sp.recentPaths.length ? '\n' + sp.recentPaths.slice(-10).map(x => '  - ' + x).join('\n') : ' (none yet)'));
+    L.push('Warnings & verifier notes:' + (sp.lessons && sp.lessons.length ? '\n' + sp.lessons.map(x => '  - ' + x).join('\n') : ' (none)'));
+    L.push('Recent paths touched (auto-tracked):' + (sp.recentPaths && sp.recentPaths.length ? '\n' + sp.recentPaths.slice(-10).map(x => '  - ' + x).join('\n') : ' (none yet)'));
     if (sp.log && sp.log.length) L.push('Recent iteration log:\n' + sp.log.slice(-6).map(x => '  ' + x).join('\n'));
     return L.join('\n');
   }
-  // The Markdown the harness PERSISTS to OPFS after every turn (human-readable + a
-  // durable backup of the injected memory).
-  function renderMemoryMd(sp, task) {
+  // The skeleton the harness pre-creates at ${ralphFile} before turn 1, so the model
+  // only ever edit_file's the file (write_file is create-only and refuses overwrites —
+  // the trap that used to eat progress updates). The model replaces this with its plan.
+  function bootstrapMd(task) {
     return [
-      '# Ralph progress (system-maintained — do not hand-edit)',
-      '', '**Task:** ' + task,
-      '', '**Iterations:** ' + (sp.iteration || 0) + (sp.done ? ' · DONE ✅' : ''),
-      '', '## Next step', sp.nextStep || '(none)',
-      '', '## Lessons', (sp.lessons && sp.lessons.length ? sp.lessons.map(x => '- ' + x).join('\n') : '(none)'),
-      '', '## Recent paths', (sp.recentPaths && sp.recentPaths.length ? sp.recentPaths.map(x => '- ' + x).join('\n') : '(none)'),
-      '', '## Iteration log', (sp.log && sp.log.length ? sp.log.map(x => '- ' + x).join('\n') : '(none)'),
+      '# PROGRESS',
+      '',
+      '## Task',
+      task,
+      '',
+      '## Checklist',
+      '- [ ] (plan not written yet — explore the codebase and replace this with a real, concrete checklist)',
+      '',
+      '## Lessons',
+      '(none yet)',
+      '',
+      '## Next',
+      'Study the codebase relevant to the task, then rewrite this file: real checklist under "## Checklist", first concrete step here under "## Next".',
       '',
     ].join('\n');
   }
@@ -657,37 +694,62 @@
     const ralphFile = ralphDir + '/PROGRESS.md';
     ui.note('run ' + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
 
-    // Harness-owned memory (opt-in via spec.memory): after every turn, render the
-    // scratchpad memory to Markdown and WRITE it to OPFS ourselves (so persistence
-    // can't be skipped by the model). We track the exact last-written text so we can
-    // edit_file it (write_file is create-only) with a guaranteed match.
-    let _lastMemText = null;
-    async function persistMemory() {
-      const text = renderMemoryMd(scratchpad, task);
-      if (text === _lastMemText) return;   // nothing changed
-      try {
-        if (_lastMemText === null) {
-          const r = await runTool('write_file', { path: ralphFile, content: text }, ctrl.signal, runId);
-          // Unique runId makes a pre-existing file near-impossible; if it happens, keep
-          // going (memory is still injected into the prompt — the file is only a backup).
-          if (/already exists/i.test(String(r))) { ui.note('memory: ' + ralphFile + ' already exists — file backup skipped (memory still injected)'); return; }
-        } else {
-          await runTool('edit_file', { path: ralphFile, old_str: _lastMemText, new_str: text }, ctrl.signal, runId);
-        }
-        _lastMemText = text;
-        ui.note('memory persisted → ' + ralphFile + ' (' + text.length + ' B)');
-      } catch (e) { ui.note('memory persist failed: ' + ((e && e.message) || e)); }
+    // Model-owned progress file (opt-in via spec.memory). The harness makes the Ralph
+    // protocol un-skippable without doing the model's job:
+    //   · pre-creates ${ralphFile} (bootstrap skeleton) so the model only ever
+    //     edit_file's it — the create-only write_file trap can't eat an update;
+    //   · re-reads the file at the START of every turn and injects it (${progress});
+    //   · detects stalls: file unchanged after an iteration → escalating warning
+    //     pushed into scratchpad.lessons (→ ${memory}); 3 stale iterations → stop.
+    let _progressBody = '', _prevBody = null, _stale = 0;
+    const PROGRESS_CLAMP = 8000;
+    // read_file returns "<path> — N lines, X bytes" then "n\tline" rows; strip both.
+    function stripReadFile(res) {
+      const s = String(res || '');
+      if (/^Error/i.test(s)) return null;
+      const lines = s.split('\n');
+      if (lines.length && /—\s*\d+\s*lines?,/.test(lines[0])) lines.shift();
+      return lines.map(l => l.replace(/^\s*\d+\t/, '')).join('\n');
+    }
+    // Returns false when the run has stalled (3 iterations without a file update).
+    async function syncProgress(turn) {
+      let body = null;
+      try { body = stripReadFile(await runTool('read_file', { path: ralphFile }, ctrl.signal, runId)); } catch (_) {}
+      if (body === null) {
+        body = bootstrapMd(task);
+        try { await runTool('write_file', { path: ralphFile, content: body }, ctrl.signal, runId); ui.note('progress file created (bootstrap): ' + ralphFile); }
+        catch (e) { ui.note('progress bootstrap failed: ' + ((e && e.message) || e)); }
+      } else if (_prevBody !== null) {
+        if (body === _prevBody) {
+          _stale++;
+          scratchpad.lessons.push('⚠ Iteration ' + (turn - 1) + ' did NOT update ' + ralphFile + ' — its work is INVISIBLE to you now. Update the file (edit_file) THIS iteration, immediately after any real work.');
+          if (scratchpad.lessons.length > 12) scratchpad.lessons = scratchpad.lessons.slice(-12);
+          ui.note('⚠ progress file unchanged after turn ' + (turn - 1) + ' (stale ×' + _stale + ')');
+        } else { _stale = 0; ui.note('progress file updated (' + body.length + ' B)'); }
+      }
+      _prevBody = body;
+      _progressBody = body.length > PROGRESS_CLAMP
+        ? body.slice(0, PROGRESS_CLAMP - 1500) + '\n…[middle clipped — file is ' + body.length + ' chars]…\n' + body.slice(-1400)
+        : body;
+      return _stale < 3;
     }
 
     try {
       for (let turn = 1; turn <= maxTurns && !stopped; turn++) {
         if (ctrl.signal.aborted) break;
+        // ENFORCED protocol (spec.memory): fresh read + injection of the model-owned
+        // progress file BEFORE the turn, stall-stop when the model stops updating it.
+        if (spec.memory) {
+          const alive = await syncProgress(turn);
+          if (!alive) { ui.note('STALLED: 3 iterations without a progress-file update — stopping (rerun to continue from ' + ralphFile + ').'); break; }
+        }
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
           task, turn, runId, ralphDir, ralphFile,
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           get memory() { return renderMemoryForPrompt(scratchpad); },
+          get progress() { return _progressBody; },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
         const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task, convId: runId };
@@ -715,10 +777,6 @@
           ui.setStats(stats);
         }
         rec('SCRATCHPAD after turn ' + turn + ':\n' + JSON.stringify(scratchpad, null, 2));
-
-        // ENFORCED persistence: the harness writes memory to OPFS every turn — the
-        // model can't skip it (this is the fix for "the model won't write to progress").
-        if (spec.memory && !ctrl.signal.aborted) await persistMemory();
 
         if (spec.stopWhen && !stopped) {
           try {
