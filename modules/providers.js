@@ -264,14 +264,33 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
   const url = new URL(route, location.href).href;
   const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: false, max_tokens: maxTokens };
   if (active && active.temperature != null) body.temperature = active.temperature;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-    body: JSON.stringify(body), signal,
-  });
-  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + (t ? ': ' + t.slice(0, 200) : '')); }
-  const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
+  // Retry transient/5xx/network failures with backoff, like a standard completion,
+  // so a 504 doesn't fail a background summarization (compaction / memory distiller)
+  // outright. Bounded (unlike the foreground turn) since these are best-effort and
+  // fire again on their next trigger; a non-retryable error (4xx) surfaces at once.
+  const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
+  const BACKOFF_MS = [1000, 2000, 5000, 10000];
+  let lastErr = null;
+  for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
+    if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
+        body: JSON.stringify(body), signal,
+      });
+      if (!res.ok) { const t = await res.text().catch(() => ''); const e = new Error('HTTP ' + res.status + (t ? ': ' + t.slice(0, 200) : '')); e.status = res.status; throw e; }
+      const data = await res.json();
+      return data?.choices?.[0]?.message?.content || '';
+    } catch (e) {
+      if (signal && signal.aborted) throw e;
+      lastErr = e;
+      const retryable = (e && RETRYABLE.has(e.status)) || (e instanceof TypeError);   // TypeError = network failure
+      if (!retryable || attempt === BACKOFF_MS.length) throw e;
+      await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+    }
+  }
+  throw lastErr || new Error('completion failed');
 }
 
 // Push the active provider's connection details into the hidden inputs that

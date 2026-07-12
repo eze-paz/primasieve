@@ -1281,37 +1281,50 @@ async function _refreshAuthToken(url) {
   } catch (_) { return null; }
 }
 
-async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
+// Shared provider-call retry: exponential backoff on transient/5xx/network
+// errors (never gives up — same as a standard completion, so a 504 never drops
+// the work) plus a single transparent managed-token re-mint on 401. `attemptFn`
+// runs ONE call against `headers` (mutated in place on re-mint so later attempts
+// reuse the fresh token) and throws on failure with Error.status set for HTTP.
+// EVERY provider call routes through here — main generation, subagents (via the
+// round loop), and compaction — so none of them can block a turn on a transient
+// failure that the others would have retried. Throws 'aborted' if the signal fires.
+async function _withProviderRetry(ctx, headers, label, attemptFn) {
   const BACKOFF_MS = [1000, 2000, 5000, 10000];
-  let authRefreshed = false;   // at most one transparent token re-mint per round
+  let authRefreshed = false;   // at most one transparent token re-mint
   for (let attempt = 0; ; attempt++) {
+    if (ctx.signal?.aborted) throw new Error('aborted');
     try {
       if (attempt > 0) ctx.emit({ type: 'info', message: null });
-      ctx._hermesMode = body && body._hermesMode;
-      return await streamOneRound(reqUrl, headers, body, ctx);
+      return await attemptFn(headers);
     } catch (e) {
       if (ctx.signal?.aborted) throw e;
       // Managed session token expired → re-mint from the still-valid SSO cookie
-      // and retry once, transparently (no user-facing message). Gated to the
-      // managed provider (ctx._authRefreshUrl set) and to one attempt: a fresh
-      // token that still 401s means the SSO session itself is gone — let it surface.
+      // and retry once. A fresh token that still 401s means the SSO session is
+      // gone — surface it.
       if (e && e.status === 401 && ctx._authRefreshUrl && !authRefreshed) {
         authRefreshed = true;
         const tok = await _refreshAuthToken(ctx._authRefreshUrl);
         if (tok) {
-          headers['Authorization'] = 'Bearer ' + tok;   // mutate in place → later rounds reuse it
+          headers['Authorization'] = 'Bearer ' + tok;
           self.postMessage({ type: 'managed-token-refreshed', token: tok });
-          continue;                                      // immediate retry with the fresh token
+          continue;
         }
-        // Re-mint failed — SSO session itself is gone. Signal so page can redirect cleanly.
         ctx.emit({ type: 'session_expired', message: 'Session expired — redirecting to login…' });
       }
       if (!isRetryableError(e)) throw e;
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
-      ctx.emit({ type: 'info', message: `Provider error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
+      ctx.emit({ type: 'info', message: `${label} error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
       await swSleep(delay, ctx.signal);
     }
   }
+}
+
+async function streamOneRoundWithRetry(reqUrl, headers, body, ctx) {
+  return _withProviderRetry(ctx, headers, 'Provider', (hdrs) => {
+    ctx._hermesMode = body && body._hermesMode;
+    return streamOneRound(reqUrl, hdrs, body, ctx);
+  });
 }
 
 function parseLeakedToolCalls(text) {
@@ -1518,25 +1531,24 @@ async function _summarizeForCompaction(config, transcript, ctx) {
     max_tokens: 2048,
     stream: false,
   };
-  const BACKOFF_MS = [800, 1500, 3000];
-  let lastErr = null;
-  for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
-    if (ctx.signal && ctx.signal.aborted) return null;
-    try {
-      const r = await fetch(config.url, { method: 'POST', headers: config.headers, body: JSON.stringify(body), signal: ctx.signal });
+  // Same retry contract as a standard completion: backoff on transient/5xx +
+  // 401 re-mint, so a 504 mid-compaction is retried (not a turn-halting failure)
+  // exactly like the main generation. Abort mid-compaction → null (not a failure;
+  // the caller skips the splice). A non-retryable error (e.g. an empty response)
+  // propagates so maybeCompactMidTurn surfaces it as a CompactionFailure.
+  try {
+    return await _withProviderRetry(ctx, config.headers, 'Compaction', async (headers) => {
+      const r = await fetch(config.url, { method: 'POST', headers, body: JSON.stringify(body), signal: ctx.signal });
       if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
       const d = await r.json();
       const txt = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
       if (txt && txt.trim()) return txt.trim();
       throw new Error('summarizer returned an empty response');
-    } catch (e) {
-      if (ctx.signal && ctx.signal.aborted) return null;
-      lastErr = e;
-      if (attempt === BACKOFF_MS.length) break;
-      await swSleep(BACKOFF_MS[attempt], ctx.signal);
-    }
+    });
+  } catch (e) {
+    if (ctx.signal && ctx.signal.aborted) return null;
+    throw e;
   }
-  throw lastErr || new Error('compaction summarizer failed');
 }
 
 // ── spawn_subagent ──────────────────────────────────────────────────────────
