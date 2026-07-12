@@ -156,7 +156,7 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
 WHEN: any task with 3+ non-trivial steps, or several distinct requirements. Skip for trivial work.
 FIRST plan: send a full list once — {"todos":[{"content":"…"}, …]} — accepted only when there is no checklist yet.
 THEN update with ops: {"ops":[ … ]}. Each op:
-  {"op":"add","text":"Write the parser","blockedBy":["2"]?}   add a task. blockedBy lists ids that must finish first — use it to express ORDERING (a blocked task can't start until they close) instead of forcing the work into one big sequence.
+  {"op":"add","text":"Write the parser","blockedBy":["2"]?}   add a task. blockedBy = ids of tasks that produce something THIS task needs as input — a real data / artifact / decision dependency, so it literally cannot start until they finish (e.g. "compare the two traces" is blockedBy BOTH "capture trace A" and "capture trace B"). A blocked task can't be started until its blockers close. Only mark a genuine dependency: do NOT chain tasks just because you plan to do them in that order — leave independent tasks unblocked so they show as runnable in parallel.
   {"op":"start","id":"3"}          mark in_progress (do this before you begin it). Refused while the task still has an open blocker. Several tasks may be in progress at once if nothing blocks them.
   {"op":"complete","id":"3"}       mark done.
   {"op":"delete","id":"3"}         drop a task you're no longer doing — it is removed from the list (and from any other task's blockedBy).
