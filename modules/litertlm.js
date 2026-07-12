@@ -197,6 +197,39 @@ const SandpieLiteRTLM = (function () {
     });
   }
 
+  // ============================================================
+  // Mobile memory relief: a loaded Gemma pins ~2GB of (unified) memory for the
+  // whole session — even while the user is in ANOTHER app — which starves the
+  // rest of the phone (reported symptom: "whole phone sluggish"). When the tab
+  // is BACKGROUNDED on mobile and no generation is in flight, free the engine
+  // (and its WebGPU device) back to the OS after a short grace period. The next
+  // runConversation lazily re-creates it (ensureEngine) — the model is still in
+  // Cache Storage, so that's a re-parse + GPU upload, NOT a re-download.
+  //
+  // Deliberately mobile-ONLY (isMobileViewport): on desktop the reload cost
+  // outweighs the benefit (more RAM, cheaper to keep resident). Grace period
+  // avoids churning on a quick glance-away; the busy-guard never yanks GPU out
+  // from under a running generation. `unloadIdleMs`/global override for tuning.
+  // ============================================================
+  let _idleUnloadMs = 90000;
+  let _idleTimer = null;
+  function _clearIdle() { if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; } }
+  function _onVisibility() {
+    _clearIdle();
+    if (typeof document === 'undefined' || !document.hidden) return;     // foreground → keep resident
+    if (!_worker) return;                                                 // nothing loaded → nothing to free
+    const mobile = (typeof window !== 'undefined' && typeof window.isMobileViewport === 'function') ? window.isMobileViewport() : false;
+    if (!mobile) return;                                                  // desktop exempt (reload cost)
+    const ms = (typeof window !== 'undefined' && window.__litertlmIdleUnloadMs != null) ? window.__litertlmIdleUnloadMs : _idleUnloadMs;
+    _idleTimer = setTimeout(() => {
+      _idleTimer = null;
+      if (_busy > 0) return;              // a generation is running — don't free out from under it
+      if (!document.hidden) return;       // returned to foreground before the timer fired
+      try { unload(); } catch (_) {}
+    }, ms);
+  }
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', _onVisibility);
+
   return { DEFAULT_MODELS, DEFAULT_N_CTX, unload, streamRound, runConversation, _viaWorker: true };
 })();
 
