@@ -566,8 +566,58 @@
 
   /* ================= run engine ================= */
   let _run = null;          // { ctrl, stats }
-  let _transcript = [];     // full plain-text record of the last run (Copy button)
-  const rec = (s) => _transcript.push(s);
+  // Transcript = the Copy-run record. To keep RAM bounded on long runs, only a small
+  // TAIL is held in memory; the rest is flushed to an OPFS file (looplab-runs/<runId>.log).
+  // Copy = file contents (flushed prefix) + the in-RAM tail (suffix) — no overlap.
+  let _transcript = [];
+  let _transcriptBytes = 0, _transcriptPath = null, _transcriptFlushed = false;
+  const rec = (s) => { s = String(s); _transcript.push(s); _transcriptBytes += s.length + 2; };
+  const TRANSCRIPT_LIMIT = 128000, TRANSCRIPT_TAIL_BYTES = 32000;   // flush RAM>128KB, keep ~32KB tail
+
+  // Page-side OPFS append (createWritable + write-at-end). Batched per turn, so the
+  // per-write overhead is negligible. Path is relative to the OPFS root.
+  async function opfsAppend(path, text) {
+    const parts = path.split('/');
+    let dir = await navigator.storage.getDirectory();
+    for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i], { create: true });
+    const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+    const size = (await fh.getFile()).size;
+    const w = await fh.createWritable({ keepExistingData: true });
+    await w.write({ type: 'write', position: size, data: text });
+    await w.close();
+  }
+  async function opfsReadText(path) {
+    const parts = path.split('/');
+    let dir = await navigator.storage.getDirectory();
+    for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i]);
+    const fh = await dir.getFileHandle(parts[parts.length - 1]);
+    return await (await fh.getFile()).text();
+  }
+  // Move everything beyond the tail from RAM → OPFS. Best-effort: on failure the
+  // entries stay in RAM and are retried next flush (memory just grows meanwhile).
+  async function flushTranscript() {
+    if (!_transcriptPath || _transcriptBytes < TRANSCRIPT_LIMIT) return;
+    // Keep a BYTE-bounded tail in RAM (entries are few-but-huge, so an entry-count
+    // tail could keep everything). Walk back from the end until ~TAIL_BYTES; flush
+    // the earlier entries.
+    let tailBytes = 0, keepFrom = _transcript.length;
+    while (keepFrom > 0 && tailBytes < TRANSCRIPT_TAIL_BYTES) { keepFrom--; tailBytes += _transcript[keepFrom].length + 2; }
+    if (keepFrom <= 0) return;   // whole buffer fits the tail budget
+    const batch = _transcript.slice(0, keepFrom).join('\n\n') + '\n\n';
+    try {
+      await opfsAppend(_transcriptPath, batch);
+      _transcript = _transcript.slice(keepFrom);
+      _transcriptBytes = tailBytes;
+      _transcriptFlushed = true;
+    } catch (_) { /* keep in RAM; retry next turn */ }
+  }
+  // Full transcript for Copy = flushed file prefix + in-RAM tail.
+  async function fullTranscript() {
+    let head = '';
+    if (_transcriptFlushed && _transcriptPath) { try { head = await opfsReadText(_transcriptPath); } catch (_) {} }
+    const tail = _transcript.join('\n\n');
+    return (head ? head + tail : tail) || '(no run yet)';
+  }
 
   function validateStage(st, inner) {
     if (!st || !st.name) return 'Every stage needs a "name".';
@@ -726,6 +776,11 @@
     const ralphFile = ralphDir + '/PROGRESS.md';
     ui.note('run ' + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
 
+    // Offload the transcript to OPFS so RAM stays bounded on long runs (see rec/flush).
+    _transcriptPath = 'looplab-runs/' + runId + '.log';
+    _transcriptFlushed = false;
+    _transcriptBytes = _transcript.reduce((n, s) => n + s.length + 2, 0);
+
     // Progress file (opt-in via spec.memory). The MODEL never touches it — a dedicated
     // scribe stage emits the full updated content and the HARNESS writes it, so a
     // persist can't be skipped (the repeated failure we saw). At turn start we read +
@@ -834,6 +889,8 @@
             }
           } catch (e) { ui.note('stopWhen eval error: ' + e.message); }
         }
+
+        await flushTranscript();   // offload the turn's transcript to OPFS (bounds RAM)
       }
     } catch (e) {
       error = e;
@@ -1208,7 +1265,7 @@
     $id('llStop').onclick = () => { if (_run) _run.ctrl.abort(); };
     $id('llCopy').onclick = async () => {
       const btn = $id('llCopy');
-      const text = _transcript.length ? _transcript.join('\n\n') : '(no run yet)';
+      const text = await fullTranscript();   // OPFS-flushed prefix + in-RAM tail
       let ok = false;
       try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
         // clipboard API can be denied — fall back to a hidden textarea
@@ -1258,5 +1315,5 @@
     });
   }
 
-  window.SandpieLoopLab = { open, close, runLoop, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
+  window.SandpieLoopLab = { open, close, runLoop, fullTranscript, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
 })();
