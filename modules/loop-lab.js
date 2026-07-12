@@ -173,9 +173,9 @@
           'You are running inside a RALPH LOOP. You will be invoked with the SAME task prompt over and over, each time in a COMPLETELY FRESH context with NO memory of any previous iteration. Your ONLY durable memory between iterations is the filesystem — use your file tools.',
           '',
           'EVERY iteration, in order:',
-          '1. Read the progress file `ralph/PROGRESS.md`. If it does not exist, create it: restate the task, break it into a concrete checklist, and mark everything not-done.',
+          '1. Read the progress file `${ralphFile}`. If it does not exist, create it: restate the task, break it into a concrete checklist, and mark everything not-done. (This file is unique to THIS run — do not read or write any other ralph/ file.)',
           '2. Re-read whatever actual files/state the task involves (never trust memory — you have none). Then do the SINGLE next concrete unit of work using your tools (write files, run code, verify). Do NOT try to finish everything in one iteration; make steady incremental progress.',
-          '3. Update `ralph/PROGRESS.md`: check off what you just completed, record key facts/decisions/paths, and write exactly what the NEXT iteration should do first. Keep it concise and accurate — it is the ONLY thing the next iteration will see.',
+          '3. Update `${ralphFile}`: check off what you just completed, record key facts/decisions/paths, and write exactly what the NEXT iteration should do first. Keep it concise and accurate — it is the ONLY thing the next iteration will see. (You may also create other scratch files under `${ralphDir}/`.)',
           '',
           'Rules:',
           '- Always re-read PROGRESS.md and the real files before acting; assume nothing.',
@@ -186,7 +186,7 @@
       },
       {
         name: 'check', type: 'js',
-        code: "const out = String(ctx.vars.out || '');\nctx.scratchpad.iteration = ctx.turn;\nif (/(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out)) { ctx.scratchpad.done = true; ctx.log('RALPH_DONE sentinel seen — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse { ctx.log('iteration ' + ctx.turn + ' complete; no sentinel — continuing (fresh context next turn, state in ralph/PROGRESS.md)'); }",
+        code: "const out = String(ctx.vars.out || '');\nctx.scratchpad.iteration = ctx.turn;\nif (/(^|\\n)\\s*RALPH_DONE\\s*($|\\n|$)/.test(out)) { ctx.scratchpad.done = true; ctx.log('RALPH_DONE sentinel seen — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse { ctx.log('iteration ' + ctx.turn + ' complete; no sentinel — continuing (fresh context next turn, state in ' + (ctx.vars.ralphFile || 'the run file') + ')'); }",
       },
     ],
   };
@@ -198,6 +198,13 @@
     try { return JSON.parse(localStorage.getItem(K_LOOPS) || '{}'); } catch (_) { return {}; }
   }
   function saveLoops(loops) { localStorage.setItem(K_LOOPS, JSON.stringify(loops)); }
+  // Safe in-place upgrades: overwrite a stored example ONLY when it is provably an
+  // unmodified older shipped version (so a user's own edits are never clobbered).
+  // ralph: the pre-per-run-file version hardcoded `ralph/PROGRESS.md` and had no
+  // `${ralphFile}` var → upgrade it to the per-run-isolated prompt.
+  const UPGRADES = {
+    ralph: (s) => s.includes('ralph/PROGRESS.md') && !s.includes('${ralphFile}'),
+  };
   // Seed each example once (per-name flag), so a user deleting one doesn't get
   // it resurrected on every open.
   function ensureExample() {
@@ -208,6 +215,8 @@
       if (!loops[ex.name] && !localStorage.getItem(flag)) {
         loops[ex.name] = JSON.stringify(ex, null, 2);
         changed = true;
+      } else if (loops[ex.name] && UPGRADES[ex.name]) {
+        try { if (UPGRADES[ex.name](loops[ex.name])) { loops[ex.name] = JSON.stringify(ex, null, 2); changed = true; } } catch (_) {}
       }
       localStorage.setItem(flag, '1');
     }
@@ -298,10 +307,10 @@
 
   // Local backends run the agent loop in-worker already; pass the real tools + a
   // STABLE convId so any conversation-scoped OPFS area persists across iterations.
-  async function localAgent(engine, prov, { system, user, tools, signal, onStep, onDelta }) {
+  async function localAgent(engine, prov, { system, user, tools, signal, onStep, onDelta, convId }) {
     let out = '';
     await engine.runConversation(
-      { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: tools || [], convId: 'loop-lab-ralph', signal },
+      { provider: prov, messages: [{ role: 'user', content: user }], systemPrompt: system || '', tools: tools || [], convId: convId || 'loop-lab-ralph', signal },
       (ev) => {
         if (!ev) return;
         // Live tokens (content + reasoning) so the UI streams during the agent turn.
@@ -324,7 +333,7 @@
 
   // Cloud: a compact, self-contained OpenAI-style tool loop (kept here, not routed
   // through conversations.js, to preserve Loop Lab's zero-blast-radius contract).
-  async function httpAgent({ system, user, tools, maxRounds, signal, onStep, onDelta }) {
+  async function httpAgent({ system, user, tools, maxRounds, signal, onStep, onDelta, convId }) {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
     const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
@@ -366,7 +375,7 @@
         try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
         if (onDelta) onDelta('\n  ⚙ calling ' + (tc.function && tc.function.name) + '…\n');
         let result;
-        try { result = await runTool(tc.function.name, args, signal); }
+        try { result = await runTool(tc.function.name, args, signal, convId); }
         catch (e) { result = 'Error: ' + (e.message || e); }
         if (onDelta) onDelta('  ✓ tool result (' + String(result).length + ' chars)\n');
         messages.push({ role: 'tool', tool_call_id: tc.id, content: String(result).slice(0, 8000) });
@@ -385,7 +394,7 @@
   }
 
   /* ================= tool runner (shared worker RPC) ================= */
-  function runTool(name, args, signal) {
+  function runTool(name, args, signal, convId) {
     return new Promise((resolve, reject) => {
       const sw = window._sandpieWorker;
       if (!sw) { reject(new Error('sandpie-worker not ready — reload the page.')); return; }
@@ -403,7 +412,7 @@
       const timer = setTimeout(() => finish('', 'tool timed out (120s)'), 120000);
       sw.addEventListener('message', onMsg);
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
-      sw.postMessage({ type: 'tool', id, name, args, conversation_file_name: 'loop-lab' });
+      sw.postMessage({ type: 'tool', id, name, args, conversation_file_name: convId || 'loop-lab' });
     });
   }
 
@@ -487,7 +496,7 @@
       const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
       rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
       const out = await agentTurn({
-        system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal,
+        system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal, convId: ctx.convId,
         onDelta: (c) => ui.stageStream(turnHost, st.name, c),
         onStep: (ev) => { if (ev && (ev.type === 'tool_started' || (ev.tool_calls && ev.tool_calls.length))) stats.toolCalls++; },
       });
@@ -509,7 +518,7 @@
       stats.toolCalls++;
       ui.stageStart(turnHost, st.name, 'tool ' + call.tool);
       rec('[' + st.name + ' · tool ' + call.tool + ']\nARGS:\n' + JSON.stringify(call.arguments || {}, null, 2));
-      const result = await runTool(call.tool, call.arguments || {}, ctrl.signal);
+      const result = await runTool(call.tool, call.arguments || {}, ctrl.signal, ctx.convId);
       const clipped = String(result).slice(0, st.maxChars || 4000);
       rec('RESULT (' + st.name + ', first ' + clipped.length + ' chars):\n' + clipped);
       if (st.saveAs) vars[st.saveAs] = clipped;
@@ -563,17 +572,27 @@
     const toolSchemas = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
     let stopped = false, error = null;
 
+    // Per-RUN identity so runs never collide on shared durable state (Ralph &
+    // friends). Generated ONCE and stable across this run's turns (so turn 2 reads
+    // what turn 1 wrote), but unique between runs. Exposed as ${runId} / ${ralphDir}
+    // / ${ralphFile} template vars, and as the tool convId (conversation_file_name),
+    // so file paths AND any conversation-scoped tool state are isolated per run.
+    const runId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const ralphDir = 'ralph/' + runId;
+    const ralphFile = ralphDir + '/PROGRESS.md';
+    ui.note('run ' + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
+
     try {
       for (let turn = 1; turn <= maxTurns && !stopped; turn++) {
         if (ctrl.signal.aborted) break;
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
-          task, turn,
+          task, turn, runId, ralphDir, ralphFile,
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
-        const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task };
+        const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task, convId: runId };
 
         for (const st of spec.stages) {
           if (ctrl.signal.aborted) { stopped = true; break; }
