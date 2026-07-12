@@ -152,15 +152,17 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     write_todos: {
-      description: `Maintain a visible checklist for a multi-step task as a FLAT list you update with deterministic OPS against task IDs — you do NOT resend or rewrite the whole list (that silently erased work in the past). The harness holds the list; you send operations and it returns the current state.
-WHEN: any task with 3+ non-trivial steps, or several distinct requirements. Skip for trivial work.
+      description: `Create and manage a structured task list for the current session. This helps you track progress, organize complex work, and demonstrate to the user that you understand the scope.
+Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).
+Do NOT use it for: a single straightforward task; trivial work; anything doable in under 3 steps; purely conversational requests — it only adds overhead there.
+The harness holds the list as a FLAT set of tasks with IDs; you send deterministic OPS and it returns the current state. You do NOT resend or rewrite the whole list (that silently erased work in the past).
 FIRST plan: send a full list once — {"todos":[{"content":"…"}, …]} — accepted only when there is no checklist yet.
 THEN update with ops: {"ops":[ … ]}. Each op:
-  {"op":"add","text":"Write the parser","blockedBy":["2"]?}   add a task. blockedBy = ids of tasks that produce something THIS task needs as input — a real data / artifact / decision dependency, so it literally cannot start until they finish (e.g. "compare the two traces" is blockedBy BOTH "capture trace A" and "capture trace B"). A blocked task can't be started until its blockers close. Only mark a genuine dependency: do NOT chain tasks just because you plan to do them in that order — leave independent tasks unblocked so they show as runnable in parallel.
-  {"op":"start","id":"3"}          mark in_progress (do this before you begin it). Refused while the task still has an open blocker. Several tasks may be in progress at once if nothing blocks them.
-  {"op":"complete","id":"3"}       mark done.
-  {"op":"delete","id":"3"}         drop a task you're no longer doing — it is removed from the list (and from any other task's blockedBy).
-  {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add or remove dependency edges after creation.
+  {"op":"add","text":"Run tests","activeForm":"Running tests"?,"blockedBy":["2"]?}   add a task. text = imperative title; activeForm = present-continuous form shown while it runs; blockedBy = ids of tasks that must complete before this one can start.
+  {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add/remove blockers (tasks that must complete before this one can start) after creation.
+  {"op":"start","id":"3"}   mark in_progress before you begin it. Refused while the task still has an open blocker; several tasks may be in progress at once if nothing blocks them.
+  {"op":"complete","id":"3"}   mark done — ONLY when you have FULLY accomplished it. Never complete a task if tests fail, the implementation is partial, or errors are unresolved: keep it in_progress. If you hit a blocker you can't clear, keep the task in_progress and add a new task describing what must be resolved.
+  {"op":"delete","id":"3"}   remove a task you're no longer doing (also removed from any other task's blockedBy).
 IDs are shown in the returned checklist. You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or delete them first.`,
       parameters: {
         type: 'object',
@@ -172,11 +174,11 @@ IDs are shown in the returned checklist. You can batch several ops in one call. 
               type: 'object',
               properties: {
                 op:        { type: 'string', enum: ['add', 'start', 'complete', 'delete', 'block', 'unblock'], description: 'The operation.' },
-                text:      { type: 'string', description: 'For "add": the task text (imperative).' },
-                blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": ids of tasks that must finish before this one can start (e.g. ["2","3"]).' },
-                activeForm:{ type: 'string', description: 'For "add": optional present-continuous label shown while the task is in progress (e.g. "Writing the parser").' },
+                text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests").' },
+                blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
+                activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
                 id:        { type: 'string', description: 'For start/complete/delete/block/unblock: the target task id.' },
-                by:        { type: 'array', items: { type: 'string' }, description: 'For block/unblock: the blocker task ids to add or remove.' },
+                by:        { type: 'array', items: { type: 'string' }, description: 'For block: mark tasks that must complete before this one can start. For unblock: the blocker ids to remove.' },
               },
               required: ['op'],
             },
@@ -187,10 +189,10 @@ IDs are shown in the returned checklist. You can batch several ops in one call. 
             items: {
               type: 'object',
               properties: {
-                content:   { type: 'string', description: 'Imperative description of the task.' },
+                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. "Run tests").' },
                 status:    { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
-                blockedBy: { type: 'array', items: { type: 'string' }, description: 'Ids (from this same list) that must finish before this task can start.' },
-                activeForm:{ type: 'string', description: 'Optional present-continuous label shown while in progress.' },
+                blockedBy: { type: 'array', items: { type: 'string' }, description: 'Mark tasks (from this same list) that must complete before this one can start.' },
+                activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. "Running tests").' },
               },
               required: ['content'],
             },
