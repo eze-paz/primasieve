@@ -201,19 +201,17 @@ IDs are shown in the returned checklist. You can batch several ops in one call. 
         required: [],
       },
     },
-    adversary_check: {
-      description: `Get a fast independent audit of a conclusion BEFORE you act on it. You send a claim, why you believe it, and the [rN] evidence you'd cite; a separate adversarial reviewer (which sees only your package, not the conversation) checks one thing: is this backed by tangible, produced artifacts — and if not, EXACTLY which cheap check (command, test, file read) would settle it. You get back supported / unsupported / needs_tangible plus a concrete list of what to run next.
-WHY USE IT ROUTINELY: it is much cheaper than being wrong. A needs_tangible answer hands you your next tool call for free; a supported answer is itself a tagged [rN] result you can cite as evidence when completing the todo. Diagnoses that skip this step have a long history of being confidently wrong.
-USE WHEN: you are about to close a claim-todo; about to say "the bug is X" / "the root cause is Y"; about to make a destructive or hard-to-reverse change based on a belief; or two explanations fit the data and you've picked one.
-DON'T USE for trivial facts you can check directly with one command — just run the command.`,
+    spawn_subagent: {
+      description: `Delegate a well-scoped subtask to a fresh subagent that runs its OWN short agent loop in an ISOLATED context (it does NOT see this conversation) and returns only its final result. Use this to keep your own context clean on a big task: hand off focused exploration, research, verification, or a self-contained piece of work, and get back a bounded summary you can act on.
+HOW: pick an agent by name — each is defined in sandpie/agents/<name>.md, whose file sets that subagent's system prompt, which tools it may use, its model, and its round budget. Then write a SELF-CONTAINED prompt: state the goal and include EVERY path, id, and constraint it needs, because it starts from a blank context and cannot ask you follow-up questions. It works independently and hands back a distilled result.
+WHEN: a subtask is bounded and describable in one brief — "audit this claim against the code", "find where X is implemented and how it's wired", "research Y and report". Skip it for trivial one-step things you can just do yourself. A subagent cannot spawn further subagents.`,
       parameters: {
         type: 'object',
         properties: {
-          claim:         { type: 'string', description: 'The conclusion to audit, stated precisely (one sentence if possible).' },
-          justification: { type: 'string', description: 'Why you believe it: your reasoning AND what you actually ran/observed.' },
-          evidence:      { type: 'array', items: { type: 'string' }, description: '[rN] ids of the tool results you would cite (the auditor reads their text).' },
+          agent:  { type: 'string', description: 'Name of the agent to run, matching a file sandpie/agents/<name>.md (e.g. "adversarial").' },
+          prompt: { type: 'string', description: 'The self-contained task brief. Include all context (paths, ids, goal, constraints) — the subagent sees nothing else.' },
         },
-        required: ['claim', 'justification'],
+        required: ['agent', 'prompt'],
       },
     },
     shell: {

@@ -1119,7 +1119,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=59');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=60');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1506,10 +1506,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],
-    // Auto adversarial audit on every checklist `complete`. KILL SWITCH: run
-    // localStorage.setItem('sandpie-auto-adversary','off') in the console if it
-    // ever locks a run in an audit loop — no code change / redeploy needed.
-    autoAdversary: (function () { try { return localStorage.getItem('sandpie-auto-adversary') !== 'off'; } catch (_) { return true; } })(),
     // Base URL of the local relay the `shell` tool runs commands through (run it
     // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
     shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',
@@ -1593,6 +1589,57 @@ async function readAgentEvents(body, onEvent) {
     }
   }
 }
+// Render one subagent (spawn_subagent) event into a collapsible panel nested
+// under the parent tool-call box. The panel is ephemeral — like reminders and
+// live reasoning, it is not persisted; on reload only the spawn_subagent call
+// and its final result (the tool result) remain. Keyed by subId so a fan-out of
+// several subagents each gets its own panel.
+function renderSubagentEvent(host, ev) {
+  if (!host) return;
+  const sub = ev.sub || {};
+  const esc = (x) => (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(String(x)) : String(x);
+  const subId = ev.subId || 'sub';
+  let panel = host.querySelector('.subagent-panel[data-sub-id="' + esc(subId) + '"]');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'subagent-panel open';
+    panel.dataset.subId = subId;
+    const head = document.createElement('div');
+    head.className = 'subagent-head';
+    head.textContent = '▸ subagent: ' + (ev.agent || '?');
+    head.addEventListener('click', () => panel.classList.toggle('open'));
+    const log = document.createElement('div');
+    log.className = 'subagent-log';
+    panel.append(head, log);
+    // Mount inside the parent spawn_subagent box if it exists yet, else at the
+    // end of the host (a later re-mount is not attempted — best-effort live view).
+    let anchor = null;
+    if (ev.tcId) {
+      const box = host.querySelector('.msg.tool-call[data-tc-id="' + esc(ev.tcId) + '"]');
+      anchor = box ? (box.querySelector('.tc-expanded') || box) : null;
+    }
+    (anchor || host).appendChild(panel);
+  }
+  const log = panel.querySelector('.subagent-log');
+  const head = panel.querySelector('.subagent-head');
+  const line = (cls, txt) => { const d = document.createElement('div'); d.className = 'subagent-line' + (cls ? ' ' + cls : ''); d.textContent = txt; log.appendChild(d); };
+  const argPreview = (a) => { let s = typeof a === 'string' ? a : JSON.stringify(a || {}); s = s.replace(/\s+/g, ' ').trim(); return s.length > 80 ? s.slice(0, 80) + '…' : s; };
+  const trimResult = (r) => { let s = String(r || '').replace(/^\[r\d+\]\s*/, '').replace(/\s+/g, ' ').trim(); return s.length > 300 ? s.slice(0, 300) + '…' : s; };
+  switch (sub.type) {
+    case 'subagent_begin': line('sa-brief', '⌖ ' + String(sub.prompt || '').replace(/\s+/g, ' ').trim().slice(0, 300)); break;
+    case 'message_added': {
+      const m = sub.message || {};
+      if (m.role === 'assistant' && typeof m.content === 'string' && m.content.trim()) line('sa-assistant', m.content.trim());
+      break;   // role:'tool' messages surface via tool_result below (avoid dupes)
+    }
+    case 'tool_started': { const tc = sub.tc || {}; line('sa-tool', '→ ' + ((tc.function && tc.function.name) || 'tool') + '(' + argPreview(tc.function && tc.function.arguments) + ')'); break; }
+    case 'tool_result':  line('sa-result', trimResult(sub.result)); break;
+    case 'error':        line('sa-err', 'Error: ' + (sub.message || '')); break;
+    case 'agent_done':   if (head) head.textContent = '✓ subagent: ' + (ev.agent || '?'); panel.classList.remove('open'); break;
+    default: break;   // round-cap / reminder / round_start etc. — not logged
+  }
+}
+
 function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
@@ -1601,6 +1648,7 @@ function dispatchAgentEvent(ev, renderer, host) {
     case 'message_added': return renderer.bindMessage(ev.message);
     case 'tool_started':  return renderer.markToolStarted(ev.tc);
     case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
+    case 'subagent':      return renderSubagentEvent(host, ev);
     case 'agent_done':    return;
     case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
     case 'info': {

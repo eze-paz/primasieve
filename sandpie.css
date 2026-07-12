@@ -1407,6 +1407,16 @@ ul.conv-list li.active {
   .tool-box .tool-todo-evidence { flex: none; font-size: 10px; color: var(--sp-text-dim); align-self: center; }
   /* Blocked-by dependency indicator (⛓ + blocker ids). */
   .tool-box .tool-todo-blocked { flex: none; font-size: 10px; color: var(--sp-text-dim); align-self: center; opacity: .8; }
+  /* spawn_subagent: collapsible live transcript nested under the tool-call box. */
+  .subagent-panel { margin: 0.4rem 0 0.2rem; border-left: 2px solid var(--sp-border); padding-left: 0.55rem; }
+  .subagent-head { font-size: 11px; color: var(--sp-text-dim); cursor: pointer; user-select: none; padding: 0.15rem 0; }
+  .subagent-panel:not(.open) .subagent-log { display: none; }
+  .subagent-log { display: flex; flex-direction: column; gap: 2px; margin-top: 0.2rem; }
+  .subagent-line { font: 10.5px/1.45 'JetBrains Mono', Consolas, monospace; color: var(--sp-text-dim); white-space: pre-wrap; word-break: break-word; }
+  .subagent-line.sa-assistant { color: var(--sp-text); }
+  .subagent-line.sa-tool { color: var(--sp-accent); }
+  .subagent-line.sa-brief { font-style: italic; opacity: .85; }
+  .subagent-line.sa-err { color: #f85149; }
   /* Auto-adversary audit badges: ✓ pass, ! overridden after repeated fails,
      · skipped/unavailable, ×N close rejected N times. Hover for full text. */
   .tool-box .tool-todo-audit-badge {
