@@ -199,7 +199,8 @@
           'NEW USER STEERING (just received — treat as highest-priority additions to the task; fold into the checklist and pick the next action accordingly):',
           '${steering}',
           '',
-          'If the file is still the bootstrap skeleton, the next action is to explore the codebase and draft the real checklist. Set "allDone" true ONLY if every checklist item is complete AND there are no unresolved verifier objections above.',
+          'HYPOTHESIS GATE (highest priority): if the progress file has a "## Hypotheses (validate before proceeding)" section with any entries, your next action MUST be to validate its FIRST entry with a concrete tool test — nothing else — until that section is empty. Unvalidated assumptions block ALL other work; an engineer checks the ground before building on it.',
+          'If the file is still the bootstrap skeleton, the next action is to explore the codebase and draft the real checklist. Set "allDone" true ONLY if every checklist item is complete AND there are no unresolved verifier objections above AND the "## Hypotheses" section is empty/absent.',
           'Output ONLY JSON: {"allDone": false, "next": "<one concrete action, imperative, one sentence>", "why": "<one line>"}',
         ].join('\n'),
         user: 'TASK:\n${task}\n\nJSON:',
@@ -263,6 +264,41 @@
           '- If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and remove them from that section (drop the whole section when empty).',
         ].join('\n'),
         user: 'ENVIRONMENT MEMORIES (first iteration only — promote the relevant ones as [inherited] lessons):\n${appSystemPromptFirstTurn}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nUpdate ${ralphFile} now with edit_file, then read_file it to verify your changes.',
+      },
+      {
+        // 3b. CRITIC — the assumption-checker. Runs after the scribe (edits the same
+        // file; the turn-end syncAgentScribe reconciles + structure-guards the combined
+        // result). Enforces that every recorded claim is EVIDENCED by this turn's trace,
+        // hunts contradictions across the WHOLE file, and converts unproven-but-load-
+        // bearing claims into "## Hypotheses (validate before proceeding)" tasks the
+        // planner MUST resolve next turn. A hypothesis lives exactly one turn: confirmed
+        // → promoted; unconfirmed/inconclusive → dropped. Better no memory than a bad one.
+        name: 'critic', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 16, saveAs: 'criticOut',
+        when: '!scratchpad.allDone',
+        system: [
+          'You are the CRITIC — the assumption-checker. You do NOT do task work. Your only job: enforce that everything recorded in the progress file is EVIDENCED, and surface CONTRADICTIONS. Work only with read_file/edit_file on the progress file.',
+          '',
+          'FILE: ${ralphFile}',
+          'PROGRESS AT TURN START (before this turn\'s scribe edits):',
+          '${progressBeforeScribe}',
+          '',
+          'THIS TURN\'S TOOL TRACE — the ONLY evidence that exists for new claims:',
+          '${workTrace}',
+          '',
+          'STEP 1: read_file ${ralphFile}. Lines present now but NOT in "PROGRESS AT TURN START" are THIS TURN\'S NEW CLAIMS.',
+          '',
+          'STEP 2 — gate each NEW claim (a lesson / [MEMORY] / [OBSERVED] / fact):',
+          '  • EVIDENCED — the tool trace above directly and obviously supports it → leave it.',
+          '  • NOT EVIDENCED but relevant to ANY part of the task (any checklist item, lesson, or the task itself could depend on it) → MOVE it into a "## Hypotheses (validate before proceeding)" section (create it right after "## Checklist" if absent), rewritten as a test: "- <claim> — CONFIRM by <the specific tool result that would prove it>". Strip any [MEMORY]/[inherited]/[OBSERVED] prefix — it is no longer a fact.',
+          '  • NOT EVIDENCED and irrelevant to the whole task (nothing depends on it) → delete the line. Do not spend a turn testing trivia.',
+          '',
+          'STEP 3 — CONTRADICTIONS (scan the WHOLE file, new AND old lines): if two statements cannot both be true, or if this turn\'s trace DISPROVES an existing lesson/memory, fix it — correct or delete the side the evidence refutes. If you cannot tell which is right, move the doubtful one into "## Hypotheses" as a CONFIRM test. Never leave a known contradiction standing (this is how stale memories get caught).',
+          '',
+          'STEP 4 — resolve LAST turn\'s hypotheses: for each existing "## Hypotheses" entry, check THIS turn\'s trace. Confirmed → move it back into "## Lessons" as a plain evidenced fact. Not confirmed, including inconclusive → DELETE it. A hypothesis lives exactly one turn.',
+          '',
+          'RULES: only touch factual claims/lessons/memories/hypotheses (and a check-off the trace directly contradicts). NEVER edit "## Task" or "## Next" — those are intentions, not claims. Keep exactly one of each: "# PROGRESS", "## Task", "## Checklist", "## Lessons", "## Next"; "## Hypotheses" is optional — delete the heading when it has no entries. If nothing needs changing, make no edits. After editing, read_file once more to verify structure is intact.',
+        ].join('\n'),
+        user: 'Audit this turn now: read ${ralphFile}, compare against PROGRESS AT TURN START to find new claims, gate each on the tool trace, resolve prior hypotheses, and fix contradictions with edit_file.',
       },
       {
         // 4. VERIFY — skeptic gate, only when the planner declared completion.
@@ -1265,6 +1301,10 @@
           // Ops must address the real on-disk lines, so a clamped/lossy view is unusable here.
           get progressNumbered() { return String(_curBody == null ? '' : _curBody).split('\n').map((l, i) => (i + 1) + '|' + l).join('\n'); },
           get steering() { return turnSteering; },
+          // Pre-scribe body snapshot — the CRITIC diffs the current file against this to
+          // find THIS turn's new claims. _curBody is only updated by the turn-end
+          // syncAgentScribe, so during the stages loop it is exactly the pre-scribe state.
+          get progressBeforeScribe() { return String(_curBody == null ? '' : _curBody); },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
         const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task, convId: runId };
@@ -1360,7 +1400,10 @@
       if (spec.memory && _curBody && window.SandpieMemory && SandpieMemory.save) {
         try {
           const seen = new Set();
-          for (const m of _curBody.matchAll(/^\s*-\s*\[MEMORY\]\s*(.+)$/gm)) {
+          // Never harvest from the "## Hypotheses" section — those are UNPROVEN by
+          // definition (the critic's holding pen). Only confirmed [MEMORY] lines graduate.
+          const harvestBody = _curBody.replace(/\n##\s*Hypotheses[^\n]*\n[\s\S]*?(?=\n##\s|\s*$)/i, '\n');
+          for (const m of harvestBody.matchAll(/^\s*-\s*\[MEMORY\]\s*(.+)$/gm)) {
             const fact = m[1].trim();
             if (!fact || seen.has(fact)) continue;
             seen.add(fact);
