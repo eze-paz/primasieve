@@ -2417,7 +2417,13 @@ opfs._ensurePdfjs = function () {
 opfs._renderPdfInto = async function (bytes, container) {
   await opfs._ensurePdfjs();
   const data = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
-  const doc = await window.pdfjsLib.getDocument({ data: data.slice(0) }).promise;
+  // disableFontFace: render glyphs as canvas vector paths via pdf.js's own font
+  // parser instead of the browser @font-face engine. A PDF with a broken embedded
+  // font (e.g. missing "glyf" table) gets "recovered" by pdf.js, but desktop
+  // Chrome's OTS sanitizer rejects the recovered font -> blank text; mobile is
+  // lenient. Path rendering sidesteps the browser font engine entirely, so text
+  // renders identically on every device. Safe here: we only rasterize to canvas.
+  const doc = await window.pdfjsLib.getDocument({ data: data.slice(0), disableFontFace: true }).promise;
   container.innerHTML = '';
   container.style.cssText = 'width:100%;height:70vh;overflow:auto;background:#525659;padding:8px 0;';
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
