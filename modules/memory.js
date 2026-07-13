@@ -105,19 +105,20 @@ const SandpieMemory = (function () {
     // → the model never saved the first one → memory stayed empty forever. The
     // capability + expectation must be visible from turn one.
     const lines = ['', '', '# Memory',
-      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — a fact's staleness is shown as (unverified Nd): the older, the more you should re-check before relying on it. When a tool observation CONFIRMS an aging fact still holds, re-save it with remember (same name, same content) to bump its verification date; when an observation CONTRADICTS one, update or forget it immediately. [[name]] inside a body is a link to the fact with that name slug (dangling links mark facts worth writing). As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
+      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — every fact shows its verification age (verified Nd ago); judge staleness yourself: the older, the more you should re-check before relying on it. When a tool observation CONFIRMS an aging fact still holds, re-save it with remember (same name, same content) to bump its verification date; when an observation CONTRADICTS one, update or forget it immediately. [[name]] inside a body is a link to the fact with that name slug (dangling links mark facts worth writing). As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
     if (!facts.length) {
       lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
     } else {
-      // Staleness badge: age since last_verified (falling back to created), shown
-      // only once it's old enough to matter (>14d) so fresh facts stay clean.
+      // Verification age on EVERY fact — raw signal, no threshold: the model (which
+      // knows "now" from the prompt header) judges staleness itself. Falls back to
+      // created when last_verified is absent; no date at all → "unverified".
       const now = Date.now();
       for (const f of facts) {
-        let badge = '';
+        let badge = ' · unverified';
         const ref = Date.parse(f.last_verified || f.created || '');
         if (Number.isFinite(ref)) {
-          const days = Math.floor((now - ref) / 86400000);
-          if (days > 14) badge = ` · unverified ${days}d`;
+          const days = Math.max(0, Math.floor((now - ref) / 86400000));
+          badge = days === 0 ? ' · verified today' : ` · verified ${days}d ago`;
         }
         lines.push('', `## ${f.description} _(${f.type}${badge})_`, f.body);
       }
