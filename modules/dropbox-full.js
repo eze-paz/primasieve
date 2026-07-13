@@ -1061,4 +1061,13 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
+
+  // Minimal read-only surface for sibling modules (dropbox-pulse.js): metadata
+  // listing with the user's token + a connection check. Content endpoints
+  // (download/upload) stay private to this module.
+  window.SandpieDbxFull = {
+    isConnected: () => !!tokens(),
+    listFolder, listContinue,
+    workingParent: () => localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT,
+  };
 })();

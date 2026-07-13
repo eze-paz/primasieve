@@ -2669,6 +2669,12 @@ async function buildSystemPrompt(convMessages) {
     try { content += await SandpieAugmentations.systemBlock(); }
     catch (e) { console.warn('[sandpie] augmentations block failed:', e); }
   }
+  // Opt-in ambient context: dropbox-pulse injects the user's active Dropbox
+  // projects (names + recency only). Returns '' when disabled/empty ⇒ no change.
+  if (typeof SandpiePulse !== 'undefined' && SandpiePulse.systemBlock) {
+    try { content += await SandpiePulse.systemBlock(); }
+    catch (e) { console.warn('[sandpie] pulse block failed:', e); }
+  }
   return { role: 'system', content };
 }
 
