@@ -242,7 +242,8 @@ TWO GATES, BOTH REQUIRED (to keep memory signal-dense):
   (1) durable — true beyond this conversation, and
   (2) non-derivable — not already recoverable from the code, files, git history, or a loaded skill.
 Skip task-local details, anything the repo/files already record, and low-confidence guesses.
-If a related fact may already exist, reuse its exact name to UPDATE it instead of creating a near-duplicate. Keep the body to the durable essence (1-3 sentences); include the WHY for feedback/project.`,
+If a related fact may already exist, reuse its exact name to UPDATE it instead of creating a near-duplicate. Keep the body to the durable essence (1-3 sentences); include the WHY for feedback/project.
+LINK related memories: reference other facts inside the body as [[their-name]] (the name slug, not the description). Link liberally — a [[name]] that doesn't exist yet marks something worth writing later, not an error.`,
       parameters: {
         type: 'object',
         properties: {

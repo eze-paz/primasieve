@@ -3326,7 +3326,9 @@ window.convPath = convPath;
 window.ensureActiveConv = ensureActiveConv;
 window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
-window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact };
+// buildSystemPrompt exposed so Loop Lab can inject the app's full system prompt
+// (memories, lessons, skills index) into its harness-loop agents — read-only.
+window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, buildSystemPrompt };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;

@@ -105,7 +105,7 @@ const SandpieMemory = (function () {
     // → the model never saved the first one → memory stayed empty forever. The
     // capability + expectation must be visible from turn one.
     const lines = ['', '', '# Memory',
-      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — if a fact names a file, function, or flag, verify it still exists before relying on it. As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
+      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — if a fact names a file, function, or flag, verify it still exists before relying on it. [[name]] inside a body is a link to the fact with that name slug (dangling links mark facts worth writing). As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
     if (!facts.length) {
       lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
     } else {
@@ -127,6 +127,7 @@ const SandpieMemory = (function () {
     "- DROP derivable facts: anything recoverable from source code or git history does not belong in memory.",
     "- PROTECT by type: NEVER drop a user or feedback fact merely to save space — they capture who the user is and how they want you to work. This pass may be running because the store exceeded its size budget; when you must shrink it, prune in THIS order: obsolete/stale first, then reference, then project. Drop a user or feedback fact ONLY when it is directly contradicted or clearly obsolete, never just to fit.",
     "- TIGHTEN: compress each body to the durable essence.",
+    "- LINKS: [[name]] in a body references another fact by its name slug. Preserve links whose target you keep; when you MERGE facts, retarget links that pointed at the absorbed name to the surviving name; add [[links]] between clearly related facts you keep. A dangling link (no fact with that name) is allowed — it marks a fact worth writing — but do not invent new dangling links.",
     "- Keep type one of: user, feedback, project, reference. Preserve created; set last_verified to today for any fact you keep or merge.",
     "",
     "Output ONLY a JSON array of the kept/merged facts: [{name, description, type, created, last_verified, body}, ...]. No prose, no markdown fences.",

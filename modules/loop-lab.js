@@ -185,7 +185,10 @@
         // 1. PLAN — decide the single next action from the current progress file.
         name: 'plan', type: 'llm', saveAs: 'planRaw', temperature: 0.2,
         system: [
-          'You are the PLANNER for one iteration of a long software task. You have NO memory; the progress file below is the whole state. Pick the SINGLE next concrete action — small and verifiable. Do NOT do the work; just decide it.',
+          'You are the PLANNER for one iteration of a long software task. The progress file below is the task state. Pick the SINGLE next concrete action — small and verifiable. Do NOT do the work; just decide it.',
+          '',
+          'ENVIRONMENT CONTEXT (the main assistant\'s system prompt — durable memories, lessons, skills; treat its saved facts as true unless the progress file contradicts them):',
+          '${appSystemPrompt}',
           '',
           'PROGRESS FILE:',
           '${progress}',
@@ -212,6 +215,9 @@
         when: '!scratchpad.allDone',
         system: [
           'You are the WORKER for one iteration of a long software task. Do EXACTLY the ONE action below — nothing more. Verify it actually worked (read files back, run code). Do not try to finish the whole task.',
+          '',
+          'ENVIRONMENT CONTEXT (the main assistant\'s system prompt — durable memories, lessons, skills; treat its saved facts as true unless direct observation contradicts them):',
+          '${appSystemPrompt}',
           '',
           'THE ACTION FOR THIS ITERATION:',
           '${planNext}',
@@ -262,6 +268,9 @@
         when: 'scratchpad.allDone === true && scratchpad.done !== true',
         system: [
           'You are the VERIFIER. The planner claims this software task is COMPLETE. Distrust it — find what is missing, broken, or unverified. `shell` runs the REAL machine (build/run/test there); read_file/edit_file are a separate OPFS sandbox.',
+          '',
+          'ENVIRONMENT CONTEXT (the main assistant\'s system prompt — durable memories, lessons; treat its saved facts as true unless your own checks contradict them):',
+          '${appSystemPrompt}',
           '',
           'PROGRESS FILE (the claim):',
           '${progress}',
@@ -1217,10 +1226,19 @@
         // Fold any user steering queued since the last turn into PROGRESS.md + surface
         // it to the planner this turn. Only meaningful for memory loops (needs the file).
         const turnSteering = spec.memory ? await drainSteering(turn) : '(none)';
+        // ${appSystemPrompt}: the main app's FULL system prompt (instructions, skills
+        // index, memories, lessons, recent paths) — rebuilt each turn so facts saved
+        // mid-run flow into later turns. Read-only inheritance; '' if unavailable.
+        let appSystemPrompt = '';
+        try {
+          if (window.SandpieConversations && SandpieConversations.buildSystemPrompt) {
+            appSystemPrompt = String(await SandpieConversations.buildSystemPrompt([]) || '');
+          }
+        } catch (e) { rec('[appSystemPrompt unavailable] ' + ((e && e.message) || e)); }
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
-          task, turn, runId, ralphDir, ralphFile,
+          task, turn, runId, ralphDir, ralphFile, appSystemPrompt,
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           get memory() { return renderMemoryForPrompt(scratchpad); },
           get progress() { return _progressBody; },
