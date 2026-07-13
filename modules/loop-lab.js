@@ -282,8 +282,8 @@
           'PROGRESS AT TURN START (before this turn\'s scribe edits):',
           '${progressBeforeScribe}',
           '',
-          'THIS TURN\'S TOOL TRACE — the ONLY evidence that exists for new claims:',
-          '${workTrace}',
+          'THIS TURN\'S TOOL EVIDENCE — the ONLY evidence that exists for new claims. This is tool CALLS and their RESULTS, with NO worker commentary. A tool RESULT is ground truth; a tool ARGUMENT shows only what was attempted (and may contain the worker\'s own reasoning — never treat an argument as proof, only a result):',
+          '${workTraceEvidence}',
           '',
           'STEP 1: read_file ${ralphFile}. Lines present now but NOT in "PROGRESS AT TURN START" are THIS TURN\'S NEW CLAIMS.',
           '',
@@ -999,13 +999,16 @@
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
       if (st.traceAs) {
-        // ${workTrace} — the scribe's evidence. Same content as everywhere else; the
-        // ceiling keeps the NEWEST activity (verification usually happens last) and
-        // announces itself when it trips.
-        let tr = trace.join('\n') + (out ? '\n\nFinal note: ' + out : '');
         const TRACE_CAP = 120000;
-        if (tr.length > TRACE_CAP) tr = '[workTrace truncated: run was ' + tr.length + ' chars; showing the most recent ' + TRACE_CAP + ']\n…' + tr.slice(-TRACE_CAP);
-        vars[st.traceAs] = tr || '(no tool calls made)';
+        const cap = (s) => s.length > TRACE_CAP ? '[trace truncated: run was ' + s.length + ' chars; showing the most recent ' + TRACE_CAP + ']\n…' + s.slice(-TRACE_CAP) : s;
+        const body = trace.join('\n');
+        // ${workTrace} — for the SCRIBE (the doer's recorder): tool calls + results +
+        // the worker's own Final note (its assembled assistant output).
+        vars[st.traceAs] = cap(body + (out ? '\n\nFinal note: ' + out : '')) || '(no tool calls made)';
+        // ${workTraceEvidence} — for the CRITIC: tool calls + results ONLY, NO assistant
+        // reasoning / Final note. The critic must judge claims against ground truth, not
+        // be anchored by the worker's narrative of what it thinks it proved.
+        vars[st.traceAs + 'Evidence'] = cap(body) || '(no tool calls made)';
       }
       ui.agentDone(turnHost, st.name, Date.now() - t0);
       return out;
