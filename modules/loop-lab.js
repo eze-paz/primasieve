@@ -699,17 +699,19 @@
         if (typeof o.heading !== 'string' || o.lines === undefined) throw new Error('replace_section needs {heading, lines}');
         sectionOps.push(o);
       } else if (o.op === 'replace') {
-        if (!Number.isInteger(o.line) || o.line < 1 || o.line > n) throw new Error('replace: line ' + o.line + ' out of range 1..' + n);
-        if (o.with === undefined) throw new Error('replace: missing "with"');
-        lineOps.push(o);
+        if (!Number.isInteger(o.line) || o.line < 1 || o.line > n) throw new Error('replace: line ' + o.line + ' out of range 1..' + n + ' (the file has ' + n + ' lines)');
+        const w = o.with !== undefined ? o.with : o.lines;   // lenient: accept "lines" too
+        if (w === undefined) throw new Error('replace: missing "with" (or "lines")');
+        lineOps.push({ op: 'replace', line: o.line, with: w });
       } else if (o.op === 'delete') {
         const from = Number.isInteger(o.from) ? o.from : o.line, to = Number.isInteger(o.to) ? o.to : from;
-        if (!Number.isInteger(from) || from < 1 || to < from || to > n) throw new Error('delete: range ' + from + '..' + to + ' out of range 1..' + n);
+        if (!Number.isInteger(from) || from < 1 || to < from || to > n) throw new Error('delete: range ' + from + '..' + to + ' out of range 1..' + n + ' (the file has ' + n + ' lines)');
         lineOps.push({ op: 'delete', from, to });
       } else if (o.op === 'insert_after') {
-        if (!Number.isInteger(o.line) || o.line < 0 || o.line > n) throw new Error('insert_after: line ' + o.line + ' out of range 0..' + n);
-        if (o.lines === undefined) throw new Error('insert_after: missing "lines"');
-        lineOps.push(o);
+        if (!Number.isInteger(o.line) || o.line < 0 || o.line > n) throw new Error('insert_after: line ' + o.line + ' out of range 0..' + n + ' (the file has ' + n + ' lines)');
+        const w = o.lines !== undefined ? o.lines : o.with;   // lenient: accept "with" too
+        if (w === undefined) throw new Error('insert_after: missing "lines"');
+        lineOps.push({ op: 'insert_after', line: o.line, lines: w });
       } else throw new Error('unknown op "' + o.op + '"');
     }
     // Bottom-up: sort by anchor line descending, so splices never invalidate later ops.
@@ -848,16 +850,30 @@
       let raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
       let out = raw;
       if (st.parse === 'json') {
+        // Two failure classes, retried IN-STAGE (st.retries extra attempts) so a bad
+        // scribe output never costs the whole turn's plan+work:
+        //  - invalid JSON      → retry with the IDENTICAL prompt (syntax hiccup);
+        //  - semantic rejection (ctx.validators[saveAs], e.g. delta-ops dry-run) →
+        //    retry with the SAME prompt + the rejection reason appended (at low temp
+        //    an identical prompt would just reproduce the same bad ops).
+        // Every retry is loud: trace + note. No silent fallback of any kind.
+        const check = (o) => {
+          if (o === null) return { why: 'output is not valid JSON', feedback: false };
+          const v = ctx.validators && st.saveAs && ctx.validators[st.saveAs];
+          if (v) { try { v(o); } catch (e) { return { why: 'rejected: ' + ((e && e.message) || e), feedback: true }; } }
+          return null;
+        };
         out = parseJSON(raw);
-        // st.retries: on JSON parse failure, re-ask with the IDENTICAL prompt (no mutation,
-        // no silent format fallback) up to N extra times. Every retry is loud: trace + note.
-        for (let attempt = 1; out === null && attempt <= (st.retries || 0); attempt++) {
-          ui.note('stage "' + st.name + '": invalid JSON — retry ' + attempt + '/' + st.retries + ' (identical prompt)');
-          rec('[' + st.name + ' · JSON RETRY ' + attempt + '] previous output was not valid JSON:\n' + String(raw).slice(0, 400));
-          raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
+        let bad = check(out);
+        for (let attempt = 1; bad && attempt <= (st.retries || 0); attempt++) {
+          ui.note('stage "' + st.name + '": ' + bad.why + ' — retry ' + attempt + '/' + st.retries + (bad.feedback ? ' (with rejection reason)' : ' (identical prompt)'));
+          rec('[' + st.name + ' · RETRY ' + attempt + '] ' + bad.why + '\nprevious output:\n' + String(raw).slice(0, 600));
+          const usr2 = bad.feedback ? usr + '\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED — ' + bad.why + '\nEmit a corrected {"ops":[...]} JSON now:' : usr;
+          raw = await llmOnce({ system: sys, user: usr2, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
           out = parseJSON(raw);
+          bad = check(out);
         }
-        if (out === null) throw new Error('stage "' + st.name + '": model output is not valid JSON' + (st.retries ? ' after ' + (st.retries + 1) + ' attempts' : '') + ':\n' + String(raw).slice(0, 400));
+        if (bad) throw new Error('stage "' + st.name + '": ' + bad.why + (st.retries ? ' after ' + (st.retries + 1) + ' attempts' : '') + ':\n' + String(raw).slice(0, 400));
       } else if (st.parse && st.parse.startsWith('block:')) {
         out = parseBlock(raw, st.parse.slice(6));
       }
@@ -1151,6 +1167,17 @@
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
         const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task, convId: runId };
+        // Delta-scribe dry-run validation, IN-STAGE: the scribe's {ops} batch is applied
+        // (discarded) against the exact body it saw. Bad ops trigger the stage's own
+        // retry-with-reason instead of surfacing at persist time and wasting the turn.
+        if (spec.memory && spec.memory.delta) {
+          ctx.validators = {
+            progressUpdate: (o) => {
+              if (!o || typeof o !== 'object' || !Array.isArray(o.ops)) throw new Error('expected {"ops":[...]}');
+              if (o.ops.length) applyOps(_curBody, o.ops);   // throws with the precise reason
+            },
+          };
+        }
 
         for (const st of spec.stages) {
           if (ctrl.signal.aborted) { stopped = true; break; }
