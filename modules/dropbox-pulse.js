@@ -53,17 +53,30 @@ const SandpiePulse = (function () {
 
   // ---- scan / delta ----------------------------------------------------------
   let _busy = false;
-  function _merge(entries, base) {
+  // me = the user's own Dropbox account_id. On a shared/team space every
+  // teammate's changes come through the same listing — without this filter one
+  // colleague's bulk dump would drown out the user's own activity. Files with
+  // NO modifiedBy (personal space, sharing_info absent) are the user's own.
+  function _merge(entries, base, me) {
     const map = new Map(base.map(e => [e.p.toLowerCase(), e]));
     for (const e of entries) {
       if (!e.path) continue;
       const pl = e.path.toLowerCase();
       if (e.kind === 'deleted') { map.delete(pl); continue; }
       if (e.kind !== 'file' || excluded(pl)) continue;
+      if (e.modifiedBy && me && e.modifiedBy !== me) continue;   // a teammate's change, not ours
       const m = Date.parse(e.cloudMtime || '');
       if (Number.isFinite(m)) map.set(pl, { p: e.path, m });
     }
     return [...map.values()];
+  }
+
+  async function _me() {
+    // Fail closed: without a resolved account id the teammate filter can't work,
+    // and an unfiltered scan silently rebuilds the "everyone's files" bug.
+    const id = await SandpieDbxFull.accountId();
+    if (!id) throw new Error('could not resolve Dropbox account id');
+    return id;
   }
 
   async function fullScan(status) {
@@ -72,8 +85,9 @@ const SandpiePulse = (function () {
     _busy = true;
     try {
       status && status('Scanning Dropbox metadata… (one-time; large accounts take a while)');
+      const me = await _me();
       const r = await SandpieDbxFull.listFolder(root() || '/', { recursive: true });
-      const kept = saveRecent(_merge(r.entries, []));
+      const kept = saveRecent(_merge(r.entries, [], me));
       localStorage.setItem(K_CURSOR, r.cursor);
       status && status('');
       return { ok: true, scanned: r.entries.length, kept: kept.length };
@@ -90,8 +104,9 @@ const SandpiePulse = (function () {
     if (!window.SandpieDbxFull || !SandpieDbxFull.isConnected()) return { ok: false, reason: 'Dropbox not connected' };
     _busy = true;
     try {
+      const me = await _me();
       const r = await SandpieDbxFull.listContinue(cursor);
-      const kept = saveRecent(_merge(r.entries, recent()));
+      const kept = saveRecent(_merge(r.entries, recent(), me));
       localStorage.setItem(K_CURSOR, r.cursor);
       return { ok: true, delta: r.entries.length, kept: kept.length };
     } catch (e) {
