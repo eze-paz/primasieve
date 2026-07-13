@@ -1390,7 +1390,7 @@
     #loopLabOverlay details.ll-stage { margin:0.2rem 0; }
     #loopLabOverlay details.ll-stage summary { cursor:pointer; font-size:0.74rem; color:var(--sp-text,#e6edf3); }
     #loopLabOverlay details.ll-stage pre { margin:0.3rem 0 0.2rem; padding:0.4rem; background:var(--sp-panel,#161b22);
-      border-radius:6px; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow-y:auto; font-size:0.72rem; }
+      border-radius:6px; white-space:pre-wrap; word-break:break-word; font-size:0.72rem; }
     #loopLabOverlay .ll-stage.err summary { color:#f85149; }
     #loopLabOverlay .ll-pad { flex:0 0 34%; display:flex; flex-direction:column; border-top:1px solid var(--sp-border,#30363d); min-height:0; }
     #loopLabOverlay .ll-pad-title { padding:0.35rem 0.6rem; font-size:0.72rem; font-weight:600; color:var(--sp-text-dim,#8b949e); display:flex; justify-content:space-between; }
@@ -1399,12 +1399,12 @@
     #loopLabOverlay .ll-note { color:var(--sp-text-dim,#8b949e); font-size:0.72rem; padding:0.15rem 0.2rem; }
     #loopLabOverlay .ll-live-body { display:flex; flex-direction:column; gap:0.25rem; }
     #loopLabOverlay pre.ll-text { margin:0.2rem 0; padding:0.4rem; background:var(--sp-panel,#161b22); border-radius:6px;
-      white-space:pre-wrap; word-break:break-word; max-height:260px; overflow-y:auto; font-size:0.72rem; }
+      white-space:pre-wrap; word-break:break-word; font-size:0.72rem; }
     #loopLabOverlay details.ll-tc summary { color:var(--sp-accent,#58a6ff); }
     #loopLabOverlay details.ll-tr summary { color:var(--sp-text-dim,#8b949e); }
     #loopLabOverlay details.ll-tc pre, #loopLabOverlay details.ll-tr pre { margin:0.25rem 0; padding:0.4rem;
       background:var(--sp-panel,#161b22); border-radius:6px; white-space:pre-wrap; word-break:break-word;
-      max-height:240px; overflow-y:auto; font-size:0.72rem; }
+      font-size:0.72rem; }
     #loopLabOverlay .ll-tr-img { margin:0.25rem 0; }
     #loopLabOverlay .ll-tr-cap { font-size:0.7rem; color:var(--sp-text-dim,#8b949e); margin-bottom:0.15rem; word-break:break-all; }
     #loopLabOverlay img.ll-img { max-width:100%; max-height:320px; border:1px solid var(--sp-border,#30363d); border-radius:6px; display:block; }
