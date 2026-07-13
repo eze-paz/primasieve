@@ -472,7 +472,62 @@
     }
   }
 
-  async function httpOnce({ system, user, temperature, maxTokens, signal }) {
+  // Consume one streaming (SSE) /chat/completions response. STREAMING is what keeps
+  // the connection warm: with stream:false the socket sits idle for the whole (often
+  // multi-minute) generation and an intermediary proxy/CDN kills it with a 504. With
+  // SSE, tokens flow continuously so the idle-timeout never fires. Assembles the
+  // assistant message from delta fragments — content, reasoning (streamed to onDelta
+  // for live display, NOT returned), and tool_calls (index-keyed argument fragments
+  // stitched back together). Returns { content, tool_calls }.
+  async function consumeChatStream(res, onDelta, signal) {
+    if (!res.body || !res.body.getReader) {
+      // Fallback: some proxies buffer and return a whole JSON body despite stream:true.
+      const data = await res.json();
+      if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
+      const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+      const c = contentToText(msg.content || '');
+      if (c && onDelta) onDelta(c);
+      return { content: c, tool_calls: msg.tool_calls || [] };
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', content = '';
+    const tc = [];   // tool_calls assembled by index
+    for (;;) {
+      if (signal && signal.aborted) { try { reader.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line || !line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        let j; try { j = JSON.parse(payload); } catch (_) { continue; }
+        if (j.error) throw new Error(String(j.error.message || JSON.stringify(j.error)));
+        const d = j.choices && j.choices[0] && j.choices[0].delta;
+        if (!d) continue;
+        if (d.reasoning_content) { if (onDelta) onDelta(d.reasoning_content); }
+        if (d.reasoning) { if (onDelta) onDelta(d.reasoning); }
+        if (d.content) { content += d.content; if (onDelta) onDelta(d.content); }
+        if (Array.isArray(d.tool_calls)) {
+          for (const p of d.tool_calls) {
+            const i = p.index || 0;
+            const slot = tc[i] || (tc[i] = { id: '', type: 'function', function: { name: '', arguments: '' } });
+            if (p.id) slot.id = p.id;
+            if (p.function) {
+              if (p.function.name) slot.function.name += p.function.name;
+              if (p.function.arguments) slot.function.arguments += p.function.arguments;
+            }
+          }
+        }
+      }
+    }
+    return { content, tool_calls: tc.filter(Boolean) };
+  }
+
+  function _llmUrlAuth() {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
     const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
@@ -480,24 +535,27 @@
     let url = endpoint + '/chat/completions';
     const proxy = window.$('proxyUrl') ? window.$('proxyUrl').value : '';
     if (proxy) { try { const u = new URL(proxy); u.searchParams.set('url', url); url = u.href; } catch (_) {} }
+    const auth = 'Bearer ' + ((window.$('apiKey') ? window.$('apiKey').value : '') || '');
+    return { url, model, auth };
+  }
 
+  async function httpOnce({ system, user, temperature, maxTokens, signal, onDelta }) {
+    const { url, model, auth } = _llmUrlAuth();
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: user });
     const body = {
-      model, messages, stream: false,
+      model, messages, stream: true, stream_options: { include_usage: true },
       max_tokens: maxTokens || 4096,
       temperature: temperature != null ? temperature : 0.7,
     };
     const res = await fetchRetry(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((window.$('apiKey') ? window.$('apiKey').value : '') || '') },
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
       body: JSON.stringify(body), signal,
     }, signal);
-    const data = await res.json();
-    if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
-    const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
-    return stripThink(contentToText(msg.content || ''));
+    const { content } = await consumeChatStream(res, onDelta, signal);
+    return stripThink(contentToText(content || ''));
   }
 
   async function llmOnce(opts) {
@@ -506,9 +564,7 @@
     if (prov && prov.type === 'litertlm' && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       return localOnce(SandpieLiteRTLM, prov, opts);
     }
-    const out = await httpOnce(opts);
-    if (opts && opts.onDelta && out) { try { opts.onDelta(out); } catch (_) {} }   // cloud is non-streaming → show the full text once
-    return out;
+    return await httpOnce(opts);   // streams live via opts.onDelta — no post-hoc single dump
   }
 
   /* ================= agent adapter (full tool-calling turn) ================= */
@@ -561,15 +617,7 @@
   }
 
   async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId, maxResultBytes }) {
-    const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
-    const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
-    if (!endpoint || !model) throw new Error('No provider endpoint or model selected.');
-    let url = endpoint + '/chat/completions';
-    const proxy = window.$('proxyUrl') ? window.$('proxyUrl').value : '';
-    if (proxy) { try { const u = new URL(proxy); u.searchParams.set('url', url); url = u.href; } catch (_) {} }
-    const auth = 'Bearer ' + ((window.$('apiKey') ? window.$('apiKey').value : '') || '');
-
+    const { url, model, auth } = _llmUrlAuth();
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
     messages.push({ role: 'user', content: user });
@@ -579,7 +627,7 @@
     for (let r = 0; r < rounds; r++) {
       if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
       const body = {
-        model, messages, stream: false, max_tokens: 4096,
+        model, messages, stream: true, stream_options: { include_usage: true }, max_tokens: 4096,
         tools: hasTools ? tools : undefined,
         tool_choice: hasTools ? 'auto' : undefined,
       };
@@ -588,12 +636,13 @@
         headers: { 'Content-Type': 'application/json', Authorization: auth },
         body: JSON.stringify(body), signal,
       }, signal);
-      const data = await res.json();
-      if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
-      const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+      // STREAMING keeps the connection warm (see consumeChatStream) — the fix for the
+      // multi-minute-then-504 stall. Reassembles content + tool_calls from the stream.
+      const { content, tool_calls } = await consumeChatStream(res, onDelta, signal);
+      const msg = { role: 'assistant', content: content || '', tool_calls: tool_calls.length ? tool_calls : undefined };
       messages.push(msg);
-      if (msg.content) { text += contentToText(msg.content) + '\n'; if (onDelta) onDelta(contentToText(msg.content) + '\n'); }
-      const calls = msg.tool_calls || [];
+      if (content) text += contentToText(content) + '\n';
+      const calls = tool_calls || [];
       if (!calls.length) break;   // no more tools → turn complete
       for (const tc of calls) {
         const nm = tc.function && tc.function.name;
@@ -1681,6 +1730,8 @@
           live = document.createElement('details');
           live.className = 'll-stage ll-live';
           live.open = !this._collapseLive;   // agent stages start collapsed (expand manually)
+          live.dataset.name = name;
+          live.dataset.chars = '0';
           const sum = document.createElement('summary');
           sum.textContent = '▶ ' + name + ' (generating…)';
           const bodyEl = document.createElement('div');
@@ -1690,11 +1741,19 @@
         }
         return live.querySelector('.ll-live-body');
       },
-      // Streamed text tokens → the trailing text <pre> (a new one starts after any
-      // tool block, so text and tool activity stay in order).
+      // Streamed tokens (content + reasoning) → the trailing text <pre>, and bump the
+      // live token counter in the summary so a long generation visibly progresses
+      // ("▶ name (generating… 3400)") instead of a frozen "(generating…)".
       stageStream(turnHost, name, chunk) {
         if (!chunk) return;
         const body = this._liveBody(turnHost, name);
+        const live = turnHost.querySelector('details.ll-live');
+        if (live && live.classList.contains('ll-live')) {
+          const chars = (+(live.dataset.chars || 0)) + chunk.length;
+          live.dataset.chars = chars;
+          const sum = live.querySelector('summary');
+          if (sum) sum.textContent = '▶ ' + (live.dataset.name || name) + ' (generating… ' + Math.ceil(chars / 4) + ')';
+        }
         let pre = body.lastElementChild;
         if (!pre || !pre.classList || !pre.classList.contains('ll-text')) {
           pre = document.createElement('pre'); pre.className = 'll-text'; body.appendChild(pre);
@@ -1757,7 +1816,8 @@
         if (!live) { this.stageDone(turnHost, name, '(no output)', ms); return; }
         live.classList.remove('ll-live');
         const sum = live.querySelector('summary');
-        if (sum) sum.textContent = '✔ ' + name + ' · ' + (ms / 1000).toFixed(1) + 's';
+        const toks = Math.ceil((+(live.dataset.chars || 0)) / 4);
+        if (sum) sum.textContent = '✔ ' + name + ' · ' + (ms / 1000).toFixed(1) + 's' + (toks ? ' · ' + toks + ' tok' : '');
       },
       _finish(turnHost, name, cls, summaryText, body) {
         const pending = turnHost.querySelector('[data-pending]');
