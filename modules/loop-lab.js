@@ -173,7 +173,7 @@
   const RALPH = {
     name: 'ralph',
     maxTurns: 0,   // 0 = unlimited: run until the verifier passes (stopWhen) or the user stops
-    memory: { file: '${ralphFile}' },
+    memory: { file: '${ralphFile}', clamp: 60000 },   // max chars of PROGRESS.md injected per turn (safety ceiling; raise/lower here)
     scratchpad: { iteration: 0, done: false, allDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
     stages: [
@@ -908,7 +908,12 @@
     // persist can't be skipped (the repeated failure we saw). At turn start we read +
     // inject it (${progress}); after the turn we write the scribe's output ourselves.
     let _curBody = null, _progressBody = '', _stale = 0;
-    const PROGRESS_CLAMP = 8000;
+    // Max chars of the progress file injected into PLAN/WORK/VERIFY prompts. This is a
+    // SAFETY CEILING, not the working size — a well-pruned progress file is a few KB and
+    // never trips it. Large by default; override per-loop via spec.memory.clamp (0/absent
+    // = default). clampForPrompt is structure-aware, so even when it fires the live plan
+    // (## Checklist / ## Next) is preserved whole and only stale prose is dropped.
+    const PROGRESS_CLAMP = (spec.memory && Number(spec.memory.clamp) > 0) ? Number(spec.memory.clamp) : 60000;
     // read_file returns "<path> — N lines, X bytes" then "n\tline" rows; strip both.
     function stripReadFile(res) {
       const s = String(res || '');
@@ -917,10 +922,35 @@
       if (lines.length && /—\s*\d+\s*lines?,/.test(lines[0])) lines.shift();
       return lines.map(l => l.replace(/^\s*\d+\t/, '')).join('\n');
     }
+    // Structure-aware clamp. Under the ceiling → return the file verbatim (the normal
+    // case). Over it → NEVER drop "## Checklist" or "## Next" (the live plan; dropping
+    // them silently loses work). Keep those whole, spend the remaining budget on the rest
+    // (Task/Steering/Lessons) in original order, truncating from the end. Falls back to a
+    // plain middle-clip only if there are no ## sections or the must-keep ones alone
+    // exceed the budget.
     function clampForPrompt(body) {
-      return body.length > PROGRESS_CLAMP
-        ? body.slice(0, PROGRESS_CLAMP - 1500) + '\n…[middle clipped — file is ' + body.length + ' chars]…\n' + body.slice(-1400)
-        : body;
+      if (body.length <= PROGRESS_CLAMP) return body;
+      const plainClip = (s) => s.slice(0, PROGRESS_CLAMP - 1500) + '\n…[clipped — file is ' + body.length + ' chars]…\n' + s.slice(-1400);
+      const heads = []; const re = /^##\s+.*$/gm; let m;
+      while ((m = re.exec(body))) heads.push(m.index);
+      if (!heads.length) return plainClip(body);
+      const pre = body.slice(0, heads[0]);
+      const secs = heads.map((start, i) => {
+        const text = body.slice(start, i + 1 < heads.length ? heads[i + 1] : body.length);
+        const title = ((text.match(/^##\s+(.*)$/m) || [, ''])[1] || '').toLowerCase();
+        return { keep: /checklist|next/.test(title), text };
+      });
+      const keptLen = secs.reduce((n, s) => n + (s.keep ? s.text.length : 0), 0);
+      let budget = PROGRESS_CLAMP - pre.length - keptLen;
+      if (budget < 0) return plainClip(pre + secs.filter(s => s.keep).map(s => s.text).join(''));
+      let out = pre;
+      for (const s of secs) {
+        if (s.keep) { out += s.text; continue; }
+        if (budget <= 0) continue;
+        if (s.text.length <= budget) { out += s.text; budget -= s.text.length; }
+        else { out += s.text.slice(0, Math.max(0, budget - 40)) + '\n…[section clipped]…\n'; budget = 0; }
+      }
+      return out;
     }
     // START of turn: read the file (bootstrap if missing) and stage it for ${progress}.
     async function loadProgress() {
