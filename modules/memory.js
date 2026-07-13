@@ -194,13 +194,24 @@ const SandpieMemory = (function () {
     }
   }
 
-  // Called on the pre-send path (from buildSystemPrompt): prune only when the
-  // injected block would exceed the budget. Cheap no-op otherwise.
+  // Called on the pre-send path (from buildSystemPrompt). Consolidation now runs
+  // whenever the store GREW since the last pass (a new fact is the moment dupes
+  // and contradictions appear — refine immediately, don't wait for the budget),
+  // and still as a backstop when over the token budget. First sighting of the
+  // store only records the baseline (no consolidate-on-app-start churn).
+  let _lastCount = -1;   // fact count after the last consolidation (or first sight)
   async function maybeConsolidate() {
     if (_consolidating || !isEnabled()) return;
     const facts = await list();
-    if (facts.length < 2 || _usedTokens(facts) <= threshold()) return;
-    try { await consolidate(facts); } catch (e) { console.warn('[sandpie] memory consolidation failed:', e); }
+    if (facts.length < 2) { _lastCount = facts.length; return; }
+    if (_lastCount < 0) { _lastCount = facts.length; if (_usedTokens(facts) <= threshold()) return; }
+    const grew = facts.length > _lastCount;
+    const over = _usedTokens(facts) > threshold();
+    if (!grew && !over) return;
+    try {
+      const r = await consolidate(facts);
+      _lastCount = (r && r.ok) ? r.after : facts.length;   // on failure: don't re-hammer every send
+    } catch (e) { _lastCount = facts.length; console.warn('[sandpie] memory consolidation failed:', e); }
   }
 
   // ---- commands -------------------------------------------------------------
