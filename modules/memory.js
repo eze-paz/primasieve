@@ -374,6 +374,24 @@ const SandpieMemory = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, notify, init };
+  // Page-side fact writer for automatic capture (the harvester, Loop Lab's
+  // run-end [MEMORY] harvest). Same file format + dirty-sync as tool_remember;
+  // same-name save = update (bumps last_verified — saving IS verifying).
+  async function save({ name, description, type, body }) {
+    if (!isEnabled() || !body || !String(body).trim()) return { ok: false, reason: 'disabled or empty' };
+    const slug = _slug(name || description || 'note');
+    const t = VALID_TYPES.includes(type) ? type : 'reference';
+    const today = _today();
+    let created = today;
+    try { const old = (await list()).find(f => f.name === slug); if (old && old.created) created = old.created; } catch (_) {}
+    const desc = String(description || String(body).split(/\r?\n/)[0]).replace(/\s*\n\s*/g, ' ').trim().slice(0, 160);
+    const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${created}\nlast_verified: ${today}\n---\n` + String(body).trim() + '\n';
+    const fpath = DIR + '/' + slug + '.md';
+    await opfs.write(fpath, text);
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath); } catch (_) {}
+    return { ok: true, name: slug };
+  }
+
+  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, notify, init, save };
 })();
 window.SandpieMemory = SandpieMemory;

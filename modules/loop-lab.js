@@ -256,11 +256,13 @@
           '- Check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified this iteration; add new checklist items and concrete facts/paths discovered.',
           '- EVIDENCE RULE: record ONLY facts observed in the worker trace (paths, addresses, filenames, test results). Never record a worker assertion it did not verify with a tool.',
           '- NO DUPLICATES: if a lesson already covers a point, refine that line in place; if a new finding contradicts an old line, replace the old line — never leave both.',
+          '- [MEMORY] TAG: when a verified finding is DURABLE and ENVIRONMENT-LEVEL — a tool quirk, where something lives, a protocol/semantics fact, a diagnosis signature that any future unrelated run would need (NOT task progress) — record it in "## Lessons" prefixed "[MEMORY] ". At run end the harness promotes those lines into permanent cross-run memory. Use sparingly; most lessons are task-local.',
+          '- ON THE FIRST ITERATION ONLY: from the ENVIRONMENT MEMORIES in the user message, copy the ones plausibly relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines (verbatim essence, one line each). Later iterations rely on these.',
           '- ALWAYS rewrite the "## Next" section body to the single most important next action (ONE paragraph only).',
           '- Keep the file lean — collapse stale detail. Do not invent progress.',
           '- If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and remove them from that section (drop the whole section when empty).',
         ].join('\n'),
-        user: 'PLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nUpdate ${ralphFile} now with edit_file, then read_file it to verify your changes.',
+        user: 'ENVIRONMENT MEMORIES (first iteration only — promote the relevant ones as [inherited] lessons):\n${appSystemPromptFirstTurn}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nUpdate ${ralphFile} now with edit_file, then read_file it to verify your changes.',
       },
       {
         // 4. VERIFY — skeptic gate, only when the planner declared completion.
@@ -1227,18 +1229,23 @@
         // it to the planner this turn. Only meaningful for memory loops (needs the file).
         const turnSteering = spec.memory ? await drainSteering(turn) : '(none)';
         // ${appSystemPrompt}: the main app's FULL system prompt (instructions, skills
-        // index, memories, lessons, recent paths) — rebuilt each turn so facts saved
-        // mid-run flow into later turns. Read-only inheritance; '' if unavailable.
+        // index, memories, recent paths) — rebuilt each turn so facts saved mid-run
+        // flow into later turns. Read-only inheritance; '' if unavailable.
+        // memory.inherit: 'always' (default) keeps it every turn; 'first-turn' sends
+        // it only on turn 1 (small-context models) — the scribe's [inherited]
+        // promotion into ## Lessons is then the only carrier of relevant facts.
         let appSystemPrompt = '';
         try {
           if (window.SandpieConversations && SandpieConversations.buildSystemPrompt) {
             appSystemPrompt = String(await SandpieConversations.buildSystemPrompt([]) || '');
           }
         } catch (e) { rec('[appSystemPrompt unavailable] ' + ((e && e.message) || e)); }
+        if (spec.memory && spec.memory.inherit === 'first-turn' && turn > 1) appSystemPrompt = '';
+        const appSystemPromptFirstTurn = (turn === 1) ? appSystemPrompt : '(provided on turn 1 — see [inherited] lessons in the progress file)';
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
-          task, turn, runId, ralphDir, ralphFile, appSystemPrompt,
+          task, turn, runId, ralphDir, ralphFile, appSystemPrompt, appSystemPromptFirstTurn,
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           get memory() { return renderMemoryForPrompt(scratchpad); },
           get progress() { return _progressBody; },
@@ -1334,6 +1341,23 @@
       else if (error) ui.note('Loop error: ' + (error.message || error));
       else if (!stopped && maxTurns !== Infinity) ui.note('Max turns (' + maxTurns + ') reached.');
       else ui.note('Loop finished.');
+      // MEMORY HARVEST — on every run end (pass, stall, error, user Stop): promote
+      // "[MEMORY] <fact>" lines from ## Lessons in PROGRESS.md into the app's
+      // permanent memory store (SandpieMemory.save; same-name = update). Pure OPFS
+      // writes, no LLM — safe even on abort. Loud per fact.
+      if (spec.memory && _curBody && window.SandpieMemory && SandpieMemory.save) {
+        try {
+          const seen = new Set();
+          for (const m of _curBody.matchAll(/^\s*-\s*\[MEMORY\]\s*(.+)$/gm)) {
+            const fact = m[1].trim();
+            if (!fact || seen.has(fact)) continue;
+            seen.add(fact);
+            const name = 'ralph-' + fact.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 6).join('-');
+            const r = await SandpieMemory.save({ name, description: fact.slice(0, 140), type: 'project', body: fact + '\n\n(harvested from ralph run ' + runId + ')' });
+            if (r && r.ok) ui.note('🧠 memory harvested: ' + r.name);
+          }
+        } catch (e) { ui.note('memory harvest failed: ' + ((e && e.message) || e)); }
+      }
     }
     return scratchpad;
   }

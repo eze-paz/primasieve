@@ -95,15 +95,20 @@
     // advance its cursor.
     const tools = meta.toolCalls.slice(fromIdx).map(tc => {
       const p = tc.args?.path || tc.args?.src || tc.args?.cwd || '';
-      return '- ' + tc.name + (p ? ' "' + p + '"' : '');
+      // Include the OUTCOME snippet: without it a distiller can only pattern-match
+      // action shapes (the root cause of the old formulaic/hallucinated lessons).
+      return '- ' + tc.name + (p ? ' "' + p + '"' : '') + (tc.result ? '  → ' + tc.result : '');
     });
     return { project, files, tools, total: meta.toolCalls.length };
   }
 
   // Called at each TURN END (conversations.js gates on touchUpdated). Distills
   // lessons from the tool calls accrued since the last run, deduped against both
-  // existing lessons AND saved memory facts, and advances the cursor so the same
-  // turns are never re-examined. Silent + guarded — never breaks the turn.
+  // saved memory facts, and advances the cursor so the same turns are never
+  // re-examined. This is the AUTOMATIC capture channel: the old lesson distiller's
+  // reliable trigger, retargeted to write memory-grade facts (remember's gates +
+  // an evidence rule) into the ONE store via SandpieMemory.save — consolidation
+  // (which runs on every add) then refines them. Silent + guarded.
   async function distillLessons(convId) {
     const meta = convMeta.get(convId);
     if (!meta) return;
@@ -112,15 +117,13 @@
     if (total - cursor < MIN_NEW_TOOLCALLS) return;   // not enough new activity this turn
     if (localStorage.getItem('sandpie-lessons-enabled') === 'false') return;
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return;
+    if (typeof window === 'undefined' || !window.SandpieMemory || !SandpieMemory.save || !SandpieMemory.isEnabled()) return;
 
     const summary = summarizeSession(convId, cursor);
     if (!summary || !summary.tools.length) return;
     const project = summary.project;
-    const lessonPath = MEMORY_DIR + '/' + project + '.lessons.md';
-    let existing = '';
-    try { existing = await opfs.read(lessonPath) || ''; } catch (_) {}
 
-    // Dedup against saved memory facts too, so a lesson never restates something
+    // Dedup against saved memory facts, so a harvest never restates something
     // the remember tool already captured.
     let memHint = '';
     try {
@@ -131,60 +134,43 @@
     } catch (_) {}
 
     const prompt = [
-      'You are a lesson distiller. From the RECENT actions below, extract 0-3 NEW lessons not already covered by the existing lessons or memory.',
+      "You are sandpie's memory harvester. From the RECENT actions + their outcomes below, extract 0-2 facts worth saving to durable memory. Usually the answer is ZERO — output [] unless something clearly passes ALL gates:",
       '',
-      'A lesson is:',
-      '- SPECIFIC to this project (not generic coding advice)',
-      '- AVOID something that failed, or WHEN to do something that worked',
-      '- 1 sentence, actionable',
-      '- Do NOT state the obvious, and do NOT repeat anything already listed below',
+      '  (1) DURABLE — true beyond this session (an environment gotcha, a tool quirk, where something lives, a verified diagnosis), not task progress or one-off state.',
+      '  (2) NON-DERIVABLE — not recoverable from the code, files, or git history.',
+      '  (3) EVIDENCED — the fact must be directly visible in an action OUTCOME below (the text after "→"). Never infer process rules from action sequences alone; never invent context that is not in the evidence.',
       '',
       'Project: ' + project,
-      'Files: ' + (summary.files.join(', ') || 'none'),
-      'Recent actions:',
+      'Recent actions (→ outcome):',
       summary.tools.join('\n'),
-      existing ? '\nExisting lessons:\n' + existing : '',
       memHint,
       '',
-      'Output ONLY markdown bullets (max 3 new ones), or nothing if there is no genuinely new lesson. No prose, no fences.',
+      'Each fact: {"name":"<short-kebab-slug>","description":"<one line>","type":"user|feedback|project|reference","body":"<1-3 sentences, the durable essence; cite the key evidence; link related memories as [[their-name]]>"}',
+      'Output ONLY a JSON array (usually []). No prose, no fences.',
     ].join('\n');
 
     const emit = (t) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(t, { convId }); } catch (_) {} };
     emit('lessons:start');
     try {
-      const out = await SandpieProviders.complete({ system: 'You extract lessons from coding sessions.', user: prompt, maxTokens: 512 });
-      // Advance the cursor on a SUCCESSFUL call even if it yielded no bullets —
-      // those turns simply had nothing to learn; don't re-examine them. On an
+      const out = await SandpieProviders.complete({ system: 'You extract durable memory facts from coding-session evidence. Precision over recall: an empty array beats a speculative fact.', user: prompt, maxTokens: 1024 });
+      // Advance the cursor on a SUCCESSFUL call even when nothing was harvested —
+      // those turns simply had nothing durable; don't re-examine them. On an
       // exception we leave the cursor put so the next turn retries.
       _distillCursor.set(convId, total);
-      if (!out || !out.trim()) return;
-      const bullets = out.trim().split('\n').filter(l => l.trim().startsWith('- '));
-      if (!bullets.length) return;
-      const block = bullets.join('\n') + '\n';
-      const updated = existing + (existing ? '\n' : '') + block;
-      const maxLessons = Number(localStorage.getItem('sandpie-lessons-max') || '20');
-      const all = updated.trim().split('\n').filter(l => l.trim().startsWith('- '));
-      const trimmed = all.slice(-maxLessons).join('\n') + '\n';
-      await opfs.write(lessonPath, trimmed);
-      try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', lessonPath); } catch (_) {}
-      console.log('[Aug] Distilled', bullets.length, 'lessons for', project, '(tools', cursor, '→', total + ')');
+      let arr = null;
+      try { arr = JSON.parse(out); } catch (_) { const a = out.indexOf('['), b = out.lastIndexOf(']'); if (a >= 0 && b > a) { try { arr = JSON.parse(out.slice(a, b + 1)); } catch (_) {} } }
+      if (!Array.isArray(arr) || !arr.length) return;
+      let saved = 0;
+      for (const f of arr.slice(0, 2)) {
+        if (!f || !f.body) continue;
+        try { const r = await SandpieMemory.save(f); if (r && r.ok) saved++; } catch (_) {}
+      }
+      if (saved) console.log('[Aug] Harvested', saved, 'memory fact(s) for', project, '(tools', cursor, '→', total + ')');
     } catch (e) {
-      console.warn('[Aug] Lesson distillation failed:', e);
+      console.warn('[Aug] Memory harvest failed:', e);
     } finally {
       emit('lessons:end');
     }
-  }
-
-  async function lessonSystemBlock(projectHint) {
-    const project = projectHint || 'global';
-    try {
-      const raw = await opfs.read(MEMORY_DIR + '/' + project + '.lessons.md');
-      if (!raw) return '';
-      const maxLessons = Number(localStorage.getItem('sandpie-lessons-max') || '20');
-      const bullets = raw.trim().split('\n').filter(l => l.trim().startsWith('- ')).slice(0, maxLessons);
-      if (!bullets.length) return '';
-      return '\n\n## Project lessons\n\n' + bullets.join('\n') + '\n\nThese are verified patterns specific to this project. Trust them.\n';
-    } catch (_) { return ''; }
   }
 
   /* ── tool-call logging (called from conversations.js dispatch loop) ── */
@@ -240,7 +226,14 @@
   function logToolResult(convId, result) {
     const meta = getMeta(convId);
     const last = meta.toolCalls[meta.toolCalls.length - 1];
-    if (last) last.phase = 'done';
+    if (last) {
+      last.phase = 'done';
+      // Keep an OUTCOME snippet — the memory harvester needs evidence (what
+      // actually happened), not just action shapes. Head+tail: errors and test
+      // verdicts usually live at one of the two ends.
+      const s = String(result || '').replace(/\s+/g, ' ').trim();
+      last.result = s.length > 300 ? s.slice(0, 200) + ' … ' + s.slice(-80) : s;
+    }
     // Scan for artifact/file creation patterns
     const text = String(result || '');
     const created = text.match(/Created:\s*([^\s]+)/);
@@ -274,11 +267,9 @@
         block += '\n\n## Recent paths\n\nFiles touched recently in this project:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
       }
     }
-    // Lessons
-    if (localStorage.getItem('sandpie-lessons-enabled') !== 'false') {
-      const lessons = await lessonSystemBlock(project);
-      if (lessons) block += lessons;
-    }
+    // (Project-lessons injection removed: the distiller now harvests memory facts
+    // into the ONE store — memory.js systemBlock injects them. Old *.lessons.md
+    // files are inert; memory.js already skips them.)
     return block;
   }
 /* ── public API ───────────────────────────────────────────────────── */
@@ -287,7 +278,6 @@
     trackRecentPath,
     getRecentPaths,
     distillLessons,
-    lessonSystemBlock,
     getConvMeta: getMeta,
     logToolStarted,
     logToolResult,
