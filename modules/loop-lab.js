@@ -172,7 +172,7 @@
      has none); cloud honors it, local backends cap at their internal 8. ---- */
   const RALPH = {
     name: 'ralph',
-    maxTurns: 40,
+    maxTurns: 0,   // 0 = unlimited: run until the verifier passes (stopWhen) or the user stops
     memory: { file: '${ralphFile}' },
     scratchpad: { iteration: 0, done: false, allDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
@@ -188,6 +188,9 @@
           '',
           'HARNESS NOTES (recent paths, verifier objections):',
           '${memory}',
+          '',
+          'NEW USER STEERING (just received — treat as highest-priority additions to the task; fold into the checklist and pick the next action accordingly):',
+          '${steering}',
           '',
           'If the file is still the bootstrap skeleton, the next action is to explore the codebase and draft the real checklist. Set "allDone" true ONLY if every checklist item is complete AND there are no unresolved verifier objections above.',
           'Output ONLY JSON: {"allDone": false, "next": "<one concrete action, imperative, one sentence>", "why": "<one line>"}',
@@ -229,8 +232,9 @@
         system: [
           'You are the SCRIBE. Produce the UPDATED progress file for a long software task, so the next fresh-context iteration inherits an accurate plan. Output ONLY the file content (Markdown) — no commentary, no code fences.',
           '',
-          'Keep the structure: "# PROGRESS", "## Task", "## Checklist" (- [ ] / - [x]), "## Lessons", "## Next".',
+          'Keep the structure: "# PROGRESS", "## Task", "## Checklist" (- [ ] / - [x]), "## Steering (user directives)" (only if present), "## Lessons", "## Next".',
           'Update it truthfully from what the worker just did: check off ONLY genuinely-completed+verified items, add concrete facts/paths and any lesson/gotcha, and rewrite "## Next" with the single most important next action. Preserve everything still relevant; do not invent progress.',
+          'If a "## Steering (user directives)" section is present, fold those directives into the checklist / next action; once a directive is fully addressed you may drop it from that section.',
         ].join('\n'),
         user: 'CURRENT PROGRESS FILE:\n${progress}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nOutput the full updated progress file now:',
       },
@@ -291,6 +295,17 @@
       }
       localStorage.setItem(flag, '1');
     }
+    // One-time, non-destructive: lift the OLD shipped ralph cap (maxTurns 40) to
+    // unlimited (0). Only rewrites that exact old-default token, so any deliberate
+    // user value (or prompt edits) are left untouched.
+    const RALPH_UNCAP = 'sandpie:looplab:ralph-uncap';
+    if (!localStorage.getItem(RALPH_UNCAP)) {
+      if (loops.ralph && /"maxTurns"\s*:\s*40\b/.test(loops.ralph)) {
+        loops.ralph = loops.ralph.replace(/"maxTurns"\s*:\s*40\b/, '"maxTurns": 0');
+        changed = true;
+      }
+      localStorage.setItem(RALPH_UNCAP, '1');
+    }
     if (changed) saveLoops(loops);
     return loops;
   }
@@ -330,6 +345,61 @@
     return stripThink(out);
   }
 
+  // Set to ui.note during a run so deep network retries can report progress to the UI.
+  let _notify = null;
+
+  // Live steering: the user can queue directives while a memory loop runs. They are
+  // drained at the NEXT turn boundary, folded into PROGRESS.md (durable + resume-safe),
+  // and surfaced to the PLANNER (the meta-cognition layer) as fresh high-priority input.
+  // Fire-and-forget: once in PROGRESS.md the planner/scribe own them.
+  let _steerQueue = [];
+  let _onSteerChange = null;   // UI hook so the "queued (n)" badge updates after a drain
+
+  // Transient = worth retrying forever (server/gateway/rate-limit). 5xx covers the
+  // 504 Gateway Timeouts that used to abort a turn and masquerade as a stall.
+  function isTransientStatus(s) { return s === 408 || s === 425 || s === 429 || (s >= 500 && s <= 599); }
+
+  // Abortable sleep (rejects with AbortError if the run is stopped mid-wait).
+  function sleepAbortable(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal && signal.aborted) { reject(new DOMException('aborted', 'AbortError')); return; }
+      const t = setTimeout(() => { cleanup(); resolve(); }, ms);
+      const onAbort = () => { cleanup(); reject(new DOMException('aborted', 'AbortError')); };
+      function cleanup() { clearTimeout(t); if (signal) { try { signal.removeEventListener('abort', onAbort); } catch (_) {} } }
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  // fetch that RETRIES transient failures (network errors, 5xx incl. 504, 429, …)
+  // indefinitely with exponential backoff + jitter, like a normal Sandpie completion.
+  // Only genuinely non-retryable responses (4xx like 400/401/403/404) throw. Abort
+  // (user Stop) always throws AbortError immediately.
+  async function fetchRetry(url, init, signal) {
+    let attempt = 0;
+    for (;;) {
+      if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
+      let res = null, netErr = null;
+      try { res = await fetch(url, init); }
+      catch (e) { if (e && e.name === 'AbortError') throw e; netErr = e; }
+      if (!netErr && res && res.ok) return res;
+
+      let reason;
+      if (netErr) reason = 'network error (' + ((netErr && netErr.message) || netErr) + ')';
+      else if (isTransientStatus(res.status)) reason = 'HTTP ' + res.status;
+      else {
+        // Genuine, non-retryable (bad request / auth / not-found). Surface to caller.
+        const bodyText = await res.text().catch(() => '');
+        throw new Error('HTTP ' + res.status + ' — ' + bodyText.slice(0, 300));
+      }
+      attempt++;
+      // 1s,2s,4s,8s,16s,30s(cap) with ±50% jitter; retries forever until ok or abort.
+      const base = Math.min(30000, 1000 * Math.pow(2, Math.min(attempt - 1, 5)));
+      const wait = Math.floor(base * (0.5 + Math.random() * 0.5));
+      if (_notify) { try { _notify('⏳ ' + reason + ' — retrying (#' + attempt + ') in ' + (wait / 1000).toFixed(1) + 's'); } catch (_) {} }
+      await sleepAbortable(wait, signal);
+    }
+  }
+
   async function httpOnce({ system, user, temperature, maxTokens, signal }) {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
@@ -347,12 +417,11 @@
       max_tokens: maxTokens || 4096,
       temperature: temperature != null ? temperature : 0.7,
     };
-    const res = await fetch(url, {
+    const res = await fetchRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((window.$('apiKey') ? window.$('apiKey').value : '') || '') },
       body: JSON.stringify(body), signal,
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + (await res.text().catch(() => '')).slice(0, 300));
+    }, signal);
     const data = await res.json();
     if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
     const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
@@ -430,12 +499,11 @@
         tools: hasTools ? tools : undefined,
         tool_choice: hasTools ? 'auto' : undefined,
       };
-      const res = await fetch(url, {
+      const res = await fetchRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: auth },
         body: JSON.stringify(body), signal,
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' — ' + (await res.text().catch(() => '')).slice(0, 300));
+      }, signal);
       const data = await res.json();
       if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
       const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
@@ -563,6 +631,25 @@
       '',
     ].join('\n');
   }
+  // Fold queued user directives into PROGRESS.md under a "## Steering (user directives)"
+  // section (created just after ## Task for salience, appended to if it already exists).
+  // Returns the new body; the loop persists it with the guaranteed edit_file write.
+  function injectSteering(body, directives) {
+    const heading = '## Steering (user directives)';
+    const bullets = directives.map(d => '- ' + String(d).replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+    if (!bullets) return body;
+    if (body.includes(heading)) {
+      return body.replace(heading + '\n', heading + '\n' + bullets + '\n');
+    }
+    const block = heading + '\n' + bullets + '\n\n';
+    const taskIdx = body.indexOf('## Task');
+    if (taskIdx >= 0) {
+      const nextIdx = body.indexOf('\n## ', taskIdx + 1);
+      const at = nextIdx >= 0 ? nextIdx + 1 : body.length;
+      return body.slice(0, at) + block + body.slice(at);
+    }
+    return body.replace(/\s*$/, '') + '\n\n' + block;
+  }
 
   /* ================= run engine ================= */
   let _run = null;          // { ctrl, stats }
@@ -618,6 +705,31 @@
     const tail = _transcript.join('\n\n');
     return (head ? head + tail : tail) || '(no run yet)';
   }
+
+  // Enumerate the offloaded Ralph runs (OPFS ralph/<runId>/PROGRESS.md) for the resume
+  // dropdown: newest first, each with its Task line and last-modified time.
+  async function listRalphRuns() {
+    const out = [];
+    try {
+      const root = await navigator.storage.getDirectory();
+      let ralph;
+      try { ralph = await root.getDirectoryHandle('ralph'); } catch (_) { return out; }
+      for await (const [name, handle] of ralph.entries()) {
+        if (!handle || handle.kind !== 'directory') continue;
+        try {
+          const fh = await handle.getFileHandle('PROGRESS.md');
+          const f = await fh.getFile();
+          const txt = await f.text();
+          const m = txt.match(/##\s*Task\s*\r?\n+([^\r\n]+)/i);
+          const done = /^\s*-\s*\[[xX]\]/m.test(txt) && !/-\s*\[ \]/.test(txt);
+          out.push({ runId: name, mtime: f.lastModified || 0, task: (m && m[1] || '').trim(), bytes: f.size, done });
+        } catch (_) { /* dir without a PROGRESS.md — skip */ }
+      }
+    } catch (_) {}
+    out.sort((a, b) => b.mtime - a.mtime);
+    return out;
+  }
+  function escHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
   function validateStage(st, inner) {
     if (!st || !st.name) return 'Every stage needs a "name".';
@@ -755,14 +867,22 @@
     throw new Error('Unknown stage type: ' + st.type);
   }
 
-  async function runLoop(spec, task, ui) {
+  async function runLoop(spec, task, ui, opts) {
+    opts = opts || {};
     const ctrl = new AbortController();
     const stats = { llmCalls: 0, toolCalls: 0, started: Date.now() };
     _run = { ctrl, stats };
     ui.setRunning(true);
+    // Let deep network retries (fetchRetry) surface backoff notices in the trace.
+    _notify = (m) => { try { ui.note(m); } catch (_) {} };
+
+    _steerQueue = [];   // fresh run: drop any directives queued before it started
+    if (_onSteerChange) { try { _onSteerChange(); } catch (_) {} }
 
     const scratchpad = JSON.parse(JSON.stringify(spec.scratchpad || {}));
-    const maxTurns = Math.max(1, Math.min(100, spec.maxTurns || 10));
+    // No hard ceiling: honor the spec's maxTurns verbatim; treat missing / 0 / negative
+    // as UNLIMITED (Infinity) — the run ends via stopWhen, a genuine stall, or user Stop.
+    const maxTurns = (spec.maxTurns && spec.maxTurns > 0) ? spec.maxTurns : Infinity;
     const toolSchemas = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
     let stopped = false, error = null;
 
@@ -771,10 +891,13 @@
     // what turn 1 wrote), but unique between runs. Exposed as ${runId} / ${ralphDir}
     // / ${ralphFile} template vars, and as the tool convId (conversation_file_name),
     // so file paths AND any conversation-scoped tool state are isolated per run.
-    const runId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    // RESUME: reuse a prior run's id (so loadProgress reads its existing PROGRESS.md
+    // instead of bootstrapping a fresh one). Otherwise mint a new isolated id.
+    const resuming = !!(opts.resumeRunId && /^[\w.-]+$/.test(opts.resumeRunId));
+    const runId = resuming ? opts.resumeRunId : ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
     const ralphDir = 'ralph/' + runId;
     const ralphFile = ralphDir + '/PROGRESS.md';
-    ui.note('run ' + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
+    ui.note((resuming ? 'RESUMING run ' : 'run ') + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
 
     // Offload the transcript to OPFS so RAM stays bounded on long runs (see rec/flush).
     _transcriptPath = 'looplab-runs/' + runId + '.log';
@@ -812,6 +935,26 @@
       _curBody = body;
       _progressBody = clampForPrompt(body);
     }
+    // START of turn (after loadProgress): drain any queued user steering, fold it into
+    // PROGRESS.md via the guaranteed edit_file write (only the harness writes _curBody,
+    // so old_str always matches — no race with the scribe persist), and return the fresh
+    // directives so the PLANNER prompt can call them out this turn. Fire-and-forget after.
+    async function drainSteering(turn) {
+      if (!_steerQueue.length) return '(none)';
+      const directives = _steerQueue.splice(0, _steerQueue.length);
+      if (_onSteerChange) { try { _onSteerChange(); } catch (_) {} }
+      const updated = injectSteering(_curBody, directives);
+      try {
+        await runTool('edit_file', { path: ralphFile, old_str: _curBody, new_str: updated }, ctrl.signal, runId);
+        _curBody = updated; _progressBody = clampForPrompt(updated);
+        ui.note('🧭 steering folded into PROGRESS.md (' + directives.length + ') for turn ' + turn);
+      } catch (e) {
+        // Write failed — still surface to the planner this turn (durability lost only).
+        ui.note('steering write failed (still injected this turn): ' + ((e && e.message) || e));
+      }
+      rec('[steering] ' + directives.join(' | '));
+      return directives.map(d => '- ' + d).join('\n');
+    }
     // END of turn: write the scribe's new content ourselves (edit_file with old_str =
     // the exact current body, which only the harness writes → guaranteed match).
     // Returns false when the run has stalled (3 turns producing no progress update).
@@ -832,12 +975,17 @@
       return true;
     }
 
+    let errStreak = 0;   // consecutive turns abandoned by a thrown stage error (infra/crash)
     try {
       for (let turn = 1; turn <= maxTurns && !stopped; turn++) {
         if (ctrl.signal.aborted) break;
+        let turnErrored = false;
         // ENFORCED protocol (spec.memory): read + inject the progress file BEFORE the
         // turn; the scribe stage's output is persisted by the harness AFTER (below).
         if (spec.memory) await loadProgress();
+        // Fold any user steering queued since the last turn into PROGRESS.md + surface
+        // it to the planner this turn. Only meaningful for memory loops (needs the file).
+        const turnSteering = spec.memory ? await drainSteering(turn) : '(none)';
         rec('--- TURN ' + turn + ' ---');
         const turnHost = ui.addTurn(turn);
         const vars = {
@@ -845,6 +993,7 @@
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           get memory() { return renderMemoryForPrompt(scratchpad); },
           get progress() { return _progressBody; },
+          get steering() { return turnSteering; },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
         const ctx = { vars, scratchpad, turnHost, ui, ctrl, stats, turn, task, convId: runId };
@@ -866,6 +1015,7 @@
             ui.stageError(turnHost, st.name, e.message || String(e));
             rec('[' + st.name + ' · ERROR]\n' + (e.message || String(e)));
             scratchpad.last_error = String(e.message || e).slice(0, 500);
+            turnErrored = true;   // infra/crash — NOT a model stall; back off & retry the turn
             break;   // abandon this turn's remaining stages, let the next turn recover
           }
           ui.setScratchpad(scratchpad);
@@ -873,9 +1023,24 @@
         }
         rec('SCRATCHPAD after turn ' + turn + ':\n' + JSON.stringify(scratchpad, null, 2));
 
+        // A turn abandoned by a THROWN stage error is infrastructure/crash, NOT the
+        // model stalling: don't touch the stall counter (so a transient failure can
+        // never trip STALLED) — just back off (escalating, capped) and retry the turn.
+        // Transient network errors are already retried inside fetchRetry; this covers
+        // anything else that slipped through (worker RPC, non-retryable HTTP, parse).
+        if (turnErrored && !ctrl.signal.aborted && !stopped) {
+          errStreak++;
+          const wait = Math.min(30000, 1000 * Math.pow(2, Math.min(errStreak - 1, 5)));
+          ui.note('turn ' + turn + ' errored (infra/crash, streak ' + errStreak + ') — retrying in ' + (wait / 1000).toFixed(1) + 's (not counted as a stall)');
+          await flushTranscript();
+          try { await sleepAbortable(wait, ctrl.signal); } catch (_) { break; }
+          continue;
+        }
+        errStreak = 0;
+
         // GUARANTEED persist: the harness writes the scribe's updated progress file
-        // (vars.progressUpdate). Can't be skipped by the model. Stall-stop after 3
-        // turns with no update produced.
+        // (vars.progressUpdate). Can't be skipped by the model. Stall-stop only after 3
+        // clean turns where the model genuinely produced no progress update.
         if (spec.memory && !ctrl.signal.aborted && !stopped) {
           const alive = await persistProgress(vars.progressUpdate, turn);
           if (!alive) { ui.note('STALLED: 3 turns without a progress update — stopping (rerun to resume from ' + ralphFile + ').'); break; }
@@ -896,12 +1061,13 @@
       error = e;
     } finally {
       _run = null;
+      _notify = null;
       ui.setRunning(false);
       ui.setScratchpad(scratchpad);
       ui.setStats(stats, true);
       if (ctrl.signal.aborted) ui.note('Stopped by user.');
       else if (error) ui.note('Loop error: ' + (error.message || error));
-      else if (!stopped) ui.note('Max turns (' + maxTurns + ') reached.');
+      else if (!stopped && maxTurns !== Infinity) ui.note('Max turns (' + maxTurns + ') reached.');
       else ui.note('Loop finished.');
     }
     return scratchpad;
@@ -909,6 +1075,7 @@
 
   /* ================= UI (own overlay, own DOM) ================= */
   let _panel = null;
+  let _refreshResume = null;   // set by buildPanel so open() can rescan offloaded runs
 
   const CSS = `
     #loopLabOverlay { position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center; }
@@ -985,9 +1152,18 @@
             <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js | foreach (inner sees \${item} \${itemIndex}) · per-stage when: skip-guard (JS expr) · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
             <textarea id="llTask" class="ll-task" placeholder="Task for the loop, e.g. 'List the files in /, read the most interesting one, record 3 facts about it.'"></textarea>
             <div class="ll-row">
+              <select id="llResume" style="flex:1;padding:0.35rem;" title="Resume a previous Ralph run from its offloaded PROGRESS.md (memory loops only)"><option value="">↻ Resume: (fresh run)</option></select>
+              <button class="ll-btn" id="llResumeRefresh" title="Rescan offloaded Ralph runs">⟳</button>
+            </div>
+            <div class="ll-row">
               <button class="ll-btn primary" id="llRun">▶ Run</button>
               <button class="ll-btn danger" id="llStop" style="display:none;">■ Stop</button>
               <span id="llStatus" class="ll-note"></span>
+            </div>
+            <div class="ll-row">
+              <input type="text" id="llSteer" placeholder="🧭 Steer the running loop — folded into the planner next iteration (Enter to send)" style="flex:1;padding:0.35rem;" disabled />
+              <button class="ll-btn" id="llSteerSend" title="Queue this directive for the next planning step (memory loops only)" disabled>➤ Steer</button>
+              <span id="llSteerN" class="ll-note"></span>
             </div>
           </div>
           <div class="ll-right">
@@ -1027,6 +1203,47 @@
       }
     }
     $id('llSelect').onchange = loadSelected;
+
+    /* resume dropdown — offloaded Ralph runs (OPFS ralph/<runId>/PROGRESS.md) */
+    async function refreshResume() {
+      const sel = $id('llResume'); if (!sel) return;
+      const keep = sel.value;
+      let runs = [];
+      try { runs = await listRalphRuns(); } catch (_) {}
+      sel.innerHTML = '<option value="">↻ Resume: (fresh run)</option>' + runs.map((r) => {
+        const when = r.mtime ? new Date(r.mtime).toLocaleString() : '?';
+        const label = r.runId + (r.task ? ' — ' + r.task.slice(0, 48) : '') + (r.done ? ' ✅' : '') + ' · ' + when;
+        return '<option value="' + escHtml(r.runId) + '">' + escHtml(label) + '</option>';
+      }).join('');
+      if (keep && sel.querySelector('option[value="' + (window.CSS && CSS.escape ? CSS.escape(keep) : keep) + '"]')) sel.value = keep;
+    }
+    // Picking a run pre-fills the task box from that run's PROGRESS.md (if empty) so the
+    // resumed prompts carry the original task.
+    $id('llResume').onchange = async () => {
+      const id = $id('llResume').value;
+      if (!id) return;
+      if ($id('llTask').value.trim()) return;
+      try {
+        const txt = await opfsReadText('ralph/' + id + '/PROGRESS.md');
+        const m = txt.match(/##\s*Task\s*\r?\n+([\s\S]*?)(?:\r?\n\s*##|$)/i);
+        if (m && m[1].trim()) $id('llTask').value = m[1].trim();
+      } catch (_) {}
+    };
+    $id('llResumeRefresh').onclick = () => refreshResume();
+
+    /* live steering — queue a directive for the running loop's next planning step */
+    function updateSteerN() { const n = _steerQueue.length; const el = $id('llSteerN'); if (el) el.textContent = n ? ('queued ' + n) : ''; }
+    _onSteerChange = updateSteerN;
+    function sendSteer() {
+      const inp = $id('llSteer'); const t = (inp.value || '').trim();
+      if (!t) return;
+      if (!_run) { $id('llStatus').textContent = 'Steering applies to a running loop.'; return; }
+      _steerQueue.push(t); inp.value = ''; updateSteerN();
+      ui.note('🧭 steering queued (applies next iteration): ' + t.slice(0, 100));
+    }
+    $id('llSteerSend').onclick = sendSteer;
+    $id('llSteer').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendSteer(); } });
+
     $id('llNew').onclick = () => {
       const name = prompt('Loop name:', 'my-loop-' + Object.keys(loadLoops()).length);
       if (!name) return;
@@ -1236,6 +1453,10 @@
         $id('llStop').style.display = on ? '' : 'none';
         $id('llStatus').textContent = on ? 'Running…' : '';
         $id('llSpec').disabled = on;
+        // Steering is only meaningful while a loop is live.
+        $id('llSteer').disabled = !on;
+        $id('llSteerSend').disabled = !on;
+        if (!on) { _steerQueue = []; const el = $id('llSteerN'); if (el) el.textContent = ''; }
       },
     };
 
@@ -1255,12 +1476,15 @@
       if (err) { $id('llStatus').textContent = err; return; }
       const task = $id('llTask').value.trim();
       if (!task) { $id('llStatus').textContent = 'Enter a task first.'; return; }
+      const resumeRunId = ($id('llResume') && $id('llResume').value) || '';
+      if (resumeRunId && !spec.memory) { $id('llStatus').textContent = 'Resume only applies to memory loops (e.g. ralph).'; return; }
       localStorage.setItem(K_TASK, task);
       $id('llTrace').innerHTML = '';
       ui._atBottom = true; ui._pruned = false;   // fresh run: follow the bottom again
-      _transcript = ['=== LOOP "' + (spec.name || '?') + '" · ' + new Date().toISOString() + ' ===', 'TASK:\n' + task];
+      _transcript = ['=== LOOP "' + (spec.name || '?') + '" · ' + new Date().toISOString() + (resumeRunId ? ' · RESUME ' + resumeRunId : '') + ' ===', 'TASK:\n' + task];
       ui.setScratchpad(spec.scratchpad || {});
-      try { await runLoop(spec, task, ui); } catch (e) { ui.note('Fatal: ' + (e.message || e)); ui.setRunning(false); }
+      try { await runLoop(spec, task, ui, { resumeRunId }); } catch (e) { ui.note('Fatal: ' + (e.message || e)); ui.setRunning(false); }
+      refreshResume();   // a just-finished run may be new/updated in the offload list
     };
     $id('llStop').onclick = () => { if (_run) _run.ctrl.abort(); };
     $id('llCopy').onclick = async () => {
@@ -1287,6 +1511,8 @@
 
     $id('llTask').value = localStorage.getItem(K_TASK) || '';
     refreshList();
+    _refreshResume = refreshResume;   // let open() rescan offloaded runs on each open
+    refreshResume();
     return root;
   }
 
@@ -1296,6 +1522,7 @@
     const label = prov ? ((prov.type || 'api') + ' · ' + (prov.model || prov.endpoint || '?')) : 'no provider';
     p.querySelector('#llProvider').textContent = label;
     p.style.display = 'flex';
+    if (_refreshResume) { try { _refreshResume(); } catch (_) {} }
   }
   function close() {
     if (!_panel) return;
@@ -1315,5 +1542,14 @@
     });
   }
 
-  window.SandpieLoopLab = { open, close, runLoop, fullTranscript, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
+  // steer(text): queue a directive for a running memory loop's next planning step.
+  function steer(text) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    if (!_run) return false;
+    _steerQueue.push(t);
+    if (_onSteerChange) { try { _onSteerChange(); } catch (_) {} }
+    return true;
+  }
+  window.SandpieLoopLab = { open, close, runLoop, steer, fullTranscript, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
 })();
