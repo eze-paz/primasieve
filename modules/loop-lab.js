@@ -240,7 +240,7 @@
         // only), so it SEES the result of every edit and can verify its own intent.
         // The harness guards afterwards: no change → stale; new structural damage →
         // reverted to the pre-turn body (syncAgentScribe).
-        name: 'scribe', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 24, saveAs: 'scribeOut',
+        name: 'scribe', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 24, saveAs: 'scribeOut', reasoning: 'off',
         when: '!scratchpad.allDone',
         system: [
           'You are the SCRIBE for a long software task. UPDATE THE PROGRESS FILE by calling edit_file on it directly. The next fresh-context iteration inherits this file as its whole state — record truthfully.',
@@ -273,7 +273,7 @@
         // bearing claims into "## Hypotheses (validate before proceeding)" tasks the
         // planner MUST resolve next turn. A hypothesis lives exactly one turn: confirmed
         // → promoted; unconfirmed/inconclusive → dropped. Better no memory than a bad one.
-        name: 'critic', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 6, saveAs: 'criticOut',
+        name: 'critic', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 6, saveAs: 'criticOut', reasoning: 'off',
         when: '!scratchpad.allDone',
         system: [
           'You are the CRITIC — a fast PROVENANCE checker. You do a shallow yes/no check, nothing more.',
@@ -541,7 +541,24 @@
     return { url, model, auth };
   }
 
-  async function httpOnce({ system, user, temperature, maxTokens, signal, onDelta }) {
+  // Per-stage reasoning control. A mechanical stage (scribe recording facts, critic
+  // doing a yes/no provenance check) does not need chain-of-thought, and paying for
+  // 12k thinking tokens there is waste. Endpoints disagree on the knob, so set the
+  // common ones and let the provider honor whichever it supports (harmless if ignored):
+  //   'off'  → no thinking (vLLM/Kimi enable_thinking:false + reasoning_effort:minimal)
+  //   'low'|'medium'|'high' → OpenAI-style reasoning_effort
+  function applyReasoning(body, r) {
+    if (!r) return;
+    if (r === 'off' || r === 'none') {
+      body.chat_template_kwargs = Object.assign({}, body.chat_template_kwargs, { enable_thinking: false });
+      body.reasoning_effort = 'minimal';
+      body.enable_thinking = false;   // some gateways read it top-level
+    } else {
+      body.reasoning_effort = r;
+    }
+  }
+
+  async function httpOnce({ system, user, temperature, maxTokens, signal, onDelta, reasoning }) {
     const { url, model, auth } = _llmUrlAuth();
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
@@ -551,6 +568,7 @@
       max_tokens: maxTokens || 4096,
       temperature: temperature != null ? temperature : 0.7,
     };
+    applyReasoning(body, reasoning);
     const res = await fetchRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: auth },
@@ -618,7 +636,7 @@
     return new TextDecoder().decode(bytes.slice(0, cap)) + '\n\n[truncated: tool result exceeded ' + Math.round(cap / 1024) + 'kB]';
   }
 
-  async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId, maxResultBytes }) {
+  async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId, maxResultBytes, reasoning }) {
     const { url, model, auth } = _llmUrlAuth();
     const messages = [];
     if (system) messages.push({ role: 'system', content: system });
@@ -633,6 +651,7 @@
         tools: hasTools ? tools : undefined,
         tool_choice: hasTools ? 'auto' : undefined,
       };
+      applyReasoning(body, reasoning);
       const res = await fetchRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: auth },
@@ -983,7 +1002,7 @@
       ui.stageStart(turnHost, st.name, 'llm');
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
       rec('[' + st.name + ' · llm]\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
-      let raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
+      let raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, reasoning: st.reasoning, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
       let out = raw;
       if (st.parse === 'json') {
         // Two failure classes, retried IN-STAGE (st.retries extra attempts) so a bad
@@ -1005,7 +1024,7 @@
           ui.note('stage "' + st.name + '": ' + bad.why + ' — retry ' + attempt + '/' + st.retries + (bad.feedback ? ' (with rejection reason)' : ' (identical prompt)'));
           rec('[' + st.name + ' · RETRY ' + attempt + '] ' + bad.why + '\nprevious output:\n' + String(raw).slice(0, 600));
           const usr2 = bad.feedback ? usr + '\n\nYOUR PREVIOUS ATTEMPT WAS REJECTED — ' + bad.why + '\nEmit a corrected {"ops":[...]} JSON now:' : usr;
-          raw = await llmOnce({ system: sys, user: usr2, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
+          raw = await llmOnce({ system: sys, user: usr2, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, reasoning: st.reasoning, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
           out = parseJSON(raw);
           bad = check(out);
         }
@@ -1035,7 +1054,7 @@
       const trace = [];   // record of what the agent DID (its final text is often empty)
       const out = await agentTurn({
         system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal, convId: ctx.convId,
-        maxResultBytes: st.maxResultBytes,
+        maxResultBytes: st.maxResultBytes, reasoning: st.reasoning,
         onDelta: (c) => ui.stageStream(turnHost, st.name, c),
         onEvent: (e) => {
           if (!e) return;
