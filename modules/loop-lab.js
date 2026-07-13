@@ -688,7 +688,14 @@
       };
       const onMsg = (e) => { const r = e.data || {}; if (r.id === id && r.type === 'tool_result') finish(r.result || ''); };
       const onAbort = () => finish('', 'Aborted');
-      const timer = setTimeout(() => finish('', 'tool timed out (120s)'), 120000);
+      // RPC backstop must never be SHORTER than the tool's own deadline, or a legit
+      // long command (shell/run_python honour a per-call timeout up to 300s) gets
+      // guillotined here at 120s while it keeps running on the relay — the "stall".
+      // Base 120s for fast tools; for a tool carrying its own timeout, allow it + 30s slack.
+      let ms = 120000;
+      const reqT = args && Number(args.timeout);
+      if (isFinite(reqT) && reqT > 0) ms = Math.min(330000, Math.max(ms, (reqT + 30) * 1000));
+      const timer = setTimeout(() => finish('', 'tool RPC timed out after ' + Math.round(ms / 1000) + 's (it may still be running on the relay — for long jobs background it: `setsid <cmd> >/tmp/job.log 2>&1 & echo $!` then poll the log)'), ms);
       sw.addEventListener('message', onMsg);
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
       sw.postMessage({ type: 'tool', id, name, args, conversation_file_name: convId || 'loop-lab' });
