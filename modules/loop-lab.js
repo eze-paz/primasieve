@@ -485,7 +485,19 @@
 
   // Cloud: a compact, self-contained OpenAI-style tool loop (kept here, not routed
   // through conversations.js, to preserve Loop Lab's zero-blast-radius contract).
-  async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId }) {
+  // Byte-measured tool-result truncation with a LOUD marker (mirrors the main app's
+  // sandpie-worker truncateToolResult). Never silent: the model, the UI, the scribe's
+  // trace and the transcript all receive this same string, marker included.
+  const DEFAULT_TOOL_RESULT_BYTES = 30 * 1024;
+  function truncateToolResult(result, maxBytes) {
+    const cap = maxBytes || DEFAULT_TOOL_RESULT_BYTES;
+    const s = String(result == null ? '' : result);
+    const bytes = new TextEncoder().encode(s);
+    if (bytes.length <= cap) return s;
+    return new TextDecoder().decode(bytes.slice(0, cap)) + '\n\n[truncated: tool result exceeded ' + Math.round(cap / 1024) + 'kB]';
+  }
+
+  async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId, maxResultBytes }) {
     const prov = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const endpoint = (window.$('endpoint') ? window.$('endpoint').value : '').replace(/\/$/, '');
     const model = (window.$('model') ? window.$('model').value : (prov && prov.model) || '');
@@ -528,8 +540,12 @@
         let result;
         try { result = await runTool(nm, args, signal, convId); }
         catch (e) { result = 'Error: ' + (e.message || e); }
+        // TRANSPARENCY CONTRACT: truncate ONCE here (byte-measured, loud marker),
+        // then feed the IDENTICAL string to the model, the UI, the trace and the
+        // transcript — no path ever sees more or less than any other.
+        result = truncateToolResult(result, maxResultBytes);
         if (onEvent) onEvent({ kind: 'toolResult', name: nm, result });
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: String(result).slice(0, 8000) });
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
       }
     }
     return stripThink(text);
@@ -858,32 +874,42 @@
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
       const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
       rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
-      const trace = [];   // compact record of what the agent DID (its final text is often empty)
+      // TRANSPARENCY CONTRACT: e.result arrives already truncated-with-marker (once,
+      // at the source in httpAgent). The UI, the transcript (rec) and the scribe's
+      // trace all record that IDENTICAL string — never a shorter re-slice of it.
+      const trace = [];   // record of what the agent DID (its final text is often empty)
       const out = await agentTurn({
         system: sys, user: usr, tools, maxRounds: st.maxRounds, signal: ctrl.signal, convId: ctx.convId,
+        maxResultBytes: st.maxResultBytes,
         onDelta: (c) => ui.stageStream(turnHost, st.name, c),
         onEvent: (e) => {
           if (!e) return;
           if (e.kind === 'toolCall') {
             stats.toolCalls++;
             ui.agentToolCall(turnHost, e.name, e.args);
-            rec('[tool call] ' + e.name + ' ' + (typeof e.args === 'string' ? e.args : JSON.stringify(e.args)));
-            if (Array.isArray(scratchpad.recentPaths)) for (const p of extractPaths(e.args)) pushMru(scratchpad.recentPaths, p, 15);
             const as = typeof e.args === 'string' ? e.args : JSON.stringify(e.args || {});
-            trace.push('· ' + e.name + ' ' + as.slice(0, 2000));
+            rec('[tool call] ' + e.name + ' ' + as);
+            if (Array.isArray(scratchpad.recentPaths)) for (const p of extractPaths(e.args)) pushMru(scratchpad.recentPaths, p, 15);
+            trace.push('· ' + e.name + ' ' + as);
           } else if (e.kind === 'toolResult') {
             ui.agentToolResult(turnHost, e.name, e.result);
             const r = String(e.result == null ? '' : e.result);
-            rec('[tool result] ' + (e.name || '') + ': ' + r.slice(0, 4000));
-            if (trace.length) trace[trace.length - 1] += '  → ' + r.replace(/\s+/g, ' ').slice(0, 2000);
+            rec('[tool result] ' + (e.name || '') + ': ' + r);
+            if (trace.length) trace[trace.length - 1] += '\n  → ' + r;
           }
         },
       });
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
-      // traceAs (e.g. ${workTrace}) is the scribe's evidence of what the worker did —
-      // keep it generous; the 60K ceiling only guards against a pathological turn.
-      if (st.traceAs) vars[st.traceAs] = (trace.join('\n') + (out ? '\n\nFinal note: ' + out : '')).slice(0, 60000) || '(no tool calls made)';
+      if (st.traceAs) {
+        // ${workTrace} — the scribe's evidence. Same content as everywhere else; the
+        // ceiling keeps the NEWEST activity (verification usually happens last) and
+        // announces itself when it trips.
+        let tr = trace.join('\n') + (out ? '\n\nFinal note: ' + out : '');
+        const TRACE_CAP = 120000;
+        if (tr.length > TRACE_CAP) tr = '[workTrace truncated: run was ' + tr.length + ' chars; showing the most recent ' + TRACE_CAP + ']\n…' + tr.slice(-TRACE_CAP);
+        vars[st.traceAs] = tr || '(no tool calls made)';
+      }
       ui.agentDone(turnHost, st.name, Date.now() - t0);
       return out;
     }
@@ -901,8 +927,10 @@
       ui.stageStart(turnHost, st.name, 'tool ' + call.tool);
       rec('[' + st.name + ' · tool ' + call.tool + ']\nARGS:\n' + JSON.stringify(call.arguments || {}, null, 2));
       const result = await runTool(call.tool, call.arguments || {}, ctrl.signal, ctx.convId);
-      const clipped = String(result).slice(0, st.maxChars || 4000);
-      rec('RESULT (' + st.name + ', first ' + clipped.length + ' chars):\n' + clipped);
+      // Same transparency contract as agent stages: truncate once, marker included,
+      // identical string everywhere. st.maxChars (legacy) still honoured as the cap.
+      const clipped = truncateToolResult(result, st.maxResultBytes || (st.maxChars ? st.maxChars : undefined));
+      rec('RESULT (' + st.name + '):\n' + clipped);
       if (st.saveAs) vars[st.saveAs] = clipped;
       ui.stageDone(turnHost, st.name + ' (' + call.tool + ')', clipped, Date.now() - t0);
       return clipped;
