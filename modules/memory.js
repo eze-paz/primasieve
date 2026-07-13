@@ -260,10 +260,10 @@ const SandpieMemory = (function () {
           : '\n\n(nothing injected — files present but none parsed as facts)';
         else injected = '\n\n──────── injected into system prompt ────────' + block;
         // Also surface the augmentations content that lives in this folder and is
-        // injected via a SEPARATE path (augmentations.systemBlock), not the fact
-        // list: recent-paths (*.recent-paths.json) and lessons (*.lessons.md).
-        // These are NOT memory facts, but they DO feed the prompt — showing them
-        // here so the memory view reflects everything in sandpie/memory/.
+        // injected via a SEPARATE path (augmentations.systemBlock): recent-paths
+        // (*.recent-paths.json). Old *.lessons.md files may still exist but are
+        // INERT — the lessons injection was replaced by the memory harvester,
+        // which writes normal facts (listed above); flag leftovers as removable.
         let aux = '';
         if (Array.isArray(entries)) {
           for (const e of entries) {
@@ -273,9 +273,7 @@ const SandpieMemory = (function () {
                 const arr = JSON.parse(await opfs.read(DIR + '/' + e.name) || '[]');
                 if (arr.length) aux += `\n\nRecent paths (${e.name}, injected via augmentations):\n` + arr.slice(0, 20).map(p => '  • ' + p).join('\n');
               } else if (e.name.endsWith('.lessons.md')) {
-                const body = (await opfs.read(DIR + '/' + e.name) || '').trim();
-                const bullets = body.split(/\r?\n/).filter(l => l.trim().startsWith('- '));
-                if (bullets.length) aux += `\n\nLessons (${e.name}, injected via augmentations):\n` + bullets.slice(0, 20).map(l => '  ' + l.trim()).join('\n');
+                aux += `\n\n(${e.name}: legacy lessons file — NO LONGER injected; safe to delete)`;
               }
             } catch (_) {}
           }
@@ -319,12 +317,9 @@ const SandpieMemory = (function () {
     <label style="font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.6rem;">Max paths (5–100):
       <input type="number" id="rpCount" min="5" max="100" step="5" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;">
     </label>
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Lessons</strong> &mdash; distilled patterns from past sessions (what worked / what failed).</p>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Auto-harvest</strong> &mdash; automatically saves durable, evidence-backed facts from sessions into memory (shares the memory budget above; refined by consolidation).</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
-      <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable lesson distillation
-    </label>
-    <label style="font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.2rem;">Max lessons (5–30):
-      <input type="number" id="lessonsMax" min="5" max="30" step="5" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;">
+      <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable automatic memory harvest
     </label>
     `;
 
@@ -338,7 +333,6 @@ const SandpieMemory = (function () {
     const rpEn = panel.querySelector('#rpEnabled');
     const rpCnt = panel.querySelector('#rpCount');
     const lsEn = panel.querySelector('#lessonsEnabled');
-    const lsMax = panel.querySelector('#lessonsMax');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
     if (th) { th.value = cfg.threshold; th.addEventListener('change', () => { const v = Math.max(MIN_THRESHOLD, parseInt(th.value || '', 10) || DEFAULTS.threshold); th.value = v; localStorage.setItem(K_THRESHOLD, String(v)); flash('Saved'); }); }
     if (rpEn) {
@@ -348,10 +342,11 @@ const SandpieMemory = (function () {
       rpCnt.addEventListener('change', () => { let v = parseInt(rpCnt.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 100) v = 100; rpCnt.value = v; localStorage.setItem('sandpie-recent-paths-count', String(v)); });
     }
     if (lsEn) {
+      // Same localStorage key as the old lessons toggle, so an existing OFF choice
+      // carries over — but it now gates the memory HARVESTER (augmentations
+      // distillLessons), whose output lives in the normal memory store/budget.
       lsEn.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
-      lsMax.value = localStorage.getItem('sandpie-lessons-max') || '20';
       lsEn.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', lsEn.checked ? 'true' : 'false'));
-      lsMax.addEventListener('change', () => { let v = parseInt(lsMax.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 30) v = 30; lsMax.value = v; localStorage.setItem('sandpie-lessons-max', String(v)); });
     }
   }
 
