@@ -200,7 +200,7 @@
       {
         // Extract the action + allDone defensively (a JSON hiccup must not waste a turn).
         name: 'pick', type: 'js',
-        code: "const raw = String(ctx.vars.planRaw || '');\nlet p = {};\ntry { const s = raw.indexOf('{'), e = raw.lastIndexOf('}'); if (s >= 0 && e > s) p = JSON.parse(raw.slice(s, e + 1)); } catch (_) {}\nctx.vars.planNext = (p.next && String(p.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';\nctx.scratchpad.allDone = !!p.allDone;\nctx.scratchpad.iteration = ctx.turn;\nctx.scratchpad.log.push('T' + ctx.turn + ': ' + (p.allDone ? '[claims done] ' : '') + ctx.vars.planNext.slice(0, 110));\nif (ctx.scratchpad.log.length > 20) ctx.scratchpad.log = ctx.scratchpad.log.slice(-20);\nctx.log(p.allDone ? 'planner claims DONE — verifying' : 'next: ' + ctx.vars.planNext.slice(0, 80));",
+        code: "const raw = String(ctx.vars.planRaw || '');\nlet p = {};\ntry { const s = raw.indexOf('{'), e = raw.lastIndexOf('}'); if (s >= 0 && e > s) p = JSON.parse(raw.slice(s, e + 1)); } catch (_) {}\nctx.vars.planNext = (p.next && String(p.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';\nctx.scratchpad.allDone = !!p.allDone;\nctx.scratchpad.iteration = ctx.turn;\nctx.scratchpad.log.push('T' + ctx.turn + ': ' + (p.allDone ? '[claims done] ' : '') + ctx.vars.planNext.slice(0, 300));\nif (ctx.scratchpad.log.length > 20) ctx.scratchpad.log = ctx.scratchpad.log.slice(-20);\nctx.log(p.allDone ? 'planner claims DONE — verifying' : 'next: ' + ctx.vars.planNext.slice(0, 80));",
       },
       {
         // 2. WORK — execute that ONE action. Trace captured for the scribe.
@@ -897,7 +897,6 @@
     const runId = resuming ? opts.resumeRunId : ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
     const ralphDir = 'ralph/' + runId;
     const ralphFile = ralphDir + '/PROGRESS.md';
-    ui.note((resuming ? 'RESUMING run ' : 'run ') + runId + ' — durable state: ' + ralphFile + '  (vars: ${runId} ${ralphDir} ${ralphFile})');
 
     // Offload the transcript to OPFS so RAM stays bounded on long runs (see rec/flush).
     _transcriptPath = 'looplab-runs/' + runId + '.log';
@@ -1149,10 +1148,9 @@
               <button class="ll-btn danger" id="llDelete" title="Delete selected loop">Del</button>
             </div>
             <textarea id="llSpec" class="ll-spec" spellcheck="false"></textarea>
-            <div class="ll-note" style="padding:0 0.6rem;">Stages: llm | tool | js | foreach (inner sees \${item} \${itemIndex}) · per-stage when: skip-guard (JS expr) · vars: \${task} \${turn} \${scratchpad} \${toolSchemas} + saveAs vars · stopWhen: JS expr over scratchpad</div>
             <textarea id="llTask" class="ll-task" placeholder="Task for the loop, e.g. 'List the files in /, read the most interesting one, record 3 facts about it.'"></textarea>
             <div class="ll-row">
-              <select id="llResume" style="flex:1;padding:0.35rem;" title="Resume a previous Ralph run from its offloaded PROGRESS.md (memory loops only)"><option value="">↻ Resume: (fresh run)</option></select>
+              <select id="llResume" style="flex:1;padding:0.35rem;width:100%;" title="Resume a previous Ralph run from its offloaded PROGRESS.md (memory loops only)"><option value="">↻ Resume: (fresh run)</option></select>
               <button class="ll-btn" id="llResumeRefresh" title="Rescan offloaded Ralph runs">⟳</button>
             </div>
             <div class="ll-row">
