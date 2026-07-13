@@ -116,9 +116,7 @@
   }
   // DeletedMetadata sometimes lacks path_display (only path_lower). Fallback so
   // deletion entries survive `cloudToRel` and actually remove items from index.
-  // modifiedBy: account_id of the LAST modifier (sharing_info is only present on
-  // files inside shared folders / team space — absent means personal-space file).
-  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified, modifiedBy: (e.sharing_info && e.sharing_info.modified_by) || '' });
+  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
   async function listFolder(folderPath, { recursive = false } = {}) {
     let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true });
     let entries = data.entries.slice();
@@ -798,7 +796,7 @@
     localStorage.setItem(AUTOCONN_OPTOUT, '1');
     // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY, 'dbxfull-account-id'].forEach(k => localStorage.removeItem(k));
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
@@ -1063,24 +1061,4 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
-
-  // Minimal read-only surface for sibling modules (dropbox-pulse.js): metadata
-  // listing with the user's token + a connection check. Content endpoints
-  // (download/upload) stay private to this module.
-  window.SandpieDbxFull = {
-    isConnected: () => !!tokens(),
-    listFolder, listContinue,
-    workingParent: () => localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT,
-    // The user's own Dropbox account_id (cached) — lets consumers tell the
-    // user's activity apart from teammates' in a shared/team space.
-    async accountId() {
-      const K = 'dbxfull-account-id';
-      let id = localStorage.getItem(K);
-      if (id) return id;
-      const acct = await getCurrentAccount();
-      id = acct.account_id || '';
-      if (id) localStorage.setItem(K, id);
-      return id;
-    },
-  };
 })();
