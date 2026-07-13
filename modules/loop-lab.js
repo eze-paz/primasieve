@@ -1493,6 +1493,9 @@
         return d;
       },
       stageStart(turnHost, name, kind) {
+        // Agent stages (work/verify) are the noisy ones — their live box is created
+        // COLLAPSED; the user expands manually. Other stages stream open as before.
+        this._collapseLive = (kind === 'agent');
         const el = document.createElement('div');
         el.className = 'll-note';
         el.dataset.pending = name;
@@ -1511,7 +1514,7 @@
           if (pending) pending.remove();
           live = document.createElement('details');
           live.className = 'll-stage ll-live';
-          live.open = true;
+          live.open = !this._collapseLive;   // agent stages start collapsed (expand manually)
           const sum = document.createElement('summary');
           sum.textContent = '▶ ' + name + ' (generating…)';
           const bodyEl = document.createElement('div');
