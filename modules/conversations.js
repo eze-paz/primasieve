@@ -242,13 +242,16 @@ function renderHistoricalMessage(m, host = null) {
       if (!ok) tcId = '';
     }
     if (!tcId && toolCalls.length > 0) tcId = toolCalls[toolCalls.length - 1].dataset.tcId;
+    // Sentinel checks ignore the citable result-id tag ("[rN] ") the worker
+    // prepends to tool results — it lands BEFORE "artifact:"/"image:".
+    const sent = content.replace(/^\[r\d+\]\s*/, '');
     if (tcId) {
-      if (content.startsWith('image:')) {
-        const path = content.slice('image:'.length);
+      if (sent.startsWith('image:')) {
+        const path = sent.slice('image:'.length);
         if (path) appendToolResultImage(tcId, path, target);
-      } else if (content.startsWith('todos:')) {
-        const nl = content.indexOf('\n');
-        const json = content.slice('todos:'.length, nl < 0 ? undefined : nl);
+      } else if (sent.startsWith('todos:')) {
+        const nl = sent.indexOf('\n');
+        const json = sent.slice('todos:'.length, nl < 0 ? undefined : nl);
         let todos = null;
         try { todos = JSON.parse(json); } catch (_) {}
         const box = _toolBoxEl(tcId, target);
@@ -256,7 +259,7 @@ function renderHistoricalMessage(m, host = null) {
           if (box) { renderTodos(tcId, todos, target); }
           else { target.appendChild(buildTodosView(todos)); }
         }
-      } else if (!content.startsWith('artifact:')) {
+      } else if (!sent.startsWith('artifact:')) {
         // Full result, untruncated — the user sees exactly what the model sees.
         appendToolResult(tcId, content, target);
       }
@@ -2271,22 +2274,25 @@ class RoundRenderer {
       renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname);
     }
     const text = String(result || '');
+    // Sentinel checks ignore the citable result-id tag ("[rN] ") the worker
+    // prepends to tool results — it lands BEFORE "artifact:"/"image:".
+    const sent = text.replace(/^\[r\d+\]\s*/, '');
 
-    if (text.startsWith('artifact:')) {
-      const path = text.slice('artifact:'.length);
+    if (sent.startsWith('artifact:')) {
+      const path = sent.slice('artifact:'.length);
       if (path) renderArtifact(this.host, path);
       return;
     }
 
-    if (text.startsWith('image:')) {
-      const path = text.slice('image:'.length);
+    if (sent.startsWith('image:')) {
+      const path = sent.slice('image:'.length);
       if (path && el) appendToolResultImage(el, path, this.host);
       return;
     }
 
-    if (text.startsWith('todos:')) {
-      const nl = text.indexOf('\n');
-      const json = text.slice('todos:'.length, nl < 0 ? undefined : nl);
+    if (sent.startsWith('todos:')) {
+      const nl = sent.indexOf('\n');
+      const json = sent.slice('todos:'.length, nl < 0 ? undefined : nl);
       let todos = null;
       try { todos = JSON.parse(json); } catch (_) {}
       if (todos) {
