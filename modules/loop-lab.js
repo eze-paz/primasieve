@@ -174,9 +174,10 @@
     name: 'ralph',
     maxTurns: 0,   // 0 = unlimited: run until the verifier passes (stopWhen) or the user stops
     // clamp: max chars of PROGRESS.md injected into plan/work/verify prompts (safety ceiling).
-    // delta: scribe emits line-ops JSON (applied by the harness) instead of re-typing the
-    // whole file — ~10× fewer output tokens; untouched lines are preserved byte-for-byte.
-    memory: { file: '${ralphFile}', clamp: 60000, delta: true },
+    // mode 'agent': the scribe edits the file ITSELF (read_file/edit_file, up to 24 rounds)
+    // so it sees the result of every edit — with a harness guard that reverts structural
+    // damage and counts no-change turns stale. ('delta'=line-ops JSON, 'rewrite'=full body.)
+    memory: { file: '${ralphFile}', clamp: 60000, mode: 'agent' },
     scratchpad: { iteration: 0, done: false, allDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
     stages: [
@@ -228,27 +229,32 @@
         user: 'Do this one action now:\n${planNext}',
       },
       {
-        // 3. SCRIBE — emit line-ops (a delta) against the numbered progress file; the
-        // HARNESS validates + applies them (persistProgress → applyOps). Cannot be
-        // skipped; a bad batch is retried with the identical prompt, then counts stale.
-        name: 'scribe', type: 'llm', parse: 'json', retries: 2, saveAs: 'progressUpdate', temperature: 0.1,
+        // 3. SCRIBE — an agent that edits the progress file ITSELF (read_file/edit_file
+        // only), so it SEES the result of every edit and can verify its own intent.
+        // The harness guards afterwards: no change → stale; new structural damage →
+        // reverted to the pre-turn body (syncAgentScribe).
+        name: 'scribe', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 24, saveAs: 'scribeOut',
         when: '!scratchpad.allDone',
         system: [
-          'You are the SCRIBE. Update the progress file for a long software task by emitting EDIT OPERATIONS against the line-numbered file below — the harness applies them. The next fresh-context iteration inherits this file as its whole state, so record truthfully.',
+          'You are the SCRIBE for a long software task. UPDATE THE PROGRESS FILE by calling edit_file on it directly. The next fresh-context iteration inherits this file as its whole state — record truthfully.',
           '',
-          'Output ONLY JSON: {"ops":[...]} — no commentary, no code fences. Allowed ops (line numbers are the N| numbers shown; they refer to the file AS SHOWN, do not adjust for your own edits):',
-          '  {"op":"replace",      "line":N, "with":"<new line text>"}',
-          '  {"op":"delete",       "line":N}   or   {"op":"delete","from":N,"to":M}',
-          '  {"op":"insert_after", "line":N, "lines":["<line>","<line>"]}   (0 = insert at top)',
-          '  {"op":"replace_section", "heading":"## Next", "lines":["<line>", ...]}   (replaces the section body, keeps the heading)',
+          'FILE: ${ralphFile}',
+          'CURRENT CONTENT (reference; read_file the path above if you need the exact bytes):',
+          '${progress}',
           '',
-          'What to record: check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified; add new checklist items or concrete facts/paths/lessons discovered; ALWAYS rewrite "## Next" (use replace_section) with the single most important next action. Keep the file lean — collapse stale detail. Do not invent progress. If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and delete them from that section.',
+          'HOW TO WORK:',
+          '- edit_file needs an EXACT old_str — copy text verbatim from the file. If an edit is rejected, read_file the current content and retry with exact text.',
+          '- AFTER your edits, read_file the file ONCE MORE and verify it is exactly what you intended: sections "# PROGRESS", "## Task", "## Checklist", "## Lessons", "## Next" each present exactly once, no orphaned or duplicated lines. Fix anything wrong before finishing.',
           '',
-          'EVIDENCE RULE: record ONLY facts that appear in the worker trace (paths, addresses, filenames, test results). If the worker asserted something it did not actually observe with a tool (e.g. named a file it never listed or read), do NOT record it as fact.',
-          'NO DUPLICATES: before adding a lesson or fact, scan the existing "## Lessons" lines. If one already covers the same point, REPLACE that line (op "replace") with the refined version instead of inserting a near-duplicate. If a new finding CONTRADICTS an existing line, replace the wrong line — never leave both.',
-          'If nothing needs recording, output {"ops":[]}.',
+          'WHAT TO RECORD:',
+          '- Check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified this iteration; add new checklist items and concrete facts/paths discovered.',
+          '- EVIDENCE RULE: record ONLY facts observed in the worker trace (paths, addresses, filenames, test results). Never record a worker assertion it did not verify with a tool.',
+          '- NO DUPLICATES: if a lesson already covers a point, refine that line in place; if a new finding contradicts an old line, replace the old line — never leave both.',
+          '- ALWAYS rewrite the "## Next" section body to the single most important next action (ONE paragraph only).',
+          '- Keep the file lean — collapse stale detail. Do not invent progress.',
+          '- If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and remove them from that section (drop the whole section when empty).',
         ].join('\n'),
-        user: 'CURRENT PROGRESS FILE (line-numbered):\n${progressNumbered}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nYour {"ops":[...]} JSON:',
+        user: 'PLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nUpdate ${ralphFile} now with edit_file, then read_file it to verify your changes.',
       },
       {
         // 4. VERIFY — skeptic gate, only when the planner declared completion.
@@ -679,6 +685,21 @@
     return body.replace(/\s*$/, '') + '\n\n' + block;
   }
 
+  // Structural invariants of PROGRESS.md — used by the agent-scribe guard to detect
+  // vandalism (a self-editing scribe losing a heading, duplicating a section, …).
+  // Returns an error string, or null when the structure is sound.
+  function checkProgressStructure(body) {
+    const s = String(body || '');
+    if (!s.trim()) return 'file is empty';
+    if (!/^# PROGRESS\s*$/m.test(s)) return 'missing "# PROGRESS" title';
+    for (const h of ['## Task', '## Checklist', '## Lessons', '## Next']) {
+      const c = (s.match(new RegExp('^' + h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'gm')) || []).length;
+      if (c === 0) return 'missing "' + h + '" heading';
+      if (c > 1) return '"' + h + '" heading appears ' + c + ' times';
+    }
+    return null;
+  }
+
   // Apply a delta-scribe ops batch to the progress file. STRICT: any malformed or
   // out-of-range op throws (the caller surfaces it loudly and counts the turn stale —
   // there is deliberately NO silent fallback). Line numbers are 1-based and refer to
@@ -891,7 +912,10 @@
       stats.llmCalls++;
       ui.stageStart(turnHost, st.name, 'agent');
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
-      const tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
+      let tools = (typeof SandpieTools !== 'undefined' && SandpieTools.schemas) ? SandpieTools.schemas() : [];
+      // st.tools: restrict this agent to a named subset (e.g. the scribe gets only
+      // read_file/edit_file — it must not shell out or write elsewhere).
+      if (Array.isArray(st.tools) && st.tools.length) tools = tools.filter(t => t && t.function && st.tools.includes(t.function.name));
       rec('[' + st.name + ' · agent] tools=' + tools.length + '\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
       // TRANSPARENCY CONTRACT: e.result arrives already truncated-with-marker (once,
       // at the source in httpAgent). The UI, the transcript (rec) and the scribe's
@@ -1136,6 +1160,43 @@
         ui.note('⚠ no progress update produced this turn (stale ×' + _stale + ')');
         return _stale < 3;
       }
+      return persistBody(next);
+    }
+    // memory.mode 'agent': the SCRIBE edited ${ralphFile} itself (read_file/edit_file,
+    // with in-context feedback). The harness stays the safety net, not the writer:
+    // re-read the file, and (a) unchanged → stale (a lazy scribe can't skip silently);
+    // (b) NEW structural damage vs the pre-turn baseline → REVERT to last-good + stale;
+    // (c) otherwise adopt the new body. All outcomes loud.
+    async function syncAgentScribe(turn) {
+      let post = null;
+      try { post = stripReadFile(await runTool('read_file', { path: ralphFile }, ctrl.signal, runId)); } catch (_) {}
+      if (post === null || post === _curBody) {
+        _stale++;
+        ui.note('⚠ scribe made no change to the progress file this turn (stale ×' + _stale + ')');
+        return _stale < 3;
+      }
+      const err = checkProgressStructure(post);
+      const baselineErr = checkProgressStructure(_curBody);
+      if (err && !baselineErr) {
+        // The scribe introduced NEW damage. Revert: old_str = post (what is on disk
+        // right now) → guaranteed match.
+        _stale++;
+        try {
+          await runTool('edit_file', { path: ralphFile, old_str: post, new_str: _curBody }, ctrl.signal, runId);
+          ui.note('⚠ scribe DAMAGED the file structure (' + err + ') — REVERTED to last good body (stale ×' + _stale + ')');
+        } catch (e) {
+          ui.note('⚠ scribe damaged the structure (' + err + ') AND revert failed: ' + ((e && e.message) || e));
+        }
+        rec('[scribe · structure REJECTED] ' + err + '\ndamaged body:\n' + post.slice(0, 2000));
+        return _stale < 3;
+      }
+      if (err) ui.note('note: progress file structure still imperfect (' + err + ') — inherited from before this turn, accepted');
+      _curBody = post; _stale = 0;
+      ui.note('✓ scribe updated progress file (' + post.length + ' B)');
+      return true;
+    }
+    // Adopt a full replacement body (shared tail of persistProgress).
+    async function persistBody(next) {
       if (next === _curBody) { _stale = 0; ui.note('progress unchanged this turn'); return true; }
       try {
         await runTool('edit_file', { path: ralphFile, old_str: _curBody, new_str: next }, ctrl.signal, runId);
@@ -1222,11 +1283,13 @@
         }
         errStreak = 0;
 
-        // GUARANTEED persist: the harness writes the scribe's updated progress file
-        // (vars.progressUpdate). Can't be skipped by the model. Stall-stop only after 3
-        // clean turns where the model genuinely produced no progress update.
+        // Progress-file bookkeeping. mode 'agent': the scribe already edited the file
+        // itself — verify/guard it (unchanged→stale, new damage→revert). Other modes:
+        // the harness writes the scribe's output (rewrite string or delta ops).
+        // Stall-stop after 3 turns without a valid update either way.
         if (spec.memory && !ctrl.signal.aborted && !stopped) {
-          const alive = await persistProgress(vars.progressUpdate, turn);
+          const agentMode = spec.memory.mode === 'agent';
+          const alive = agentMode ? await syncAgentScribe(turn) : await persistProgress(vars.progressUpdate, turn);
           if (!alive) { ui.note('STALLED: 3 turns without a progress update — stopping (rerun to resume from ' + ralphFile + ').'); break; }
         }
 
