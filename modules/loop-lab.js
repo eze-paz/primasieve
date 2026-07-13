@@ -173,7 +173,10 @@
   const RALPH = {
     name: 'ralph',
     maxTurns: 0,   // 0 = unlimited: run until the verifier passes (stopWhen) or the user stops
-    memory: { file: '${ralphFile}', clamp: 60000 },   // max chars of PROGRESS.md injected per turn (safety ceiling; raise/lower here)
+    // clamp: max chars of PROGRESS.md injected into plan/work/verify prompts (safety ceiling).
+    // delta: scribe emits line-ops JSON (applied by the harness) instead of re-typing the
+    // whole file — ~10× fewer output tokens; untouched lines are preserved byte-for-byte.
+    memory: { file: '${ralphFile}', clamp: 60000, delta: true },
     scratchpad: { iteration: 0, done: false, allDone: false, lessons: [], recentPaths: [], log: [] },
     stopWhen: 'scratchpad.done === true',
     stages: [
@@ -225,18 +228,24 @@
         user: 'Do this one action now:\n${planNext}',
       },
       {
-        // 3. SCRIBE — rewrite the full progress file; the HARNESS persists it
-        // (saveAs progressUpdate → runLoop.persistProgress). Cannot be skipped.
-        name: 'scribe', type: 'llm', saveAs: 'progressUpdate', temperature: 0.1,
+        // 3. SCRIBE — emit line-ops (a delta) against the numbered progress file; the
+        // HARNESS validates + applies them (persistProgress → applyOps). Cannot be
+        // skipped; a bad batch is retried with the identical prompt, then counts stale.
+        name: 'scribe', type: 'llm', parse: 'json', retries: 2, saveAs: 'progressUpdate', temperature: 0.1,
         when: '!scratchpad.allDone',
         system: [
-          'You are the SCRIBE. Produce the UPDATED progress file for a long software task, so the next fresh-context iteration inherits an accurate plan. Output ONLY the file content (Markdown) — no commentary, no code fences.',
+          'You are the SCRIBE. Update the progress file for a long software task by emitting EDIT OPERATIONS against the line-numbered file below — the harness applies them. The next fresh-context iteration inherits this file as its whole state, so record truthfully.',
           '',
-          'Keep the structure: "# PROGRESS", "## Task", "## Checklist" (- [ ] / - [x]), "## Steering (user directives)" (only if present), "## Lessons", "## Next".',
-          'Update it truthfully from what the worker just did: check off ONLY genuinely-completed+verified items, add concrete facts/paths and any lesson/gotcha, and rewrite "## Next" with the single most important next action. Preserve everything still relevant; do not invent progress.',
-          'If a "## Steering (user directives)" section is present, fold those directives into the checklist / next action; once a directive is fully addressed you may drop it from that section.',
+          'Output ONLY JSON: {"ops":[...]} — no commentary, no code fences. Allowed ops (line numbers are the N| numbers shown; they refer to the file AS SHOWN, do not adjust for your own edits):',
+          '  {"op":"replace",      "line":N, "with":"<new line text>"}',
+          '  {"op":"delete",       "line":N}   or   {"op":"delete","from":N,"to":M}',
+          '  {"op":"insert_after", "line":N, "lines":["<line>","<line>"]}   (0 = insert at top)',
+          '  {"op":"replace_section", "heading":"## Next", "lines":["<line>", ...]}   (replaces the section body, keeps the heading)',
+          '',
+          'What to record: check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified; add new checklist items or concrete facts/paths/lessons discovered; ALWAYS rewrite "## Next" (use replace_section) with the single most important next action. Keep the file lean — collapse stale detail. Do not invent progress. If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and delete them from that section.',
+          'If nothing needs recording, output {"ops":[]}.',
         ].join('\n'),
-        user: 'CURRENT PROGRESS FILE:\n${progress}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nOutput the full updated progress file now:',
+        user: 'CURRENT PROGRESS FILE (line-numbered):\n${progressNumbered}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nYour {"ops":[...]} JSON:',
       },
       {
         // 4. VERIFY — skeptic gate, only when the planner declared completion.
@@ -651,6 +660,63 @@
     return body.replace(/\s*$/, '') + '\n\n' + block;
   }
 
+  // Apply a delta-scribe ops batch to the progress file. STRICT: any malformed or
+  // out-of-range op throws (the caller surfaces it loudly and counts the turn stale —
+  // there is deliberately NO silent fallback). Line numbers are 1-based and refer to
+  // the ORIGINAL body the scribe saw; line ops are applied bottom-up so earlier ops
+  // can't shift the coordinates of later ones. Section ops (heading-addressed) run
+  // after line ops and are immune to line-number drift.
+  //   {op:'replace',      line:N, with:'text'}            – replace one line
+  //   {op:'delete',       line:N}                          – delete one line
+  //   {op:'delete',       from:N, to:M}                    – delete an inclusive range
+  //   {op:'insert_after', line:N, lines:['a','b']}         – insert below line N (0 = at top)
+  //   {op:'replace_section', heading:'## Next', lines:[...]} – replace a section's body (heading kept)
+  function applyOps(body, ops) {
+    if (!Array.isArray(ops)) throw new Error('ops is not an array');
+    const lines = String(body).split('\n');
+    const n = lines.length;
+    const asLines = (v) => Array.isArray(v) ? v.map(String) : [String(v)];
+    const lineOps = [], sectionOps = [];
+    for (const o of ops) {
+      if (!o || typeof o !== 'object' || typeof o.op !== 'string') throw new Error('malformed op: ' + JSON.stringify(o).slice(0, 120));
+      if (o.op === 'replace_section') {
+        if (typeof o.heading !== 'string' || o.lines === undefined) throw new Error('replace_section needs {heading, lines}');
+        sectionOps.push(o);
+      } else if (o.op === 'replace') {
+        if (!Number.isInteger(o.line) || o.line < 1 || o.line > n) throw new Error('replace: line ' + o.line + ' out of range 1..' + n);
+        if (o.with === undefined) throw new Error('replace: missing "with"');
+        lineOps.push(o);
+      } else if (o.op === 'delete') {
+        const from = Number.isInteger(o.from) ? o.from : o.line, to = Number.isInteger(o.to) ? o.to : from;
+        if (!Number.isInteger(from) || from < 1 || to < from || to > n) throw new Error('delete: range ' + from + '..' + to + ' out of range 1..' + n);
+        lineOps.push({ op: 'delete', from, to });
+      } else if (o.op === 'insert_after') {
+        if (!Number.isInteger(o.line) || o.line < 0 || o.line > n) throw new Error('insert_after: line ' + o.line + ' out of range 0..' + n);
+        if (o.lines === undefined) throw new Error('insert_after: missing "lines"');
+        lineOps.push(o);
+      } else throw new Error('unknown op "' + o.op + '"');
+    }
+    // Bottom-up: sort by anchor line descending, so splices never invalidate later ops.
+    lineOps.sort((a, b) => ((b.line !== undefined ? b.line : b.from)) - ((a.line !== undefined ? a.line : a.from)));
+    for (const o of lineOps) {
+      if (o.op === 'replace') lines.splice(o.line - 1, 1, ...asLines(o.with));
+      else if (o.op === 'delete') lines.splice(o.from - 1, o.to - o.from + 1);
+      else if (o.op === 'insert_after') lines.splice(o.line, 0, ...asLines(o.lines));
+    }
+    let out = lines.join('\n');
+    for (const o of sectionOps) {
+      const h = o.heading.trim();
+      const re = new RegExp('^' + h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'm');
+      const m = out.match(re);
+      if (!m) throw new Error('replace_section: heading "' + h + '" not found');
+      const start = m.index + m[0].length;
+      const nextIdx = out.indexOf('\n## ', start);
+      const end = nextIdx >= 0 ? nextIdx : out.length;
+      out = out.slice(0, start) + '\n' + asLines(o.lines).join('\n') + '\n' + (nextIdx >= 0 ? '' : '') + out.slice(end);
+    }
+    return out;
+  }
+
   /* ================= run engine ================= */
   let _run = null;          // { ctrl, stats }
   // Transcript = the Copy-run record. To keep RAM bounded on long runs, only a small
@@ -763,11 +829,19 @@
       ui.stageStart(turnHost, st.name, 'llm');
       const sys = fill(st.system, vars), usr = fill(st.user, vars);
       rec('[' + st.name + ' · llm]\nSYSTEM:\n' + sys + '\nUSER:\n' + usr);
-      const raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
+      let raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
       let out = raw;
       if (st.parse === 'json') {
         out = parseJSON(raw);
-        if (out === null) throw new Error('stage "' + st.name + '": model output is not valid JSON:\n' + raw.slice(0, 400));
+        // st.retries: on JSON parse failure, re-ask with the IDENTICAL prompt (no mutation,
+        // no silent format fallback) up to N extra times. Every retry is loud: trace + note.
+        for (let attempt = 1; out === null && attempt <= (st.retries || 0); attempt++) {
+          ui.note('stage "' + st.name + '": invalid JSON — retry ' + attempt + '/' + st.retries + ' (identical prompt)');
+          rec('[' + st.name + ' · JSON RETRY ' + attempt + '] previous output was not valid JSON:\n' + String(raw).slice(0, 400));
+          raw = await llmOnce({ system: sys, user: usr, temperature: st.temperature, maxTokens: st.maxTokens, signal: ctrl.signal, onDelta: (c) => ui.stageStream(turnHost, st.name, c) });
+          out = parseJSON(raw);
+        }
+        if (out === null) throw new Error('stage "' + st.name + '": model output is not valid JSON' + (st.retries ? ' after ' + (st.retries + 1) + ' attempts' : '') + ':\n' + String(raw).slice(0, 400));
       } else if (st.parse && st.parse.startsWith('block:')) {
         out = parseBlock(raw, st.parse.slice(6));
       }
@@ -986,10 +1060,28 @@
     }
     // END of turn: write the scribe's new content ourselves (edit_file with old_str =
     // the exact current body, which only the harness writes → guaranteed match).
-    // Returns false when the run has stalled (3 turns producing no progress update).
+    // Two scribe formats: full-rewrite (string) or delta ops ({ops:[...]}, when
+    // spec.memory.delta). A bad ops batch is a LOUD stale turn — never a silent
+    // fallback to some other format. Returns false when the run has stalled
+    // (3 turns producing no valid progress update).
     async function persistProgress(nextRaw, turn) {
-      let next = (typeof nextRaw === 'string' ? nextRaw : '').trim();
-      next = next.replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '').trim();   // strip stray fences
+      let next;
+      if (nextRaw && typeof nextRaw === 'object') {
+        // Delta mode: scribe emitted {ops:[...]} against the numbered file it saw.
+        try {
+          if ((nextRaw.ops || []).length === 0) { _stale = 0; ui.note('progress unchanged this turn (empty ops)'); return true; }
+          next = applyOps(_curBody, nextRaw.ops);
+          ui.note('delta scribe: ' + nextRaw.ops.length + ' op(s) applied');
+        } catch (e) {
+          _stale++;
+          ui.note('⚠ delta scribe ops REJECTED (' + ((e && e.message) || e) + ') — turn counts stale ×' + _stale + ', file untouched');
+          rec('[persist · ops REJECTED] ' + ((e && e.message) || e) + '\nops were:\n' + JSON.stringify(nextRaw.ops || nextRaw, null, 2).slice(0, 2000));
+          return _stale < 3;
+        }
+      } else {
+        next = (typeof nextRaw === 'string' ? nextRaw : '').trim();
+        next = next.replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '').trim();   // strip stray fences
+      }
       if (!next) {
         _stale++;
         ui.note('⚠ no progress update produced this turn (stale ×' + _stale + ')');
@@ -1022,6 +1114,9 @@
           get scratchpad() { return JSON.stringify(scratchpad, null, 2); },
           get memory() { return renderMemoryForPrompt(scratchpad); },
           get progress() { return _progressBody; },
+          // FULL file (never clamped) with 1-based line numbers — the delta scribe's view.
+          // Ops must address the real on-disk lines, so a clamped/lossy view is unusable here.
+          get progressNumbered() { return String(_curBody == null ? '' : _curBody).split('\n').map((l, i) => (i + 1) + '|' + l).join('\n'); },
           get steering() { return turnSteering; },
           toolSchemas: JSON.stringify(toolSchemas, null, 2),
         };
