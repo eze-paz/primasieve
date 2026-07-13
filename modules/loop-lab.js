@@ -351,7 +351,14 @@
     if (Array.isArray(c)) return c.map(p => (p && (p.text || '')) || '').join('');
     return String(c ?? '');
   }
-  function stripThink(t) { return String(t).replace(/<think>[\s\S]*?<\/think>/g, '').trim(); }
+  function stripThink(t) {
+    let s = String(t).replace(/<think>[\s\S]*?<\/think>/g, '');
+    // Some models (Kimi K2 family) emit reasoning in the content field terminated
+    // by a BARE </think> with no opening tag — strip everything up to the last one.
+    const close = s.lastIndexOf('</think>');
+    if (close !== -1) s = s.slice(close + '</think>'.length);
+    return s.trim();
+  }
 
   // Local backends run the whole agent loop in-worker; with tools:[] that is one
   // assistant message → agent_done, i.e. a single-shot completion.
@@ -1237,7 +1244,12 @@
         let appSystemPrompt = '';
         try {
           if (window.SandpieConversations && SandpieConversations.buildSystemPrompt) {
-            appSystemPrompt = String(await SandpieConversations.buildSystemPrompt([]) || '');
+            // buildSystemPrompt has returned a plain string AND a {role,content}
+            // message object across versions — accept both (String(obj) would
+            // silently inject "[object Object]", which happened in a real run).
+            const r = await SandpieConversations.buildSystemPrompt([]);
+            appSystemPrompt = typeof r === 'string' ? r : String((r && (r.content || r.text)) || '');
+            if (appSystemPrompt === '[object Object]') appSystemPrompt = '';
           }
         } catch (e) { rec('[appSystemPrompt unavailable] ' + ((e && e.message) || e)); }
         if (spec.memory && spec.memory.inherit === 'first-turn' && turn > 1) appSystemPrompt = '';
