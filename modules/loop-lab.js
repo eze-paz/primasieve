@@ -203,7 +203,7 @@
       {
         // Extract the action + allDone defensively (a JSON hiccup must not waste a turn).
         name: 'pick', type: 'js',
-        code: "const raw = String(ctx.vars.planRaw || '');\nlet p = {};\ntry { const s = raw.indexOf('{'), e = raw.lastIndexOf('}'); if (s >= 0 && e > s) p = JSON.parse(raw.slice(s, e + 1)); } catch (_) {}\nctx.vars.planNext = (p.next && String(p.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';\nctx.scratchpad.allDone = !!p.allDone;\nctx.scratchpad.iteration = ctx.turn;\nctx.scratchpad.log.push('T' + ctx.turn + ': ' + (p.allDone ? '[claims done] ' : '') + ctx.vars.planNext.slice(0, 300));\nif (ctx.scratchpad.log.length > 20) ctx.scratchpad.log = ctx.scratchpad.log.slice(-20);\nctx.log(p.allDone ? 'planner claims DONE — verifying' : 'next: ' + ctx.vars.planNext.slice(0, 80));",
+        code: "const raw = String(ctx.vars.planRaw || '');\nlet p = {};\ntry { const s = raw.indexOf('{'), e = raw.lastIndexOf('}'); if (s >= 0 && e > s) p = JSON.parse(raw.slice(s, e + 1)); } catch (_) {}\nctx.vars.planNext = (p.next && String(p.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';\nctx.scratchpad.allDone = !!p.allDone;\nctx.scratchpad.iteration = ctx.turn;\nctx.scratchpad.log.push('T' + ctx.turn + ': ' + (p.allDone ? '[claims done] ' : '') + ctx.vars.planNext);\nif (ctx.scratchpad.log.length > 20) ctx.scratchpad.log = ctx.scratchpad.log.slice(-20);\nctx.log(p.allDone ? 'planner claims DONE — verifying' : 'next: ' + ctx.vars.planNext);",
       },
       {
         // 2. WORK — execute that ONE action. Trace captured for the scribe.
@@ -266,7 +266,7 @@
         // 5. VERDICT — apply the verifier's ruling.
         name: 'verdict', type: 'js',
         when: 'scratchpad.allDone === true && scratchpad.done !== true',
-        code: "const v = String(ctx.vars.verdictOut || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nif (/VERDICT:\\s*PASS/i.test(v)) { sp.done = true; ctx.log('\\u2705 verifier PASSED — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse {\n  const m = v.match(/VERDICT:\\s*FAIL\\s*[\\u2014-]*\\s*(.*)/i);\n  const reason = ((m && m[1]) || 'no explicit verdict — treated as FAIL').slice(0, 200);\n  sp.allDone = false;\n  sp.lessons.push('Verifier REJECTED completion at iteration ' + ctx.turn + ': ' + reason);\n  if (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\n  ctx.log('\\u274c verifier rejected: ' + reason);\n}",
+        code: "const v = String(ctx.vars.verdictOut || '');\nconst sp = ctx.scratchpad;\nsp.iteration = ctx.turn;\nif (/VERDICT:\\s*PASS/i.test(v)) { sp.done = true; ctx.log('\\u2705 verifier PASSED — task complete after ' + ctx.turn + ' iteration(s)'); }\nelse {\n  const m = v.match(/VERDICT:\\s*FAIL\\s*[\\u2014-]*\\s*(.*)/i);\n  const reason = (m && m[1]) || 'no explicit verdict — treated as FAIL';\n  sp.allDone = false;\n  sp.lessons.push('Verifier REJECTED completion at iteration ' + ctx.turn + ': ' + reason);\n  if (sp.lessons.length > 12) sp.lessons = sp.lessons.slice(-12);\n  ctx.log('\\u274c verifier rejected: ' + reason);\n}",
       },
     ],
   };
@@ -870,18 +870,20 @@
             rec('[tool call] ' + e.name + ' ' + (typeof e.args === 'string' ? e.args : JSON.stringify(e.args)));
             if (Array.isArray(scratchpad.recentPaths)) for (const p of extractPaths(e.args)) pushMru(scratchpad.recentPaths, p, 15);
             const as = typeof e.args === 'string' ? e.args : JSON.stringify(e.args || {});
-            trace.push('· ' + e.name + ' ' + as.slice(0, 160));
+            trace.push('· ' + e.name + ' ' + as.slice(0, 2000));
           } else if (e.kind === 'toolResult') {
             ui.agentToolResult(turnHost, e.name, e.result);
             const r = String(e.result == null ? '' : e.result);
-            rec('[tool result] ' + (e.name || '') + ': ' + r.slice(0, 600));
-            if (trace.length) trace[trace.length - 1] += '  → ' + r.replace(/\s+/g, ' ').slice(0, 220);
+            rec('[tool result] ' + (e.name || '') + ': ' + r.slice(0, 4000));
+            if (trace.length) trace[trace.length - 1] += '  → ' + r.replace(/\s+/g, ' ').slice(0, 2000);
           }
         },
       });
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
-      if (st.traceAs) vars[st.traceAs] = (trace.join('\n') + (out ? '\n\nFinal note: ' + out : '')).slice(0, 6000) || '(no tool calls made)';
+      // traceAs (e.g. ${workTrace}) is the scribe's evidence of what the worker did —
+      // keep it generous; the 60K ceiling only guards against a pathological turn.
+      if (st.traceAs) vars[st.traceAs] = (trace.join('\n') + (out ? '\n\nFinal note: ' + out : '')).slice(0, 60000) || '(no tool calls made)';
       ui.agentDone(turnHost, st.name, Date.now() - t0);
       return out;
     }
@@ -1362,7 +1364,7 @@
       if (!t) return;
       if (!_run) { $id('llStatus').textContent = 'Steering applies to a running loop.'; return; }
       _steerQueue.push(t); inp.value = ''; updateSteerN();
-      ui.note('🧭 steering queued (applies next iteration): ' + t.slice(0, 100));
+      ui.note('🧭 steering queued (applies next iteration): ' + t);
     }
     $id('llSteerSend').onclick = sendSteer;
     $id('llSteer').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendSteer(); } });
