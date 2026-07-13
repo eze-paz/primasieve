@@ -257,7 +257,7 @@
           '- Check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified this iteration; add new checklist items and concrete facts/paths discovered.',
           '- EVIDENCE RULE: record ONLY facts observed in the worker trace (paths, addresses, filenames, test results). Never record a worker assertion it did not verify with a tool.',
           '- NO DUPLICATES: if a lesson already covers a point, refine that line in place; if a new finding contradicts an old line, replace the old line — never leave both.',
-          '- [MEMORY] TAG: when a verified finding is DURABLE and ENVIRONMENT-LEVEL — a tool quirk, where something lives, a protocol/semantics fact, a diagnosis signature that any future unrelated run would need (NOT task progress) — record it in "## Lessons" prefixed "[MEMORY] ". At run end the harness promotes those lines into permanent cross-run memory. Use sparingly; most lessons are task-local.',
+          '- [MEMORY] TAG (RARE — most iterations tag ZERO): only for a finding a DIFFERENT, UNRELATED future task would need AND that is NOT recoverable from the repo. A genuine tool/environment gotcha or a hard-won cross-cutting diagnosis qualifies. Do NOT tag anything one grep away — file paths, build/test commands, checksums, addresses, crate lists, "where X lives", "how this project is laid out" are ALL task-local: leave them as plain lessons, never [MEMORY]. [MEMORY] lines become PERMANENT memory injected into every future conversation, so over-tagging is expensive pollution. If unsure, do not tag.',
           '- ON THE FIRST ITERATION ONLY: from the ENVIRONMENT MEMORIES in the user message, copy the ones plausibly relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines (verbatim essence, one line each). Later iterations rely on these.',
           '- ALWAYS rewrite the "## Next" section body to the single most important next action (ONE paragraph only).',
           '- Keep the file lean — collapse stale detail. Do not invent progress.',
@@ -1462,13 +1462,25 @@
           // Never harvest from the "## Hypotheses" section — those are UNPROVEN by
           // definition (the critic's holding pen). Only confirmed [MEMORY] lines graduate.
           const harvestBody = _curBody.replace(/\n##\s*Hypotheses[^\n]*\n[\s\S]*?(?=\n##\s|\s*$)/i, '\n');
+          const HARVEST_CAP = 3;   // hard ceiling per run — [MEMORY] is meant to be rare
+          // Skip facts already covered by an existing memory (keyword overlap) so the
+          // harvest never re-creates a curated fact as a junk ralph-* duplicate.
+          let existing = [];
+          try { existing = (await SandpieMemory.list()).map(f => (f.name + ' ' + f.description + ' ' + f.body).toLowerCase()); } catch (_) {}
+          const kw = (s) => (s.toLowerCase().match(/[a-z0-9_]{4,}/g) || []);
+          let harvested = 0;
           for (const m of harvestBody.matchAll(/^\s*-\s*\[MEMORY\]\s*(.+)$/gm)) {
+            if (harvested >= HARVEST_CAP) { ui.note('memory harvest cap (' + HARVEST_CAP + ') reached — remaining [MEMORY] lines skipped'); break; }
             const fact = m[1].trim();
             if (!fact || seen.has(fact)) continue;
             seen.add(fact);
+            const words = kw(fact);
+            const dup = existing.find(e => { const hit = words.filter(w => e.includes(w)).length; return words.length && hit / words.length > 0.6; });
+            if (dup) { ui.note('memory harvest: skipped (already covered) — ' + fact.slice(0, 60)); continue; }
+            const desc = (fact.split(/(?<=[.:])\s/)[0] || fact).slice(0, 120);   // first sentence, not a raw cut
             const name = 'ralph-' + fact.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 6).join('-');
-            const r = await SandpieMemory.save({ name, description: fact.slice(0, 140), type: 'project', body: fact + '\n\n(harvested from ralph run ' + runId + ')' });
-            if (r && r.ok) ui.note('🧠 memory harvested: ' + r.name);
+            const r = await SandpieMemory.save({ name, description: desc, type: 'project', body: fact + '\n\n(harvested from ralph run ' + runId + ')' });
+            if (r && r.ok) { harvested++; ui.note('🧠 memory harvested: ' + r.name); }
           }
         } catch (e) { ui.note('memory harvest failed: ' + ((e && e.message) || e)); }
       }
