@@ -3559,7 +3559,7 @@ window.endTotalTimer = endTotalTimer;
    separately by themes.js.
    ============================================================================= */
 // Compaction progress banner: shown in a conversation's host while a compact-sink
-// agent is summarizing (agents.js emits compaction:start/end). Pre-send compaction
+// agent is summarizing (pre-send compaction emits these events). Pre-send compaction
 // is awaited before the turn goes out, so without this the user just sees an
 // unexplained pause. Removed on end (and harmlessly wiped by the post-compaction
 // re-render, whichever comes first).
