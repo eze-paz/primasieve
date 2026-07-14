@@ -33,15 +33,9 @@
     return body.slice(start, next >= 0 ? next : body.length).trim();
   }
   function planFromFile(body) {
-    const checklist = sectionBody(body, 'Checklist');
-    const items = checklist.split('\n').filter(l => /^\s*-\s*\[[ xX]\]/.test(l));
-    const unchecked = items.filter(l => /\[ \]/.test(l));
-    const checked   = items.filter(l => /\[[xX]\]/.test(l));
-    const allDone = unchecked.length === 0 && checked.length > 0;
-    if (allDone) return { allDone: true, next: '' };
-    const firstUnchecked = unchecked[0];
-    const next = firstUnchecked ? firstUnchecked.replace(/^-\s*\[ \]\s*/, '').trim() : '';
-    return { allDone: false, next: next || 'Explore the codebase relevant to the task and draft a real, concrete checklist of remaining work.' };
+    const nextStep = sectionBody(body, 'Next Step').trim();
+    if (!nextStep || nextStep === '(none yet)') return { allDone: true, next: '' };
+    return { allDone: false, next: nextStep };
   }
   // Prompt TEMPLATES — user-editable in the panel ("Prompts ✎"), persisted in
   // localStorage, filled with ${placeholder}s at call time. Defaults below.
@@ -57,10 +51,11 @@
     scribe: [
       'You are the SCRIBE. This file is the ONLY memory between turns. OUTPUT THE ENTIRE UPDATED FILE — start ("# PROGRESS") to end, NOTHING else (no preamble, no code fences, no commentary). The harness overwrites with exactly your output; anything you omit is DELETED.',
       'Be ruthless. The worker starts each turn fresh. If you leave bloat, they re-read garbage instead of acting. If you leave ambiguity, they redo work. The file should fit in a screenshot.',
-      'DELETE any checklist item the worker actually finished (verified by tool result → lines, not their claim). DELETE any lesson that does not prevent a future mistake. DELETE any prose that restates code or repeats a previous turn.',
-      'KEEP only: open problems as single-turn actionable items (- [ ]), confirmed facts that prevent re-work, and one-line "do not go here again" warnings. This file IS the plan — each turn the worker reads the FIRST unchecked checklist item and does exactly that. No unchecked items = the task is done.',
-      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons".',
-      'Record a fact in ## Lessons ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence). A load-bearing claim with no supporting result becomes a new unchecked checklist item instead.',
+      'DELETE any lesson that does not prevent a future mistake. DELETE any prose that restates code or repeats a previous turn.',
+      'KEEP only: confirmed facts that prevent re-work, one-line "do not go here again" warnings, and a single concrete next step at the bottom.',
+      '## Next Step must be ONE single-turn actionable item. When the worker finishes it, replace it with the next logical action. If you do not know the next step, write "Explore the codebase and identify the next concrete action". If the task is truly done, write "(none yet)".',
+      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Lessons", "## Next Step".',
+      'Record a fact in ## Lessons ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence). A load-bearing claim with no supporting result becomes the next step instead.',
       'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines. Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
       '', 'CURRENT CONTENT (copy this, then apply your update — do NOT shrink it by dropping sections):', '${progress}',
     ].join('\n'),
@@ -248,13 +243,13 @@
 
   /* ============ progress file ============ */
   function bootstrapMd(task) {
-    return '# PROGRESS\n\n## Task\n' + task + '\n\n## Checklist\n- [ ] Explore the codebase relevant to the task and draft a real, concrete checklist of remaining work\n\n## Lessons\n(none yet)\n';
+    return '# PROGRESS\n\n## Task\n' + task + '\n\n## Lessons\n(none yet)\n\n## Next Step\nExplore the codebase relevant to the task and draft the first concrete action\n';
   }
   function checkStructure(body) {
     const s = String(body || '');
     if (!s.trim()) return 'file is empty';
     if (!/^# PROGRESS\s*$/m.test(s)) return 'missing "# PROGRESS" title';
-    for (const h of ['## Task', '## Checklist', '## Lessons']) {
+    for (const h of ['## Task', '## Lessons', '## Next Step']) {
       const c = (s.match(new RegExp('^' + h + '\s*$', 'gm')) || []).length;
       if (c === 0) return 'missing "' + h + '"';
       if (c > 1) return '"' + h + '" appears ' + c + ' times';
@@ -338,10 +333,10 @@
         const appSystemPrompt = turn === 1 ? appSystemPromptFull : '(provided on turn 1 — see [inherited] lessons in the progress file)';
         const v = { task, ralphFile, progress: body, appSystemPrompt, planNext: '' };
 
-        // 1. PLAN — pure code, zero tokens: the first unchecked item in "## Checklist" IS the plan.
+        // 1. PLAN — pure code, zero tokens: the ## Next Step IS the plan.
         const plan = planFromFile(body);
         v.planNext = plan.next;
-        rec('[plan] ' + (plan.allDone ? 'all checklist items done — verifying' : plan.next));
+        rec('[plan] ' + (plan.allDone ? 'next step is empty — verifying' : plan.next));
         ui.note('▶ plan: ' + (plan.allDone ? 'all done — verifying' : plan.next.slice(0, 160)));
 
         if (plan.allDone) {
@@ -360,11 +355,11 @@
             const m = verdict.match(/VERDICT:\s*FAIL\s*[—-]*\s*(.*)/i);
             const reason = (m && m[1]) || 'no explicit verdict';
             ui.stageDone(host, 'verify', '❌ FAIL — ' + reason);
-            // Surface the objection as a new checklist item and return to the work-scribe loop.
+            // Surface the objection as a new next step and return to the work-scribe loop.
             let onDisk = body;
             try { const d = await readProgress(); if (d != null) onDisk = d; } catch (_) {}
-            const failureItem = '- [ ] Verifier objection (turn ' + turn + '): ' + reason.replace(/\s+/g, ' ').slice(0, 300);
-            const updated = onDisk.replace(/^## Checklist$/m, '## Checklist\n' + failureItem);
+            const failureItem = 'Verifier objection (turn ' + turn + '): ' + reason.replace(/\s+/g, ' ').slice(0, 300);
+            const updated = onDisk.replace(/^## Next Step$/m, '## Next Step\n' + failureItem);
             try { await runTool('edit_file', { path: ralphFile, old_str: onDisk, new_str: updated }, signal, runId); body = updated; } catch (_) {}
           ui.showProgress(body);
           }
