@@ -18,12 +18,27 @@
   const K_TASK = 'sandpie:looplab:lastTask';
 
   /* ============ prompts (keep ~3 sentences each) ============ */
-  const P_PLAN = (v) => [
-    'You are the PLANNER. Read the progress file and pick the SINGLE next concrete, verifiable action — do not do it, just name it — except if a "## Hypotheses" section has any entries, your action MUST be to validate its first one. Set "allDone" true ONLY when every checklist item is done AND "## Hypotheses" is empty; if the file is still the skeleton, the action is to explore and draft the checklist. Output ONLY JSON: {"allDone": false, "next": "<one imperative sentence>", "why": "<one line>"}.',
-    '', 'ENVIRONMENT (durable facts — trust unless the progress file contradicts):', v.appSystemPrompt,
-    '', 'PROGRESS FILE:', v.progress,
-    '', 'NEW USER STEERING (highest priority):', v.steering,
-  ].join('\n');
+  // NO PLANNER LLM. The plan IS the file: the scribe already writes "## Next" as the
+  // single most important next action, so the "planner" is pure code — read that
+  // section and do it. Hypotheses gate first; all boxes checked + no hypotheses → verify.
+  function sectionBody(body, heading) {
+    const re = new RegExp('^##\\s*' + heading + '[^\\n]*$', 'mi');
+    const m = String(body || '').match(re);
+    if (!m) return '';
+    const start = m.index + m[0].length;
+    const next = body.indexOf('\n## ', start);
+    return body.slice(start, next >= 0 ? next : body.length).trim();
+  }
+  function planFromFile(body) {
+    const hyp = sectionBody(body, 'Hypotheses');
+    const firstHyp = hyp && (hyp.match(/^\s*-\s*(.+)$/m) || [])[1];
+    if (firstHyp) return { allDone: false, next: 'Validate this hypothesis with a concrete tool test (then it either becomes a Lesson or is dropped): ' + firstHyp.trim() };
+    const checklist = sectionBody(body, 'Checklist');
+    const allDone = !/-\s*\[ \]/.test(checklist) && /-\s*\[[xX]\]/.test(checklist);
+    if (allDone) return { allDone: true, next: '' };
+    const next = sectionBody(body, 'Next');
+    return { allDone: false, next: next || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.' };
+  }
 
   const P_WORK = (v) => [
     'You are the WORKER. Do EXACTLY the one action below and verify it actually worked (read files back, run code) — nothing more; do not try to finish the whole task. Use `shell` for the real project on disk (/home/..., absolute paths); read_file/write_file/edit_file are a SEPARATE browser sandbox that cannot see the project, so never use them for real files. You do NOT update any progress file — just do the action and report concretely what you changed and what you verified.',
@@ -134,17 +149,6 @@
       body.enable_thinking = false;
     }
   }
-  // Single completion, no tools. deterministic: greedy decoding (temperature 0,
-  // top_p 1, fixed seed for endpoints that honor it) — same file in, same plan out.
-  async function llmOnce(system, user, { signal, onDelta, temperature, reasoning, deterministic } = {}) {
-    const { url, model, auth } = llmUrlAuth();
-    const body = { model, stream: true, stream_options: { include_usage: true }, max_tokens: 4096, temperature: temperature != null ? temperature : 0.7, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
-    if (deterministic) { body.temperature = 0; body.top_p = 1; body.top_k = 1; body.seed = 42; }
-    if (reasoning) body.reasoning_effort = reasoning;
-    const res = await fetchRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth }, body: JSON.stringify(body), signal }, signal);
-    return stripThink((await consumeStream(res, onDelta, signal)).content);
-  }
-
   /* ============ tools ============ */
   function runTool(name, args, signal, convId) {
     return new Promise((resolve, reject) => {
@@ -322,14 +326,14 @@
         const appSystemPrompt = turn === 1 ? appSystemPromptFull : '(provided on turn 1 — see [inherited] lessons in the progress file)';
         const v = { task, ralphFile, progress: body, steering, appSystemPrompt, planNext: '' };
 
-        // 1. PLAN
-        ui.stageStart(host, 'plan');
-        const planRaw = await llmOnce(P_PLAN(v), 'TASK:\n' + task + '\n\nJSON:', { signal, deterministic: true, reasoning: 'low', onDelta: (c) => ui.stageStream(host, 'plan', c) });
-        rec('[plan] ' + planRaw);
-        let plan = {};
-        try { const s = planRaw.indexOf('{'), e = planRaw.lastIndexOf('}'); if (s >= 0 && e > s) plan = JSON.parse(planRaw.slice(s, e + 1)); } catch (_) {}
-        v.planNext = (plan.next && String(plan.next).trim()) || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.';
-        ui.stageDone(host, 'plan', plan.allDone ? 'claims DONE — verifying' : v.planNext);
+        // 1. PLAN — pure code, zero tokens: the scribe's "## Next" IS the plan.
+        // Fresh steering overrides the queued action for this turn (it is also folded
+        // into the file above, so the scribe carries it forward).
+        const plan = planFromFile(body);
+        if (steering !== '(none)') { plan.allDone = false; plan.next = 'USER STEERING (highest priority — do this first):\n' + steering + '\n\nThen, if fully addressed, continue with: ' + (plan.next || 'the checklist'); }
+        v.planNext = plan.next;
+        rec('[plan] ' + (plan.allDone ? 'all checklist items done — verifying' : plan.next));
+        ui.note('▶ plan: ' + (plan.allDone ? 'all done — verifying' : plan.next.slice(0, 160)));
 
         if (plan.allDone) {
           // 4. VERIFY
