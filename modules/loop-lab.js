@@ -627,13 +627,26 @@
   // Byte-measured tool-result truncation with a LOUD marker (mirrors the main app's
   // sandpie-worker truncateToolResult). Never silent: the model, the UI, the scribe's
   // trace and the transcript all receive this same string, marker included.
-  const DEFAULT_TOOL_RESULT_BYTES = 30 * 1024;
+  const DEFAULT_TOOL_RESULT_BYTES = 8 * 1024;
+  // HEAD+TAIL truncation. The signal in a long tool result (a boot trace, a cargo
+  // test dump) lives at BOTH ends: the setup/context at the top and the crash/BUG
+  // /assertion at the very bottom. Head-only truncation decapitates the ending —
+  // exactly the part that says how the run died — so we keep ~25% head + ~75% tail
+  // with a loud marker naming how much was dropped. Byte-measured; same string fed
+  // to the model, UI, trace and transcript (transparency contract).
   function truncateToolResult(result, maxBytes) {
     const cap = maxBytes || DEFAULT_TOOL_RESULT_BYTES;
     const s = String(result == null ? '' : result);
     const bytes = new TextEncoder().encode(s);
     if (bytes.length <= cap) return s;
-    return new TextDecoder().decode(bytes.slice(0, cap)) + '\n\n[truncated: tool result exceeded ' + Math.round(cap / 1024) + 'kB]';
+    const dropped = bytes.length - cap;
+    const headBytes = Math.floor(cap * 0.25);
+    const tailBytes = cap - headBytes;
+    const dec = new TextDecoder();
+    const head = dec.decode(bytes.slice(0, headBytes));
+    const tail = dec.decode(bytes.slice(bytes.length - tailBytes));
+    return head + '\n\n…[' + Math.round(dropped / 1024) + 'kB of ' + Math.round(bytes.length / 1024) +
+      'kB elided — head+tail kept; the crash/exit is usually at the tail below]…\n\n' + tail;
   }
 
   async function httpAgent({ system, user, tools, maxRounds, signal, onEvent, onDelta, convId, maxResultBytes, reasoning }) {
@@ -1076,7 +1089,7 @@
       rec('OUTPUT (' + st.name + '):\n' + out);
       if (st.saveAs) vars[st.saveAs] = out;
       if (st.traceAs) {
-        const TRACE_CAP = 120000;
+        const TRACE_CAP = 32000;
         const cap = (s) => s.length > TRACE_CAP ? '[trace truncated: run was ' + s.length + ' chars; showing the most recent ' + TRACE_CAP + ']\n…' + s.slice(-TRACE_CAP) : s;
         const body = trace.join('\n');
         // ${workTrace} — for the SCRIBE (the doer's recorder): tool calls + results +
