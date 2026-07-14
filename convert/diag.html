@@ -85,11 +85,11 @@
   document.body.appendChild(pjBox);
   (async () => {
     try {
-      log('pdf.js: loading https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js ...');
-      await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('pdf.min.js load failed')); document.head.appendChild(sc); });
+      log('pdf.js: loading /modules/vendor/pdfjs/pdf.min.js ...');
+      await new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/modules/vendor/pdfjs/pdf.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('pdf.min.js load failed')); document.head.appendChild(sc); });
       if (!window.pdfjsLib) throw new Error('pdfjsLib undefined after load');
       log('pdf.js: lib loaded, setting worker ...');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.js';
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js';
       const doc = await window.pdfjsLib.getDocument({ data: new TextEncoder().encode(MINI_PDF) }).promise;
       log('pdf.js: doc opened, numPages=' + doc.numPages);
       const page = await doc.getPage(1);
