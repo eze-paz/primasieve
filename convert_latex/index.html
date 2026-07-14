@@ -526,8 +526,8 @@ onmessage = async ({data}) => {
 <script>
 window.renderLatexPdf = async function (bytes, container) {
   if (!window.__pdfjsP) {
-    window.__pdfjsP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/modules/vendor/pdfjs/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('pdf.js load failed')); document.head.appendChild(s); })
-      .then(() => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js'; });
+    window.__pdfjsP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/modules/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('pdf.js load failed')); document.head.appendChild(s); })
+      .then(() => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/pdf.worker.min.js'; });
   }
   try {
     await window.__pdfjsP;
