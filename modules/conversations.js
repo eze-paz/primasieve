@@ -2658,10 +2658,12 @@ async function buildSystemPrompt(convMessages) {
     catch (e) { console.warn('[sandpie] mindframe block failed:', e); }
   }
   // Optional capability: memory.js injects all durable facts (sandpie/memory/*.md).
-  // maybeConsolidate first so an over-budget store is pruned before it's injected;
-  // it's a cheap no-op when under budget. Returns '' when off/empty ⇒ no change.
+  // maybeConsolidate runs FIRE-AND-FORGET: it is an LLM housekeeping pass that can
+  // take minutes (and 504), and awaiting it here blocked every completion — and
+  // every ralph turn, which builds this prompt — behind it. The pruned store simply
+  // lands on the NEXT prompt build; this one injects the current store as-is.
   if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
-    try { await SandpieMemory.maybeConsolidate(); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
+    try { SandpieMemory.maybeConsolidate().catch((e) => console.warn('[sandpie] memory consolidate failed:', e)); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
     try { content += await SandpieMemory.systemBlock(); }
     catch (e) { console.warn('[sandpie] memory block failed:', e); }
   }

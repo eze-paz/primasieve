@@ -262,8 +262,39 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
   if (!endpoint || !mdl) throw new Error('no provider configured');
   const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions') : (endpoint + '/chat/completions');
   const url = new URL(route, location.href).href;
-  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: false, max_tokens: maxTokens };
+  // STREAM the response: with stream:false the socket sits idle for the whole (often
+  // multi-minute) generation and an intermediary proxy/CDN kills it with a 504 — the
+  // exact failure that blocked memory consolidation. SSE keeps tokens flowing so the
+  // idle-timeout never fires; we just assemble the text and return it.
+  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: true, stream_options: { include_usage: true }, max_tokens: maxTokens };
   if (active && active.temperature != null) body.temperature = active.temperature;
+  async function readStreamText(res) {
+    if (!res.body || !res.body.getReader) {   // buffering proxy: whole JSON despite stream:true
+      const data = await res.json();
+      if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
+      return data?.choices?.[0]?.message?.content || '';
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '', out = '';
+    for (;;) {
+      if (signal && signal.aborted) { try { reader.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        let j; try { j = JSON.parse(payload); } catch (_) { continue; }
+        if (j.error) throw new Error(String(j.error.message || JSON.stringify(j.error)));
+        const c = j.choices?.[0]?.delta?.content;
+        if (c) out += c;
+      }
+    }
+    return out;
+  }
   // Retry transient/5xx/network failures with backoff, like a standard completion,
   // so a 504 doesn't fail a background summarization (compaction / memory distiller)
   // outright. Bounded (unlike the foreground turn) since these are best-effort and
@@ -280,8 +311,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
         body: JSON.stringify(body), signal,
       });
       if (!res.ok) { const t = await res.text().catch(() => ''); const e = new Error('HTTP ' + res.status + (t ? ': ' + t.slice(0, 200) : '')); e.status = res.status; throw e; }
-      const data = await res.json();
-      return data?.choices?.[0]?.message?.content || '';
+      return await readStreamText(res);
     } catch (e) {
       if (signal && signal.aborted) throw e;
       lastErr = e;
