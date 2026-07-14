@@ -58,7 +58,7 @@ const SandpieMemory = (function () {
     const name = fm.name || (file ? file.replace(/\.md$/, '') : 'note');
     const description = fm.description || (body.split(/\r?\n/)[0] || '').slice(0, 120);
     const type = VALID_TYPES.includes(fm.type) ? fm.type : 'reference';
-    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md') };
+    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md'), conversation: fm.conversation || '', tool_calls: fm.tool_calls || '', paths: fm.paths || '' };
   }
 
   async function list() {

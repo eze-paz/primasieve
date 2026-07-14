@@ -1756,6 +1756,23 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
 function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
 async function tool_remember({ name, description, type, body, links }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
+  // Extract provenance: recent tool result IDs (rN) from this turn
+  const toolCallIds = [];
+  const toolPaths = [];
+  if (ctx && ctx._messages) {
+    for (let i = ctx._messages.length - 1; i >= 0; i--) {
+      const m = ctx._messages[i];
+      if (m && m.role === 'tool' && typeof m.content === 'string') {
+        const rid = /^\[r(\d+)\]/.exec(m.content);
+        if (rid && !toolCallIds.includes('r' + rid[1])) toolCallIds.push('r' + rid[1]);
+        // Extract paths from tool result text
+        const paths = m.content.match(/(?:\/|\w:\\|\\)[^\s"'\n]+(?:\.[^\s"'\n]+)?/g);
+        if (paths) for (const p of paths) if (!toolPaths.includes(p)) toolPaths.push(p);
+      }
+      if (m && m.role === 'user') break; // stop at previous user turn
+    }
+  }
+  if (toolCallIds.length === 0) return { result: 'Error: remember() requires at least one tool call result as evidence. Use a tool first, then remember the lesson.' };
   const slug = _memSlug(name);
   const t = ['user', 'feedback', 'project', 'reference'].includes(type) ? type : 'reference';
   const today = new Date().toISOString().slice(0, 10);
@@ -1763,7 +1780,10 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   let created = today, verb = 'Remembered';
   try { const ex = await opfsReadText(path); const m = /^created:[ \t]*(.+)$/m.exec(ex); if (m) { created = m[1].trim(); verb = 'Updated memory'; } } catch (_) {}
   const desc = String(description || '').replace(/\s*\n\s*/g, ' ').trim();
-  let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + '---\n' + String(body).trim() + '\n';
+  const convId = ctx && ctx._conversation_file_name ? ctx._conversation_file_name : 'unknown';
+  let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.join(', ')}\n`;
+  if (toolPaths.length) out += `paths: ${toolPaths.slice(0, 10).join(', ')}\n`;
+  out += '---\n' + String(body).trim() + '\n';
   if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
   try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }
   // Notify the page so sync-state marks this file dirty — otherwise the next
