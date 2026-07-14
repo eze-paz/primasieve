@@ -318,6 +318,7 @@
           body = bootstrapMd(task);
           await runTool('write_file', { path: ralphFile, content: body }, signal, runId);
           ui.note('progress file created: ' + ralphFile);
+          ui.showProgress(body);
         }
 
         // Fold queued steering into the file (harness-owned write → old_str always matches).
@@ -331,6 +332,7 @@
             ? body.replace(heading + '\n', heading + '\n' + steering + '\n')
             : body.replace(/^## Checklist$/m, heading + '\n' + steering + '\n\n## Checklist');
           try { await runTool('edit_file', { path: ralphFile, old_str: body, new_str: updated }, signal, runId); body = updated; ui.note('🧭 steering folded in (' + dirs.length + ')'); } catch (e) { ui.note('steering write failed: ' + e.message); }
+          ui.showProgress(body);
           rec('[steering] ' + dirs.join(' | '));
         }
 
@@ -380,6 +382,7 @@
             const failureItem = '- [ ] Verifier objection (turn ' + turn + '): ' + reason.replace(/\s+/g, ' ').slice(0, 300);
             const updated = onDisk.replace(/^## Checklist$/m, '## Checklist\n' + failureItem);
             try { await runTool('edit_file', { path: ralphFile, old_str: onDisk, new_str: updated }, signal, runId); body = updated; } catch (_) {}
+          ui.showProgress(body);
           }
           continue;
         }
@@ -430,6 +433,7 @@
           try {
             await runTool('edit_file', { path: ralphFile, old_str: onDisk, new_str: next }, signal, runId);
             body = next; stale = 0;
+          ui.showProgress(body);
             ui.stageDone(host, 'scribe', '✓ progress rewritten (' + next.length + ' B)');
           } catch (e) { stale++; ui.note('⚠ harness write failed: ' + e.message + ' (stale ×' + stale + ')'); }
         }
@@ -467,6 +471,8 @@
     #loopLabOverlay details pre { margin:0.3rem 0; padding:0.4rem; background:var(--sp-panel,#161b22); border-radius:6px;
       white-space:pre-wrap; word-break:break-word; font-size:0.72rem; max-height:300px; overflow:auto; }
     #loopLabOverlay .ll-note { color:var(--sp-text-dim,#8b949e); font-size:0.72rem; padding:0.15rem 0.2rem; }
+    #loopLabOverlay .ll-progress { flex:1; overflow-y:auto; padding:0.5rem; font-size:0.72rem; white-space:pre-wrap; word-break:break-word; background:var(--sp-panel,#161b22); border-top:1px solid var(--sp-border,#30363d); max-height:25vh; }
+    #loopLabOverlay .ll-progress-label { font-size:0.68rem; color:var(--sp-text-dim,#8b949e); padding:0.2rem 0.5rem; border-top:1px solid var(--sp-border,#30363d); }
   `;
 
   function buildPanel() {
@@ -501,6 +507,8 @@
           <div id="llPromptEditors"></div>
         </details>
         <div class="ll-trace" id="llTrace"></div>
+        <div class="ll-progress-label">PROGRESS.md</div>
+        <div class="ll-progress" id="llProgress">(no active run)</div>
       </div>`;
     document.body.appendChild(root);
     _panel = root;
@@ -620,6 +628,12 @@
         if (!on) { _steerQueue = []; this.updateSteerCount(); refreshResume(); }
       },
       updateSteerCount() { $id('llSteerN').textContent = _steerQueue.length ? 'queued ' + _steerQueue.length : ''; },
+      showProgress(body) {
+        const el = $id('llProgress');
+        if (!el) return;
+        el.textContent = body || '(empty)';
+        el.scrollTop = 0;
+      },
     };
 
     $id('llRun').onclick = async () => {
