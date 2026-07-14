@@ -6,11 +6,15 @@
  * fresh-context. No spec editor, no JSON interpreter, no alternate loops — every
  * feature that isn't ralph is a place for a gotcha.
  *
+ * The SCRIBE never touches a tool: it emits the ENTIRE new PROGRESS.md as plain text
+ * and the HARNESS writes it (a structure guard rejects damaged output and keeps the
+ * old file). No edit_file for the model to fight — the cannon that kills that bug class.
+ *
  * Kept hard-won fixes: SSE streaming (defeats proxy 504s), retry-forever on transient
  * HTTP, per-stage reasoning off for the scribe, dynamic tool-RPC timeout (no 120s
- * guillotine on long shells), progress structure guard + revert, steering, resume,
- * [MEMORY] harvest. Tool-result truncation (8kB head+tail) applies ONLY to noisy
- * tools — read_file is NEVER truncated (the scribe must see the whole progress file).
+ * guillotine on long shells), progress structure guard, steering, resume, [MEMORY]
+ * harvest. Tool-result truncation (8kB head+tail) applies ONLY to noisy tools —
+ * read_file is NEVER truncated (the harness reads the whole progress file each turn).
  */
 (function () {
   'use strict';
@@ -52,10 +56,11 @@
       '', 'THE ONE ACTION:', '${planNext}',
     ].join('\n'),
     scribe: [
-      'You are the SCRIBE. Update ${ralphFile} with edit_file so it truthfully reflects this iteration — the next fresh-context iteration inherits it as its whole state, so keep it lean, duplicate-free, and rewrite "## Next" to the single most important next action. Record a fact or check off an item ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence); a load-bearing claim with no supporting result goes under "## Hypotheses (validate before proceeding)" instead, and each existing hypothesis moves to "## Lessons" if a result confirmed it this turn or is deleted otherwise. After editing, read_file once to confirm the sections survived.',
-      '', 'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines.',
-      'Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
-      '', 'FILE: ${ralphFile}', 'CURRENT CONTENT:', '${progress}',
+      'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED. Copy the current content below verbatim, then fold in this iteration: it truthfully reflects the work, stays lean and duplicate-free, and its "## Next" is the single most important next action.',
+      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons", "## Next" (plus "## Hypotheses" and "## Steering" only when they have entries).',
+      'Record a fact or check off an item ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence); a load-bearing claim with no supporting result goes under "## Hypotheses (validate before proceeding)" instead, and each existing hypothesis moves to "## Lessons" if a result confirmed it this turn or is deleted otherwise.',
+      'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines. Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
+      '', 'CURRENT CONTENT (copy this, then apply your update — do NOT shrink it by dropping sections):', '${progress}',
     ].join('\n'),
     verify: [
       'You are the VERIFIER: the planner claims this task is COMPLETE — distrust it and find what is missing, broken, or unverified. Spot-check with tools (`shell` builds/runs/tests the real project on disk; read the files it claims it changed), trusting the strongest evidence over the prose. End with exactly ONE line: "VERDICT: PASS" or "VERDICT: FAIL — <one concrete reason>" (no verdict line = FAIL).',
@@ -193,8 +198,9 @@
     });
   }
   // Head+tail truncation for NOISY tools only (the crash/exit lives at the tail).
-  // read_file / edit_file are EXEMPT: the scribe must see the whole progress file —
-  // truncating it made the scribe edit against an amputated view (real breakage).
+  // read_file / edit_file / write_file are EXEMPT: the harness reads the whole
+  // progress file each turn (load + bulletproof pre-write readback), and truncating
+  // that would corrupt the state it writes back.
   const RESULT_CAP = 8 * 1024, NEVER_TRUNCATE = new Set(['read_file', 'edit_file', 'write_file']);
   function capResult(name, result) {
     const s = String(result == null ? '' : result);
@@ -385,33 +391,44 @@
         rec('[work trace]\n' + work.trace + '\n[work note] ' + work.text);
         ui.stageDone(host, 'work', work.text || '(tool calls only)');
 
-        // 3. SCRIBE (edits the file itself; reasoning off)
+        // 3. SCRIBE — FULL REWRITE. The scribe never touches a tool: it emits the
+        // ENTIRE new file as plain text (no edit_file to fight), and the HARNESS
+        // writes it. tools:[] + maxRounds:1 → one completion, .text is the whole file.
         ui.stageStart(host, 'scribe');
         const workTrace = (work.trace || '(no tool calls made)') + (work.text ? '\n\nFinal note: ' + work.text : '');
-        await agentTurn({
+        const scribe = await agentTurn({
           system: P_SCRIBE(v),
-          user: 'ENVIRONMENT MEMORIES (first iteration only — promote the relevant ones as [inherited] lessons):\n' + (turn === 1 ? appSystemPrompt : '(provided on turn 1 — see [inherited] lessons)') + '\n\nPLANNED ACTION THIS ITERATION:\n' + v.planNext + '\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n' + workTrace + '\n\nUpdate ' + ralphFile + ' now with edit_file, then read_file it to verify.',
-          tools: toolSchemas(['read_file', 'edit_file']), maxRounds: 8, reasoning: 'off', signal, convId: runId,
-          onDelta: (c) => ui.stageStream(host, 'scribe', c), onTool: (k, n, x) => ui.tool(host, k, n, x),
+          user: 'ENVIRONMENT MEMORIES (first iteration only — promote the relevant ones as [inherited] lessons):\n' + (turn === 1 ? appSystemPrompt : '(provided on turn 1 — see [inherited] lessons)') + '\n\nPLANNED ACTION THIS ITERATION:\n' + v.planNext + '\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n' + workTrace + '\n\nOutput the ENTIRE updated ' + ralphFile + ' now — full markdown, nothing else.',
+          tools: [], maxRounds: 1, reasoning: 'off', signal, convId: runId,
+          onDelta: (c) => ui.stageStream(host, 'scribe', c),
         });
-
-        // Guard: unchanged → stale; NEW structural damage → revert; else adopt.
-        let post = null;
-        try { post = await readProgress(); } catch (_) {}
-        if (post == null || post === body) {
+        // Strip stray ```markdown fences and any preamble before "# PROGRESS".
+        let next = String(scribe.text || '').trim().replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const h = next.indexOf('# PROGRESS');
+        if (h > 0) next = next.slice(h);
+        // Guard: empty or NEW structural damage → keep the old body, count stale.
+        // Otherwise the harness overwrites the file with the scribe's full output
+        // (old_str = body, which only the harness writes → the match is guaranteed).
+        const err = checkStructure(next), baseErr = checkStructure(body);
+        if (!next || (err && !baseErr)) {
+          stale++;
+          ui.note('⚠ scribe output ' + (!next ? 'was empty' : 'DAMAGED structure (' + err + ')') + ' — kept previous file (stale ×' + stale + ')');
+          rec('[scribe REJECTED] ' + (err || 'empty') + '\noutput was:\n' + next.slice(0, 1000));
+        } else if (next === body) {
           stale++;
           ui.note('⚠ scribe made no change (stale ×' + stale + ')');
         } else {
-          const err = checkStructure(post), baseErr = checkStructure(body);
-          if (err && !baseErr) {
-            stale++;
-            try { await runTool('edit_file', { path: ralphFile, old_str: post, new_str: body }, signal, runId); ui.note('⚠ scribe DAMAGED structure (' + err + ') — REVERTED (stale ×' + stale + ')'); }
-            catch (e) { ui.note('⚠ damage (' + err + ') and revert failed: ' + e.message); }
-            rec('[scribe REJECTED] ' + err);
-          } else {
-            body = post; stale = 0;
-            ui.stageDone(host, 'scribe', '✓ progress updated (' + post.length + ' B)');
-          }
+          // Overwrite via edit_file (write_file is create-only). old_str MUST equal
+          // the exact on-disk bytes; read them back rather than trusting `body`, so a
+          // drift can't make the match fail. write_file bootstrap ran turn 1, so the
+          // file exists.
+          let onDisk = body;
+          try { const d = await readProgress(); if (d != null) onDisk = d; } catch (_) {}
+          try {
+            await runTool('edit_file', { path: ralphFile, old_str: onDisk, new_str: next }, signal, runId);
+            body = next; stale = 0;
+            ui.stageDone(host, 'scribe', '✓ progress rewritten (' + next.length + ' B)');
+          } catch (e) { stale++; ui.note('⚠ harness write failed: ' + e.message + ' (stale ×' + stale + ')'); }
         }
         if (stale >= 3) { ui.note('STALLED: 3 turns without a progress update — stopping (resume from ' + ralphFile + ').'); break; }
       }
