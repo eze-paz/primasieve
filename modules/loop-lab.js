@@ -134,10 +134,12 @@
       body.enable_thinking = false;
     }
   }
-  // Single completion, no tools.
-  async function llmOnce(system, user, { signal, onDelta, temperature, reasoning } = {}) {
+  // Single completion, no tools. deterministic: greedy decoding (temperature 0,
+  // top_p 1, fixed seed for endpoints that honor it) — same file in, same plan out.
+  async function llmOnce(system, user, { signal, onDelta, temperature, reasoning, deterministic } = {}) {
     const { url, model, auth } = llmUrlAuth();
     const body = { model, stream: true, stream_options: { include_usage: true }, max_tokens: 4096, temperature: temperature != null ? temperature : 0.7, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+    if (deterministic) { body.temperature = 0; body.top_p = 1; body.top_k = 1; body.seed = 42; }
     if (reasoning) body.reasoning_effort = reasoning;
     const res = await fetchRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth }, body: JSON.stringify(body), signal }, signal);
     return stripThink((await consumeStream(res, onDelta, signal)).content);
@@ -322,7 +324,7 @@
 
         // 1. PLAN
         ui.stageStart(host, 'plan');
-        const planRaw = await llmOnce(P_PLAN(v), 'TASK:\n' + task + '\n\nJSON:', { signal, temperature: 0.2, reasoning: 'low', onDelta: (c) => ui.stageStream(host, 'plan', c) });
+        const planRaw = await llmOnce(P_PLAN(v), 'TASK:\n' + task + '\n\nJSON:', { signal, deterministic: true, reasoning: 'low', onDelta: (c) => ui.stageStream(host, 'plan', c) });
         rec('[plan] ' + planRaw);
         let plan = {};
         try { const s = planRaw.indexOf('{'), e = planRaw.lastIndexOf('}'); if (s >= 0 && e > s) plan = JSON.parse(planRaw.slice(s, e + 1)); } catch (_) {}
