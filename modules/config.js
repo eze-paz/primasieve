@@ -85,7 +85,7 @@ const SandpieConfig = (() => {
   // Adopt any namespaces the local mirror is missing (so another device's
   // settings carried in the old synced file aren't lost), then remove the file
   // locally and from Dropbox (via the standard file:deleted event — its listener
-  // is registered by dropbox-full's boot, which runs before this async resumes).
+  // is registered by dropbox's boot, which runs before this async resumes).
   async function migrateOffOpfs() {
     if (localStorage.getItem('sandpie-config-migrated') === '1') return;
     if (window.opfs) {

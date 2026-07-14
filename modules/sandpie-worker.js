@@ -436,7 +436,7 @@ function _dbxHeaders(json) {
   return h;
 }
 // Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
-// Mirrors dropbox-full.js download() — the documented CORS-enabled browser path.
+// Mirrors dropbox.js download() — the documented CORS-enabled browser path.
 async function hydrateAsync(rel) {
   const entry = _indexEntry(rel);
   if (!entry) return false;
@@ -478,7 +478,7 @@ function _indexEntriesUnder(norm, recursive) {
   for (const d of dirs) out.push({ path: d, kind: 'directory' });
   return out;
 }
-// Flushing last session's hydrated copies is now PAGE-side (dropbox-full
+// Flushing last session's hydrated copies is now PAGE-side (dropbox
 // dehydratePurge() on boot) — it knows sync state, so it can skip files with
 // unsynced edits. The worker no longer persists a manifest or wipes on boot.
 
@@ -1182,7 +1182,7 @@ async function tool_copy_to_workspace({ src, dest }) {
           _pyBroadcast({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt });
         }
 
-        // 2. Notify the page (dropbox-full.js) so file viewer renders it
+        // 2. Notify the page (dropbox.js) so file viewer renders it
         _reportHydrated(finalRel);
 
         // 3. Sync the new file into every pool worker's MEMFS so run_python sees it

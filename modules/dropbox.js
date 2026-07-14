@@ -1,5 +1,5 @@
 /* =============================================================================
-   modules/dropbox-full.js — Full-Dropbox sync provider.
+   modules/dropbox.js — Full-Dropbox sync provider.
 
    The app's sole cloud-sync provider (the former App-folder modules/dropbox.js
    was removed 2026-06-18). Registers a Sandpie sync provider + its cloud-sync
@@ -25,7 +25,7 @@
    ============================================================================= */
 (function () {
   'use strict';
-  if (!window.Sandpie) { console.warn('[dropbox-full] no Sandpie host — disabled'); return; }
+  if (!window.Sandpie) { console.warn('[dropbox] no Sandpie host — disabled'); return; }
 
   // ---- persistent state (dbxfull-* namespace) -------------------------------
   const TOKENS_KEY = 'dbxfull-tokens';
@@ -181,15 +181,15 @@
             commit: { path: relToCloud(rel), mode: 'overwrite', mute: true, autorename: false },
             rel, lm, s, content,
           };
-        } catch (err) { console.warn('[dropbox-full] session start failed:', rel, err); return null; }
+        } catch (err) { console.warn('[dropbox] session start failed:', rel, err); return null; }
       }));
       sessions.push(...results.filter(Boolean));
     }
     if (!sessions.length) return [];
     const entries = sessions.map(x => ({ cursor: x.cursor, commit: x.commit }));
     const result = await uploadSessionFinishBatch(entries);
-    if (result['.tag'] === 'async_job_id') { console.warn('[dropbox-full] finish_batch returned async_job_id — skipped, will retry next sync'); return []; }
-    if (!result.entries) { console.warn('[dropbox-full] unexpected finish_batch response:', result); return []; }
+    if (result['.tag'] === 'async_job_id') { console.warn('[dropbox] finish_batch returned async_job_id — skipped, will retry next sync'); return []; }
+    if (!result.entries) { console.warn('[dropbox] unexpected finish_batch response:', result); return []; }
     return sessions.map((x, i) => ({ ...x, meta: result.entries[i] }));
   }
   async function del(path) {
@@ -221,7 +221,7 @@
       localStorage.setItem(NS_KEY, ns);
       localStorage.setItem(EMAIL_KEY, email);
       localStorage.setItem(NS_VER_KEY, NS_DETECT_VER);
-      console.info('[dropbox-full] path-root', ns ? ('→ team root ' + ns) : '→ home', '(root=' + ri.root_namespace_id + ', home=' + ri.home_namespace_id + ')');
+      console.info('[dropbox] path-root', ns ? ('→ team root ' + ns) : '→ home', '(root=' + ri.root_namespace_id + ', home=' + ri.home_namespace_id + ')');
     }
     // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
     // section (default DEFAULT_PARENT = /R+D+I/sandpie, the department folder).
@@ -349,7 +349,7 @@
     for (const f of files) {
       const sub = f.slice(oldRel.length).replace(/^\/+/, '');
       try { await opfs.write(newRel + '/' + sub, await opfs.readBytes(f)); }
-      catch (e) { console.warn('[dropbox-full] move file failed:', f, e && e.message); }
+      catch (e) { console.warn('[dropbox] move file failed:', f, e && e.message); }
     }
     try { await opfs.remove(oldRel); } catch (_) {}
   }
@@ -364,7 +364,7 @@
         catch (e) {
           const m = String((e && e.message) || '').toLowerCase();
           // not_found = source already moved/never existed; conflict/duplicate = dest already there → fine.
-          if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox-full] sandpie migration deferred:', oldName, m); return; }
+          if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox] sandpie migration deferred:', oldName, m); return; }
         }
       }
       // Dropbox now reflects the new layout — reset sync state so the next sync
@@ -372,7 +372,7 @@
       localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
     }
     for (const [oldName, newRel] of SANDPIE_MOVES) {
-      try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox-full] local move failed:', oldName, e && e.message); }
+      try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox] local move failed:', oldName, e && e.message); }
     }
     localStorage.setItem('dbxfull-sandpie-migrated-v2', '1');
     try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
@@ -434,7 +434,7 @@
         setCursor(result.cursor); setCloudIndex(idx);
         return { index: idx, delta, deletions };
       } catch (err) {
-        console.warn('[dropbox-full] cursor sync failed, full re-list:', err.message);
+        console.warn('[dropbox] cursor sync failed, full re-list:', err.message);
         setCursor(null);
       }
     }
@@ -499,7 +499,7 @@
           await opfs.write(it.rel, bytes);
           const mtime = await Sandpie.opfsMtime(it.rel);
           state[it.rel] = { rev: it.e.rev, size: it.e.size, syncedMtime: mtime };
-        } catch (err) { console.warn('[dropbox-full] download failed:', it.rel, err); }
+        } catch (err) { console.warn('[dropbox] download failed:', it.rel, err); }
         if (onProgress) { try { onProgress(++done, total); } catch (_) {} }
       }
     }
@@ -533,49 +533,49 @@
       for (const path of Object.keys(state)) {
         if (cloudSet.has(path)) continue;
         if (state[path].syncedMtime === 0) {
-          if (isConv(path)) console.log('[dropbox-full] PASS1 KEEP (dirty):', path, 'syncedMtime=0');
+          if (isConv(path)) console.log('[dropbox] PASS1 KEEP (dirty):', path, 'syncedMtime=0');
           continue;
         }
         if (p[path]) {
-          if (isConv(path)) console.log('[dropbox-full] PASS1 KEEP (pending):', path);
+          if (isConv(path)) console.log('[dropbox] PASS1 KEEP (pending):', path);
           continue;
         }
         const exists = await opfs.exists(path);
-        if (isConv(path)) console.log('[dropbox-full] PASS1 DELETE:', path, 'exists=', exists);
+        if (isConv(path)) console.log('[dropbox] PASS1 DELETE:', path, 'exists=', exists);
         if (!exists) { delete state[path]; continue; }
         try {
           await opfs.remove(path);
           delete state[path]; removedAny = true;
         } catch (e) {
-          console.warn('[dropbox-full] PASS1 remove FAILED:', path, e && e.message);
+          console.warn('[dropbox] PASS1 remove FAILED:', path, e && e.message);
         }
       }
 
       // ── Pass 2: local files with no state entry ──
       let allLocal = []; try { allLocal = await opfs.list(); } catch (e) {
-        console.warn('[dropbox-full] opfs.list() FAILED:', e && e.message);
+        console.warn('[dropbox] opfs.list() FAILED:', e && e.message);
       }
       let removedCount = 0, keptCount = 0;
       for (const path of allLocal) {
         if (cloudSet.has(path)) { keptCount++; continue; }
         if (state[path] && state[path].syncedMtime === 0) {
-          if (isConv(path)) console.log('[dropbox-full] PASS2 KEEP (dirty-state):', path);
+          if (isConv(path)) console.log('[dropbox] PASS2 KEEP (dirty-state):', path);
           keptCount++; continue;
         }
         if (p[path]) {
-          if (isConv(path)) console.log('[dropbox-full] PASS2 KEEP (pending):', path);
+          if (isConv(path)) console.log('[dropbox] PASS2 KEEP (pending):', path);
           keptCount++; continue;
         }
-        if (isConv(path)) console.log('[dropbox-full] PASS2 DELETE orphan:', path);
+        if (isConv(path)) console.log('[dropbox] PASS2 DELETE orphan:', path);
         try {
           await opfs.remove(path);
           if (state[path]) delete state[path];
           removedAny = true; removedCount++;
         } catch (e) {
-          console.warn('[dropbox-full] PASS2 remove FAILED:', path, e && e.message);
+          console.warn('[dropbox] PASS2 remove FAILED:', path, e && e.message);
         }
       }
-      console.log('[dropbox-full] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
+      console.log('[dropbox] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
 
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
@@ -627,10 +627,10 @@
               };
               addPending(r.rel);   // protect from deletion until cursor confirms
             } else {
-              console.warn('[dropbox-full] batch item failed:', r.rel, r.meta);
+              console.warn('[dropbox] batch item failed:', r.rel, r.meta);
             }
           }
-        } catch (err) { console.warn('[dropbox-full] batch upload failed:', err); }
+        } catch (err) { console.warn('[dropbox] batch upload failed:', err); }
         upDone += chunk.length;
         _setSyncProgress(upDone, dirty.length, 'Uploading');
       }
@@ -648,7 +648,7 @@
       }
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
-      console.warn('[dropbox-full] sync:', e);
+      console.warn('[dropbox] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
       try { _setSyncProgress(0, 0); } catch (_) {}   // clear the bar when the cycle ends
@@ -1048,7 +1048,7 @@
     } else if (tokens()) {
       (async () => {
         try { await ensureWorkingRoot(); await maybeMigrateAiSandbox(); }   // MIGRATE_AI_SANDBOX (temporary)
-        catch (e) { console.warn('[dropbox-full] pre-sync:', e && e.message); }
+        catch (e) { console.warn('[dropbox] pre-sync:', e && e.message); }
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
         await migrateExemptToSandpie();

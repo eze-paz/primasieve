@@ -1,4 +1,57 @@
-import { streamDiff } from './streamdiff.js';
+// ---- streamDiff (was streamdiff.js) — minimal DOM diff/patch for preserving
+// selection during streaming. Receives a live DOM element and a new HTML string.
+// Parses the HTML into a temp fragment, then walks both trees to apply only the
+// minimal set of attribute/child mutations needed. Text nodes that haven't
+// changed are left untouched, so any active user text selection survives.
+// ---------------------------------------------------------------------------
+const _SD_DIV = document.createElement('div');
+
+function _sdPatchAttrs(el, ref) {
+  const keep = new Set();
+  for (const a of ref.attributes || []) {
+    keep.add(a.name);
+    if (el.getAttribute(a.name) !== a.value) el.setAttribute(a.name, a.value);
+  }
+  for (const a of Array.from(el.attributes)) {
+    if (!keep.has(a.name)) el.removeAttribute(a.name);
+  }
+}
+
+function _sdPatchKids(el, ref) {
+  const oldN = el.childNodes.length;
+  const newN = ref.childNodes.length;
+  const min = Math.min(oldN, newN);
+
+  for (let i = 0; i < min; i++) {
+    const o = el.childNodes[i];
+    const n = ref.childNodes[i];
+    const sameType = o.nodeType === n.nodeType;
+
+    if (sameType && o.nodeType === Node.TEXT_NODE) {
+      if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue;
+      continue;
+    }
+
+    if (sameType && o.nodeType === Node.ELEMENT_NODE && o.tagName === n.tagName) {
+      _sdPatchAttrs(o, n);
+      _sdPatchKids(o, n);
+      continue;
+    }
+
+    el.replaceChild(n.cloneNode(true), o);
+  }
+
+  while (el.childNodes.length > min) el.removeChild(el.lastChild);
+
+  for (let i = min; i < newN; i++) {
+    el.appendChild(ref.childNodes[i].cloneNode(true));
+  }
+}
+
+function streamDiff(rootEl, html) {
+  _SD_DIV.innerHTML = html;
+  _sdPatchKids(rootEl, _SD_DIV);
+}
 const CONV_DIR = 'sandpie/conversations';
 const ARCHIVED_DIR = 'sandpie/conversations/archived';
 function newConvId() {
@@ -1134,7 +1187,7 @@ function getSandpieWorker() {
     }
     if (msg.type === 'forward-to-page') {
       // Relay opfs-deleted-by-python / sw-opfs-changed to existing SW message
-      // listeners (dropbox-full.js) by dispatching onto navigator.serviceWorker.
+      // listeners (dropbox.js) by dispatching onto navigator.serviceWorker.
       try { navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: msg.payload })); } catch (_) {}
       return;
     }

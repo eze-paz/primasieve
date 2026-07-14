@@ -218,7 +218,7 @@
   ul.fs-list button { padding: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.9rem; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; }
   ul.fs-list button:hover { color: var(--sp-danger); background: transparent; }
 
-  /* Subscriptions modal (dropbox-full). Own list class so its text buttons are
+  /* Subscriptions modal (dropbox). Own list class so its text buttons are
      NOT crushed by the 18px icon-button rule above (ul.fs-list button), and own
      button styling since .ghost is scoped to aside (the modal lives on body). */
   .subs-modal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
