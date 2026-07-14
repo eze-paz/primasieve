@@ -438,27 +438,6 @@
       _run = null; _ui = null;
       ui.setRunning(false);
       ui.note(signal.aborted ? 'Stopped by user.' : done ? 'Loop finished.' : 'Loop ended.');
-      // [MEMORY] harvest — cap 3, dedup vs existing store, never from ## Hypotheses.
-      try {
-        if (body && window.SandpieMemory && SandpieMemory.save) {
-          const hb = body.replace(/\n##\s*Hypotheses[^\n]*\n[\s\S]*?(?=\n##\s|\s*$)/i, '\n');
-          let existing = [];
-          try { existing = (await SandpieMemory.list()).map(f => (f.name + ' ' + f.description + ' ' + f.body).toLowerCase()); } catch (_) {}
-          let n = 0;
-          for (const m of hb.matchAll(/^\s*-\s*\[MEMORY\]\s*(.+)$/gm)) {
-            if (n >= 3) break;
-            const fact = m[1].trim();
-            const words = fact.toLowerCase().match(/[a-z0-9_]{4,}/g) || [];
-            if (existing.find(e => words.filter(w => e.includes(w)).length / (words.length || 1) > 0.6)) continue;
-            const r = await SandpieMemory.save({
-              name: 'ralph-' + fact.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').split('-').slice(0, 6).join('-'),
-              description: (fact.split(/(?<=[.:])\s/)[0] || fact).slice(0, 120),
-              type: 'project', body: fact + '\n\n(harvested from ralph run ' + runId + ')',
-            });
-            if (r && r.ok) { n++; ui.note('🧠 memory harvested: ' + r.name); }
-          }
-        }
-      } catch (e) { ui.note('memory harvest failed: ' + (e.message || e)); }
     }
   }
 
