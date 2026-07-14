@@ -12,8 +12,7 @@
  *
  * Kept hard-won fixes: SSE streaming (defeats proxy 504s), retry-forever on transient
  * HTTP, per-stage reasoning off for the scribe, dynamic tool-RPC timeout (no 120s
- * guillotine on long shells), progress structure guard, steering, resume, [MEMORY]
- * harvest. Tool-result truncation (8kB head+tail) applies ONLY to noisy tools —
+ * guillotine on long shells), progress structure guard, steering, resume. Tool-result truncation (8kB head+tail) applies ONLY to noisy tools —
  * read_file is NEVER truncated (the harness reads the whole progress file each turn).
  */
 (function () {
