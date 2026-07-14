@@ -255,8 +255,16 @@
           '',
           'WHAT TO RECORD:',
           '- Check off (- [ ] → - [x]) ONLY items the worker genuinely completed AND verified this iteration; add new checklist items and concrete facts/paths discovered.',
-          '- EVIDENCE RULE: record ONLY facts observed in the worker trace (paths, addresses, filenames, test results). Never record a worker assertion it did not verify with a tool.',
-          '- NO DUPLICATES: if a lesson already covers a point, refine that line in place; if a new finding contradicts an old line, replace the old line — never leave both.',
+          '',
+          'EVIDENCE SUFFICIENCY — you are the skeptic too (there is no separate critic; this check is yours):',
+          '- In the trace, lines starting with "·" are tool CALLS (what was attempted); lines starting with "→" are tool RESULTS (ground truth). The "Final note:" at the end is the worker\'s OWN account — a hint about intent, NEVER evidence.',
+          '- Before writing ANY factual line (a checkbox, a lesson, a discovered fact), ask ONE question: does a tool RESULT this iteration literally show it? A command merely attempted, or the worker asserting it, is NOT proof.',
+          '  • YES, a result shows it → record it as a fact/lesson.',
+          '  • NO result shows it, but the task could depend on it (load-bearing) → do NOT record it as fact. Put it in "## Hypotheses (validate before proceeding)" (create the section right after "## Checklist" if absent) as "- <claim> — CONFIRM by <the tool result that would show it>". The next iteration must validate it before building on it.',
+          '  • NO result shows it and nothing depends on it → drop it entirely.',
+          '- HYPOTHESES decay in ONE turn: for each EXISTING "## Hypotheses" entry, if a RESULT this turn confirms it → move it to "## Lessons"; if this turn disproved it or did not test it → delete it. Never let a hypothesis linger. Drop the "## Hypotheses" heading when the section is empty.',
+          '- CONTRADICTIONS: you can see the whole file — if a result this iteration contradicts an existing line, replace/fix that line; never leave the old and new side by side.',
+          '- NO DUPLICATES: if a lesson already covers a point, refine that line in place instead of adding a second.',
           '- [MEMORY] TAG (RARE — most iterations tag ZERO): only for a finding a DIFFERENT, UNRELATED future task would need AND that is NOT recoverable from the repo. A genuine tool/environment gotcha or a hard-won cross-cutting diagnosis qualifies. Do NOT tag anything one grep away — file paths, build/test commands, checksums, addresses, crate lists, "where X lives", "how this project is laid out" are ALL task-local: leave them as plain lessons, never [MEMORY]. [MEMORY] lines become PERMANENT memory injected into every future conversation, so over-tagging is expensive pollution. If unsure, do not tag.',
           '- ON THE FIRST ITERATION ONLY: from the ENVIRONMENT MEMORIES in the user message, copy the ones plausibly relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines (verbatim essence, one line each). Later iterations rely on these.',
           '- ALWAYS rewrite the "## Next" section body to the single most important next action (ONE paragraph only).',
@@ -264,43 +272,6 @@
           '- If a "## Steering (user directives)" section exists, fold addressed directives into the checklist and remove them from that section (drop the whole section when empty).',
         ].join('\n'),
         user: 'ENVIRONMENT MEMORIES (first iteration only — promote the relevant ones as [inherited] lessons):\n${appSystemPromptFirstTurn}\n\nPLANNED ACTION THIS ITERATION:\n${planNext}\n\nWHAT THE WORKER ACTUALLY DID (tool trace):\n${workTrace}\n\nUpdate ${ralphFile} now with edit_file, then read_file it to verify your changes.',
-      },
-      {
-        // 3b. CRITIC — the assumption-checker. Runs after the scribe (edits the same
-        // file; the turn-end syncAgentScribe reconciles + structure-guards the combined
-        // result). Enforces that every recorded claim is EVIDENCED by this turn's trace,
-        // hunts contradictions across the WHOLE file, and converts unproven-but-load-
-        // bearing claims into "## Hypotheses (validate before proceeding)" tasks the
-        // planner MUST resolve next turn. A hypothesis lives exactly one turn: confirmed
-        // → promoted; unconfirmed/inconclusive → dropped. Better no memory than a bad one.
-        name: 'critic', type: 'agent', tools: ['read_file', 'edit_file'], maxRounds: 6, saveAs: 'criticOut', reasoning: 'off',
-        when: '!scratchpad.allDone',
-        system: [
-          'You are the CRITIC — a fast PROVENANCE checker. You do a shallow yes/no check, nothing more.',
-          '',
-          'HARD LIMITS — you have ONLY read_file/edit_file on the progress file. You CANNOT investigate, run commands, decode instructions, compute addresses, parse binaries, or verify anything yourself. You NEVER reason about whether a claim is technically correct — only whether the trace already SHOWS it. If you catch yourself decoding, calculating, or re-deriving ANYTHING, STOP: that is the worker\'s job, not yours.',
-          '',
-          'THE ONE QUESTION, per new claim: does a tool RESULT in the evidence below literally contain something that supports this line? YES → leave it. NO → downgrade it. That is the entire decision. Do not overthink it; scan for the supporting result and move on.',
-          '',
-          'FILE: ${ralphFile}',
-          'PROGRESS AT TURN START (before this turn\'s scribe edits):',
-          '${progressBeforeScribe}',
-          '',
-          'THIS TURN\'S TOOL EVIDENCE — tool CALLS + RESULTS, no worker commentary. A RESULT is ground truth; an ARGUMENT is only what was attempted, never proof:',
-          '${workTraceEvidence}',
-          '',
-          'DO THIS, fast:',
-          '1. read_file ${ralphFile} once. New claims = lines present now but NOT in "PROGRESS AT TURN START".',
-          '2. For each NEW factual line (lesson/[MEMORY]/[OBSERVED]/fact), apply THE ONE QUESTION:',
-          '   • YES (a result supports it) → leave it.',
-          '   • NO (no result shows it) but the whole task could depend on it → edit_file to MOVE it into "## Hypotheses (validate before proceeding)" (create after "## Checklist" if absent) as "- <claim> — CONFIRM by <what result would show it>"; strip any [MEMORY]/[inherited]/[OBSERVED] prefix.',
-          '   • NO and nothing depends on it → edit_file to delete the line.',
-          '3. Existing "## Hypotheses" entries: a result this turn supports it → move to "## Lessons"; otherwise delete it (one turn only).',
-          '4. Only if a result DIRECTLY contradicts an existing line, fix/delete that line. Do NOT hunt for subtle contradictions — that is overthinking.',
-          '',
-          'RULES: never edit "## Task"/"## Next". Keep one each of "# PROGRESS","## Task","## Checklist","## Lessons","## Next"; drop the "## Hypotheses" heading when empty. If every new claim is evidenced and nothing contradicts, make NO edits and finish immediately.',
-        ].join('\n'),
-        user: 'Provenance-check this turn: read ${ralphFile}, and for each new claim answer only "does a tool result show this?" — leave if yes, downgrade/delete if no. Do not investigate or re-derive anything. Finish fast.',
       },
       {
         // 4. VERIFY — skeptic gate, only when the planner declared completion.
@@ -541,9 +512,9 @@
     return { url, model, auth };
   }
 
-  // Per-stage reasoning control. A mechanical stage (scribe recording facts, critic
-  // doing a yes/no provenance check) does not need chain-of-thought, and paying for
-  // 12k thinking tokens there is waste. Endpoints disagree on the knob, so set the
+  // Per-stage reasoning control. A mechanical stage (the scribe recording facts and
+  // doing its yes/no evidence-sufficiency check) does not need chain-of-thought, and
+  // paying for 12k thinking tokens there is waste. Endpoints disagree on the knob, so set the
   // common ones and let the provider honor whichever it supports (harmless if ignored):
   //   'off'  → no thinking (vLLM/Kimi enable_thinking:false + reasoning_effort:minimal)
   //   'low'|'medium'|'high' → OpenAI-style reasoning_effort
@@ -1095,9 +1066,10 @@
         // ${workTrace} — for the SCRIBE (the doer's recorder): tool calls + results +
         // the worker's own Final note (its assembled assistant output).
         vars[st.traceAs] = cap(body + (out ? '\n\nFinal note: ' + out : '')) || '(no tool calls made)';
-        // ${workTraceEvidence} — for the CRITIC: tool calls + results ONLY, NO assistant
-        // reasoning / Final note. The critic must judge claims against ground truth, not
-        // be anchored by the worker's narrative of what it thinks it proved.
+        // ${workTraceEvidence} — tool calls + results ONLY, NO Final note. Kept
+        // available for any evidence-only consumer; the critic that used it was folded
+        // into the scribe (the scribe now does its own evidence-sufficiency check and
+        // is told to treat the "Final note:" in ${workTrace} as narrative, not proof).
         vars[st.traceAs + 'Evidence'] = cap(body) || '(no tool calls made)';
       }
       ui.agentDone(turnHost, st.name, Date.now() - t0);
@@ -1494,7 +1466,8 @@
         try {
           const seen = new Set();
           // Never harvest from the "## Hypotheses" section — those are UNPROVEN by
-          // definition (the critic's holding pen). Only confirmed [MEMORY] lines graduate.
+          // definition (the scribe's holding pen for unevidenced claims). Only confirmed
+          // [MEMORY] lines graduate.
           const harvestBody = _curBody.replace(/\n##\s*Hypotheses[^\n]*\n[\s\S]*?(?=\n##\s|\s*$)/i, '\n');
           const HARVEST_CAP = 3;   // hard ceiling per run — [MEMORY] is meant to be rare
           // Skip facts already covered by an existing memory (keyword overlap) so the
