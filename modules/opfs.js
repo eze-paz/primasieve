@@ -4785,7 +4785,6 @@ window.showContextMenu = function(x, y, items) { return opfs.showContextMenu(x, 
 
 
 
-window.openFileViewer = function(fullKey, name) { return opfs.openFile(fullKey, name); };
 
 
 window.closeFileViewer = function() { return opfs.closeFile(); };
@@ -4827,7 +4826,6 @@ window.markedPromise = null;
 
 
 
-window.opfsLastModified = function(path) { return opfs.lastModified(path); };
 
 
 window.getFileSize = function(path) { return opfs.getFileSize(path); };

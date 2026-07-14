@@ -685,5 +685,4 @@
   if (typeof SandpieCommands !== 'undefined') {
     SandpieCommands.register({ name: 'loop-lab', module: 'loop-lab', help: 'Open the Ralph loop panel', usage: '>>> loop-lab', run() { open(); return 'Ralph opened.'; } });
   }
-  window.SandpieLoopLab = { open, close, steer, get running() { return !!_run; }, get transcript() { return _transcript.join('\n\n'); } };
 })();
