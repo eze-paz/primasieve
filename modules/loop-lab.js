@@ -55,9 +55,10 @@
       '', 'THE ONE ACTION:', '${planNext}',
     ].join('\n'),
     scribe: [
-      'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED. Copy the current content below verbatim, then fold in this iteration: it truthfully reflects the work, stays lean and duplicate-free.',
+      'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED.',
+      'This file IS the plan. Each turn the worker reads the FIRST unchecked checklist item and does exactly that. No unchecked items = the task is done. Your job is to keep the checklist accurate: remove what got done, add what got discovered, re-order by priority.',
       'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons".',
-      'The ## Checklist contains ONLY unchecked items (- [ ]). Any item the worker completed this turn is REMOVED from the checklist. If a completed item produced a verifiable, reusable fact, move that fact to ## Lessons as a new bullet. Do NOT keep checked items in the checklist — they bloat the file with stale premises.',
+      'The ## Checklist contains ONLY unchecked items (- [ ]). Each item must be a single concrete action the worker can execute in one turn. REMOVE completed items immediately — do NOT keep them as checked. If completing an item revealed a new task, add it. If an item is too vague, split it.',
       'Record a fact in ## Lessons ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence). A load-bearing claim with no supporting result becomes a new unchecked checklist item instead.',
       'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines. Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
       '', 'CURRENT CONTENT (copy this, then apply your update — do NOT shrink it by dropping sections):', '${progress}',
