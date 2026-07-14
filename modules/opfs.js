@@ -1669,7 +1669,7 @@ opfs.openFile = async function(fullKey, name, opts = {}) {
     const dirPath = fullKey.replace(/\/[^\/]+$/, '');
 
 
-    body.innerHTML = '<iframe src="/convert_latex/index.html?v=3#project=' + encodeURIComponent(dirPath) + '" style="width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;"></iframe>';
+    body.innerHTML = '<iframe src="/convert_latex/index.html?v=4#project=' + encodeURIComponent(dirPath) + '" style="width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;"></iframe>';
 
 
     mount(opfs.closeFile);
@@ -2404,9 +2404,9 @@ opfs._putConvertJob = function(job) {
 opfs._pdfjsReady = null;
 opfs._ensurePdfjs = function () {
   if (!opfs._pdfjsReady) {
-    opfs._pdfjsReady = opfs._loadScript('/modules/vendor/pdfjs/pdf.min.js').then(function () {
+    opfs._pdfjsReady = opfs._loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.js').then(function () {
       if (!window.pdfjsLib) throw new Error('pdf.js failed to load');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/vendor/pdfjs/pdf.worker.min.js';
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.js';
     });
   }
   return opfs._pdfjsReady;
@@ -4488,7 +4488,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
               const dirPath = it.fullKey.replace(/\/[^\/]+$/, '');
 
 
-              window.open('/convert_latex/index.html?v=3#project=' + encodeURIComponent(dirPath), '_blank');
+              window.open('/convert_latex/index.html?v=4#project=' + encodeURIComponent(dirPath), '_blank');
 
 
             }
