@@ -12,7 +12,7 @@
  *
  * Kept hard-won fixes: SSE streaming (defeats proxy 504s), retry-forever on transient
  * HTTP, per-stage reasoning off for the scribe, dynamic tool-RPC timeout (no 120s
- * guillotine on long shells), progress structure guard, steering, resume. Tool-result truncation (8kB head+tail) applies ONLY to noisy tools —
+ * guillotine on long shells), progress structure guard, resume. Tool-result truncation (8kB head+tail) applies ONLY to noisy tools —
  * read_file is NEVER truncated (the harness reads the whole progress file each turn).
  */
 (function () {
@@ -56,7 +56,7 @@
     ].join('\n'),
     scribe: [
       'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED. Copy the current content below verbatim, then fold in this iteration: it truthfully reflects the work, stays lean and duplicate-free.',
-      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons" (plus "## Steering" only when it has entries).',
+      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons".',
       'The ## Checklist contains ONLY unchecked items (- [ ]). Any item the worker completed this turn is REMOVED from the checklist. If a completed item produced a verifiable, reusable fact, move that fact to ## Lessons as a new bullet. Do NOT keep checked items in the checklist — they bloat the file with stale premises.',
       'Record a fact in ## Lessons ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence). A load-bearing claim with no supporting result becomes a new unchecked checklist item instead.',
       'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines. Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
@@ -287,7 +287,6 @@
 
   /* ============ the ralph loop ============ */
   let _run = null;               // { ctrl }
-  let _steerQueue = [];
   let _transcript = [];
   const rec = (s) => { _transcript.push(String(s)); if (_transcript.length > 400) _transcript.splice(0, 100); };
   let _ui = null;
@@ -321,20 +320,6 @@
           ui.showProgress(body);
         }
 
-        // Fold queued steering into the file (harness-owned write → old_str always matches).
-        let steering = '(none)';
-        if (_steerQueue.length) {
-          const dirs = _steerQueue.splice(0);
-          ui.updateSteerCount();
-          steering = dirs.map(d => '- ' + d).join('\n');
-          const heading = '## Steering (user directives)';
-          const updated = body.includes(heading)
-            ? body.replace(heading + '\n', heading + '\n' + steering + '\n')
-            : body.replace(/^## Checklist$/m, heading + '\n' + steering + '\n\n## Checklist');
-          try { await runTool('edit_file', { path: ralphFile, old_str: body, new_str: updated }, signal, runId); body = updated; ui.note('🧭 steering folded in (' + dirs.length + ')'); } catch (e) { ui.note('steering write failed: ' + e.message); }
-          ui.showProgress(body);
-          rec('[steering] ' + dirs.join(' | '));
-        }
 
         // App system prompt (durable memories). buildSystemPrompt may return a string
         // or {role,content} — unwrap; never inject "[object Object]".
@@ -349,13 +334,10 @@
         // "## Lessons" as [inherited] lines, and the progress file carries them from
         // then on. Re-injecting it every turn multiplied every call's input cost.
         const appSystemPrompt = turn === 1 ? appSystemPromptFull : '(provided on turn 1 — see [inherited] lessons in the progress file)';
-        const v = { task, ralphFile, progress: body, steering, appSystemPrompt, planNext: '' };
+        const v = { task, ralphFile, progress: body, appSystemPrompt, planNext: '' };
 
         // 1. PLAN — pure code, zero tokens: the first unchecked item in "## Checklist" IS the plan.
-        // Fresh steering overrides the queued action for this turn (it is also folded
-        // into the file above, so the scribe carries it forward).
         const plan = planFromFile(body);
-        if (steering !== '(none)') { plan.allDone = false; plan.next = 'USER STEERING (highest priority — do this first):\n' + steering + '\n\nThen, if fully addressed, continue with: ' + (plan.next || 'the checklist'); }
         v.planNext = plan.next;
         rec('[plan] ' + (plan.allDone ? 'all checklist items done — verifying' : plan.next));
         ui.note('▶ plan: ' + (plan.allDone ? 'all done — verifying' : plan.next.slice(0, 160)));
@@ -498,10 +480,6 @@
           <button class="ll-btn primary" id="llRun">▶ Run</button>
           <button class="ll-btn" id="llStop" style="display:none;">■ Stop</button>
         </div>
-        <div class="ll-row">
-          <input type="text" id="llSteer" placeholder="Steer the running loop… (Enter)" style="flex:1;padding:0.4rem;" disabled>
-          <span id="llSteerN" class="ll-note"></span>
-        </div>
         <details id="llPrompts" style="margin:0 0.6rem;">
           <summary style="cursor:pointer;font-size:0.74rem;color:var(--sp-text-dim,#8b949e);">Prompts ✎ <span id="llPromptsMod"></span></summary>
           <div id="llPromptEditors"></div>
@@ -613,10 +591,8 @@
         $id('llRun').style.display = on ? 'none' : '';
         $id('llStop').style.display = on ? '' : 'none';
         $id('llStatus').textContent = on ? 'Running…' : '';
-        $id('llSteer').disabled = !on;
-        if (!on) { _steerQueue = []; this.updateSteerCount(); refreshResume(); }
+        if (!on) { refreshResume(); }
       },
-      updateSteerCount() { $id('llSteerN').textContent = _steerQueue.length ? 'queued ' + _steerQueue.length : ''; },
       showProgress(body) {
         const el = $id('llProgress');
         if (!el) return;
@@ -650,12 +626,6 @@
       try { await runRalph(task, ui, $id('llResume').value || null); } catch (e) { ui.note('Fatal: ' + (e.message || e)); ui.setRunning(false); }
     };
     $id('llStop').onclick = () => { if (_run) _run.ctrl.abort(); };
-    $id('llSteer').addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const t = $id('llSteer').value.trim();
-      if (t && _run) { _steerQueue.push(t); $id('llSteer').value = ''; ui.updateSteerCount(); ui.note('🧭 steering queued: ' + t); }
-    });
     $id('llCopy').onclick = async () => {
       try { await navigator.clipboard.writeText(_transcript.join('\n\n')); $id('llCopy').textContent = '✓ Copied'; }
       catch (_) { $id('llCopy').textContent = '✕ failed'; }
@@ -674,12 +644,6 @@
     if (!_panel) return;
     if (_run && !confirm('A loop is running — close anyway? (It keeps running.)')) return;
     _panel.style.display = 'none';
-  }
-  function steer(text) {
-    const t = String(text || '').trim();
-    if (!t || !_run) return false;
-    _steerQueue.push(t);
-    return true;
   }
 
   if (typeof SandpieCommands !== 'undefined') {
