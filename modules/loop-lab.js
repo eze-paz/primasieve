@@ -450,7 +450,7 @@
   const CSS = `
     #loopLabOverlay { position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center; }
     #loopLabOverlay .ll-backdrop { position:absolute; inset:0; background:rgba(0,0,0,0.55); }
-    #loopLabOverlay .ll-modal { position:relative; width:min(900px,94vw); height:min(720px,92vh); display:flex; flex-direction:column;
+    #loopLabOverlay .ll-modal { position:relative; width:min(900px,94vw); height:92vh; display:flex; flex-direction:column;
       background:var(--sp-bg,#0d1117); border:1px solid var(--sp-border,#30363d); border-radius:10px; overflow:hidden; }
     #loopLabOverlay .ll-head { display:flex; align-items:center; gap:0.6rem; padding:0.7rem 1rem; border-bottom:1px solid var(--sp-border,#30363d); }
     #loopLabOverlay .ll-row { display:flex; gap:0.4rem; align-items:center; padding:0.4rem 0.6rem; }
