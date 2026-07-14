@@ -28,21 +28,6 @@
 
 
   /* ── project ID from paths ────────────────────────────────────────── */
-  function getProjectId(paths) {
-    if (!paths || !paths.length) {
-      try { return localStorage.getItem('sandpie-active-folder') || 'global'; } catch (_) { return 'global'; }
-    }
-    const ps = paths.filter(Boolean).map(p => p.replace(/\\/g, '/'));
-    if (!ps.length) return 'global';
-    const parts = ps[0].split('/');
-    let prefix = '';
-    for (let i = 0; i < parts.length; i++) {
-      const cand = prefix + parts[i];
-      if (ps.every(p => p.startsWith(cand + '/') || p === cand)) { prefix = cand + '/'; }
-      else break;
-    }
-    return prefix.replace(/\/$/, '') || 'global';
-  }
 
   // Serialize the read-modify-write: a turn fires many trackRecentPath calls
   // concurrently, and without a queue they race on the same file and clobber
@@ -55,10 +40,9 @@
   }
   async function _trackRecentPathInner(path) {
     // Use the SAME project id the read side (systemBlock) uses. Deriving it from
-    // meta.files via getProjectId([...]) returned the full file path (incl. name)
     // and wrote to a garbage nested dir that the reader never looked in.
-    const project = getProjectId();
-    const storePath = MEMORY_DIR + '/' + project + '.recent-paths.json';
+    // Recent paths: single global list (was per-project)
+    const storePath = MEMORY_DIR + '/global.recent-paths.json';
     let list = [];
     try { const raw = await opfs.read(storePath); if (raw) list = JSON.parse(raw); } catch (_) {}
     list = list.filter(p => p !== path);
@@ -70,9 +54,8 @@
     try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', storePath); } catch (_) {}
   }
 
-  async function getRecentPaths(projectHint) {
-    const project = projectHint || 'global';
-    try { const raw = await opfs.read(MEMORY_DIR + '/' + project + '.recent-paths.json'); if (raw) return JSON.parse(raw); } catch (_) {}
+  async function getRecentPaths() {
+    try { const raw = await opfs.read(MEMORY_DIR + '/global.recent-paths.json'); if (raw) return JSON.parse(raw); } catch (_) {}
     return [];
   }
 
@@ -86,9 +69,8 @@
   function summarizeSession(convId, fromIdx = 0) {
     const meta = convMeta.get(convId);
     if (!meta || meta.toolCalls.length === 0) return null;
-    // Same no-arg project id the reader (lessonSystemBlock) uses — deriving it
     // from meta.files wrote lessons to a path the reader never looked in.
-    const project = getProjectId();
+    // Recent paths: single global list (was per-project)
     const files = [...meta.files];
     // Only the tool calls SINCE the last distill (fromIdx) — the "what just
     // happened" the distiller reasons over. total is returned so the caller can
@@ -256,15 +238,15 @@
   /* ── system prompt injection block ─────────────────────────────────── */
   async function systemBlock() {
     let block = '';
-    const project = getProjectId();
+    // Recent paths: single global list (was per-project)
     // Recent paths
     if (localStorage.getItem('sandpie-recent-paths-enabled') !== 'false') {
       // Path-shape filter: cleans any pre-existing junk entries (21, len, panic!,
       // {, {:#x}) written before the _shellFileTargets fix, so they never reach the
       // prompt. The stored file self-heals via its 20-cap as real paths push them out.
-      const paths = (await getRecentPaths(project)).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
+      const paths = (await getRecentPaths()).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
       if (paths.length) {
-        block += '\n\n## Recent paths\n\nFiles touched recently in this project:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
+        block += '\n\n## Recent paths\n\nFiles touched recently:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
       }
     }
     // (Project-lessons injection removed: the distiller now harvests memory facts
@@ -274,7 +256,7 @@
   }
 /* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
-    getProjectId,
+    
     trackRecentPath,
     getRecentPaths,
     distillLessons,
