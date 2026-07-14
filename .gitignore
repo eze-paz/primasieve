@@ -1,11 +1,22 @@
+# Ignore all dot-prefixed files and directories (except .git and .gitignore itself)
+.*
+!.git
+!.gitignore
+
+# Python
 __pycache__/
 *.pyc
 *.bak
+
+# Editor / OS
 .DS_Store
 .env
 *.swp
+
+# Local dev
 .qwenref/
 docs/_localmodel/
 
+# Playwright
 playwright-tests/test-results/
 playwright-tests/playwright-report/
