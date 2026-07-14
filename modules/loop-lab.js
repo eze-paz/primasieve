@@ -21,9 +21,9 @@
   const K_TASK = 'sandpie:looplab:lastTask';
 
   /* ============ prompts (keep ~3 sentences each) ============ */
-  // NO PLANNER LLM. The plan IS the file: the scribe already writes "## Next" as the
+  // NO PLANNER LLM. The plan IS the file: the single most important next action, so the "planner" is pure code — read that
   // single most important next action, so the "planner" is pure code — read that
-  // section and do it. Hypotheses gate first; all boxes checked + no hypotheses → verify.
+  // section and do it. All boxes checked → verify. Any unchecked item → work on it.
   function sectionBody(body, heading) {
     const re = new RegExp('^##\\s*' + heading + '[^\\n]*$', 'mi');
     const m = String(body || '').match(re);
@@ -33,16 +33,16 @@
     return body.slice(start, next >= 0 ? next : body.length).trim();
   }
   function planFromFile(body) {
-    const hyp = sectionBody(body, 'Hypotheses');
-    const firstHyp = hyp && (hyp.match(/^\s*-\s*(.+)$/m) || [])[1];
-    if (firstHyp) return { allDone: false, next: 'Validate this hypothesis with a concrete tool test (then it either becomes a Lesson or is dropped): ' + firstHyp.trim() };
     const checklist = sectionBody(body, 'Checklist');
-    const allDone = !/-\s*\[ \]/.test(checklist) && /-\s*\[[xX]\]/.test(checklist);
+    const items = checklist.split('\n').filter(l => /^\s*-\s*\[[ xX]\]/.test(l));
+    const unchecked = items.filter(l => /\[ \]/.test(l));
+    const checked   = items.filter(l => /\[[xX]\]/.test(l));
+    const allDone = unchecked.length === 0 && checked.length > 0;
     if (allDone) return { allDone: true, next: '' };
-    const next = sectionBody(body, 'Next');
-    return { allDone: false, next: next || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.' };
+    const firstUnchecked = unchecked[0];
+    const next = firstUnchecked ? firstUnchecked.replace(/^-\s*\[ \]\s*/, '').trim() : '';
+    return { allDone: false, next: next || 'Explore the codebase relevant to the task and draft a real, concrete checklist of remaining work.' };
   }
-
   // Prompt TEMPLATES — user-editable in the panel ("Prompts ✎"), persisted in
   // localStorage, filled with ${placeholder}s at call time. Defaults below.
   // Placeholders: ${appSystemPrompt} ${progress} ${planNext} ${ralphFile} ${task}
@@ -55,9 +55,10 @@
       '', 'THE ONE ACTION:', '${planNext}',
     ].join('\n'),
     scribe: [
-      'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED. Copy the current content below verbatim, then fold in this iteration: it truthfully reflects the work, stays lean and duplicate-free, and its "## Next" is the single most important next action.',
-      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons", "## Next" (plus "## Hypotheses" and "## Steering" only when they have entries).',
-      'Record a fact or check off an item ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence); a load-bearing claim with no supporting result goes under "## Hypotheses (validate before proceeding)" instead, and each existing hypothesis moves to "## Lessons" if a result confirmed it this turn or is deleted otherwise.',
+      'You are the SCRIBE. OUTPUT THE ENTIRE UPDATED PROGRESS FILE — the full markdown, start ("# PROGRESS") to end, and NOTHING else (no preamble, no code fences, no commentary). The harness overwrites the file with exactly your output, so anything you omit is DELETED. Copy the current content below verbatim, then fold in this iteration: it truthfully reflects the work, stays lean and duplicate-free.',
+      'Keep these sections, each exactly once, in this order: "# PROGRESS", "## Task", "## Checklist", "## Lessons" (plus "## Steering" only when it has entries).',
+      'The ## Checklist contains ONLY unchecked items (- [ ]). Any item the worker completed this turn is REMOVED from the checklist. If a completed item produced a verifiable, reusable fact, move that fact to ## Lessons as a new bullet. Do NOT keep checked items in the checklist — they bloat the file with stale premises.',
+      'Record a fact in ## Lessons ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence). A load-bearing claim with no supporting result becomes a new unchecked checklist item instead.',
       'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines. Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
       '', 'CURRENT CONTENT (copy this, then apply your update — do NOT shrink it by dropping sections):', '${progress}',
     ].join('\n'),
@@ -245,14 +246,14 @@
 
   /* ============ progress file ============ */
   function bootstrapMd(task) {
-    return '# PROGRESS\n\n## Task\n' + task + '\n\n## Checklist\n- [ ] (plan not written yet — explore the codebase and replace this with a real, concrete checklist)\n\n## Lessons\n(none yet)\n\n## Next\nStudy the codebase relevant to the task, then rewrite this file: real checklist under "## Checklist", first concrete step here under "## Next".\n';
+    return '# PROGRESS\n\n## Task\n' + task + '\n\n## Checklist\n- [ ] Explore the codebase relevant to the task and draft a real, concrete checklist of remaining work\n\n## Lessons\n(none yet)\n';
   }
   function checkStructure(body) {
     const s = String(body || '');
     if (!s.trim()) return 'file is empty';
     if (!/^# PROGRESS\s*$/m.test(s)) return 'missing "# PROGRESS" title';
-    for (const h of ['## Task', '## Checklist', '## Lessons', '## Next']) {
-      const c = (s.match(new RegExp('^' + h + '\\s*$', 'gm')) || []).length;
+    for (const h of ['## Task', '## Checklist', '## Lessons']) {
+      const c = (s.match(new RegExp('^' + h + '\s*$', 'gm')) || []).length;
       if (c === 0) return 'missing "' + h + '"';
       if (c > 1) return '"' + h + '" appears ' + c + ' times';
     }
@@ -348,7 +349,7 @@
         const appSystemPrompt = turn === 1 ? appSystemPromptFull : '(provided on turn 1 — see [inherited] lessons in the progress file)';
         const v = { task, ralphFile, progress: body, steering, appSystemPrompt, planNext: '' };
 
-        // 1. PLAN — pure code, zero tokens: the scribe's "## Next" IS the plan.
+        // 1. PLAN — pure code, zero tokens: the first unchecked item in "## Checklist" IS the plan.
         // Fresh steering overrides the queued action for this turn (it is also folded
         // into the file above, so the scribe carries it forward).
         const plan = planFromFile(body);
@@ -373,9 +374,12 @@
             const m = verdict.match(/VERDICT:\s*FAIL\s*[—-]*\s*(.*)/i);
             const reason = (m && m[1]) || 'no explicit verdict';
             ui.stageDone(host, 'verify', '❌ FAIL — ' + reason);
-            // Surface the objection to the next planner turn via the file itself.
-            const updated = body.replace(/^## Checklist$/m, '## Checklist\n- [ ] Verifier objection (turn ' + turn + '): ' + reason.replace(/\s+/g, ' ').slice(0, 300));
-            try { await runTool('edit_file', { path: ralphFile, old_str: body, new_str: updated }, signal, runId); } catch (_) {}
+            // Surface the objection as a new checklist item and return to the work-scribe loop.
+            let onDisk = body;
+            try { const d = await readProgress(); if (d != null) onDisk = d; } catch (_) {}
+            const failureItem = '- [ ] Verifier objection (turn ' + turn + '): ' + reason.replace(/\s+/g, ' ').slice(0, 300);
+            const updated = onDisk.replace(/^## Checklist$/m, '## Checklist\n' + failureItem);
+            try { await runTool('edit_file', { path: ralphFile, old_str: onDisk, new_str: updated }, signal, runId); body = updated; } catch (_) {}
           }
           continue;
         }
