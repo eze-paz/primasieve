@@ -227,6 +227,11 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   if (comp) meta.compaction = comp;
   if (todos) meta.todos = todos;
   if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
+  // Paths touched by tools in this conversation (from augmentations.js)
+  const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
+    ? SandpieAugmentations.getConvPaths(convId)
+    : (prevMeta && prevMeta.paths) || [];
+  if (convPaths && convPaths.length) meta.paths = convPaths;
 
   const metaStr = JSON.stringify(meta);
   if (metaStr !== prevMetaRaw) {

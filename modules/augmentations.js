@@ -261,6 +261,11 @@
     getRecentPaths,
     distillLessons,
     getConvMeta: getMeta,
+    getConvPaths(convId) {
+      const meta = convMeta.get(convId);
+      if (!meta) return [];
+      return [...meta.files].filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
+    },
     logToolStarted,
     logToolResult,
     systemBlock,
