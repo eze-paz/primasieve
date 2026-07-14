@@ -40,25 +40,42 @@
     return { allDone: false, next: next || 'Explore the codebase relevant to the task and draft or refine the concrete checklist.' };
   }
 
-  const P_WORK = (v) => [
-    'You are the WORKER. Do EXACTLY the one action below and verify it actually worked (read files back, run code) — nothing more; do not try to finish the whole task. Use `shell` for the real project on disk (/home/..., absolute paths); read_file/write_file/edit_file are a SEPARATE browser sandbox that cannot see the project, so never use them for real files. You do NOT update any progress file — just do the action and report concretely what you changed and what you verified.',
-    '', 'ENVIRONMENT (durable facts — trust unless you observe otherwise):', v.appSystemPrompt,
-    '', 'CURRENT PROGRESS FILE:', v.progress,
-    '', 'THE ONE ACTION:', v.planNext,
-  ].join('\n');
-
-  const P_SCRIBE = (v) => [
-    'You are the SCRIBE. Update ' + v.ralphFile + ' with edit_file so it truthfully reflects this iteration — the next fresh-context iteration inherits it as its whole state, so keep it lean, duplicate-free, and rewrite "## Next" to the single most important next action. Record a fact or check off an item ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence); a load-bearing claim with no supporting result goes under "## Hypotheses (validate before proceeding)" instead, and each existing hypothesis moves to "## Lessons" if a result confirmed it this turn or is deleted otherwise. After editing, read_file once to confirm the sections survived.',
-    '', 'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines.',
-    'Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
-    '', 'FILE: ' + v.ralphFile, 'CURRENT CONTENT:', v.progress,
-  ].join('\n');
-
-  const P_VERIFY = (v) => [
-    'You are the VERIFIER: the planner claims this task is COMPLETE — distrust it and find what is missing, broken, or unverified. Spot-check with tools (`shell` builds/runs/tests the real project on disk; read the files it claims it changed), trusting the strongest evidence over the prose. End with exactly ONE line: "VERDICT: PASS" or "VERDICT: FAIL — <one concrete reason>" (no verdict line = FAIL).',
-    '', 'ENVIRONMENT (durable facts — trust unless your checks contradict):', v.appSystemPrompt,
-    '', 'PROGRESS FILE (the claim):', v.progress,
-  ].join('\n');
+  // Prompt TEMPLATES — user-editable in the panel ("Prompts ✎"), persisted in
+  // localStorage, filled with ${placeholder}s at call time. Defaults below.
+  // Placeholders: ${appSystemPrompt} ${progress} ${planNext} ${ralphFile} ${task}
+  const K_PROMPTS = 'sandpie:looplab:prompts';
+  const DEFAULT_PROMPTS = {
+    work: [
+      'You are the WORKER. Do EXACTLY the one action below and verify it actually worked (read files back, run code) — nothing more; do not try to finish the whole task. Use `shell` for the real project on disk (/home/..., absolute paths); read_file/write_file/edit_file are a SEPARATE browser sandbox that cannot see the project, so never use them for real files. You do NOT update any progress file — just do the action and report concretely what you changed and what you verified.',
+      '', 'ENVIRONMENT (durable facts — trust unless you observe otherwise):', '${appSystemPrompt}',
+      '', 'CURRENT PROGRESS FILE:', '${progress}',
+      '', 'THE ONE ACTION:', '${planNext}',
+    ].join('\n'),
+    scribe: [
+      'You are the SCRIBE. Update ${ralphFile} with edit_file so it truthfully reflects this iteration — the next fresh-context iteration inherits it as its whole state, so keep it lean, duplicate-free, and rewrite "## Next" to the single most important next action. Record a fact or check off an item ONLY if a tool RESULT shows it (in the trace "→" lines are results = ground truth; the "Final note" is the worker\'s own claim, NOT evidence); a load-bearing claim with no supporting result goes under "## Hypotheses (validate before proceeding)" instead, and each existing hypothesis moves to "## Lessons" if a result confirmed it this turn or is deleted otherwise. After editing, read_file once to confirm the sections survived.',
+      '', 'FIRST ITERATION ONLY: copy the environment memories in the user message relevant to THIS task into "## Lessons" as "- [inherited] <fact>" lines.',
+      'Prefix a lesson [MEMORY] ONLY (rare) for a cross-task environment gotcha NOT recoverable from the repo — never for paths, commands, or addresses.',
+      '', 'FILE: ${ralphFile}', 'CURRENT CONTENT:', '${progress}',
+    ].join('\n'),
+    verify: [
+      'You are the VERIFIER: the planner claims this task is COMPLETE — distrust it and find what is missing, broken, or unverified. Spot-check with tools (`shell` builds/runs/tests the real project on disk; read the files it claims it changed), trusting the strongest evidence over the prose. End with exactly ONE line: "VERDICT: PASS" or "VERDICT: FAIL — <one concrete reason>" (no verdict line = FAIL).',
+      '', 'ENVIRONMENT (durable facts — trust unless your checks contradict):', '${appSystemPrompt}',
+      '', 'PROGRESS FILE (the claim):', '${progress}',
+    ].join('\n'),
+  };
+  function loadPrompts() {
+    try { return Object.assign({}, DEFAULT_PROMPTS, JSON.parse(localStorage.getItem(K_PROMPTS) || '{}')); }
+    catch (_) { return Object.assign({}, DEFAULT_PROMPTS); }
+  }
+  function savePrompt(key, text) {
+    const cur = (() => { try { return JSON.parse(localStorage.getItem(K_PROMPTS) || '{}'); } catch (_) { return {}; } })();
+    if (text === DEFAULT_PROMPTS[key]) delete cur[key]; else cur[key] = text;
+    localStorage.setItem(K_PROMPTS, JSON.stringify(cur));
+  }
+  function fill(tpl, v) { return String(tpl).replace(/\$\{(\w+)\}/g, (_, k) => (v[k] !== undefined ? String(v[k]) : '')); }
+  const P_WORK = (v) => fill(loadPrompts().work, v);
+  const P_SCRIBE = (v) => fill(loadPrompts().scribe, v);
+  const P_VERIFY = (v) => fill(loadPrompts().verify, v);
 
   /* ============ LLM plumbing ============ */
   function stripThink(s) {
@@ -480,6 +497,10 @@
           <input type="text" id="llSteer" placeholder="Steer the running loop… (Enter)" style="flex:1;padding:0.4rem;" disabled>
           <span id="llSteerN" class="ll-note"></span>
         </div>
+        <details id="llPrompts" style="margin:0 0.6rem;">
+          <summary style="cursor:pointer;font-size:0.74rem;color:var(--sp-text-dim,#8b949e);">Prompts ✎ <span id="llPromptsMod"></span></summary>
+          <div id="llPromptEditors"></div>
+        </details>
         <div class="ll-trace" id="llTrace"></div>
       </div>`;
     document.body.appendChild(root);
@@ -492,6 +513,33 @@
       sel.innerHTML = '<option value="">↻ Resume: (fresh run)</option>' + runs.map(r =>
         '<option value="' + r.runId + '">' + r.runId + (r.task ? ' — ' + r.task.slice(0, 48).replace(/</g, '&lt;') : '') + ' · ' + new Date(r.mtime).toLocaleString() + '</option>').join('');
     }
+    // Prompt editors: one textarea per stage, auto-saved to localStorage on input
+    // (applies from the NEXT stage call — prompts are re-read at call time, so you
+    // can tune mid-run). "reset" restores the shipped default.
+    (function buildPromptEditors() {
+      const wrap = $id('llPromptEditors');
+      const modBadge = () => {
+        let saved = {}; try { saved = JSON.parse(localStorage.getItem(K_PROMPTS) || '{}'); } catch (_) {}
+        const mods = Object.keys(saved);
+        $id('llPromptsMod').textContent = mods.length ? '(modified: ' + mods.join(', ') + ')' : '';
+      };
+      const cur = loadPrompts();
+      for (const key of Object.keys(DEFAULT_PROMPTS)) {
+        const row = document.createElement('div');
+        row.innerHTML = '<div class="ll-note" style="display:flex;align-items:center;gap:0.5rem;margin-top:0.3rem;"><strong>' + key + '</strong>'
+          + '<span style="opacity:0.7;">placeholders: ${appSystemPrompt} ${progress} ${planNext} ${ralphFile} ${task}</span>'
+          + '<button class="ll-btn" data-reset="' + key + '" style="margin-left:auto;padding:0.1rem 0.5rem;font-size:0.68rem;">reset</button></div>';
+        const ta = document.createElement('textarea');
+        ta.value = cur[key];
+        ta.style.cssText = 'width:100%;height:7rem;padding:0.4rem;font-family:ui-monospace,monospace;font-size:0.7rem;resize:vertical;';
+        ta.oninput = () => { savePrompt(key, ta.value); modBadge(); };
+        row.querySelector('[data-reset]').onclick = () => { ta.value = DEFAULT_PROMPTS[key]; savePrompt(key, ta.value); modBadge(); };
+        row.appendChild(ta);
+        wrap.appendChild(row);
+      }
+      modBadge();
+    })();
+
     $id('llResume').onchange = async () => {
       const id = $id('llResume').value;
       if (!id || $id('llTask').value.trim()) return;
