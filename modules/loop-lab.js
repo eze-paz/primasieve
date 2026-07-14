@@ -547,20 +547,6 @@
       modBadge();
     })();
 
-    $id('llResume').onchange = async () => {
-      const id = $id('llResume').value;
-      if (!id) { ui.showProgress('(no active run)'); return; }
-      if ($id('llTask').value.trim()) return;
-      try {
-        const root2 = await navigator.storage.getDirectory();
-        const f = await (await (await (await root2.getDirectoryHandle('ralph')).getDirectoryHandle(id)).getFileHandle('PROGRESS.md')).getFile();
-        const text = await f.text();
-        const m = text.match(/^\s*##\s*Task\s*\r?\n+([\s\S]*?)(?:\r?\n\s*##|$)/i);
-        if (m) $id('llTask').value = m[1].trim();
-        ui.showProgress(text);
-      } catch (_) { ui.showProgress('(no active run)'); }
-    };
-
     const ui = {
       addTurn(n) {
         const d = document.createElement('div');
@@ -637,6 +623,20 @@
         el.textContent = body || '(empty)';
         el.scrollTop = 0;
       },
+    };
+
+    $id('llResume').onchange = async () => {
+      const id = $id('llResume').value;
+      if (!id) { ui.showProgress('(no active run)'); return; }
+      if ($id('llTask').value.trim()) return;
+      try {
+        const root2 = await navigator.storage.getDirectory();
+        const f = await (await (await (await root2.getDirectoryHandle('ralph')).getDirectoryHandle(id)).getFileHandle('PROGRESS.md')).getFile();
+        const text = await f.text();
+        const m = text.match(/^\s*##\s*Task\s*\r?\n+([\s\S]*?)(?:\r?\n\s*##|$)/i);
+        if (m) $id('llTask').value = m[1].trim();
+        ui.showProgress(text);
+      } catch (_) { ui.showProgress('(no active run)'); }
     };
 
     $id('llRun').onclick = async () => {
