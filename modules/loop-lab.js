@@ -135,9 +135,10 @@
     }
   }
   // Single completion, no tools.
-  async function llmOnce(system, user, { signal, onDelta, temperature } = {}) {
+  async function llmOnce(system, user, { signal, onDelta, temperature, reasoning } = {}) {
     const { url, model, auth } = llmUrlAuth();
     const body = { model, stream: true, stream_options: { include_usage: true }, max_tokens: 4096, temperature: temperature != null ? temperature : 0.7, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+    if (reasoning) body.reasoning_effort = reasoning;
     const res = await fetchRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: auth }, body: JSON.stringify(body), signal }, signal);
     return stripThink((await consumeStream(res, onDelta, signal)).content);
   }
@@ -306,17 +307,22 @@
 
         // App system prompt (durable memories). buildSystemPrompt may return a string
         // or {role,content} — unwrap; never inject "[object Object]".
-        let appSystemPrompt = '';
+        let appSystemPromptFull = '';
         try {
           const r = await SandpieConversations.buildSystemPrompt([]);
-          appSystemPrompt = typeof r === 'string' ? r : String((r && (r.content || r.text)) || '');
-          if (appSystemPrompt === '[object Object]') appSystemPrompt = '';
+          appSystemPromptFull = typeof r === 'string' ? r : String((r && (r.content || r.text)) || '');
+          if (appSystemPromptFull === '[object Object]') appSystemPromptFull = '';
         } catch (_) {}
+        // TOKEN DIET: the full environment prompt (all memories, skills index) goes to
+        // plan/work ONLY on turn 1 — the scribe copies the relevant facts into
+        // "## Lessons" as [inherited] lines, and the progress file carries them from
+        // then on. Re-injecting it every turn multiplied every call's input cost.
+        const appSystemPrompt = turn === 1 ? appSystemPromptFull : '(provided on turn 1 — see [inherited] lessons in the progress file)';
         const v = { task, ralphFile, progress: body, steering, appSystemPrompt, planNext: '' };
 
         // 1. PLAN
         ui.stageStart(host, 'plan');
-        const planRaw = await llmOnce(P_PLAN(v), 'TASK:\n' + task + '\n\nJSON:', { signal, temperature: 0.2, onDelta: (c) => ui.stageStream(host, 'plan', c) });
+        const planRaw = await llmOnce(P_PLAN(v), 'TASK:\n' + task + '\n\nJSON:', { signal, temperature: 0.2, reasoning: 'low', onDelta: (c) => ui.stageStream(host, 'plan', c) });
         rec('[plan] ' + planRaw);
         let plan = {};
         try { const s = planRaw.indexOf('{'), e = planRaw.lastIndexOf('}'); if (s >= 0 && e > s) plan = JSON.parse(planRaw.slice(s, e + 1)); } catch (_) {}
