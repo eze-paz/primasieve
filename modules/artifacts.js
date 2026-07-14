@@ -83,6 +83,26 @@ const _ARTIFACT_ICON = {
   img: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
   generic: '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/>',
 };
+// Legacy-path fallback: user files moved from /files/<dir>/ to /files/sandpie/<dir>/.
+// Resolve a stored artifact path to whichever variant actually exists in OPFS, so
+// old conversations replaying "artifact:artifacts/x.html" still find the file. If
+// the file exists nowhere (e.g. dehydrated), fall back to trying the sandpie/-
+// prefixed variant anyway when the original is a bare legacy path.
+async function resolveArtifactPath(clean) {
+  const candidates = [clean];
+  if (!clean.startsWith('sandpie/')) candidates.push('sandpie/' + clean);
+  else candidates.push(clean.slice('sandpie/'.length));
+  for (const p of candidates) {
+    try {
+      const { parts, name } = splitPath(p);
+      const dir = await opfs.resolveDir(parts);
+      await dir.getFileHandle(name);
+      return p;
+    } catch (_) {}
+  }
+  return candidates[0].startsWith('sandpie/') ? candidates[0] : candidates[1] || candidates[0];
+}
+
 function buildArtifactCard(clean, ext, onOpen) {
   const kind = _ARTIFACT_KIND[ext] || 'generic';
   const label = _ARTIFACT_LABEL[ext] || (ext ? ext.toUpperCase() : 'File');
@@ -101,7 +121,7 @@ function buildArtifactCard(clean, ext, onOpen) {
   el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
   (async () => {
     try {
-      const { parts, name } = splitPath(clean);
+      const { parts, name } = splitPath(await resolveArtifactPath(clean));
       const dir = await opfs.resolveDir(parts);
       const file = await (await dir.getFileHandle(name)).getFile();
       const sub = el.querySelector('.ac-sub');
@@ -114,6 +134,8 @@ function buildArtifactCard(clean, ext, onOpen) {
 function renderArtifact(host, path) {
   const target = host || (_activeStream() && _activeStream().host) || _$('messages');
   const clean = path ? String(path).replace(/^\/+/, '') : '';
+  // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
+  const resolvedP = clean ? resolveArtifactPath(clean) : Promise.resolve(clean);
 
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
@@ -156,7 +178,7 @@ function renderArtifact(host, path) {
     panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
     panelBtn.title = 'Open in side panel';
     panelBtn.textContent = '⊞';
-    panelBtn.onclick = () => { collapseArtifact(wrap); openArtifactPanel(clean); };
+    panelBtn.onclick = async () => { collapseArtifact(wrap); openArtifactPanel(await resolvedP); };
     btns.appendChild(panelBtn);
 
     const openLink = document.createElement('a');
@@ -168,7 +190,7 @@ function renderArtifact(host, path) {
     openLink.onclick = async (e) => {
       e.preventDefault();
       try {
-        const url = await opfs.toUrl(clean);
+        const url = await opfs.toUrl(await resolvedP);
         const win = window.open(url, '_blank');
         // Revoke after a minute — enough for the new tab to finish loading.
         setTimeout(() => URL.revokeObjectURL(url), 60000);
@@ -183,8 +205,9 @@ function renderArtifact(host, path) {
   dlBtn.className = 'artifact-icon-btn';
   dlBtn.onclick = async () => {
     try {
-      const bytes = await opfs.readBytes(clean);
-      const ext2 = clean.split('.').pop().toLowerCase();
+      const p = await resolvedP;
+      const bytes = await opfs.readBytes(p);
+      const ext2 = p.split('.').pop().toLowerCase();
       const mime = ({html:'text/html',htm:'text/html',svg:'image/svg+xml',png:'image/png',
         jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',
         csv:'text/csv',json:'application/json',txt:'text/plain'})[ext2] || 'application/octet-stream';
@@ -217,7 +240,7 @@ function renderArtifact(host, path) {
     if (cb) cb.remove();
     wrap.appendChild(buildArtifactCard(clean, ext, async () => {
       try {
-        const url = await opfs.toUrl(clean);
+        const url = await opfs.toUrl(await resolvedP);
         window.open(url, '_blank');
         setTimeout(() => URL.revokeObjectURL(url), 60000);
       } catch (e) { console.error('[artifact] open failed:', e); }
@@ -232,7 +255,7 @@ function renderArtifact(host, path) {
   if (PANEL_ONLY_EXTS.has(ext)) {
     const cb = wrap.querySelector('.artifact-collapse-btn');
     if (cb) cb.remove();
-    wrap.appendChild(buildArtifactCard(clean, ext, () => openArtifactPanel(clean)));
+    wrap.appendChild(buildArtifactCard(clean, ext, async () => openArtifactPanel(await resolvedP)));
     target.appendChild(wrap);
     return;
   }
@@ -252,7 +275,9 @@ function renderArtifact(host, path) {
   // Load async: read from OPFS, create blob URL, revoke old one on refresh.
   (async () => {
     try {
-      const url = await opfs.toUrl(clean);
+      const p = await resolvedP;
+      wrap.dataset.artifactPath = p;
+      const url = await opfs.toUrl(p);
       if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
       frame._blobUrl = url;
       frame.src = url;

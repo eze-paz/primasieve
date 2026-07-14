@@ -636,11 +636,17 @@ async function tool_write_todos({ ops, todos }, ctx) {
 async function tool_show_artifact({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
-  try { await opfsReadBytes(clean); return { result: 'artifact:' + clean }; }
-  catch (e) {
-    if (_indexEntry(clean)) { try { await hydrateAsync(clean); return { result: 'artifact:' + clean }; } catch (_) {} }
-    return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
+  // Legacy-path fallback: user files moved from /files/<dir>/ to /files/sandpie/<dir>/,
+  // so old calls like "artifacts/x.html" resolve against the new prefix too (and
+  // vice versa, in case a caller double-prefixes).
+  const candidates = [clean];
+  if (!clean.startsWith('sandpie/')) candidates.push('sandpie/' + clean);
+  else candidates.push(clean.slice('sandpie/'.length));
+  for (const p of candidates) {
+    try { await opfsReadBytes(p); return { result: 'artifact:' + p }; } catch (_) {}
+    if (_indexEntry(p)) { try { await hydrateAsync(p); return { result: 'artifact:' + p }; } catch (_) {} }
   }
+  return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
 }
 
 // Images are embedded as base64 in the NEXT model request. The upstream gateway
