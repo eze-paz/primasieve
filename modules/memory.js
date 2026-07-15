@@ -214,24 +214,11 @@ const SandpieMemory = (function () {
     return { ok: true, before: facts.length, after: facts.length, clusters: clusters.length, merged };
   }
 
-  // Called on the pre-send path (from buildSystemPrompt). Consolidation now runs
-  // whenever the store GREW since the last pass (a new fact is the moment dupes
-  // and contradictions appear — refine immediately, don't wait for the budget),
-  // and still as a backstop when over the token budget. First sighting of the
-  // store only records the baseline (no consolidate-on-app-start churn).
-  let _lastCount = -1;   // fact count after the last consolidation (or first sight)
+  // Phase 3: Auto-consolidation disabled. Path clustering is deterministic but
+  // still user-initiated via >>> memory cluster. The store grows unbounded until
+  // the user clusters it — no silent LLM pruning.
   async function maybeConsolidate() {
-    if (_consolidating || !isEnabled()) return;
-    const facts = await list();
-    if (facts.length < 2) { _lastCount = facts.length; return; }
-    if (_lastCount < 0) { _lastCount = facts.length; if (_usedTokens(facts) <= threshold()) return; }
-    const grew = facts.length > _lastCount;
-    const over = _usedTokens(facts) > threshold();
-    if (!grew && !over) return;
-    try {
-      const r = await consolidate(facts);
-      _lastCount = (r && r.ok) ? r.after : facts.length;   // on failure: don't re-hammer every send
-    } catch (e) { _lastCount = facts.length; console.warn('[sandpie] memory consolidation failed:', e); }
+    // No-op: clustering is user-initiated.
   }
 
   // ---- commands -------------------------------------------------------------
@@ -239,10 +226,10 @@ const SandpieMemory = (function () {
     if (typeof SandpieCommands === 'undefined') return;
     SandpieCommands.register({
       name: 'memory', module: 'core',
-      help: 'List remembered facts; "show <name>" for one, "consolidate" to prune now',
-      usage: '>>> memory [show <name> | consolidate]',
+      help: 'List remembered facts; "show <name>" for one, "cluster" to group by paths',
+      usage: '>>> memory [show <name> | cluster]',
       async run(text, parts) {
-        if (parts[1] === 'consolidate') { const r = await consolidate(); return r.ok ? `Consolidated: ${r.before} → ${r.after} fact(s), ${r.removed} pruned.${r.guarded ? ' (deletion skipped by safety guard — pass looked over-aggressive)' : ''}` : 'Consolidation: ' + (r.reason || 'failed') + '.'; }
+        if (parts[1] === 'consolidate' || parts[1] === 'cluster') { const r = await consolidate(); return r.ok ? `Clustered: ${r.clusters} cluster(s), ${r.merged} fact(s) grouped by shared paths.` : 'Clustering: ' + (r.reason || 'failed') + '.'; }
         if (parts[1] === 'show') { const f = (await list()).find(x => x.name === parts[2]); return f ? f.body : 'No memory named "' + (parts[2] || '') + '".'; }
         // Default: DIAGNOSE + simulate the real system-prompt injection, so what you
         // see here is exactly what the model gets (systemBlock) — and when it's empty
@@ -454,7 +441,8 @@ const SandpieMemory = (function () {
       const h = _sbHash(f.name);
       const a = _sbRand01(h, 1) * Math.PI * 2;
       const r = 8 + _sbRand01(h, 2) * 34;
-      return { f, x: Math.min(SB_W - 6, Math.max(6, c.x + Math.cos(a) * r)), y: Math.min(SB_H - 6, Math.max(6, c.y + Math.sin(a) * r * 0.75)), s: 1.8 + _sbRand01(h, 3) * 1.8 };
+      const isCluster = f.name.endsWith('-cluster');
+      return { f, x: Math.min(SB_W - 6, Math.max(6, c.x + Math.cos(a) * r)), y: Math.min(SB_H - 6, Math.max(6, c.y + Math.sin(a) * r * 0.75)), s: isCluster ? 4.5 : 1.8 + _sbRand01(h, 3) * 1.8, isCluster };
     });
     const byName = new Map(pos.map((p, i) => [p.f.name, i]));
     const edges = [];
@@ -473,7 +461,7 @@ const SandpieMemory = (function () {
       if (best >= 0 && bd < 2200) edges.push([i, best, false]);
     });
     const edgeSvg = edges.map(([i, j, isLink]) => `<line class="sb-edge${isLink ? ' sb-link' : ''}" x1="${pos[i].x.toFixed(1)}" y1="${pos[i].y.toFixed(1)}" x2="${pos[j].x.toFixed(1)}" y2="${pos[j].y.toFixed(1)}"/>`).join('');
-    const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; return `<circle class="sb-node ${SB_TYPE_CLASS[p.f.type] || 'sb-reference'}${isNew ? ' sb-new' : ''}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
+    const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; const cls = (SB_TYPE_CLASS[p.f.type] || 'sb-reference') + (p.isCluster ? ' sb-cluster' : '') + (isNew ? ' sb-new' : ''); return `<circle class="sb-node ${cls}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
     const now = Date.now();
     const counts = new Array(30).fill(0);
     let before = 0;
