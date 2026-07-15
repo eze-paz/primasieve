@@ -1415,6 +1415,11 @@ function normalizeToolArgs(raw) {
 }
 
 async function streamOneRound(reqUrl, headers, body, ctx) {
+  // OpenRouter prompt-cache grouping: pin a stable per-conversation session id
+  // (set once in runAgent) so the re-sent prefix across tool rounds caches.
+  // Applied here — the single funnel for every generation request, including the
+  // 413-compaction retry — rather than only on the first-round body.
+  if (ctx && ctx._sessionId) body.session_id = ctx._sessionId;
   const payload = JSON.stringify(body);
   // We deliberately do NOT pre-block oversized bodies here: some providers cap the
   // request body (~1 MB) and reply 413, others don't. So let the provider decide and
@@ -1805,6 +1810,11 @@ async function runAgent(config, ctx) {
   // (e.g. spawn_subagent builds the child's config from it).
   ctx._agentConfig = config;
   ctx._messages = messages;
+  // Stable per-conversation id for OpenRouter prompt-cache grouping. Generated
+  // ONCE here and reused on every round — a fresh value each round would defeat
+  // caching. Random token + the (stable-for-this-conversation) file name keeps
+  // it unique across conversations.
+  ctx._sessionId = (Math.random().toString(36).slice(2, 10)) + '-' + (config.conversation_file_name || 'unknown');
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
