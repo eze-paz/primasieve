@@ -128,6 +128,30 @@ async function readConvData(id) {
   return null;
 }
 
+// Per-conversation prompt-cache key (OpenRouter session_id). Generated once as
+// <random>-<convId> and persisted in the conversation meta so it stays stable
+// across turns, refreshes, and devices — without it, every send regenerates
+// the id and the cached system+history prefix is recomputed from scratch.
+// Duplicates/rewinds behave correctly for free: duplicateConv writes a clean
+// meta (no session_id) so the copy gets its own key; rewind keeps the same
+// conversation's meta, so it reuses the same key.
+function newSessionId(convId) {
+  return (Math.random().toString(36).slice(2, 10)) + '-' + (convId || 'unknown');
+}
+async function ensureSessionId(convId) {
+  if (!convId) return null;
+  const loc = await convLocation(convId);
+  const mp = metaPath(convId, loc.archived);
+  let meta = null;
+  try { meta = JSON.parse(await opfs.read(mp)); } catch {}
+  if (meta && meta.session_id) return meta.session_id;
+  const sid = newSessionId(convId);
+  const updated = Object.assign({}, meta || {}, { id: convId, session_id: sid });
+  await opfs.write(mp, JSON.stringify(updated));
+  Sandpie.events.emit('file:changed', mp);
+  return sid;
+}
+
 // Lightweight list row. New format → read only the tiny meta file. Legacy → read
 // the whole .json (unavoidable until it migrates). Message text for search is only
 // pulled when a query is active.
@@ -227,6 +251,9 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   if (comp) meta.compaction = comp;
   if (todos) meta.todos = todos;
   if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
+  // Keep the stable cache key across saves; otherwise the first save after
+  // ensureSessionId() rewrites meta and would drop session_id.
+  if (prevMeta && prevMeta.session_id) meta.session_id = prevMeta.session_id;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -709,6 +736,8 @@ async function duplicateConv(id, title) {
   };
   if (data.compaction) meta.compaction = data.compaction;
   if (data.todos) meta.todos = data.todos;
+  // Intentionally do NOT copy session_id: the duplicate is a distinct
+  // conversation and must get its own cache key (ensureSessionId on first send).
   const mp = metaPath(newId, false);
   await opfs.write(mp, JSON.stringify(meta));
   Sandpie.events.emit('file:changed', mp);
@@ -1204,7 +1233,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=67');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=68');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1587,6 +1616,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     reasoning: (active && active.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
+    // Stable per-conversation cache key, persisted in meta (ensureSessionId).
+    // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
+    session_id: await ensureSessionId(activeConvId),
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],

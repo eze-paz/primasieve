@@ -1650,6 +1650,9 @@ async function tool_spawn_subagent({ agent, prompt }, ctx) {
     messages: [{ role: 'user', content: brief }],
     tools: subTools,
     todos: [],
+    // Own cache key: the cfg spread above would otherwise copy the parent's
+    // session_id, making the subagent share the parent's prompt-cache slot.
+    session_id: subId,
     maxRounds: (Number(def.meta.maxRounds) > 0) ? Number(def.meta.maxRounds) : SUBAGENT_DEFAULT_MAX_ROUNDS,
   };
 
@@ -1812,11 +1815,12 @@ async function runAgent(config, ctx) {
   // (e.g. spawn_subagent builds the child's config from it).
   ctx._agentConfig = config;
   ctx._messages = messages;
-  // Stable per-conversation id for OpenRouter prompt-cache grouping. Generated
-  // ONCE here and reused on every round — a fresh value each round would defeat
-  // caching. Random token + the (stable-for-this-conversation) file name keeps
-  // it unique across conversations.
-  ctx._sessionId = (Math.random().toString(36).slice(2, 10)) + '-' + (config.conversation_file_name || 'unknown');
+  // Stable per-conversation cache key, generated ONCE and persisted in the
+  // conversation meta (see ensureSessionId in conversations.js). Reuse it so
+  // OpenRouter prompt-cache grouping survives across turns, refreshes, and
+  // devices. The page always supplies config.session_id; the fallback (file
+  // name) only protects non-conversation callers and stays unique per file.
+  ctx._sessionId = config.session_id || (config.conversation_file_name || 'unknown');
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
