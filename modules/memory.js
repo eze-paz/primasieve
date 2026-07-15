@@ -153,60 +153,65 @@ const SandpieMemory = (function () {
     return null;
   }
 
+
+  // ---- path clustering ------------------------------------------------------
+  function _parsePaths(fact) {
+    if (!fact.paths) return [];
+    return String(fact.paths).split(',').map(p => p.trim()).filter(Boolean);
+  }
+  function clusterByPaths(facts, minShared) {
+    minShared = minShared || 2;
+    const clusters = [];
+    const used = new Set();
+    for (let i = 0; i < facts.length; i++) {
+      if (used.has(i)) continue;
+      const fi = facts[i];
+      const pi = _parsePaths(fi);
+      if (!pi.length) continue;
+      const cluster = { id: fi.name, memories: [fi], sharedPaths: pi.slice(), types: new Set([fi.type]) };
+      used.add(i);
+      for (let j = i + 1; j < facts.length; j++) {
+        if (used.has(j)) continue;
+        const fj = facts[j];
+        const pj = _parsePaths(fj);
+        if (!pj.length) continue;
+        const shared = pi.filter(p => pj.some(q => q === p || p.startsWith(q + '/') || q.startsWith(p + '/')));
+        if (shared.length >= minShared) {
+          cluster.memories.push(fj);
+          shared.forEach(p => { if (!cluster.sharedPaths.includes(p)) cluster.sharedPaths.push(p); });
+          cluster.types.add(fj.type);
+          used.add(j);
+        }
+      }
+      if (cluster.memories.length >= 3) clusters.push(cluster);
+    }
+    return clusters;
+  }
+
   let _consolidating = false;
   async function consolidate(facts) {
-    if (_consolidating) return { ok: false, reason: 'already running' };
+    // Phase 3: path-based clustering replaces LLM merge/prune.
     facts = facts || await list();
     if (facts.length < 2) return { ok: false, reason: 'nothing to consolidate' };
-    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return { ok: false, reason: 'no completion provider' };
-    _consolidating = true;
-    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:consolidate-start', {}); } catch (_) {}
-    try {
-      const input = facts.map(f => JSON.stringify({ name: f.name, description: f.description, type: f.type, created: f.created, last_verified: f.last_verified, body: f.body })).join('\n');
-      const out = await SandpieProviders.complete({ system: CONSOLIDATE_PROMPT, user: input, maxTokens: 4096 });
-      const arr = _extractJsonArray(out);
-      if (!Array.isArray(arr) || !arr.length) return { ok: false, reason: 'consolidator returned unusable output' };
+    const clusters = clusterByPaths(facts, 2);
+    if (!clusters.length) return { ok: false, reason: 'no path clusters found (need ≥3 memories sharing ≥2 paths)' };
+    let merged = 0;
+    for (const c of clusters) {
+      const slug = _slug(c.id + '-cluster');
+      const desc = 'Cluster: ' + c.sharedPaths.slice(0, 3).join(', ') + (c.sharedPaths.length > 3 ? '...' : '');
+      const t = c.types.has('project') ? 'project' : c.types.has('feedback') ? 'feedback' : c.types.has('user') ? 'user' : 'reference';
       const today = _today();
-      const keep = new Set();
-      for (const f of arr) {
-        if (!f || !f.body || !String(f.body).trim()) continue;
-        const slug = _slug(f.name || f.description || 'note');
-        keep.add(slug);
-        const t = VALID_TYPES.includes(f.type) ? f.type : 'reference';
-        const desc = String(f.description || '').replace(/\s*\n\s*/g, ' ').trim();
-        // last_verified comes from the consolidator (told to preserve / take newest
-        // on merge) — NOT stamped to today: surviving consolidation isn't verification.
-        const lv = String(f.last_verified || f.created || today).slice(0, 10);
-        const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${f.created || today}\nlast_verified: ${lv}\n---\n` + String(f.body).trim() + '\n';
-        const fpath = DIR + '/' + slug + '.md';
-        try {
-          await opfs.write(fpath, text);
-          // Mark dirty so the merged/rewritten fact uploads and survives the sync
-          // orphan-cleanup — same reason tool_remember posts sw-opfs-changed.
-          if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath);
-        } catch (_) {}
-      }
-      // Deletions now propagate to Dropbox (see _tombstone), so an over-aggressive
-      // LLM that drops facts it shouldn't would lose them permanently. Safety guard:
-      // if a single pass wants to remove more than 60% of the store (beyond ~3),
-      // treat the output as untrustworthy — keep the merged improvements we just
-      // wrote, but do NOT delete the originals this pass.
-      const removeList = facts.filter(f => !keep.has(_slug(f.name)));
-      let removed = 0, guarded = false;
-      if (removeList.length > Math.max(3, facts.length * 0.6)) {
-        guarded = true;
-        console.warn('[sandpie] memory consolidation would remove', removeList.length, 'of', facts.length, 'facts — skipping deletion as a safety guard');
-      } else {
-        for (const f of removeList) { await _tombstone(f); removed++; }
-      }
-      notify();
-      return { ok: true, before: facts.length, after: keep.size, removed, guarded };
-    } catch (e) {
-      return { ok: false, reason: (e && e.message) || String(e) };
-    } finally {
-      _consolidating = false;
-      try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:consolidate-end', {}); } catch (_) {}
+      const body = c.memories.map(m => `## ${m.name}\n${m.body}`).join('\n\n');
+      const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${today}\nlast_verified: ${today}\npaths: ${c.sharedPaths.join(', ')}\n---\n${body}\n`;
+      const fpath = DIR + '/' + slug + '.md';
+      try {
+        await opfs.write(fpath, text);
+        if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath);
+        merged += c.memories.length;
+      } catch (_) {}
     }
+    notify();
+    return { ok: true, before: facts.length, after: facts.length, clusters: clusters.length, merged };
   }
 
   // Called on the pre-send path (from buildSystemPrompt). Consolidation now runs
@@ -486,8 +491,8 @@ const SandpieMemory = (function () {
     const sy = v => (22 - ((v - min) / span) * 18).toFixed(1);
     const linePts = cum.map((v, i) => `${sx(i)},${sy(v)}`).join(' ');
     _sbBody.innerHTML = `
-      <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span><span class="sb-count-lbl">memories</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
-      <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Constellation of ${facts.length} memories">${edgeSvg}${nodeSvg}</svg>
+      <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
+      <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Constellation of ${facts.length}">${edgeSvg}${nodeSvg}</svg>
       <div class="sb-legend">${Object.keys(SB_TYPE_CLASS).map(t => `<span><i class="${SB_TYPE_CLASS[t]}" style="background:var(${t === 'user' ? '--sp-success' : t === 'feedback' ? '--sp-warn' : t === 'project' ? '--sp-accent' : '--sp-text-dim'})"></i>${SB_TYPE_LABEL[t]}</span>`).join('')}</div>
       <div class="sb-hover" id="sbHover">hover a memory</div>
       <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
@@ -514,7 +519,7 @@ const SandpieMemory = (function () {
     const style = document.createElement('style');
     style.textContent = SB_CSS;
     document.head.appendChild(style);
-    SandpieMenu.add(SB_SECTION_ID, { title: 'Second brain', badge: '…', open: false, onRender(body) { _sbBody = body; } });
+    SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: false, onRender(body) { _sbBody = body; } });
     _sbDetails = SandpieMenu.get(SB_SECTION_ID);
     if (_sbDetails) _sbDetails.addEventListener('toggle', _sbOnToggle);
     document.addEventListener('visibilitychange', () => { document.visibilityState === 'visible' ? _sbStartAnim() : _sbStopAnim(); });
