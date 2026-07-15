@@ -652,33 +652,13 @@ async function tool_show_artifact({ path }, ctx) {
 // Images are embedded as base64 in the NEXT model request. The upstream gateway
 // (NPAW ai-balancer.npaw.com) caps the WHOLE request body at ~1 MB and that limit
 // is NOT raisable, so instead of rejecting a large image we downscale + re-encode
-// it to fit (see _compressImageToFit / tool_load_image). All three limits sit
-// UNDER ~1 MB, leaving headroom for the system prompt + tools + history that share
-// the body with the image(s):
-//   • IMAGE_MAX_B64_BYTES    — per image: the compress-to-fit target (base64).
-//   • IMAGE_CONVO_B64_BUDGET — cumulative images across the conversation (≈ 1 image).
-//   • MAX_REQUEST_BYTES      — hard ceiling on the WHOLE serialized body, just under
-//                              the gateway's cap; an over-size request then fails
-//                              fast client-side with a clear message, not a 413.
+// it to fit (see _compressImageToFit / tool_load_image).
+//   • IMAGE_MAX_B64_BYTES — per image: the compress-to-fit target (base64).
+//     (We no longer cap the WHOLE serialized body client-side. Providers differ in
+//      request-size limits, so an oversized body is left to the provider, which
+//      answers with HTTP 413; 413 is non-retryable — see RETRYABLE_STATUS below.)
 const IMAGE_MAX_B64_BYTES    = 700 * 1024;   // per image: compress-to-fit target
-const IMAGE_CONVO_B64_BUDGET = 900 * 1024;   // cumulative images across the conversation
-const MAX_REQUEST_BYTES      = 950 * 1024;   // whole serialized body (just under NPAW's ~1 MB cap)
 const _fmtBytes = n => n >= 1024 * 1024 ? (n / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
-// Base64 bytes of images already present in the request messages (real data: URLs
-// only; opfs:// placeholders cost nothing).
-function _imageB64InMessages(msgs) {
-  let n = 0;
-  for (const m of (msgs || [])) {
-    const c = m && m.content;
-    if (!Array.isArray(c)) continue;
-    for (const p of c) {
-      if (p && p.type === 'image_url' && p.image_url && typeof p.image_url.url === 'string' && p.image_url.url.startsWith('data:')) n += p.image_url.url.length;
-    }
-  }
-  return n;
-}
-
-
 // Downscale + re-encode an image (in the worker, via OffscreenCanvas) until its
 // base64 size is at or under `targetB64`. The upstream gateway caps the whole
 // request body near 1 MB, so a full-res photo has to be shrunk to fit. Walks
@@ -741,12 +721,7 @@ async function tool_load_image({ path }, ctx) {
       const c = await _compressImageToFit(bytes, mime, IMAGE_MAX_B64_BYTES);
       if (c) { bytes = c.bytes; mime = c.mime; estB64 = c.estB64; }
     }
-    // Cumulative conversation budget (on the FINAL, possibly-compressed size).
-    const budget = ctx && ctx._imageBudget;
-    if (budget && budget.used + estB64 > budget.total) {
-      return { result: `Error: "${clean}" was NOT loaded — even compressed, the conversation's images would total ${_fmtBytes(budget.used + estB64)}, over the ${_fmtBytes(budget.total)} image budget (the upstream gateway caps the whole request near 1 MB). Load only the one image you need, reuse an image already shown above, or continue in a fresh conversation.` };
-    }
-    if (budget) budget.used += estB64;   // reserve before encoding so the next call in the batch sees it
+    // No cumulative conversation budget: per-image compression only.
     let bin = ''; const CHUNK = 0x8000;
     for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
     const dataUrl = 'data:' + mime + ';base64,' + btoa(bin);
@@ -1279,6 +1254,9 @@ async function runTool(name, args, ctx) {
 // ============================================================
 // Auto-retry for transient upstream errors.
 // ============================================================
+// 413 (Payload Too Large) is deliberately NOT retryable: resending the same
+// oversized body can't shrink it, so retrying would loop. A provider that caps
+// request size answers 413 and the error surfaces immediately (non-retryable).
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 function isRetryableError(e) {
   if (!e || e.name === 'AbortError') return false;
@@ -1438,17 +1416,19 @@ function normalizeToolArgs(raw) {
 
 async function streamOneRound(reqUrl, headers, body, ctx) {
   const payload = JSON.stringify(body);
-  // Total-body guard: fail fast (and clearly) BEFORE the server returns a cryptic
-  // 413. Measures real UTF-8 bytes. Not retryable (size won't change on retry).
+  // We deliberately do NOT pre-block oversized bodies here: some providers cap the
+  // request body (~1 MB) and reply 413, others don't. So let the provider decide and
+  // surface its own 413 (handled just below; 413 is non-retryable). We still measure
+  // real UTF-8 bytes to include an accurate size in the 413 diagnostic hint.
   let bytes; try { bytes = new Blob([payload]).size; } catch (_) { bytes = payload.length; }
-  if (bytes > MAX_REQUEST_BYTES) {
-    throw new Error(`Request too large: ${_fmtBytes(bytes)} exceeds the ~${_fmtBytes(MAX_REQUEST_BYTES)} limit (the upstream gateway caps the request body near 1 MB and that can't be raised). The conversation is holding too much to send (usually images) — remove some, load only the one(s) you need, or start a fresh conversation.`);
-  }
   const res = await fetch(reqUrl, { method: 'POST', headers, body: payload, signal: ctx.signal });
   if (!res.ok) {
     const text = (await res.text()).slice(0, 300);
-    const hint = res.status === 413 ? ` (request body was ${_fmtBytes(bytes)}; the upstream gateway rejected it as too large — its ~1 MB cap can't be raised, so send fewer/smaller images or trim the conversation)` : '';
-    throw Object.assign(new Error(res.status + ': ' + text + hint), { status: res.status });
+    if (res.status === 413) {
+      // Body too large for this provider. Trigger compaction and ask the caller to retry.
+      throw Object.assign(new Error('Payload Too Large'), { status: 413, payloadBytes: bytes });
+    }
+    throw Object.assign(new Error(res.status + ': ' + text), { status: res.status });
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -1703,9 +1683,11 @@ class CompactionFailure extends Error {
 async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
   const cmp = config.compaction;
   if (!cmp || !cmp.enabled || !cmp.window) return;
-  if (!promptTokens || promptTokens <= 0) return;   // no reported number → nothing to gate on
-  const pct = (promptTokens / cmp.window) * 100;
-  if (pct < (cmp.pct || 70)) return;
+  if (promptTokens !== null && (!promptTokens || promptTokens <= 0)) return;   // no reported number → nothing to gate on (null = forced by 413)
+  if (promptTokens !== null) {
+    const pct = (promptTokens / cmp.window) * 100;
+    if (pct < (cmp.pct || 70)) return;
+  }
 
   const marker = cmp.marker || SP_SUMMARY_MARKER;
   const m0 = messages[0];
@@ -1772,7 +1754,10 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
       if (m && m.role === 'user') break; // stop at previous user turn
     }
   }
-  if (toolCallIds.length === 0) return { result: 'Error: remember() requires at least one tool call result as evidence. Use a tool first, then remember the lesson.' };
+  // Evidence gate: project/reference facts must cite a tool result as evidence;
+  // user/feedback (stable preferences, how-to-work corrections) don't require it.
+  if (type !== 'user' && type !== 'feedback' && toolCallIds.length === 0)
+    return { result: 'Error: remember() for project/reference facts requires at least one tool call result as evidence. Use a tool first, then remember the lesson.' };
   const slug = _memSlug(name);
   const t = ['user', 'feedback', 'project', 'reference'].includes(type) ? type : 'reference';
   const today = new Date().toISOString().slice(0, 10);
@@ -1793,6 +1778,25 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   return { result: verb + ' "' + slug + '" (' + t + ').' };
 }
 
+// Build the OpenRouter-native `reasoning` parameter from the provider config.
+// We always speak OpenRouter's `reasoning` shape ({ effort, max_tokens, exclude })
+// instead of the OpenAI-only `reasoning_effort`, so the thinking level is honored
+// for every reasoning model OpenRouter fronts (Claude, DeepSeek, Qwen, GLM, …),
+// not just OpenAI o-series. `config.reasoning` is the raw OpenRouter value the UI
+// captured; `config.reasoningEffort` is the OpenAI-style effort string we map in.
+function _openRouterReasoning(config) {
+  const r = config && config.reasoning;
+  if (r !== undefined && r !== null && r !== '' && r !== 'auto') {
+    if (typeof r === 'string' || typeof r === 'number') return { effort: String(r).toLowerCase() };
+    return r; // already an object: { effort, max_tokens?, exclude? }
+  }
+  const eff = config && config.reasoningEffort;
+  if (!eff) return null;
+  const e = String(eff).toLowerCase();
+  const effort = e === 'minimal' ? 'low' : e; // OpenRouter effort vocab is low|medium|high
+  return { effort };
+}
+
 async function runAgent(config, ctx) {
   const convFileName = config.conversation_file_name || 'unknown';
   ctx._conversation_file_name = convFileName;
@@ -1801,10 +1805,6 @@ async function runAgent(config, ctx) {
   // (e.g. spawn_subagent builds the child's config from it).
   ctx._agentConfig = config;
   ctx._messages = messages;
-  // Cumulative image budget for load_image — seeded from images already in the
-  // conversation, then incremented per load so a batch of parallel load_image
-  // calls in one turn can't pile up and blow the context / request body.
-  ctx._imageBudget = { total: IMAGE_CONVO_B64_BUDGET, used: _imageB64InMessages(messages) };
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
@@ -1957,11 +1957,43 @@ async function runAgent(config, ctx) {
       stream_options: { include_usage: true },
       tools: config.tools,
     };
-    if (config.maxTokens != null) reqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
+    const reasoning = _openRouterReasoning(config);
+    if (config.maxTokens != null) reqBody[reasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
-    if (config.reasoningEffort) reqBody.reasoning_effort = config.reasoningEffort;
-    const round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
+    if (reasoning) reqBody.reasoning = reasoning;
+    let round;
+    try {
+      round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
+    } catch (e) {
+      if (e && e.status === 413) {
+        // Provider rejected the body as too large. Compact and retry once.
+        try {
+          await maybeCompactMidTurn(config, messages, ctx, null); // null promptTokens forces compaction
+          // Rebuild reqBody with compacted messages and retry
+          const compactedReqBody = {
+            model: config.model,
+            messages: [config.systemPrompt, ...messages, reminderMsg].filter(Boolean),
+            stream: true,
+            stream_options: { include_usage: true },
+            tools: config.tools,
+          };
+          if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
+          if (config.temperature != null) compactedReqBody.temperature = config.temperature;
+          if (config.topP != null) compactedReqBody.top_p = config.topP;
+          if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
+          round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
+        } catch (compactErr) {
+          if (compactErr && compactErr.compactionFailed) {
+            ctx.emit({ type: 'error', message: compactErr.message || 'Compaction failed.' });
+            break;
+          }
+          throw e; // re-throw original 413 if compaction didn't help
+        }
+      } else {
+        throw e;
+      }
+    }
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
@@ -1998,12 +2030,14 @@ async function runAgent(config, ctx) {
       break;
     }
     const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
-    // Preserve the model's reasoning on the tool-call turn and resend it. Reasoning
-    // models served over an OpenAI-compatible API (Kimi K2.6, DeepSeek) require the
-    // assistant message's reasoning_content to stay in context across multi-step
-    // tool calls — dropping it makes the provider error on the next round. Attached
-    // only when non-empty, so providers that don't emit reasoning never see the field.
-    if (round.reasoning_content) asstMsg.reasoning_content = round.reasoning_content;
+    // Preserve the model's reasoning on the tool-call turn and resend it. Across
+    // multi-step tool calls the next round re-sends this assistant message, and the
+    // provider needs its prior reasoning in context — dropping it makes the provider
+    // error. We use OpenRouter's unified `reasoning` field (not OpenAI's
+    // `reasoning_content`) so thinking survives for every reasoning model OpenRouter
+    // fronts, not just OpenAI o-series. Attached only when non-empty, so models
+    // that don't emit reasoning never see the field.
+    if (round.reasoning_content) asstMsg.reasoning = round.reasoning_content;
     messages.push(asstMsg); ctx.emit({ type: 'message_added', message: asstMsg });
     const loadedImages = [];
     let touchedTodo = false;

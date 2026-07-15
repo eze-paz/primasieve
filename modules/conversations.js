@@ -1180,7 +1180,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=63');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=65');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1562,6 +1562,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     temperature: (active && active.temperature != null) ? active.temperature : null,
     topP: (active && active.topP != null) ? active.topP : null,
     reasoningEffort: (active && active.reasoningEffort) || null,
+    reasoning: (active && active.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
     // Current checklist (task tree) so the worker can apply write_todos ops to it
