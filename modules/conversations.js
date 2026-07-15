@@ -926,9 +926,33 @@ function setStreamSending(stream, sending) {
 
   refreshConversationList();
 }
+// Resume eligibility: a turn is resumable iff its last message did NOT finish
+// normally. finish_reason is 'stop' only for a completed final assistant turn; any
+// other case (user/tool tail, tool_calls/length, or a truncated message with no
+// recorded finish_reason) resumes. Single guard, per design.
+function isResumable(messages) {
+  const m = messages[messages.length - 1];
+  if (!m) return false;
+  return m.finish_reason !== 'stop';
+}
+function isResumableActive() {
+  const s = activeStream();
+  return !!(s && s.messages && s.messages.length && isResumable(s.messages));
+}
+
 async function handleSubmit() {
   const text = $('input').value.trim();
-  if (!text && !SandpieImages.hasAttachment()) return;
+  if (!text && !SandpieImages.hasAttachment()) {
+    // Empty submit resumes an interrupted turn instead of doing nothing — but only
+    // when the conversation is resumable (last message didn't finish with 'stop').
+    // No auto-resume on load; the user opts in by pressing Enter / send.
+    if (isResumableActive()) {
+      const s = ensureStream(activeConvId);
+      if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+      await sendSingle('', s, { resume: true });
+    }
+    return;
+  }
   if (typeof SandpieCommands !== 'undefined' && text.startsWith('>>>')) {
     const handled = await SandpieCommands.dispatch(text);
     if (handled) {
@@ -1180,7 +1204,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=66');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=67');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1319,7 +1343,6 @@ async function sendSingle(text, stream, opts = {}) {
   }
 
   startTotalTimer(stream);
-  flightWrite(convId, text);
 
   let config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
   // Reactive boundary correction. If the BUILT request is still over the gateway's
@@ -1456,7 +1479,6 @@ async function sendSingle(text, stream, opts = {}) {
 
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
-    flightClear(convId);
 
     _localInferring = false;
     stream.agentId = null;   // no longer steerable once the loop has ended
@@ -1776,16 +1798,6 @@ function ensureStream(id) {
 }
 
 function activeStream() { return activeConvId ? (convStreams.get(activeConvId) || null) : null; }
-function flightWrite(id, text) {
-  try { localStorage.setItem(SP_FLIGHT_KEY(id), JSON.stringify({t: Date.now(), text})); } catch(_) {}
-}
-
-function flightRead(id) {
-  try { const v = localStorage.getItem(SP_FLIGHT_KEY(id)); return v ? JSON.parse(v) : null; } catch(_) { return null; }
-}
-
-function flightClear(id) { try { localStorage.removeItem(SP_FLIGHT_KEY(id)); } catch(_) {} }
-
 // Render an attached-document part ({ type:'file' }) as a clickable chip in a
 // message bubble. Clicking opens it in the OPFS file viewer. Images use the
 // <img> path above; this is for everything else.
@@ -2739,25 +2751,6 @@ function anyStreamGenerating() {
   return false;
 }
 
-/* ---- resume-on-refresh flight checkpointing (pairs with flightWrite/Read/Clear) ---- */
-const SP_FLIGHT_KEY = (id) => 'sp-flight-' + id;
-async function maybeResumeFlight(id) {
-  if (!id) return;
-  const ck = flightRead(id);
-  if (!ck) return;
-  if (Date.now() - ck.t > 5 * 60 * 1000) { flightClear(id); return; }
-  const data = await readConvData(id);
-  if (!data) { flightClear(id); return; }
-  const s = ensureStream(id);
-  hydrateStreamFromData(s, data);
-  if (!s.messages.length || s.messages[s.messages.length - 1].role !== 'user') {
-    flightClear(id); return;
-  }
-  mountConv(id);
-  renderConversation(s.messages, s.compaction);
-  addMsg('info', 'Resuming generation…', s.host);
-  sendSingle(ck.text, s, { resume: true });
-}
 
 /* ---- conversation compaction (NON-destructive) ---------------------------
    Compaction never deletes turns. It records a boundary + a summary on the
@@ -3350,15 +3343,11 @@ let _localInferring = false;
 
 
 /* expose moved page-glue for inline handlers (HTML onclick) + the host contract */
-window.maybeResumeFlight = maybeResumeFlight;
 window.anyStreamGenerating = anyStreamGenerating;
 
 /* expose on window for inline script compatibility */
 window.ensureStream = ensureStream;
 window.activeStream = activeStream;
-window.flightWrite = flightWrite;
-window.flightRead = flightRead;
-window.flightClear = flightClear;
 /* ---------------------------------------------------------------------------
    Inject a synthetic user message (used for file upload notifications).
    --------------------------------------------------------------------------- */
@@ -3722,7 +3711,7 @@ function bootConversations() {
     window._sandpieBootDone = true;
   })();
   // Resume any in-flight generation after a tab refresh.
-  setTimeout(() => { if (activeConvId) maybeResumeFlight(activeConvId); }, 300);
+
 }
 if (document.readyState === 'complete') {
   bootConversations();

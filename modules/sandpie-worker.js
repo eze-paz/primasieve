@@ -1439,6 +1439,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   const decoder = new TextDecoder();
   let buffer = '', content = '', reasoningText = '';
   const toolCalls = []; let usage = null, sawDone = false;
+  let finishReason = null;
   while (!sawDone) {
     const { done, value } = await reader.read(); if (done) break;
     buffer += decoder.decode(value, { stream: true });
@@ -1449,6 +1450,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       try {
         const parsed = JSON.parse(data);
         if (parsed && parsed.usage) usage = parsed.usage;
+        if (parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].finish_reason) finishReason = parsed.choices[0].finish_reason;
         const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
         if (!delta) continue;
         if (delta.content) content += delta.content;
@@ -1483,7 +1485,7 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     if (typeof tc.function.name === 'string') tc.function.name = scrubFramingTokens(tc.function.name).trim().replace(/^functions\./, '');
     tc.function.arguments = normalizeToolArgs(tc.function.arguments);
   }
-  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText };
+  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText, finish_reason: finishReason };
 }
 
 // ============================================================
@@ -2009,7 +2011,7 @@ async function runAgent(config, ctx) {
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
     if (!round.tool_calls.length) {
       if (round.content) {
-        const m = { role: 'assistant', content: round.content };
+        const m = { role: 'assistant', content: round.content, finish_reason: round.finish_reason };
         messages.push(m); ctx.emit({ type: 'message_added', message: m });
       }
       // The model is done, but if the user steered a message in during this round
@@ -2039,7 +2041,7 @@ async function runAgent(config, ctx) {
       }
       break;
     }
-    const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls };
+    const asstMsg = { role: 'assistant', content: round.content, tool_calls: round.tool_calls, finish_reason: round.finish_reason };
     // Preserve the model's reasoning on the tool-call turn and resend it. Across
     // multi-step tool calls the next round re-sends this assistant message, and the
     // provider needs its prior reasoning in context — dropping it makes the provider
