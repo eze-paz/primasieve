@@ -238,6 +238,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
       provider: { ...active, maxTokens },
       messages: [{ role: 'user', content: user }],
       systemPrompt: system, tools: [], convId: null, signal,
+      logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
     }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
     return out;
   }
@@ -253,6 +254,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
       provider: { endpoint: active.endpoint, maxTokens },
       messages: [{ role: 'user', content: user }],
       systemPrompt: system, tools: [], convId: null, signal,
+      logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
     }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
     return out;
   }

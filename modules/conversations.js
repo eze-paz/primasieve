@@ -509,6 +509,85 @@ function registerMetacogCommand() {
   });
 }
 
+/* ---- per-token logprob confidence display ----------------------------- */
+// Activated by the `>>> logprob [on|off]` command. When on, the WebGPU Qwen
+// engine emits a `token` event per generated token (with its log-prob); the
+// renderer wraps each in a clickable span. Clicking shows the log-prob + P.
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function spLpTokenHtml(t) {
+  const lp = parseFloat(t.logprob);
+  const p = isNaN(lp) ? 1 : Math.exp(lp);
+  const conf = p < 0.05 ? 'sp-lp-lo' : (p < 0.3 ? 'sp-lp-mid' : 'sp-lp-hi');
+  const alts = Array.isArray(t.alts) ? escHtml(JSON.stringify(t.alts)) : '';
+  return '<span class="sp-lp-tok ' + conf + '" data-lp="' + escHtml(isNaN(lp) ? '' : lp.toFixed(4)) + '" data-alts="' + alts + '">' + escHtml(t.text) + '</span>';
+}
+function showLogprobPopup(span, x, y) {
+  let pop = document.getElementById('sp-lp-popup');
+  if (!pop) { pop = document.createElement('div'); pop.id = 'sp-lp-popup'; pop.className = 'sp-lp-popup'; document.body.appendChild(pop); }
+  const lp = parseFloat(span.getAttribute('data-lp'));
+  const prob = Math.exp(lp);
+  let html = '<div class="sp-lp-h">log P = ' + (isNaN(lp) ? '?' : lp.toFixed(4)) + '</div>'
+    + '<div class="sp-lp-p">P(token) = ' + (isNaN(lp) ? '?' : (prob * 100).toFixed(2) + '%') + '</div>';
+  const raw = span.getAttribute('data-alts');
+  if (raw) {
+    try {
+      const alts = JSON.parse(raw);
+      if (alts && alts.length) {
+        html += '<div class="sp-lp-alt-h">other likely tokens</div><div class="sp-lp-alts">';
+        for (const a of alts) {
+          const ap = Math.exp(parseFloat(a.logprob) || 0) * 100;
+          html += '<div class="sp-lp-alt"><span class="sp-lp-alt-t">' + escHtml(a.text) + '</span>'
+            + '<span class="sp-lp-alt-bar"><i style="width:' + Math.min(100, ap).toFixed(1) + '%"></i></span>'
+            + '<span class="sp-lp-alt-p">' + ap.toFixed(2) + '%</span></div>';
+        }
+        html += '</div>';
+      }
+    } catch (_) {}
+  }
+  pop.innerHTML = html;
+  pop.style.display = 'block';
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let px = x + 10, py = y + 10;
+  if (px + pw > window.innerWidth - 8) px = x - pw - 10;
+  if (py + ph > window.innerHeight - 8) py = y - ph - 10;
+  pop.style.left = px + 'px'; pop.style.top = py + 'px';
+}
+function initLogprobUi() {
+  if (window.__spLpUiReady) return;
+  window.__spLpUiReady = true;
+  document.addEventListener('click', (e) => {
+    const pop = document.getElementById('sp-lp-popup');
+    const tok = e.target && e.target.closest ? e.target.closest('.sp-lp-tok') : null;
+    if (!tok) { if (pop) pop.style.display = 'none'; return; }
+    e.stopPropagation();
+    showLogprobPopup(tok, e.clientX, e.clientY);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { const pop = document.getElementById('sp-lp-popup'); if (pop) pop.style.display = 'none'; }
+  });
+}
+function registerLogprobCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'logprob',
+    module: 'core',
+    help: 'Toggle per-token log-probability (confidence) display for the local WebGPU Qwen model',
+    usage: '>>> logprob [on|off]',
+    run(text, parts) {
+      let on;
+      if (parts.length > 1) on = /^(on|1|true|yes)$/i.test(parts[1]);
+      else on = !window.__SP_LOGPROBS__;
+      window.__SP_LOGPROBS__ = on;
+      try { localStorage.setItem('sandpie-logprobs', on ? '1' : '0'); } catch (_) {}
+      return 'Per-token log-prob display is now ' + (on ? 'ON' : 'OFF')
+        + '\n(Only affects the local WebGPU Qwen model. Each generated token becomes clickable;'
+        + ' click it to see its log-probability. Serial decode is used while on, so generation is slower.)';
+    }
+  });
+}
+
 /* ---- command registration: rewind -------------------------------------- */
 function registerRewindCommand() {
   if (typeof SandpieCommands === 'undefined') return;
@@ -588,6 +667,8 @@ function registerRewindCommand() {
 registerRewindCommand();
 registerDriftCommand();
 registerMetacogCommand();
+registerLogprobCommand();
+initLogprobUi();
 
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -1476,7 +1557,7 @@ async function sendSingle(text, stream, opts = {}) {
       && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
     if (_isDense && SandpieQwen3.runConversation) {
       await SandpieQwen3.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
+        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal, logprobs: !!window.__SP_LOGPROBS__ },
         dispatch,
       );
     } else {
@@ -1759,6 +1840,7 @@ function renderSubagentEvent(host, ev) {
 function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
+    case 'token':        return renderer.applyToken(ev.token, ev.region);
     case 'delta':         return renderer.applyDelta(ev.delta);
     case 'round_end':     return renderer.endRound(ev.content);
     case 'message_added': return renderer.bindMessage(ev.message);
@@ -2287,6 +2369,14 @@ class RoundRenderer {
     }
   }
   endRound(finalContent) {
+    if (this._logprob) {
+      // content already carries per-token confidence spans; do NOT reconcile
+      // against the plain (parser) text, or the spans would be stripped.
+      this.toolsShouldClose = true;
+      this._scheduleDrain();
+      if (this.reply && (!this.content || !this.content.trim())) { this.reply.remove(); this.reply = null; }
+      return;
+    }
     this._finishThinking();
     // The SW may rewrite this round's content — e.g. stripping a model's leaked
     // native tool-call tokens after recovering them into structured calls. When
@@ -2467,6 +2557,23 @@ class RoundRenderer {
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
     this.thinkEl.open = false;
+  }
+
+  applyToken(token, region) {
+    this._logprob = true;
+    const html = spLpTokenHtml(token);
+    if (region === 'reasoning') {
+      if (!this.thinkEl) this._createThinkBox();
+      this.reasoning += html;
+      this.thinkBody.innerHTML = this.reasoning;
+      const sh = this._scrollHost();
+      if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
+    } else {
+      this._finishThinking();
+      this.content += html;
+      this.pending += html;
+      this._scheduleDrain();
+    }
   }
 
   _appendContent(chunk) {
