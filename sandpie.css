@@ -331,6 +331,7 @@
     padding: 0;
     background: transparent;
     --py: 0;
+    max-width: 82%;
   }
   .user .bubble {
     display: block;
@@ -355,6 +356,7 @@
     color: var(--sp-text);
     line-height: 1.6;
     border-left: 2px solid var(--sp-accent-dim);
+    max-width: 90%;
   }
   .assistant .bubble {
     display: block;
@@ -2373,7 +2375,7 @@ ul.conv-list li.active {
   text-transform: uppercase;
   margin-top: 1.5rem;
 }
-[data-theme="electric"] .msg { max-width: 82%; 
+[data-theme="electric"] .msg {
   --sp-elb-ff3b5c: var(--sp-accent);
   --sp-elb-fafafa: var(--sp-text);
   --sp-elb-0a0a0a: var(--sp-bg);
@@ -2802,7 +2804,7 @@ body.sp-decoding *::after {
   text-transform: uppercase;
   margin-top: 1.5rem;
 }
-[data-theme="clear"] .msg { max-width: 82%; 
+[data-theme="clear"] .msg {
   --sp-elb-ff3b5c: var(--sp-accent);
   --sp-elb-fafafa: var(--sp-text);
   --sp-elb-0a0a0a: var(--sp-bg);
