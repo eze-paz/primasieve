@@ -2909,6 +2909,14 @@ body.sp-decoding *::after {
 
 .sp-lp-tok { cursor: pointer; border-bottom: 1px dotted var(--sp-text-dim); border-radius: 2px; }
 .sp-lp-tok:hover { background: var(--sp-accent-dim, rgba(88,166,255,0.25)); }
+.sp-lp-score {
+  font-size: 11px; padding: 2px 8px; border-radius: 3px; margin-top: 6px;
+  display: inline-block; font-family: var(--sp-mono, monospace);
+  background: rgba(255,255,255,0.06); color: var(--sp-text-dim, #aaa);
+}
+.sp-lp-score.sp-lp-lo  { background: rgba(255, 86, 86, 0.22); color: #ff8a8a; }
+.sp-lp-score.sp-lp-mid { background: rgba(255, 184, 0, 0.18); }
+.sp-lp-score.sp-lp-hi  { background: rgba(120, 220, 140, 0.12); }
 .sp-lp-popup {
   position: fixed; z-index: 9999; display: none;
   background: var(--sp-surface, #1c1c22); color: var(--sp-text, #eee);

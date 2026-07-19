@@ -2329,6 +2329,9 @@ class RoundRenderer {
     this.thinkSummary = null;
     this.thinkStart = 0;
     this._thinkDone = false;
+    this.lpSum = 0;
+    this.lpCount = 0;
+    this.lpScoreEl = null;
   }
 
   startRound() {
@@ -2349,8 +2352,27 @@ class RoundRenderer {
     this.thinkSummary = null;
     this.thinkStart = 0;
     this._thinkDone = false;
+    this.lpSum = 0;
+    this.lpCount = 0;
+    this.lpScoreEl = null;
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
+  }
+  _updateLpScore(finalize) {
+    if (!this.lpCount) return;
+    const mean = this.lpSum / this.lpCount;
+    const p = Math.exp(mean);
+    const label = (p * 100).toFixed(1) + '% avg (' + this.lpCount + 'tok)';
+    if (!this.lpScoreEl) {
+      this.lpScoreEl = document.createElement('div');
+      this.lpScoreEl.className = 'sp-lp-score';
+      if (this.reply) this.reply.appendChild(this.lpScoreEl);
+    }
+    if (this.lpScoreEl) {
+      this.lpScoreEl.textContent = label;
+      const conf = p < 0.05 ? 'sp-lp-lo' : (p < 0.3 ? 'sp-lp-mid' : 'sp-lp-hi');
+      this.lpScoreEl.className = 'sp-lp-score ' + conf;
+    }
   }
   applyDelta(delta) {
     if (!delta) return;
@@ -2375,6 +2397,7 @@ class RoundRenderer {
       this.toolsShouldClose = true;
       this._scheduleDrain();
       if (this.reply && (!this.content || !this.content.trim())) { this.reply.remove(); this.reply = null; }
+      else { this._updateLpScore(true); }
       return;
     }
     this._finishThinking();
@@ -2561,11 +2584,14 @@ class RoundRenderer {
 
   applyToken(token, region) {
     this._logprob = true;
+    const lp = parseFloat(token.logprob);
+    if (!isNaN(lp)) { this.lpSum += lp; this.lpCount++; }
     const html = spLpTokenHtml(token);
     if (region === 'reasoning') {
       if (!this.thinkEl) this._createThinkBox();
       this.reasoning += html;
       this.thinkBody.innerHTML = this.reasoning;
+      this._updateLpScore();
       const sh = this._scrollHost();
       if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
     } else {
