@@ -36,7 +36,7 @@
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
-  let univerAPI = null, dirty = false, docUnit = null, kind = 'sheet';
+  let univerAPI = null, dirty = false, docUnit = null, kind = 'sheet', readOnly = false;
 
   function boot(payload, k) {
     kind = k || 'sheet';
@@ -71,17 +71,18 @@
     // but createUnit itself fires a burst of commands, so arm the listener
     // only after boot settles.
     setTimeout(() => {
+      if (readOnly) return;   // no dirty tracking for a read-only extraction
       dirty = false; setStatus('');
       univerAPI.onCommandExecuted(() => { if (!dirty) { dirty = true; setStatus('unsaved changes'); } });
     }, 800);
     $('saveBtn').disabled = false;
-    setStatus('');
+    if (!readOnly) setStatus('');
   }
 
   function setStatus(t) { $('status').textContent = t; }
 
   function save() {
-    if (!univerAPI) return;
+    if (!univerAPI || readOnly) return;
     setStatus('saving…');
     if (kind === 'doc') {
       // DocumentDataModel from createUnit is the stable snapshot source across builds
@@ -179,8 +180,11 @@
     if (e.origin !== location.origin || !e.data) return;
     if (e.data.type === 'univer-load') {
       $('fname').textContent = e.data.name || '';
-      try { boot(e.data.doc || e.data.workbook, e.data.doc ? 'doc' : 'sheet'); }
-      catch (err) { setStatus('engine error: ' + err.message); }
+      readOnly = !!e.data.readOnly;
+      try {
+        boot(e.data.doc || e.data.workbook, e.data.doc ? 'doc' : 'sheet');
+        if (readOnly) { $('saveBtn').style.display = 'none'; setStatus('read-only (extracted text)'); }
+      } catch (err) { setStatus('engine error: ' + err.message); }
     } else if (e.data.type === 'univer-saved') {
       dirty = !e.data.ok;
       setStatus(e.data.ok ? 'saved ✓' : 'save failed: ' + (e.data.error || '?'));

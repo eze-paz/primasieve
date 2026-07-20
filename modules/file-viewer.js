@@ -22,7 +22,7 @@
   const SHEET_EXTS = new Set(['xlsx', 'xls', 'ods', 'csv']);
   const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif']);
   const MEDIA_EXTS = new Set(['mp4', 'webm', 'mp3', 'wav', 'ogg', 'm4a', 'mov']);
-  const OFFICE_EXTS = new Set(['docx', 'doc', 'odt', 'rtf', 'pptx', 'ppt', 'odp', 'odg']);
+  const OFFICE_EXTS = new Set(['doc', 'odt', 'rtf', 'pptx', 'ppt', 'odp', 'odg']);   // docx handled separately (Univer default)
   const TEXT_EDIT_CAP = 4 * 1024 * 1024;   // Univer doc editor cap; larger text → download row
 
   /* ════════════════════ Univer bridges (SheetJS / plain text) ═══════════ */
@@ -162,6 +162,32 @@
 
   function fill(body, el) { body.innerHTML = ''; body.appendChild(el); return el; }
 
+  // Add a button to a pane's header (before the ✕ close button = header's last child).
+  function addHeaderButton(header, label, title, onClick) {
+    const b = document.createElement('button');
+    b.className = 'ghost'; b.textContent = label; b.title = title;
+    b.style.cssText = 'font-size:0.72rem;padding:2px 8px;flex:none;';
+    b.onclick = onClick;
+    header.insertBefore(b, header.lastChild);
+    return b;
+  }
+
+  // Extract a .docx's text client-side via docx-preview (no LibreOffice). Renders
+  // into a laid-out node parked OFF-SCREEN — NOT visibility:hidden / display:none,
+  // because innerText returns only *rendered* text, so a hidden node yields ''.
+  async function extractDocxText(file) {
+    const dp = await opfs.getDocxPreview();
+    const tmp = document.createElement('div');
+    tmp.style.cssText = 'position:fixed;left:-99999px;top:0;width:820px;pointer-events:none;opacity:0;';
+    document.body.appendChild(tmp);
+    try {
+      await dp.renderAsync(await file.arrayBuffer(), tmp, null, { inWrapper: false });
+      return (tmp.innerText || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    } finally { tmp.remove(); }
+  }
+
+  const loading = (msg) => `<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">${msg}</div>`;
+
   function blobUrlFor(pane, file, type) {
     const url = URL.createObjectURL(type ? new Blob([file], { type }) : file);
     pane.dataset.blobUrl = url;   // opfs.closeFile revokes .fv-panel[data-blob-url]
@@ -174,9 +200,9 @@
   // can reach the workbook the user is looking at. Cleared when the pane closes.
   let _active = null;   // { iframe, kind, name, fullKey, onSave, rpcWaiters:Map, rpcSeq }
 
-  function mountUniver(body, name, payload, kind, onSave, fullKey) {
+  function mountUniver(body, name, payload, kind, onSave, fullKey, readOnly) {
     const iframe = document.createElement('iframe');
-    iframe.src = '/univer-editor.html?v=5';
+    iframe.src = '/univer-editor.html?v=6';
     iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
     fill(body, iframe);
     _active = { iframe, kind, name, fullKey, onSave, rpcWaiters: new Map(), rpcSeq: 0 };
@@ -184,12 +210,13 @@
       if (e.source !== iframe.contentWindow || !e.data) return;
       if (e.data.type === 'univer-ready') {
         iframe.contentWindow.postMessage(
-          kind === 'doc' ? { type: 'univer-load', name, doc: payload }
+          kind === 'doc' ? { type: 'univer-load', name, doc: payload, readOnly: !!readOnly }
                          : { type: 'univer-load', name, workbook: payload },
           location.origin);
       } else if (e.data.type === 'univer-save') {
         let reply;
         try {
+          if (!onSave) throw new Error('this view is read-only');
           await onSave(e.data.doc || e.data.workbook);
           reply = { type: 'univer-saved', ok: true };
         } catch (err) {
@@ -247,7 +274,7 @@
     opfs.closeFile();                       // single viewer instance
     window._openFilePath = fullKey;
     const ext = (name.split('.').pop() || '').toLowerCase();
-    const { pane, body } = buildPane(fullKey);
+    const { pane, header, body } = buildPane(fullKey);
 
     /* sheets → Univer sheet editor */
     if (SHEET_EXTS.has(ext)) {
@@ -299,11 +326,30 @@
       return;
     }
 
-    /* word/powerpoint & friends → LibreOffice-WASM PDF render (read-only for now) */
+    /* .docx → Univer docs (extracted text) by default, with a header button to
+       switch to the high-fidelity LibreOffice render. The extracted view is
+       READ-ONLY: Univer docs would save as plain text, which must never overwrite
+       the .docx binary. Fidelity + editing-with-layout live behind the button. */
+    if (ext === 'docx') {
+      const toLibre = async () => {
+        if (_active && _active.iframe) _active = null;   // leaving the Univer editor
+        body.innerHTML = loading('Rendering with LibreOffice…');
+        if (!(await opfs._renderOfficePdf(file, ext, name, body, pane))) body.innerHTML = loading('Could not render this document.');
+      };
+      addHeaderButton(header, '⧉ LibreOffice', 'High-fidelity render via LibreOffice (read-only)', toLibre);
+      body.innerHTML = loading('Extracting text…');
+      let text = null;
+      try { text = await extractDocxText(file); } catch (_) {}
+      if (text != null) mountUniver(body, name, textToUniverDoc(text, name), 'doc', null, fullKey, /*readOnly*/ true);
+      else await toLibre();   // legacy .doc / corrupt / non-OOXML → straight to LibreOffice
+      return;
+    }
+
+    /* other office formats → LibreOffice-WASM PDF render (read-only) */
     if (OFFICE_EXTS.has(ext)) {
-      body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Rendering document…</div>';
+      body.innerHTML = loading('Rendering document…');
       if (await opfs._renderOfficePdf(file, ext, name, body, pane)) return;
-      body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Could not render this document.</div>';
+      body.innerHTML = loading('Could not render this document.');
       return;
     }
 
