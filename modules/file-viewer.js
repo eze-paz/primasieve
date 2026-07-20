@@ -1,16 +1,13 @@
-// file-viewer.js — THE file viewer. From-zero replacement for the old
-// opfs.openFile modal (deleted): one side pane, no modal, Univer is the
-// default surface.
+// file-viewer.js — THE file viewer. One side pane, no modal.
 //
-//   sheets (xlsx/xls/ods/csv)  → Univer sheet editor (SheetJS bridge)
-//   pdf                        → inline <iframe> (blob URL)
-//   images / audio / video     → inline element (blob URL)
-//   docx/doc/odt/rtf/pptx/…    → LibreOffice-WASM PDF render (opfs._renderOfficePdf)
-//   tex                        → convert_latex project iframe
-//   html/htm/svg               → sandboxed iframe preview
-//   EVERYTHING ELSE that decodes as UTF-8 (txt, md, py, json, js, no-ext…)
-//                              → Univer docs editor; Save writes plain text back
-//   true binary                → info row + download
+//   office (docx/xlsx/csv/ods/pptx/odt/rtf/…) → LibreOffice-WASM (ZetaOffice) PDF render
+//   pdf                                        → inline <iframe> (blob URL)
+//   images / audio / video                     → inline element (blob URL)
+//   tex                                        → convert_latex project iframe
+//   html/htm/svg                               → rendered preview (+ source toggle)
+//   text (txt/md/py/json/js/no-ext/…)          → editable plain-text pane; Save → OPFS
+//                                                (md also gets a rendered preview toggle)
+//   true binary                                → info row + download
 //
 // The pane mirrors the app's side-viewer conventions (.file-viewer.side inside
 // #messagesSide, viewer-mode/viewer-side-open classes, .fv-panel[data-blob-url]
@@ -19,108 +16,12 @@
 (function () {
   'use strict';
 
-  const SHEET_EXTS = new Set(['xlsx', 'xls', 'ods', 'csv']);
   const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif']);
   const MEDIA_EXTS = new Set(['mp4', 'webm', 'mp3', 'wav', 'ogg', 'm4a', 'mov']);
-  const OFFICE_EXTS = new Set(['doc', 'odt', 'rtf', 'pptx', 'ppt', 'odp', 'odg']);   // docx handled separately (Univer default)
-  const TEXT_EDIT_CAP = 4 * 1024 * 1024;   // Univer doc editor cap; larger text → download row
+  const OFFICE_EXTS = new Set(['docx', 'doc', 'odt', 'rtf', 'xlsx', 'xls', 'ods', 'csv', 'pptx', 'ppt', 'odp', 'odg']);
+  const TEXT_EDIT_CAP = 4 * 1024 * 1024;   // above this a text file offers download, not an editor
 
-  /* ════════════════════ Univer bridges (SheetJS / plain text) ═══════════ */
-
-  function xlsxToUniver(XLSX, wb, name) {
-    const sheets = {}, sheetOrder = [];
-    wb.SheetNames.forEach((sn, i) => {
-      const ws = wb.Sheets[sn];
-      const id = 'sheet-' + i;
-      const cellData = {};
-      let maxR = 0, maxC = 0;
-      for (const addr of Object.keys(ws)) {
-        if (addr[0] === '!') continue;
-        const { r, c } = XLSX.utils.decode_cell(addr);
-        maxR = Math.max(maxR, r); maxC = Math.max(maxC, c);
-        const cell = ws[addr];
-        const out = {};
-        if (cell.f) out.f = '=' + cell.f;
-        if (cell.v !== undefined) {
-          if (cell.t === 'n') { out.v = cell.v; out.t = 2; }
-          else if (cell.t === 'b') { out.v = cell.v ? 1 : 0; out.t = 3; }
-          else if (cell.t === 'd') { out.v = String(cell.w || cell.v); out.t = 1; }
-          else { out.v = String(cell.v); out.t = 1; }
-        }
-        if (out.f !== undefined || out.v !== undefined) {
-          (cellData[r] = cellData[r] || {})[c] = out;
-        }
-      }
-      const mergeData = (ws['!merges'] || []).map(m => ({
-        startRow: m.s.r, startColumn: m.s.c, endRow: m.e.r, endColumn: m.e.c,
-      }));
-      const columnData = {};
-      (ws['!cols'] || []).forEach((col, ci) => { if (col && col.wpx) columnData[ci] = { w: col.wpx }; });
-      const rowData = {};
-      (ws['!rows'] || []).forEach((row, ri) => { if (row && row.hpx) rowData[ri] = { h: row.hpx }; });
-      sheets[id] = {
-        id, name: sn, cellData, mergeData, columnData, rowData,
-        rowCount: Math.max(maxR + 50, 100),
-        columnCount: Math.max(maxC + 10, 26),
-      };
-      sheetOrder.push(id);
-    });
-    return { id: 'workbook-1', name, appVersion: '1', locale: 'enUS', styles: {}, sheetOrder, sheets };
-  }
-
-  function univerToXlsxBytes(XLSX, snap, bookType) {
-    const wb = XLSX.utils.book_new();
-    for (const id of snap.sheetOrder) {
-      const s = snap.sheets[id];
-      const ws = {};
-      let maxR = 0, maxC = 0, any = false;
-      for (const r of Object.keys(s.cellData || {})) {
-        for (const c of Object.keys(s.cellData[r] || {})) {
-          const cell = s.cellData[r][c] || {};
-          if (cell.v === undefined && !cell.f) continue;
-          const addr = XLSX.utils.encode_cell({ r: +r, c: +c });
-          const out = {};
-          if (cell.f) { out.f = String(cell.f).replace(/^=/, ''); out.t = 'n'; }
-          if (cell.v !== undefined) {
-            if (cell.t === 2 || (typeof cell.v === 'number' && cell.t === undefined)) { out.v = +cell.v; out.t = 'n'; }
-            else if (cell.t === 3) { out.v = !!cell.v; out.t = 'b'; }
-            else { out.v = String(cell.v); if (!out.f) out.t = 's'; }
-          }
-          // SheetJS DROPS a formula cell that has no cached value on write, so a
-          // freshly-set formula (whose Univer recompute lags the snapshot) would
-          // vanish. Give it a placeholder 0 — Excel/Univer recompute on open.
-          if (out.f && out.v === undefined) { out.v = 0; out.t = 'n'; }
-          ws[addr] = out;
-          maxR = Math.max(maxR, +r); maxC = Math.max(maxC, +c); any = true;
-        }
-      }
-      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: any ? maxR : 0, c: any ? maxC : 0 } });
-      if ((s.mergeData || []).length) {
-        ws['!merges'] = s.mergeData.map(m => ({ s: { r: m.startRow, c: m.startColumn }, e: { r: m.endRow, c: m.endColumn } }));
-      }
-      XLSX.utils.book_append_sheet(wb, ws, (s.name || id).slice(0, 31));
-    }
-    return XLSX.write(wb, { type: 'array', bookType });
-  }
-
-  // Univer's dataStream uses '\r' as the paragraph mark and ends '\r\n'.
-  function textToUniverDoc(text, name) {
-    const dataStream = String(text).replace(/\r\n?/g, '\n').replace(/\n/g, '\r') + '\r\n';
-    const paragraphs = [];
-    for (let i = 0; i < dataStream.length; i++) if (dataStream[i] === '\r') paragraphs.push({ startIndex: i });
-    return {
-      id: 'doc-1', title: name, locale: 'enUS',
-      body: { dataStream, textRuns: [], paragraphs, sectionBreaks: [{ startIndex: dataStream.length - 1 }] },
-      documentStyle: {
-        pageSize: { width: 595, height: 842 },
-        marginTop: 40, marginBottom: 40, marginLeft: 45, marginRight: 45,
-      },
-    };
-  }
-  function univerDocToText(snap) {
-    const ds = (snap && snap.body && snap.body.dataStream) || '';
-    return ds.replace(/\r\n$/, '').replace(/\r/g, '\n');
-  }
+  const loading = (msg) => `<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">${msg}</div>`;
 
   /* ════════════════════ pane host (the ONLY chrome) ═════════════════════ */
 
@@ -157,7 +58,7 @@
       pane.style.cssText += 'position:fixed;inset:0;z-index:1000;background:var(--sp-bg,#0d1117);';
       document.body.appendChild(pane);
     }
-    return { pane, header, body, title };
+    return { pane, header, title, body };
   }
 
   function fill(body, el) { body.innerHTML = ''; body.appendChild(el); return el; }
@@ -172,81 +73,59 @@
     return b;
   }
 
-  // Extract a .docx's text client-side via docx-preview (no LibreOffice). Renders
-  // into a laid-out node parked OFF-SCREEN — NOT visibility:hidden / display:none,
-  // because innerText returns only *rendered* text, so a hidden node yields ''.
-  async function extractDocxText(file) {
-    const dp = await opfs.getDocxPreview();
-    const tmp = document.createElement('div');
-    tmp.style.cssText = 'position:fixed;left:-99999px;top:0;width:820px;pointer-events:none;opacity:0;';
-    document.body.appendChild(tmp);
-    try {
-      await dp.renderAsync(await file.arrayBuffer(), tmp, null, { inWrapper: false });
-      return (tmp.innerText || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-    } finally { tmp.remove(); }
-  }
-
-  const loading = (msg) => `<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">${msg}</div>`;
-
   function blobUrlFor(pane, file, type) {
     const url = URL.createObjectURL(type ? new Blob([file], { type }) : file);
     pane.dataset.blobUrl = url;   // opfs.closeFile revokes .fv-panel[data-blob-url]
     return url;
   }
 
-  /* ════════════════════ Univer mounting ═════════════════════════════════ */
+  /* ════════════════════ text viewer/editor ══════════════════════════════ */
 
-  // The single live Univer editor (sheet or doc), so the LLM's sheet_edit tool
-  // can reach the workbook the user is looking at. Cleared when the pane closes.
-  let _active = null;   // { iframe, kind, name, fullKey, onSave, rpcWaiters:Map, rpcSeq }
+  function openText(fullKey, name, ext, text, header, body) {
+    const isMd = ext === 'md' || ext === 'markdown';
+    let mode = isMd ? 'preview' : 'edit';   // md defaults to rendered; others to source
+    let ta = null, dirty = false;
 
-  function mountUniver(body, name, payload, kind, onSave, fullKey, readOnly) {
-    const iframe = document.createElement('iframe');
-    iframe.src = '/univer-editor.html?v=6';
-    iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
-    fill(body, iframe);
-    _active = { iframe, kind, name, fullKey, onSave, rpcWaiters: new Map(), rpcSeq: 0 };
-    const onMsg = async (e) => {
-      if (e.source !== iframe.contentWindow || !e.data) return;
-      if (e.data.type === 'univer-ready') {
-        iframe.contentWindow.postMessage(
-          kind === 'doc' ? { type: 'univer-load', name, doc: payload, readOnly: !!readOnly }
-                         : { type: 'univer-load', name, workbook: payload },
-          location.origin);
-      } else if (e.data.type === 'univer-save') {
-        let reply;
-        try {
-          if (!onSave) throw new Error('this view is read-only');
-          await onSave(e.data.doc || e.data.workbook);
-          reply = { type: 'univer-saved', ok: true };
-        } catch (err) {
-          reply = { type: 'univer-saved', ok: false, error: (err && err.message) || String(err) };
-        }
-        iframe.contentWindow.postMessage(reply, location.origin);
-      } else if (e.data.type === 'univer-op-result' && _active) {
-        const w = _active.rpcWaiters.get(e.data.rpcId);
-        if (w) { _active.rpcWaiters.delete(e.data.rpcId); clearTimeout(w.timer); w.resolve(e.data); }
-      }
-    };
-    addEventListener('message', onMsg);
-    const mo = new MutationObserver(() => {
-      if (!document.contains(iframe)) {
-        removeEventListener('message', onMsg); mo.disconnect();
-        if (_active && _active.iframe === iframe) _active = null;
-      }
+    const setTitle = (dirtyNow) => { const t = header.querySelector('span'); if (t) t.textContent = (dirtyNow ? '• ' : '') + '/' + fullKey; };
+
+    const saveBtn = addHeaderButton(header, 'Save', 'Save to OPFS (Ctrl+S)', async () => {
+      if (!ta) return;
+      saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
+      try { await opfs.write(fullKey, ta.value); text = ta.value; dirty = false; setTitle(false); saveBtn.textContent = 'Saved ✓'; }
+      catch (e) { saveBtn.textContent = 'Save failed'; console.error(e); }
+      finally { setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1200); }
     });
-    mo.observe(document.body, { childList: true, subtree: true });
-  }
+    const modeBtn = isMd ? addHeaderButton(header, 'Source', 'Toggle rendered / source', () => {
+      mode = mode === 'preview' ? 'edit' : 'preview';
+      modeBtn.textContent = mode === 'preview' ? 'Source' : 'Preview';
+      render();
+    }) : null;
 
-  // Post one op into the live editor iframe and await its result.
-  function iframeOp(op, args, timeoutMs = 15000) {
-    return new Promise((resolve, reject) => {
-      if (!_active) return reject(new Error('no editor open'));
-      const rpcId = ++_active.rpcSeq;
-      const timer = setTimeout(() => { _active && _active.rpcWaiters.delete(rpcId); reject(new Error('editor op timed out')); }, timeoutMs);
-      _active.rpcWaiters.set(rpcId, { resolve, reject, timer });
-      _active.iframe.contentWindow.postMessage({ type: 'univer-op', rpcId, op, args }, location.origin);
-    });
+    function render() {
+      const showEdit = mode === 'edit';
+      saveBtn.style.display = showEdit ? '' : 'none';
+      if (showEdit) {
+        ta = document.createElement('textarea');
+        ta.value = (dirty && ta) ? ta.value : text;
+        ta.spellcheck = false;
+        ta.style.cssText = 'width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;'
+          + 'font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);';
+        ta.addEventListener('input', () => { dirty = true; setTitle(true); });
+        ta.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveBtn.click(); } });
+        fill(body, ta);
+        ta.focus();
+      } else {
+        ta = null;
+        const div = document.createElement('div');
+        div.className = 'md-body';
+        div.style.cssText = 'padding:14px 18px;max-width:820px;margin:0 auto;color:var(--sp-text,#e6edf3);line-height:1.6;';
+        // marked + DOMPurify are loaded blocking in the page head (same as chat rendering).
+        try { div.innerHTML = window.DOMPurify.sanitize(window.marked.parse(text)); }
+        catch (_) { const pre = document.createElement('pre'); pre.textContent = text; pre.style.whiteSpace = 'pre-wrap'; div.appendChild(pre); }
+        fill(body, div);
+      }
+    }
+    render();
   }
 
   /* ════════════════════ the dispatcher ══════════════════════════════════ */
@@ -276,14 +155,11 @@
     const ext = (name.split('.').pop() || '').toLowerCase();
     const { pane, header, body } = buildPane(fullKey);
 
-    /* sheets → Univer sheet editor */
-    if (SHEET_EXTS.has(ext)) {
-      body.innerHTML = '<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">Loading spreadsheet editor…</div>';
-      const XLSX = await opfs.getSheetJS();
-      const wbData = xlsxToUniver(XLSX, XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }), name);
-      mountUniver(body, name, wbData, 'sheet', async (snap) => {
-        await opfs.write(fullKey, new Blob([univerToXlsxBytes(XLSX, snap, ext === 'csv' ? 'csv' : ext)]));
-      }, fullKey);
+    /* office (word / sheet / slides) → LibreOffice-WASM (ZetaOffice) render */
+    if (OFFICE_EXTS.has(ext)) {
+      body.innerHTML = loading('Rendering document…');
+      if (await opfs._renderOfficePdf(file, ext, name, body, pane)) return;
+      body.innerHTML = loading('Could not render this document.');
       return;
     }
 
@@ -326,33 +202,6 @@
       return;
     }
 
-    /* .docx → Univer docs (extracted text) by default, with a header button to
-       switch to the high-fidelity LibreOffice render. The extracted view is
-       READ-ONLY: Univer docs would save as plain text, which must never overwrite
-       the .docx binary. Fidelity + editing-with-layout live behind the button. */
-    if (ext === 'docx') {
-      const toLibre = async () => {
-        if (_active && _active.iframe) _active = null;   // leaving the Univer editor
-        body.innerHTML = loading('Rendering with LibreOffice…');
-        if (!(await opfs._renderOfficePdf(file, ext, name, body, pane))) body.innerHTML = loading('Could not render this document.');
-      };
-      addHeaderButton(header, '⧉ LibreOffice', 'High-fidelity render via LibreOffice (read-only)', toLibre);
-      body.innerHTML = loading('Extracting text…');
-      let text = null;
-      try { text = await extractDocxText(file); } catch (_) {}
-      if (text != null) mountUniver(body, name, textToUniverDoc(text, name), 'doc', null, fullKey, /*readOnly*/ true);
-      else await toLibre();   // legacy .doc / corrupt / non-OOXML → straight to LibreOffice
-      return;
-    }
-
-    /* other office formats → LibreOffice-WASM PDF render (read-only) */
-    if (OFFICE_EXTS.has(ext)) {
-      body.innerHTML = loading('Rendering document…');
-      if (await opfs._renderOfficePdf(file, ext, name, body, pane)) return;
-      body.innerHTML = loading('Could not render this document.');
-      return;
-    }
-
     /* html/svg → sandboxed preview */
     if (ext === 'html' || ext === 'htm' || ext === 'svg') {
       const iframe = document.createElement('iframe');
@@ -363,25 +212,18 @@
       return;
     }
 
-    /* default: text → Univer docs editor; binary → download row */
+    /* default: text → editable pane; binary → download row */
     const bytes = new Uint8Array(await file.arrayBuffer());
     let text = null;
     if (bytes.length <= TEXT_EDIT_CAP) {
       const probe = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
       const sample = probe.slice(0, 4096);
       let bad = 0;
-      for (let i = 0; i < sample.length; i++) {
-        const ch = sample.charCodeAt(i);
-        if (ch === 0xFFFD || ch === 0) bad++;
-      }
+      for (let i = 0; i < sample.length; i++) { const ch = sample.charCodeAt(i); if (ch === 0xFFFD || ch === 0) bad++; }
       if (!sample.length || bad / Math.max(sample.length, 1) < 0.05) text = probe;
     }
-    if (text !== null) {
-      mountUniver(body, name, textToUniverDoc(text, name), 'doc', async (snap) => {
-        await opfs.write(fullKey, univerDocToText(snap));
-      }, fullKey);
-      return;
-    }
+    if (text !== null) { openText(fullKey, name, ext, text, header, body); return; }
+
     const row = document.createElement('div');
     row.style.cssText = 'padding:2rem;text-align:center;color:var(--sp-text-dim);';
     const kb = (bytes.length / 1024).toFixed(1);
@@ -396,27 +238,5 @@
     fill(body, row);
   }
 
-  // Is a spreadsheet currently open? (gates the sheet_edit tool's availability)
-  function hasOpenSheet() { return !!(_active && _active.kind === 'sheet'); }
-
-  // The LLM's sheet_edit tool, dispatched here from the page's worker-RPC bridge.
-  // op ∈ info | read | set. A 'set' persists back to OPFS (through the same
-  // save path as the Save button) so the edit survives reload and Dropbox syncs.
-  async function toolRpc(op, args = {}) {
-    if (!hasOpenSheet()) throw new Error('no spreadsheet is open — the user must open an .xlsx/.csv file first');
-    if (op === 'info' || op === 'read') {
-      const r = await iframeOp(op, args);
-      if (!r.ok) throw new Error(r.error || 'op failed');
-      return r;
-    }
-    if (op === 'set') {
-      const r = await iframeOp('set', args);
-      if (!r.ok) throw new Error(r.error || 'set failed');
-      if (r.snapshot && _active && _active.onSave) await _active.onSave(r.snapshot);   // persist to OPFS
-      return { ok: true };
-    }
-    throw new Error('unknown op: ' + op);
-  }
-
-  window.SandpieFileViewer = { open, hasOpenSheet, toolRpc };
+  window.SandpieFileViewer = { open };
 })();

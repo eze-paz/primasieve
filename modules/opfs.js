@@ -1209,10 +1209,11 @@ opfs.showContextMenu = function(x, y, items) {
 
 
 // ── File viewer ──────────────────────────────────────────────────────────────
-// The viewer proper lives in modules/file-viewer.js: ONE side pane, no modal,
-// Univer (sheets/docs) as the default surface. The old in-place modal viewer
-// (~940 lines) was removed; this stub keeps the historical entry point and
-// signature for callers (artifacts.js, conversations.js file chips).
+// The viewer proper lives in modules/file-viewer.js: ONE side pane, no modal.
+// Office (docx/xlsx/…) render via LibreOffice-WASM (ZetaOffice); text files get
+// an editable pane. The old in-place modal viewer (~940 lines) was removed; this
+// stub keeps the historical entry point and signature for callers (artifacts.js,
+// conversations.js file chips).
 opfs.openFile = async function(fullKey, name, opts = {}) {
   if (window.SandpieFileViewer) return SandpieFileViewer.open(fullKey, name, opts);
   try { Sandpie.addMsg('err', 'file viewer module not loaded'); } catch (_) {}
