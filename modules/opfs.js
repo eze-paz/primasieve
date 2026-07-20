@@ -4273,7 +4273,7 @@ opfs.refreshFileList = async function() {
     const statusLabel = it.status === 'cloud' ? 'synced' : it.status;
 
 
-    btn.title = `${it.kind} · ${statusLabel}`;
+    btn.title = it.fullKey;
 
 
     if (it.kind === 'folder') {
