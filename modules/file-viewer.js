@@ -86,6 +86,10 @@
             else if (cell.t === 3) { out.v = !!cell.v; out.t = 'b'; }
             else { out.v = String(cell.v); if (!out.f) out.t = 's'; }
           }
+          // SheetJS DROPS a formula cell that has no cached value on write, so a
+          // freshly-set formula (whose Univer recompute lags the snapshot) would
+          // vanish. Give it a placeholder 0 — Excel/Univer recompute on open.
+          if (out.f && out.v === undefined) { out.v = 0; out.t = 'n'; }
           ws[addr] = out;
           maxR = Math.max(maxR, +r); maxC = Math.max(maxC, +c); any = true;
         }
@@ -166,11 +170,16 @@
 
   /* ════════════════════ Univer mounting ═════════════════════════════════ */
 
-  function mountUniver(body, name, payload, kind, onSave) {
+  // The single live Univer editor (sheet or doc), so the LLM's sheet_edit tool
+  // can reach the workbook the user is looking at. Cleared when the pane closes.
+  let _active = null;   // { iframe, kind, name, fullKey, onSave, rpcWaiters:Map, rpcSeq }
+
+  function mountUniver(body, name, payload, kind, onSave, fullKey) {
     const iframe = document.createElement('iframe');
-    iframe.src = '/univer-editor.html?v=2';
+    iframe.src = '/univer-editor.html?v=5';
     iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
     fill(body, iframe);
+    _active = { iframe, kind, name, fullKey, onSave, rpcWaiters: new Map(), rpcSeq: 0 };
     const onMsg = async (e) => {
       if (e.source !== iframe.contentWindow || !e.data) return;
       if (e.data.type === 'univer-ready') {
@@ -187,13 +196,30 @@
           reply = { type: 'univer-saved', ok: false, error: (err && err.message) || String(err) };
         }
         iframe.contentWindow.postMessage(reply, location.origin);
+      } else if (e.data.type === 'univer-op-result' && _active) {
+        const w = _active.rpcWaiters.get(e.data.rpcId);
+        if (w) { _active.rpcWaiters.delete(e.data.rpcId); clearTimeout(w.timer); w.resolve(e.data); }
       }
     };
     addEventListener('message', onMsg);
     const mo = new MutationObserver(() => {
-      if (!document.contains(iframe)) { removeEventListener('message', onMsg); mo.disconnect(); }
+      if (!document.contains(iframe)) {
+        removeEventListener('message', onMsg); mo.disconnect();
+        if (_active && _active.iframe === iframe) _active = null;
+      }
     });
     mo.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Post one op into the live editor iframe and await its result.
+  function iframeOp(op, args, timeoutMs = 15000) {
+    return new Promise((resolve, reject) => {
+      if (!_active) return reject(new Error('no editor open'));
+      const rpcId = ++_active.rpcSeq;
+      const timer = setTimeout(() => { _active && _active.rpcWaiters.delete(rpcId); reject(new Error('editor op timed out')); }, timeoutMs);
+      _active.rpcWaiters.set(rpcId, { resolve, reject, timer });
+      _active.iframe.contentWindow.postMessage({ type: 'univer-op', rpcId, op, args }, location.origin);
+    });
   }
 
   /* ════════════════════ the dispatcher ══════════════════════════════════ */
@@ -230,7 +256,7 @@
       const wbData = xlsxToUniver(XLSX, XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' }), name);
       mountUniver(body, name, wbData, 'sheet', async (snap) => {
         await opfs.write(fullKey, new Blob([univerToXlsxBytes(XLSX, snap, ext === 'csv' ? 'csv' : ext)]));
-      });
+      }, fullKey);
       return;
     }
 
@@ -307,7 +333,7 @@
     if (text !== null) {
       mountUniver(body, name, textToUniverDoc(text, name), 'doc', async (snap) => {
         await opfs.write(fullKey, univerDocToText(snap));
-      });
+      }, fullKey);
       return;
     }
     const row = document.createElement('div');
@@ -324,5 +350,27 @@
     fill(body, row);
   }
 
-  window.SandpieFileViewer = { open };
+  // Is a spreadsheet currently open? (gates the sheet_edit tool's availability)
+  function hasOpenSheet() { return !!(_active && _active.kind === 'sheet'); }
+
+  // The LLM's sheet_edit tool, dispatched here from the page's worker-RPC bridge.
+  // op ∈ info | read | set. A 'set' persists back to OPFS (through the same
+  // save path as the Save button) so the edit survives reload and Dropbox syncs.
+  async function toolRpc(op, args = {}) {
+    if (!hasOpenSheet()) throw new Error('no spreadsheet is open — the user must open an .xlsx/.csv file first');
+    if (op === 'info' || op === 'read') {
+      const r = await iframeOp(op, args);
+      if (!r.ok) throw new Error(r.error || 'op failed');
+      return r;
+    }
+    if (op === 'set') {
+      const r = await iframeOp('set', args);
+      if (!r.ok) throw new Error(r.error || 'set failed');
+      if (r.snapshot && _active && _active.onSave) await _active.onSave(r.snapshot);   // persist to OPFS
+      return { ok: true };
+    }
+    throw new Error('unknown op: ' + op);
+  }
+
+  window.SandpieFileViewer = { open, hasOpenSheet, toolRpc };
 })();

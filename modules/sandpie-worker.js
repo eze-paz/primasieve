@@ -229,12 +229,33 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  if (data.type === 'page-rpc-result') {
+    const w = _pageRpcWaiters.get(data.id);
+    if (w) { _pageRpcWaiters.delete(data.id); clearTimeout(w.timer); if (data.error) w.reject(new Error(data.error)); else w.resolve(data.result); }
+    return;
+  }
+
   if (data.type === 'abort') {
     const ctl = _agentAborts.get(data.id);
     if (ctl) { try { ctl.abort(); } catch (_) {} }
     return;
   }
 });
+
+// Worker→page request/reply: a tool that needs something only the page can do
+// (reaching the open Univer editor for sheet_edit) posts a 'page-rpc' and awaits
+// the matching 'page-rpc-result'. Times out so a closed/hung page can't wedge a turn.
+const _pageRpcWaiters = new Map();
+let _pageRpcSeq = 0;
+function pageRpc(target, op, args, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const id = ++_pageRpcSeq;
+    const timer = setTimeout(() => { _pageRpcWaiters.delete(id); reject(new Error('page did not respond (is the app tab still open?)')); }, timeoutMs);
+    _pageRpcWaiters.set(id, { resolve, reject, timer });
+    try { self.postMessage({ type: 'page-rpc', id, target, op, args }); }
+    catch (e) { clearTimeout(timer); _pageRpcWaiters.delete(id); reject(e); }
+  });
+}
 
 // ============================================================
 // Pyodide worker pool. Python used to run inline on THIS thread, so a long or
@@ -1247,6 +1268,7 @@ async function runTool(name, args, ctx) {
     case 'write_todos':   return tool_write_todos(args, ctx);
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
+    case 'sheet_edit':    return tool_sheet_edit(args, ctx);
     default:              return unknownTool(name);
   }
 }
@@ -1845,6 +1867,42 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
 // so writing the file IS the whole operation; no index to maintain here. If a
 // file with the same slug exists we preserve its `created` date and update.
 function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
+// Read/edit the spreadsheet the user has open in the Univer editor. Runs here in
+// the worker but the workbook lives on the page, so every op is a page-rpc to
+// file-viewer's toolRpc. A 'set' persists back to OPFS through the editor's save
+// path (survives reload + Dropbox sync). Values render live for the user.
+async function tool_sheet_edit(args, _ctx) {
+  const op = String((args && args.op) || '').toLowerCase();
+  if (!['info', 'read', 'set'].includes(op)) {
+    return { result: 'Error: op must be one of "info", "read", "set".' };
+  }
+  try {
+    if (op === 'info') {
+      const r = await pageRpc('file-viewer', 'info', {});
+      return { result: `sheets: ${JSON.stringify(r.sheets)} · active: ${r.active} · used: ${r.rows} rows × ${r.cols} cols` };
+    }
+    if (op === 'read') {
+      const r = await pageRpc('file-viewer', 'read', { sheet: args.sheet, range: args.range });
+      const grid = r.values || [];
+      const csv = grid.map(row => row.map(v => {
+        const s = v == null ? '' : String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(',')).join('\n');
+      return { result: (args.range ? `${args.range}:\n` : '') + (csv || '(empty)') };
+    }
+    // set
+    const edits = args.edits, range = args.range, values = args.values;
+    if (!(Array.isArray(edits) && edits.length) && !(range && Array.isArray(values))) {
+      return { result: 'Error: set needs edits:[{a1,value|formula}, …] or {range:"A1", values:[[…]]}.' };
+    }
+    await pageRpc('file-viewer', 'set', { sheet: args.sheet, edits, range, values });
+    const n = (edits ? edits.length : 0) + (values ? values.reduce((a, r) => a + r.length, 0) : 0);
+    return { result: `Applied ${n} cell edit(s) and saved.` };
+  } catch (e) {
+    return { result: 'Error: ' + ((e && e.message) || e) };
+  }
+}
+
 async function tool_remember({ name, description, type, body, links }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
   // Extract provenance: recent tool result IDs (rN) from this turn

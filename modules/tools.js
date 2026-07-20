@@ -257,6 +257,29 @@ LINK related memories: reference other facts inside the body as [[their-name]] (
       },
     },
 
+    sheet_edit: {
+      description: `Read or edit the spreadsheet the user currently has OPEN in sandpie's editor (Univer). Only available while an .xlsx/.csv/.ods file is open in the side pane; edits appear live for the user and are saved back to the file.
+op "info"  → sheet names, active sheet, used size. Call this first to orient.
+op "read"  → returns the cells as CSV. Whole used grid by default, or a specific A1 range: {op:"read", range:"A1:D20"}. Optional sheet:"Name".
+op "set"   → write cells. Either {op:"set", edits:[{a1:"B2", value:225}, {a1:"C2", formula:"=B2*2"}]} (formula OR value per cell) or a rectangular block {op:"set", range:"A1", values:[["x",1],["y",2]]}. Optional sheet:"Name". Saves automatically.
+Use A1 notation. Formulas use standard spreadsheet syntax with a leading "=".`,
+      parameters: {
+        type: 'object',
+        properties: {
+          op:     { type: 'string', enum: ['info', 'read', 'set'], description: 'info = metadata; read = get cells as CSV; set = write cells.' },
+          sheet:  { type: 'string', description: 'Sheet/tab name (defaults to the active sheet).' },
+          range:  { type: 'string', description: 'A1 range. For read: the region to return. For set: the top-left anchor of a values block.' },
+          values: { type: 'array', items: { type: 'array', items: {} }, description: 'set (block form): 2D row-major array written starting at range.' },
+          edits:  { type: 'array', items: { type: 'object', properties: {
+                      a1:      { type: 'string', description: 'Target cell in A1 notation, e.g. "C2".' },
+                      value:   { description: 'Literal value (number, string, boolean) to write.' },
+                      formula: { type: 'string', description: 'Formula to write, e.g. "=SUM(B2:B10)" (mutually exclusive with value).' },
+                    }, required: ['a1'] }, description: 'set (cell form): individual cell writes.' },
+        },
+        required: ['op'],
+      },
+    },
+
 };
 //// Lets the user (Settings → System prompt) turn tools off and rewrite their
 // descriptions. Stored globally so it applies to every conversation. toolDefs()
@@ -289,6 +312,12 @@ function _toolAvailable(name) {
   // remember is only offered when the memory feature is enabled (Settings → Memory).
   if (name === 'remember') {
     try { return !!(window.SandpieMemory && SandpieMemory.isEnabled()); }
+    catch (_) { return false; }
+  }
+  // sheet_edit only exists while a spreadsheet is open in the editor. (Availability
+  // is snapshotted at send time — a sheet opened mid-turn appears next turn.)
+  if (name === 'sheet_edit') {
+    try { return !!(window.SandpieFileViewer && SandpieFileViewer.hasOpenSheet && SandpieFileViewer.hasOpenSheet()); }
     catch (_) { return false; }
   }
   return true;

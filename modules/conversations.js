@@ -1315,7 +1315,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=73');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=74');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1335,6 +1335,23 @@ function getSandpieWorker() {
       // The worker silently re-minted the managed session token after a 401; keep
       // the page-side provider + hidden #apiKey in sync so the next request is fresh.
       try { window.SandpieAccount?.applyRefreshedToken?.(msg.token); } catch (_) {}
+      return;
+    }
+    if (msg.type === 'page-rpc') {
+      // A worker-side tool needs something only the page can do (e.g. sheet_edit
+      // reaching the open Univer editor). Run it and post the result back keyed
+      // by id. Kept generic: msg.target names the handler, msg.op/args the call.
+      (async () => {
+        let result = null, error = null;
+        try {
+          if (msg.target === 'file-viewer' && window.SandpieFileViewer && SandpieFileViewer.toolRpc) {
+            result = await SandpieFileViewer.toolRpc(msg.op, msg.args);
+          } else {
+            error = 'page-rpc target unavailable: ' + msg.target;
+          }
+        } catch (e) { error = (e && e.message) || String(e); }
+        try { _sandpieWorker.postMessage({ type: 'page-rpc-result', id: msg.id, result, error }); } catch (_) {}
+      })();
       return;
     }
   });
