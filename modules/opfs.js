@@ -1088,7 +1088,7 @@ opfs.showContextMenu = function(x, y, items) {
       const info = document.createElement('div');
 
 
-      info.className = 'ctx-info';
+      info.className = 'ctx-info' + (item.className ? ' ' + item.className : '');
 
 
       info.textContent = item.label;
@@ -4323,7 +4323,7 @@ opfs.refreshFileList = async function() {
       // demand here so navigating the list never pays for the subtree walk.
 
 
-      if (it.kind === 'folder') menuItems.push({ info: true, label: 'Size: …' });
+      if (it.kind === 'folder') menuItems.push({ info: true, label: 'Size: …', className: 'ctx-size' });
 
 
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
@@ -4572,8 +4572,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
 
       if (it.kind === 'folder') {
-        const infoEls = menu.querySelectorAll('.ctx-info');
-        const sizeEl = infoEls[infoEls.length - 1];
+        const sizeEl = menu.querySelector('.ctx-size');
         opfs.getFolderSize(it.fullKey).then((sz) => {
           if (sizeEl && sizeEl.isConnected) sizeEl.textContent = 'Size: ' + (opfs.formatSize(sz) || '0B');
         }).catch(() => { if (sizeEl && sizeEl.isConnected) sizeEl.textContent = 'Size: —'; });
