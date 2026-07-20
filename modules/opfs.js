@@ -1101,14 +1101,6 @@ opfs.showContextMenu = function(x, y, items) {
 
 
     }
-    if (item.separator) {
-      const hr = document.createElement('hr');
-      hr.className = 'ctx-sep';
-      menu.appendChild(hr);
-      continue;
-    }
-
-
     const btn = document.createElement('button');
 
 
@@ -4552,9 +4544,6 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
       }});
 
-      // Separator before the sort section
-      menuItems.push({ separator: true });
-
       // Sort-by (view setting for the whole list; folders always group first by
 
 
@@ -4564,7 +4553,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
       const _sortMode = fileSortMode();
 
 
-      menuItems.push({ info: true, label: 'Sort by' });
+      menuItems.push({ info: true, label: 'Sort by', className: 'ctx-sort-header' });
 
 
       menuItems.push({ label: (_sortMode === 'name'  ? '● ' : '○ ') + 'Alphabetical',  action: () => setFileSortMode('name') });
