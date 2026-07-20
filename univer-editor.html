@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spreadsheet editor</title>
+<link rel="stylesheet" href="vendor/univer/univer.css">
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  #bar { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px;
+         background: #1b1f24; color: #d8dee5; font: 12px system-ui, sans-serif; }
+  #bar button { background: #2ea043; color: #fff; border: 0; border-radius: 5px;
+                padding: 4px 14px; font: 600 12px system-ui; cursor: pointer; }
+  #bar button:disabled { background: #444; cursor: default; }
+  #fname { font-weight: 600; }
+  #status { color: #8b949e; }
+  #univer { height: calc(100% - 36px); }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span id="fname"></span>
+  <button id="saveBtn" disabled>Save</button>
+  <span id="status">Loading engine…</span>
+</div>
+<div id="univer"></div>
+
+<script src="vendor/univer/univer.full.umd.js"></script>
+<script src="vendor/univer/locale-en.js"></script>
+<script>
+// Univer sheets workbench in an isolated iframe. Same-origin postMessage
+// protocol with modules/univer-editor.js (the host):
+//   host  -> { type:'univer-load', name, workbook /* IWorkbookData */ }
+//   frame -> { type:'univer-ready' }
+//   frame -> { type:'univer-save', workbook }   (Save button / Ctrl+S)
+//   host  -> { type:'univer-saved', ok, error? }
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let univerAPI = null, dirty = false;
+
+  function boot(workbook) {
+    const { Univer, LocaleType, UniverInstanceType } = UniverCore;
+    const univer = new Univer({
+      theme: UniverDesign.defaultTheme,
+      locale: LocaleType.EN_US,
+      locales: { [LocaleType.EN_US]: UniverUMD['en-US'] },
+    });
+    univer.registerPlugin(UniverEngineRender.UniverRenderEnginePlugin);
+    univer.registerPlugin(UniverEngineFormula.UniverFormulaEnginePlugin);
+    univer.registerPlugin(UniverUi.UniverUIPlugin, { container: 'univer' });
+    univer.registerPlugin(UniverDocs.UniverDocsPlugin, { hasScroll: false });
+    univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
+    univer.registerPlugin(UniverSheets.UniverSheetsPlugin);
+    univer.registerPlugin(UniverSheetsUi.UniverSheetsUIPlugin);
+    univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);
+    // optional extras — presence varies across UMD builds, register when there
+    try { univer.registerPlugin(UniverSheetsFormulaUi.UniverSheetsFormulaUIPlugin); } catch (_) {}
+    try { univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin); } catch (_) {}
+    try { univer.registerPlugin(UniverSheetsNumfmtUi.UniverSheetsNumfmtUIPlugin); } catch (_) {}
+    univer.createUnit(UniverInstanceType.UNIVER_SHEET, workbook);
+    univerAPI = UniverFacade.FUniver.newAPI(univer);
+    // any command marks the doc dirty (cheap superset of "content changed") —
+    // but createUnit itself fires a burst of commands, so arm the listener
+    // only after boot settles.
+    setTimeout(() => {
+      dirty = false; setStatus('');
+      univerAPI.onCommandExecuted(() => { if (!dirty) { dirty = true; setStatus('unsaved changes'); } });
+    }, 800);
+    $('saveBtn').disabled = false;
+    setStatus('');
+  }
+
+  function setStatus(t) { $('status').textContent = t; }
+
+  function save() {
+    if (!univerAPI) return;
+    const wb = univerAPI.getActiveWorkbook();
+    if (!wb) return;
+    setStatus('saving…');
+    parent.postMessage({ type: 'univer-save', workbook: wb.save() }, location.origin);
+  }
+
+  $('saveBtn').addEventListener('click', save);
+  addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+  });
+  addEventListener('beforeunload', e => { if (dirty) e.preventDefault(); });
+
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.type === 'univer-load') {
+      $('fname').textContent = e.data.name || '';
+      try { boot(e.data.workbook); } catch (err) { setStatus('engine error: ' + err.message); }
+    } else if (e.data.type === 'univer-saved') {
+      dirty = !e.data.ok;
+      setStatus(e.data.ok ? 'saved ✓' : 'save failed: ' + (e.data.error || '?'));
+    }
+  });
+
+  parent.postMessage({ type: 'univer-ready' }, location.origin);
+})();
+</script>
+</body>
+</html>
