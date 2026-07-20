@@ -1101,6 +1101,12 @@ opfs.showContextMenu = function(x, y, items) {
 
 
     }
+    if (item.separator) {
+      const hr = document.createElement('hr');
+      hr.className = 'ctx-sep';
+      menu.appendChild(hr);
+      continue;
+    }
 
 
     const btn = document.createElement('button');
@@ -4546,6 +4552,8 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
       }});
 
+      // Separator before the sort section
+      menuItems.push({ separator: true });
 
       // Sort-by (view setting for the whole list; folders always group first by
 
