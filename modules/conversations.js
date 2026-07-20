@@ -2542,8 +2542,11 @@ class RoundRenderer {
     this.toolsShouldClose = true;
     this._flushAllPending();
     this._finishThinking();
-    // Full markdown render deferred from local inference — do it once now, then scroll
-    if (this.isLocal && this.reply && this.displayed) {
+    // Full markdown render deferred from local inference — do it once now, then scroll.
+    // EXCEPT in logprob mode: displayed is per-token span HTML, and renderMd's math
+    // extractor would pair $ signs across span attributes (data-alts carries the model's
+    // own $/\\ text) and shred the markup. Spans stay as-is; no markdown in this mode.
+    if (this.isLocal && this.reply && this.displayed && !this._logprob) {
       streamDiff(this.reply.querySelector('.bubble') || this.reply, renderMd(this.displayed));
     }
     if (this.isLocal) {
