@@ -4313,6 +4313,8 @@ opfs.refreshFileList = async function() {
 
 
       const menuItems = [];
+      // Show the full filename first so long names are always readable.
+      menuItems.push({ info: true, label: it.fullKey });
 
 
       // For folders, show the (recursively summed) size at the top — computed on
