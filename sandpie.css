@@ -53,19 +53,23 @@
 
   /* Resize handle for the sidebar */
   .sidebar-resize-handle {
-    position: absolute;
+    position: fixed;
     top: 0;
-    right: 0;
+    bottom: 0;
     width: 4px;
-    height: 100%;
     cursor: col-resize;
     z-index: 10;
     background: transparent;
     transition: background 0.15s;
+    /* left is set dynamically by JS to sit on the right edge of <aside> */
   }
   .sidebar-resize-handle:hover,
   .sidebar-resize-handle.active {
     background: var(--sp-accent);
+  }
+  /* When sidebar is collapsed, hide the handle */
+  aside.collapsed + .sidebar-resize-handle {
+    display: none;
   }
 
   /* Scrollbars — cryocut style (default for all scrollables) */

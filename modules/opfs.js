@@ -5308,10 +5308,21 @@ function initFileBrowser() {
     if (saved) {
       sidebar.style.setProperty('--sidebar-width', saved + 'px');
     }
+    // Position handle on the right edge of <aside> (outside the scrollbar)
+    const positionHandle = () => {
+      const rect = sidebar.getBoundingClientRect();
+      handle.style.left = (rect.right - 2) + 'px';
+    };
+    positionHandle();
+    window.addEventListener('resize', positionHandle);
+    // Observe attribute changes (e.g. collapsed class toggled)
+    const observer = new MutationObserver(positionHandle);
+    observer.observe(sidebar, { attributes: true, attributeFilter: ['class', 'style'] });
     let startX, startW;
     const onMouseMove = (e) => {
       const w = Math.max(160, Math.min(600, startW + (e.clientX - startX)));
       sidebar.style.setProperty('--sidebar-width', w + 'px');
+      handle.style.left = (sidebar.getBoundingClientRect().right - 2) + 'px';
     };
     const onMouseUp = (e) => {
       document.removeEventListener('mousemove', onMouseMove);
