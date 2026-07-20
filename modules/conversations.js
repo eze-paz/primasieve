@@ -1695,8 +1695,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     temperature: (active && active.temperature != null) ? active.temperature : null,
     topP: (active && active.topP != null) ? active.topP : null,
     reasoningEffort: (active && active.reasoningEffort) || null,
-    // OpenRouter upstream routing: preferred providers in order (provider.order).
-    providerOrder: (active && Array.isArray(active.providerOrder)) ? active.providerOrder : null,
     reasoning: (active && active.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,

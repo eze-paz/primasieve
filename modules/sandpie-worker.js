@@ -2025,11 +2025,6 @@ async function runAgent(config, ctx) {
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
     if (reasoning) reqBody.reasoning = reasoning;
-    // OpenRouter upstream routing: prefer these providers in order (e.g. ['deepseek']
-    // to hit DeepSeek's own endpoint first), still falling back to others if down.
-    if (Array.isArray(config.providerOrder) && config.providerOrder.length) {
-      reqBody.provider = { order: config.providerOrder, allow_fallbacks: true };
-    }
     let round;
     try {
       round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
@@ -2050,9 +2045,6 @@ async function runAgent(config, ctx) {
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
           if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
-          if (Array.isArray(config.providerOrder) && config.providerOrder.length) {
-            compactedReqBody.provider = { order: config.providerOrder, allow_fallbacks: true };
-          }
           round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
         } catch (compactErr) {
           if (compactErr && compactErr.compactionFailed) {

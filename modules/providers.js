@@ -47,7 +47,6 @@ const AI_HTML = `
         <input id="spTopP" type="number" min="0" max="1" step="0.05" autocomplete="off" placeholder="top_p (optional, 0–1)">
         <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
-        <input id="spProviderOrder" autocomplete="off" placeholder="Upstream routing (OpenRouter: e.g. deepseek — comma-separated, tried in order)">
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
           <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
@@ -115,7 +114,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort','spProviderOrder']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -520,7 +519,6 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spTopP', p.topP);
   set('spReasoningEffort', p.reasoningEffort);
-  set('spProviderOrder', Array.isArray(p.providerOrder) ? p.providerOrder.join(', ') : '');
   set('spType', p.type || 'openai');
   const lr = document.getElementById('spLiteRTLMModel');
   if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
@@ -542,7 +540,6 @@ function applyTypeUI() {
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
-  show('spProviderOrder', !local);
   // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
   // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
@@ -587,10 +584,6 @@ function commitForm() {
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const pp = num('spTopP');          if (pp != null && pp >= 0) p.topP = pp;        else delete p.topP;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
-  // OpenRouter upstream-provider routing: preferred providers, comma-separated, tried
-  // in order (maps to the request's `provider.order`; fallbacks stay enabled).
-  const po = val('spProviderOrder').split(',').map(s => s.trim()).filter(Boolean);
-  if (po.length) p.providerOrder = po; else delete p.providerOrder;
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();
   applyActiveProvider();
