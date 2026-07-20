@@ -1516,6 +1516,15 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       if (tail && tail.error) throw _sseErrorToThrow(tail.error);
     } catch (e) { if (e && e.status) throw e; }
   }
+  // Some upstreams (seen: GMICloud via OpenRouter) report failures as a NORMAL
+  // completion: the error text ("Connect timeout, please try again later.")
+  // arrives as delta.content with finish_reason "stop" and no error object —
+  // indistinguishable from a real answer except that usage is all zeros
+  // (prompt_tokens 0 is impossible for a genuine round: the prompt was sent).
+  // Treat zero-usage rounds as a transient provider failure and retry.
+  if (usage && (usage.prompt_tokens | 0) === 0 && (usage.completion_tokens | 0) === 0) {
+    throw _sseErrorToThrow({ code: 502, message: 'zero-usage round (upstream failure disguised as a completion): ' + String(content || '').slice(0, 200) });
+  }
   let keptToolCalls = toolCalls.filter(tc => tc && tc.id && tc.function && tc.function.name);
   if (!keptToolCalls.length) {
     let parsed = parseLeakedToolCalls(content);
