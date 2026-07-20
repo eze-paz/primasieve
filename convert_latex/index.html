@@ -302,27 +302,44 @@ onmessage = async ({data}) => {
           let finalPdf = null;
           let finalExit = 0;
           let extraLogs = [];
-
+          const log_path = tex_path.replace(/\.tex$/, '.log');
+          // Exit codes from this WASM build are UNRELIABLE (EXIT_RUNTIME unset:
+          // the same run has reported 0 in the pipeline and 1 here; bibtex has
+          // reported 0 with 'status: 2' on stderr). Gate on artifacts instead:
+          // the .log tells us whether TeX really errored (a line starting with
+          // '! '), and the .xdv whether there is anything to convert. Trusting exit codes
+          // made a spurious 1 abort the extra passes and silently fall back to
+          // the pass-1 PDF — whose ToC ("index") is always empty because
+          // main.toc doesn't exist until pass 1 completes.
+          let texErrored = false;
           for (let pass = 0; pass < 2; pass++) {
-            try { FS.unlink(tex_path.replace(/\.tex$/, '.log')); } catch(e) {}
+            try { FS.unlink(log_path); } catch(e) {}
             const r = Module.callMainWithRedirects(xelatex, false);
             finalExit = r.exit_code;
-            extraLogs.push('$ ' + xelatex.join(' ') + '\\nEXITCODE: ' + finalExit + '\\n\\n' + r.stdout + '\\n' + r.stderr);
-            if (finalExit !== 0) break;
+            let logTail = '';
+            try {
+              const lg = FS.readFile(log_path, {encoding: 'utf8'});
+              texErrored = /^! /m.test(lg);
+              if (texErrored) logTail = '\\n--- .log tail (batchmode hides errors from stdout) ---\\n' + lg.slice(-3000);
+            } catch(e) {}
+            extraLogs.push('$ ' + xelatex.join(' ') + '\\nEXITCODE: ' + finalExit + '\\n\\n' + r.stdout + '\\n' + r.stderr + logTail);
+            if (texErrored) break;   // a real TeX error: rerunning can't fix it
           }
 
-          if (finalExit === 0) {
+          let hasXdv = false;
+          try { FS.stat(tex_path.replace(/\.tex$/, '.xdv')); hasXdv = true; } catch(e) {}
+          if (!texErrored && hasXdv) {
             const xdvipdfmx = ['xdvipdfmx', '-o',
               tex_path.replace(/\.tex$/, '.pdf'),
               tex_path.replace(/\.tex$/, '.xdv')];
             const r2 = Module.callMainWithRedirects(xdvipdfmx, false);
             extraLogs.push('$ ' + xdvipdfmx.join(' ') + '\\nEXITCODE: ' + r2.exit_code + '\\n\\n' + r2.stdout + '\\n' + r2.stderr);
-            if (r2.exit_code === 0) {
-              try {
-                finalPdf = FS.readFile(tex_path.replace(/\.tex$/, '.pdf'), {encoding: 'binary'});
-              } catch(e) {}
-            }
+            try {
+              finalPdf = FS.readFile(tex_path.replace(/\.tex$/, '.pdf'), {encoding: 'binary'});
+            } catch(e) {}
+            if (finalPdf) finalExit = 0;
           }
+          if (texErrored) finalExit = finalExit || 1;
 
           postMessage({
             type: 'done',
