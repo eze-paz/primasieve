@@ -223,182 +223,85 @@
 
   // ===== BusyTeX Worker =====
   function makeWorkerCode() {
-    return [
-'const BUSYTEX_BASE = \'' + BUSYTEX_BASE + '\';',
-'',
-'self.Module = {',
-'  locateFile: function(path, prefix) {',
-'    return BUSYTEX_BASE + path;',
-'  }',
-'};',
-'',
-'importScripts(location.origin + \'/convert_latex/vendor/busytex_pipeline.js\');',
-'',
-'self.pipeline = null;',
-'self.data_packages_js = [',
-'  BUSYTEX_BASE + \'texlive-basic.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-latex-recommended.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-latex-extra.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-science.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-fonts-recommended.js\'',
-'];',
-'self.preload_data_packages_js = [',
-'  BUSYTEX_BASE + \'texlive-basic.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-latex-recommended.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-latex-extra.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-science.js\',',
-'  BUSYTEX_BASE + \'ubuntu-texlive-fonts-recommended.js\'',
-'];',
-'',
-'onmessage = async function(ev) {',
-'  var data = ev.data;',
-'  var action = data.action, files = data.files, main_tex_path = data.main_tex_path, verbose = data.verbose;',
-'',
-'  if (action === \'init\') {',
-'    try {',
-'      self.pipeline = new BusytexPipeline(',
-'        BUSYTEX_BASE + \'busytex.js\',',
-'        BUSYTEX_BASE + \'busytex.wasm\',',
-'        self.data_packages_js,',
-'        self.preload_data_packages_js,',
-'        [],',
-'        function(msg) { postMessage({type: \'print\', text: msg}); },',
-'        function(versions) { postMessage({type: \'initialized\', versions: versions}); },',
-'        true,',
-'        BusytexPipeline.ScriptLoaderWorker',
-'      );',
-'    } catch (err) {',
-'      postMessage({type: \'error\', text: \'Init error: \' + err.message + \'\\n\' + err.stack});',
-'    }',
-'    return;',
-'  }',
-'',
-'  if (action === \'compile\') {',
-'    if (!self.pipeline) {',
-'      postMessage({type: \'error\', text: \'Pipeline not initialized\'});',
-'      return;',
-'    }',
-'    try {',
-'      postMessage({type: \'print\', text: \'Initializing XeTeX engine...\'});',
-'      // Initialize the WASM module (normally done by compile(), but we bypass it)',
-'      await self.pipeline.reload_module_if_needed(true, [], \'/project\', self.data_packages_js);',
-'      var Module = await self.pipeline.Module;',
-'      var FS = Module.FS;',
-'      var PATH = Module.PATH;',
-'',
-'      var tex_path = main_tex_path.split(\'/\').pop();',
-'      var dirname = main_tex_path.split(\'/\').slice(0, -1).join(\'/\');',
-'',
-'      // Mount fresh MEMFS',
-'      try {',
-'        if (FS.analyzePath(\'/project\').object.mount.mountpoint === \'/project\')',
-'          FS.unmount(\'/project\');',
-'      } catch(e) {}',
-'      FS.mount(FS.filesystems.MEMFS, {}, \'/project\');',
-'',
-'      // Write all project files',
-'      var dirs = {}; dirs[\'/\'] = true; dirs[\'/project\'] = true;',
-'      function mkdirP(abs) {',
-'        var parts = abs.replace(/^\\/+/, \'\').split(\'/\');',
-'        var p = \'/project\';',
-'        for (var i = 0; i < parts.length; i++) {',
-'          p += \'/\' + parts[i];',
-'          if (!dirs[p]) { try { FS.mkdir(p); } catch(e) {} dirs[p] = true; }',
-'        }',
-'      }',
-'      for (var i = 0; i < files.length; i++) {',
-'        var f = files[i];',
-'        var abs = PATH.join(\'/project\', f.path);',
-'        if (f.contents == null) {',
-'          mkdirP(abs);',
-'        } else {',
-'          mkdirP(PATH.dirname(abs));',
-'          FS.writeFile(abs, f.contents);',
-'        }',
-'      }',
-'',
-'      var sourceDir = PATH.join(\'/project\', dirname);',
-'      FS.chdir(sourceDir);',
-'',
-'      // Build command templates',
-'      var fmt = self.pipeline.fmt.xetex;',
-'      var xelatex = [\'xelatex\', \'--no-shell-escape\', \'--interaction=batchmode\',',
-'        \'--halt-on-error\', \'--no-pdf\', \'--fmt\', fmt, tex_path];',
-'      var xdvipdfmx = [\'xdvipdfmx\', \'-o\',',
-'        tex_path.replace(/\.tex$/, \'.pdf\'),',
-'        tex_path.replace(/\.tex$/, \'.xdv\')];',
-'',
-'      // latexmk-style loop: run until .aux stabilises',
-'      var MAX_PASSES = 5;',
-'      var prevHash = null;',
-'      var exitCode = 0;',
-'      var allLogs = [];',
-'',
-'      for (var pass = 0; pass < MAX_PASSES; pass++) {',
-'        postMessage({type: \'print\', text: \'XeLaTeX pass \' + (pass + 1) + \'...\'});',
-'',
-'        // Remove stale log file',
-'        try { FS.unlink(tex_path.replace(/\.tex$/, \'.log\')); } catch(e) {}',
-'',
-'        var r = Module.callMainWithRedirects(xelatex, false);',
-'        exitCode = r.exit_code;',
-'        allLogs.push(\'$ \' + xelatex.join(\' \') + \'\\nEXITCODE: \' + exitCode + \'\\n\\n\' + r.stdout + \'\\n\' + r.stderr);',
-'',
-'        if (exitCode !== 0) {',
-'          postMessage({type: \'print\', text: \'XeLaTeX pass \' + (pass + 1) + \' failed (exit \' + exitCode + \').\'});',
-'          break;',
-'        }',
-'',
-'        // Read .aux, compute hash to detect stability',
-'        var auxContent = \'\';',
-'        try {',
-'          auxContent = FS.readFile(tex_path.replace(/\.tex$/, \'.aux\'), {encoding: \'utf8\'});',
-'        } catch(e) {}',
-'        var hash = 0;',
-'        for (var j = 0; j < auxContent.length; j++) {',
-'          hash = ((hash << 5) - hash + auxContent.charCodeAt(j)) | 0;',
-'        }',
-'        hash = hash + \'\';',
-'',
-'        if (pass > 0 && hash === prevHash) {',
-'          postMessage({type: \'print\', text: \'Stable after \' + (pass + 1) + \' passes.\'});',
-'          break;',
-'        }',
-'        prevHash = hash;',
-'      }',
-'',
-'      // Convert to PDF',
-'      var pdf = null;',
-'      if (exitCode === 0) {',
-'        postMessage({type: \'print\', text: \'xdvipdfmx: generating PDF...\'});',
-'        var r2 = Module.callMainWithRedirects(xdvipdfmx, false);',
-'        exitCode = r2.exit_code;',
-'        allLogs.push(\'$ \' + xdvipdfmx.join(\' \') + \'\\nEXITCODE: \' + exitCode + \'\\n\\n\' + r2.stdout + \'\\n\' + r2.stderr);',
-'',
-'        if (exitCode === 0) {',
-'          try {',
-'            pdf = FS.readFile(tex_path.replace(/\.tex$/, \'.pdf\'), {encoding: \'binary\'});',
-'          } catch(e) {',
-'            postMessage({type: \'print\', text: \'Error reading PDF output.\'});',
-'          }',
-'        }',
-'      }',
-'',
-'      postMessage({',
-'        type: \'done\',',
-'        pdf: pdf,',
-'        log: allLogs.join(\'\\n\\n======\\n\\n\'),',
-'        exit_code: exitCode,',
-'        logs: allLogs',
-'      });',
-'',
-'    } catch (err) {',
-'      postMessage({type: \'error\', text: \'Compile error: \' + err.message + \'\\n\' + err.stack});',
-'    }',
-'  }',
-'};'
-    ].join('\n');
-  }  function getOrCreateWorker() {
+    return `
+const BUSYTEX_BASE = '${BUSYTEX_BASE}';
+
+self.Module = {
+  locateFile: function(path, prefix) {
+    return BUSYTEX_BASE + path;
+  }
+};
+
+importScripts(location.origin + '/convert_latex/vendor/busytex_pipeline.js');
+
+self.pipeline = null;
+self.data_packages_js = [
+  BUSYTEX_BASE + 'texlive-basic.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
+];
+self.preload_data_packages_js = [
+  BUSYTEX_BASE + 'texlive-basic.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
+  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
+];
+
+onmessage = async ({data}) => {
+  const {action, files, main_tex_path, bibtex, verbose, driver} = data;
+
+  if (action === 'init') {
+    try {
+      self.pipeline = new BusytexPipeline(
+        BUSYTEX_BASE + 'busytex.js',
+        BUSYTEX_BASE + 'busytex.wasm',
+        self.data_packages_js,
+        self.preload_data_packages_js,
+        [],
+        msg => postMessage({type: 'print', text: msg}),
+        applet_versions => postMessage({type: 'initialized', versions: applet_versions}),
+        true,
+        BusytexPipeline.ScriptLoaderWorker
+      );
+    } catch (err) {
+      postMessage({type: 'error', text: 'Init error: ' + err.message + '\\n' + err.stack});
+    }
+    return;
+  }
+
+  if (action === 'compile') {
+    if (!self.pipeline) {
+      postMessage({type: 'error', text: 'Pipeline not initialized'});
+      return;
+    }
+    try {
+      postMessage({type: 'print', text: 'Resolving packages ( analysing \\\\usepackage ) ...'});
+      const result = await self.pipeline.compile(
+        files, main_tex_path,
+        bibtex === null ? null : !!bibtex,
+        verbose || 'silent',
+        driver || 'xetex_bibtex8_dvipdfmx',
+        self.data_packages_js
+      );
+      postMessage({
+        type: 'done',
+        pdf: result.pdf,
+        log: result.log,
+        exit_code: result.exit_code,
+        logs: result.logs
+      });
+    } catch (err) {
+      postMessage({type: 'error', text: 'Compile error: ' + err.message + '\\n' + err.stack});
+    }
+  }
+};
+`;
+  }
+
+  function getOrCreateWorker() {
     if (worker) return worker;
     const code = makeWorkerCode();
     const blob = new Blob([code], {type: 'application/javascript'});
@@ -450,7 +353,14 @@
         });
       }
 
-      setStatus('Compiling (XeLaTeX, multi-pass)...');
+      let hasBib = false;
+      for (const f of files) {
+        if (typeof f.contents === 'string' && /\\(bibliography|printbibliography|addbibresource)\b/.test(f.contents)) {
+          hasBib = true; break;
+        }
+      }
+
+      setStatus('Compiling (XeLaTeX)…');
       setProgress(25);
       logAppend('=== BusyTeX compilation started ===');
 
@@ -458,11 +368,15 @@
         action: 'compile',
         files: files,
         main_tex_path: masterFile,
-        verbose: 'verbose'
+        bibtex: hasBib ? null : false,
+        verbose: 'verbose',
+        driver: 'xetex_bibtex8_dvipdfmx'
       });
 
       // Track milestones for live progress
-      let lastPassSeen = 0;
+      let compileStage = '';
+      let resolveCount = 0;
+      let lastPage = 0;
 
       const result = await new Promise((resolve, reject) => {
         const onMsg = (e) => {
@@ -471,37 +385,76 @@
 
           if (d.type === 'print') {
             logs.push(d.text);
-            const line = d.text.trim();
-            if (!line) { /* skip empty */ }
+            for (const raw of d.text.split(/\r?\n/)) {
+              const line = raw.trim();
+              if (!line) continue;
 
-            // Data-package preloading messages
-            else if (/Preparing|download|initialized/i.test(line)) {
-              setStatus(line);
-            }
+              // Data-package preloading messages
+              if (/Preparing|download|initialized/i.test(line)) {
+                setStatus(line);
+                continue;
+              }
 
-            // Multi-pass: XeLaTeX pass N...
-            else if (/^XeLaTeX pass (\d+)\.\.\.$/.test(line)) {
-              const p = parseInt(line.match(/^XeLaTeX pass (\d+)\.\.\.$/)[1], 10);
-              lastPassSeen = p;
-              setStatus('XeLaTeX: pass ' + p + '...');
-              setProgress(25 + Math.min(60, (p - 1) * 12));
-            }
+              // Package resolution
+              if (/Resolving packages/i.test(line)) {
+                compileStage = 'resolve';
+                resolveCount = 0;
+                setStatus('Resolving LaTeX packages (first run ~120 MB)...');
+                setProgress(25);
+                continue;
+              }
+              if (compileStage === 'resolve' && /^resolving\s+\//i.test(line)) {
+                resolveCount++;
+                setProgress(25 + Math.min(15, resolveCount * 0.4));
+                continue;
+              }
 
-            // Stable after N passes
-            else if (/^Stable after (\d+) passes\.$/.test(line)) {
-              setStatus('Stable after ' + line.match(/^Stable after (\d+) passes\.$/)[1] + ' passes.');
-              setProgress(88);
-            }
+              // XeLaTeX engine start
+              if (/busytex\s+xelatex/i.test(line)) {
+                compileStage = 'xelatex';
+                lastPage = 0;
+                setStatus('XeLaTeX: starting first pass...');
+                setProgress(45);
+                continue;
+              }
+              // BibTeX engine start
+              if (/busytex\s+bibtex8/i.test(line)) {
+                compileStage = 'bibtex';
+                setStatus('BibTeX: processing references...');
+                setProgress(72);
+                continue;
+              }
+              // PDF generation (dvipdfmx)
+              if (/dvipdfmx|converting\s+xdv|generating\s+pdf/i.test(line)) {
+                compileStage = 'pdf';
+                setStatus('Generating PDF (dvipdfmx)...');
+                setProgress(88);
+                continue;
+              }
 
-            // xdvipdfmx: generating PDF
-            else if (/^xdvipdfmx: generating PDF/.test(line)) {
-              setStatus('Generating PDF...');
-              setProgress(92);
-            }
+              // XeLaTeX page numbers: [1] [2] [3]
+              if (compileStage === 'xelatex') {
+                const pm = line.match(/^\[(\d+)\+?\]$/);
+                if (pm) {
+                  lastPage = parseInt(pm[1], 10);
+                  setStatus(`XeLaTeX: processing page ${lastPage}...`);
+                  // 2% per page, capped at 85% (unknown total page count)
+                  setProgress(Math.min(85, 45 + lastPage * 2));
+                  continue;
+                }
+                // Show current file being loaded (before first page)
+                const fm = line.match(/^\(([^)\s]+)/);
+                if (fm && lastPage === 0) {
+                  const fname = fm[1].split('/').pop();
+                  setStatus(`XeLaTeX: loading ${fname}...`);
+                }
+              }
 
-            // XeLaTeX pass N failed
-            else if (/^XeLaTeX pass \d+ failed/.test(line)) {
-              setStatus(line);
+              // Final output file written
+              if (/^Output written\s+on/i.test(line)) {
+                setStatus('Finalizing PDF...');
+                setProgress(95);
+              }
             }
           }
 
@@ -526,8 +479,7 @@
 
       $stage1.style.display = 'none';
       $stage2.style.display = '';
-      $result.innerHTML = '<div id="pdfPages" style="max-height:70vh;overflow:auto;background:#525659;padding:8px 0;border-radius:6px"></div><div style="margin-top:.75rem"><a class="dl" href="' + url + '" download="' + outName + '">Download ' + outName + '</a><button class="secondary" id="backBtn">↺ Back</button></div>';
-      renderLatexPdf(result.pdf, document.getElementById('pdfPages'));
+      $result.innerHTML = '<iframe src="' + url + '" type="application/pdf"></iframe><div style="margin-top:.75rem"><a class="dl" href="' + url + '" download="' + outName + '">Download ' + outName + '</a><button class="secondary" id="backBtn">↺ Back</button></div>';
       document.getElementById('backBtn').addEventListener('click', () => {
         $stage2.style.display = 'none';
         $stage1.style.display = '';
@@ -569,34 +521,6 @@
     if (p) loadProject(p);
   });
 })();
-</script>
-<script>
-window.renderLatexPdf = async function (bytes, container) {
-  if (!window.__pdfjsP) {
-    window.__pdfjsP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/modules/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('pdf.js load failed')); document.head.appendChild(s); })
-      .then(() => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/modules/pdf.worker.min.js'; });
-  }
-  try {
-    await window.__pdfjsP;
-    const data = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
-    const doc = await window.pdfjsLib.getDocument({ data: data.slice(0) }).promise;
-    container.innerHTML = '';
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cw = (container.clientWidth || 800) - 16;
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const base = page.getViewport({ scale: 1 });
-      const scale = Math.max(0.2, cw / base.width);
-      const vp = page.getViewport({ scale: scale * dpr });
-      const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
-      c.style.cssText = 'display:block;margin:0 auto 8px;width:' + Math.round(vp.width / dpr) + 'px;max-width:100%;box-shadow:0 1px 4px rgba(0,0,0,.4);background:#fff';
-      container.appendChild(c);
-      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-    }
-  } catch (e) {
-    container.innerHTML = '<div style="color:#f85149;padding:1rem">Preview failed: ' + (e && e.message || e) + '. Use the Download link.</div>';
-  }
-};
 </script>
 </body>
 </html>
