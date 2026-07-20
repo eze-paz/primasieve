@@ -128,12 +128,18 @@ const opfs = {
 
 
   // Append to the end of a file (creating it if absent) WITHOUT rewriting existing
-  // bytes: open keeping existing data and do one positioned write at the current
-  // size. The append-only conversation JSONL uses this so persisting a new message
-  // costs O(new bytes), not O(whole conversation). NOTE: some Chromium versions may
-  // copy-on-write a temp file in createWritable; if this profiles as O(N), move the
-  // append into a worker using a FileSystemSyncAccessHandle (true O(1) append).
+  // bytes. Preferred path: a dedicated worker holding a FileSystemSyncAccessHandle,
+  // which writes in place at end-of-file — a true O(1) append with no swap file.
+  // Fallback (worker unavailable / errored / SyncAccessHandle unsupported): open a
+  // writable keeping existing data and do one positioned write at the current size.
+  // That is O(new bytes) at the API level, but some Chromium versions copy the whole
+  // file through a swap on close() — which is exactly what the worker path avoids.
   async append(path, content) {
+    if (content == null || content === '') return;
+    if (await this._appendViaWorker(path, content)) return;
+    await this._appendViaWritable(path, content);
+  },
+  async _appendViaWritable(path, content) {
     const { parts, name } = splitPath(path);
     const dir = await this.resolveDir(parts, { create: true });
     const handle = await dir.getFileHandle(name, { create: true });
@@ -141,6 +147,48 @@ const opfs = {
     const w = await handle.createWritable({ keepExistingData: true });
     await w.write({ type: 'write', position: size, data: content });
     await w.close();
+  },
+  // Lazily spin up the append worker and RPC one append across. Returns true on a
+  // confirmed in-place append, false if the worker route is unavailable/failed (so
+  // the caller falls back). Once construction fails we latch _appendWorker=false and
+  // never retry — every subsequent append takes the writable path with no overhead.
+  _appendWorker: undefined,        // undefined=untried, Worker=ready, false=disabled
+  _appendSeq: 0,
+  _appendPending: null,            // Map<seq, {resolve}>
+  async _appendViaWorker(path, content) {
+    try {
+      if (this._appendWorker === false) return false;
+      if (this._appendWorker === undefined) {
+        // Feature-gate: SyncAccessHandle is worker-only and Chromium-specific.
+        if (typeof Worker === 'undefined' || typeof navigator === 'undefined' || !navigator.storage || !navigator.storage.getDirectory) {
+          this._appendWorker = false; return false;
+        }
+        this._appendPending = new Map();
+        const w = new Worker('./modules/opfs-append-worker.js?v=1');
+        w.onmessage = (e) => {
+          const { seq, ok, error } = e.data || {};
+          const p = this._appendPending.get(seq);
+          if (!p) return;
+          this._appendPending.delete(seq);
+          if (ok) p.resolve(true); else p.reject(new Error(error || 'append failed'));
+        };
+        w.onerror = () => {
+          // Worker died: fail every in-flight append so callers fall back, then latch off.
+          this._appendWorker = false;
+          for (const p of this._appendPending.values()) p.reject(new Error('append worker error'));
+          this._appendPending.clear();
+        };
+        this._appendWorker = w;
+      }
+      const seq = ++this._appendSeq;
+      await new Promise((resolve, reject) => {
+        this._appendPending.set(seq, { resolve, reject });
+        this._appendWorker.postMessage({ seq, path, data: content });
+      });
+      return true;
+    } catch (_) {
+      return false;   // fall back to the writable path for this one append
+    }
   },
 
   async remove(path) {
