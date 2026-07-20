@@ -223,85 +223,180 @@
 
   // ===== BusyTeX Worker =====
   function makeWorkerCode() {
-    return `
-const BUSYTEX_BASE = '${BUSYTEX_BASE}';
-
-self.Module = {
-  locateFile: function(path, prefix) {
-    return BUSYTEX_BASE + path;
-  }
-};
-
-importScripts(BUSYTEX_BASE + 'busytex_pipeline.js');
-
-self.pipeline = null;
-self.data_packages_js = [
-  BUSYTEX_BASE + 'texlive-basic.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
-];
-self.preload_data_packages_js = [
-  BUSYTEX_BASE + 'texlive-basic.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-latex-recommended.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-latex-extra.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-science.js',
-  BUSYTEX_BASE + 'ubuntu-texlive-fonts-recommended.js'
-];
-
-onmessage = async ({data}) => {
-  const {action, files, main_tex_path, bibtex, verbose, driver} = data;
-
-  if (action === 'init') {
-    try {
-      self.pipeline = new BusytexPipeline(
-        BUSYTEX_BASE + 'busytex.js',
-        BUSYTEX_BASE + 'busytex.wasm',
-        self.data_packages_js,
-        self.preload_data_packages_js,
-        [],
-        msg => postMessage({type: 'print', text: msg}),
-        applet_versions => postMessage({type: 'initialized', versions: applet_versions}),
-        true,
-        BusytexPipeline.ScriptLoaderWorker
-      );
-    } catch (err) {
-      postMessage({type: 'error', text: 'Init error: ' + err.message + '\\n' + err.stack});
-    }
-    return;
-  }
-
-  if (action === 'compile') {
-    if (!self.pipeline) {
-      postMessage({type: 'error', text: 'Pipeline not initialized'});
-      return;
-    }
-    try {
-      postMessage({type: 'print', text: 'Resolving packages ( analysing \\\\usepackage ) ...'});
-      const result = await self.pipeline.compile(
-        files, main_tex_path,
-        bibtex === null ? null : !!bibtex,
-        verbose || 'silent',
-        driver || 'xetex_bibtex8_dvipdfmx',
-        self.data_packages_js
-      );
-      postMessage({
-        type: 'done',
-        pdf: result.pdf,
-        log: result.log,
-        exit_code: result.exit_code,
-        logs: result.logs
-      });
-    } catch (err) {
-      postMessage({type: 'error', text: 'Compile error: ' + err.message + '\\n' + err.stack});
-    }
-  }
-};
-`;
-  }
-
-  function getOrCreateWorker() {
+    return [
+'const BUSYTEX_BASE = \'' + BUSYTEX_BASE + '\';',
+'',
+'self.Module = {',
+'  locateFile: function(path, prefix) {',
+'    return BUSYTEX_BASE + path;',
+'  }',
+'};',
+'',
+'importScripts(BUSYTEX_BASE + \'busytex_pipeline.js\');',
+'',
+'self.pipeline = null;',
+'self.data_packages_js = [',
+'  BUSYTEX_BASE + \'texlive-basic.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-latex-recommended.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-latex-extra.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-science.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-fonts-recommended.js\'',
+'];',
+'self.preload_data_packages_js = [',
+'  BUSYTEX_BASE + \'texlive-basic.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-latex-recommended.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-latex-extra.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-science.js\',',
+'  BUSYTEX_BASE + \'ubuntu-texlive-fonts-recommended.js\'',
+'];',
+'',
+'onmessage = async function(ev) {',
+'  var data = ev.data;',
+'  var action = data.action, files = data.files, main_tex_path = data.main_tex_path, verbose = data.verbose;',
+'',
+'  if (action === \'init\') {',
+'    try {',
+'      self.pipeline = new BusytexPipeline(',
+'        BUSYTEX_BASE + \'busytex.js\',',
+'        BUSYTEX_BASE + \'busytex.wasm\',',
+'        self.data_packages_js,',
+'        self.preload_data_packages_js,',
+'        [],',
+'        function(msg) { postMessage({type: \'print\', text: msg}); },',
+'        function(versions) { postMessage({type: \'initialized\', versions: versions}); },',
+'        true,',
+'        BusytexPipeline.ScriptLoaderWorker',
+'      );',
+'    } catch (err) {',
+'      postMessage({type: \'error\', text: \'Init error: \' + err.message + \'\\n\' + err.stack});',
+'    }',
+'    return;',
+'  }',
+'',
+'  if (action === \'compile\') {',
+'    if (!self.pipeline) {',
+'      postMessage({type: \'error\', text: \'Pipeline not initialized\'});',
+'      return;',
+'    }',
+'    try {',
+'      postMessage({type: \'print\', text: \'Starting multi-pass compilation...\'});',
+'      var Module = await self.pipeline.Module;',
+'      var FS = Module.FS;',
+'      var PATH = Module.PATH;',
+'',
+'      var tex_path = main_tex_path.split(\'/\').pop();',
+'      var dirname = main_tex_path.split(\'/\').slice(0, -1).join(\'/\');',
+'',
+'      // Mount fresh MEMFS',
+'      try {',
+'        if (FS.analyzePath(\'/project\').object.mount.mountpoint === \'/project\')',
+'          FS.unmount(\'/project\');',
+'      } catch(e) {}',
+'      FS.mount(FS.filesystems.MEMFS, {}, \'/project\');',
+'',
+'      // Write all project files',
+'      var dirs = {}; dirs[\'/\'] = true; dirs[\'/project\'] = true;',
+'      function mkdirP(abs) {',
+'        var parts = abs.replace(/^\\/+/, \'\').split(\'/\');',
+'        var p = \'/project\';',
+'        for (var i = 0; i < parts.length; i++) {',
+'          p += \'/\' + parts[i];',
+'          if (!dirs[p]) { try { FS.mkdir(p); } catch(e) {} dirs[p] = true; }',
+'        }',
+'      }',
+'      for (var i = 0; i < files.length; i++) {',
+'        var f = files[i];',
+'        var abs = PATH.join(\'/project\', f.path);',
+'        if (f.contents == null) {',
+'          mkdirP(abs);',
+'        } else {',
+'          mkdirP(PATH.dirname(abs));',
+'          FS.writeFile(abs, f.contents);',
+'        }',
+'      }',
+'',
+'      var sourceDir = PATH.join(\'/project\', dirname);',
+'      FS.chdir(sourceDir);',
+'',
+'      // Build command templates',
+'      var fmt = self.pipeline.fmt.xetex;',
+'      var xelatex = [\'xelatex\', \'--no-shell-escape\', \'--interaction=batchmode\',',
+'        \'--halt-on-error\', \'--no-pdf\', \'--fmt\', fmt, tex_path];',
+'      var xdvipdfmx = [\'xdvipdfmx\', \'-o\',',
+'        tex_path.replace(/\.tex$/, \'.pdf\'),',
+'        tex_path.replace(/\.tex$/, \'.xdv\')];',
+'',
+'      // latexmk-style loop: run until .aux stabilises',
+'      var MAX_PASSES = 5;',
+'      var prevHash = null;',
+'      var exitCode = 0;',
+'      var allLogs = [];',
+'',
+'      for (var pass = 0; pass < MAX_PASSES; pass++) {',
+'        postMessage({type: \'print\', text: \'XeLaTeX pass \' + (pass + 1) + \'...\'});',
+'',
+'        // Remove stale log file',
+'        try { FS.unlink(tex_path.replace(/\.tex$/, \'.log\')); } catch(e) {}',
+'',
+'        var r = Module.callMainWithRedirects(xelatex, false);',
+'        exitCode = r.exit_code;',
+'        allLogs.push(\'$ \' + xelatex.join(\' \') + \'\\nEXITCODE: \' + exitCode + \'\\n\\n\' + r.stdout + \'\\n\' + r.stderr);',
+'',
+'        if (exitCode !== 0) {',
+'          postMessage({type: \'print\', text: \'XeLaTeX pass \' + (pass + 1) + \' failed (exit \' + exitCode + \').\'});',
+'          break;',
+'        }',
+'',
+'        // Read .aux, compute hash to detect stability',
+'        var auxContent = \'\';',
+'        try {',
+'          auxContent = FS.readFile(tex_path.replace(/\.tex$/, \'.aux\'), {encoding: \'utf8\'});',
+'        } catch(e) {}',
+'        var hash = 0;',
+'        for (var j = 0; j < auxContent.length; j++) {',
+'          hash = ((hash << 5) - hash + auxContent.charCodeAt(j)) | 0;',
+'        }',
+'        hash = hash + \'\';',
+'',
+'        if (pass > 0 && hash === prevHash) {',
+'          postMessage({type: \'print\', text: \'Stable after \' + (pass + 1) + \' passes.\'});',
+'          break;',
+'        }',
+'        prevHash = hash;',
+'      }',
+'',
+'      // Convert to PDF',
+'      var pdf = null;',
+'      if (exitCode === 0) {',
+'        postMessage({type: \'print\', text: \'xdvipdfmx: generating PDF...\'});',
+'        var r2 = Module.callMainWithRedirects(xdvipdfmx, false);',
+'        exitCode = r2.exit_code;',
+'        allLogs.push(\'$ \' + xdvipdfmx.join(\' \') + \'\\nEXITCODE: \' + exitCode + \'\\n\\n\' + r2.stdout + \'\\n\' + r2.stderr);',
+'',
+'        if (exitCode === 0) {',
+'          try {',
+'            pdf = FS.readFile(tex_path.replace(/\.tex$/, \'.pdf\'), {encoding: \'binary\'});',
+'          } catch(e) {',
+'            postMessage({type: \'print\', text: \'Error reading PDF output.\'});',
+'          }',
+'        }',
+'      }',
+'',
+'      postMessage({',
+'        type: \'done\',',
+'        pdf: pdf,',
+'        log: allLogs.join(\'\\n\\n======\\n\\n\'),',
+'        exit_code: exitCode,',
+'        logs: allLogs',
+'      });',
+'',
+'    } catch (err) {',
+'      postMessage({type: \'error\', text: \'Compile error: \' + err.message + \'\\n\' + err.stack});',
+'    }',
+'  }',
+'};'
+    ].join('\n');
+  }  function getOrCreateWorker() {
     if (worker) return worker;
     const code = makeWorkerCode();
     const blob = new Blob([code], {type: 'application/javascript'});
@@ -353,14 +448,7 @@ onmessage = async ({data}) => {
         });
       }
 
-      let hasBib = false;
-      for (const f of files) {
-        if (typeof f.contents === 'string' && /\\(bibliography|printbibliography|addbibresource)\b/.test(f.contents)) {
-          hasBib = true; break;
-        }
-      }
-
-      setStatus('Compiling (XeLaTeX)…');
+      setStatus('Compiling (XeLaTeX, multi-pass)...');
       setProgress(25);
       logAppend('=== BusyTeX compilation started ===');
 
@@ -368,15 +456,11 @@ onmessage = async ({data}) => {
         action: 'compile',
         files: files,
         main_tex_path: masterFile,
-        bibtex: hasBib ? null : false,
-        verbose: 'verbose',
-        driver: 'xetex_bibtex8_dvipdfmx'
+        verbose: 'verbose'
       });
 
       // Track milestones for live progress
-      let compileStage = '';
-      let resolveCount = 0;
-      let lastPage = 0;
+      let lastPassSeen = 0;
 
       const result = await new Promise((resolve, reject) => {
         const onMsg = (e) => {
@@ -385,76 +469,37 @@ onmessage = async ({data}) => {
 
           if (d.type === 'print') {
             logs.push(d.text);
-            for (const raw of d.text.split(/\r?\n/)) {
-              const line = raw.trim();
-              if (!line) continue;
+            const line = d.text.trim();
+            if (!line) { /* skip empty */ }
 
-              // Data-package preloading messages
-              if (/Preparing|download|initialized/i.test(line)) {
-                setStatus(line);
-                continue;
-              }
+            // Data-package preloading messages
+            else if (/Preparing|download|initialized/i.test(line)) {
+              setStatus(line);
+            }
 
-              // Package resolution
-              if (/Resolving packages/i.test(line)) {
-                compileStage = 'resolve';
-                resolveCount = 0;
-                setStatus('Resolving LaTeX packages (first run ~120 MB)...');
-                setProgress(25);
-                continue;
-              }
-              if (compileStage === 'resolve' && /^resolving\s+\//i.test(line)) {
-                resolveCount++;
-                setProgress(25 + Math.min(15, resolveCount * 0.4));
-                continue;
-              }
+            // Multi-pass: XeLaTeX pass N...
+            else if (/^XeLaTeX pass (\d+)\.\.\.$/.test(line)) {
+              const p = parseInt(line.match(/^XeLaTeX pass (\d+)\.\.\.$/)[1], 10);
+              lastPassSeen = p;
+              setStatus('XeLaTeX: pass ' + p + '...');
+              setProgress(25 + Math.min(60, (p - 1) * 12));
+            }
 
-              // XeLaTeX engine start
-              if (/busytex\s+xelatex/i.test(line)) {
-                compileStage = 'xelatex';
-                lastPage = 0;
-                setStatus('XeLaTeX: starting first pass...');
-                setProgress(45);
-                continue;
-              }
-              // BibTeX engine start
-              if (/busytex\s+bibtex8/i.test(line)) {
-                compileStage = 'bibtex';
-                setStatus('BibTeX: processing references...');
-                setProgress(72);
-                continue;
-              }
-              // PDF generation (dvipdfmx)
-              if (/dvipdfmx|converting\s+xdv|generating\s+pdf/i.test(line)) {
-                compileStage = 'pdf';
-                setStatus('Generating PDF (dvipdfmx)...');
-                setProgress(88);
-                continue;
-              }
+            // Stable after N passes
+            else if (/^Stable after (\d+) passes\.$/.test(line)) {
+              setStatus('Stable after ' + line.match(/^Stable after (\d+) passes\.$/)[1] + ' passes.');
+              setProgress(88);
+            }
 
-              // XeLaTeX page numbers: [1] [2] [3]
-              if (compileStage === 'xelatex') {
-                const pm = line.match(/^\[(\d+)\+?\]$/);
-                if (pm) {
-                  lastPage = parseInt(pm[1], 10);
-                  setStatus(`XeLaTeX: processing page ${lastPage}...`);
-                  // 2% per page, capped at 85% (unknown total page count)
-                  setProgress(Math.min(85, 45 + lastPage * 2));
-                  continue;
-                }
-                // Show current file being loaded (before first page)
-                const fm = line.match(/^\(([^)\s]+)/);
-                if (fm && lastPage === 0) {
-                  const fname = fm[1].split('/').pop();
-                  setStatus(`XeLaTeX: loading ${fname}...`);
-                }
-              }
+            // xdvipdfmx: generating PDF
+            else if (/^xdvipdfmx: generating PDF/.test(line)) {
+              setStatus('Generating PDF...');
+              setProgress(92);
+            }
 
-              // Final output file written
-              if (/^Output written\s+on/i.test(line)) {
-                setStatus('Finalizing PDF...');
-                setProgress(95);
-              }
+            // XeLaTeX pass N failed
+            else if (/^XeLaTeX pass \d+ failed/.test(line)) {
+              setStatus(line);
             }
           }
 
