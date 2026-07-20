@@ -232,7 +232,7 @@ self.Module = {
   }
 };
 
-importScripts(location.origin + '/convert_latex/vendor/busytex_pipeline.js');
+importScripts(BUSYTEX_BASE + 'busytex_pipeline.js');
 
 self.pipeline = null;
 self.data_packages_js = [
@@ -280,6 +280,7 @@ onmessage = async ({data}) => {
     }
     try {
       postMessage({type: 'print', text: 'Resolving packages ( analysing \\\\usepackage ) ...'});
+      // Pass 1: compile normally (generates .toc, .aux)
       const result = await self.pipeline.compile(
         files, main_tex_path,
         bibtex === null ? null : !!bibtex,
@@ -287,6 +288,64 @@ onmessage = async ({data}) => {
         driver || 'xetex_bibtex8_dvipdfmx',
         self.data_packages_js
       );
+
+      if (result.exit_code === 0 && result.pdf && result.pdf.length > 0) {
+        // Pass 2+: re-run xelatex + dvipdfmx to resolve ToC and cross-refs
+        try {
+          const Module = await self.pipeline.Module;
+          const FS = Module.FS;
+          const tex_path = main_tex_path.split('/').pop();
+          const fmt = self.pipeline.fmt.xetex;
+          const xelatex = ['xelatex', '--no-shell-escape', '--interaction=batchmode',
+            '--halt-on-error', '--no-pdf', '--fmt', fmt, tex_path];
+
+          let finalPdf = null;
+          let finalExit = 0;
+          let extraLogs = [];
+
+          for (let pass = 0; pass < 2; pass++) {
+            try { FS.unlink(tex_path.replace(/\.tex$/, '.log')); } catch(e) {}
+            const r = Module.callMainWithRedirects(xelatex, false);
+            finalExit = r.exit_code;
+            extraLogs.push('$ ' + xelatex.join(' ') + '\nEXITCODE: ' + finalExit + '\n\n' + r.stdout + '\n' + r.stderr);
+            if (finalExit !== 0) break;
+          }
+
+          if (finalExit === 0) {
+            const xdvipdfmx = ['xdvipdfmx', '-o',
+              tex_path.replace(/\.tex$/, '.pdf'),
+              tex_path.replace(/\.tex$/, '.xdv')];
+            const r2 = Module.callMainWithRedirects(xdvipdfmx, false);
+            extraLogs.push('$ ' + xdvipdfmx.join(' ') + '\nEXITCODE: ' + r2.exit_code + '\n\n' + r2.stdout + '\n' + r2.stderr);
+            if (r2.exit_code === 0) {
+              try {
+                finalPdf = FS.readFile(tex_path.replace(/\.tex$/, '.pdf'), {encoding: 'binary'});
+              } catch(e) {}
+            }
+          }
+
+          postMessage({
+            type: 'done',
+            pdf: finalPdf || result.pdf,
+            log: result.log + '\n\n====== Extra passes ======\n\n' + extraLogs.join('\n\n'),
+            exit_code: finalExit || result.exit_code,
+            logs: (result.logs || []).concat(extraLogs)
+          });
+          return;
+        } catch(e) {
+          // Fall back to first pass result
+          postMessage({
+            type: 'done',
+            pdf: result.pdf,
+            log: result.log + '\n\nExtra pass error: ' + e.message,
+            exit_code: result.exit_code,
+            logs: result.logs || []
+          });
+          return;
+        }
+      }
+
+      // No need for extra passes (compilation failed or no PDF)
       postMessage({
         type: 'done',
         pdf: result.pdf,
