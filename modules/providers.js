@@ -234,13 +234,17 @@ function getActiveProvider() {
 // conversation stream, so it emits no generation:complete. Routes to whatever
 // provider is active: in-browser LiteRT-LM / WebGPU engines, or a cloud
 // /chat/completions endpoint. Returns the assistant text (may be '').
-async function completeOnce({ system = '', user = '', model = '', maxTokens = 1024, signal } = {}) {
+// maxTokens: null (default) sends NO max_tokens on the wire for cloud providers
+// (OpenAI-spec default — the model's own cap). In-browser engines still need a
+// concrete generation budget, so the local paths below fall back to 1024.
+async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal } = {}) {
   const active = getActiveProvider();
+  const localMax = maxTokens != null ? maxTokens : 1024;
   if (active && active.type === 'litertlm') {
     if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.runConversation) throw new Error('LiteRT-LM engine not loaded');
     let out = '';
     await SandpieLiteRTLM.runConversation({
-      provider: { ...active, maxTokens },
+      provider: { ...active, maxTokens: localMax },
       messages: [{ role: 'user', content: user }],
       systemPrompt: system, tools: [], convId: null, signal,
       logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
@@ -256,7 +260,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
     if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
     let out = '';
     await eng.runConversation({
-      provider: { endpoint: active.endpoint, maxTokens },
+      provider: { endpoint: active.endpoint, maxTokens: localMax },
       messages: [{ role: 'user', content: user }],
       systemPrompt: system, tools: [], convId: null, signal,
       logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
@@ -273,7 +277,8 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = 10
   // multi-minute) generation and an intermediary proxy/CDN kills it with a 504 — the
   // exact failure that blocked memory consolidation. SSE keeps tokens flowing so the
   // idle-timeout never fires; we just assemble the text and return it.
-  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: true, stream_options: { include_usage: true }, max_tokens: maxTokens };
+  const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: true, stream_options: { include_usage: true } };
+  if (maxTokens != null) body.max_tokens = maxTokens;
   if (active && active.temperature != null) body.temperature = active.temperature;
   async function readStreamText(res) {
     if (!res.body || !res.body.getReader) {   // buffering proxy: whole JSON despite stream:true

@@ -1315,7 +1315,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=71');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=72');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1691,7 +1691,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     systemPrompt: await buildSystemPrompt(convMessages),
     messages: resolvedMessages,
     tools: toolDefs(),
-    maxTokens: (active && active.maxTokens) || 8192,
+    // Only what the provider config explicitly sets — no invented default. Absent
+    // means absent on the wire (OpenAI-spec default: the model's own maximum).
+    maxTokens: (active && active.maxTokens != null) ? active.maxTokens : null,
     temperature: (active && active.temperature != null) ? active.temperature : null,
     topP: (active && active.topP != null) ? active.topP : null,
     reasoningEffort: (active && active.reasoningEffort) || null,
@@ -3088,7 +3090,7 @@ async function _performCompaction(convId, cfg) {
   emit('compaction:start');
   try {
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return { ok: false, reason: 'no completion provider available' };
-    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined, maxTokens: 2048 });
+    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined });
     if (!out || !out.trim()) return { ok: false, reason: 'summarizer returned empty' };
     const r = await compactConversation(convId, { keepTail: cfg.keepTail, summary: out });
     return (r && r.ok) ? { ok: true, removed: r.removed, kept: r.kept } : { ok: false, reason: (r && r.reason) || 'compaction failed' };

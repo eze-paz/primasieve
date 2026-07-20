@@ -1594,9 +1594,11 @@ async function _summarizeForCompaction(config, transcript, ctx) {
   const body = {
     model: cmp.model || config.model,
     messages: [{ role: 'system', content: cmp.prompt }, { role: 'user', content: transcript }],
-    max_tokens: 2048,
     stream: false,
   };
+  // No invented max_tokens: send a cap only when the provider config sets one
+  // (a summary never needs more than 2048, so clamp to that when capping at all).
+  if (config.maxTokens != null) body.max_tokens = Math.min(2048, config.maxTokens);
   // Same retry contract as a standard completion: backoff on transient/5xx +
   // 401 re-mint, so a 504 mid-compaction is retried (not a turn-halting failure)
   // exactly like the main generation. Abort mid-compaction → null (not a failure;
