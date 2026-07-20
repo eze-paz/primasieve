@@ -1571,6 +1571,48 @@ function _safeSplitIndex(msgs, keepTail) {
   return split;
 }
 
+// Request-funnel guard: strict providers (DeepSeek) reject histories where a
+// role:'tool' message is not an immediate response to a preceding assistant
+// tool_calls entry — "Messages with role 'tool' must be a response to a
+// preceding message with 'tool_calls'" (400). Compaction splices, steered
+// messages, or old persisted conversations can break the pairing, and lenient
+// hosts mask it. Walk the outgoing history and repair BOTH directions:
+//  - orphaned tool result (no open matching call) → re-shaped as a user message
+//    carrying the same text, deferred until no tool_calls block is open so it
+//    can't split an assistant/tool group;
+//  - assistant tool_calls left unanswered before the next non-tool message →
+//    synthetic '[tool result missing]' fillers so the group is complete.
+function fixToolPairing(msgs) {
+  const out = [];
+  let open = null;          // Set of tool_call_ids awaiting their results
+  let held = [];            // orphans converted to user msgs, flushed once the group closes
+  const closeOpen = () => {
+    if (open) for (const id of open) out.push({ role: 'tool', tool_call_id: id, content: '[tool result missing]' });
+    open = null;
+    if (held.length) { out.push(...held); held = []; }
+  };
+  for (const m of msgs) {
+    if (!m) continue;
+    if (m.role === 'tool') {
+      const id = m.tool_call_id;
+      if (open && id && open.has(id)) { out.push(m); open.delete(id); if (!open.size) { open = null; if (held.length) { out.push(...held); held = []; } } }
+      else {
+        const conv = { role: 'user', content: '[recovered tool result]\n' + _cmpTextOf(m.content) };
+        if (open) held.push(conv); else out.push(conv);
+      }
+      continue;
+    }
+    closeOpen();
+    out.push(m);
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      open = new Set(m.tool_calls.map(tc => tc && tc.id).filter(Boolean));
+      if (!open.size) open = null;
+    }
+  }
+  closeOpen();
+  return out;
+}
+
 function _cmpTranscript(messages, fromIdx, toIdx) {
   const out = [];
   for (let i = fromIdx; i < toIdx; i++) {
@@ -2026,7 +2068,7 @@ async function runAgent(config, ctx) {
     }
     const reqBody = {
       model: config.model,
-      messages: [config.systemPrompt, ...messages, reminderMsg].filter(Boolean),
+      messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
       stream: true,
       stream_options: { include_usage: true },
       tools: config.tools,
@@ -2050,7 +2092,7 @@ async function runAgent(config, ctx) {
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
             model: config.model,
-            messages: [config.systemPrompt, ...messages, reminderMsg].filter(Boolean),
+            messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
             tools: config.tools,
