@@ -36,9 +36,10 @@
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
-  let univerAPI = null, dirty = false;
+  let univerAPI = null, dirty = false, docUnit = null, kind = 'sheet';
 
-  function boot(workbook) {
+  function boot(payload, k) {
+    kind = k || 'sheet';
     const { Univer, LocaleType, UniverInstanceType } = UniverCore;
     const univer = new Univer({
       theme: UniverDesign.defaultTheme,
@@ -48,16 +49,23 @@
     univer.registerPlugin(UniverEngineRender.UniverRenderEnginePlugin);
     univer.registerPlugin(UniverEngineFormula.UniverFormulaEnginePlugin);
     univer.registerPlugin(UniverUi.UniverUIPlugin, { container: 'univer' });
-    univer.registerPlugin(UniverDocs.UniverDocsPlugin, { hasScroll: false });
-    univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
-    univer.registerPlugin(UniverSheets.UniverSheetsPlugin);
-    univer.registerPlugin(UniverSheetsUi.UniverSheetsUIPlugin);
-    univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);
-    // optional extras — presence varies across UMD builds, register when there
-    try { univer.registerPlugin(UniverSheetsFormulaUi.UniverSheetsFormulaUIPlugin); } catch (_) {}
-    try { univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin); } catch (_) {}
-    try { univer.registerPlugin(UniverSheetsNumfmtUi.UniverSheetsNumfmtUIPlugin); } catch (_) {}
-    univer.createUnit(UniverInstanceType.UNIVER_SHEET, workbook);
+    if (kind === 'doc') {
+      // document mode: docs plugins only, the doc IS the scrolling unit
+      univer.registerPlugin(UniverDocs.UniverDocsPlugin);
+      univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
+      docUnit = univer.createUnit(UniverInstanceType.UNIVER_DOC, payload);
+    } else {
+      univer.registerPlugin(UniverDocs.UniverDocsPlugin, { hasScroll: false });
+      univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
+      univer.registerPlugin(UniverSheets.UniverSheetsPlugin);
+      univer.registerPlugin(UniverSheetsUi.UniverSheetsUIPlugin);
+      univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);
+      // optional extras — presence varies across UMD builds, register when there
+      try { univer.registerPlugin(UniverSheetsFormulaUi.UniverSheetsFormulaUIPlugin); } catch (_) {}
+      try { univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin); } catch (_) {}
+      try { univer.registerPlugin(UniverSheetsNumfmtUi.UniverSheetsNumfmtUIPlugin); } catch (_) {}
+      univer.createUnit(UniverInstanceType.UNIVER_SHEET, payload);
+    }
     univerAPI = UniverFacade.FUniver.newAPI(univer);
     // any command marks the doc dirty (cheap superset of "content changed") —
     // but createUnit itself fires a burst of commands, so arm the listener
@@ -74,10 +82,17 @@
 
   function save() {
     if (!univerAPI) return;
-    const wb = univerAPI.getActiveWorkbook();
-    if (!wb) return;
     setStatus('saving…');
-    parent.postMessage({ type: 'univer-save', workbook: wb.save() }, location.origin);
+    if (kind === 'doc') {
+      // DocumentDataModel from createUnit is the stable snapshot source across builds
+      const snap = docUnit && docUnit.getSnapshot ? docUnit.getSnapshot() : null;
+      if (!snap) { setStatus('save failed: no doc snapshot'); return; }
+      parent.postMessage({ type: 'univer-save', doc: snap }, location.origin);
+    } else {
+      const wb = univerAPI.getActiveWorkbook();
+      if (!wb) return;
+      parent.postMessage({ type: 'univer-save', workbook: wb.save() }, location.origin);
+    }
   }
 
   $('saveBtn').addEventListener('click', save);
@@ -90,7 +105,8 @@
     if (e.origin !== location.origin || !e.data) return;
     if (e.data.type === 'univer-load') {
       $('fname').textContent = e.data.name || '';
-      try { boot(e.data.workbook); } catch (err) { setStatus('engine error: ' + err.message); }
+      try { boot(e.data.doc || e.data.workbook, e.data.doc ? 'doc' : 'sheet'); }
+      catch (err) { setStatus('engine error: ' + err.message); }
     } else if (e.data.type === 'univer-saved') {
       dirty = !e.data.ok;
       setStatus(e.data.ok ? 'saved ✓' : 'save failed: ' + (e.data.error || '?'));

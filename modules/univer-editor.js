@@ -14,7 +14,30 @@
   'use strict';
 
   const EXTS = new Set(['xlsx', 'xls', 'ods', 'csv']);
+  // Text files that DEFAULT to the Univer docs editor in the side pane.
+  // (html/svg keep the rendered preview; code files keep the plain editor.)
+  const TEXT_EXTS = new Set(['txt', 'md', 'markdown']);
   let lastKey = null;   // fullKey of the file most recently opened via opfs.openFile
+
+  /* ── plain text ↔ Univer IDocumentData ───────────────────────────── */
+  // Univer's dataStream uses '\r' as the paragraph mark and ends '\r\n'.
+  function textToUniverDoc(text, name) {
+    const dataStream = String(text).replace(/\r\n?/g, '\n').replace(/\n/g, '\r') + '\r\n';
+    const paragraphs = [];
+    for (let i = 0; i < dataStream.length; i++) if (dataStream[i] === '\r') paragraphs.push({ startIndex: i });
+    return {
+      id: 'doc-1', title: name, locale: 'enUS',
+      body: { dataStream, textRuns: [], paragraphs, sectionBreaks: [{ startIndex: dataStream.length - 1 }] },
+      documentStyle: {
+        pageSize: { width: 595, height: 842 },
+        marginTop: 40, marginBottom: 40, marginLeft: 45, marginRight: 45,
+      },
+    };
+  }
+  function univerDocToText(snap) {
+    const ds = (snap && snap.body && snap.body.dataStream) || '';
+    return ds.replace(/\r\n$/, '').replace(/\r/g, '\n');
+  }
 
   /* ── xlsx (SheetJS model) → Univer IWorkbookData ─────────────────── */
   function xlsxToUniver(XLSX, wb, name) {
@@ -96,7 +119,7 @@
     const workbook = xlsxToUniver(XLSX, XLSX.read(bytes, { type: 'array' }), name);
     body.innerHTML = '';
     const iframe = document.createElement('iframe');
-    iframe.src = '/univer-editor.html?v=1';
+    iframe.src = '/univer-editor.html?v=2';
     iframe.style.cssText = 'width:100%;height:calc(100vh - 60px);border:0;border-radius:6px;background:#fff;';
     body.appendChild(iframe);
 
@@ -128,13 +151,78 @@
     mo.observe(document.body, { childList: true, subtree: true });
   }
 
+  /* ── text files: Univer docs editor in the SIDE PANE (the default) ── */
+  // Self-contained mount mirroring opfs.js's prefer:'side' (a .file-viewer.side
+  // div inside #messagesSide) so opfs.js stays untouched. Mobile has no side
+  // panel — fall back to the original text viewer there.
+  function openDocSide(fullKey, name, text, origOpen) {
+    const host = document.getElementById('messagesSide');
+    const overlay = document.createElement('div');
+    overlay.className = 'file-viewer side';
+    overlay.setAttribute('data-chrome', '');
+    const close = () => {
+      overlay.remove();
+      host.classList.remove('viewer-mode');
+      document.body.classList.remove('viewer-side-open');
+      removeEventListener('message', onMsg);
+    };
+    overlay.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;">'
+      + '<span style="flex:1;font-size:0.78rem;color:var(--sp-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/' + fullKey + '</span>'
+      + '<button class="ghost" data-act="plain" title="Open in the plain text viewer" style="font-size:0.72rem;padding:2px 8px;">Plain</button>'
+      + '<button class="ghost" data-act="close" title="Close" style="font-size:0.72rem;padding:2px 8px;">✕</button></div>';
+    const iframe = document.createElement('iframe');
+    iframe.src = '/univer-editor.html?v=2';
+    iframe.style.cssText = 'width:100%;flex:1;border:0;background:#fff;';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.appendChild(iframe);
+    overlay.querySelector('[data-act="close"]').onclick = close;
+    overlay.querySelector('[data-act="plain"]').onclick = () => { close(); origOpen.call(opfs, fullKey, name, { prefer: 'side', __univerBypass: true }); };
+    host.appendChild(overlay);
+    host.classList.add('viewer-mode');
+    document.body.classList.add('viewer-side-open');
+
+    const doc = textToUniverDoc(text, name);
+    const onMsg = async (e) => {
+      if (e.source !== iframe.contentWindow || !e.data) return;
+      if (e.data.type === 'univer-ready') {
+        iframe.contentWindow.postMessage({ type: 'univer-load', name, doc }, location.origin);
+      } else if (e.data.type === 'univer-save') {
+        let reply;
+        try {
+          await opfs.write(fullKey, univerDocToText(e.data.doc));
+          reply = { type: 'univer-saved', ok: true };
+        } catch (err) {
+          reply = { type: 'univer-saved', ok: false, error: (err && err.message) || String(err) };
+        }
+        iframe.contentWindow.postMessage(reply, location.origin);
+      }
+    };
+    addEventListener('message', onMsg);
+  }
+
   /* ── hook install (opfs.js loads before us; retry covers races) ───── */
   function install() {
     if (!window.opfs || !opfs._renderOfficePdf || !opfs.openFile) return false;
     if (opfs._renderOfficePdf.__univerWrapped) return true;
 
     const origOpen = opfs.openFile;
-    opfs.openFile = function (fullKey) { lastKey = fullKey; return origOpen.apply(this, arguments); };
+    opfs.openFile = async function (fullKey, name, opts) {
+      lastKey = fullKey;
+      const ext = (String(name || fullKey).split('.').pop() || '').toLowerCase();
+      if (TEXT_EXTS.has(ext) && !(opts && opts.__univerBypass) && !opfs._isMobile()) {
+        // default text-file experience: Univer docs editor, side pane.
+        // opfs.read handles the dehydrated-Dropbox fault-in; if it can't
+        // deliver bytes, fall through to the stock viewer.
+        try {
+          const bytes = await opfs.read(fullKey);
+          openDocSide(fullKey, name || fullKey.split('/').pop(), new TextDecoder().decode(bytes), origOpen);
+          return;
+        } catch (_) { /* fall through */ }
+      }
+      return origOpen.apply(this, arguments);
+    };
 
     const orig = opfs._renderOfficePdf;
     const wrapped = async function (file, ext, name, body, panel) {
