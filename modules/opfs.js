@@ -4572,18 +4572,14 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
 
       if (it.kind === 'folder') {
-
-
-        const infoEl = menu.querySelector('.ctx-info');
-
-
+        const infoEls = menu.querySelectorAll('.ctx-info');
+        const sizeEl = infoEls[infoEls.length - 1];
         opfs.getFolderSize(it.fullKey).then((sz) => {
+          if (sizeEl && sizeEl.isConnected) sizeEl.textContent = 'Size: ' + (opfs.formatSize(sz) || '0B');
+        }).catch(() => { if (sizeEl && sizeEl.isConnected) sizeEl.textContent = 'Size: —'; });
 
 
-          if (infoEl && infoEl.isConnected) infoEl.textContent = 'Size: ' + (opfs.formatSize(sz) || '0B');
 
-
-        }).catch(() => { if (infoEl && infoEl.isConnected) infoEl.textContent = 'Size: —'; });
 
 
       }
