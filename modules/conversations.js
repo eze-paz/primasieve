@@ -557,6 +557,7 @@ function showLogprobPopup(span, x, y) {
 function initLogprobUi() {
   if (window.__spLpUiReady) return;
   window.__spLpUiReady = true;
+  try { window.__SP_LOGPROBS__ = localStorage.getItem('sandpie-logprobs') === '1'; } catch (_) {}
   document.addEventListener('click', (e) => {
     const pop = document.getElementById('sp-lp-popup');
     const tok = e.target && e.target.closest ? e.target.closest('.sp-lp-tok') : null;
@@ -2331,6 +2332,8 @@ class RoundRenderer {
     this._thinkDone = false;
     this.lpSum = 0;
     this.lpCount = 0;
+    this.lpMin = Infinity;
+    this.lpLow = 0;
     this.lpScoreEl = null;
   }
 
@@ -2354,15 +2357,23 @@ class RoundRenderer {
     this._thinkDone = false;
     this.lpSum = 0;
     this.lpCount = 0;
+    this.lpMin = Infinity;
+    this.lpLow = 0;
     this.lpScoreEl = null;
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
   }
-  _updateLpScore(finalize) {
+  // Confidence badge over ANSWER tokens only. Thinking tokens are deliberately
+  // exploratory/high-entropy and would dominate the average, so they are excluded.
+  // min-P is the hallucination signal (one 2% token in a name/number is the tell,
+  // and it vanishes in a mean), so the badge shows it and colors by it.
+  _updateLpScore() {
     if (!this.lpCount) return;
     const mean = this.lpSum / this.lpCount;
     const p = Math.exp(mean);
-    const label = (p * 100).toFixed(1) + '% avg (' + this.lpCount + 'tok)';
+    const minP = Math.exp(this.lpMin);
+    let label = (p * 100).toFixed(1) + '% avg · min ' + (minP * 100).toFixed(1) + '% (' + this.lpCount + ' tok)';
+    if (this.lpLow) label += ' · ' + this.lpLow + ' below 5%';
     if (!this.lpScoreEl) {
       this.lpScoreEl = document.createElement('div');
       this.lpScoreEl.className = 'sp-lp-score';
@@ -2370,7 +2381,7 @@ class RoundRenderer {
     }
     if (this.lpScoreEl) {
       this.lpScoreEl.textContent = label;
-      const conf = p < 0.05 ? 'sp-lp-lo' : (p < 0.3 ? 'sp-lp-mid' : 'sp-lp-hi');
+      const conf = (minP < 0.02 || p < 0.05) ? 'sp-lp-lo' : ((this.lpLow || p < 0.3) ? 'sp-lp-mid' : 'sp-lp-hi');
       this.lpScoreEl.className = 'sp-lp-score ' + conf;
     }
   }
@@ -2397,7 +2408,7 @@ class RoundRenderer {
       this.toolsShouldClose = true;
       this._scheduleDrain();
       if (this.reply && (!this.content || !this.content.trim())) { this.reply.remove(); this.reply = null; }
-      else { this._updateLpScore(true); }
+      else { this._updateLpScore(); }
       return;
     }
     this._finishThinking();
@@ -2584,21 +2595,26 @@ class RoundRenderer {
 
   applyToken(token, region) {
     this._logprob = true;
-    const lp = parseFloat(token.logprob);
-    if (!isNaN(lp)) { this.lpSum += lp; this.lpCount++; }
     const html = spLpTokenHtml(token);
     if (region === 'reasoning') {
       if (!this.thinkEl) this._createThinkBox();
       this.reasoning += html;
-      this.thinkBody.innerHTML = this.reasoning;
-      this._updateLpScore();
+      // append-only: re-assigning innerHTML re-parses the whole think block per token (O(n²))
+      this.thinkBody.insertAdjacentHTML('beforeend', html);
       const sh = this._scrollHost();
       if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
     } else {
+      const lp = parseFloat(token.logprob);
+      if (!isNaN(lp)) {
+        this.lpSum += lp; this.lpCount++;
+        if (lp < this.lpMin) this.lpMin = lp;
+        if (Math.exp(lp) < 0.05) this.lpLow++;
+      }
       this._finishThinking();
       this.content += html;
       this.pending += html;
       this._scheduleDrain();
+      this._updateLpScore();
     }
   }
 
