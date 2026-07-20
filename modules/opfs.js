@@ -5299,10 +5299,41 @@ function initFileBrowser() {
 
 
   }
-
-
-
-
+  // Sidebar resize via drag handle
+  const sidebar = document.querySelector('aside');
+  const handle = document.getElementById('sidebarResizeHandle');
+  if (sidebar && handle) {
+    // Restore saved width
+    const saved = localStorage.getItem('sandpie-sidebar-width');
+    if (saved) {
+      sidebar.style.setProperty('--sidebar-width', saved + 'px');
+    }
+    let startX, startW;
+    const onMouseMove = (e) => {
+      const w = Math.max(160, Math.min(600, startW + (e.clientX - startX)));
+      sidebar.style.setProperty('--sidebar-width', w + 'px');
+    };
+    const onMouseUp = (e) => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      handle.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Save
+      const w = parseInt(sidebar.style.getPropertyValue('--sidebar-width'));
+      if (w) localStorage.setItem('sandpie-sidebar-width', w);
+    };
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = sidebar.getBoundingClientRect().width;
+      handle.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  }
 
   refreshFileList();
 

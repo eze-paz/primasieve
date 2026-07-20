@@ -38,7 +38,7 @@
     display: flex;
   }
   aside {
-    width: 300px;
+    width: var(--sidebar-width, 300px);
     padding: 1rem;
     background: var(--sp-surface);
     border-right: 1px solid var(--sp-border);
@@ -49,6 +49,23 @@
     overflow-x: hidden;
     position: relative;
     z-index: 1;
+  }
+
+  /* Resize handle for the sidebar */
+  .sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .sidebar-resize-handle:hover,
+  .sidebar-resize-handle.active {
+    background: var(--sp-accent);
   }
 
   /* Scrollbars — cryocut style (default for all scrollables) */
@@ -1088,6 +1105,7 @@ ul.conv-list li.active {
     }
     .sidebar-header { display: none; }
     .sidebar-expand-btn { display: none !important; }
+    .sidebar-resize-handle { display: none; }
     body.sidebar-open aside { left: 0; }
     .backdrop {
       display: block;
