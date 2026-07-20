@@ -389,16 +389,14 @@ onmessage = async ({data}) => {
 
       // Initialize pipeline (only once)
       if (!w._initialized) {
-        if (!w._initialized) {
         w.postMessage({action: 'init'});
-      }
       }
       await new Promise((resolve, reject) => {
         const onMsg = (e) => {
           const d = e.data;
           if (d.type === 'error') { w.removeEventListener('message', onMsg); reject(new Error(d.text)); return; }
           if (d.type === 'print') { logs.push(d.text); setStatus(d.text); }
-          if (d.type === 'initialized') { w._initialized = true; w._initialized = true; w.removeEventListener('message', onMsg); resolve(); }
+          if (d.type === 'initialized') { w._initialized = true; w.removeEventListener('message', onMsg); resolve(); }
         };
         w.addEventListener('message', onMsg);
       });
