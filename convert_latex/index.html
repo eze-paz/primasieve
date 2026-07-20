@@ -307,7 +307,7 @@ onmessage = async ({data}) => {
             try { FS.unlink(tex_path.replace(/\.tex$/, '.log')); } catch(e) {}
             const r = Module.callMainWithRedirects(xelatex, false);
             finalExit = r.exit_code;
-            extraLogs.push('$ ' + xelatex.join(' ') + '\nEXITCODE: ' + finalExit + '\n\n' + r.stdout + '\n' + r.stderr);
+            extraLogs.push('$ ' + xelatex.join(' ') + '\\nEXITCODE: ' + finalExit + '\\n\\n' + r.stdout + '\\n' + r.stderr);
             if (finalExit !== 0) break;
           }
 
@@ -316,7 +316,7 @@ onmessage = async ({data}) => {
               tex_path.replace(/\.tex$/, '.pdf'),
               tex_path.replace(/\.tex$/, '.xdv')];
             const r2 = Module.callMainWithRedirects(xdvipdfmx, false);
-            extraLogs.push('$ ' + xdvipdfmx.join(' ') + '\nEXITCODE: ' + r2.exit_code + '\n\n' + r2.stdout + '\n' + r2.stderr);
+            extraLogs.push('$ ' + xdvipdfmx.join(' ') + '\\nEXITCODE: ' + r2.exit_code + '\\n\\n' + r2.stdout + '\\n' + r2.stderr);
             if (r2.exit_code === 0) {
               try {
                 finalPdf = FS.readFile(tex_path.replace(/\.tex$/, '.pdf'), {encoding: 'binary'});
@@ -327,7 +327,7 @@ onmessage = async ({data}) => {
           postMessage({
             type: 'done',
             pdf: finalPdf || result.pdf,
-            log: result.log + '\n\n====== Extra passes ======\n\n' + extraLogs.join('\n\n'),
+            log: result.log + '\\n\\n====== Extra passes ======\\n\\n' + extraLogs.join('\\n\\n'),
             exit_code: finalExit || result.exit_code,
             logs: (result.logs || []).concat(extraLogs)
           });
@@ -337,7 +337,7 @@ onmessage = async ({data}) => {
           postMessage({
             type: 'done',
             pdf: result.pdf,
-            log: result.log + '\n\nExtra pass error: ' + e.message,
+            log: result.log + '\\n\\nExtra pass error: ' + e.message,
             exit_code: result.exit_code,
             logs: result.logs || []
           });
