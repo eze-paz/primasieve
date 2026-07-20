@@ -142,7 +142,7 @@
     closeBtn.onclick = () => opfs.closeFile();
     header.append(title, closeBtn);
     const body = document.createElement('div');
-    body.style.cssText = 'flex:1;min-height:0;overflow:auto;position:relative;';
+    body.style.cssText = 'flex:1;width:100%;min-height:0;overflow:auto;position:relative;';
     pane.append(header, body);
 
     const host = document.getElementById('messagesSide');
