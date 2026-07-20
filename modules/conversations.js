@@ -1315,7 +1315,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=68');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=69');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1695,6 +1695,8 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     temperature: (active && active.temperature != null) ? active.temperature : null,
     topP: (active && active.topP != null) ? active.topP : null,
     reasoningEffort: (active && active.reasoningEffort) || null,
+    // OpenRouter upstream routing: preferred providers in order (provider.order).
+    providerOrder: (active && Array.isArray(active.providerOrder)) ? active.providerOrder : null,
     reasoning: (active && active.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
@@ -1841,6 +1843,7 @@ function renderSubagentEvent(host, ev) {
 function dispatchAgentEvent(ev, renderer, host) {
   switch (ev.type) {
     case 'round_start':   return renderer.startRound();
+    case 'round_retry':   return renderer.retryRound();
     case 'token':        return renderer.applyToken(ev.token, ev.region);
     case 'delta':         return renderer.applyDelta(ev.delta);
     case 'round_end':     return renderer.endRound(ev.content);
@@ -2362,6 +2365,15 @@ class RoundRenderer {
     this.lpScoreEl = null;
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
+  }
+  // A mid-stream provider error killed the previous attempt of this round after
+  // some deltas already rendered; the worker is retrying the same round. Remove
+  // the partial bubbles so the retry doesn't paint a duplicate copy of the text.
+  retryRound() {
+    if (this.reply) { this.reply.remove(); this.reply = null; }
+    if (this.thinkEl) { this.thinkEl.remove(); this.thinkEl = null; }
+    for (const el of this.toolCallEls) if (el) el.remove();
+    this.startRound();
   }
   // Confidence badge over ANSWER tokens only. Thinking tokens are deliberately
   // exploratory/high-entropy and would dominate the average, so they are excluded.

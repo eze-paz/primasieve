@@ -1264,6 +1264,17 @@ function isRetryableError(e) {
   if (e instanceof TypeError) return true;
   return false;
 }
+// Convert an in-stream provider error object ({code, message} — OpenRouter's
+// mid-stream error event, per-choice error, or a bare JSON error body on a 200)
+// into a throwable with `status` set so isRetryableError can classify it. An
+// upstream connect timeout / transient failure with no usable numeric code maps
+// to 502 so it retries; a genuine 4xx (bad request, key…) surfaces immediately.
+function _sseErrorToThrow(errObj) {
+  const code = errObj && (errObj.code ?? errObj.status);
+  const msg = (errObj && (errObj.message || errObj.msg)) || 'provider reported an error mid-stream';
+  const status = (typeof code === 'number' && code >= 400 && code < 600) ? code : 502;
+  return Object.assign(new Error('Provider stream error: ' + msg), { status });
+}
 function swSleep(ms, signal) {
   return new Promise((resolve, reject) => {
     const id = setTimeout(resolve, ms);
@@ -1435,13 +1446,28 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     }
     throw Object.assign(new Error(res.status + ': ' + text), { status: res.status });
   }
+  // If a previous attempt of THIS round already streamed deltas to the UI before
+  // failing mid-stream, tell the renderer to reset so the retry doesn't append a
+  // duplicate copy of the partial text. _attemptStreamed is cleared at round_start.
+  if (ctx && ctx._attemptStreamed) { ctx.emit({ type: 'round_retry' }); ctx._attemptStreamed = false; }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '', content = '', reasoningText = '';
   const toolCalls = []; let usage = null, sawDone = false;
-  let finishReason = null;
-  while (!sawDone) {
-    const { done, value } = await reader.read(); if (done) break;
+  let finishReason = null, streamErr = null;
+  // Stall watchdog: a dead upstream connection can leave reader.read() pending
+  // forever with no error event and no [DONE]. If no chunk arrives for STALL_MS,
+  // throw a retryable 408 so _withProviderRetry re-issues the request.
+  const STALL_MS = 180000;
+  const readWithStall = () => {
+    let timer;
+    return Promise.race([
+      reader.read(),
+      new Promise((_, rej) => { timer = setTimeout(() => rej(Object.assign(new Error('Provider stream stalled (no data for ' + (STALL_MS / 1000) + 's)'), { status: 408 })), STALL_MS); }),
+    ]).finally(() => clearTimeout(timer));
+  };
+  while (!sawDone && !streamErr) {
+    const { done, value } = await readWithStall(); if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n'); buffer = lines.pop() || '';
     for (const line of lines) {
@@ -1449,8 +1475,17 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       const data = line.slice(6); if (data === '[DONE]') { sawDone = true; break; }
       try {
         const parsed = JSON.parse(data);
+        // OpenRouter delivers mid-stream failures (upstream connect timeout, provider
+        // 5xx…) as an SSE event carrying an `error` object — the HTTP status was
+        // already 200 by then, so res.ok can't catch it. Without this check the error
+        // is swallowed and the round returns looking like a normal short completion.
+        // Throw (below, outside this swallow-all catch) so _withProviderRetry
+        // backs off and retries like any other transient provider failure.
+        const errObj = (parsed && parsed.error) || (parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].error);
+        if (errObj) { streamErr = _sseErrorToThrow(errObj); break; }
         if (parsed && parsed.usage) usage = parsed.usage;
         if (parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].finish_reason) finishReason = parsed.choices[0].finish_reason;
+        if (finishReason === 'error') { streamErr = _sseErrorToThrow(null); break; }
         const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
         if (!delta) continue;
         if (delta.content) content += delta.content;
@@ -1466,10 +1501,21 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
           }
         }
         ctx.emit({ type: 'delta', delta });
+        if (ctx) ctx._attemptStreamed = true;
       } catch (_) {}
     }
   }
   try { reader.cancel(); } catch (_) {}
+  if (streamErr) throw streamErr;
+  // A 200 response whose body was a bare JSON error (not SSE-framed) never matches
+  // the `data: ` prefix, so the loop drains it into `buffer` and we'd return an
+  // empty round. Detect and surface it as a retryable provider error instead.
+  if (!sawDone && !content && !toolCalls.length && !finishReason && buffer.trim()) {
+    try {
+      const tail = JSON.parse(buffer.trim());
+      if (tail && tail.error) throw _sseErrorToThrow(tail.error);
+    } catch (e) { if (e && e.status) throw e; }
+  }
   let keptToolCalls = toolCalls.filter(tc => tc && tc.id && tc.function && tc.function.name);
   if (!keptToolCalls.length) {
     let parsed = parseLeakedToolCalls(content);
@@ -1957,6 +2003,7 @@ async function runAgent(config, ctx) {
     }
     if (ctx.signal && ctx.signal.aborted) break;
     ctx.emit({ type: 'round_start' });
+    ctx._attemptStreamed = false;   // fresh round: no partial text to reset on retry
     // Consume the ephemeral reminder for exactly this round: append it to the
     // request body only (never to `messages`), and echo it to the page so the
     // guard is observable without polluting the stored conversation.
@@ -1978,6 +2025,11 @@ async function runAgent(config, ctx) {
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
     if (reasoning) reqBody.reasoning = reasoning;
+    // OpenRouter upstream routing: prefer these providers in order (e.g. ['deepseek']
+    // to hit DeepSeek's own endpoint first), still falling back to others if down.
+    if (Array.isArray(config.providerOrder) && config.providerOrder.length) {
+      reqBody.provider = { order: config.providerOrder, allow_fallbacks: true };
+    }
     let round;
     try {
       round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
@@ -1998,6 +2050,9 @@ async function runAgent(config, ctx) {
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
           if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
+          if (Array.isArray(config.providerOrder) && config.providerOrder.length) {
+            compactedReqBody.provider = { order: config.providerOrder, allow_fallbacks: true };
+          }
           round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
         } catch (compactErr) {
           if (compactErr && compactErr.compactionFailed) {
