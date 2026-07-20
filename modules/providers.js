@@ -47,6 +47,11 @@ const AI_HTML = `
         <input id="spTopP" type="number" min="0" max="1" step="0.05" autocomplete="off" placeholder="top_p (optional, 0–1)">
         <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
         <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
+        <input id="spProviderOrder" autocomplete="off" placeholder="Upstream routing (OpenRouter provider.order: e.g. deepseek — comma-separated, tried in order)">
+        <select id="spAllowFallbacks" style="display:none;">
+          <option value="yes">If preferred upstreams fail: fall back to others</option>
+          <option value="no">If preferred upstreams fail: error (no fallback)</option>
+        </select>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
           <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
@@ -114,7 +119,7 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort','spProviderOrder','spAllowFallbacks']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
@@ -519,6 +524,8 @@ function loadFormFor(id) {
   set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
   set('spTopP', p.topP);
   set('spReasoningEffort', p.reasoningEffort);
+  set('spProviderOrder', Array.isArray(p.providerOrder) ? p.providerOrder.join(', ') : '');
+  set('spAllowFallbacks', p.allowFallbacks === false ? 'no' : 'yes');
   set('spType', p.type || 'openai');
   const lr = document.getElementById('spLiteRTLMModel');
   if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
@@ -540,6 +547,10 @@ function applyTypeUI() {
   show('spApiKey', !local);
   show('spProxyUrl', !local);
   show('spReasoningEffort', !local);
+  show('spProviderOrder', !local);
+  // Fallback choice only matters once a preferred-provider order is set.
+  const hasOrder = !!(document.getElementById('spProviderOrder')?.value || '').trim();
+  show('spAllowFallbacks', !local && hasOrder);
   // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
   // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
@@ -584,6 +595,13 @@ function commitForm() {
   const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
   const pp = num('spTopP');          if (pp != null && pp >= 0) p.topP = pp;        else delete p.topP;
   const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
+  // OpenRouter upstream routing: providerOrder is stored as an ARRAY (maps to the
+  // request's provider.order), allowFallbacks as a bool (provider.allow_fallbacks).
+  const po = val('spProviderOrder').split(',').map(s => s.trim()).filter(Boolean);
+  if (po.length) p.providerOrder = po; else delete p.providerOrder;
+  const af = (document.getElementById('spAllowFallbacks')?.value) || 'yes';
+  if (po.length && af === 'no') p.allowFallbacks = false; else delete p.allowFallbacks;
+  applyTypeUI();   // reflect fallback-select visibility as the order field changes
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();
   applyActiveProvider();

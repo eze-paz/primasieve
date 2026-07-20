@@ -1315,7 +1315,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=69');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=70');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1695,6 +1695,11 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
     temperature: (active && active.temperature != null) ? active.temperature : null,
     topP: (active && active.topP != null) ? active.topP : null,
     reasoningEffort: (active && active.reasoningEffort) || null,
+    // OpenRouter upstream routing, already in wire shape ({ order, allow_fallbacks })
+    // so the worker can drop it straight into the request body's `provider` field.
+    providerRouting: (active && Array.isArray(active.providerOrder) && active.providerOrder.length)
+      ? { order: active.providerOrder, allow_fallbacks: active.allowFallbacks !== false }
+      : null,
     reasoning: (active && active.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
