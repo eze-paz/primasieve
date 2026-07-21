@@ -773,7 +773,48 @@ a[href]{cursor:pointer;}
       // drag-drop + paste images
       doc.body.addEventListener('dragover', (e) => e.preventDefault());
       doc.body.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f && /^image\//.test(f.type)) { e.preventDefault(); fileToImg(f); } });
-      doc.body.addEventListener('paste', (e) => { const items = e.clipboardData && e.clipboardData.items; if (!items) return; for (const it of items) { if (/^image\//.test(it.type)) { e.preventDefault(); fileToImg(it.getAsFile()); return; } } });
+      doc.body.addEventListener('copy', (e) => {
+        // Copy selected textbox as HTML object
+        if (selectedImg && selectedImg.classList && selectedImg.classList.contains('sp-textbox')) {
+          e.preventDefault();
+          const clone = selectedImg.cloneNode(true);
+          clone.removeAttribute('data-sp-gid');
+          clone.classList.remove('sp-obj-sel');
+          clone.setAttribute('data-sp-textbox', '1');
+          clone.contentEditable = 'false';
+          e.clipboardData.setData('text/html', clone.outerHTML);
+          e.clipboardData.setData('text/plain', selectedImg.textContent.trim() || 'Text box');
+        }
+      });
+            doc.body.addEventListener('paste', (e) => {
+        // When editing inside a textbox (body not editable), let default paste handle text
+        if (doc.body.contentEditable === 'false') return;
+        // Check for custom textbox serialization
+        const htmlData = e.clipboardData && e.clipboardData.getData('text/html');
+        if (htmlData && htmlData.includes('data-sp-textbox="1"')) {
+          e.preventDefault();
+          const tmp = doc.createElement('div');
+          tmp.innerHTML = htmlData;
+          const tb = tmp.querySelector('[data-sp-textbox="1"]');
+          if (tb) {
+            tb.removeAttribute('data-sp-textbox');
+            tb.removeAttribute('data-sp-gid');
+            tb.contentEditable = 'false';
+            const pg = curPage();
+            if (pg) { pg.style.position = 'relative'; pg.appendChild(tb); }
+            else { editRoot().appendChild(tb); }
+            selectImg(tb);
+            onEdit();
+          }
+          return;
+        }
+        // Paste image files
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+          if (/^image\//.test(it.type)) { e.preventDefault(); fileToImg(it.getAsFile()); return; }
+        }
+      });
       startHistory();
       buildRibbon();
       fitZoom();   // default: scale pages to the pane width
