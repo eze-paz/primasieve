@@ -19,6 +19,7 @@
   const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif']);
   const MEDIA_EXTS = new Set(['mp4', 'webm', 'mp3', 'wav', 'ogg', 'm4a', 'mov']);
   const OFFICE_EXTS = new Set(['docx', 'doc', 'odt', 'rtf', 'xlsx', 'xls', 'ods', 'csv', 'pptx', 'ppt', 'odp', 'odg']);
+  const SPREADSHEET_EXTS = new Set(['xlsx', 'xls', 'csv']);
   const TEXT_EDIT_CAP = 4 * 1024 * 1024;   // above this a text file offers download, not an editor
 
   const loading = (msg) => `<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">${msg}</div>`;
@@ -245,7 +246,18 @@
     // other types serve the original file bytes.
     if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);
 
-    /* office (word / sheet / slides) → LibreOffice-WASM (ZetaOffice) render */
+    /* spreadsheet (xlsx / xls / csv) → Univer interactive editor */
+    if (SPREADSHEET_EXTS.has(ext)) {
+      if (window.SandpieUniver) {
+        body.innerHTML = '';
+        body.style.padding = '0';
+        body.style.overflow = 'hidden';
+        await window.SandpieUniver.mount(body, { fullKey, name, ext, file });
+        return;
+      }
+    }
+
+    /* office (word / sheets / slides) → LibreOffice-WASM (ZetaOffice) render */
     if (OFFICE_EXTS.has(ext)) {
       body.innerHTML = loading('Rendering document…');
       if (await opfs._renderOfficePdf(file, ext, name, body, pane)) return;
