@@ -33,13 +33,13 @@ body{margin:0;font-family:system-ui,sans-serif;}
 html{background:#525659;}
 [contenteditable]{outline:none;}
 .sp-obj-sel{outline:2px solid #4a9eff !important;}
-.sp-obj-sel:not([contenteditable="true"]){cursor:move;}
 .sp-textbox{outline:1px dashed #b9c0c8;}
-.sp-toc a{cursor:pointer;}
+a[href]{cursor:pointer;}
 .sp-handle{position:fixed;width:11px;height:11px;background:#4a9eff;border:1.5px solid #fff;border-radius:2px;z-index:2147483000;box-sizing:border-box;}
 .sp-imgbar{position:fixed;z-index:2147483001;display:flex;gap:2px;background:#1b1f24;border-radius:6px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.4);}
 .sp-imgbar button{background:#2b313a;color:#d8dee5;border:0;border-radius:4px;font-size:11px;padding:3px 7px;cursor:pointer;}
 .sp-imgbar button.on{background:#4a9eff;color:#fff;}
+.sp-imgbar select{background:#2b313a;color:#d8dee5;border:0;border-radius:4px;font:11px system-ui;padding:3px 4px;cursor:pointer;}
 .sp-imgbar span{color:#8b949e;font:11px system-ui;padding:3px 4px;}
 .sp-grip{position:fixed;width:22px;height:22px;z-index:2147483002;display:flex;align-items:center;justify-content:center;background:#4a9eff;color:#fff;border:1.5px solid #fff;border-radius:50%;cursor:move;font:13px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.4);}
 .sp-stylepop{position:fixed;z-index:2147483003;background:#1b1f24;color:#d8dee5;border:1px solid #30363d;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 3px 12px rgba(0,0,0,.5);font:12px system-ui;}
@@ -262,9 +262,20 @@ html{background:#525659;}
 
       if (isImg) {
         el.setAttribute('draggable', 'false'); el.ondragstart = (e) => e.preventDefault();
-        // alignment is via the RIBBON's L/C/R buttons now (see alignSelected); the
-        // image toolbar only offers "In text" (return to the flow) + Style.
-        objbar.append(mkBtn('In text', 'Place inline in the text flow', () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; place(); onEdit(); }));
+        // Text-wrap selector (Word-style): In line / Wrap left / Wrap right. Block
+        // alignment is the ribbon's L/C/R; free placement is dragging the grip.
+        const wrapSel = doc.createElement('select'); wrapSel.title = 'Text wrapping';
+        [['In line', 'inline'], ['Wrap left', 'left'], ['Wrap right', 'right']].forEach(([l, v]) => { const o = doc.createElement('option'); o.textContent = l; o.value = v; wrapSel.appendChild(o); });
+        wrapSel.value = el.style.float === 'left' ? 'left' : el.style.float === 'right' ? 'right' : 'inline';
+        wrapSel.onmousedown = (e) => e.stopPropagation();
+        wrapSel.onchange = () => {
+          el.style.position = ''; el.style.left = el.style.top = ''; el.style.display = '';
+          if (wrapSel.value === 'left') { el.style.float = 'left'; el.style.margin = '0 1em 0.5em 0'; }
+          else if (wrapSel.value === 'right') { el.style.float = 'right'; el.style.margin = '0 0 0.5em 1em'; }
+          else { el.style.float = ''; el.style.margin = ''; }
+          place(); onEdit();
+        };
+        objbar.appendChild(wrapSel);
       }
       objbar.append(mkBtn('Style', 'Border, background, padding, radius…', () => toggleStylePanel(el, isTable, place)));
       const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
