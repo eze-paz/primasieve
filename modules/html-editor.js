@@ -22,6 +22,7 @@
   const BLOCKS = [['Normal', 'P'], ['Heading 1', 'H1'], ['Heading 2', 'H2'], ['Heading 3', 'H3'], ['Quote', 'BLOCKQUOTE'], ['Code', 'PRE']];
 
   const DOC_CSS = `
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 body{margin:0;font-family:system-ui,sans-serif;}
 .sp-page{width:${A4.w};min-height:${A4.h};padding:25mm 20mm;margin:10mm auto;background:#fff;color:#111;box-sizing:border-box;position:relative;box-shadow:0 2px 14px rgba(0,0,0,.35);}
 .sp-page:focus{outline:none;}
