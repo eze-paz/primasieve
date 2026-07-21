@@ -40,7 +40,13 @@ html{background:#525659;}
 .sp-imgbar{position:fixed;z-index:2147483001;display:flex;gap:2px;background:#1b1f24;border-radius:6px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.4);}
 .sp-imgbar button{background:#2b313a;color:#d8dee5;border:0;border-radius:4px;font-size:11px;padding:3px 7px;cursor:pointer;}
 .sp-imgbar button.on{background:#4a9eff;color:#fff;}
-.sp-imgbar span{color:#8b949e;font:11px system-ui;padding:3px 4px;}`;
+.sp-imgbar span{color:#8b949e;font:11px system-ui;padding:3px 4px;}
+.sp-grip{position:fixed;width:22px;height:22px;z-index:2147483002;display:flex;align-items:center;justify-content:center;background:#4a9eff;color:#fff;border:1.5px solid #fff;border-radius:50%;cursor:move;font:13px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.sp-stylepop{position:fixed;z-index:2147483003;background:#1b1f24;color:#d8dee5;border:1px solid #30363d;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;box-shadow:0 3px 12px rgba(0,0,0,.5);font:12px system-ui;}
+.sp-stylepop .sp-sr{display:flex;align-items:center;gap:6px;justify-content:space-between;}
+.sp-stylepop .sp-sr>span:first-child{color:#8b949e;min-width:76px;}
+.sp-stylepop input,.sp-stylepop select,.sp-stylepop button{background:#2b313a;color:#d8dee5;border:1px solid #30363d;border-radius:4px;font:12px system-ui;padding:2px 4px;}
+.sp-stylepop button{cursor:pointer;}`;
 
   const NEW_DOC = `<!DOCTYPE html><html><head><meta charset="utf-8"><style id="sp-doc-css">${DOC_CSS}</style></head><body><div class="sp-page"><p>Start typing…</p></div></body></html>`;
 
@@ -210,55 +216,57 @@ html{background:#525659;}
     }
     function addPage() { const p = doc.createElement('div'); p.className = 'sp-page'; p.innerHTML = '<p><br></p>'; const pages = doc.querySelectorAll('.sp-page'); const last = pages[pages.length - 1]; if (last) last.after(p); else editRoot().appendChild(p); p.querySelector('p').focus?.(); onEdit(); }
 
-    /* ── object selection (images + text boxes): move/resize handles ─────── */
-    let handles = [], objbar = null, placeCleanup = null;
+    /* ── object selection (images · text boxes · tables) ─────────────────── */
+    // Unified box model: any of the three can be selected (corner handles + a
+    // toolbar), MOVED via a dedicated ✥ grip (never by dragging the body, so text
+    // editing in boxes/cells is never hijacked), RESIZED via corners, and RESTYLED
+    // via a shared Style panel (border / background / padding / radius). Handles
+    // live on documentElement (outside the zoomed body); deltas ÷ zoom = 1:1.
+    let handles = [], grip = null, objbar = null, stylePop = null, placeCleanup = null;
     function clearImgSel() {
-      if (placeCleanup) { placeCleanup(); placeCleanup = null; }   // drop scroll/resize listeners first
+      if (placeCleanup) { placeCleanup(); placeCleanup = null; }
       if (selectedImg) selectedImg.classList.remove('sp-obj-sel'); selectedImg = null;
-      handles.forEach(h => h.remove()); handles = []; if (objbar) { objbar.remove(); objbar = null; }
+      handles.forEach(h => h.remove()); handles = [];
+      if (grip) { grip.remove(); grip = null; }
+      if (objbar) { objbar.remove(); objbar = null; }
+      if (stylePop) { stylePop.remove(); stylePop = null; }
     }
     function exitBoxEdit() { if (doc) doc.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(b => b.contentEditable = 'false'); }
-    // Select an image OR a text box: draw corner handles + a mini toolbar; drag to
-    // move (images only when floating; text boxes always), corners to resize
-    // (images keep aspect). Handles live on documentElement (outside the zoomed
-    // body) and mouse deltas are divided by the zoom so it's 1:1 at any zoom.
+
     function selectImg(el) {
       clearImgSel(); selectedImg = el; el.classList.add('sp-obj-sel');
       const isImg = el.tagName === 'IMG';
       const isBox = el.classList && el.classList.contains('sp-textbox');
+      const isTable = el.tagName === 'TABLE';
       const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['sw', 0, 1], ['se', 1, 1]];
       handles = CORNERS.map(() => { const h = doc.createElement('div'); h.className = 'sp-handle'; doc.documentElement.appendChild(h); return h; });
+      grip = doc.createElement('div'); grip.className = 'sp-grip'; grip.title = 'Drag to move'; grip.textContent = '✥'; doc.documentElement.appendChild(grip);
       objbar = doc.createElement('div'); objbar.className = 'sp-imgbar';
       const isFloat = () => el.style.position === 'absolute';
-      // become freely-positioned at the current on-page spot (only on a real drag)
       const goFree = () => { const pg = closestPage(el); if (pg) pg.style.position = 'relative'; const l = el.offsetLeft, t = el.offsetTop; el.style.float = ''; el.style.display = ''; el.style.margin = ''; el.style.position = 'absolute'; el.style.left = Math.round(l) + 'px'; el.style.top = Math.round(t) + 'px'; };
+      const mkBtn = (label, title, fn) => { const b = document.createElement('button'); b.textContent = label; b.title = title; b.onmousedown = (e) => e.preventDefault(); b.onclick = () => fn(); return b; };
+
       if (isImg) {
-        el.setAttribute('draggable', 'false'); el.ondragstart = (e) => e.preventDefault();   // block native image DnD so our drag works
-        // anchor buttons (no "float" jargon): back into text flow, or block-aligned.
-        const anchor = (label, title, fn) => { const b = document.createElement('button'); b.textContent = label; b.title = title; b.onmousedown = (e) => e.preventDefault(); b.onclick = () => { fn(); place(); onEdit(); }; return b; };
-        const toFlow = () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; };
-        const toAlign = (m) => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = 'block'; el.style.margin = m; };
-        objbar.append(
-          anchor('In text', 'Place inline in the text flow', toFlow),
-          anchor('⯇', 'Align left', () => toAlign('0 auto 0 0')),
-          anchor('▣', 'Center', () => toAlign('0 auto')),
-          anchor('⯈', 'Align right', () => toAlign('0 0 0 auto')),
-        );
+        el.setAttribute('draggable', 'false'); el.ondragstart = (e) => e.preventDefault();
+        const toFlow = () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; place(); onEdit(); };
+        const toAlign = (m) => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = 'block'; el.style.margin = m; place(); onEdit(); };
+        objbar.append(mkBtn('In text', 'Place inline in the text flow', toFlow), mkBtn('⯇', 'Align left', () => toAlign('0 auto 0 0')), mkBtn('▣', 'Center', () => toAlign('0 auto')), mkBtn('⯈', 'Align right', () => toAlign('0 0 0 auto')));
       }
+      if (isBox || isTable) objbar.append(mkBtn('Style', 'Border, background, padding…', () => toggleStylePanel(el, isTable, place)));
       const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
-      const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.onmousedown = (e) => e.preventDefault();
-      delBtn.onclick = () => { el.remove(); clearImgSel(); onEdit(); };
-      objbar.appendChild(delBtn);
+      objbar.appendChild(mkBtn('Delete', 'Delete this object', () => { el.remove(); clearImgSel(); onEdit(); }));
       doc.documentElement.appendChild(objbar);
 
       const place = () => {
-        if (selectedImg !== el || handles.length < 4 || !objbar) return;   // torn-down selection guard
+        if (selectedImg !== el || handles.length < 4 || !objbar || !grip) return;
         const r = el.getBoundingClientRect();
         CORNERS.forEach(([, cx, cy], i) => { handles[i].style.left = (r.left + cx * r.width - 5) + 'px'; handles[i].style.top = (r.top + cy * r.height - 5) + 'px'; handles[i].style.cursor = (cx === cy ? 'nwse' : 'nesw') + '-resize'; });
+        grip.style.left = (r.left - 12) + 'px'; grip.style.top = (r.top - 12) + 'px';
         objbar.style.left = r.left + 'px'; objbar.style.top = Math.max(2, r.top - 30) + 'px';
         sizeLbl.textContent = Math.round(r.width) + '×' + Math.round(r.height) + (isFloat() ? ' · ' + Math.round(el.offsetLeft) + ',' + Math.round(el.offsetTop) : '');
+        if (stylePop && stylePop._reposition) stylePop._reposition(r);
       };
-      // resize (corner drag) — aspect-locked for images, free for text boxes
+      // resize (corner drag) — images keep aspect; boxes/tables free
       CORNERS.forEach(([, cx, cy], i) => {
         handles[i].onmousedown = (e) => {
           e.preventDefault(); const z = zoom || 1, rr = el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sw = rr.width / z, sh = rr.height / z, ar = sh / sw;
@@ -273,28 +281,15 @@ html{background:#525659;}
           doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
         };
       });
-      // Press-and-drag to move. A plain CLICK never moves anything: motion only
-      // begins past a 4px threshold, and only THEN does an in-text image become
-      // freely-positioned (so clicking to select never changes layout).
-      const beginMove = (e) => {
-        if (isBox && el.getAttribute('contenteditable') === 'true') return;   // editing text: leave the caret alone
-        const z = zoom || 1, sx = e.clientX, sy = e.clientY;
-        let dragging = false, baseL = 0, baseT = 0;
-        const mv = (ev) => {
-          if (!dragging) {
-            if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;     // still a click, not a drag
-            dragging = true;
-            if (isImg && !isFloat()) goFree();                               // first real drag → free position
-            baseL = el.offsetLeft; baseT = el.offsetTop; doc.body.style.cursor = 'grabbing';
-          }
-          el.style.left = Math.round(baseL + (ev.clientX - sx) / z) + 'px';
-          el.style.top = Math.round(baseT + (ev.clientY - sy) / z) + 'px';
-          place();
-        };
-        const up = () => { doc.body.style.cursor = ''; doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); if (dragging) onEdit(); };
+      // move ONLY via the grip (never the body → text editing is never hijacked)
+      grip.onmousedown = (e) => {
+        e.preventDefault(); const z = zoom || 1, sx = e.clientX, sy = e.clientY;
+        if (!isFloat()) goFree();
+        const baseL = el.offsetLeft, baseT = el.offsetTop; doc.body.style.cursor = 'grabbing';
+        const mv = (ev) => { el.style.left = Math.round(baseL + (ev.clientX - sx) / z) + 'px'; el.style.top = Math.round(baseT + (ev.clientY - sy) / z) + 'px'; place(); };
+        const up = () => { doc.body.style.cursor = ''; doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); onEdit(); };
         doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
       };
-      el._spBeginMove = beginMove;   // the body mousedown handler invokes this (single binding — no double-drag)
       place(); win.requestAnimationFrame(place);
       if (isImg && !el.complete) el.addEventListener('load', place, { once: true });
       win.addEventListener('scroll', place, true); win.addEventListener('resize', place);
@@ -302,6 +297,40 @@ html{background:#525659;}
       el._spPlace = place;
     }
     function closestPage(el) { while (el && !el.classList?.contains('sp-page')) el = el.parentElement; return el; }
+
+    /* ── shared Style panel (box objects: text boxes + tables) ───────────── */
+    // A small popover exposing common CSS: border (width/style/color), background,
+    // padding, corner radius. For tables the border/padding also apply to cells so
+    // "add borders" yields grid lines. Same panel for text boxes.
+    function toggleStylePanel(el, isTable, place) {
+      if (stylePop) { stylePop.remove(); stylePop = null; return; }
+      const pop = doc.createElement('div'); pop.className = 'sp-stylepop';
+      const cells = () => isTable ? [...el.querySelectorAll('td,th')] : [];
+      const applyBorder = () => {
+        const w = wIn.value, st = stSel.value, c = cIn.value;
+        const b = (st === 'none' || !+w) ? '' : (w + 'px ' + st + ' ' + c);
+        el.style.border = b; cells().forEach(td => td.style.border = b);
+        if (isTable) el.style.borderCollapse = 'collapse';
+        place(); onEdit();
+      };
+      const row = (label, node) => { const r = doc.createElement('label'); r.className = 'sp-sr'; const s = doc.createElement('span'); s.textContent = label; r.append(s, node); pop.appendChild(r); return r; };
+      const num = (val, on) => { const i = doc.createElement('input'); i.type = 'number'; i.min = '0'; i.value = val; i.style.width = '56px'; i.oninput = on; return i; };
+      const color = (val, on) => { const i = doc.createElement('input'); i.type = 'color'; i.value = val; i.oninput = on; return i; };
+
+      const cs = win.getComputedStyle(el);
+      const wIn = num(parseInt(cs.borderTopWidth) || 1, applyBorder);
+      const stSel = doc.createElement('select'); ['none', 'solid', 'dashed', 'dotted', 'double'].forEach(o => { const op = doc.createElement('option'); op.textContent = op.value = o; stSel.appendChild(op); }); stSel.value = (cs.borderTopStyle === 'none' ? 'solid' : cs.borderTopStyle); stSel.onchange = applyBorder;
+      const cIn = color('#333333', applyBorder);
+      row('Border', (() => { const w = doc.createElement('span'); w.style.cssText = 'display:flex;gap:4px;align-items:center'; w.append(wIn, stSel, cIn); return w; })());
+      row('Background', color('#ffffff', (e) => { el.style.background = e.target.value; onEdit(); }));
+      row('No fill', (() => { const b = doc.createElement('button'); b.textContent = 'Clear'; b.onclick = () => { el.style.background = ''; onEdit(); }; return b; })());
+      row('Padding', num(parseInt(cs.paddingTop) || 0, (e) => { const p = (+e.target.value || 0) + 'px'; if (isTable) cells().forEach(td => td.style.padding = p); else el.style.padding = p; place(); onEdit(); }));
+      row('Radius', num(parseInt(cs.borderRadius) || 0, (e) => { el.style.borderRadius = (+e.target.value || 0) + 'px'; onEdit(); }));
+
+      pop._reposition = (r) => { pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 6) + 'px'; };
+      doc.documentElement.appendChild(pop); stylePop = pop;
+      pop._reposition(el.getBoundingClientRect());
+    }
 
     /* ── text boxes ─────────────────────────────────────────────────────── */
     // A floating, absolutely-positioned editable div inside the current page.
@@ -379,7 +408,7 @@ html{background:#525659;}
     /* ── serialize (strip editor-only chrome) ───────────────────────────── */
     function getHTML() {
       const clone = doc.documentElement.cloneNode(true);
-      clone.querySelectorAll('#sp-editor-css,.sp-handle,.sp-imgbar').forEach(n => n.remove());
+      clone.querySelectorAll('#sp-editor-css,.sp-handle,.sp-grip,.sp-imgbar,.sp-stylepop').forEach(n => n.remove());
       clone.querySelectorAll('.sp-obj-sel').forEach(n => n.classList.remove('sp-obj-sel'));
       clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
       return '<!DOCTYPE html>\n' + clone.outerHTML;
@@ -500,18 +529,14 @@ html{background:#525659;}
       doc.body.contentEditable = 'true';
       doc.body.addEventListener('input', onEdit);
       doc.body.addEventListener('mousedown', (e) => {
+        // Click selects the object; moving is done via its ✥ grip (so clicking a
+        // cell / box still edits text). Tables select on any cell click.
         const box = e.target.closest && e.target.closest('.sp-textbox');
-        // Single binding: select if needed, then arm a threshold drag from THIS event.
-        // A plain click just selects (drag only starts past the threshold).
-        if (e.target.tagName === 'IMG') {
-          if (selectedImg !== e.target) selectImg(e.target);
-          e.target._spBeginMove && e.target._spBeginMove(e);
-        } else if (box) {
-          if (box.getAttribute('contenteditable') !== 'true') {
-            if (selectedImg !== box) selectImg(box);
-            box._spBeginMove && box._spBeginMove(e);
-          }
-        } else { clearImgSel(); exitBoxEdit(); }
+        const table = e.target.closest && e.target.closest('table');
+        if (e.target.tagName === 'IMG') { if (selectedImg !== e.target) selectImg(e.target); }
+        else if (box) { if (box.getAttribute('contenteditable') !== 'true' && selectedImg !== box) selectImg(box); }
+        else if (table && editRoot().contains(table)) { if (selectedImg !== table) selectImg(table); }
+        else { clearImgSel(); exitBoxEdit(); }
       });
       // double-click a text box → edit its text; single click elsewhere exits (above)
       doc.body.addEventListener('dblclick', (e) => {
