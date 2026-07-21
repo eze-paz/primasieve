@@ -297,10 +297,15 @@
       return;
     }
 
-    /* html → WYSIWYG editor ("Word for HTML"); svg → sandboxed preview */
+    /* html → full page-oriented WYSIWYG editor (modules/html-editor.js) */
     if (ext === 'html' || ext === 'htm') {
       const html = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(await file.arrayBuffer()));
-      openHtml(fullKey, name, html, header, body);
+      if (window.SandpieHtmlEditor) {
+        body.style.padding = '0';
+        SandpieHtmlEditor.mount(body, { html, onSave: (out) => opfs.write(fullKey, out) });
+        return;
+      }
+      openHtml(fullKey, name, html, header, body);   // fallback: inline execCommand editor
       return;
     }
     if (ext === 'svg') {
