@@ -633,6 +633,7 @@ a[href]{cursor:pointer;}
       btn('❡ Index', 'Insert clickable index from headings', () => insertToc());
       btn('⤓ Page', 'Add page', addPage);
       btn('⚙ Page setup', 'Page size, color, margins, globals', togglePageSetup); sep();
+      btn('📄 PDF', 'Export to PDF via browser print dialog', () => { win.focus(); win.print(); });
       btn('🔍', 'Find & replace', toggleFind); sep();
       // zoom group
       btn('Fit', 'Zoom to fit width', () => fitZoom());
