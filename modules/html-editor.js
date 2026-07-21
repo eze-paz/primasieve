@@ -200,8 +200,12 @@ html{background:#525659;}
     function addPage() { const p = doc.createElement('div'); p.className = 'sp-page'; p.innerHTML = '<p><br></p>'; const pages = doc.querySelectorAll('.sp-page'); const last = pages[pages.length - 1]; if (last) last.after(p); else editRoot().appendChild(p); p.querySelector('p').focus?.(); onEdit(); }
 
     /* ── image selection + resize/move handles ──────────────────────────── */
-    let handles = [], imgbar = null;
-    function clearImgSel() { if (selectedImg) selectedImg.classList.remove('sp-img-sel'); selectedImg = null; handles.forEach(h => h.remove()); handles = []; if (imgbar) { imgbar.remove(); imgbar = null; } }
+    let handles = [], imgbar = null, placeCleanup = null;
+    function clearImgSel() {
+      if (placeCleanup) { placeCleanup(); placeCleanup = null; }   // drop scroll/resize listeners first
+      if (selectedImg) selectedImg.classList.remove('sp-img-sel'); selectedImg = null;
+      handles.forEach(h => h.remove()); handles = []; if (imgbar) { imgbar.remove(); imgbar = null; }
+    }
     function selectImg(img) {
       clearImgSel(); selectedImg = img; img.classList.add('sp-img-sel');
       const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['sw', 0, 1], ['se', 1, 1]];
@@ -222,6 +226,9 @@ html{background:#525659;}
         syncFloat(); place(); onEdit();
       };
       const place = () => {
+        // a lingering scroll/resize/drag callback can fire after deselection —
+        // bail if this image is no longer the selected one (handles cleared).
+        if (selectedImg !== img || handles.length < 4 || !imgbar) return;
         const r = img.getBoundingClientRect();
         CORNERS.forEach(([, cx, cy], i) => { handles[i].style.left = (r.left + cx * r.width - 5) + 'px'; handles[i].style.top = (r.top + cy * r.height - 5) + 'px'; handles[i].style.cursor = (cx === cy ? 'nwse' : 'nesw') + '-resize'; });
         imgbar.style.left = r.left + 'px'; imgbar.style.top = Math.max(2, r.top - 30) + 'px';
@@ -248,6 +255,9 @@ html{background:#525659;}
       win.requestAnimationFrame(place);                 // re-place after layout settles
       if (!img.complete) img.addEventListener('load', place, { once: true });   // and once dimensions are known
       win.addEventListener('scroll', place, true); win.addEventListener('resize', place);
+      // remember how to detach these when the image is deselected (prevents place()
+      // firing on a torn-down selection → "cannot read style of undefined")
+      placeCleanup = () => { try { win.removeEventListener('scroll', place, true); win.removeEventListener('resize', place); } catch (_) {} };
       img._spPlace = place;
     }
     function closestPage(el) { while (el && !el.classList?.contains('sp-page')) el = el.parentElement; return el; }
