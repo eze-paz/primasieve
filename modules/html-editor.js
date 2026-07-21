@@ -159,6 +159,20 @@ html{background:#525659;}
       return [...set];
     }
     function styleBlocks(fn) { const bs = selectedBlocks(); bs.forEach(fn); if (bs.length) onEdit(); }
+    // Ribbon L/C/R: if an image or table is selected, align THAT object (block +
+    // auto-margins; tables keep their display so table layout survives). Otherwise
+    // set text-align on the selected paragraphs.
+    function alignSelected(dir) {
+      const el = selectedImg;
+      if (el && (el.tagName === 'IMG' || el.tagName === 'TABLE')) {
+        el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = '';
+        el.style.margin = dir === 'center' ? '0 auto' : dir === 'right' ? '0 0 0 auto' : '0 auto 0 0';
+        if (el.tagName === 'IMG') el.style.display = 'block';   // tables: don't touch display (would break layout)
+        if (el._spPlace) el._spPlace();
+        onEdit(); return;
+      }
+      styleBlocks(b => b.style.textAlign = dir);
+    }
     function formatBlock(tag) {
       const bs = selectedBlocks(); if (!bs.length) return;
       for (const b of bs) {
@@ -222,7 +236,7 @@ html{background:#525659;}
     // editing in boxes/cells is never hijacked), RESIZED via corners, and RESTYLED
     // via a shared Style panel (border / background / padding / radius). Handles
     // live on documentElement (outside the zoomed body); deltas ÷ zoom = 1:1.
-    let handles = [], grip = null, objbar = null, stylePop = null, placeCleanup = null;
+    let handles = [], grip = null, objbar = null, stylePop = null, placeCleanup = null, lastCell = null;
     function clearImgSel() {
       if (placeCleanup) { placeCleanup(); placeCleanup = null; }
       if (selectedImg) selectedImg.classList.remove('sp-obj-sel'); selectedImg = null;
@@ -248,11 +262,11 @@ html{background:#525659;}
 
       if (isImg) {
         el.setAttribute('draggable', 'false'); el.ondragstart = (e) => e.preventDefault();
-        const toFlow = () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; place(); onEdit(); };
-        const toAlign = (m) => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = 'block'; el.style.margin = m; place(); onEdit(); };
-        objbar.append(mkBtn('In text', 'Place inline in the text flow', toFlow), mkBtn('⯇', 'Align left', () => toAlign('0 auto 0 0')), mkBtn('▣', 'Center', () => toAlign('0 auto')), mkBtn('⯈', 'Align right', () => toAlign('0 0 0 auto')));
+        // alignment is via the RIBBON's L/C/R buttons now (see alignSelected); the
+        // image toolbar only offers "In text" (return to the flow) + Style.
+        objbar.append(mkBtn('In text', 'Place inline in the text flow', () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; place(); onEdit(); }));
       }
-      if (isBox || isTable) objbar.append(mkBtn('Style', 'Border, background, padding…', () => toggleStylePanel(el, isTable, place)));
+      objbar.append(mkBtn('Style', 'Border, background, padding, radius…', () => toggleStylePanel(el, isTable, place)));
       const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
       objbar.appendChild(mkBtn('Delete', 'Delete this object', () => { el.remove(); clearImgSel(); onEdit(); }));
       doc.documentElement.appendChild(objbar);
@@ -302,14 +316,31 @@ html{background:#525659;}
     // A small popover exposing common CSS: border (width/style/color), background,
     // padding, corner radius. For tables the border/padding also apply to cells so
     // "add borders" yields grid lines. Same panel for text boxes.
+    // the cells covered by a table-styling scope, keyed off the last-clicked cell
+    function cellsForScope(table, scope, cell) {
+      if (!cell || !table.contains(cell)) return [];
+      const tr = cell.parentElement;
+      if (scope === 'cell') return [cell];
+      if (scope === 'row') return [...tr.children].filter(c => /^(TD|TH)$/.test(c.tagName));
+      if (scope === 'column') { const idx = [...tr.children].indexOf(cell); const out = []; [...table.rows].forEach(r => { const c = r.children[idx]; if (c) out.push(c); }); return out; }
+      return [];
+    }
     function toggleStylePanel(el, isTable, place) {
       if (stylePop) { stylePop.remove(); stylePop = null; return; }
       const pop = doc.createElement('div'); pop.className = 'sp-stylepop';
-      const cells = () => isTable ? [...el.querySelectorAll('td,th')] : [];
+      let scope = 'table';
+      // elements the current controls affect: text box/image → itself; table →
+      // whole table (table + all cells) or the selected cell / row / column.
+      const targets = () => {
+        if (!isTable) return [el];
+        if (scope === 'table') return [el, ...el.querySelectorAll('td,th')];
+        const cs2 = cellsForScope(el, scope, lastCell);
+        return cs2.length ? cs2 : [el];
+      };
       const applyBorder = () => {
         const w = wIn.value, st = stSel.value, c = cIn.value;
         const b = (st === 'none' || !+w) ? '' : (w + 'px ' + st + ' ' + c);
-        el.style.border = b; cells().forEach(td => td.style.border = b);
+        targets().forEach(t => t.style.border = b);
         if (isTable) el.style.borderCollapse = 'collapse';
         place(); onEdit();
       };
@@ -317,15 +348,21 @@ html{background:#525659;}
       const num = (val, on) => { const i = doc.createElement('input'); i.type = 'number'; i.min = '0'; i.value = val; i.style.width = '56px'; i.oninput = on; return i; };
       const color = (val, on) => { const i = doc.createElement('input'); i.type = 'color'; i.value = val; i.oninput = on; return i; };
 
+      if (isTable) {
+        const sc = doc.createElement('select');
+        [['Whole table', 'table'], ['Cell', 'cell'], ['Row', 'row'], ['Column', 'column']].forEach(([l, v]) => { const o = doc.createElement('option'); o.textContent = l; o.value = v; sc.appendChild(o); });
+        sc.onchange = () => { scope = sc.value; };
+        row('Apply to', sc);
+      }
       const cs = win.getComputedStyle(el);
       const wIn = num(parseInt(cs.borderTopWidth) || 1, applyBorder);
       const stSel = doc.createElement('select'); ['none', 'solid', 'dashed', 'dotted', 'double'].forEach(o => { const op = doc.createElement('option'); op.textContent = op.value = o; stSel.appendChild(op); }); stSel.value = (cs.borderTopStyle === 'none' ? 'solid' : cs.borderTopStyle); stSel.onchange = applyBorder;
       const cIn = color('#333333', applyBorder);
       row('Border', (() => { const w = doc.createElement('span'); w.style.cssText = 'display:flex;gap:4px;align-items:center'; w.append(wIn, stSel, cIn); return w; })());
-      row('Background', color('#ffffff', (e) => { el.style.background = e.target.value; onEdit(); }));
-      row('No fill', (() => { const b = doc.createElement('button'); b.textContent = 'Clear'; b.onclick = () => { el.style.background = ''; onEdit(); }; return b; })());
-      row('Padding', num(parseInt(cs.paddingTop) || 0, (e) => { const p = (+e.target.value || 0) + 'px'; if (isTable) cells().forEach(td => td.style.padding = p); else el.style.padding = p; place(); onEdit(); }));
-      row('Radius', num(parseInt(cs.borderRadius) || 0, (e) => { el.style.borderRadius = (+e.target.value || 0) + 'px'; onEdit(); }));
+      row('Background', color('#ffffff', (e) => { targets().forEach(t => t.style.background = e.target.value); onEdit(); }));
+      row('No fill', (() => { const b = doc.createElement('button'); b.textContent = 'Clear'; b.onclick = () => { targets().forEach(t => t.style.background = ''); onEdit(); }; return b; })());
+      row('Padding', num(parseInt(cs.paddingTop) || 0, (e) => { const p = (+e.target.value || 0) + 'px'; targets().forEach(t => t.style.padding = p); place(); onEdit(); }));
+      row('Radius', num(parseInt(cs.borderRadius) || 0, (e) => { const rd = (+e.target.value || 0) + 'px'; targets().forEach(t => t.style.borderRadius = rd); onEdit(); }));
 
       pop._reposition = (r) => { pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 6) + 'px'; };
       doc.documentElement.appendChild(pop); stylePop = pop;
@@ -375,31 +412,49 @@ html{background:#525659;}
       c.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(n => n.setAttribute('contenteditable', 'false'));
       return c.innerHTML;
     }
+    // data-URI pool: without this, every snapshot re-stores all base64 images, so a
+    // 15MB image-heavy doc exhausts the byte budget after ~5 snapshots (≈ "only 1
+    // undo"). Each unique data URI is stored ONCE in the pool; snapshots reference
+    // it by a short id, so a snapshot is just the markup — hundreds of undo steps fit.
+    const uriById = new Map(); const uriToId = new Map(); let uriSeq = 0;
+    const DATA_RE = /(src="|url\((?:'|")?)(data:[^"')]+)("|(?:'|")?\))/g;
+    function encodeHist(html) {
+      return html.replace(DATA_RE, (m, pre, uri, post) => { let id = uriToId.get(uri); if (id === undefined) { id = 'spu' + (uriSeq++); uriToId.set(uri, id); uriById.set(id, uri); } return pre + id + post; });
+    }
+    function decodeHist(html) { return html.replace(/(src="|url\((?:'|")?)(spu\d+)("|(?:'|")?\))/g, (m, pre, id, post) => pre + (uriById.get(id) || id) + post); }
     function snapshot() {
-      const html = contentHTML();
+      const html = encodeHist(contentHTML());
       if (history[hist_i] === html) return;
       history = history.slice(0, hist_i + 1);
       history.push(html); hist_i = history.length - 1; histBytes += html.length * 2;
-      while (histBytes > HIST_MAX_BYTES && history.length > 1) { histBytes -= history.shift().length * 2; hist_i--; }
+      while ((histBytes > HIST_MAX_BYTES || history.length > 300) && history.length > 1) { histBytes -= history.shift().length * 2; hist_i--; }
     }
     // A "commit" = propagate any pending header/footer edit to the other pages,
     // THEN snapshot — so one history entry captures the whole propagated change
     // and undo reverts every page's header at once.
     function commit() { if (pendingProp) { propagate(pendingProp); pendingProp = null; } snapshot(); }
-    function scheduleSnapshot() { clearTimeout(inputTimer); inputTimer = setTimeout(() => { inputTimer = null; commit(); }, 350); }
+    // Debounce, but FORCE a commit once edits have been coalescing >900ms so long
+    // continuous typing still yields many undo steps (not one giant one).
+    let pendStart = 0;
+    function scheduleSnapshot() {
+      const t = Date.now();
+      if (!inputTimer) pendStart = t;
+      clearTimeout(inputTimer);
+      inputTimer = setTimeout(() => { inputTimer = 0; commit(); }, (t - pendStart) > 900 ? 0 : 250);
+    }
     function flushSnapshot() { if (inputTimer) { clearTimeout(inputTimer); inputTimer = null; } commit(); }
     function restore(i) {
       if (i < 0 || i >= history.length) return;
       hist_i = i; clearImgSel();
       if (mo) mo.disconnect();                         // don't record our own innerHTML swap
-      editRoot().innerHTML = history[i];
+      editRoot().innerHTML = decodeHist(history[i]);   // expand pooled data-URIs back
       if (mo) mo.observe(editRoot(), MO_OPTS);
       syncRibbon();
     }
     function undo() { flushSnapshot(); if (hist_i > 0) restore(hist_i - 1); }
     function redo() { flushSnapshot(); if (hist_i < history.length - 1) restore(hist_i + 1); }
     function startHistory() {
-      history = [contentHTML()]; hist_i = 0; histBytes = history[0].length * 2;
+      history = [encodeHist(contentHTML())]; hist_i = 0; histBytes = history[0].length * 2;
       mo = new MutationObserver((muts) => {
         for (const m of muts) { const reg = regionOf(m.target); if (reg) { pendingProp = reg; break; } }   // note which running region was edited
         markDirty(); scheduleSnapshot();
@@ -487,9 +542,9 @@ html{background:#525659;}
       btn('<s>S</s>', 'Strikethrough', () => toggleProp('textDecorationLine', 'line-through', 'none', s => /line-through/.test(s.textDecorationLine || s.textDecoration)));
       colorBtn('A', 'Text color', (c) => applyInline(sp => sp.style.color = c));
       colorBtn('▉', 'Highlight', (c) => applyInline(sp => sp.style.backgroundColor = c)); sep();
-      btn('⯇', 'Align left', () => styleBlocks(b => b.style.textAlign = 'left'));
-      btn('≡', 'Align center', () => styleBlocks(b => b.style.textAlign = 'center'));
-      btn('⯈', 'Align right', () => styleBlocks(b => b.style.textAlign = 'right'));
+      btn('⯇', 'Align left (text, image, or table)', () => alignSelected('left'));
+      btn('≡', 'Align center (text, image, or table)', () => alignSelected('center'));
+      btn('⯈', 'Align right (text, image, or table)', () => alignSelected('right'));
       btn('☰', 'Justify', () => styleBlocks(b => b.style.textAlign = 'justify'));
       select(LINEH.map(v => ['↕ ' + v, v]), 'Line spacing', (v) => styleBlocks(b => b.style.lineHeight = v), '70px'); sep();
       btn('• List', 'Bullet list', () => toggleList(false));
@@ -567,6 +622,8 @@ html{background:#525659;}
         // cell / box still edits text). Tables select on any cell click.
         const box = e.target.closest && e.target.closest('.sp-textbox');
         const table = e.target.closest && e.target.closest('table');
+        const cell = e.target.closest && e.target.closest('td,th');
+        if (cell && editRoot().contains(cell)) lastCell = cell;   // for cell/row/column styling scope
         if (e.target.tagName === 'IMG') { if (selectedImg !== e.target) selectImg(e.target); }
         else if (box) { if (box.getAttribute('contenteditable') !== 'true' && selectedImg !== box) selectImg(box); }
         else if (table && editRoot().contains(table)) { if (selectedImg !== table) selectImg(table); }
