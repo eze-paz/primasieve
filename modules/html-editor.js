@@ -260,7 +260,7 @@ a[href]{cursor:pointer;}
       if (el && el !== editRoot()) return el;
       return doc.querySelector('.sp-page, .page') || (editRoot() && editRoot().firstElementChild) || editRoot();
     }
-    function addPage() { const p = doc.createElement('div'); p.className = 'sp-page'; p.innerHTML = '<p><br></p>'; const pages = doc.querySelectorAll('.sp-page'); const last = pages[pages.length - 1]; if (last) last.after(p); else editRoot().appendChild(p); p.querySelector('p').focus?.(); onEdit(); }
+    function addPage() { const p = doc.createElement('div'); p.className = pageSel().slice(1); p.innerHTML = '<p><br></p>'; const pages = eachPage(); const last = pages[pages.length - 1]; if (last) last.after(p); else editRoot().appendChild(p); refreshGlobals(); p.querySelector('p').focus?.(); onEdit(); }
 
     /* ── object selection (images · text boxes · tables) ─────────────────── */
     // Unified box model: any of the three can be selected (corner handles + a
@@ -268,7 +268,7 @@ a[href]{cursor:pointer;}
     // editing in boxes/cells is never hijacked), RESIZED via corners, and RESTYLED
     // via a shared Style panel (border / background / padding / radius). Handles
     // live on documentElement (outside the zoomed body); deltas ÷ zoom = 1:1.
-    let handles = [], grip = null, objbar = null, stylePop = null, placeCleanup = null, lastCell = null;
+    let handles = [], grip = null, objbar = null, stylePop = null, placeCleanup = null, lastCell = null, gidSeq = 0;
     function clearImgSel() {
       if (placeCleanup) { placeCleanup(); placeCleanup = null; }
       if (selectedImg) selectedImg.classList.remove('sp-obj-sel'); selectedImg = null;
@@ -310,8 +310,17 @@ a[href]{cursor:pointer;}
         objbar.appendChild(wrapSel);
       }
       objbar.append(mkBtn('Style', 'Border, background, padding, radius…', () => toggleStylePanel(el, isTable, place)));
+      // z-index layering
+      objbar.append(mkBtn('⤒', 'Bring to front', () => { el.style.zIndex = 100; place(); onEdit(); }), mkBtn('⤓', 'Send to back', () => { el.style.zIndex = 0; place(); onEdit(); }));
+      // Global: show this object on every page (edit any copy → all sync)
+      const gBtn = mkBtn('Global', 'Show on every page (master object)', () => {
+        if (el.classList.contains('sp-global')) { unmakeGlobal(el); gBtn.classList.remove('on'); }
+        else { makeGlobal(el); gBtn.classList.add('on'); }
+      });
+      gBtn.classList.toggle('on', el.classList.contains('sp-global'));
+      objbar.append(gBtn);
       const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
-      objbar.appendChild(mkBtn('Delete', 'Delete this object', () => { el.remove(); clearImgSel(); onEdit(); }));
+      objbar.appendChild(mkBtn('Delete', 'Delete this object (all pages if global)', () => { if (el.classList.contains('sp-global')) unmakeGlobal(el); el.remove(); clearImgSel(); onEdit(); }));
       doc.documentElement.appendChild(objbar);
 
       const place = () => {
@@ -406,6 +415,7 @@ a[href]{cursor:pointer;}
       row('No fill', (() => { const b = doc.createElement('button'); b.textContent = 'Clear'; b.onclick = () => { targets().forEach(t => t.style.background = ''); onEdit(); }; return b; })());
       row('Padding', num(parseInt(cs.paddingTop) || 0, (e) => { const p = (+e.target.value || 0) + 'px'; targets().forEach(t => t.style.padding = p); place(); onEdit(); }));
       row('Radius', num(parseInt(cs.borderRadius) || 0, (e) => { const rd = (+e.target.value || 0) + 'px'; targets().forEach(t => t.style.borderRadius = rd); onEdit(); }));
+      row('Z-index', num(parseInt(el.style.zIndex) || 0, (e) => { el.style.zIndex = (+e.target.value || 0); onEdit(); }));
 
       pop._reposition = (r) => { pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 6) + 'px'; };
       doc.documentElement.appendChild(pop); stylePop = pop;
@@ -499,37 +509,61 @@ a[href]{cursor:pointer;}
     function startHistory() {
       history = [encodeHist(contentHTML())]; hist_i = 0; histBytes = history[0].length * 2;
       mo = new MutationObserver((muts) => {
-        for (const m of muts) { const reg = regionOf(m.target); if (reg) { pendingProp = reg; break; } }   // note which running region was edited
+        for (const m of muts) { const g = globalOf(m.target); if (g) { pendingProp = g; break; } }   // note which global object was edited → sync copies
         markDirty(); scheduleSnapshot();
       });
       mo.observe(editRoot(), MO_OPTS);
     }
     function onEdit() { markDirty(); scheduleSnapshot(); }   // explicit nudge; the observer also covers it
 
-    /* ── repeating headers/footers: edit one → all pages ─────────────────── */
-    // Duplicated-per-page model kept as-is; when a header/footer region is edited
-    // its HTML is copied to the matching region on every other page. Footers keep
-    // each page's OWN page number (propagate everything except the number).
-    const HEADER_SEL = 'header,.hdr,[class*="header" i]';
-    const FOOTER_SEL = 'footer,.ftr,[class*="footer" i]';
-    const PAGENO_SEL = '.pnum,.sp-pageno,[class*="pagenum" i],[class*="page-number" i]';
-    function regionOf(node) {
-      let el = node && (node.nodeType === 3 ? node.parentElement : node);
-      return (el && el.closest) ? el.closest(HEADER_SEL + ',' + FOOTER_SEL) : null;
+    /* ── global/master objects: shown on every page, edit one → all sync ──── */
+    // Any object can be toggled "global": it's copied onto every page (same class
+    // + data-gid), and editing/moving/styling ANY copy syncs all of them (by gid).
+    // A page with data-globals="off" opts out. Replaces the old header/footer model
+    // (no hidden sections — you just mark the thing you want repeated).
+    const pageSel = () => (editRoot().querySelector('.sp-page') ? '.sp-page' : (editRoot().querySelector('.page') ? '.page' : '.sp-page'));
+    const eachPage = () => [...editRoot().querySelectorAll('.sp-page, .page')];
+    const pageOf = (el) => el && el.closest && el.closest('.sp-page, .page');
+    const globalOf = (node) => { let el = node && (node.nodeType === 3 ? node.parentElement : node); return (el && el.closest) ? el.closest('.sp-global') : null; };
+    function makeGlobal(el) {
+      if (!el.getAttribute('data-gid')) el.setAttribute('data-gid', 'g' + (++gidSeq));
+      el.classList.add('sp-global');
+      const pg = pageOf(el); if (pg) pg.style.position = 'relative';
+      if (el.style.position !== 'absolute') { el.style.left = Math.round(el.offsetLeft) + 'px'; el.style.top = Math.round(el.offsetTop) + 'px'; el.style.position = 'absolute'; }
+      refreshGlobals(); onEdit();
     }
-    function propagate(source) {
-      if (!source || !source.isConnected || !editRoot().contains(source)) return;
-      const sel = source.matches(HEADER_SEL) ? HEADER_SEL : (source.matches(FOOTER_SEL) ? FOOTER_SEL : null);
-      if (!sel) return;
-      const targets = [...editRoot().querySelectorAll(sel)].filter(r => r !== source && !source.contains(r) && !r.contains(source));
-      if (!targets.length) return;
-      const srcHtml = source.innerHTML;
+    function unmakeGlobal(el) {
+      const gid = el.getAttribute('data-gid');
       if (mo) mo.disconnect();
-      targets.forEach(r => {
-        const numText = (r.querySelector(PAGENO_SEL) || {}).textContent;   // preserve this page's own number
-        r.innerHTML = srcHtml;
-        if (numText != null) { const n = r.querySelector(PAGENO_SEL); if (n) n.textContent = numText; }
+      if (gid) [...editRoot().querySelectorAll('.sp-global[data-gid="' + gid + '"]')].forEach(t => { if (t !== el) t.remove(); });
+      el.classList.remove('sp-global'); el.removeAttribute('data-gid');
+      if (mo) mo.observe(editRoot(), MO_OPTS);
+      onEdit();
+    }
+    // Ensure every non-opted-out page carries one copy of each global (template =
+    // the first existing copy). Called on mark, page add, and per-page toggle.
+    function refreshGlobals() {
+      const gids = new Set([...editRoot().querySelectorAll('.sp-global[data-gid]')].map(e => e.getAttribute('data-gid')));
+      if (mo) mo.disconnect();
+      gids.forEach(gid => {
+        const copies = [...editRoot().querySelectorAll('.sp-global[data-gid="' + gid + '"]')];
+        if (!copies.length) return;
+        const tmpl = copies[0];
+        eachPage().forEach(pg => {
+          const has = pg.querySelector('.sp-global[data-gid="' + gid + '"]');
+          if (pg.getAttribute('data-globals') === 'off') { if (has) has.remove(); }
+          else if (!has) { const c = tmpl.cloneNode(true); c.classList.remove('sp-obj-sel'); pg.style.position = 'relative'; pg.appendChild(c); }
+        });
       });
+      if (mo) mo.observe(editRoot(), MO_OPTS);
+    }
+    function propagate(source) {   // sync all copies of the edited global to match it
+      if (!source || !source.isConnected || !editRoot().contains(source)) return;
+      const gid = source.getAttribute && source.getAttribute('data-gid');
+      if (!gid || !source.classList.contains('sp-global')) return;
+      const clone = source.cloneNode(true); clone.classList.remove('sp-obj-sel');
+      if (mo) mo.disconnect();
+      [...editRoot().querySelectorAll('.sp-global[data-gid="' + gid + '"]')].forEach(t => { if (t !== source) t.replaceWith(clone.cloneNode(true)); });
       if (mo) mo.observe(editRoot(), MO_OPTS);
     }
 
@@ -597,7 +631,8 @@ a[href]{cursor:pointer;}
       btn('▭ Text', 'Insert text box (drag to move, double-click to edit)', () => insertTextbox());
       btn('▦', 'Insert table', () => { saveSel(); const s = prompt('Table size (rows x cols):', '3x3'); if (s) { const m = /(\d+)\s*[x×]\s*(\d+)/.exec(s); if (m) insertTable(+m[1], +m[2]); } });
       btn('❡ Index', 'Insert clickable index from headings', () => insertToc());
-      btn('⤓ Page', 'Add page', addPage); sep();
+      btn('⤓ Page', 'Add page', addPage);
+      btn('⚙ Page setup', 'Page size, color, margins, globals', togglePageSetup); sep();
       btn('🔍', 'Find & replace', toggleFind); sep();
       // zoom group
       btn('Fit', 'Zoom to fit width', () => fitZoom());
@@ -625,6 +660,50 @@ a[href]{cursor:pointer;}
       const doReplace = (global) => { if (!f.value) return; const html = editRoot().innerHTML; const re = new RegExp(f.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), global ? 'g' : ''); editRoot().innerHTML = html.replace(re, rep.value); onEdit(); };
       go.onclick = () => doReplace(false); all.onclick = () => doReplace(true);
       findBar.append(f, rep, go, all); stage.appendChild(findBar); f.focus();
+    }
+
+    /* ── page setup (size · color · margins · per-page globals) ──────────── */
+    // Applies via a saved <style id="sp-pagecfg"> that overrides the page rule, so
+    // it round-trips as plain CSS. Sizes are W×H mm; @page keeps print correct.
+    const PAGE_SIZES = { A4: [210, 297], Letter: [216, 279], Legal: [216, 356] };
+    let pageCfgPanel = null;
+    function applyPageCfg(w, h, m, bg) {
+      let st = doc.getElementById('sp-pagecfg'); if (!st) { st = doc.createElement('style'); st.id = 'sp-pagecfg'; (doc.head || doc.documentElement).appendChild(st); }
+      const PC = pageSel();
+      st.textContent = `${PC}{width:${w}mm;min-height:${h}mm;padding:${m}mm;box-sizing:border-box;${bg ? 'background:' + bg + ';' : ''}}\n@page{size:${w}mm ${h}mm;margin:0;}`;
+      onEdit(); fitZoom();
+    }
+    function togglePageSetup() {
+      if (pageCfgPanel) { pageCfgPanel.remove(); pageCfgPanel = null; return; }
+      const pageEl = eachPage()[0];
+      const cs = pageEl ? win.getComputedStyle(pageEl) : null;
+      const mmOf = (px) => Math.round((parseFloat(px) || 0) / 3.7795);   // px→mm approx
+      let w = cs ? mmOf(cs.width) : 210, h = cs ? mmOf(cs.minHeight || cs.height) : 297, m = cs ? mmOf(cs.paddingTop) : 20;
+      let bg = '#ffffff';
+      const p = document.createElement('div'); p.className = 'sp-pagecfg-panel';
+      p.style.cssText = 'position:absolute;top:6px;right:16px;z-index:20;display:flex;flex-direction:column;gap:6px;background:var(--sp-panel,#161b22);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:8px;padding:10px;box-shadow:0 3px 12px rgba(0,0,0,.5);font:12px system-ui;min-width:220px;';
+      const rowEl = (label, node) => { const r = document.createElement('label'); r.style.cssText = 'display:flex;align-items:center;gap:8px;justify-content:space-between;'; const s = document.createElement('span'); s.textContent = label; s.style.color = 'var(--sp-text-dim,#8b949e)'; r.append(s, node); p.appendChild(r); };
+      const inp = (v, on) => { const i = document.createElement('input'); i.type = 'number'; i.value = v; i.style.cssText = 'width:64px;background:var(--sp-bg,#0d1117);color:inherit;border:1px solid var(--sp-border,#30363d);border-radius:4px;padding:2px 4px;'; i.oninput = on; return i; };
+      const apply = () => applyPageCfg(w, h, m, bg);
+      // size preset
+      const szSel = document.createElement('select');
+      ['A4', 'Letter', 'Legal', 'Custom'].forEach(o => { const op = document.createElement('option'); op.textContent = op.value = o; szSel.appendChild(op); });
+      const wI = inp(w, e => { w = +e.target.value || w; szSel.value = 'Custom'; apply(); });
+      const hI = inp(h, e => { h = +e.target.value || h; szSel.value = 'Custom'; apply(); });
+      szSel.value = Object.keys(PAGE_SIZES).find(k => PAGE_SIZES[k][0] === w && PAGE_SIZES[k][1] === h) || 'Custom';
+      szSel.onchange = () => { if (PAGE_SIZES[szSel.value]) { [w, h] = PAGE_SIZES[szSel.value]; wI.value = w; hI.value = h; apply(); } };
+      rowEl('Size', szSel);
+      const wh = document.createElement('span'); wh.style.cssText = 'display:flex;gap:4px;align-items:center'; wh.append(wI, document.createTextNode('×'), hI, document.createTextNode('mm')); rowEl('W × H', wh);
+      rowEl('Margins (mm)', inp(m, e => { m = +e.target.value || 0; apply(); }));
+      const bgI = document.createElement('input'); bgI.type = 'color'; bgI.value = '#ffffff'; bgI.oninput = e => { bg = e.target.value; apply(); }; rowEl('Page color', bgI);
+      // per-page globals toggle (current page = the one holding the caret)
+      const gChk = document.createElement('input'); gChk.type = 'checkbox';
+      const cp = curPage(); gChk.checked = !(cp && cp.getAttribute('data-globals') === 'off');
+      gChk.onchange = () => { const pg = curPage(); if (!pg) return; if (gChk.checked) pg.removeAttribute('data-globals'); else pg.setAttribute('data-globals', 'off'); refreshGlobals(); onEdit(); };
+      rowEl('Globals on current page', gChk);
+      const close = document.createElement('button'); close.textContent = 'Done'; close.className = 'ghost'; close.style.cssText = 'align-self:flex-end;font-size:0.8rem;padding:2px 10px;'; close.onclick = () => { p.remove(); pageCfgPanel = null; };
+      p.appendChild(close);
+      stage.appendChild(p); pageCfgPanel = p;
     }
 
     /* ── ribbon state sync ──────────────────────────────────────────────── */
