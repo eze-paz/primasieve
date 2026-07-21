@@ -79,6 +79,21 @@
     return url;
   }
 
+  // ↗ open-in-new-tab + ⬇ download, like the show_artifact buttons. getBlob()
+  // returns the content to serve (a Blob/File; may be async) so it can reflect
+  // live edits, and getName() the download filename.
+  function addOpenDownload(header, getBlob, getName) {
+    addHeaderButton(header, '↗', 'Open in new tab', async () => {
+      const b = await getBlob(); const url = URL.createObjectURL(b);
+      window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+    addHeaderButton(header, '⬇', 'Download', async () => {
+      const b = await getBlob(); const url = URL.createObjectURL(b);
+      const a = document.createElement('a'); a.href = url; a.download = getName(); a.style.display = 'none';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+  }
+
   /* ════════════════════ text viewer/editor ══════════════════════════════ */
 
   function openText(fullKey, name, ext, text, header, body) {
@@ -137,8 +152,12 @@
     let active = null;       // { getHTML?, destroy? } of the current mode, if any
     let textSave = null;     // Text-mode Save button (removed on mode change)
 
+    // latest content, capturing unsaved edits from the active mode (for the
+    // dropdown carry-over AND the ↗/⬇ buttons).
+    const currentHtml = () => { if (active && active.getHTML) { try { html = active.getHTML(); } catch (_) {} } return html; };
+
     const teardown = () => {
-      if (active && active.getHTML) { try { html = active.getHTML(); } catch (_) {} }
+      currentHtml();
       if (active && active.destroy) { try { active.destroy(); } catch (_) {} }
       active = null;
       if (textSave) { textSave.remove(); textSave = null; }
@@ -146,7 +165,7 @@
     };
 
     function showPage() {
-      teardown(); setActive('page'); body.style.padding = '0';
+      teardown(); modeSel.value = 'page'; body.style.padding = '0';
       if (window.SandpieHtmlEditor) {
         active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; return opfs.write(fullKey, out); } });
       } else {
@@ -155,7 +174,7 @@
     }
 
     function showText() {
-      teardown(); setActive('text');
+      teardown(); modeSel.value = 'text';
       const ta = document.createElement('textarea');
       ta.value = html; ta.spellcheck = false;
       ta.style.cssText = 'width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;'
@@ -173,7 +192,7 @@
     }
 
     function showRendered() {
-      teardown(); setActive('rendered');
+      teardown(); modeSel.value = 'rendered';
       const iframe = document.createElement('iframe');
       // allow-scripts (no allow-same-origin) → the doc's own scripts run in a
       // null origin, so charts/artifacts render but can't reach the app.
@@ -183,12 +202,15 @@
       body.appendChild(iframe);
     }
 
-    const modeBtns = {
-      page: addHeaderButton(header, 'Page', 'Edit as a page document', showPage),
-      text: addHeaderButton(header, 'Text', 'Edit raw HTML source', showText),
-      rendered: addHeaderButton(header, 'Rendered', 'Preview rendered (read-only)', showRendered),
-    };
-    function setActive(m) { for (const k in modeBtns) modeBtns[k].style.fontWeight = (k === m) ? '700' : ''; }
+    // single view-mode dropdown (Page / Text / Rendered) in the header
+    const modeSel = document.createElement('select');
+    modeSel.title = 'View mode';
+    modeSel.style.cssText = 'font-size:0.72rem;padding:2px 6px;flex:none;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:4px;';
+    [['Page', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
+    modeSel.onchange = () => ({ page: showPage, text: showText, rendered: showRendered }[modeSel.value] || showPage)();
+    header.insertBefore(modeSel, header.lastChild);
+    // ↗ / ⬇ serving the LIVE document (reflects unsaved edits in any mode)
+    addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name);
 
     showPage();   // default
   }
@@ -219,6 +241,9 @@
     window._openFilePath = fullKey;
     const ext = (name.split('.').pop() || '').toLowerCase();
     const { pane, header, body } = buildPane(fullKey);
+    // ↗ / ⬇ for every file. HTML serves live content via openHtmlModes; all
+    // other types serve the original file bytes.
+    if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);
 
     /* office (word / sheet / slides) → LibreOffice-WASM (ZetaOffice) render */
     if (OFFICE_EXTS.has(ext)) {
