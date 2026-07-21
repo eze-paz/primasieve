@@ -367,7 +367,7 @@ html{background:#525659;}
     // (image/textbox move & resize) — which the old 'input' event missed. Each
     // snapshot stores the CLEANED content (selection classes / edit-mode flags
     // removed) so merely selecting an object never creates a history entry.
-    let mo = null;
+    let mo = null, pendingProp = null;
     const MO_OPTS = { subtree: true, childList: true, attributes: true, characterData: true };
     function contentHTML() {
       const c = editRoot().cloneNode(true);
@@ -382,8 +382,12 @@ html{background:#525659;}
       history.push(html); hist_i = history.length - 1; histBytes += html.length * 2;
       while (histBytes > HIST_MAX_BYTES && history.length > 1) { histBytes -= history.shift().length * 2; hist_i--; }
     }
-    function scheduleSnapshot() { clearTimeout(inputTimer); inputTimer = setTimeout(() => { inputTimer = null; snapshot(); }, 350); }
-    function flushSnapshot() { if (inputTimer) { clearTimeout(inputTimer); inputTimer = null; } snapshot(); }
+    // A "commit" = propagate any pending header/footer edit to the other pages,
+    // THEN snapshot — so one history entry captures the whole propagated change
+    // and undo reverts every page's header at once.
+    function commit() { if (pendingProp) { propagate(pendingProp); pendingProp = null; } snapshot(); }
+    function scheduleSnapshot() { clearTimeout(inputTimer); inputTimer = setTimeout(() => { inputTimer = null; commit(); }, 350); }
+    function flushSnapshot() { if (inputTimer) { clearTimeout(inputTimer); inputTimer = null; } commit(); }
     function restore(i) {
       if (i < 0 || i >= history.length) return;
       hist_i = i; clearImgSel();
@@ -396,10 +400,40 @@ html{background:#525659;}
     function redo() { flushSnapshot(); if (hist_i < history.length - 1) restore(hist_i + 1); }
     function startHistory() {
       history = [contentHTML()]; hist_i = 0; histBytes = history[0].length * 2;
-      mo = new MutationObserver(() => { markDirty(); scheduleSnapshot(); });
+      mo = new MutationObserver((muts) => {
+        for (const m of muts) { const reg = regionOf(m.target); if (reg) { pendingProp = reg; break; } }   // note which running region was edited
+        markDirty(); scheduleSnapshot();
+      });
       mo.observe(editRoot(), MO_OPTS);
     }
     function onEdit() { markDirty(); scheduleSnapshot(); }   // explicit nudge; the observer also covers it
+
+    /* ── repeating headers/footers: edit one → all pages ─────────────────── */
+    // Duplicated-per-page model kept as-is; when a header/footer region is edited
+    // its HTML is copied to the matching region on every other page. Footers keep
+    // each page's OWN page number (propagate everything except the number).
+    const HEADER_SEL = 'header,.hdr,[class*="header" i]';
+    const FOOTER_SEL = 'footer,.ftr,[class*="footer" i]';
+    const PAGENO_SEL = '.pnum,.sp-pageno,[class*="pagenum" i],[class*="page-number" i]';
+    function regionOf(node) {
+      let el = node && (node.nodeType === 3 ? node.parentElement : node);
+      return (el && el.closest) ? el.closest(HEADER_SEL + ',' + FOOTER_SEL) : null;
+    }
+    function propagate(source) {
+      if (!source || !source.isConnected || !editRoot().contains(source)) return;
+      const sel = source.matches(HEADER_SEL) ? HEADER_SEL : (source.matches(FOOTER_SEL) ? FOOTER_SEL : null);
+      if (!sel) return;
+      const targets = [...editRoot().querySelectorAll(sel)].filter(r => r !== source && !source.contains(r) && !r.contains(source));
+      if (!targets.length) return;
+      const srcHtml = source.innerHTML;
+      if (mo) mo.disconnect();
+      targets.forEach(r => {
+        const numText = (r.querySelector(PAGENO_SEL) || {}).textContent;   // preserve this page's own number
+        r.innerHTML = srcHtml;
+        if (numText != null) { const n = r.querySelector(PAGENO_SEL); if (n) n.textContent = numText; }
+      });
+      if (mo) mo.observe(editRoot(), MO_OPTS);
+    }
 
     /* ── dirty / save ───────────────────────────────────────────────────── */
     let dirty = false, saveBtn = null;
