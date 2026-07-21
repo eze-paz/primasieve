@@ -58,9 +58,24 @@ html{background:#525659;}
 
     let doc = null, win = null, savedRange = null, selectedImg = null;
     let history = [], hist_i = -1, histBytes = 0, inputTimer = null;
+    let zoom = 1, fitMode = true, zoomLbl = null;
     const HIST_MAX_BYTES = 80 * 1024 * 1024;
 
     const editRoot = () => doc && doc.body;
+
+    /* ── zoom (CSS `zoom` scales layout + box, so scrollbars stay correct) ─ */
+    function setZoom(z, isFit) {
+      zoom = Math.max(0.1, Math.min(3, z)); fitMode = !!isFit;
+      if (doc && doc.body) doc.body.style.zoom = zoom;
+      if (zoomLbl) zoomLbl.textContent = Math.round(zoom * 100) + '%';
+    }
+    function fitZoom() {
+      if (!doc) return;
+      let w = 0; doc.querySelectorAll('.sp-page, [class*="page" i]').forEach(p => { w = Math.max(w, p.offsetWidth); });
+      if (!w) { const prev = doc.body.style.zoom; doc.body.style.zoom = 1; w = doc.body.scrollWidth; doc.body.style.zoom = prev; }
+      const avail = (iframe.clientWidth || stage.clientWidth) - 24;
+      setZoom(w ? avail / w : 1, true);
+    }
 
     /* ── selection helpers ──────────────────────────────────────────────── */
     const getSel = () => (win && win.getSelection && win.getSelection.call(win)) || (win && win.getSelection());
@@ -190,11 +205,14 @@ html{background:#525659;}
     function selectImg(img) {
       clearImgSel(); selectedImg = img; img.classList.add('sp-img-sel');
       const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['sw', 0, 1], ['se', 1, 1]];
-      handles = CORNERS.map(() => { const h = doc.createElement('div'); h.className = 'sp-handle'; doc.body.appendChild(h); return h; });
+      // append to documentElement (NOT body): body carries CSS `zoom`, and fixed
+      // handles inside a zoomed subtree would be double-scaled. getBoundingClientRect
+      // returns post-zoom viewport coords, so handles align at any zoom.
+      handles = CORNERS.map(() => { const h = doc.createElement('div'); h.className = 'sp-handle'; doc.documentElement.appendChild(h); return h; });
       imgbar = doc.createElement('div'); imgbar.className = 'sp-imgbar';
       const floatBtn = document.createElement('button'); floatBtn.textContent = 'Float';
       const sizeLbl = document.createElement('span');
-      imgbar.append(floatBtn, sizeLbl); doc.body.appendChild(imgbar);
+      imgbar.append(floatBtn, sizeLbl); doc.documentElement.appendChild(imgbar);
       const isFloat = () => img.style.position === 'absolute';
       const syncFloat = () => { floatBtn.classList.toggle('on', isFloat()); };
       floatBtn.onmousedown = (e) => e.preventDefault();
@@ -227,6 +245,8 @@ html{background:#525659;}
         doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
       };
       syncFloat(); place();
+      win.requestAnimationFrame(place);                 // re-place after layout settles
+      if (!img.complete) img.addEventListener('load', place, { once: true });   // and once dimensions are known
       win.addEventListener('scroll', place, true); win.addEventListener('resize', place);
       img._spPlace = place;
     }
@@ -310,7 +330,15 @@ html{background:#525659;}
       btn('🖼', 'Insert image', () => { saveSel(); pickImage(); });
       btn('▦', 'Insert table', () => { saveSel(); const s = prompt('Table size (rows x cols):', '3x3'); if (s) { const m = /(\d+)\s*[x×]\s*(\d+)/.exec(s); if (m) insertTable(+m[1], +m[2]); } });
       btn('⤓ Page', 'Add page', addPage); sep();
-      btn('🔍', 'Find & replace', toggleFind);
+      btn('🔍', 'Find & replace', toggleFind); sep();
+      // zoom group
+      btn('Fit', 'Zoom to fit width', () => fitZoom());
+      btn('−', 'Zoom out', () => setZoom(zoom - 0.1, false));
+      zoomLbl = document.createElement('span');
+      zoomLbl.style.cssText = 'font:0.78rem system-ui;color:var(--sp-text-dim,#8b949e);min-width:38px;text-align:center;';
+      zoomLbl.textContent = Math.round(zoom * 100) + '%';
+      ribbon.appendChild(zoomLbl);
+      btn('+', 'Zoom in', () => setZoom(zoom + 0.1, false));
     }
 
     /* ── image picker / drag / paste ────────────────────────────────────── */
@@ -375,6 +403,8 @@ html{background:#525659;}
       doc.body.addEventListener('paste', (e) => { const items = e.clipboardData && e.clipboardData.items; if (!items) return; for (const it of items) { if (/^image\//.test(it.type)) { e.preventDefault(); fileToImg(it.getAsFile()); return; } } });
       history = [editRoot().innerHTML]; hist_i = 0; histBytes = history[0].length * 2;
       buildRibbon();
+      fitZoom();   // default: scale pages to the pane width
+      try { new ResizeObserver(() => { if (fitMode) fitZoom(); }).observe(iframe); } catch (_) {}
     }, { once: true });
 
     return {
