@@ -352,8 +352,14 @@ html{background:#525659;}
       // inject doc-css (saved) if absent, and editor-css (transient, stripped on save)
       if (!doc.getElementById('sp-doc-css')) { const s = doc.createElement('style'); s.id = 'sp-doc-css'; s.textContent = DOC_CSS; (doc.head || doc.documentElement).appendChild(s); }
       const es = doc.createElement('style'); es.id = 'sp-editor-css'; es.textContent = EDITOR_CSS; (doc.head || doc.documentElement).appendChild(es);
-      // if the body has no page structure at all, wrap its content in one page
-      if (!doc.querySelector('.sp-page') && doc.body) { const pg = doc.createElement('div'); pg.className = 'sp-page'; while (doc.body.firstChild) pg.appendChild(doc.body.firstChild); doc.body.appendChild(pg); }
+      // Wrap loose content into a page ONLY for documents with no structure of
+      // their own — never wrap a doc that already lays itself out (its own .page
+      // sections, divs, tables…), or we'd nest A4 pages inside A4 pages and it
+      // overflows horizontally. Detect existing structure broadly.
+      const hasOwnStructure = doc.querySelector('.sp-page')
+        || (doc.body && [...doc.body.children].some(el => /^(DIV|SECTION|ARTICLE|MAIN|TABLE|HEADER|FOOTER|ASIDE)$/.test(el.tagName)))
+        || doc.querySelector('[class*="page" i]');
+      if (!hasOwnStructure && doc.body) { const pg = doc.createElement('div'); pg.className = 'sp-page'; while (doc.body.firstChild) pg.appendChild(doc.body.firstChild); doc.body.appendChild(pg); }
       doc.body.contentEditable = 'true';
       doc.body.addEventListener('input', onEdit);
       doc.body.addEventListener('mousedown', (e) => { if (e.target.tagName === 'IMG') { selectImg(e.target); } else { clearImgSel(); } });

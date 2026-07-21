@@ -128,99 +128,69 @@
     render();
   }
 
-  /* ════════════════════ HTML — WYSIWYG ("Word for HTML") ════════════════ */
-  // Edits the LIVE rendered document via designMode, so ALL CSS/layout survives
-  // (a schema editor like Tiptap would flatten a styled doc to its node model).
-  // No libraries — native contenteditable + execCommand. Two modes: Visual (a
-  // formatting toolbar over the editable iframe) and Source (raw HTML textarea).
-  function openHtml(fullKey, name, text, header, body) {
-    let mode = 'visual', dirty = false, iframe = null, ta = null;
-    const setDirty = (d) => { dirty = d; const t = header.querySelector('span'); if (t) t.textContent = (d ? '• ' : '') + '/' + fullKey; };
+  /* ════════════════════ HTML — 3 view modes ════════════════════════════ */
+  // Page (WYSIWYG page-document editor) · Text (raw HTML source) · Rendered
+  // (read-only preview). Mode buttons live in the pane header; switching carries
+  // the latest (unsaved) content across modes so nothing is lost.
+  function openHtmlModes(fullKey, name, initialHtml, header, body) {
+    let html = initialHtml;
+    let active = null;       // { getHTML?, destroy? } of the current mode, if any
+    let textSave = null;     // Text-mode Save button (removed on mode change)
 
-    const currentHtml = () => {
-      if (mode === 'source' && ta) return ta.value;
-      if (iframe && iframe.contentDocument) {
-        const doc = iframe.contentDocument;
-        const dt = doc.doctype ? '<!DOCTYPE html>\n' : '';
-        return dt + doc.documentElement.outerHTML;
-      }
-      return text;
+    const teardown = () => {
+      if (active && active.getHTML) { try { html = active.getHTML(); } catch (_) {} }
+      if (active && active.destroy) { try { active.destroy(); } catch (_) {} }
+      active = null;
+      if (textSave) { textSave.remove(); textSave = null; }
+      body.innerHTML = ''; body.style.padding = '';
     };
-    const saveBtn = addHeaderButton(header, 'Save', 'Save to OPFS (Ctrl+S)', async () => {
-      saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
-      try { text = currentHtml(); await opfs.write(fullKey, text); setDirty(false); saveBtn.textContent = 'Saved ✓'; }
-      catch (e) { saveBtn.textContent = 'Save failed'; console.error(e); }
-      finally { setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1200); }
-    });
-    const modeBtn = addHeaderButton(header, 'Source', 'Toggle visual / HTML source', () => {
-      text = currentHtml();            // capture edits from the mode we're leaving
-      mode = mode === 'visual' ? 'source' : 'visual';
-      modeBtn.textContent = mode === 'visual' ? 'Source' : 'Visual';
-      render();
-    });
 
-    // one formatting command against the editable iframe document
-    const exec = (cmd, val) => { try { iframe.contentDocument.execCommand(cmd, false, val); iframe.contentWindow.focus(); setDirty(true); } catch (_) {} };
-    const TOOLS = [
-      ['B', 'Bold', () => exec('bold'), 'font-weight:700'],
-      ['I', 'Italic', () => exec('italic'), 'font-style:italic'],
-      ['U', 'Underline', () => exec('underline'), 'text-decoration:underline'],
-      ['H1', 'Heading 1', () => exec('formatBlock', 'H1')],
-      ['H2', 'Heading 2', () => exec('formatBlock', 'H2')],
-      ['¶', 'Paragraph', () => exec('formatBlock', 'P')],
-      ['•', 'Bullet list', () => exec('insertUnorderedList')],
-      ['1.', 'Numbered list', () => exec('insertOrderedList')],
-      ['🔗', 'Insert link', () => { const u = prompt('Link URL:'); if (u) exec('createLink', u); }],
-      ['↶', 'Undo', () => exec('undo')],
-      ['↷', 'Redo', () => exec('redo')],
-    ];
-
-    function buildToolbar() {
-      const bar = document.createElement('div');
-      bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;padding:4px 6px;border-bottom:1px solid var(--sp-border,#30363d);flex:none;background:var(--sp-panel,#161b22);';
-      for (const [label, title, fn, extra] of TOOLS) {
-        const b = document.createElement('button');
-        b.className = 'ghost'; b.textContent = label; b.title = title;
-        b.style.cssText = 'min-width:26px;padding:2px 6px;font-size:0.8rem;' + (extra || '');
-        b.addEventListener('mousedown', (e) => e.preventDefault());   // keep the iframe selection
-        b.onclick = fn;
-        bar.appendChild(b);
-      }
-      return bar;
-    }
-
-    function render() {
-      const editing = mode === 'visual';
-      modeBtn.textContent = editing ? 'Source' : 'Visual';
-      body.innerHTML = '';
-      if (editing) {
-        body.appendChild(buildToolbar());
-        iframe = document.createElement('iframe');
-        iframe.sandbox = 'allow-same-origin';   // same-origin so we can edit; NO allow-scripts
-        iframe.style.cssText = 'width:100%;flex:1;border:0;background:#fff;';
-        iframe.srcdoc = text;
-        iframe.addEventListener('load', () => {
-          try {
-            const doc = iframe.contentDocument;
-            doc.designMode = 'on';
-            doc.addEventListener('input', () => setDirty(true));
-            doc.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveBtn.click(); } });
-          } catch (_) {}
-        }, { once: true });
-        body.appendChild(iframe);
+    function showPage() {
+      teardown(); setActive('page'); body.style.padding = '0';
+      if (window.SandpieHtmlEditor) {
+        active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; return opfs.write(fullKey, out); } });
       } else {
-        iframe = null;
-        ta = document.createElement('textarea');
-        ta.value = text; ta.spellcheck = false;
-        ta.style.cssText = 'width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;'
-          + 'font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);';
-        ta.addEventListener('input', () => setDirty(true));
-        ta.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveBtn.click(); } });
-        body.appendChild(ta);
+        body.innerHTML = loading('Editor module not loaded.');
       }
     }
-    body.style.display = 'flex'; body.style.flexDirection = 'column';
-    render();
+
+    function showText() {
+      teardown(); setActive('text');
+      const ta = document.createElement('textarea');
+      ta.value = html; ta.spellcheck = false;
+      ta.style.cssText = 'width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;'
+        + 'font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);';
+      const save = async () => {
+        textSave.textContent = 'Saving…'; textSave.disabled = true;
+        try { html = ta.value; await opfs.write(fullKey, html); textSave.textContent = 'Saved ✓'; }
+        catch (e) { textSave.textContent = 'Save failed'; console.error(e); }
+        finally { setTimeout(() => { textSave.textContent = 'Save'; textSave.disabled = false; }, 1200); }
+      };
+      ta.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); html = ta.value; save(); } });
+      ta.addEventListener('input', () => { html = ta.value; });
+      textSave = addHeaderButton(header, 'Save', 'Save to OPFS (Ctrl+S)', save);
+      body.appendChild(ta);
+    }
+
+    function showRendered() {
+      teardown(); setActive('rendered');
+      const iframe = document.createElement('iframe');
+      // allow-scripts (no allow-same-origin) → the doc's own scripts run in a
+      // null origin, so charts/artifacts render but can't reach the app.
+      iframe.sandbox = 'allow-scripts';
+      iframe.srcdoc = html;
+      iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
+      body.appendChild(iframe);
+    }
+
+    const modeBtns = {
+      page: addHeaderButton(header, 'Page', 'Edit as a page document', showPage),
+      text: addHeaderButton(header, 'Text', 'Edit raw HTML source', showText),
+      rendered: addHeaderButton(header, 'Rendered', 'Preview rendered (read-only)', showRendered),
+    };
+    function setActive(m) { for (const k in modeBtns) modeBtns[k].style.fontWeight = (k === m) ? '700' : ''; }
+
+    showPage();   // default
   }
 
   /* ════════════════════ the dispatcher ══════════════════════════════════ */
@@ -297,15 +267,10 @@
       return;
     }
 
-    /* html → full page-oriented WYSIWYG editor (modules/html-editor.js) */
+    /* html → 3 view modes: Page (editor) · Text (raw source) · Rendered (preview) */
     if (ext === 'html' || ext === 'htm') {
-      const html = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(await file.arrayBuffer()));
-      if (window.SandpieHtmlEditor) {
-        body.style.padding = '0';
-        SandpieHtmlEditor.mount(body, { html, onSave: (out) => opfs.write(fullKey, out) });
-        return;
-      }
-      openHtml(fullKey, name, html, header, body);   // fallback: inline execCommand editor
+      const html0 = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(await file.arrayBuffer()));
+      openHtmlModes(fullKey, name, html0, header, body);
       return;
     }
     if (ext === 'svg') {
