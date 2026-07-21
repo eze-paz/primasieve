@@ -205,6 +205,38 @@ a[href]{cursor:pointer;}
       onEdit();
     }
 
+    /* ── Tab / Shift+Tab: cells → next/prev · lists → nest/unnest · else indent ── */
+    function caretEl() { const r = curRange(); if (!r) return null; const n = r.startContainer; return n.nodeType === 3 ? n.parentElement : n; }
+    function placeCaret(el, atEnd) { const r = doc.createRange(); r.selectNodeContents(el); r.collapse(!atEnd); const s = win.getSelection(); s.removeAllRanges(); s.addRange(r); }
+    function handleTab(back) {
+      const el = caretEl(); if (!el || !editRoot().contains(el)) return;
+      const cell = el.closest('td,th');
+      if (cell) {                                    // table: move between cells
+        const tcells = [...cell.closest('table').querySelectorAll('td,th')];
+        const nxt = tcells[tcells.indexOf(cell) + (back ? -1 : 1)];
+        if (nxt) placeCaret(nxt, false);
+        return;
+      }
+      const li = el.closest('li');
+      if (li) {                                      // list: nest / unnest
+        const list = li.parentElement;
+        if (!back) {
+          const prev = li.previousElementSibling;
+          if (!prev) return;                         // can't indent the first item
+          let sub = prev.querySelector(':scope > ul, :scope > ol');
+          if (!sub) { sub = doc.createElement(list.tagName); prev.appendChild(sub); }
+          sub.appendChild(li);
+        } else {
+          const parentLi = list.parentElement.closest('li');
+          if (parentLi) { parentLi.after(li); if (!list.children.length) list.remove(); }
+          else { const p = doc.createElement('p'); while (li.firstChild) p.appendChild(li.firstChild); list.after(p); li.remove(); if (!list.children.length) list.remove(); placeCaret(p, true); onEdit(); return; }
+        }
+        placeCaret(li, true); onEdit(); return;
+      }
+      // plain block: indent / outdent via margin-left
+      styleBlocks(b => b.style.marginLeft = Math.max(0, parseFloat(b.style.marginLeft || 0) + (back ? -32 : 32)) + 'px');
+    }
+
     /* ── insertions ─────────────────────────────────────────────────────── */
     function insertNodeAtCaret(node) {
       const r = restoreSel() || curRange();
@@ -559,9 +591,7 @@ a[href]{cursor:pointer;}
       btn('☰', 'Justify', () => styleBlocks(b => b.style.textAlign = 'justify'));
       select(LINEH.map(v => ['↕ ' + v, v]), 'Line spacing', (v) => styleBlocks(b => b.style.lineHeight = v), '70px'); sep();
       btn('• List', 'Bullet list', () => toggleList(false));
-      btn('1. List', 'Numbered list', () => toggleList(true));
-      btn('⇥', 'Indent', () => styleBlocks(b => b.style.marginLeft = (parseFloat(b.style.marginLeft || 0) + 24) + 'px'));
-      btn('⇤', 'Outdent', () => styleBlocks(b => b.style.marginLeft = Math.max(0, parseFloat(b.style.marginLeft || 0) - 24) + 'px')); sep();
+      btn('1. List', 'Numbered list', () => toggleList(true)); sep();
       btn('🔗', 'Insert link', () => { saveSel(); const u = prompt('Link URL:'); if (u) insertLink(u); });
       btn('🖼', 'Insert image', () => { saveSel(); pickImage(); });
       btn('▭ Text', 'Insert text box (drag to move, double-click to edit)', () => insertTextbox());
@@ -657,6 +687,7 @@ a[href]{cursor:pointer;}
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
         else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
         else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
+        else if (e.key === 'Tab') { e.preventDefault(); handleTab(e.shiftKey); }
       });
       // drag-drop + paste images
       doc.body.addEventListener('dragover', (e) => e.preventDefault());
