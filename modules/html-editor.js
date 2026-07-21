@@ -230,18 +230,20 @@ html{background:#525659;}
       handles = CORNERS.map(() => { const h = doc.createElement('div'); h.className = 'sp-handle'; doc.documentElement.appendChild(h); return h; });
       objbar = doc.createElement('div'); objbar.className = 'sp-imgbar';
       const isFloat = () => el.style.position === 'absolute';
-      const goFloat = () => { const pg = closestPage(el); if (pg) pg.style.position = 'relative'; const l = el.offsetLeft, t = el.offsetTop; el.style.float = ''; el.style.display = ''; el.style.margin = ''; el.style.position = 'absolute'; el.style.left = Math.round(l) + 'px'; el.style.top = Math.round(t) + 'px'; };
+      // become freely-positioned at the current on-page spot (only on a real drag)
+      const goFree = () => { const pg = closestPage(el); if (pg) pg.style.position = 'relative'; const l = el.offsetLeft, t = el.offsetTop; el.style.float = ''; el.style.display = ''; el.style.margin = ''; el.style.position = 'absolute'; el.style.left = Math.round(l) + 'px'; el.style.top = Math.round(t) + 'px'; };
       if (isImg) {
         el.setAttribute('draggable', 'false'); el.ondragstart = (e) => e.preventDefault();   // block native image DnD so our drag works
-        const floatBtn = document.createElement('button'); floatBtn.textContent = 'Float';
-        floatBtn.classList.toggle('on', isFloat()); floatBtn.onmousedown = (e) => e.preventDefault();
-        floatBtn.onclick = () => {
-          if (isFloat()) { el.style.position = ''; el.style.left = el.style.top = ''; } else { goFloat(); }
-          floatBtn.classList.toggle('on', isFloat()); place(); onEdit();
-        };
-        // quick alignment (inline anchor points) — clears float/absolute
-        const align = (label, title, margin) => { const b = document.createElement('button'); b.textContent = label; b.title = title; b.onmousedown = (e) => e.preventDefault(); b.onclick = () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = 'block'; el.style.margin = margin; floatBtn.classList.remove('on'); place(); onEdit(); }; return b; };
-        objbar.append(floatBtn, align('⯇', 'Align left', '0 auto 0 0'), align('▣', 'Center', '0 auto'), align('⯈', 'Align right', '0 0 0 auto'));
+        // anchor buttons (no "float" jargon): back into text flow, or block-aligned.
+        const anchor = (label, title, fn) => { const b = document.createElement('button'); b.textContent = label; b.title = title; b.onmousedown = (e) => e.preventDefault(); b.onclick = () => { fn(); place(); onEdit(); }; return b; };
+        const toFlow = () => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = ''; el.style.margin = ''; };
+        const toAlign = (m) => { el.style.position = ''; el.style.left = el.style.top = ''; el.style.float = ''; el.style.display = 'block'; el.style.margin = m; };
+        objbar.append(
+          anchor('In text', 'Place inline in the text flow', toFlow),
+          anchor('⯇', 'Align left', () => toAlign('0 auto 0 0')),
+          anchor('▣', 'Center', () => toAlign('0 auto')),
+          anchor('⯈', 'Align right', () => toAlign('0 0 0 auto')),
+        );
       }
       const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
       const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.onmousedown = (e) => e.preventDefault();
@@ -271,20 +273,28 @@ html{background:#525659;}
           doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
         };
       });
-      // move by dragging the object body — dragging an inline image auto-floats it
-      // so ANY image is repositionable (text boxes are already floating).
+      // Press-and-drag to move. A plain CLICK never moves anything: motion only
+      // begins past a 4px threshold, and only THEN does an in-text image become
+      // freely-positioned (so clicking to select never changes layout).
       const beginMove = (e) => {
         if (isBox && el.getAttribute('contenteditable') === 'true') return;   // editing text: leave the caret alone
-        e.preventDefault();
-        if (isImg && !isFloat()) goFloat();                                   // inline image → float, then drag
-        const z = zoom || 1, sx = e.clientX, sy = e.clientY, ol = el.offsetLeft, ot = el.offsetTop;
-        doc.body.style.cursor = 'grabbing';
-        const mv = (ev) => { el.style.left = Math.round(ol + (ev.clientX - sx) / z) + 'px'; el.style.top = Math.round(ot + (ev.clientY - sy) / z) + 'px'; place(); };
-        const up = () => { doc.body.style.cursor = ''; doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); onEdit(); };
+        const z = zoom || 1, sx = e.clientX, sy = e.clientY;
+        let dragging = false, baseL = 0, baseT = 0;
+        const mv = (ev) => {
+          if (!dragging) {
+            if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 4) return;     // still a click, not a drag
+            dragging = true;
+            if (isImg && !isFloat()) goFree();                               // first real drag → free position
+            baseL = el.offsetLeft; baseT = el.offsetTop; doc.body.style.cursor = 'grabbing';
+          }
+          el.style.left = Math.round(baseL + (ev.clientX - sx) / z) + 'px';
+          el.style.top = Math.round(baseT + (ev.clientY - sy) / z) + 'px';
+          place();
+        };
+        const up = () => { doc.body.style.cursor = ''; doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); if (dragging) onEdit(); };
         doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
       };
-      el.onmousedown = beginMove;    // drags on subsequent presses
-      el._spBeginMove = beginMove;   // and the body handler starts it on the first (selecting) press
+      el._spBeginMove = beginMove;   // the body mousedown handler invokes this (single binding — no double-drag)
       place(); win.requestAnimationFrame(place);
       if (isImg && !el.complete) el.addEventListener('load', place, { once: true });
       win.addEventListener('scroll', place, true); win.addEventListener('resize', place);
@@ -322,21 +332,45 @@ html{background:#525659;}
       nav.appendChild(ul); insertNodeAtCaret(nav);
     }
 
-    /* ── history (byte-budgeted undo/redo) ──────────────────────────────── */
+    /* ── history (MutationObserver-driven, byte-budgeted undo/redo) ──────── */
+    // A MutationObserver on the editable root is the reliable change detector:
+    // it catches EVERYTHING — typing, deletes, and programmatic style changes
+    // (image/textbox move & resize) — which the old 'input' event missed. Each
+    // snapshot stores the CLEANED content (selection classes / edit-mode flags
+    // removed) so merely selecting an object never creates a history entry.
+    let mo = null;
+    const MO_OPTS = { subtree: true, childList: true, attributes: true, characterData: true };
+    function contentHTML() {
+      const c = editRoot().cloneNode(true);
+      c.querySelectorAll('.sp-obj-sel').forEach(n => n.classList.remove('sp-obj-sel'));
+      c.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(n => n.setAttribute('contenteditable', 'false'));
+      return c.innerHTML;
+    }
     function snapshot() {
-      const html = editRoot().innerHTML;
+      const html = contentHTML();
       if (history[hist_i] === html) return;
       history = history.slice(0, hist_i + 1);
       history.push(html); hist_i = history.length - 1; histBytes += html.length * 2;
       while (histBytes > HIST_MAX_BYTES && history.length > 1) { histBytes -= history.shift().length * 2; hist_i--; }
     }
-    function restore(i) { if (i < 0 || i >= history.length) return; hist_i = i; clearImgSel(); editRoot().innerHTML = history[i]; syncRibbon(); }
-    // Commit any pending (debounced) edit into history NOW, so undo can reach the
-    // most recent change instead of doing nothing when pressed within the debounce.
+    function scheduleSnapshot() { clearTimeout(inputTimer); inputTimer = setTimeout(() => { inputTimer = null; snapshot(); }, 350); }
     function flushSnapshot() { if (inputTimer) { clearTimeout(inputTimer); inputTimer = null; } snapshot(); }
+    function restore(i) {
+      if (i < 0 || i >= history.length) return;
+      hist_i = i; clearImgSel();
+      if (mo) mo.disconnect();                         // don't record our own innerHTML swap
+      editRoot().innerHTML = history[i];
+      if (mo) mo.observe(editRoot(), MO_OPTS);
+      syncRibbon();
+    }
     function undo() { flushSnapshot(); if (hist_i > 0) restore(hist_i - 1); }
     function redo() { flushSnapshot(); if (hist_i < history.length - 1) restore(hist_i + 1); }
-    function onEdit() { clearTimeout(inputTimer); inputTimer = setTimeout(() => { inputTimer = null; snapshot(); }, 400); markDirty(); }
+    function startHistory() {
+      history = [contentHTML()]; hist_i = 0; histBytes = history[0].length * 2;
+      mo = new MutationObserver(() => { markDirty(); scheduleSnapshot(); });
+      mo.observe(editRoot(), MO_OPTS);
+    }
+    function onEdit() { markDirty(); scheduleSnapshot(); }   // explicit nudge; the observer also covers it
 
     /* ── dirty / save ───────────────────────────────────────────────────── */
     let dirty = false, saveBtn = null;
@@ -467,13 +501,16 @@ html{background:#525659;}
       doc.body.addEventListener('input', onEdit);
       doc.body.addEventListener('mousedown', (e) => {
         const box = e.target.closest && e.target.closest('.sp-textbox');
-        // Select on first press AND immediately start the drag from the SAME event
-        // (so a single press-and-drag moves it — no select-then-drag two-step). On
-        // later presses the object is already selected and its own onmousedown drags.
+        // Single binding: select if needed, then arm a threshold drag from THIS event.
+        // A plain click just selects (drag only starts past the threshold).
         if (e.target.tagName === 'IMG') {
-          if (selectedImg !== e.target) { selectImg(e.target); if (selectedImg && selectedImg._spBeginMove) selectedImg._spBeginMove(e); }
+          if (selectedImg !== e.target) selectImg(e.target);
+          e.target._spBeginMove && e.target._spBeginMove(e);
         } else if (box) {
-          if (box.getAttribute('contenteditable') !== 'true' && selectedImg !== box) { selectImg(box); if (box._spBeginMove) box._spBeginMove(e); }
+          if (box.getAttribute('contenteditable') !== 'true') {
+            if (selectedImg !== box) selectImg(box);
+            box._spBeginMove && box._spBeginMove(e);
+          }
         } else { clearImgSel(); exitBoxEdit(); }
       });
       // double-click a text box → edit its text; single click elsewhere exits (above)
@@ -498,7 +535,7 @@ html{background:#525659;}
       doc.body.addEventListener('dragover', (e) => e.preventDefault());
       doc.body.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f && /^image\//.test(f.type)) { e.preventDefault(); fileToImg(f); } });
       doc.body.addEventListener('paste', (e) => { const items = e.clipboardData && e.clipboardData.items; if (!items) return; for (const it of items) { if (/^image\//.test(it.type)) { e.preventDefault(); fileToImg(it.getAsFile()); return; } } });
-      history = [editRoot().innerHTML]; hist_i = 0; histBytes = history[0].length * 2;
+      startHistory();
       buildRibbon();
       fitZoom();   // default: scale pages to the pane width
       try { new ResizeObserver(() => { if (fitMode) fitZoom(); }).observe(iframe); } catch (_) {}
