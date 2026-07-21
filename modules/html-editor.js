@@ -32,7 +32,9 @@ body{margin:0;font-family:system-ui,sans-serif;}
   const EDITOR_CSS = `
 html{background:#525659;}
 [contenteditable]{outline:none;}
-.sp-img-sel{outline:2px solid #4a9eff !important;}
+.sp-obj-sel{outline:2px solid #4a9eff !important;}
+.sp-textbox{outline:1px dashed #b9c0c8;}
+.sp-toc a{cursor:pointer;}
 .sp-handle{position:fixed;width:11px;height:11px;background:#4a9eff;border:1.5px solid #fff;border-radius:2px;z-index:2147483000;box-sizing:border-box;}
 .sp-imgbar{position:fixed;z-index:2147483001;display:flex;gap:2px;background:#1b1f24;border-radius:6px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.4);}
 .sp-imgbar button{background:#2b313a;color:#d8dee5;border:0;border-radius:4px;font-size:11px;padding:3px 7px;cursor:pointer;}
@@ -196,71 +198,121 @@ html{background:#525659;}
       for (let i = 0; i < rows; i++) { const tr = doc.createElement('tr'); for (let j = 0; j < cols; j++) { const td = doc.createElement('td'); td.style.cssText = 'border:1px solid #999;padding:4px 6px;min-width:40px;'; td.innerHTML = '<br>'; tr.appendChild(td); } t.appendChild(tr); }
       insertNodeAtCaret(t);
     }
-    function curPage() { const r = curRange(); let el = r ? (r.startContainer.nodeType === 3 ? r.startContainer.parentElement : r.startContainer) : null; while (el && !el.classList?.contains('sp-page')) el = el.parentElement; return el || doc.querySelector('.sp-page'); }
+    // nearest page-like container of the caret (sp-page OR the doc's own .page),
+    // else the first such element, else the first body child, else the body.
+    function curPage() {
+      const r = curRange();
+      let el = r ? (r.startContainer.nodeType === 3 ? r.startContainer.parentElement : r.startContainer) : null;
+      while (el && el !== editRoot() && !(el.classList && (el.classList.contains('sp-page') || el.classList.contains('page')))) el = el.parentElement;
+      if (el && el !== editRoot()) return el;
+      return doc.querySelector('.sp-page, .page') || (editRoot() && editRoot().firstElementChild) || editRoot();
+    }
     function addPage() { const p = doc.createElement('div'); p.className = 'sp-page'; p.innerHTML = '<p><br></p>'; const pages = doc.querySelectorAll('.sp-page'); const last = pages[pages.length - 1]; if (last) last.after(p); else editRoot().appendChild(p); p.querySelector('p').focus?.(); onEdit(); }
 
-    /* ── image selection + resize/move handles ──────────────────────────── */
-    let handles = [], imgbar = null, placeCleanup = null;
+    /* ── object selection (images + text boxes): move/resize handles ─────── */
+    let handles = [], objbar = null, placeCleanup = null;
     function clearImgSel() {
       if (placeCleanup) { placeCleanup(); placeCleanup = null; }   // drop scroll/resize listeners first
-      if (selectedImg) selectedImg.classList.remove('sp-img-sel'); selectedImg = null;
-      handles.forEach(h => h.remove()); handles = []; if (imgbar) { imgbar.remove(); imgbar = null; }
+      if (selectedImg) selectedImg.classList.remove('sp-obj-sel'); selectedImg = null;
+      handles.forEach(h => h.remove()); handles = []; if (objbar) { objbar.remove(); objbar = null; }
     }
-    function selectImg(img) {
-      clearImgSel(); selectedImg = img; img.classList.add('sp-img-sel');
+    function exitBoxEdit() { if (doc) doc.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(b => b.contentEditable = 'false'); }
+    // Select an image OR a text box: draw corner handles + a mini toolbar; drag to
+    // move (images only when floating; text boxes always), corners to resize
+    // (images keep aspect). Handles live on documentElement (outside the zoomed
+    // body) and mouse deltas are divided by the zoom so it's 1:1 at any zoom.
+    function selectImg(el) {
+      clearImgSel(); selectedImg = el; el.classList.add('sp-obj-sel');
+      const isImg = el.tagName === 'IMG';
+      const isBox = el.classList && el.classList.contains('sp-textbox');
       const CORNERS = [['nw', 0, 0], ['ne', 1, 0], ['sw', 0, 1], ['se', 1, 1]];
-      // append to documentElement (NOT body): body carries CSS `zoom`, and fixed
-      // handles inside a zoomed subtree would be double-scaled. getBoundingClientRect
-      // returns post-zoom viewport coords, so handles align at any zoom.
       handles = CORNERS.map(() => { const h = doc.createElement('div'); h.className = 'sp-handle'; doc.documentElement.appendChild(h); return h; });
-      imgbar = doc.createElement('div'); imgbar.className = 'sp-imgbar';
-      const floatBtn = document.createElement('button'); floatBtn.textContent = 'Float';
-      const sizeLbl = document.createElement('span');
-      imgbar.append(floatBtn, sizeLbl); doc.documentElement.appendChild(imgbar);
-      const isFloat = () => img.style.position === 'absolute';
-      const syncFloat = () => { floatBtn.classList.toggle('on', isFloat()); };
-      floatBtn.onmousedown = (e) => e.preventDefault();
-      floatBtn.onclick = () => {
-        if (isFloat()) { img.style.position = ''; img.style.left = img.style.top = ''; }
-        else { const pg = closestPage(img); if (pg) pg.style.position = 'relative'; const r = img.getBoundingClientRect(), pr = (pg || doc.body).getBoundingClientRect(); img.style.position = 'absolute'; img.style.left = Math.round(img.offsetLeft) + 'px'; img.style.top = Math.round(img.offsetTop) + 'px'; }
-        syncFloat(); place(); onEdit();
-      };
+      objbar = doc.createElement('div'); objbar.className = 'sp-imgbar';
+      const isFloat = () => el.style.position === 'absolute';
+      if (isImg) {
+        const floatBtn = document.createElement('button'); floatBtn.textContent = 'Float';
+        floatBtn.classList.toggle('on', isFloat()); floatBtn.onmousedown = (e) => e.preventDefault();
+        floatBtn.onclick = () => {
+          if (isFloat()) { el.style.position = ''; el.style.left = el.style.top = ''; }
+          else { const pg = closestPage(el); if (pg) pg.style.position = 'relative'; el.style.position = 'absolute'; el.style.left = Math.round(el.offsetLeft) + 'px'; el.style.top = Math.round(el.offsetTop) + 'px'; }
+          floatBtn.classList.toggle('on', isFloat()); place(); onEdit();
+        };
+        objbar.appendChild(floatBtn);
+      }
+      const sizeLbl = document.createElement('span'); objbar.appendChild(sizeLbl);
+      const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.onmousedown = (e) => e.preventDefault();
+      delBtn.onclick = () => { el.remove(); clearImgSel(); onEdit(); };
+      objbar.appendChild(delBtn);
+      doc.documentElement.appendChild(objbar);
+
       const place = () => {
-        // a lingering scroll/resize/drag callback can fire after deselection —
-        // bail if this image is no longer the selected one (handles cleared).
-        if (selectedImg !== img || handles.length < 4 || !imgbar) return;
-        const r = img.getBoundingClientRect();
+        if (selectedImg !== el || handles.length < 4 || !objbar) return;   // torn-down selection guard
+        const r = el.getBoundingClientRect();
         CORNERS.forEach(([, cx, cy], i) => { handles[i].style.left = (r.left + cx * r.width - 5) + 'px'; handles[i].style.top = (r.top + cy * r.height - 5) + 'px'; handles[i].style.cursor = (cx === cy ? 'nwse' : 'nesw') + '-resize'; });
-        imgbar.style.left = r.left + 'px'; imgbar.style.top = Math.max(2, r.top - 30) + 'px';
-        sizeLbl.textContent = Math.round(r.width) + '×' + Math.round(r.height) + (isFloat() ? ' · ' + Math.round(img.offsetLeft) + ',' + Math.round(img.offsetTop) : '');
+        objbar.style.left = r.left + 'px'; objbar.style.top = Math.max(2, r.top - 30) + 'px';
+        sizeLbl.textContent = Math.round(r.width) + '×' + Math.round(r.height) + (isFloat() ? ' · ' + Math.round(el.offsetLeft) + ',' + Math.round(el.offsetTop) : '');
       };
-      // resize by dragging a corner
+      // resize (corner drag) — aspect-locked for images, free for text boxes
       CORNERS.forEach(([, cx, cy], i) => {
         handles[i].onmousedown = (e) => {
-          e.preventDefault(); const sx = e.clientX, sw = img.getBoundingClientRect().width, ar = img.getBoundingClientRect().height / sw;
-          const mv = (ev) => { let nw = Math.max(20, sw + (cx ? (ev.clientX - sx) : (sx - ev.clientX))); img.style.width = Math.round(nw) + 'px'; img.style.height = Math.round(nw * ar) + 'px'; place(); };
+          e.preventDefault(); const z = zoom || 1, rr = el.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, sw = rr.width / z, sh = rr.height / z, ar = sh / sw;
+          const mv = (ev) => {
+            let nw = Math.max(24, sw + (cx ? (ev.clientX - sx) : (sx - ev.clientX)) / z);
+            el.style.width = Math.round(nw) + 'px';
+            if (isImg) el.style.height = Math.round(nw * ar) + 'px';
+            else el.style.height = Math.round(Math.max(24, sh + (cy ? (ev.clientY - sy) : (sy - ev.clientY)) / z)) + 'px';
+            place();
+          };
           const up = () => { doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); onEdit(); };
           doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
         };
       });
-      // move (float only) by dragging the image
-      img.onmousedown = (e) => {
-        if (!isFloat()) return; e.preventDefault();
-        const sx = e.clientX, sy = e.clientY, ol = img.offsetLeft, ot = img.offsetTop;
-        const mv = (ev) => { img.style.left = Math.round(ol + ev.clientX - sx) + 'px'; img.style.top = Math.round(ot + ev.clientY - sy) + 'px'; place(); };
+      // move by dragging the object body
+      el.onmousedown = (e) => {
+        if (isBox && el.getAttribute('contenteditable') === 'true') return;   // editing text: leave the caret alone
+        if (isImg && !isFloat()) return;                                      // inline image: not movable
+        e.preventDefault();
+        const z = zoom || 1, sx = e.clientX, sy = e.clientY, ol = el.offsetLeft, ot = el.offsetTop;
+        const mv = (ev) => { el.style.left = Math.round(ol + (ev.clientX - sx) / z) + 'px'; el.style.top = Math.round(ot + (ev.clientY - sy) / z) + 'px'; place(); };
         const up = () => { doc.removeEventListener('mousemove', mv); doc.removeEventListener('mouseup', up); onEdit(); };
         doc.addEventListener('mousemove', mv); doc.addEventListener('mouseup', up);
       };
-      syncFloat(); place();
-      win.requestAnimationFrame(place);                 // re-place after layout settles
-      if (!img.complete) img.addEventListener('load', place, { once: true });   // and once dimensions are known
+      place(); win.requestAnimationFrame(place);
+      if (isImg && !el.complete) el.addEventListener('load', place, { once: true });
       win.addEventListener('scroll', place, true); win.addEventListener('resize', place);
-      // remember how to detach these when the image is deselected (prevents place()
-      // firing on a torn-down selection → "cannot read style of undefined")
       placeCleanup = () => { try { win.removeEventListener('scroll', place, true); win.removeEventListener('resize', place); } catch (_) {} };
-      img._spPlace = place;
+      el._spPlace = place;
     }
     function closestPage(el) { while (el && !el.classList?.contains('sp-page')) el = el.parentElement; return el; }
+
+    /* ── text boxes ─────────────────────────────────────────────────────── */
+    // A floating, absolutely-positioned editable div inside the current page.
+    // Object mode (contenteditable=false): single-click selects → move/resize.
+    // Double-click enters text editing; clicking outside exits it.
+    function insertTextbox() {
+      const pg = curPage(); if (!pg) return;
+      pg.style.position = 'relative';
+      const tb = doc.createElement('div'); tb.className = 'sp-textbox'; tb.contentEditable = 'false';
+      tb.style.cssText = 'position:absolute;left:48px;top:48px;width:240px;min-height:40px;padding:6px 8px;box-sizing:border-box;';
+      tb.innerHTML = '<p style="margin:0">Text box — double-click to edit</p>';
+      pg.appendChild(tb); onEdit(); selectImg(tb);
+    }
+
+    /* ── clickable index / table of contents ────────────────────────────── */
+    const slug = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'sec';
+    function insertToc() {
+      const heads = [...editRoot().querySelectorAll('h1,h2,h3')].filter(h => !h.closest('.sp-toc'));
+      if (!heads.length) { alert('No headings (H1–H3) found to build an index from.'); return; }
+      const nav = doc.createElement('nav'); nav.className = 'sp-toc';
+      const cap = doc.createElement('h2'); cap.textContent = 'Índice'; nav.appendChild(cap);
+      const ul = doc.createElement('ul'); ul.style.cssText = 'list-style:none;padding-left:0;line-height:1.9;';
+      heads.forEach((hd, i) => {
+        if (!hd.id) hd.id = 'sec-' + (i + 1) + '-' + slug(hd.textContent);
+        const li = doc.createElement('li'); li.style.marginLeft = ({ H1: '0', H2: '1.2em', H3: '2.4em' }[hd.tagName] || '0');
+        const a = doc.createElement('a'); a.href = '#' + hd.id; a.textContent = hd.textContent.trim(); li.appendChild(a); ul.appendChild(li);
+      });
+      nav.appendChild(ul); insertNodeAtCaret(nav);
+    }
 
     /* ── history (byte-budgeted undo/redo) ──────────────────────────────── */
     function snapshot() {
@@ -283,7 +335,7 @@ html{background:#525659;}
     function getHTML() {
       const clone = doc.documentElement.cloneNode(true);
       clone.querySelectorAll('#sp-editor-css,.sp-handle,.sp-imgbar').forEach(n => n.remove());
-      clone.querySelectorAll('.sp-img-sel').forEach(n => n.classList.remove('sp-img-sel'));
+      clone.querySelectorAll('.sp-obj-sel').forEach(n => n.classList.remove('sp-obj-sel'));
       clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
       return '<!DOCTYPE html>\n' + clone.outerHTML;
     }
@@ -338,7 +390,9 @@ html{background:#525659;}
       btn('⇤', 'Outdent', () => styleBlocks(b => b.style.marginLeft = Math.max(0, parseFloat(b.style.marginLeft || 0) - 24) + 'px')); sep();
       btn('🔗', 'Insert link', () => { saveSel(); const u = prompt('Link URL:'); if (u) insertLink(u); });
       btn('🖼', 'Insert image', () => { saveSel(); pickImage(); });
+      btn('▭ Text', 'Insert text box (drag to move, double-click to edit)', () => insertTextbox());
       btn('▦', 'Insert table', () => { saveSel(); const s = prompt('Table size (rows x cols):', '3x3'); if (s) { const m = /(\d+)\s*[x×]\s*(\d+)/.exec(s); if (m) insertTable(+m[1], +m[2]); } });
+      btn('❡ Index', 'Insert clickable index from headings', () => insertToc());
       btn('⤓ Page', 'Add page', addPage); sep();
       btn('🔍', 'Find & replace', toggleFind); sep();
       // zoom group
@@ -400,7 +454,24 @@ html{background:#525659;}
       if (!hasOwnStructure && doc.body) { const pg = doc.createElement('div'); pg.className = 'sp-page'; while (doc.body.firstChild) pg.appendChild(doc.body.firstChild); doc.body.appendChild(pg); }
       doc.body.contentEditable = 'true';
       doc.body.addEventListener('input', onEdit);
-      doc.body.addEventListener('mousedown', (e) => { if (e.target.tagName === 'IMG') { selectImg(e.target); } else { clearImgSel(); } });
+      doc.body.addEventListener('mousedown', (e) => {
+        const box = e.target.closest && e.target.closest('.sp-textbox');
+        if (e.target.tagName === 'IMG') { selectImg(e.target); }
+        else if (box) { if (box.getAttribute('contenteditable') !== 'true') selectImg(box); }   // editing box: leave it
+        else { clearImgSel(); exitBoxEdit(); }
+      });
+      // double-click a text box → edit its text; single click elsewhere exits (above)
+      doc.body.addEventListener('dblclick', (e) => {
+        const box = e.target.closest && e.target.closest('.sp-textbox');
+        if (box) { box.contentEditable = 'true'; box.focus(); }
+      });
+      // clickable anchors (index / ToC) scroll to their target inside the editor
+      doc.body.addEventListener('click', (e) => {
+        const a = e.target.closest && e.target.closest('a[href^="#"]');
+        if (!a) return;
+        const t = doc.getElementById(a.getAttribute('href').slice(1));
+        if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      });
       doc.addEventListener('selectionchange', saveSel);
       doc.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
