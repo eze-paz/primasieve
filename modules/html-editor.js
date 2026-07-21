@@ -278,7 +278,7 @@ a[href]{cursor:pointer;}
       if (objbar) { objbar.remove(); objbar = null; }
       if (stylePop) { stylePop.remove(); stylePop = null; }
     }
-    function exitBoxEdit() { if (doc) doc.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(b => b.contentEditable = 'false'); }
+    function exitBoxEdit() { if (doc) { doc.querySelectorAll('.sp-textbox[contenteditable="true"]').forEach(b => b.contentEditable = 'false'); if (doc.body) doc.body.contentEditable = 'true'; } }
 
     function selectImg(el) {
       clearImgSel(); selectedImg = el; el.classList.add('sp-obj-sel');
@@ -754,7 +754,7 @@ a[href]{cursor:pointer;}
       // double-click a text box → edit its text; single click elsewhere exits (above)
       doc.body.addEventListener('dblclick', (e) => {
         const box = e.target.closest && e.target.closest('.sp-textbox');
-        if (box) { box.contentEditable = 'true'; box.focus(); }
+        if (box) { box.contentEditable = 'true'; if (doc.body) doc.body.contentEditable = 'false'; box.focus(); }
       });
       // clickable anchors (index / ToC) scroll to their target inside the editor
       doc.body.addEventListener('click', (e) => {
