@@ -142,20 +142,36 @@ const SandpieImages = (function() {
     return _heicPromise;
   }
 
+  // Resolve the folder new attachments should land in, fresh at call time
+  // (just-in-time — the file-viewer's current folder can change between init and
+  // the actual attach). Returns '' for root. Never a hidden bucket: if the path
+  // can't be resolved we fall back to root, which is always visible in the
+  // sidebar, so an attach can never "disappear" into a folder the user can't see.
+  function currentBasePath() {
+    try {
+      if (typeof opfsCurrentPath === 'function') {
+        return (opfsCurrentPath() || '').trim().replace(/^\/+|\/+$/g, '');
+      }
+    } catch (_) { /* #opfsPath not mounted yet — treat as root */ }
+    return '';
+  }
+
   // Pick a non-colliding OPFS path under dir/ so attaching never clobbers an
-  // existing file with the same name.
+  // existing file with the same name. An empty dir means the OPFS root (no
+  // leading slash).
   async function uniquePath(dir, name) {
     const safe = String(name).replace(/[\\/:*?"<>|]/g, '_') || 'file';
-    let p = dir + '/' + safe;
+    const join = (d, f) => (d ? d + '/' + f : f);
+    let p = join(dir, safe);
     if (!(await opfs.exists(p))) return p;
     const dot = safe.lastIndexOf('.');
     const base = dot > 0 ? safe.slice(0, dot) : safe;
     const ext = dot > 0 ? safe.slice(dot) : '';
     for (let i = 2; i < 1000; i++) {
-      p = `${dir}/${base}-${i}${ext}`;
+      p = join(dir, `${base}-${i}${ext}`);
       if (!(await opfs.exists(p))) return p;
     }
-    return `${dir}/${base}-${Date.now()}${ext}`;
+    return join(dir, `${base}-${Date.now()}${ext}`);
   }
 
   // Decide whether a file's bytes are UTF-8 text (→ inline at send time) or
@@ -254,7 +270,7 @@ const SandpieImages = (function() {
     const imgEl = await loadImageFromBlob(new Blob([bytes], { type: blob.type || getMimeType(name) }));
     const thumb = compressImage(imgEl, 200, 0.7);
 
-    const dir = basePath || "images";
+    const dir = (basePath != null ? basePath : currentBasePath()) || "images";
     const opfsPath = await uniquePath(dir, name);
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
@@ -271,7 +287,9 @@ const SandpieImages = (function() {
   async function attachDocument(file, { basePath = null } = {}) {
     const name = file.name || ('file_' + Date.now());
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const dir = basePath || 'attachments';
+    // Land in the current file-viewer folder ('' = OPFS root). No hidden
+    // fallback bucket: at worst the file appears at root, visible in the sidebar.
+    const dir = (basePath != null ? basePath : currentBasePath());
     const opfsPath = await uniquePath(dir, name);
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
@@ -328,7 +346,7 @@ const SandpieImages = (function() {
      Process items from a drop event (supports files and folders).
      --------------------------------------------------------------------------- */
   async function processDroppedItems(items) {
-    const basePath = (typeof opfsCurrentPath === 'function') ? opfsCurrentPath() : '';
+    const basePath = currentBasePath();
     const allPaths = [];
     let topFolderName = null;
 
@@ -357,7 +375,7 @@ const SandpieImages = (function() {
    */
   async function addFiles(fileList) {
     const files = Array.from(fileList || []);
-    const basePath = (typeof opfsCurrentPath === 'function') ? opfsCurrentPath() : 'attachments';
+    const basePath = currentBasePath();
     const paths = [];
     for (const file of files) {
       const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
