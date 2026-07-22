@@ -1,4 +1,5 @@
 /** sandpie Univer v2 — iframe-based spreadsheet viewer for .xlsx and .csv */
+console.log('[sandpie] univer.js loaded');
 (function () {
   'use strict';
 
