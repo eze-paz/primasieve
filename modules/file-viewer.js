@@ -246,18 +246,50 @@
     // other types serve the original file bytes.
     if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);
 
-    /* spreadsheet (xlsx / xls / csv) → Univer interactive editor */
+    /* spreadsheet (xlsx / xls / csv) → viewer dropdown (default Univer) */
     if (SPREADSHEET_EXTS.has(ext)) {
-      if (window.SandpieUniver) {
-        body.innerHTML = '';
-        body.style.padding = '0';
-        body.style.overflow = 'hidden';
-        await window.SandpieUniver.mount(body, { fullKey, name, ext, file });
-        return;
+      // Mode selector dropdown (Univer or ZetaOffice PDF)
+      const sheetModes = window.SandpieUniver
+        ? [['SheetsJS / Univer', 'univer'], ['PDF (ZetaOffice)', 'zeta']]
+        : [['PDF (ZetaOffice)', 'zeta']];
+      const sheetSel = document.createElement('select');
+      sheetSel.title = 'Spreadsheet viewer';
+      sheetSel.style.cssText = 'font-size:0.72rem;padding:2px 6px;flex:none;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:4px;';
+      sheetModes.forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; sheetSel.appendChild(o); });
+      header.insertBefore(sheetSel, header.lastChild);
+
+      let teardown = null;
+
+      async function renderSheet(mode) {
+        if (teardown) { try { teardown(); } catch (_) {} teardown = null; }
+        body.innerHTML = ''; body.style.padding = ''; body.style.overflow = '';
+
+        if (mode === 'univer' && window.SandpieUniver) {
+          body.style.padding = '0';
+          body.style.overflow = 'hidden';
+          try {
+            await window.SandpieUniver.mount(body, { fullKey, name, ext, file });
+            teardown = () => window.SandpieUniver.teardown();
+          } catch (e) {
+            body.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--sp-text-dim,#8b949e);">SheetsJS / Univer error: ' + e.message + '<br><small>Switch to PDF view below</small></div>';
+          }
+          return;
+        }
+
+        body.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--sp-text-dim,#8b949e);">Rendering via ZetaOffice…</div>';
+        try {
+          if (await opfs._renderOfficePdf(file, ext, name, body, pane)) { teardown = () => {}; return; }
+        } catch (_) {}
+        body.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--sp-text-dim,#8b949e);">Could not render this document.</div>';
       }
+
+      sheetSel.value = window.SandpieUniver ? 'univer' : 'zeta';
+      sheetSel.onchange = () => renderSheet(sheetSel.value);
+      await renderSheet(sheetSel.value);
+      return;
     }
 
-    /* office (word / sheets / slides) → LibreOffice-WASM (ZetaOffice) render */
+        /* office (word / sheets / slides) → LibreOffice-WASM (ZetaOffice) render */
     if (OFFICE_EXTS.has(ext)) {
       body.innerHTML = loading('Rendering document…');
       if (await opfs._renderOfficePdf(file, ext, name, body, pane)) return;
