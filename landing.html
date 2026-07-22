@@ -398,76 +398,78 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 100);
 camera.position.set(0, 0, 10);
 
-/* ---------- sample targets from an offscreen 2D canvas ---------- */
-function sampleCanvas(draw, n){
+/* ---------- INVERTED sampling ----------
+   The sand is the medium: grains fill the panel EXCEPT where the shape is
+   drawn — the shapes read as carved shadows in the sand. Grains that sit on
+   the rim of a carving are flagged as "edge" (disturbed sand → ember glow). */
+function rasterImg(draw){
   const W = 1200, H = 640;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const cx = cv.getContext('2d');
   cx.fillStyle = '#000'; cx.fillRect(0,0,W,H);
   cx.fillStyle = cx.strokeStyle = '#fff';
   draw(cx, W, H);
-  const img = cx.getImageData(0,0,W,H).data;
-  const pts = [];
+  return { img: cx.getImageData(0,0,W,H).data, W, H };
+}
+function sampleInverted({img,W,H}, n){
+  const lit = (x,y)=> x>=0 && x<W && y>=0 && y<H && img[(y*W+x)*4] > 100;
+  const FEATHER = 110;
+  const pts = [], edges = [];
   for(let y=0; y<H; y+=2){
     for(let x=0; x<W; x+=2){
-      if(img[(y*W+x)*4] > 100) pts.push([x,y]);
+      if(lit(x,y)) continue;                       // carved void — no sand
+      const bd = Math.min(x, W-x, y, H-y);
+      if(bd < FEATHER && Math.random() > bd/FEATHER) continue;  // feathered panel edge
+      // rim of a carving? look for lit pixels nearby
+      const e = lit(x+5,y)||lit(x-5,y)||lit(x,y+5)||lit(x,y-5)||lit(x+4,y+4)||lit(x-4,y-4) ? 1
+              : (lit(x+9,y)||lit(x-9,y)||lit(x,y+9)||lit(x,y-9) ? 0.5 : 0);
+      pts.push([x,y]); edges.push(e);
     }
   }
-  // world scale: fit ~9.2 world units wide
   const S = 9.2 / W;
-  const out = new Float32Array(n*3);
+  const targets = new Float32Array(n*3), edge = new Float32Array(n);
   for(let i=0;i<n;i++){
-    const p = pts[(Math.random()*pts.length)|0];
-    out[i*3]   = (p[0]-W/2)*S + (Math.random()-.5)*0.02;
-    out[i*3+1] = -(p[1]-H/2)*S + (Math.random()-.5)*0.02;
-    out[i*3+2] = (Math.random()-.5)*0.25;
+    const k = (Math.random()*pts.length)|0;
+    const p = pts[k];
+    targets[i*3]   = (p[0]-W/2)*S + (Math.random()-.5)*0.02;
+    targets[i*3+1] = -(p[1]-H/2)*S + (Math.random()-.5)*0.02;
+    targets[i*3+2] = (Math.random()-.5)*0.25;
+    edge[i] = edges[k];
   }
-  return out;
+  return { targets, edge };
 }
 
-/* target A — the wordmark */
-const wordTargets = sampleCanvas((cx,W,H)=>{
+/* target A — the wordmark, carved */
+const drawWord = (cx,W,H)=>{
   cx.font = '600 218px Archivo, system-ui, sans-serif';
   cx.textAlign='center'; cx.textBaseline='middle';
   cx.fillText('sandpie', W/2, H/2 - 40);
   cx.font = '300 34px Archivo, system-ui, sans-serif';
   cx.fillText('[ a i ,  i n  t h e  b r o w s e r ]', W/2, H/2 + 130);
-}, COUNT);
+};
+const wordSample = sampleInverted(rasterImg(drawWord), COUNT);
+const wordTargets = wordSample.targets;
 
-/* target B — a laptop sketched in the sand.
-   Sampled from TWO drawings: the hardware (stays sand-colored) and the
-   screen UI (flagged "hot" → ignites neon orange once the laptop forms). */
-function rasterPts(draw){
-  const W = 1200, H = 640;
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const cx = cv.getContext('2d');
-  cx.fillStyle = '#000'; cx.fillRect(0,0,W,H);
-  cx.fillStyle = cx.strokeStyle = '#fff';
-  draw(cx, W, H);
-  const img = cx.getImageData(0,0,W,H).data;
-  const pts = [];
-  for(let y=0; y<H; y+=2) for(let x=0; x<W; x+=2)
-    if(img[(y*W+x)*4] > 100) pts.push([x,y]);
-  return pts;
-}
+/* target B — a laptop carved into the sand (hardware + screen UI as voids) */
 function rr(c,x,y,w,h,r){ c.beginPath(); c.roundRect(x,y,w,h,r); }
 function ln(c,x1,y1,x2,y2){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
 
-const framePts = rasterPts((cx,W,H)=>{
+const drawLaptop = (cx,W,H)=>{
   const sx=W/2, sy=H/2 - 10;
   cx.lineJoin = cx.lineCap = 'round';
+  /* — hardware — */
   // screen — double-stroked bezel
-  cx.lineWidth = 6;
+  cx.lineWidth = 8;
   rr(cx, sx-300, sy-232, 600, 322, 18); cx.stroke();
-  cx.lineWidth = 3;
+  cx.lineWidth = 4;
   rr(cx, sx-288, sy-220, 576, 298, 10); cx.stroke();
   // camera dot
-  cx.beginPath(); cx.arc(sx, sy-226, 3.5, 0, 7); cx.fill();
+  cx.beginPath(); cx.arc(sx, sy-226, 4, 0, 7); cx.fill();
   // hinge
-  cx.lineWidth = 5;
+  cx.lineWidth = 6;
   ln(cx, sx-310, sy+98, sx+310, sy+98);
   // deck (slight perspective)
-  cx.lineWidth = 6;
+  cx.lineWidth = 8;
   cx.beginPath();
   cx.moveTo(sx-318, sy+104); cx.lineTo(sx+318, sy+104);
   cx.lineTo(sx+382, sy+206); cx.lineTo(sx-382, sy+206);
@@ -484,43 +486,38 @@ const framePts = rasterPts((cx,W,H)=>{
       rr(cx, x, y, kw, kh, 3); cx.fill();
     }
   }
-  // spacebar
+  // spacebar + trackpad
   rr(cx, sx-90, sy+172, 180, 11, 5); cx.fill();
-  // trackpad
-  cx.lineWidth = 4;
+  cx.lineWidth = 5;
   rr(cx, sx-72, sy+190, 144, 12, 6); cx.stroke();
   // sand mound the laptop sits in
-  cx.lineWidth = 5;
+  cx.lineWidth = 6;
   cx.beginPath();
   cx.moveTo(sx-520, sy+232);
   cx.bezierCurveTo(sx-330, sy+200, sx-160, sy+238, sx, sy+226);
   cx.bezierCurveTo(sx+180, sy+212, sx+330, sy+242, sx+520, sy+218);
   cx.stroke();
-});
-
-const contentPts = rasterPts((cx,W,H)=>{
-  const sx=W/2, sy=H/2 - 10;
-  cx.lineJoin = cx.lineCap = 'round';
+  /* — screen UI — */
   // browser chrome divider
-  cx.lineWidth = 4;
+  cx.lineWidth = 5;
   ln(cx, sx-288, sy-172, sx+288, sy-172);
   // traffic dots
-  for(let i=0;i<3;i++){ cx.beginPath(); cx.arc(sx-262+i*24, sy-196, 6, 0, 7); cx.fill(); }
+  for(let i=0;i<3;i++){ cx.beginPath(); cx.arc(sx-262+i*24, sy-196, 7, 0, 7); cx.fill(); }
   // url pill
-  rr(cx, sx-160, sy-207, 320, 22, 11); cx.stroke();
+  rr(cx, sx-160, sy-208, 320, 24, 12); cx.stroke();
   // wordmark on screen
-  cx.font = '500 44px JetBrains Mono, monospace';
+  cx.font = '500 46px JetBrains Mono, monospace';
   cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
-  cx.fillText('[sandpie]', sx-258, sy-108);
+  cx.fillText('[sandpie]', sx-258, sy-106);
   // assistant bubble (left)
-  cx.lineWidth = 5;
+  cx.lineWidth = 6;
   ln(cx, sx-258, sy-64, sx-20, sy-64);
   ln(cx, sx-258, sy-36, sx+70, sy-36);
   // user bubble (right, boxed)
   rr(cx, sx+60, sy-4, 200, 34, 16); cx.stroke();
   ln(cx, sx+84, sy+13, sx+236, sy+13);
   // code / result sparkline
-  cx.lineWidth = 4;
+  cx.lineWidth = 5;
   cx.beginPath();
   cx.moveTo(sx-258, sy+56);
   const xs=[-258,-210,-176,-140,-96,-52,-16,24,66];
@@ -528,26 +525,12 @@ const contentPts = rasterPts((cx,W,H)=>{
   for(let i=1;i<xs.length;i++) cx.lineTo(sx+xs[i], sy+ys[i]);
   cx.stroke();
   // prompt caret + block cursor
-  cx.font = '700 40px JetBrains Mono, monospace';
-  cx.fillText('›', sx-258, sy+86);
-  cx.fillRect(sx-228, sy+56, 16, 30);
-});
-
-const laptopTargets = new Float32Array(COUNT*3);
-const hotFlags = new Float32Array(COUNT);
-{
-  const S = 9.2/1200, W=1200, H=640;
-  const hotShare = 0.34;
-  for(let i=0;i<COUNT;i++){
-    const hot = i < COUNT*hotShare;
-    const src = hot ? contentPts : framePts;
-    const p = src[(Math.random()*src.length)|0];
-    laptopTargets[i*3]   = (p[0]-W/2)*S + (Math.random()-.5)*0.02;
-    laptopTargets[i*3+1] = -(p[1]-H/2)*S + (Math.random()-.5)*0.02;
-    laptopTargets[i*3+2] = (Math.random()-.5)*0.25;
-    hotFlags[i] = hot ? 1 : 0;
-  }
-}
+  cx.font = '700 42px JetBrains Mono, monospace';
+  cx.fillText('›', sx-258, sy+88);
+  cx.fillRect(sx-228, sy+58, 17, 30);
+};
+const laptopSample = sampleInverted(rasterImg(drawLaptop), COUNT);
+const laptopTargets = laptopSample.targets;
 
 /* target C — dunes: layered sine ridges */
 const duneTargets = (()=>{
@@ -579,7 +562,8 @@ geo.setAttribute('aWord', new THREE.BufferAttribute(wordTargets, 3));
 geo.setAttribute('aLaptop', new THREE.BufferAttribute(laptopTargets, 3));
 geo.setAttribute('aDune', new THREE.BufferAttribute(duneTargets, 3));
 geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 3));
-geo.setAttribute('aHot', new THREE.BufferAttribute(hotFlags, 1));
+geo.setAttribute('aEdgeW', new THREE.BufferAttribute(wordSample.edge, 1));
+geo.setAttribute('aEdgeL', new THREE.BufferAttribute(laptopSample.edge, 1));
 
 const uniforms = {
   uTime:{value:0},
@@ -598,7 +582,7 @@ const mat = new THREE.ShaderMaterial({
   blending:THREE.AdditiveBlending,
   vertexShader:/*glsl*/`
     attribute vec3 aStart, aWord, aLaptop, aDune, aSeed;
-    attribute float aHot;
+    attribute float aEdgeW, aEdgeL;
     uniform float uTime, uIntro, uMorph, uDune, uMouseVel, uDPR;
     uniform vec2 uMouse;
     varying float vGlow;
@@ -643,15 +627,16 @@ const mat = new THREE.ShaderMaterial({
 
       gl_Position = projectionMatrix * mv4;
 
-      float size = (0.9 + aSeed.y*1.6) * uDPR;
+      float size = (1.3 + aSeed.y*1.7) * uDPR;
       gl_PointSize = size * (10.0 / -mv4.z);
 
-      // glow: brighter while flying, ember fraction when settled
-      float ember = step(0.955, aSeed.x);
-      vGlow = ember + force*2.0 + (1.0-ease)*0.6;
-      // screen UI ignites orange once the laptop has formed, with a soft flicker
-      float lapOn = smoothstep(0.72, 1.0, uMorph) * (1.0 - smoothstep(0.0, 0.5, uDune));
-      vGlow += aHot * lapOn * (0.7 + 0.3*sin(uTime*2.4 + aSeed.x*40.0));
+      // glow: brighter while flying, sparse embers when settled
+      float ember = step(0.97, aSeed.x);
+      vGlow = ember*0.8 + force*2.0 + (1.0-ease)*0.6;
+      // disturbed sand along the carved rims smolders orange
+      float edge = mix(aEdgeW, aEdgeL, smoothstep(0.0, 1.0, uMorph));
+      edge *= 1.0 - smoothstep(0.0, 0.5, uDune);
+      vGlow += edge * (0.6 + 0.25*sin(uTime*2.0 + aSeed.x*30.0)) * ease;
     }
   `,
   fragmentShader:/*glsl*/`
@@ -660,10 +645,10 @@ const mat = new THREE.ShaderMaterial({
     void main(){
       vec2 uv = gl_PointCoord - 0.5;
       float a = smoothstep(0.5, 0.12, length(uv));
-      vec3 sand = vec3(0.62, 0.55, 0.42);
+      vec3 sand = vec3(0.60, 0.53, 0.40);
       vec3 ember = vec3(1.0, 0.30, 0.0);
       vec3 col = mix(sand, ember, clamp(vGlow, 0.0, 1.0));
-      float alpha = a * (0.32 + clamp(vGlow,0.0,1.0)*0.55);
+      float alpha = a * (0.50 + clamp(vGlow,0.0,1.0)*0.45);
       gl_FragColor = vec4(col, alpha);
     }
   `,
@@ -755,15 +740,13 @@ let intro = 0;
 // document fonts must be ready before we sampled? we sampled at parse time —
 // resample the wordmark once fonts load, so Archivo (not fallback) shapes the sand.
 document.fonts?.ready.then(()=>{
-  const fresh = sampleCanvas((cx,W,H)=>{
-    cx.font = '600 218px Archivo, system-ui, sans-serif';
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText('sandpie', W/2, H/2 - 40);
-    cx.font = '300 34px Archivo, system-ui, sans-serif';
-    cx.fillText('[ a i ,  i n  t h e  b r o w s e r ]', W/2, H/2 + 130);
-  }, COUNT);
-  geo.getAttribute('aWord').copyArray(fresh);
-  geo.getAttribute('aWord').needsUpdate = true;
+  for(const [draw, posName, edgeName] of [[drawWord,'aWord','aEdgeW'],[drawLaptop,'aLaptop','aEdgeL']]){
+    const fresh = sampleInverted(rasterImg(draw), COUNT);
+    geo.getAttribute(posName).copyArray(fresh.targets);
+    geo.getAttribute(posName).needsUpdate = true;
+    geo.getAttribute(edgeName).copyArray(fresh.edge);
+    geo.getAttribute(edgeName).needsUpdate = true;
+  }
 });
 
 /* adaptive quality: if frames are slow (weak GPU / software GL),
