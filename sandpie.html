@@ -1,35 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-// ── Service Worker kill-switch guard ───────────────────────────────────────
-// Runs before ANY other script or asset is requested. A stale SW from an older
-// version (any script name, any scope — the old heavy sandpie.js, a leftover
-// coi-serviceworker.js, etc.) installs a fetch handler that intercepts the
-// sandpie-worker.js request and leaves it "pending" forever. The per-name
-// tombstone (sandpie.js) only evicts a /sandpie.js registration, and the
-// page-side recovery in conversations.js can't run if that very module is
-// served stale by the old SW. This guard closes both holes: if this page is
-// controlled by ANY service worker, unregister every registration and reload
-// into a SW-free (uncontrolled) state, so the worker fetch goes straight to the
-// network. A small sessionStorage counter prevents an infinite reload loop if a
-// browser keeps reassigning the controller across the reload.
-(function () {
-  try {
-    if (!('serviceWorker' in navigator)) return;
-    var KEY = '__sandpie_sw_evict__';
-    if (!navigator.serviceWorker.controller) { sessionStorage.removeItem(KEY); return; }
-    var attempts = +(sessionStorage.getItem(KEY) || 0);
-    if (attempts >= 3) return; // give up; let the tombstone / page recovery take over
-    sessionStorage.setItem(KEY, attempts + 1);
-    navigator.serviceWorker.getRegistrations()
-      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
-      .catch(function () {})
-      .then(function () { location.reload(); });
-  } catch (e) {}
-})();
-</script>
 <meta name="theme-color" content="#58a6ff">
+<script>
+if("serviceWorker"in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("/sw.js",{scope:"/"})
+      .catch(function(e){console.warn("SW registration failed:",e)});
+  });
+}
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
