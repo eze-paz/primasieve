@@ -51,6 +51,19 @@
     0%{transform:translate(0,0)}25%{transform:translate(-2%,3%)}
     50%{transform:translate(3%,-2%)}75%{transform:translate(-3%,-3%)}100%{transform:translate(2%,2%)}
   }
+  /* slow-breathing color wash over the whole page */
+  .aura{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:
+      radial-gradient(90% 60% at 78% 108%, rgba(255,77,0,.13), transparent 60%),
+      radial-gradient(70% 50% at 12% -8%,  rgba(255,140,60,.07), transparent 65%),
+      radial-gradient(120% 80% at 50% 55%, rgba(120,32,0,.10), transparent 70%);
+    animation:aura 16s ease-in-out infinite alternate;
+  }
+  @keyframes aura{
+    from{opacity:.75;transform:translateY(0) scale(1)}
+    to{opacity:1;transform:translateY(-2.5%) scale(1.04)}
+  }
   /* vignette */
   .vignette{
     position:fixed;inset:0;z-index:2;pointer-events:none;
@@ -237,6 +250,7 @@
 <body>
 
 <div id="stage"></div>
+<div class="aura"></div>
 <div class="vignette"></div>
 <div class="grain"></div>
 
@@ -372,7 +386,8 @@ const stage = document.getElementById('stage');
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const isMobile = matchMedia('(max-width:760px)').matches;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const COUNT = isMobile ? 22000 : 60000;
+const COUNT = isMobile ? 32000 : 100000;
+const DUST = isMobile ? 6000 : 22000;
 
 const renderer = new THREE.WebGLRenderer({ antialias:false, alpha:true, powerPreference:'high-performance' });
 renderer.setPixelRatio(DPR);
@@ -419,37 +434,120 @@ const wordTargets = sampleCanvas((cx,W,H)=>{
   cx.fillText('[ a i ,  i n  t h e  b r o w s e r ]', W/2, H/2 + 130);
 }, COUNT);
 
-/* target B — a laptop / browser sketched in the sand */
-const laptopTargets = sampleCanvas((cx,W,H)=>{
-  cx.lineWidth = 7; cx.lineJoin = cx.lineCap = 'round';
-  const sx=W/2, sy=H/2 - 20;
-  // screen
-  roundRect(cx, sx-300, sy-190, 600, 360, 18); cx.stroke();
-  // browser chrome
-  cx.beginPath(); cx.moveTo(sx-300, sy-140); cx.lineTo(sx+300, sy-140); cx.stroke();
-  // traffic dots
-  for(let i=0;i<3;i++){ cx.beginPath(); cx.arc(sx-272+i*26, sy-165, 7, 0, 7); cx.fill(); }
-  // url pill
-  roundRect(cx, sx-170, sy-176, 340, 24, 12); cx.stroke();
-  // chat lines inside
+/* target B — a laptop sketched in the sand.
+   Sampled from TWO drawings: the hardware (stays sand-colored) and the
+   screen UI (flagged "hot" → ignites neon orange once the laptop forms). */
+function rasterPts(draw){
+  const W = 1200, H = 640;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d');
+  cx.fillStyle = '#000'; cx.fillRect(0,0,W,H);
+  cx.fillStyle = cx.strokeStyle = '#fff';
+  draw(cx, W, H);
+  const img = cx.getImageData(0,0,W,H).data;
+  const pts = [];
+  for(let y=0; y<H; y+=2) for(let x=0; x<W; x+=2)
+    if(img[(y*W+x)*4] > 100) pts.push([x,y]);
+  return pts;
+}
+function rr(c,x,y,w,h,r){ c.beginPath(); c.roundRect(x,y,w,h,r); }
+function ln(c,x1,y1,x2,y2){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
+
+const framePts = rasterPts((cx,W,H)=>{
+  const sx=W/2, sy=H/2 - 10;
+  cx.lineJoin = cx.lineCap = 'round';
+  // screen — double-stroked bezel
   cx.lineWidth = 6;
-  line(cx, sx-250, sy-90, sx-40, sy-90);
-  line(cx, sx-250, sy-55, sx+60, sy-55);
-  line(cx, sx+40,  sy-5,  sx+250, sy-5);
-  line(cx, sx-10,  sy+30, sx+250, sy+30);
-  line(cx, sx-250, sy+80, sx-120, sy+80);
-  // prompt caret
-  cx.font='700 46px JetBrains Mono, monospace';
-  cx.fillText('›', sx-258, sy+130);
-  cx.lineWidth = 7;
-  // base
+  rr(cx, sx-300, sy-232, 600, 322, 18); cx.stroke();
+  cx.lineWidth = 3;
+  rr(cx, sx-288, sy-220, 576, 298, 10); cx.stroke();
+  // camera dot
+  cx.beginPath(); cx.arc(sx, sy-226, 3.5, 0, 7); cx.fill();
+  // hinge
+  cx.lineWidth = 5;
+  ln(cx, sx-310, sy+98, sx+310, sy+98);
+  // deck (slight perspective)
+  cx.lineWidth = 6;
   cx.beginPath();
-  cx.moveTo(sx-360, sy+218); cx.lineTo(sx+360, sy+218);
-  cx.lineTo(sx+312, sy+172); cx.lineTo(sx-312, sy+172);
+  cx.moveTo(sx-318, sy+104); cx.lineTo(sx+318, sy+104);
+  cx.lineTo(sx+382, sy+206); cx.lineTo(sx-382, sy+206);
   cx.closePath(); cx.stroke();
-  function roundRect(c,x,y,w,h,r){ c.beginPath(); c.roundRect(x,y,w,h,r); }
-  function line(c,x1,y1,x2,y2){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
-}, COUNT);
+  // keyboard — perspective key grid
+  const rows = 4, cols = 14;
+  for(let r=0;r<rows;r++){
+    const t = r/(rows-1);
+    const y = sy+116 + t*46;
+    const halfW = 292 + t*38;
+    const kw = (halfW*2)/cols - 5, kh = 8 + t*2;
+    for(let k=0;k<cols;k++){
+      const x = sx - halfW + k*(halfW*2/cols) + 2.5;
+      rr(cx, x, y, kw, kh, 3); cx.fill();
+    }
+  }
+  // spacebar
+  rr(cx, sx-90, sy+172, 180, 11, 5); cx.fill();
+  // trackpad
+  cx.lineWidth = 4;
+  rr(cx, sx-72, sy+190, 144, 12, 6); cx.stroke();
+  // sand mound the laptop sits in
+  cx.lineWidth = 5;
+  cx.beginPath();
+  cx.moveTo(sx-520, sy+232);
+  cx.bezierCurveTo(sx-330, sy+200, sx-160, sy+238, sx, sy+226);
+  cx.bezierCurveTo(sx+180, sy+212, sx+330, sy+242, sx+520, sy+218);
+  cx.stroke();
+});
+
+const contentPts = rasterPts((cx,W,H)=>{
+  const sx=W/2, sy=H/2 - 10;
+  cx.lineJoin = cx.lineCap = 'round';
+  // browser chrome divider
+  cx.lineWidth = 4;
+  ln(cx, sx-288, sy-172, sx+288, sy-172);
+  // traffic dots
+  for(let i=0;i<3;i++){ cx.beginPath(); cx.arc(sx-262+i*24, sy-196, 6, 0, 7); cx.fill(); }
+  // url pill
+  rr(cx, sx-160, sy-207, 320, 22, 11); cx.stroke();
+  // wordmark on screen
+  cx.font = '500 44px JetBrains Mono, monospace';
+  cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+  cx.fillText('[sandpie]', sx-258, sy-108);
+  // assistant bubble (left)
+  cx.lineWidth = 5;
+  ln(cx, sx-258, sy-64, sx-20, sy-64);
+  ln(cx, sx-258, sy-36, sx+70, sy-36);
+  // user bubble (right, boxed)
+  rr(cx, sx+60, sy-4, 200, 34, 16); cx.stroke();
+  ln(cx, sx+84, sy+13, sx+236, sy+13);
+  // code / result sparkline
+  cx.lineWidth = 4;
+  cx.beginPath();
+  cx.moveTo(sx-258, sy+56);
+  const xs=[-258,-210,-176,-140,-96,-52,-16,24,66];
+  const ys=[56,30,44,12,34,2,24,-4,10];
+  for(let i=1;i<xs.length;i++) cx.lineTo(sx+xs[i], sy+ys[i]);
+  cx.stroke();
+  // prompt caret + block cursor
+  cx.font = '700 40px JetBrains Mono, monospace';
+  cx.fillText('›', sx-258, sy+86);
+  cx.fillRect(sx-228, sy+56, 16, 30);
+});
+
+const laptopTargets = new Float32Array(COUNT*3);
+const hotFlags = new Float32Array(COUNT);
+{
+  const S = 9.2/1200, W=1200, H=640;
+  const hotShare = 0.34;
+  for(let i=0;i<COUNT;i++){
+    const hot = i < COUNT*hotShare;
+    const src = hot ? contentPts : framePts;
+    const p = src[(Math.random()*src.length)|0];
+    laptopTargets[i*3]   = (p[0]-W/2)*S + (Math.random()-.5)*0.02;
+    laptopTargets[i*3+1] = -(p[1]-H/2)*S + (Math.random()-.5)*0.02;
+    laptopTargets[i*3+2] = (Math.random()-.5)*0.25;
+    hotFlags[i] = hot ? 1 : 0;
+  }
+}
 
 /* target C — dunes: layered sine ridges */
 const duneTargets = (()=>{
@@ -481,6 +579,7 @@ geo.setAttribute('aWord', new THREE.BufferAttribute(wordTargets, 3));
 geo.setAttribute('aLaptop', new THREE.BufferAttribute(laptopTargets, 3));
 geo.setAttribute('aDune', new THREE.BufferAttribute(duneTargets, 3));
 geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 3));
+geo.setAttribute('aHot', new THREE.BufferAttribute(hotFlags, 1));
 
 const uniforms = {
   uTime:{value:0},
@@ -499,6 +598,7 @@ const mat = new THREE.ShaderMaterial({
   blending:THREE.AdditiveBlending,
   vertexShader:/*glsl*/`
     attribute vec3 aStart, aWord, aLaptop, aDune, aSeed;
+    attribute float aHot;
     uniform float uTime, uIntro, uMorph, uDune, uMouseVel, uDPR;
     uniform vec2 uMouse;
     varying float vGlow;
@@ -547,8 +647,11 @@ const mat = new THREE.ShaderMaterial({
       gl_PointSize = size * (10.0 / -mv4.z);
 
       // glow: brighter while flying, ember fraction when settled
-      float ember = step(0.965, aSeed.x);
+      float ember = step(0.955, aSeed.x);
       vGlow = ember + force*2.0 + (1.0-ease)*0.6;
+      // screen UI ignites orange once the laptop has formed, with a soft flicker
+      float lapOn = smoothstep(0.72, 1.0, uMorph) * (1.0 - smoothstep(0.0, 0.5, uDune));
+      vGlow += aHot * lapOn * (0.7 + 0.3*sin(uTime*2.4 + aSeed.x*40.0));
     }
   `,
   fragmentShader:/*glsl*/`
@@ -567,22 +670,69 @@ const mat = new THREE.ShaderMaterial({
 });
 scene.add(new THREE.Points(geo, mat));
 
-/* faint orange horizon glow behind everything */
+/* ambient dust — a second, looser cloud of drifting grains */
 {
-  const g = new THREE.PlaneGeometry(40, 24);
+  const g = new THREE.BufferGeometry();
+  const pos = new Float32Array(DUST*3), sd = new Float32Array(DUST*3);
+  for(let i=0;i<DUST;i++){
+    pos[i*3]=(Math.random()-.5)*22;
+    pos[i*3+1]=(Math.random()-.5)*14;
+    pos[i*3+2]=(Math.random()-.5)*10 - 2;
+    sd[i*3]=Math.random(); sd[i*3+1]=Math.random(); sd[i*3+2]=Math.random();
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(sd,3));
+  const m = new THREE.ShaderMaterial({
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    uniforms:{ uTime: uniforms.uTime, uDPR:{value:DPR} },
+    vertexShader:/*glsl*/`
+      attribute vec3 aSeed;
+      uniform float uTime, uDPR;
+      varying float vA;
+      void main(){
+        vec3 p = position;
+        p.x += sin(uTime*0.12 + aSeed.x*6.283)*1.6 + uTime*0.08*(aSeed.y-0.5);
+        p.y += cos(uTime*0.09 + aSeed.y*6.283)*0.9;
+        p.x = mod(p.x + 11.0, 22.0) - 11.0;
+        vec4 mv = modelViewMatrix * vec4(p,1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = (0.6 + aSeed.z*1.3) * uDPR * (10.0 / -mv.z);
+        vA = 0.25 + 0.75*aSeed.x;
+      }`,
+    fragmentShader:/*glsl*/`
+      precision mediump float;
+      varying float vA;
+      void main(){
+        float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5));
+        gl_FragColor = vec4(vec3(0.66, 0.52, 0.36), a * 0.14 * vA);
+      }`
+  });
+  scene.add(new THREE.Points(g, m));
+}
+
+/* layered background gradient — ember horizon + deep amber dome */
+{
+  const g = new THREE.PlaneGeometry(46, 26);
   const m = new THREE.ShaderMaterial({
     transparent:true, depthWrite:false,
     uniforms:{ uTime: uniforms.uTime },
     vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-    fragmentShader:`
+    fragmentShader:/*glsl*/`
       varying vec2 vUv; uniform float uTime;
       void main(){
-        float d = distance(vUv, vec2(0.5, 0.42));
-        float g = smoothstep(0.5, 0.0, d) * 0.05 * (1.0 + 0.15*sin(uTime*0.4));
-        gl_FragColor = vec4(1.0, 0.30, 0.0, g);
+        // hot ember core behind the wordmark
+        float core = smoothstep(0.55, 0.0, distance(vUv, vec2(0.5, 0.44)));
+        // low, wide horizon band that breathes
+        float horizon = smoothstep(0.42, 0.0, distance(vUv, vec2(0.5 + 0.06*sin(uTime*0.2), 0.16)));
+        // faint cool-amber dome upper-left for depth
+        float dome = smoothstep(0.6, 0.0, distance(vUv, vec2(0.24, 0.86)));
+        vec3 col = vec3(1.0, 0.30, 0.0) * (core*0.075 + horizon*0.10*(1.0+0.2*sin(uTime*0.35)))
+                 + vec3(1.0, 0.62, 0.25) * dome * 0.035;
+        float a = clamp(core*0.075 + horizon*0.10 + dome*0.035, 0.0, 1.0);
+        gl_FragColor = vec4(col, a);
       }`
   });
-  const p = new THREE.Mesh(g, m); p.position.z = -6; scene.add(p);
+  const p = new THREE.Mesh(g, m); p.position.z = -7; scene.add(p);
 }
 
 /* ---------- interaction / scroll ---------- */
