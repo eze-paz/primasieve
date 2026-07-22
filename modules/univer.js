@@ -25,7 +25,7 @@ console.log('[sandpie] univer.js loaded');
       + 'presets:[UniverSheetsCorePreset()]});'
       + 'univer.createUnit(UniverInstanceType.UNIVER_SHEET,SNAPSHOT);}'
       + 'main().catch(e=>{document.body.innerHTML='
-      + '"<p style=\\"padding:2rem;color:#c00;font:14px sans-serif\\">"
+      + '"<p style=\\"padding:2rem;color:#c00;font:14px sans-serif\\">"'
       + '+"Univer: "+e.message;console.error(e)});'
       + '<\/script></body></html>';
   }
