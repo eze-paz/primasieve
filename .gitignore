@@ -20,3 +20,10 @@ docs/_localmodel/
 # Playwright
 playwright-tests/test-results/
 playwright-tests/playwright-report/
+
+# CPU/WASM ternary engine — large / regenerable artifacts (NEVER commit)
+_bonsai17/
+_hf/
+*.cpu.bin
+cpukern.wasm
+_cpukern/target/
