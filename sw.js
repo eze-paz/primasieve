@@ -29,6 +29,11 @@ async function handleFiles(pathname, request) {
       const w = await fh.createWritable();
       await w.write(body);
       await w.close();
+      // Notify all page clients so they can mark the file dirty for Dropbox sync
+      const clients = await self.clients.matchAll();
+      for (const client of clients) {
+        client.postMessage({ type: 'sw-opfs-changed', paths: [relPath] });
+      }
       return new Response('OK', { status: 200, headers: { 'Content-Type': 'text/plain' } });
     }
 
