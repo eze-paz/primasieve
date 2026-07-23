@@ -95,25 +95,8 @@
     });
   }
 
-  /* ════════════════════ rendered HTML (OPFS-served via the service worker) ══
-   * The rendered doc must NOT be sandbox="allow-scripts": a sandboxed opaque origin
-   * is not controlled by the service worker, so the doc's fetch()/XHR/resource loads
-   * bypass sw.js and 404 (the original bug). With no sandbox the SW (scope /) serves
-   * the doc's /files/… requests straight from OPFS — exactly how the Editor works.
-   * We inject a <base> pointed at the file's own OPFS directory, so relative refs
-   * (fetch, XHR, <img>, <script>, <link>) resolve to sibling workspace files, and
-   * absolute /files/… paths work too → full OPFS access. Under cross-origin isolation
-   * the doc still gets an opaque origin, so it reaches its OPFS neighbourhood yet
-   * can't script the app DOM.
-   */
-  function injectBase(html, baseHref) {
-    const tag = '<base href="' + baseHref + '">';
-    const mHead = html.match(/<head[^>]*>/i);
-    if (mHead) return html.slice(0, mHead.index + mHead[0].length) + tag + html.slice(mHead.index + mHead[0].length);
-    const mHtml = html.match(/<html[^>]*>/i);
-    if (mHtml) return html.slice(0, mHtml.index + mHtml[0].length) + '<head>' + tag + '</head>' + html.slice(mHtml.index + mHtml[0].length);
-    return tag + html;
-  }
+  // Encode each path segment for a /files/ URL; sw.js decodeURIComponent-s them back.
+  function filesUrl(fullKey) { return '/files/' + String(fullKey).split('/').filter(Boolean).map(encodeURIComponent).join('/'); }
 
   /* ════════════════════ text viewer/editor ══════════════════════════════ */
 
@@ -215,12 +198,16 @@
     function showRendered() {
       teardown(); modeSel.value = 'rendered';
       const iframe = document.createElement('iframe');
-      // No sandbox (like the Editor) so the service worker serves this doc's OPFS
-      // reads; a <base> at the file's own directory gives full OPFS access to
-      // sibling/workspace files. See the block comment on injectBase above.
-      const baseDir = fullKey.includes('/') ? fullKey.slice(0, fullKey.lastIndexOf('/')) : '';
-      const baseHref = '/files/' + (baseDir ? baseDir.split('/').map(encodeURIComponent).join('/') + '/' : '');
-      iframe.srcdoc = injectBase(currentHtml(), baseHref);
+      // Load the file through the service worker at its real /files/ URL — NOT
+      // srcdoc. This gives the doc a REAL same-origin, so it reliably shares the
+      // app's OPFS: navigator.storage.getDirectory() sees the same files (a
+      // sandboxed/srcdoc opaque origin does NOT, per spec), and its fetch / XHR /
+      // resource loads resolve against its own /files/<dir>/ URL → sibling files,
+      // all served by sw.js. Full OPFS access.
+      //   Tradeoffs: renders the SAVED file (unsaved Text/Editor edits show after a
+      //   Save), and the doc runs same-origin (app-level access) — fine for the
+      //   user's own files, which is what this viewer opens.
+      iframe.src = filesUrl(fullKey);
       iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
       body.appendChild(iframe);
     }
