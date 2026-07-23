@@ -3487,6 +3487,11 @@ opfs.refreshFileList = async function() {
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
 
 
+      if (window.SandpieSharing && !it.fullKey.startsWith('sandpie/shared')) {
+        menuItems.push({ label: '🔗 Share…', action: () => SandpieSharing.shareDialog(it.fullKey, it.kind === 'folder' ? undefined : 'artifact') });
+      }
+
+
       menuItems.push({ label: 'Rename ' + (it.kind === 'folder' ? 'folder' : 'file'), action: () => opfs.renameEntry(it.fullKey, it.kind) });
 
 

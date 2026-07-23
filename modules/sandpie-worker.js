@@ -53,7 +53,7 @@ let _dbxCtx = null;
 // first touch. See the hydration helpers further down. Default off ⇒ no change.
 let _dehydrated = false;
 let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
-let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];   // app metadata, always eager; sandpie/scripts|artifacts|memory stay dehydratable
+let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/shared', 'sandpie/shared-hub'];   // app metadata + shared packages, always eager; sandpie/scripts|artifacts|memory stay dehydratable
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
@@ -280,7 +280,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=1', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=2', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -733,9 +733,13 @@ async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
   const file = 'sandpie/skills/' + n + '/SKILL.md';
+  const sharedFile = 'sandpie/shared/' + n + '/SKILL.md';   // shared, installed skill package
   let text;
   try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
-  catch (e) { return { result: 'Error: could not read ' + file + ' — no such skill, or its ' + file + ' is missing.' }; }
+  catch (e) {
+    try { text = new TextDecoder().decode(await opfsReadBytes(sharedFile)); }
+    catch (e2) { return { result: 'Error: could not read ' + file + ' — no such skill, or its SKILL.md is missing.' }; }
+  }
   const body = text.replace(/^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '').trim();
   return { result: body || text };
 }

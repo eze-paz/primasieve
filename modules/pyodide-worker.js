@@ -48,7 +48,7 @@ console.log('[pyodide-worker] boot — id=' + _WID);
 let _dbxCtx = null;
 let _dehydrated = false;
 let _dbxIndex = null;
-let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills'];
+let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/shared', 'sandpie/shared-hub'];
 
 // ---- message protocol ------------------------------------------------------
 self.addEventListener('message', async (event) => {

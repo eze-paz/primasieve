@@ -46,7 +46,7 @@
   const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
-  const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/memory', 'sandpie/config'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
+  const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared', 'sandpie/shared-hub'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================

@@ -165,11 +165,10 @@ const SandpieContext = (() => {
   // Walk skills/*/ and derive the index from each folder's SKILL.md frontmatter.
   // Every problem is reported in `errors`; only fully-valid skills reach `skills`.
   async function scanSkills() {
-    let entries;
-    try { entries = await opfs.listDir(SKILLS_DIR); }
-    catch { return { exists: false, skills: [], errors: [] }; } // no skills/ dir yet
     const skills = [], errors = [];
-    for (const e of entries) {
+    let entries = null;
+    try { entries = await opfs.listDir(SKILLS_DIR); } catch (_) {} // no skills/ dir yet
+    for (const e of (entries || [])) {
       if (e.kind !== 'directory') continue; // stray files under skills/ are ignored
       const folder = e.name;                // the folder name IS the skill name
       const path = `${SKILLS_DIR}/${folder}`;
@@ -189,8 +188,22 @@ const SandpieContext = (() => {
       if (!desc) { errors.push(`${file} — missing "description"; the model needs it to decide when to load this skill`); continue; }
       skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
+    // Shared skills: installed, read-only packages under sandpie/shared/<id>/ that
+    // carry a SKILL.md. Discovered + advertised like local skills; load_skill falls
+    // back to the shared path. A local skill of the same name takes precedence.
+    try {
+      for (const e of await opfs.listDir('sandpie/shared')) {
+        if (e.kind !== 'directory' || !NAME_RE.test(e.name)) continue;
+        const path = 'sandpie/shared/' + e.name, file = path + '/' + SKILL_FILE;
+        let text; try { text = await opfs.read(file); } catch { continue; }   // not a skill package
+        const fm = parseFrontmatter(text);
+        const desc = ((fm && fm.description) || '').replace(/\s+/g, ' ').trim();
+        if (!desc || skills.some(s => s.name === e.name)) continue;
+        skills.push({ name: e.name, desc, path, file, enabled: isSkillEnabled(e.name), shared: true });
+      }
+    } catch (_) {}
     skills.sort((a, b) => a.name.localeCompare(b.name));
-    return { exists: true, skills, errors };
+    return { exists: !!(entries || skills.length), skills, errors };
   }
 
   // Names of skills the model already pulled in this conversation — so the index
