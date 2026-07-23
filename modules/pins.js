@@ -124,8 +124,109 @@
   };
   window.SandpiePins = Pins;
 
+  /* ─────────────── thumbnails ─────────────── */
+  // Best-effort, offline, per-file thumbnails for the home grid:
+  //   • image files  → the image itself
+  //   • HTML         → og:image / apple-touch-icon / favicon declared in <head>, whether
+  //                    embedded (data:) or a sibling OPFS file; else the theme-color tint
+  //   • everything else → the typed extension badge (handled inline in renderHome)
+  // Nothing is fetched from the network and no page is executed/rendered — we only read OPFS
+  // bytes and parse declared metadata with a DETACHED DOMParser (runs no scripts, loads nothing).
+  const THUMB_IMG_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'svg', 'ico']);
+  const THUMB_MAX_BYTES = 8 * 1024 * 1024;     // don't inline a huge image for a 60px tile
+  const HTML_HEAD_BYTES = 1 * 1024 * 1024;     // only <head> is needed; cap the read
+  let liveThumbUrls = [];                        // object URLs from the current render, revoked on the next
+
+  function mimeForExt(ext) {
+    return ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+      bmp: 'image/bmp', avif: 'image/avif', svg: 'image/svg+xml', ico: 'image/x-icon' })[ext] || 'application/octet-stream';
+  }
+  async function getFile(path) {
+    const parts = path.split('/').filter(Boolean); const name = parts.pop();
+    const dir = await opfs.resolveDir(parts);
+    return (await dir.getFileHandle(name)).getFile();
+  }
+  // Object URL for an image File. OPFS Files often have an empty type, which breaks SVG (and
+  // strict image decoders), so re-wrap in a Blob with the extension's MIME when type is missing.
+  async function urlForImageFile(f, ext) {
+    if (f.type) return URL.createObjectURL(f);
+    return URL.createObjectURL(new Blob([await f.arrayBuffer()], { type: mimeForExt(ext) }));
+  }
+  // Best thumbnail source declared in an HTML <head>: og/twitter image, then apple-touch-icon,
+  // then the largest favicon.
+  function pickHtmlThumbHref(doc) {
+    const meta = doc.querySelector('meta[property="og:image"], meta[name="og:image"], meta[name="twitter:image"], meta[property="twitter:image"]');
+    const mc = meta && meta.getAttribute('content');
+    if (mc && mc.trim()) return mc.trim();
+    const apple = doc.querySelector('link[rel~="apple-touch-icon"]');
+    const ah = apple && apple.getAttribute('href');
+    if (ah && ah.trim()) return ah.trim();
+    const icons = Array.prototype.filter.call(doc.querySelectorAll('link[rel]'),
+      l => /(^|\s)(shortcut\s+)?icon(\s|$)/i.test(l.getAttribute('rel') || ''));
+    icons.sort((a, b) => (parseInt(b.getAttribute('sizes')) || 0) - (parseInt(a.getAttribute('sizes')) || 0));
+    const ih = icons[0] && icons[0].getAttribute('href');
+    return (ih && ih.trim()) || null;
+  }
+  // Resolve an href from an HTML file → { data } (inline), { path } (sibling OPFS file), or
+  // null (external URL, skipped to stay offline). Relative paths resolve against the file's dir.
+  function resolveHref(basePath, href) {
+    if (/^data:/i.test(href)) return { data: href };
+    if (/^[a-z][a-z0-9+.\-]*:/i.test(href) || href.startsWith('//')) return null;   // http(s):/mailto:/protocol-relative → external
+    let rel;
+    if (href[0] === '/') rel = href.replace(/^\/+/, '');
+    else {
+      const segs = basePath.includes('/') ? basePath.slice(0, basePath.lastIndexOf('/')).split('/').filter(Boolean) : [];
+      for (const s of href.split('/')) { if (s === '' || s === '.') continue; if (s === '..') segs.pop(); else segs.push(s); }
+      rel = segs.join('/');
+    }
+    return { path: rel.replace(/[?#].*$/, '') };
+  }
+  // Resolve a thumbnail for `path`. Returns { url?, src?, tint? } or null (→ keep the badge).
+  async function loadThumb(path, ext) {
+    if (!(window.opfs && opfs.resolveDir)) return null;
+    try {
+      if (THUMB_IMG_EXTS.has(ext)) {
+        const f = await getFile(path);
+        if (f.size > THUMB_MAX_BYTES) return null;
+        return { url: await urlForImageFile(f, ext) };
+      }
+      if (ext === 'html' || ext === 'htm') {
+        const f = await getFile(path);
+        const head = await f.slice(0, Math.min(f.size, HTML_HEAD_BYTES)).text();
+        const doc = new DOMParser().parseFromString(head, 'text/html');
+        const tint = (doc.querySelector('meta[name="theme-color"]') || {}).content || null;
+        const href = pickHtmlThumbHref(doc);
+        if (!href) return { tint };
+        const r = resolveHref(path, href);
+        if (!r) return { tint };                                  // external → badge (+tint), no image
+        if (r.data) return { src: r.data, tint };
+        const f2 = await getFile(r.path);
+        if (f2.size > THUMB_MAX_BYTES) return { tint };
+        return { url: await urlForImageFile(f2, (r.path.split('.').pop() || '').toLowerCase()), tint };
+      }
+    } catch (_) {}
+    return null;
+  }
+  // Apply a resolved thumbnail to a tile's .pin-thumb — swaps the badge for an <img> once it
+  // decodes. Safe against stale re-renders (checks isConnected; revokes orphaned object URLs).
+  async function applyThumb(thumbEl, path, ext) {
+    const res = await loadThumb(path, ext);
+    if (!res || !thumbEl.isConnected) { if (res && res.url) URL.revokeObjectURL(res.url); return; }
+    if (res.tint) thumbEl.style.background = res.tint;
+    const src = res.url || res.src;
+    if (!src) return;
+    if (res.url) liveThumbUrls.push(res.url);
+    const img = document.createElement('img');
+    img.className = 'pin-thumb-img'; img.alt = '';
+    img.onload = () => { if (thumbEl.isConnected) { thumbEl.textContent = ''; thumbEl.appendChild(img); thumbEl.classList.add('has-thumb'); } };
+    img.onerror = () => { if (res.url) { URL.revokeObjectURL(res.url); const i = liveThumbUrls.indexOf(res.url); if (i >= 0) liveThumbUrls.splice(i, 1); } };
+    img.src = src;
+  }
+
   /* ─────────────── home-screen "Pinned" list (rendered into #welcome) ─────────────── */
   function renderHome() {
+    for (const u of liveThumbUrls) { try { URL.revokeObjectURL(u); } catch (_) {} }
+    liveThumbUrls = [];
     const welcome = document.getElementById('welcome');
     if (!welcome) return;
     let box = document.getElementById('pinnedHome');
@@ -166,6 +267,7 @@
       thumb.dataset.ext = ext;
       thumb.textContent = ext ? ext.toUpperCase() : '📄';
       open.appendChild(thumb);
+      applyThumb(thumb, path, ext);   // async: swaps in a real thumbnail if one can be resolved
 
       const label = document.createElement('div');
       label.className = 'pin-tile-label';

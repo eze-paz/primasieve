@@ -2980,13 +2980,15 @@ body.sp-decoding *::after {
 .pin-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 78px; }
 .pin-tile-btn { all: unset; cursor: pointer; }
 .pin-thumb {
-  width: 60px; height: 60px; border-radius: 15px;
+  width: 60px; height: 60px; border-radius: 15px; overflow: hidden;
   background: var(--sp-panel); border: 1px solid var(--sp-border);
   display: flex; align-items: center; justify-content: center;
   color: var(--sp-text-dim); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em;
   box-shadow: 0 1px 3px rgba(0,0,0,0.18);
   transition: transform .12s ease, border-color .12s, box-shadow .12s;
 }
+.pin-thumb.has-thumb { color: transparent; }   /* image covers the badge text */
+.pin-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pin-tile-btn:hover .pin-thumb, .pin-tile-btn:focus-visible .pin-thumb {
   transform: translateY(-2px); border-color: var(--sp-accent); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
 }
