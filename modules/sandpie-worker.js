@@ -1353,6 +1353,44 @@ function parseLeakedToolCalls(text) {
   return { toolCalls, stripped };
 }
 
+// Blob-form tool calls for write_file / edit_file. The payload rides in the
+// message body as RAW text between sentinels, so the model never has to escape
+// newlines / quotes / backslashes into a JSON string — the #1 tool-call failure
+// mode on weaker models. We extract the raw text and build the call's arguments
+// by JSON.stringify-ing it OURSELVES, so the escaping is always correct.
+//   write_file:  <|write_file:PATH|>\n…content…\n<|end_write_file|>
+//   edit_file:   <|edit_file:PATH|>\n<<<<<<< SEARCH\n…old…\n=======\n…new…\n>>>>>>> REPLACE\n<|end_edit_file|>
+// One SEARCH/REPLACE per edit block; multiple blocks ⇒ multiple calls, in order.
+function parseBlobToolCalls(text) {
+  const toolCalls = [];
+  if (typeof text !== 'string' || (text.indexOf('<|write_file:') === -1 && text.indexOf('<|edit_file:') === -1)) {
+    return { toolCalls, stripped: text };
+  }
+  const blockRe = /<\|(write_file|edit_file):([^\n|]+?)\|>([\s\S]*?)<\|end_\1\|>/g;
+  const srRe = /<{5,9} SEARCH\r?\n([\s\S]*?)\r?\n={3,}\r?\n([\s\S]*?)\r?\n>{5,9} REPLACE/;
+  const spans = [];   // consumed [start,end) ranges, stripped from content afterward
+  let m, idx = 0;
+  while ((m = blockRe.exec(text)) !== null) {
+    const [full, kind, rawPath, body] = m;
+    const path = rawPath.trim();
+    if (!path) continue;
+    let args;
+    if (kind === 'write_file') {
+      // Drop only the single newline adjacent to each sentinel; keep the rest byte-exact.
+      args = { path, content: body.replace(/^\r?\n/, '').replace(/\r?\n$/, '') };
+    } else {
+      const sr = srRe.exec(body);
+      if (!sr) continue;   // malformed edit body → leave as text so the model can retry
+      args = { path, old_str: sr[1], new_str: sr[2] };
+    }
+    toolCalls.push({ id: 'call_blob_' + (idx++), type: 'function', function: { name: kind, arguments: JSON.stringify(args) } });
+    spans.push([m.index, m.index + full.length]);
+  }
+  let stripped = text;
+  for (let i = spans.length - 1; i >= 0; i--) stripped = stripped.slice(0, spans[i][0]) + stripped.slice(spans[i][1]);
+  return { toolCalls, stripped: stripped.trim() };
+}
+
 function scrubFramingTokens(s) { return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '') : s; }
 
 function firstBalancedObject(s) {
@@ -1414,7 +1452,9 @@ function parseHermesToolCalls(text) {
 
 function normalizeToolArgs(raw) {
   const s0 = raw == null ? '' : String(raw);
-  if (s0.indexOf('<|') === -1) { try { JSON.parse(s0); return s0; } catch (_) {} }
+  // Already-valid JSON short-circuits regardless of content: a legit string value
+  // may itself contain "<|" (e.g. blob-written file content), which must NOT be scrubbed.
+  try { JSON.parse(s0); return s0; } catch (_) {}
   const s = scrubFramingTokens(s0).trim(); if (!s) return '{}';
   const tryParse = (t) => { try { return JSON.stringify(JSON.parse(t)); } catch (_) { return null; } };
   const escStray = (t) => t.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
@@ -1526,6 +1566,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     throw _sseErrorToThrow({ code: 502, message: 'zero-usage round (upstream failure disguised as a completion): ' + String(content || '').slice(0, 200) });
   }
   let keptToolCalls = toolCalls.filter(tc => tc && tc.id && tc.function && tc.function.name);
+  if (!keptToolCalls.length) {
+    const blob = parseBlobToolCalls(content);
+    if (blob.toolCalls.length) { keptToolCalls = blob.toolCalls; content = blob.stripped; }
+  }
   if (!keptToolCalls.length) {
     let parsed = parseLeakedToolCalls(content);
     if (parsed.toolCalls.length) { keptToolCalls = parsed.toolCalls; content = parsed.stripped; }

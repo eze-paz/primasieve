@@ -26,7 +26,12 @@ Examples:
     },
   },
   write_file: {
-  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ (e.g. "sandpie/scripts/analyze.py", "sandpie/artifacts/chart.html"). Use this to create scripts before running them with run_python.`,
+  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ (e.g. "sandpie/scripts/analyze.py", "sandpie/artifacts/chart.html"). Use this to create scripts before running them with run_python.
+
+For large or multi-line content, you MAY skip JSON and emit the body as a raw block in your reply instead (no escaping of newlines/quotes needed):
+<|write_file:PATH|>
+<file content, verbatim>
+<|end_write_file|>`,
   parameters: {
     type: 'object',
     properties: {
@@ -37,7 +42,16 @@ Examples:
   },
 },
 edit_file: {
-  description: `Replace a string in an existing OPFS file — the PREFERRED way to change a file. Matching is forgiving: exact first, then ignoring line-ending and trailing-whitespace differences, so a small whitespace drift won't fail. old_str must still resolve to ONE place (otherwise it returns the match count + line numbers, or the closest lines, so you can retry precisely). Read the file first to copy exact content (do NOT include read_file's line-number prefixes in old_str). To FIX a script that errored, edit_file the offending lines — NEVER rewrite the whole file or save a renamed copy.`,
+  description: `Replace a string in an existing OPFS file — the PREFERRED way to change a file. Matching is forgiving: exact first, then ignoring line-ending and trailing-whitespace differences, so a small whitespace drift won't fail. old_str must still resolve to ONE place (otherwise it returns the match count + line numbers, or the closest lines, so you can retry precisely). Read the file first to copy exact content (do NOT include read_file's line-number prefixes in old_str). To FIX a script that errored, edit_file the offending lines — NEVER rewrite the whole file or save a renamed copy.
+
+For multi-line edits, you MAY skip JSON and emit a raw SEARCH/REPLACE block in your reply instead (no escaping needed). One block per edit; emit multiple for multiple edits:
+<|edit_file:PATH|>
+<<<<<<< SEARCH
+<exact old text>
+=======
+<new text>
+>>>>>>> REPLACE
+<|end_edit_file|>`,
   parameters: {
     type: 'object',
     properties: {
