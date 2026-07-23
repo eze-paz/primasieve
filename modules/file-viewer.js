@@ -34,7 +34,7 @@
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 8px;flex:none;';
     const title = document.createElement('span');
-    title.textContent = '/' + fullKey;
+    var _fname = fullKey.split('/').pop(); title.textContent = _fname;
     title.style.cssText = 'flex:1;font-size:0.78rem;color:var(--sp-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;';
     const closeBtn = document.createElement('button');
     closeBtn.className = 'ghost';
@@ -105,7 +105,7 @@
     let mode = isMd ? 'preview' : 'edit';   // md defaults to rendered; others to source
     let ta = null, dirty = false;
 
-    const setTitle = (dirtyNow) => { const t = header.querySelector('span'); if (t) t.textContent = (dirtyNow ? '• ' : '') + '/' + fullKey; };
+    const setTitle = (dirtyNow) => { const t = header.querySelector('span'); if (t) t.textContent = (dirtyNow ? '• ' : '') + fullKey.split('/').pop(); };
 
     const saveBtn = addHeaderButton(header, 'Save', 'Save to OPFS (Ctrl+S)', async () => {
       if (!ta) return;
