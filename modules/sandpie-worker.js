@@ -1107,14 +1107,63 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
   return { result: head + local.buf.replace(/\n$/, '') + cloudExtra };
 }
 
-// ---- copy_to_workspace — server-side copy a file from elsewhere in the user's
-// Dropbox INTO the working root so the LLM can use it. READ-ONLY on the source.
+// ── Shared, read-only packages (sandpie/shared/) ──────────────────────────
+// Installed shared packages live under this root. They auto-update from the team
+// registry, so local writes/edits are refused; the caller is pointed at a fork.
+const SHARED_ROOT = 'sandpie/shared/';
+function _sharedReadOnly(norm) {
+  if (!norm || !norm.startsWith(SHARED_ROOT)) return null;
+  return { result: `"${norm}" is a shared, read-only package — it's managed centrally and auto-updates, so any local change would be overwritten on the next sync. To modify it, fork your own editable copy first:\n    copy_to_workspace(src="${norm}")\nthen edit the copy it returns (it lands outside sandpie/shared/).` };
+}
+
+// If a destination already exists in OPFS, append _2/_3/… before the extension.
+async function _opfsAutorename(rel) {
+  const exists = async (r) => { try { await opfsReadBytes(r); return true; } catch (_) { return false; } };
+  if (!(await exists(rel))) return rel;
+  const slash = rel.lastIndexOf('/'), dir = slash >= 0 ? rel.slice(0, slash + 1) : '';
+  const base = slash >= 0 ? rel.slice(slash + 1) : rel;
+  const dot = base.lastIndexOf('.'), stem = dot > 0 ? base.slice(0, dot) : base, ext = dot > 0 ? base.slice(dot) : '';
+  for (let i = 2; i < 1000; i++) { const cand = dir + stem + '_' + i + ext; if (!(await exists(cand))) return cand; }
+  return dir + stem + '_' + base.length + ext;
+}
+
+// Fork a LOCAL workspace file (e.g. a read-only shared package) into an editable
+// location. No Dropbox needed. Files only for now — folder forking arrives with
+// the package registry.
+async function _forkLocal(src, dest) {
+  const srcRel = src.replace(/^\/+/, '').replace(/^files\//, '');
+  let destRel;
+  if (dest != null && String(dest).trim()) {
+    destRel = String(dest).trim().replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '');
+  } else {
+    const base = srcRel.split('/').pop();
+    destRel = srcRel.startsWith(SHARED_ROOT) ? 'sandpie/' + base : base;   // lift out of the managed area
+  }
+  if (!destRel || destRel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
+  if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared/ — that area is read-only. Pick an editable location.' };
+  let bytes;
+  try { bytes = await opfsReadBytes(srcRel); }
+  catch (_) { return { result: `Error: "${srcRel}" not found in your workspace. (If it's a folder, fork individual files — folder forking isn't supported yet.)` }; }
+  destRel = await _opfsAutorename(destRel);
+  try {
+    await opfsWriteBytes(destRel, bytes);
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [destRel] } });
+    _pyBroadcast({ type: 'fs-changed', rel: destRel });
+    return { result: `Forked ${srcRel} → ${destRel} — your editable copy. Edit "${destRel}"; the shared original stays managed and keeps auto-updating.` };
+  } catch (e) { return { result: `Fork failed: ${(e && e.message) || e}` }; }
+}
+
+// ---- copy_to_workspace — fork a local workspace file (e.g. a read-only shared
+// package) into an editable copy, OR server-side copy a file from elsewhere in
+// the user's Dropbox INTO the working root. READ-ONLY on the source either way.
 // Only offered when Dropbox is connected (gated in tools.js toolDefs).
 async function tool_copy_to_workspace({ src, dest }) {
-  if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };
   const from = (src == null ? '' : String(src)).trim();
-  if (!from) return { result: 'Error: "src" (an absolute Dropbox path, e.g. from search) is required.' };
-  if (!from.startsWith('/')) return { result: 'Error: "src" must be an absolute Dropbox path like "/R+D+I/reports/q1.pdf" (use the path search returned).' };
+  if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
+  // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared/…): fork in OPFS, no Dropbox needed.
+  if (!from.startsWith('/')) return _forkLocal(from, dest);
+  // Absolute path → import from elsewhere in the user's Dropbox (needs Dropbox connected).
+  if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };
   const wr = (_dbxCtx.workingRoot || '').replace(/\/+$/, '');
   if (!wr) return { result: 'Error: your workspace folder is not resolved yet — try again in a moment.' };
   let rel = (dest != null && String(dest).trim())
@@ -2272,6 +2321,7 @@ async function runAgent(config, ctx) {
 async function tool_write_file({ path, content, _conv }) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  const _ro = _sharedReadOnly(norm); if (_ro) return _ro;   // shared packages are read-only → fork instead
   try {
     const root = await opfsRoot();
     const parts = norm.split('/').filter(Boolean); const name = parts.pop();
@@ -2408,6 +2458,7 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (!path) return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  const _ro = _sharedReadOnly(norm); if (_ro) return _ro;   // shared packages are read-only → fork instead
   let current;
   try { current = new TextDecoder().decode(await opfsReadBytes(norm)); }
   catch {

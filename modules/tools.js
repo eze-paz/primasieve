@@ -155,12 +155,12 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     copy_to_workspace: {
-      description: `Copy a file from ELSEWHERE in the user's Dropbox INTO their workspace so you can use it. Use this after the search tool returns a file OUTSIDE the workspace (an absolute Dropbox path like "/R+D+I/reports/q1.pdf") that you need to read or process — read_file/run_python/load_image cannot reach paths outside the workspace directly. The copy is server-side and READ-ONLY on the source (the original is never modified, moved, or deleted). Returns the new workspace-relative path; then use read_file / run_python / load_image on it as normal.`,
+      description: `Copy a file INTO the user's editable workspace so you can modify it. Two uses: (1) FORK a read-only workspace file — e.g. a shared, managed package under "sandpie/shared/" — into an editable copy: pass its workspace path as src (no leading slash). (2) IMPORT a file from ELSEWHERE in the user's Dropbox that read_file/run_python/load_image can't reach: pass an absolute Dropbox path like "/R+D+I/reports/q1.pdf" (as returned by search). The source is never modified in either case. Returns the new editable workspace-relative path; then use read_file / edit_file / run_python on it.`,
       parameters: {
         type: 'object',
         properties: {
-          src:  { type: 'string', description: 'Absolute Dropbox path of the file to copy in (as returned by search), e.g. "/R+D+I/reports/q1.pdf".' },
-          dest: { type: 'string', description: 'Optional destination within the workspace (default: the source filename), e.g. "imported/q1.pdf".' },
+          src:  { type: 'string', description: 'Either a workspace path to fork (e.g. "sandpie/shared/impagados/dashboard.html") or an absolute Dropbox path to import (e.g. "/R+D+I/reports/q1.pdf").' },
+          dest: { type: 'string', description: 'Optional destination within the workspace (default: the source filename, lifted out of sandpie/shared/), e.g. "imported/q1.pdf".' },
         },
         required: ['src'],
       },
