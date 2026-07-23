@@ -2252,12 +2252,11 @@ function buildToolBox(args, toolName) {
   let code = '';
   try {
     const parsed = JSON.parse(args);
-    if (parsed.code) code = parsed.code;
-    else if (parsed.cmd) code = parsed.cmd;
-    else if (parsed.path) code = `run_python(path="${parsed.path}", args=${JSON.stringify(parsed.args || [])})`;
-    else code = JSON.stringify(parsed, null, 2);
+    if (parsed.code) code = parsed.code;                 // run_python — real code
+    else if (parsed.cmd) code = parsed.cmd;              // shell — real command
+    else code = JSON.stringify(parsed, null, 2);         // everything else — raw args JSON, no fabricated signature
   } catch (e) {
-    code = args;
+    code = args;                                         // non-JSON (blob) → raw tool-call text
   }
   const lines = code.split('\n').filter(l => l.trim());
   const codeHtml = lines.map(l => `<div class="line">${tcEscape(l)}</div>`).join('');
