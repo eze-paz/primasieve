@@ -4,33 +4,45 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.pathname.startsWith('/files/')) {
-    e.respondWith(handleFiles(url.pathname));
+    e.respondWith(handleFiles(url.pathname, e.request));
   }
 });
 
-async function handleFiles(pathname) {
+async function handleFiles(pathname, request) {
   const relPath = pathname.replace(/^\/files\//, '');
-  // Segments may be percent-encoded (e.g. a <base href> built with encodeURIComponent
-  // for names containing spaces/unicode). Decode each to match the OPFS entry name.
-  const parts = relPath.split('/').map(s => { try { return decodeURIComponent(s); } catch (_) { return s; } });
+  const parts = relPath.split('/').map(s => {
+    try { return decodeURIComponent(s); } catch (_) { return s; }
+  });
   const fileName = parts.pop();
   try {
     const root = await navigator.storage.getDirectory();
     let dir = root;
+    const createDirs = request.method === 'PUT';
     for (const p of parts) {
       if (!p) continue;
-      dir = await dir.getDirectoryHandle(p);
+      dir = await dir.getDirectoryHandle(p, { create: createDirs });
     }
-    const fileHandle = await dir.getFileHandle(fileName);
-    const blob = await fileHandle.getFile();
+
+    if (request.method === 'PUT') {
+      const body = await request.text();
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const w = await fh.createWritable();
+      await w.write(body);
+      await w.close();
+      return new Response('OK', { status: 200, headers: { 'Content-Type': 'text/plain' } });
+    }
+
+    // GET
+    const fh = await dir.getFileHandle(fileName);
+    const blob = await fh.getFile();
     const ct = contentType(fileName);
-    // COEP must match the app page (coiserver / prod both use 'credentialless').
-    // require-corp here made a rendered /files/ HTML doc reject cross-origin
-    // subresources without CORP (e.g. cdn.tailwindcss.com → NotSameOrigin…ByCoep),
-    // whereas the Editor's srcdoc inherits the parent's credentialless and loads
-    // them fine. 'credentialless' keeps the doc cross-origin-isolated yet lets it
-    // pull cross-origin CDNs (fetched without credentials, no CORP required).
-    return new Response(blob, { headers: { 'Content-Type': ct, 'Cross-Origin-Embedder-Policy': 'credentialless', 'X-Sandpie-SW': '1' } });
+    return new Response(blob, {
+      headers: {
+        'Content-Type': ct,
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'X-Sandpie-SW': '1',
+      },
+    });
   } catch (e) {
     return new Response('Not found: ' + relPath, { status: 404 });
   }
