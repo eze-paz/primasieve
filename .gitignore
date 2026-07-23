@@ -26,4 +26,5 @@ _bonsai17/
 _hf/
 *.cpu.bin
 cpukern.wasm
+cpukern-shared.wasm
 _cpukern/target/
