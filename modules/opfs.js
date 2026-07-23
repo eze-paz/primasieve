@@ -3456,6 +3456,8 @@ opfs.refreshFileList = async function() {
       if (it.kind === 'file') {
 
 
+const _isPinned = !!(window.SandpiePins && SandpiePins.isPinned(it.fullKey));
+        menuItems.push({ label: (_isPinned ? '📌 Unpin file' : '📌 Pin file'), action: () => { if (window.SandpiePins) SandpiePins.toggle(it.fullKey); } });
 const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
         if (opfs.OFFICE_ENGINE_EXTS.has(itExt)) {

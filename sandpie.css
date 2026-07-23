@@ -2963,3 +2963,32 @@ body.sp-decoding *::after {
 .sp-lp-alt-bar { flex: 1; min-width: 48px; height: 6px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
 .sp-lp-alt-bar i { display: block; height: 100%; background: var(--sp-accent, #58a6ff); }
 .sp-lp-alt-p { min-width: 46px; text-align: right; color: var(--sp-text-dim, #aaa); }
+
+/* ═══════════════ pinned files ═══════════════ */
+/* Pin toggle buttons (file-viewer .ghost + artifact .artifact-icon-btn) dim when
+   unpinned, light up in the accent colour when pinned. */
+.artifact-pin-btn, .file-viewer .ghost[aria-pressed] { opacity: 0.55; transition: opacity .12s, color .12s, filter .12s; }
+.artifact-pin-btn:hover, .file-viewer .ghost[aria-pressed]:hover { opacity: 0.9; }
+.artifact-pin-btn.pinned, .file-viewer .ghost.pinned { opacity: 1; filter: none; color: var(--sp-accent); }
+
+/* Home-screen "Pinned" list (rendered into #welcome by pins.js) */
+.pinned-home { width: 100%; max-width: 420px; margin-top: 1.6rem; text-align: left; user-select: none; }
+.pinned-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin-bottom: 0.5rem; padding-left: 0.2rem; }
+.pinned-list { display: flex; flex-direction: column; gap: 2px; }
+.pinned-file { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 5px; }
+.pinned-file:hover { border-color: var(--sp-border); background: var(--sp-panel); }
+.pinned-file-open {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.4rem;
+  background: transparent; border: none; cursor: pointer; text-align: left;
+  padding: 0.4rem 0.5rem; color: var(--sp-text); font-size: 0.85rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pinned-file-open:hover { color: var(--sp-accent); }
+.pinned-file-dir { color: var(--sp-text-dim); font-size: 0.72rem; flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pinned-file-unpin {
+  flex: none; background: transparent; border: none; cursor: pointer;
+  color: var(--sp-text-dim); font-size: 0.8rem; line-height: 1; padding: 0.35rem 0.5rem;
+  opacity: 0; transition: opacity .12s, color .12s;
+}
+.pinned-file:hover .pinned-file-unpin { opacity: 0.7; }
+.pinned-file-unpin:hover { opacity: 1; color: var(--sp-accent); }

@@ -242,6 +242,9 @@
     window._openFilePath = fullKey;
     const ext = (name.split('.').pop() || '').toLowerCase();
     const { pane, header, body } = buildPane(fullKey);
+    // 📌 pin toggle — reflects/sets SandpiePins state for the open file.
+    const pinBtn = addHeaderButton(header, '📌', 'Pin file', () => {});
+    if (window.SandpiePins) SandpiePins.bindButton(pinBtn, fullKey);
     // ↗ / ⬇ for every file. HTML serves live content via openHtmlModes; all
     // other types serve the original file bytes.
     if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);

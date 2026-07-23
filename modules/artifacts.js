@@ -229,6 +229,15 @@ function renderArtifact(host, path) {
     btns.appendChild(collapseBtn);
   }
 
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'artifact-icon-btn artifact-pin-btn';
+  pinBtn.textContent = '📌';
+  pinBtn.title = 'Pin file';
+  // Pin the RESOLVED path (legacy artifacts/ → sandpie/artifacts/), so the
+  // home-screen shortcut opens the file that actually exists on disk.
+  Promise.resolve(resolvedP).then(rp => { if (window.SandpiePins) SandpiePins.bindButton(pinBtn, rp || clean); });
+  btns.appendChild(pinBtn);
+
   header.appendChild(btns);
   wrap.appendChild(header);
 
