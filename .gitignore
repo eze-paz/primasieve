@@ -21,10 +21,10 @@ docs/_localmodel/
 playwright-tests/test-results/
 playwright-tests/playwright-report/
 
-# CPU/WASM ternary engine — large / regenerable artifacts (NEVER commit)
+# CPU/WASM ternary engine — large / regenerable artifacts (NEVER commit).
+# NOTE: cpukern.wasm + cpukern-shared.wasm ARE committed (8KB kernels, version-locked
+# to _cpukern/cpuengine-mt.js — rebuild recipe in _cpukern/src/lib.rs header).
 _bonsai17/
 _hf/
 *.cpu.bin
-cpukern.wasm
-cpukern-shared.wasm
 _cpukern/target/
