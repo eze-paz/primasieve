@@ -1945,22 +1945,45 @@ function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-
 
 async function tool_remember({ name, description, type, body, links }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
-  // Extract provenance: recent tool result IDs (rN) from this turn
+  // Provenance from THIS turn (back to the previous user message):
+  //  - tool_calls: the [rN] result IDs (capped — was dumping the whole turn).
+  //  - paths: REAL file paths from the tool CALL ARGUMENTS (args.path/src/dest +
+  //    shell write-targets), NOT regexed from result text. Text-scraping produced
+  //    garbage (code fragments, //, URLs, :line:col, truncations); structured args
+  //    are always qualified real paths. edit/write targets outrank mere reads.
   const toolCallIds = [];
-  const toolPaths = [];
+  const pathScore = new Map();   // path -> best weight seen (write/edit=2, read/other=1)
+  const WRITE_TOOLS = new Set(['edit_file', 'write_file', 'apply_patch', 'create_file', 'str_replace', 'str_replace_editor']);
+  const _looksPath = t => typeof t === 'string' && t && (t.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(t)) && !/^\/dev\//.test(t);
+  const _addPath = (p, w) => { if (_looksPath(p)) pathScore.set(p, Math.max(pathScore.get(p) || 0, w)); };
+  // Unambiguous WRITE targets from a shell command (redirects + tee), heredoc bodies stripped.
+  const _shellWrites = (cmd) => {
+    if (typeof cmd !== 'string' || !cmd) return;
+    let scan = cmd.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[ \t]*\2[ \t]*$/gm, ' <<HD ').replace(/<<-?\s*(['"]?)\w+\1[\s\S]*$/g, ' <<HD ');
+    for (const m of scan.matchAll(/\d*>>?\s*("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) _addPath(m[1].replace(/^['"]|['"]$/g, ''), 2);
+    for (const m of scan.matchAll(/\btee\s+(?:-a\s+)?("[^"]+"|'[^']+'|[^\s|&;<>()]+)/g)) _addPath(m[1].replace(/^['"]|['"]$/g, ''), 2);
+  };
   if (ctx && ctx._messages) {
     for (let i = ctx._messages.length - 1; i >= 0; i--) {
       const m = ctx._messages[i];
+      if (m && m.role === 'user') break; // stop at previous user turn
       if (m && m.role === 'tool' && typeof m.content === 'string') {
         const rid = /^\[r(\d+)\]/.exec(m.content);
         if (rid && !toolCallIds.includes('r' + rid[1])) toolCallIds.push('r' + rid[1]);
-        // Extract paths from tool result text
-        const paths = m.content.match(/(?:\/|\w:\\|\\)[^\s"'\n]+(?:\.[^\s"'\n]+)?/g);
-        if (paths) for (const p of paths) if (!toolPaths.includes(p)) toolPaths.push(p);
       }
-      if (m && m.role === 'user') break; // stop at previous user turn
+      if (m && m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+        for (const tc of m.tool_calls) {
+          const nm = tc && tc.function && tc.function.name;
+          let a = {}; try { a = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (_) {}
+          const w = WRITE_TOOLS.has(nm) ? 2 : 1;
+          _addPath(a.path, w); _addPath(a.src, w); _addPath(a.dest, w);
+          if (nm === 'shell') _shellWrites(a.command);
+        }
+      }
     }
   }
+  // Rank write>read (stable → recent-first within a tier since we walked backward); cap at 6.
+  const toolPaths = [...pathScore.entries()].sort((x, y) => y[1] - x[1]).slice(0, 6).map(e => e[0]);
   // Evidence gate: project/reference facts must cite a tool result as evidence;
   // user/feedback (stable preferences, how-to-work corrections) don't require it.
   if (type !== 'user' && type !== 'feedback' && toolCallIds.length === 0)
@@ -1973,8 +1996,8 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   try { const ex = await opfsReadText(path); const m = /^created:[ \t]*(.+)$/m.exec(ex); if (m) { created = m[1].trim(); verb = 'Updated memory'; } } catch (_) {}
   const desc = String(description || '').replace(/\s*\n\s*/g, ' ').trim();
   const convId = ctx && ctx._conversation_file_name ? ctx._conversation_file_name : 'unknown';
-  let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.join(', ')}\n`;
-  if (toolPaths.length) out += `paths: ${toolPaths.slice(0, 10).join(', ')}\n`;
+  let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.slice(0, 8).join(', ')}\n`;
+  if (toolPaths.length) out += `paths: ${toolPaths.join(', ')}\n`;
   out += '---\n' + String(body).trim() + '\n';
   if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
   try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }

@@ -422,6 +422,45 @@ const SandpieMemory = (function () {
   function _sbStopAnim() { if (_sbRaf) { cancelAnimationFrame(_sbRaf); _sbRaf = 0; } }
   function _sbEsc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
+  // ---- path-based graph -----------------------------------------------------
+  // Group + link memories by the real files they touch (frontmatter `paths`),
+  // NOT by type-quadrant or [[links]]. Canonical identity uses SUFFIX-UNION: one
+  // path is the same node as another when it is a segment-suffix of it
+  // (crates/…/mmu.rs ≡ riscv-vm/crates/…/mmu.rs). A bare basename (<2 segments) is
+  // NEVER used to merge — a lone "SKILL.md" would falsely bridge unrelated skills.
+  // Edges join memories sharing a canonical path that occurs in ≥2 memories; the
+  // connected components are the "sections" (riscv, sandpie, tecnec, …).
+  function _memParsePaths(f) { return String(f.paths || '').split(',').map(s => s.trim()).filter(Boolean); }
+  function _memCanonMap(all) {
+    const uniq = [...new Set(all)];
+    const nseg = p => p.split('/').filter(Boolean).length;
+    const map = {};
+    for (const p of uniq) {
+      let best = p, bestLen = nseg(p);
+      if (nseg(p) >= 2) for (const q of uniq) { if (q !== p && q.endsWith('/' + p) && nseg(q) > bestLen) { best = q; bestLen = nseg(q); } }
+      map[p] = best;
+    }
+    return map;
+  }
+  function _memGraph(facts) {
+    const canon = _memCanonMap(facts.flatMap(_memParsePaths));
+    const canByFact = facts.map(f => [...new Set(_memParsePaths(f).map(p => canon[p]))]);
+    const freq = {};
+    for (const cs of canByFact) for (const c of cs) freq[c] = (freq[c] || 0) + 1;
+    const par = facts.map((_, i) => i);
+    const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const edges = [];
+    for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
+      const shared = canByFact[i].filter(c => freq[c] >= 2 && canByFact[j].includes(c));
+      if (shared.length) { edges.push([i, j, shared.length]); par[find(i)] = find(j); }
+    }
+    const comp = {}; for (let i = 0; i < facts.length; i++) { const r = find(i); (comp[r] = comp[r] || []).push(i); }
+    const comps = Object.values(comp).sort((a, b) => b.length - a.length);
+    const compOf = new Array(facts.length);
+    comps.forEach((g, ci) => g.forEach(i => { compOf[i] = ci; }));
+    return { edges, comps, compOf, canByFact, freq };
+  }
+
   async function _sbRender() {
     if (!_sbBody) return;
     _sbDirty = false;
@@ -436,30 +475,30 @@ const SandpieMemory = (function () {
     }
     const td = _today();
     const newToday = facts.filter(f => (f.created || '').slice(0, 10) === td).length;
-    const pos = facts.map(f => {
-      const c = SB_CLUSTERS[f.type] || SB_CLUSTERS.reference;
-      const h = _sbHash(f.name);
+    // Layout by PATH-COMPONENT: each multi-member component gets a center (golden-angle
+    // spiral, radius grows with index so big clusters sit central); singletons ring the
+    // border. Colour still encodes type; position now encodes shared-file neighbourhood.
+    const G = _memGraph(facts);
+    const multiCis = G.comps.map((g, ci) => ({ g, ci })).filter(x => x.g.length >= 2);
+    const centerByCi = {};
+    multiCis.forEach((x, k) => {
+      const ang = k * 2.3999632;
+      const rad = 0.14 + 0.32 * Math.sqrt(k / Math.max(1, multiCis.length - 1 || 1));
+      centerByCi[x.ci] = { x: SB_W * (0.5 + Math.cos(ang) * rad), y: SB_H * (0.5 + Math.sin(ang) * rad * 0.82) };
+    });
+    const pos = facts.map((f, i) => {
+      const ci = G.compOf[i], sz = G.comps[ci].length, h = _sbHash(f.name);
       const a = _sbRand01(h, 1) * Math.PI * 2;
-      const r = 8 + _sbRand01(h, 2) * 34;
+      let cx, cy, spread;
+      const ctr = centerByCi[ci];
+      if (ctr) { cx = ctr.x; cy = ctr.y; spread = 5 + Math.min(24, sz * 1.5); }
+      else { const ba = (h % 360) * Math.PI / 180; cx = SB_W * (0.5 + Math.cos(ba) * 0.46); cy = SB_H * (0.5 + Math.sin(ba) * 0.44); spread = 4; }
+      const r = _sbRand01(h, 2) * spread;
       const isCluster = f.name.endsWith('-cluster');
-      return { f, x: Math.min(SB_W - 6, Math.max(6, c.x + Math.cos(a) * r)), y: Math.min(SB_H - 6, Math.max(6, c.y + Math.sin(a) * r * 0.75)), s: isCluster ? 4.5 : 1.8 + _sbRand01(h, 3) * 1.8, isCluster };
+      return { f, x: Math.min(SB_W - 6, Math.max(6, cx + Math.cos(a) * r)), y: Math.min(SB_H - 6, Math.max(6, cy + Math.sin(a) * r * 0.8)), s: isCluster ? 4.5 : 1.8 + _sbRand01(h, 3) * 1.8, isCluster };
     });
-    const byName = new Map(pos.map((p, i) => [p.f.name, i]));
-    const edges = [];
-    const linked = new Set();
-    pos.forEach((p, i) => {
-      const re = /\[\[([a-z0-9-]+)\]\]/g; let m;
-      while ((m = re.exec(p.f.body || '')) !== null) {
-        const j = byName.get(m[1]);
-        if (j !== undefined && j !== i) { edges.push([i, j, true]); linked.add(i); linked.add(j); }
-      }
-    });
-    pos.forEach((p, i) => {
-      if (linked.has(i)) return;
-      let best = -1, bd = Infinity;
-      pos.forEach((q, j) => { if (i === j || q.f.type !== p.f.type) return; const d = (p.x - q.x) ** 2 + (p.y - q.y) ** 2; if (d < bd) { bd = d; best = j; } });
-      if (best >= 0 && bd < 2200) edges.push([i, best, false]);
-    });
+    // Edges = shared canonical path; strong (≥2 shared files) drawn in accent.
+    const edges = G.edges.map(([i, j, w]) => [i, j, w >= 2]);
     const edgeSvg = edges.map(([i, j, isLink]) => `<line class="sb-edge${isLink ? ' sb-link' : ''}" x1="${pos[i].x.toFixed(1)}" y1="${pos[i].y.toFixed(1)}" x2="${pos[j].x.toFixed(1)}" y2="${pos[j].y.toFixed(1)}"/>`).join('');
     const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; const cls = (SB_TYPE_CLASS[p.f.type] || 'sb-reference') + (p.isCluster ? ' sb-cluster' : '') + (isNew ? ' sb-new' : ''); return `<circle class="sb-node ${cls}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
     const now = Date.now();
