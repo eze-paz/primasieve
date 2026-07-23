@@ -62,6 +62,7 @@
     // button leaves the DOM).
     bindButton(btn, path) {
       if (!btn) return btn;
+      btn.classList.add('pin-toggle');   // drives the grayscale→accent icon-state CSS
       const refresh = () => {
         const on = Pins.isPinned(path);
         btn.textContent = '📌';
@@ -93,38 +94,47 @@
     if (!list.length) { box.style.display = 'none'; return; }
     box.style.display = '';
 
-    const title = document.createElement('div');
-    title.className = 'pinned-home-title';
-    title.textContent = '📌 Pinned';
-    box.appendChild(title);
-
-    const rows = document.createElement('div');
-    rows.className = 'pinned-list';
+    // App-style grid of tiles (phone home-screen feel): thumbnail placeholder +
+    // short label (filename, no path, no extension). Click a tile → open in viewer.
+    const grid = document.createElement('div');
+    grid.className = 'pin-grid';
     for (const path of list) {
-      const name = path.split('/').pop();
-      const row = document.createElement('div');
-      row.className = 'pinned-file';
-      row.title = path;
+      const fname = path.split('/').pop();
+      const dot = fname.lastIndexOf('.');
+      const shortName = dot > 0 ? fname.slice(0, dot) : fname;      // drop the extension
+      const ext = dot > 0 ? fname.slice(dot + 1).toLowerCase() : '';
+
+      const tile = document.createElement('div');
+      tile.className = 'pin-tile';
+      tile.title = path;
 
       const open = document.createElement('button');
-      open.className = 'pinned-file-open';
-      open.textContent = name;
-      open.onclick = () => { try { if (window.opfs && opfs.openFile) opfs.openFile(path, name); } catch (_) {} };
+      open.className = 'pin-tile-btn';
+      open.onclick = () => { try { if (window.opfs && opfs.openFile) opfs.openFile(path, fname); } catch (_) {} };
 
-      const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-      if (dir) { const d = document.createElement('span'); d.className = 'pinned-file-dir'; d.textContent = dir + '/'; open.prepend(d); }
+      // Thumbnail PLACEHOLDER — real per-file thumbnails are TODO. For now a rounded
+      // "app icon" tile showing the file's extension; data-ext lets a future
+      // thumbnailer target it, and .has-thumb (unused yet) will swap in an <img>.
+      const thumb = document.createElement('div');
+      thumb.className = 'pin-thumb';
+      thumb.dataset.ext = ext;
+      thumb.textContent = ext ? ext.toUpperCase() : '📄';
+      open.appendChild(thumb);
+
+      const label = document.createElement('div');
+      label.className = 'pin-tile-label';
+      label.textContent = shortName;
 
       const unpin = document.createElement('button');
-      unpin.className = 'pinned-file-unpin';
+      unpin.className = 'pin-tile-unpin';
       unpin.title = 'Unpin';
       unpin.textContent = '✕';
       unpin.onclick = (e) => { e.stopPropagation(); Pins.remove(path); };
 
-      row.appendChild(open);
-      row.appendChild(unpin);
-      rows.appendChild(row);
+      tile.append(open, label, unpin);
+      grid.appendChild(tile);
     }
-    box.appendChild(rows);
+    box.appendChild(grid);
   }
 
   function init() { renderHome(); Pins.subscribe(renderHome); }

@@ -2965,30 +2965,41 @@ body.sp-decoding *::after {
 .sp-lp-alt-p { min-width: 46px; text-align: right; color: var(--sp-text-dim, #aaa); }
 
 /* ═══════════════ pinned files ═══════════════ */
-/* Pin toggle buttons (file-viewer .ghost + artifact .artifact-icon-btn) dim when
-   unpinned, light up in the accent colour when pinned. */
-.artifact-pin-btn, .file-viewer .ghost[aria-pressed] { opacity: 0.55; transition: opacity .12s, color .12s, filter .12s; }
-.artifact-pin-btn:hover, .file-viewer .ghost[aria-pressed]:hover { opacity: 0.9; }
-.artifact-pin-btn.pinned, .file-viewer .ghost.pinned { opacity: 1; filter: none; color: var(--sp-accent); }
+/* Pin toggle icon (viewer header + artifact header). Unpinned = greyed-out /
+   inactive pin; pinned = full-colour pin, so the state reads at a glance. */
+.pin-toggle { filter: grayscale(1); opacity: 0.5; transition: filter .12s, opacity .12s, transform .12s; }
+.pin-toggle:hover { opacity: 0.85; }
+.pin-toggle.pinned { filter: none; opacity: 1; }
+.pin-toggle.pinned:hover { transform: scale(1.08); }
 
-/* Home-screen "Pinned" list (rendered into #welcome by pins.js) */
-.pinned-home { width: 100%; max-width: 420px; margin-top: 1.6rem; text-align: left; user-select: none; }
-.pinned-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin-bottom: 0.5rem; padding-left: 0.2rem; }
-.pinned-list { display: flex; flex-direction: column; gap: 2px; }
-.pinned-file { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 5px; }
-.pinned-file:hover { border-color: var(--sp-border); background: var(--sp-panel); }
-.pinned-file-open {
-  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.4rem;
-  background: transparent; border: none; cursor: pointer; text-align: left;
-  padding: 0.4rem 0.5rem; color: var(--sp-text); font-size: 0.85rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* Home-screen "Pinned" app grid (rendered into #welcome by pins.js) */
+.pinned-home { width: 100%; max-width: 520px; margin: 1.8rem auto 0; user-select: none; }
+.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 1.1rem 0.6rem; justify-items: center; }
+.pin-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 78px; }
+.pin-tile-btn { all: unset; cursor: pointer; }
+.pin-thumb {
+  width: 60px; height: 60px; border-radius: 15px;
+  background: var(--sp-panel); border: 1px solid var(--sp-border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--sp-text-dim); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  transition: transform .12s ease, border-color .12s, box-shadow .12s;
 }
-.pinned-file-open:hover { color: var(--sp-accent); }
-.pinned-file-dir { color: var(--sp-text-dim); font-size: 0.72rem; flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pinned-file-unpin {
-  flex: none; background: transparent; border: none; cursor: pointer;
-  color: var(--sp-text-dim); font-size: 0.8rem; line-height: 1; padding: 0.35rem 0.5rem;
-  opacity: 0; transition: opacity .12s, color .12s;
+.pin-tile-btn:hover .pin-thumb, .pin-tile-btn:focus-visible .pin-thumb {
+  transform: translateY(-2px); border-color: var(--sp-accent); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
 }
-.pinned-file:hover .pinned-file-unpin { opacity: 0.7; }
-.pinned-file-unpin:hover { opacity: 1; color: var(--sp-accent); }
+.pin-tile-btn:active .pin-thumb { transform: translateY(0) scale(0.96); }
+.pin-tile-label {
+  max-width: 78px; font-size: 0.72rem; line-height: 1.15; color: var(--sp-text);
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pin-tile-unpin {
+  position: absolute; top: -5px; right: 4px;
+  width: 18px; height: 18px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sp-bg); border: 1px solid var(--sp-border); color: var(--sp-text-dim);
+  font-size: 0.7rem; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+}
+.pin-tile:hover .pin-tile-unpin { opacity: 1; }
+.pin-tile-unpin:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
