@@ -24,7 +24,13 @@ async function handleFiles(pathname) {
     const fileHandle = await dir.getFileHandle(fileName);
     const blob = await fileHandle.getFile();
     const ct = contentType(fileName);
-    return new Response(blob, { headers: { 'Content-Type': ct, 'Cross-Origin-Embedder-Policy': 'require-corp', 'X-Sandpie-SW': '1' } });
+    // COEP must match the app page (coiserver / prod both use 'credentialless').
+    // require-corp here made a rendered /files/ HTML doc reject cross-origin
+    // subresources without CORP (e.g. cdn.tailwindcss.com → NotSameOrigin…ByCoep),
+    // whereas the Editor's srcdoc inherits the parent's credentialless and loads
+    // them fine. 'credentialless' keeps the doc cross-origin-isolated yet lets it
+    // pull cross-origin CDNs (fetched without credentials, no CORP required).
+    return new Response(blob, { headers: { 'Content-Type': ct, 'Cross-Origin-Embedder-Policy': 'credentialless', 'X-Sandpie-SW': '1' } });
   } catch (e) {
     return new Response('Not found: ' + relPath, { status: 404 });
   }
