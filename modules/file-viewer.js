@@ -207,13 +207,13 @@
     const modeSel = document.createElement('select');
     modeSel.title = 'View mode';
     modeSel.style.cssText = 'font-size:0.72rem;padding:2px 6px;flex:none;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:4px;';
-    [['Page', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
+    [['Editor', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
     modeSel.onchange = () => ({ page: showPage, text: showText, rendered: showRendered }[modeSel.value] || showPage)();
     header.insertBefore(modeSel, header.lastChild);
     // ↗ / ⬇ serving the LIVE document (reflects unsaved edits in any mode)
     addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name);
 
-    showPage();   // default
+    showRendered();   // default (falls back to Editor/Text via the dropdown)
   }
 
   /* ════════════════════ the dispatcher ══════════════════════════════════ */
