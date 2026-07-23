@@ -2614,6 +2614,49 @@ opfs.createFile = async function() {
 };
 
 
+// Rename a file or folder. OPFS has no native rename, so this is copy-to-new +
+// remove-old, driven through the same file:changed / file:deleted events the rest
+// of the app uses (so Dropbox sync uploads the new path and deletes the old). Pins
+// pointing at a moved path are rewritten, and an open viewer follows the rename.
+opfs.renameEntry = async function(fullKey, kind) {
+  if (!fullKey) return;
+  const base = fullKey.includes('/') ? fullKey.slice(0, fullKey.lastIndexOf('/')) : '';
+  const cur = fullKey.split('/').pop();
+  const input = prompt('Rename ' + (kind === 'folder' ? 'folder' : 'file') + ':', cur);
+  if (input === null) return;                                  // cancelled
+  const clean = input.trim().replace(/[\\/:*?"<>|]/g, '_');
+  if (!clean || clean === cur) return;
+  const newPath = base ? base + '/' + clean : clean;
+  const movePin = (from, to) => { if (window.SandpiePins && SandpiePins.isPinned(from)) { SandpiePins.remove(from); SandpiePins.add(to); } };
+  try {
+    if (kind === 'folder') {
+      const files = await opfs.list(fullKey);                  // recursive descendant file paths
+      if (!files.length) { await opfs.mkdir(newPath); }
+      for (const f of files) {
+        const rel = f.slice(fullKey.length).replace(/^\/+/, '');
+        const dest = rel ? newPath + '/' + rel : newPath;
+        await opfs.write(dest, new Blob([await opfs.readBytes(f)]));
+        if (window.Sandpie) Sandpie.events.emit('file:changed', dest);
+        movePin(f, dest);
+        if (window._openFilePath === f && opfs.openFile) { opfs.closeFile && opfs.closeFile(); opfs.openFile(dest, dest.split('/').pop()); }
+      }
+      await opfs.remove(fullKey);
+      if (window.Sandpie) Sandpie.events.emit('file:deleted', fullKey);
+    } else {
+      // Guard against clobbering an existing file at the target name.
+      let exists = false; try { await opfs.readBytes(newPath); exists = true; } catch (_) {}
+      if (exists) { alert('A file named "' + clean + '" already exists here.'); return; }
+      await opfs.write(newPath, new Blob([await opfs.readBytes(fullKey)]));
+      await opfs.remove(fullKey);
+      if (window.Sandpie) { Sandpie.events.emit('file:changed', newPath); Sandpie.events.emit('file:deleted', fullKey); }
+      movePin(fullKey, newPath);
+      if (window._openFilePath === fullKey && opfs.openFile) { opfs.closeFile && opfs.closeFile(); opfs.openFile(newPath, clean); }
+    }
+    await opfs.refreshFileList();
+  } catch (e) { console.warn('rename failed:', fullKey, '→', newPath, e); alert('Could not rename: ' + (e && e.message || e)); }
+};
+
+
 
 
 
@@ -3442,6 +3485,9 @@ opfs.refreshFileList = async function() {
 
 
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
+
+
+      menuItems.push({ label: 'Rename ' + (it.kind === 'folder' ? 'folder' : 'file'), action: () => opfs.renameEntry(it.fullKey, it.kind) });
 
 
       menuItems.push({ label: 'Upload files', action: () => opfs.promptUpload(opfsCurrentPath()) });
