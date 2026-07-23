@@ -19,40 +19,86 @@
 // on every change via the 'sandpie-pins-changed' event.
 (function () {
   'use strict';
-  const NS = 'pinnedFiles';
-  const LS_KEY = 'sandpie-pinned-files';   // fallback when SandpieConfig isn't loaded
+  const LS_KEY = 'sandpie-pinned-files';           // instant-boot mirror + offline fallback
+  const LEGACY_NS = 'pinnedFiles';                  // pre-sync SandpieConfig namespace (migrated once)
+  const OPFS_PATH = 'sandpie/config/pins.json';     // synced source of truth (eager: dropbox EXEMPT_PREFIXES)
 
   // Canonical path form: strip leading slashes only. We deliberately do NOT strip a
   // 'files/' prefix — front-end paths (it.fullKey / artifact clean / _openFilePath)
   // are already OPFS-root-relative without it, and stripping it could corrupt a real
   // top-level 'files' folder path.
   function norm(p) { return String(p == null ? '' : p).replace(/^\/+/, '').trim(); }
+  function uniqNorm(list) {
+    const seen = new Set(), out = [];
+    for (const p of (list || [])) { const n = norm(p); if (n && !seen.has(n)) { seen.add(n); out.push(n); } }
+    return out;
+  }
+  const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 
-  function read() {
-    const c = window.SandpieConfig;
-    if (c) { const v = c.get(NS, null); if (Array.isArray(v)) return v.map(norm).filter(Boolean); }
-    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a)) return a.map(norm).filter(Boolean); } } catch (_) {}
+  // The in-memory cache is the SYNCHRONOUS source for list()/isPinned() (those can't await).
+  // Seeded from the localStorage mirror at boot for instant paint, then reconciled with the
+  // synced OPFS file (sandpie/config/pins.json) which is authoritative across devices.
+  let cache = (() => {
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const a = JSON.parse(raw); if (Array.isArray(a)) return uniqNorm(a); } } catch (_) {}
+    const c = window.SandpieConfig; if (c) { const v = c.get(LEGACY_NS, null); if (Array.isArray(v)) return uniqNorm(v); }  // migrate old local-only pins
     return [];
+  })();
+
+  function mirrorLocal(list) { try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch (_) {} }
+  function fire(list) { try { window.dispatchEvent(new CustomEvent('sandpie-pins-changed', { detail: list })); } catch (_) {} }
+
+  // Write the synced OPFS file and flag it dirty so Dropbox uploads it (file:changed is the
+  // same signal createFile/renameEntry use). Fire-and-forget; UI already updated from cache.
+  async function writeDisk(list) {
+    if (!(window.opfs && opfs.write)) return;
+    try {
+      await opfs.write(OPFS_PATH, new Blob([JSON.stringify(list)], { type: 'application/json' }));
+      if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', OPFS_PATH);
+    } catch (e) { console.warn('[pins] OPFS write failed:', e); }
   }
 
-  function write(list) {
-    const seen = new Set(), uniq = [];
-    for (const p of list) { const n = norm(p); if (n && !seen.has(n)) { seen.add(n); uniq.push(n); } }
-    const c = window.SandpieConfig;
-    if (c) c.set(NS, uniq);
-    else { try { localStorage.setItem(LS_KEY, JSON.stringify(uniq)); } catch (_) {} }
-    try { window.dispatchEvent(new CustomEvent('sandpie-pins-changed', { detail: uniq })); } catch (_) {}
-    return uniq;
+  // Read the synced OPFS file. null = absent/unreadable → keep the current cache.
+  async function readDisk() {
+    if (!(window.opfs && opfs.readBytes)) return null;
+    try {
+      const arr = JSON.parse(new TextDecoder().decode(await opfs.readBytes(OPFS_PATH)));
+      return Array.isArray(arr) ? uniqNorm(arr) : null;
+    } catch (_) { return null; }   // NotFound / parse error
+  }
+
+  // Persist a new list: cache + local mirror + change event synchronously, then the OPFS file.
+  function persist(list) {
+    cache = uniqNorm(list);
+    mirrorLocal(cache);
+    fire(cache);
+    writeDisk(cache);
+    return cache;
+  }
+
+  // Reconcile the cache with the synced OPFS file — at boot and on window focus (Dropbox may
+  // have pulled a newer pins.json from another device). OPFS is authoritative; last-write-wins.
+  let seeded = false;
+  async function refreshFromDisk() {
+    const disk = await readDisk();
+    if (disk === null) {
+      // No synced file yet: one-time seed from the pins we booted with, so existing
+      // localStorage-only pins start syncing across devices.
+      if (!seeded) { seeded = true; if (cache.length) await writeDisk(cache); }
+      return;
+    }
+    seeded = true;
+    if (!same(disk, cache)) { cache = disk; mirrorLocal(cache); fire(cache); }
   }
 
   const Pins = {
-    list() { return read(); },
-    isPinned(p) { const n = norm(p); return n ? read().indexOf(n) !== -1 : false; },
-    add(p) { const n = norm(p); if (!n) return false; const l = read(); if (l.indexOf(n) === -1) { l.push(n); write(l); } return true; },
-    remove(p) { const n = norm(p); write(read().filter(x => x !== n)); return false; },
+    list() { return cache.slice(); },
+    isPinned(p) { const n = norm(p); return n ? cache.indexOf(n) !== -1 : false; },
+    add(p) { const n = norm(p); if (n && cache.indexOf(n) === -1) persist(cache.concat(n)); return true; },
+    remove(p) { const n = norm(p); persist(cache.filter(x => x !== n)); return false; },
     toggle(p) { return this.isPinned(p) ? this.remove(p) : this.add(p); },
+    refresh() { return refreshFromDisk(); },
     subscribe(cb) {
-      const h = (e) => cb((e && e.detail) || read());
+      const h = (e) => cb((e && e.detail) || cache.slice());
       window.addEventListener('sandpie-pins-changed', h);
       return () => window.removeEventListener('sandpie-pins-changed', h);
     },
@@ -137,7 +183,12 @@
     box.appendChild(grid);
   }
 
-  function init() { renderHome(); Pins.subscribe(renderHome); }
+  function init() {
+    renderHome();
+    Pins.subscribe(renderHome);
+    refreshFromDisk();                                  // reconcile with the synced OPFS file at boot
+    window.addEventListener('focus', refreshFromDisk);  // pick up pins.json pulled from another device
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
