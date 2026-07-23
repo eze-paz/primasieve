@@ -10,7 +10,9 @@ self.addEventListener('fetch', (e) => {
 
 async function handleFiles(pathname) {
   const relPath = pathname.replace(/^\/files\//, '');
-  const parts = relPath.split('/');
+  // Segments may be percent-encoded (e.g. a <base href> built with encodeURIComponent
+  // for names containing spaces/unicode). Decode each to match the OPFS entry name.
+  const parts = relPath.split('/').map(s => { try { return decodeURIComponent(s); } catch (_) { return s; } });
   const fileName = parts.pop();
   try {
     const root = await navigator.storage.getDirectory();

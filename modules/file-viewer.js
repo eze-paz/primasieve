@@ -95,96 +95,23 @@
     });
   }
 
-  /* ════════════════════ OPFS fetch-bridge (rendered HTML) ══════════════════
-   * A rendered HTML file runs in a sandboxed srcdoc iframe (origin null), so its
-   * fetch()/XHR of sibling or workspace files can't reach OPFS — they hit the
-   * network and CORS-fail. We inject a shim that overrides fetch + XMLHttpRequest
-   * and proxies same-origin/relative requests to the parent over postMessage; the
-   * parent reads OPFS and returns the bytes. FULL OPFS access by design: a relative
-   * path resolves against the file's own directory, and '/abs' or an app-origin
-   * absolute URL maps to the OPFS root. Genuinely external (other-origin) URLs pass
-   * straight through to the network. The random per-open token isolates channels.
+  /* ════════════════════ rendered HTML (OPFS-served via the service worker) ══
+   * The rendered doc must NOT be sandbox="allow-scripts": a sandboxed opaque origin
+   * is not controlled by the service worker, so the doc's fetch()/XHR/resource loads
+   * bypass sw.js and 404 (the original bug). With no sandbox the SW (scope /) serves
+   * the doc's /files/… requests straight from OPFS — exactly how the Editor works.
+   * We inject a <base> pointed at the file's own OPFS directory, so relative refs
+   * (fetch, XHR, <img>, <script>, <link>) resolve to sibling workspace files, and
+   * absolute /files/… paths work too → full OPFS access. Under cross-origin isolation
+   * the doc still gets an opaque origin, so it reaches its OPFS neighbourhood yet
+   * can't script the app DOM.
    */
-  function bridgeMime(path) {
-    const ext = (path.split('.').pop() || '').toLowerCase();
-    return ({ html: 'text/html', htm: 'text/html', css: 'text/css', js: 'text/javascript', mjs: 'text/javascript',
-      json: 'application/json', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-      gif: 'image/gif', webp: 'image/webp', csv: 'text/csv', txt: 'text/plain', xml: 'application/xml',
-      wasm: 'application/wasm', woff: 'font/woff', woff2: 'font/woff2' })[ext] || 'application/octet-stream';
-  }
-  // Map a URL as seen by the shim to an OPFS-root-relative path.
-  function bridgeResolve(url, baseDir) {
-    let path;
-    if (/^[a-z][a-z0-9+.\-]*:\/\//i.test(url)) { try { path = new URL(url).pathname; } catch (_) { path = url; } path = path.replace(/^\/+/, ''); }
-    else if (url[0] === '/') path = url.replace(/^\/+/, '');
-    else {                                   // relative → resolve against the file's directory
-      const segs = baseDir ? baseDir.split('/').filter(Boolean) : [];
-      for (const s of url.split('/')) { if (s === '' || s === '.') continue; if (s === '..') segs.pop(); else segs.push(s); }
-      path = segs.join('/');
-    }
-    return path.replace(/[?#].*$/, '').replace(/^files\//, '');   // drop query/hash + tolerate a /files/ prefix
-  }
-  // Runs INSIDE the sandboxed iframe (serialized via .toString()); self-contained.
-  function bridgeShim(T, ORIGIN) {
-    var pending = {}, seq = 0;
-    function proxied(u) {
-      if (u == null) return false; u = String(u);
-      if (/^(data|blob):/i.test(u)) return false;
-      if (/^[a-z][a-z0-9+.\-]*:\/\//i.test(u)) { try { return new URL(u).origin === ORIGIN; } catch (e) { return false; } }
-      return true;   // relative or root-relative → serve from OPFS
-    }
-    function ask(u) {
-      return new Promise(function (resolve, reject) {
-        var id = ++seq; pending[id] = { resolve: resolve, reject: reject };
-        try { parent.postMessage({ __opfsBridge: T, req: true, id: id, url: u }, '*'); }
-        catch (e) { delete pending[id]; reject(e); return; }
-        setTimeout(function () { if (pending[id]) { var p = pending[id]; delete pending[id]; p.reject(new Error('opfs bridge timeout: ' + u)); } }, 20000);
-      });
-    }
-    window.addEventListener('message', function (e) {
-      var d = e.data;
-      if (!d || d.__opfsBridge !== T || d.req || !('id' in d)) return;
-      var p = pending[d.id]; if (!p) return; delete pending[d.id];
-      if (d.ok) p.resolve(d); else p.reject(new Error(d.error || 'opfs bridge: not found'));
-    });
-    var _fetch = window.fetch ? window.fetch.bind(window) : null;
-    window.fetch = function (input, init) {
-      var url = (typeof input === 'string') ? input : (input && input.url) ? input.url : String(input);
-      if (!proxied(url)) return _fetch ? _fetch(input, init) : Promise.reject(new Error('fetch unavailable'));
-      return ask(url).then(function (d) {
-        return new Response(d.bytes, { status: 200, headers: { 'Content-Type': d.contentType || 'application/octet-stream' } });
-      }, function (err) {
-        return new Response(String((err && err.message) || err), { status: 404, statusText: 'Not Found' });
-      });
-    };
-    try {
-      var XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send;
-      XMLHttpRequest.prototype.open = function (m, u) { this.__bu = u; this.__bp = proxied(u); return XO.apply(this, arguments); };
-      XMLHttpRequest.prototype.send = function () {
-        if (!this.__bp) return XS.apply(this, arguments);
-        var xhr = this;
-        function def(k, v) { try { Object.defineProperty(xhr, k, { configurable: true, get: function () { return v; } }); } catch (e) {} }
-        ask(xhr.__bu).then(function (d) {
-          var buf = d.bytes, txt = ''; try { txt = new TextDecoder().decode(new Uint8Array(buf)); } catch (e) {}
-          def('readyState', 4); def('status', 200); def('statusText', 'OK'); def('responseURL', xhr.__bu); def('responseText', txt);
-          def('response', xhr.responseType === 'arraybuffer' ? buf : xhr.responseType === 'blob' ? new Blob([buf])
-            : xhr.responseType === 'json' ? (function () { try { return JSON.parse(txt); } catch (e) { return null; } })() : txt);
-          if (typeof xhr.onreadystatechange === 'function') xhr.onreadystatechange();
-          xhr.dispatchEvent(new Event('readystatechange')); xhr.dispatchEvent(new Event('load')); xhr.dispatchEvent(new Event('loadend'));
-        }, function () {
-          def('readyState', 4); def('status', 404);
-          xhr.dispatchEvent(new Event('readystatechange')); xhr.dispatchEvent(new Event('error')); xhr.dispatchEvent(new Event('loadend'));
-        });
-      };
-    } catch (e) {}
-  }
-  // Inject a <script> as the first child of <head> (or <html>), keeping any doctype first.
-  function injectHeadScript(html, js) {
-    const tag = '<script>' + js + '</scr' + 'ipt>';
+  function injectBase(html, baseHref) {
+    const tag = '<base href="' + baseHref + '">';
     const mHead = html.match(/<head[^>]*>/i);
     if (mHead) return html.slice(0, mHead.index + mHead[0].length) + tag + html.slice(mHead.index + mHead[0].length);
     const mHtml = html.match(/<html[^>]*>/i);
-    if (mHtml) return html.slice(0, mHtml.index + mHtml[0].length) + tag + html.slice(mHtml.index + mHtml[0].length);
+    if (mHtml) return html.slice(0, mHtml.index + mHtml[0].length) + '<head>' + tag + '</head>' + html.slice(mHtml.index + mHtml[0].length);
     return tag + html;
   }
 
@@ -288,32 +215,12 @@
     function showRendered() {
       teardown(); modeSel.value = 'rendered';
       const iframe = document.createElement('iframe');
-      // allow-scripts (no allow-same-origin) → the doc's own scripts run in a
-      // null origin, so charts/artifacts render but can't reach the app. An
-      // injected OPFS fetch-bridge lets the doc's fetch/XHR read workspace files
-      // (see the bridge helpers above); full OPFS access, resolved against this
-      // file's directory.
-      iframe.sandbox = 'allow-scripts';
-      const token = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('b' + Date.now() + '_' + (window._openFilePath || ''));
+      // No sandbox (like the Editor) so the service worker serves this doc's OPFS
+      // reads; a <base> at the file's own directory gives full OPFS access to
+      // sibling/workspace files. See the block comment on injectBase above.
       const baseDir = fullKey.includes('/') ? fullKey.slice(0, fullKey.lastIndexOf('/')) : '';
-      const shim = '(' + bridgeShim.toString() + ')(' + JSON.stringify(token) + ',' + JSON.stringify(location.origin) + ')';
-      const onMsg = async (e) => {
-        const d = e.data;
-        if (!d || d.__opfsBridge !== token || !d.req || e.source !== iframe.contentWindow) return;
-        let reply, transfer = [];
-        try {
-          const bytes = await opfs.readBytes(bridgeResolve(d.url, baseDir));
-          const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-          reply = { __opfsBridge: token, id: d.id, ok: true, bytes: buf, contentType: bridgeMime(bridgeResolve(d.url, baseDir)) };
-          transfer = [buf];
-        } catch (err) {
-          reply = { __opfsBridge: token, id: d.id, ok: false, error: String((err && err.message) || err) };
-        }
-        try { e.source.postMessage(reply, '*', transfer); } catch (_) { try { e.source.postMessage(reply, '*'); } catch (__) {} }
-      };
-      window.addEventListener('message', onMsg);
-      active = { destroy: () => window.removeEventListener('message', onMsg) };
-      iframe.srcdoc = injectHeadScript(html, shim);
+      const baseHref = '/files/' + (baseDir ? baseDir.split('/').map(encodeURIComponent).join('/') + '/' : '');
+      iframe.srcdoc = injectBase(currentHtml(), baseHref);
       iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
       body.appendChild(iframe);
     }
