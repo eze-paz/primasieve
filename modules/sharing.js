@@ -33,7 +33,8 @@
   'use strict';
   const INSTALL_ROOT = 'sandpie/shared-installed';   // read-only accepted packages (worker guard keys on this)
   const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
-  const SUBS_PATH = 'sandpie/config/shares.json';
+  const SUBS_PATH = 'sandpie/config/shares.json';   // team-share subscription state only (1:1 uses the filesystem)
+  const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev}
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
   const localPart = (email) => String(email || '').split('@')[0].toLowerCase();
@@ -161,19 +162,38 @@
   // are ACL-filtered; inbox manifests are addressed to me by construction.
   async function catalog() {
     const who = me(), byId = {};
-    for (const m of await listManifests(myInbox())) byId[m.id] = m;                             // 1:1: addressed to me by placement
-    for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) byId[m.id] = m;   // team: ACL-filtered
+    for (const m of await listManifests(myInbox())) { m._from = 'incoming'; byId[m.id] = m; }   // 1:1: a file in shared-incoming IS the pending notification
+    for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) { m._from = 'team'; byId[m.id] = m; }
     return byId;
   }
 
-  // catalog() is the single authority (inbox items are mine; team items are already
-  // ACL-filtered), so pendingInvites just removes my own shares + accepted + dismissed.
+  // Pending invites (the notification list):
+  //   • incoming (1:1)  → its mere PRESENCE in shared-incoming = pending. Accept MOVES
+  //     it out (→ shared-installed) which clears the notification; a re-share re-delivers
+  //     a fresh file and re-notifies. No accepted-state cache, so nothing goes stale.
+  //   • team            → tracked in shares.json (accepted/dismissed) for silent auto-update.
   async function pendingInvites() {
     const who = me(), cat = await catalog(), s = await subs(), out = [];
-    for (const id in cat) { const m = cat[id]; if (m.publisher === who.user) continue; if (s.accepted[id] != null) continue; if (s.dismissed.includes(id)) continue; out.push(m); }
+    for (const id in cat) {
+      const m = cat[id];
+      if (m.publisher === who.user) continue;
+      if (m._from === 'incoming') { out.push(m); continue; }   // present ⇒ pending (accept consumes it)
+      if (s.accepted[id] != null || s.dismissed.includes(id)) continue;
+      out.push(m);
+    }
     return out;
   }
-  async function acceptedList() { const cat = await catalog(), s = await subs(), out = []; for (const id in s.accepted) if (cat[id]) out.push({ ...cat[id], installedVer: String(s.accepted[id]) }); return out; }
+  // "Shared with me" = whatever is physically installed (each package carries a small
+  // .sandpie-pkg.json marker written at install), independent of shares.json.
+  async function acceptedList() {
+    const out = [];
+    let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
+    for (const id of dirs) {
+      let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+      out.push(mk || { id, title: id, kind: 'folder' });
+    }
+    return out;
+  }
 
   /* ── accept / install / activate ──────────────────────────────────────── */
   async function install(m) {
@@ -187,18 +207,38 @@
       markDirty(p);   // emit file:changed so Dropbox marks it dirty + uploads it — without this the
                       // reconciliation pass deletes it as a local-only orphan under the eager prefix
     }
+    // marker so "Shared with me" + rollback-free identification work without shares.json
+    const mp = dst + '/' + PKG_MARKER;
+    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev })], { type: 'application/json' }));
+    markDirty(mp);
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
     // skill:true → nothing to move; context.js discovers sandpie/shared-installed/<id>/SKILL.md and load_skill resolves it
     try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
   }
+  // Delete a 1:1 package from shared-incoming (local + Dropbox) — used by accept (move)
+  // and dismiss. file:deleted propagates the removal to the recipient's Dropbox folder.
+  async function consumeIncoming(m) {
+    const base = m._store.root + '/packages/' + m.id;
+    for (const rel of await listOpfs(base, '', [])) {
+      const p = base + '/' + rel;
+      try { await O().remove(p); } catch (_) {}
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
+    }
+    try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
+  }
   async function accept(id) {
     const cat = await catalog(); const m = cat[id]; if (!m) return;
     await install(m);
-    const s = await subs(); s.accepted[id] = m.rev; s.dismissed = s.dismissed.filter(x => x !== id); await saveSubs(s);
+    if (m._from === 'incoming') { await consumeIncoming(m); }                 // MOVE: clears the notification
+    else { const s = await subs(); s.accepted[id] = m.rev; s.dismissed = s.dismissed.filter(x => x !== id); await saveSubs(s); }
     fire();
   }
-  async function dismiss(id) { const s = await subs(); if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s); fire(); }
+  async function dismiss(id) {
+    const cat = await catalog(); const m = cat[id];
+    if (m && m._from === 'incoming') { await consumeIncoming(m); fire(); return; }   // delete without installing
+    const s = await subs(); if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s); fire();
+  }
 
   /* ── silent auto-update ───────────────────────────────────────────────── */
   let syncing = false;
@@ -206,7 +246,10 @@
     if (syncing || !O()) return; syncing = true;
     try {
       const cat = await catalog(), s = await subs(); let changed = false;
-      for (const id in s.accepted) { const m = cat[id]; if (!m) continue; if (String(m.rev) !== String(s.accepted[id])) { await install(m); s.accepted[id] = m.rev; changed = true; } }
+      // Team subscriptions only. 1:1 shares are never in shares.json (they're accepted
+      // by moving the file), so a re-delivered 1:1 shows as a fresh invite instead of
+      // silently re-installing — the bug this guard prevents.
+      for (const id in s.accepted) { const m = cat[id]; if (!m || m._from !== 'team') continue; if (String(m.rev) !== String(s.accepted[id])) { await install(m); s.accepted[id] = m.rev; changed = true; } }
       if (changed) { await saveSubs(s); fire(); }
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
