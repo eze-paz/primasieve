@@ -78,7 +78,7 @@
     return {
       kind: 'cloud', root: absRoot,
       async listFiles(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, true)).filter(e => e.kind === 'file').map(e => strip(e.path)); },
-      async listDirs(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, false)).filter(e => e.kind === 'directory').map(e => e.path.split('/').pop()); },
+      async listDirs(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, false)).filter(e => e.kind === 'folder' || e.kind === 'directory').map(e => e.path.split('/').pop()); },   // Dropbox tags folders 'folder', not 'directory'
       async readText(rel) { try { return new TextDecoder().decode(await P().cloudDownload(absRoot + '/' + rel)); } catch (_) { return null; } },
       async readBytes(rel) { try { return await P().cloudDownload(absRoot + '/' + rel); } catch (_) { return null; } },
       async writeBytes(rel, bytes) { await P().cloudUpload(absRoot + '/' + rel, bytes); },
