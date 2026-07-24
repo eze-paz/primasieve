@@ -35,6 +35,7 @@
   const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
   const SUBS_PATH = 'sandpie/config/shares.json';   // team-share subscription state only (1:1 uses the filesystem)
   const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev}
+  const COLLAPSE_KEY = 'sandpie-shared-collapsed';  // "Shared with me" collapsed state (per device)
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
   const localPart = (email) => String(email || '').split('@')[0].toLowerCase();
@@ -241,6 +242,29 @@
     }
     try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
   }
+  // Remove an INSTALLED shared package: delete sandpie/shared-installed/<id>/ (local +
+  // Dropbox), unpin anything under it, and stop a team share from auto-reinstalling or
+  // re-appearing as an invite.
+  async function uninstall(id) {
+    const dst = INSTALL_ROOT + '/' + id;
+    if (window.SandpiePins) { for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p); }
+    try {
+      const p = prov();
+      if (cloudOn() && p && p.cloudDelete && p.workingRoot) {
+        const abs = String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + dst;
+        await p.cloudDelete(abs);
+        console.log('[sharing] uninstalled — deleted from Dropbox:', abs);
+      }
+    } catch (e) { console.warn('[sharing] cloud delete of installed failed:', e); }
+    for (const rel of await listOpfs(dst, '', [])) {
+      const p = dst + '/' + rel;
+      try { await O().remove(p); } catch (_) {}
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
+    }
+    try { await O().remove(dst); } catch (_) {}
+    const s = await subs(); delete s.accepted[id]; if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s);
+    fire();
+  }
   async function accept(id) {
     const cat = await catalog(); const m = cat[id]; if (!m) return;
     await install(m);
@@ -272,7 +296,7 @@
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, acceptedList, accept, dismiss, autoSync, subscribe, shareDialog, teamHub, recipientHub, INSTALL_ROOT, LOCAL_HUB };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, acceptedList, accept, dismiss, uninstall, autoSync, subscribe, shareDialog, teamHub, recipientHub, INSTALL_ROOT, LOCAL_HUB };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */
@@ -337,7 +361,17 @@
       if (!invites.length && !installed.length) { box.style.display = 'none'; return; }
       box.style.display = '';
       if (invites.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; box.appendChild(h); for (const m of invites) box.appendChild(inviteRow(m)); }
-      if (installed.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '🔗 Shared with me'; box.appendChild(h); for (const m of installed) box.appendChild(installedRow(m)); }
+      if (installed.length) {
+        let collapsed = false; try { collapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch (_) {}
+        const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
+        const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
+        const lbl = document.createElement('span'); lbl.textContent = '🔗 Shared with me (' + installed.length + ')';
+        h.append(caret, lbl);
+        const list = document.createElement('div'); list.className = 'shared-list'; list.style.display = collapsed ? 'none' : '';
+        for (const m of installed) list.appendChild(installedRow(m));
+        h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; try { localStorage.setItem(COLLAPSE_KEY, open ? '0' : '1'); } catch (_) {} };
+        box.appendChild(h); box.appendChild(list);
+      }
     } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
   }
   const kindIcon = (k) => k === 'skill' ? '🧩' : k === 'folder' ? '📁' : '📄';
@@ -353,7 +387,9 @@
     const open = document.createElement('button'); open.className = 'shared-file-open'; open.innerHTML = kindIcon(m.kind) + ' ' + esc(m.title);
     open.title = m.kind === 'skill' ? 'Shared skill — the model can load it by name' : INSTALL_ROOT + '/' + m.id;
     open.onclick = () => { const entry = m.pin || (m.kind === 'artifact' ? m.title : ''); if (entry) { try { opfs.openFile(INSTALL_ROOT + '/' + m.id + '/' + entry, entry.split('/').pop()); } catch (_) {} } };
-    row.append(open); return row;
+    const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove from my shared items'; del.textContent = '✕';
+    del.onclick = (e) => { e.stopPropagation(); uninstall(m.id); };
+    row.append(open, del); return row;
   }
 
   /* ── off-home banner ──────────────────────────────────────────────────── */
