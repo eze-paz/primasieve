@@ -362,7 +362,7 @@
       box.style.display = '';
       if (invites.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; box.appendChild(h); for (const m of invites) box.appendChild(inviteRow(m)); }
       if (installed.length) {
-        let collapsed = false; try { collapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch (_) {}
+        let collapsed = true; try { if (localStorage.getItem(COLLAPSE_KEY) === '0') collapsed = false; } catch (_) {}   // collapsed by default; '0' = user expanded
         const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
         const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
         const lbl = document.createElement('span'); lbl.textContent = '🔗 Shared with me (' + installed.length + ')';
