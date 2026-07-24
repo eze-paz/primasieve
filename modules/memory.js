@@ -53,8 +53,23 @@ const SandpieMemory = (function () {
     for (const p of uniq) { let best = p, bl = nseg(p); if (nseg(p) >= 2) for (const q of uniq) if (q !== p && q.endsWith('/' + p) && nseg(q) > bl) { best = q; bl = nseg(q); } map[p] = best; }
     return map;
   }
-  // Deterministic project label from a canonical path: first meaningful segment(s).
-  function _projLabel(path) { const s = String(path).split('/').filter(Boolean); if (!s.length) return ''; return s.slice(0, (s[0] === 'skills' || s[0] === 'files') ? 2 : 1).join('/'); }
+  // Deterministic project label from a canonical path → one of the real repos.
+  // STRONG = explicit repo roots; WEAK = generic files that tend to belong to a repo.
+  // (The stored `project` frontmatter always wins over this; it's only the fallback
+  // for a cluster with no stored label. Keep in sync with the worker's _projFromPath.)
+  function _pathRepoStrong(p) {
+    if (/(^|\/)(crates|riscv-core|riscv-supervisor|riscv-harness|riscv-devices|riscv-test-harness)(\/|$)|(^|\/)riscv-vm(\/|$)|vmlinuz|oneshot_alpine|(^|\/)kernels\/|gen_dtb/i.test(p)) return 'riscv-vm';
+    if (/(^|\/)(opt\/)?sandpie-server(\/|$)/.test(p)) return 'sandpie-server';
+    let m = /(^|\/)skills\/([^/]+)/.exec(p); if (m) return m[2];
+    m = /(^|\/)files\/projects\/([^/]+)/.exec(p); if (m) return /impag/i.test(m[2]) ? 'impagados' : m[2];
+    return '';
+  }
+  function _pathRepoWeak(p) {
+    if (/(^|\/)modules\//.test(p) || /^[^/]+\.(js|css|wasm)$/.test(p) || /coiserver|(^|\/)sandpie\.(html|css)|(^|\/)sw\.js|(^|\/)opfs\.js|univer\.js|file-viewer\.js/.test(p)) return 'sandpie';
+    if (/aging_|dashboard_live|slartran|IONAPI/i.test(p)) return 'impagados';
+    return '';
+  }
+  function _projLabel(path) { return _pathRepoStrong(path) || _pathRepoWeak(path) || (String(path).split('/').filter(Boolean)[0] || ''); }
   function _clusterFacts(facts) {
     const canon = _canonMap(facts.flatMap(_parsePaths));
     const canByFact = facts.map(f => [...new Set(_parsePaths(f).map(p => canon[p]))]);

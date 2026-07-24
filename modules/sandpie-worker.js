@@ -1944,9 +1944,36 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
 // file with the same slug exists we preserve its `created` date and update.
 function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
 
-// Deterministic project label from a path: first meaningful segment(s). Mirrors
-// memory.js _projLabel so injection/graph group by the same key.
-function _projFromPath(p) { const s = String(p || '').split('/').filter(Boolean); if (!s.length) return ''; return s.slice(0, (s[0] === 'skills' || s[0] === 'files') ? 2 : 1).join('/'); }
+// Project label for a new memory → one of the real repos. Mirrors memory.js so
+// injection/graph group by the same key. Strong path signals beat weak; if paths
+// give nothing, fall back to content keywords. Keep in sync with memory.js.
+function _projPathStrong(p) {
+  if (/(^|\/)(crates|riscv-core|riscv-supervisor|riscv-harness|riscv-devices|riscv-test-harness)(\/|$)|(^|\/)riscv-vm(\/|$)|vmlinuz|oneshot_alpine|(^|\/)kernels\/|gen_dtb/i.test(p)) return 'riscv-vm';
+  if (/(^|\/)(opt\/)?sandpie-server(\/|$)/.test(p)) return 'sandpie-server';
+  let m = /(^|\/)skills\/([^/]+)/.exec(p); if (m) return m[2];
+  m = /(^|\/)files\/projects\/([^/]+)/.exec(p); if (m) return /impag/i.test(m[2]) ? 'impagados' : m[2];
+  return '';
+}
+function _projPathWeak(p) {
+  if (/(^|\/)modules\//.test(p) || /^[^/]+\.(js|css|wasm)$/.test(p) || /coiserver|(^|\/)sandpie\.(html|css)|(^|\/)sw\.js|(^|\/)opfs\.js|univer\.js|file-viewer\.js/.test(p)) return 'sandpie';
+  if (/aging_|dashboard_live|slartran|IONAPI/i.test(p)) return 'impagados';
+  return '';
+}
+function _projKeyword(hay) {
+  hay = String(hay || '').toLowerCase();
+  if (/\briscv\b|\balpine\b|vmlinuz|\bdtb\b|\bmmu\b|kernel|setup_smp|clint|ebreak|udelay|\bsatp\b|\bsepc\b|oneshot|emulator|boot_alpine|c\.bnez/.test(hay)) return 'riscv-vm';
+  if (/tecnec|\bcapex\b|\bopex\b|bombas.?calor/.test(hay)) return 'tecnec_proposals';
+  if (/impagados|impagats|ion.?api|slartran|\baging\b|factura/.test(hay)) return 'impagados';
+  if (/sandpie-server|\bnpaw\b|nginx|ai-balancer/.test(hay)) return 'sandpie-server';
+  if (/sandpie|\bopfs\b|univer|logprob|compaction|second.brain|webgpu|html-editor|service.worker|\bsw\.js\b|artifact|zetaoffice|busytex|dropbox|loop.lab|arxiv|adreno|cross-origin|\bfont\b|distiller|tool_remember|worker/.test(hay)) return 'sandpie';
+  return '';
+}
+function _projFromPaths(paths, hay) {
+  const vote = (fn) => { const v = {}; for (const p of paths) { const l = fn(p); if (l) v[l] = (v[l] || 0) + 1; } return Object.entries(v).sort((a, b) => b[1] - a[1])[0]; };
+  const s = vote(_projPathStrong); if (s) return s[0];
+  const w = vote(_projPathWeak); if (w) return w[0];
+  return _projKeyword(hay);
+}
 
 async function tool_remember({ name, description, type, body, links, project, supersedes }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
@@ -2003,7 +2030,7 @@ async function tool_remember({ name, description, type, body, links, project, su
   const convId = ctx && ctx._conversation_file_name ? ctx._conversation_file_name : 'unknown';
   // project = the model's explicit hint if given, else derived from the top path.
   // First-class grouping key for tiered injection + the graph (memory.js).
-  const projLabel = (project && String(project).trim()) || (toolPaths.length ? _projFromPath(toolPaths[0]) : '');
+  const projLabel = (project && String(project).trim()) || _projFromPaths(toolPaths, name + ' ' + (description || '') + ' ' + body);
   let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.slice(0, 8).join(', ')}\n`;
   if (toolPaths.length) out += `paths: ${toolPaths.join(', ')}\n`;
   if (projLabel) out += `project: ${projLabel}\n`;
