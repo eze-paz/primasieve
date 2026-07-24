@@ -223,7 +223,7 @@
       //   Save), and the doc runs same-origin (app-level access) — fine for the
       //   user's own files, which is what this viewer opens.
       iframe.src = filesUrl(fullKey);
-      iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
+      iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:#fff;';
       body.appendChild(iframe);
     }
 
@@ -330,7 +330,7 @@
     if (ext === 'pdf') {
       const iframe = document.createElement('iframe');
       iframe.src = blobUrlFor(pane, file, 'application/pdf');
-      iframe.style.cssText = 'width:100%;height:100%;border:0;';
+      iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;';
       fill(body, iframe);
       return;
     }
@@ -360,7 +360,7 @@
       const dirPath = fullKey.replace(/\/[^\/]+$/, '');
       const iframe = document.createElement('iframe');
       iframe.src = '/convert_latex/index.html?v=4#project=' + encodeURIComponent(dirPath);
-      iframe.style.cssText = 'width:100%;height:100%;border:0;';
+      iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;';
       fill(body, iframe);
       return;
     }
@@ -375,7 +375,7 @@
       const iframe = document.createElement('iframe');
       iframe.sandbox = 'allow-same-origin';
       iframe.src = blobUrlFor(pane, file, 'image/svg+xml');
-      iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
+      iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:#fff;';
       fill(body, iframe);
       return;
     }
