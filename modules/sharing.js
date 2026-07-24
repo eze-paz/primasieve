@@ -386,7 +386,7 @@
       const team = installed.filter(m => m.from === 'team');     // auto, always shown
       if (!invites.length && !shared.length && !team.length) { box.style.display = 'none'; return; }
       box.style.display = '';
-      if (invites.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; box.appendChild(h); for (const m of invites) box.appendChild(inviteRow(m)); }
+      if (invites.length) { const card = document.createElement('div'); card.className = 'share-invites'; const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; card.appendChild(h); for (const m of invites) card.appendChild(inviteRow(m)); box.appendChild(card); }
       if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
       // Team artifacts: ✕ (unshare) only on ones I published; everyone else gets pin only.
       if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team, m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
@@ -407,8 +407,9 @@
     let collapsed = true; try { if (localStorage.getItem(key) === '0') collapsed = false; } catch (_) {}
     const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
     const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
-    const lbl = document.createElement('span'); lbl.textContent = title + ' (' + items.length + ')';
-    h.append(caret, lbl);
+    const lbl = document.createElement('span'); lbl.className = 'shared-group-name'; lbl.textContent = title;
+    const cnt = document.createElement('span'); cnt.className = 'shared-count'; cnt.textContent = items.length;
+    h.append(caret, lbl, cnt);
     const list = document.createElement('div'); list.className = 'shared-list'; list.style.display = collapsed ? 'none' : '';
     for (const m of items) list.appendChild(rowFn(m));
     h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };

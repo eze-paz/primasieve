@@ -238,8 +238,15 @@
     }
     const list = Pins.list();
     box.textContent = '';
-    if (!list.length) { box.style.display = 'none'; return; }
     box.style.display = '';
+    if (!list.length) {   // composed empty state instead of a blank home
+      const empty = document.createElement('div');
+      empty.className = 'pin-empty';
+      empty.innerHTML = '<div class="pin-empty-ghosts"><i></i><i></i><i></i></div>'
+        + '<div class="pin-empty-hint">No pinned apps yet.<br>Right-click any file → <b>Pin</b> to keep it one tap away.</div>';
+      box.appendChild(empty);
+      return;
+    }
 
     // App-style grid of tiles (phone home-screen feel): thumbnail placeholder +
     // short label (filename, no path, no extension). Click a tile → open in viewer.

@@ -3015,6 +3015,12 @@ body.sp-decoding *::after {
 }
 .pin-tile:hover .pin-tile-unpin { opacity: 1; }
 .pin-tile-unpin:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
+/* empty pinned state — shown (instead of hiding) so a user with no pins still lands on something composed */
+.pin-empty { border: 1.5px dashed var(--sp-border); border-radius: 14px; padding: 1.35rem 1rem; text-align: center; max-width: 340px; margin: 0 auto; }
+.pin-empty-ghosts { display: flex; justify-content: center; gap: 0.55rem; margin-bottom: 0.85rem; }
+.pin-empty-ghosts i { width: 46px; height: 46px; border-radius: 14px; border: 1.5px dashed var(--sp-border); }
+.pin-empty-hint { font-size: 0.8rem; color: var(--sp-text-dim); line-height: 1.5; }
+.pin-empty-hint b { color: var(--sp-text); font-weight: 600; }
 
 /* ═══════════════ sharing ═══════════════ */
 .share-modal-back { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; }
@@ -3032,7 +3038,7 @@ body.sp-decoding *::after {
 .share-modal button.share-primary:hover:not(:disabled) { background: var(--sp-accent); color: var(--sp-text); border-color: var(--sp-accent); }
 .share-modal-msg { font-size: 0.76rem; color: var(--sp-text-dim); margin-top: 0.6rem; min-height: 1em; }
 
-.shared-home { width: 100%; max-width: 420px; margin-top: 1.4rem; text-align: left; user-select: none; }
+.shared-home { width: 100%; max-width: 520px; margin: 1.4rem auto 0; text-align: left; user-select: none; }
 .shared-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin: 0.8rem 0 0.4rem; padding-left: 0.2rem; }
 .shared-file { display: flex; align-items: center; gap: 6px; padding: 0.3rem 0.4rem; border: 1px solid transparent; border-radius: 6px; }
 .shared-file:hover { border-color: var(--sp-border); background: var(--sp-panel); }
@@ -3040,13 +3046,21 @@ body.sp-decoding *::after {
 .shared-file-open { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: none; text-align: left; cursor: pointer; padding: 0.1rem 0; }
 .shared-file-open:hover { color: var(--sp-accent); }
 .shared-by { font-size: 0.72rem; color: var(--sp-text-dim); flex: none; }
-.shared-accept { font-size: 0.72rem; padding: 2px 10px; flex: none; color: var(--sp-accent); border-color: var(--sp-accent); }
+.shared-accept { font-size: 0.72rem; font-weight: 600; padding: 3px 12px; flex: none; color: var(--sp-accent); background: transparent; border: 1px solid var(--sp-accent); border-radius: 7px; cursor: pointer; }
+.shared-accept:hover { background: var(--sp-accent-dim); }
 .shared-dismiss { flex: none; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; font-size: 0.8rem; padding: 2px 6px; }
-.shared-dismiss:hover { color: var(--sp-accent); }
-.shared-file.invite { background: var(--sp-accent-dim); border-color: transparent; }
-.shared-toggle { background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; width: 100%; text-align: left; }
-.shared-caret { font-size: 0.6rem; width: 0.8em; display: inline-block; flex: none; }
-.shared-list { display: flex; flex-direction: column; }
+.shared-dismiss:hover { color: var(--sp-danger); }
+/* pending invites, grouped into one accent-tinted card (the on-home notification surface) */
+.share-invites { border: 1px solid var(--sp-accent); background: var(--sp-accent-dim); border-radius: 12px; padding: 0.5rem 0.55rem; margin: 0.5rem 0 1.1rem; }
+.share-invites .shared-home-title { margin: 0.15rem 0.3rem 0.45rem; }
+.shared-file.invite { background: var(--sp-bg); border-color: transparent; margin-top: 0.3rem; }
+/* collapsible group bars (Shared with me / Team artifacts) — count pushed right */
+.shared-toggle { background: none; border: none; border-top: 1px solid var(--sp-border); cursor: pointer; display: flex; align-items: center; gap: 0.45rem; width: 100%; text-align: left; text-transform: none; letter-spacing: 0; font-size: 0.82rem; font-weight: 600; color: var(--sp-text-dim); padding: 0.62rem 0.15rem; margin: 0; transition: color .12s; }
+.shared-toggle:hover { color: var(--sp-text); }
+.shared-caret { font-size: 0.6rem; width: 0.8em; display: inline-block; flex: none; color: var(--sp-text-dim); }
+.shared-group-name { flex: none; }
+.shared-count { margin-left: auto; font-size: 0.64rem; font-weight: 600; font-family: ui-monospace, monospace; color: var(--sp-text-dim); background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 12px; padding: 0.14rem 0.46rem; }
+.shared-list { display: flex; flex-direction: column; padding-bottom: 0.3rem; }
 .shared-pin { flex: none; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px 4px; }
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
