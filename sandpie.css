@@ -3032,3 +3032,12 @@ body.sp-decoding *::after {
 .shared-dismiss:hover { color: var(--sp-accent); }
 .shared-file.invite { background: var(--sp-accent-dim); border-color: transparent; }
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
+
+.share-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  background: var(--sp-accent); color: #fff;
+  font-size: 0.82rem; font-weight: 500; text-align: center;
+  padding: 0.5rem 1rem; cursor: pointer; user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.share-banner:hover { filter: brightness(1.06); }

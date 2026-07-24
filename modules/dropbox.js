@@ -645,6 +645,9 @@
       if (firstSync || toDownload.length || dirty.length || removedAny || cursorChanged) {
         await Sandpie.refreshFiles();
         await Sandpie.refreshConversations();
+        // Let sharing.js react to pulled changes (e.g. a new file in shared-incoming
+        // → refresh the invite notifications + banner without a manual refresh).
+        try { Sandpie.events.emit('sync:done', { downloaded: toDownload.map(d => d.rel), deletions: deletions || [] }); } catch (_) {}
       }
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');

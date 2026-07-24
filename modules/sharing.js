@@ -329,15 +329,16 @@
     if (homeBusy) { homePending = true; return; } homeBusy = true;
     try {
       let box = document.getElementById('sharedHome');
-      if (!box) { box = document.createElement('div'); box.id = 'sharedHome'; box.className = 'shared-home'; welcome.appendChild(box); }
+      if (!box) { box = document.createElement('div'); box.id = 'sharedHome'; box.className = 'shared-home'; welcome.appendChild(box); observeInbox(); }
       let invites = [], installed = [];
       try { invites = await pendingInvites(); installed = await acceptedList(); } catch (_) {}
+      _pendingCount = invites.length;   // banner is updated in finally, once the box is populated/sized
       box.textContent = '';
       if (!invites.length && !installed.length) { box.style.display = 'none'; return; }
       box.style.display = '';
       if (invites.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; box.appendChild(h); for (const m of invites) box.appendChild(inviteRow(m)); }
       if (installed.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '🔗 Shared with me'; box.appendChild(h); for (const m of installed) box.appendChild(installedRow(m)); }
-    } finally { homeBusy = false; if (homePending) { homePending = false; renderHome(); } }
+    } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
   }
   const kindIcon = (k) => k === 'skill' ? '🧩' : k === 'folder' ? '📁' : '📄';
   function inviteRow(m) {
@@ -355,9 +356,38 @@
     row.append(open); return row;
   }
 
+  /* ── off-home banner ──────────────────────────────────────────────────── */
+  // A slim top banner shown when there are pending invites AND the home inbox is
+  // NOT on screen (i.e. the user is in a conversation, not looking at the invites).
+  // Tapping it lands on the home screen. Visibility of the inbox is tracked with an
+  // IntersectionObserver (robust to scroll; no rect polling), count comes from renderHome.
+  let _pendingCount = 0, _banner = null, _inboxVisible = true, _io = null;
+  function observeInbox() {
+    const box = document.getElementById('sharedHome');
+    if (!box || !window.IntersectionObserver) return;
+    if (_io) _io.disconnect();
+    _io = new IntersectionObserver((entries) => { _inboxVisible = entries.some(e => e.isIntersecting); updateBanner(); }, { threshold: 0.01 });
+    _io.observe(box);
+  }
+  function updateBanner() {
+    const show = _pendingCount > 0 && !_inboxVisible;
+    if (!show) { if (_banner) _banner.style.display = 'none'; return; }
+    if (!_banner) {
+      _banner = document.createElement('div');
+      _banner.className = 'share-banner';
+      _banner.setAttribute('data-chrome', '');
+      _banner.onclick = () => { try { if (window.newConversation) newConversation(); } catch (_) {} };
+      document.body.appendChild(_banner);
+    }
+    _banner.textContent = '📥 ' + _pendingCount + ' item' + (_pendingCount === 1 ? '' : 's') + ' shared with you — tap to view';
+    _banner.style.display = '';
+  }
+
   /* ── boot ─────────────────────────────────────────────────────────────── */
-  function boot() { renderHome(); autoSync(); }
+  function boot() { renderHome(); autoSync(); observeInbox(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-  window.addEventListener('focus', () => autoSync());
-  try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', () => autoSync()); } catch (_) {}
+  window.addEventListener('focus', () => { autoSync(); renderHome(); });
+  // Dropbox cursor pull finished: if a new file landed in shared-incoming, this
+  // re-renders the invite list (and banner) automatically — no manual refresh.
+  try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', () => { autoSync(); renderHome(); }); } catch (_) {}
 })();
