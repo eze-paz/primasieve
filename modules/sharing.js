@@ -339,12 +339,10 @@
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
-        '<label class="share-opt"><input type="radio" name="aud" value="org" checked> Everyone in the org</label>' +
-        (who.teams.length ? '<label class="share-opt"><input type="radio" name="aud" value="teams"> Team(s): <input class="share-in" data-k="teams" placeholder="' + esc(who.teams.join(', ')) + '"></label>'
-                          : '<label class="share-opt share-dim"><input type="radio" name="aud" value="teams" disabled> Teams (no team directory yet)</label>') +
+        '<label class="share-opt"><input type="radio" name="aud" value="org" checked> Share with team</label>' +
         '<label class="share-opt"><input type="radio" name="aud" value="users"> Specific people: <input class="share-in" data-k="users" placeholder="email, email…"></label>' +
-        '<label class="share-opt share-pin"><input type="checkbox" data-k="pin"> Pin to their home screen</label>' +
-        (folder ? '<div class="share-pin-file" style="display:none;"><label class="share-opt">Pin which file: <select class="share-in" data-k="pinfile">' +
+        '<label class="share-opt share-pin"><input type="checkbox" data-k="pin" checked> Pin to their home screen</label>' +
+        (folder ? '<div class="share-pin-file"><label class="share-opt">Pin which file: <select class="share-in" data-k="pinfile">' +
                     folderFiles.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
                   '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
@@ -361,14 +359,13 @@
     back.querySelector('[data-act="share"]').onclick = async () => {
       const sel = back.querySelector('input[name="aud"]:checked').value, audience = {};
       if (sel === 'org') audience.org = true;
-      else if (sel === 'teams') audience.teams = splitList(back.querySelector('.share-in[data-k="teams"]').value) || who.teams;
       else audience.users = splitList(back.querySelector('.share-in[data-k="users"]').value);
-      if ((sel === 'users' && !(audience.users || []).length) || (sel === 'teams' && !(audience.teams || []).length)) { back.querySelector('.share-modal-msg').textContent = 'Enter at least one ' + (sel === 'users' ? 'email' : 'team') + '.'; return; }
+      if (sel === 'users' && !(audience.users || []).length) { back.querySelector('.share-modal-msg').textContent = 'Enter at least one email.'; return; }
       const pin = !!pinBox.checked;
       const pinSel = back.querySelector('.share-in[data-k="pinfile"]');
       const pinFile = pin && folder && pinSel ? pinSel.value : undefined;
       const msg = back.querySelector('.share-modal-msg'); msg.textContent = 'Sharing…';
-      try { const r = await publish(srcPath, audience, { kind: presetKind, pin, pinFile }); msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'everyone' : sel === 'teams' ? audience.teams.join(', ') : audience.users.join(', ')) + (pin ? ', pinned ' + (pinFile || 'file') : '') + (cloudOn() ? '' : ' [local test — Dropbox not connected]'); setTimeout(close, 1400); }
+      try { const r = await publish(srcPath, audience, { kind: presetKind, pin, pinFile }); msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'the team' : audience.users.join(', ')) + (pin ? ', pinned ' + (pinFile || 'file') : '') + (cloudOn() ? '' : ' [local test — Dropbox not connected]'); setTimeout(close, 1400); }
       catch (e) { msg.textContent = 'Share failed: ' + ((e && e.message) || e); }
     };
   }
