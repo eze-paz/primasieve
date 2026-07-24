@@ -34,7 +34,7 @@
     // Match the show_artifact header: panel bar, monospace label, round icon buttons.
     const header = document.createElement('div');
     header.className = 'fv-header artifact-header';
-    header.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 8px;flex:none;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);';
+    header.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 8px;flex:none;width:100%;box-sizing:border-box;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);';
     const title = document.createElement('span');
     var _fname = fullKey.split('/').pop(); title.textContent = _fname;
     title.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
@@ -233,7 +233,7 @@
     modeSel.style.cssText = 'font:10px monospace;height:20px;padding:0 4px;flex:none;background:var(--sp-surface);color:var(--sp-text-dim);border:1px solid var(--sp-border);border-radius:10px;cursor:pointer;';
     [['Editor', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
     modeSel.onchange = () => ({ page: showPage, text: showText, rendered: showRendered }[modeSel.value] || showPage)();
-    header.insertBefore(modeSel, header.lastChild);
+    header.insertBefore(modeSel, header.firstElementChild.nextElementSibling);   // right after the title, not sandwiched among the icons
     // ↗ / ⬇ serving the LIVE document (reflects unsaved edits in any mode)
     addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name);
 
@@ -269,6 +269,8 @@
     // 📌 pin toggle — reflects/sets SandpiePins state for the open file.
     const pinBtn = addHeaderButton(header, '📌', 'Pin file', () => {});
     if (window.SandpiePins) SandpiePins.bindButton(pinBtn, fullKey);
+    // 🔗 share this file/folder
+    if (window.SandpieSharing) addHeaderButton(header, '🔗', 'Share', () => SandpieSharing.shareDialog(fullKey));
     // ↗ / ⬇ for every file. HTML serves live content via openHtmlModes; all
     // other types serve the original file bytes.
     if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);
@@ -283,7 +285,7 @@
       sheetSel.title = 'Spreadsheet viewer';
       sheetSel.style.cssText = 'font:10px monospace;height:20px;padding:0 4px;flex:none;background:var(--sp-surface);color:var(--sp-text-dim);border:1px solid var(--sp-border);border-radius:10px;cursor:pointer;';
       sheetModes.forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; sheetSel.appendChild(o); });
-      header.insertBefore(sheetSel, header.lastChild);
+      header.insertBefore(sheetSel, header.firstElementChild.nextElementSibling);   // right after the title
 
       let teardown = null;
 

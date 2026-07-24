@@ -238,6 +238,13 @@ function renderArtifact(host, path) {
   Promise.resolve(resolvedP).then(rp => { if (window.SandpiePins) SandpiePins.bindButton(pinBtn, rp || clean); });
   btns.appendChild(pinBtn);
 
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'artifact-icon-btn artifact-share-btn';
+  shareBtn.textContent = '🔗';
+  shareBtn.title = 'Share';
+  shareBtn.onclick = async () => { if (window.SandpieSharing) SandpieSharing.shareDialog((await resolvedP) || clean, 'artifact'); };
+  btns.appendChild(shareBtn);
+
   header.appendChild(btns);
   wrap.appendChild(header);
 
