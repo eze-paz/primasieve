@@ -96,23 +96,37 @@ const SandpieMemory = (function () {
     const projectOf = facts.map((f, i) => (f.project && f.project.trim()) ? f.project.trim() : (labelOf[compOf[i]] || ''));
     return { canon, canByFact, freq, edges, comps, compOf, labelOf, projectOf };
   }
-  // Which projects the current turn is "in": recent file paths that map to a fact,
-  // plus projects of any memory strongly keyword-matching the current user message.
+  // Which project(s) the current turn is "in". SCORE every project by relevance —
+  // recency-weighted recent-path hits + keyword hits — then activate only the TOP
+  // one or two (leader + anything within 60% of it, hard cap 2). Binary "any match →
+  // active" over-fired: a global recent-path list spanning scattered work, plus a big
+  // message, lit up every project at once. Ranking keeps it to the project(s) actually
+  // in focus; the rest stay in the one-line index (recall() pulls them on demand).
   function _activeProjects(facts, cl, ctx) {
-    const active = new Set();
     const base = p => String(p).split('/').filter(Boolean).pop() || p;
-    const recent = (ctx && ctx.paths) || [];
-    for (const rp of recent) for (let i = 0; i < facts.length; i++) {
-      if (cl.canByFact[i].some(c => c === rp || c.endsWith('/' + rp) || rp.endsWith('/' + c) || base(c) === base(rp))) active.add(cl.projectOf[i]);
-    }
-    const terms = [...new Set((String((ctx && ctx.message) || '').toLowerCase().match(/[a-z0-9][a-z0-9_-]{3,}/g) || []))];
-    if (terms.length) for (let i = 0; i < facts.length; i++) {
-      const hay = (facts[i].name + ' ' + facts[i].description + ' ' + facts[i].paths + ' ' + cl.projectOf[i]).toLowerCase();
+    const score = {};
+    const bump = (i, w) => { const p = cl.projectOf[i]; if (p) score[p] = (score[p] || 0) + w; };
+    // Recent paths: freshest first; weight newest higher; only the freshest ~12 (the
+    // list is a long global accumulator — stale cross-project paths shouldn't activate).
+    const recent = ((ctx && ctx.paths) || []).slice(0, 12);
+    recent.forEach((rp, idx) => {
+      const w = 2 - idx / 12;
+      for (let i = 0; i < facts.length; i++)
+        if (cl.canByFact[i].some(c => c === rp || c.endsWith('/' + rp) || rp.endsWith('/' + c) || base(c) === base(rp))) bump(i, w);
+    });
+    // Keyword match on the current user message (cap the term set so a pasted wall of
+    // text can't match everything); a fact needs ≥2 distinct term hits to count.
+    const terms = [...new Set((String((ctx && ctx.message) || '').toLowerCase().match(/[a-z0-9][a-z0-9_-]{3,}/g) || []))].slice(0, 40);
+    for (let i = 0; i < facts.length; i++) {
+      const hay = (facts[i].name + ' ' + facts[i].description + ' ' + facts[i].paths).toLowerCase();
       let hits = 0; for (const t of terms) if (hay.includes(t)) hits++;
-      if (hits >= 2 || (hits >= 1 && terms.length <= 3)) active.add(cl.projectOf[i]);
+      if (hits >= 2) bump(i, 1);
     }
-    active.delete('');
-    return active;
+    delete score[''];
+    const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) return new Set();
+    const max = ranked[0][1];
+    return new Set(ranked.filter(([, s]) => s >= max * 0.6).slice(0, 2).map(([p]) => p));
   }
   const FM_RE = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 

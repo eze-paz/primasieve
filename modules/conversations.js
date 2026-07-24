@@ -2951,7 +2951,11 @@ async function buildSystemPrompt(convMessages) {
       const c = lastUser && lastUser.content;
       memCtx.message = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '';
     } catch (_) {}
-    try { if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getRecentPaths) memCtx.paths = await SandpieAugmentations.getRecentPaths(); } catch (_) {}
+    // Use THIS conversation's touched files (getConvPaths), NOT the global recent-paths
+    // accumulator — in a fresh chat the global list is full of past-conversation work and
+    // would wrongly activate every project. Conversation-scoped = empty on a new chat, so
+    // only the current message drives activation until this chat actually touches files.
+    try { if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths) memCtx.paths = SandpieAugmentations.getConvPaths(activeConvId); } catch (_) {}
     try { content += await SandpieMemory.systemBlock(memCtx); }
     catch (e) { console.warn('[sandpie] memory block failed:', e); }
   }
