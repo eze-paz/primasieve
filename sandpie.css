@@ -3024,7 +3024,12 @@ body.sp-decoding *::after {
 .share-opt.share-dim { opacity: 0.5; }
 .share-in { flex: 1; min-width: 140px; background: var(--sp-bg); border: 1px solid var(--sp-border); border-radius: 5px; color: var(--sp-text); padding: 3px 7px; font-size: 0.8rem; }
 .share-modal-btns { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
-.share-primary { color: var(--sp-accent); border-color: var(--sp-accent); }
+/* .ghost is scoped to `aside`; this modal lives on <body>, so restyle its buttons
+   to match the app (same pattern as #settingsModal / .subs-modal). */
+.share-modal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.8rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.share-modal button.ghost:hover:not(:disabled) { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
+.share-modal button.share-primary { color: var(--sp-accent); border-color: var(--sp-accent); }
+.share-modal button.share-primary:hover:not(:disabled) { background: var(--sp-accent); color: var(--sp-text); border-color: var(--sp-accent); }
 .share-modal-msg { font-size: 0.76rem; color: var(--sp-text-dim); margin-top: 0.6rem; min-height: 1em; }
 
 .shared-home { width: 100%; max-width: 420px; margin-top: 1.4rem; text-align: left; user-select: none; }
