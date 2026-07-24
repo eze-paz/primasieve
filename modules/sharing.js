@@ -136,16 +136,19 @@
 
     const acl = { org: !!audience.org, users: (audience.users || []).map(String), teams: (audience.teams || []).map(String) };
     const pinFile = opts.pin ? (kind === 'artifact' ? base : (files[0] || '')) : null;
-    let latest = '1';
+    let rev = 1;
     for (const store of dests) {
       const prev = await readManifest(store, id);
-      const ver = String((prev ? parseInt(prev.latest, 10) || 0 : 0) + 1); latest = ver;
-      for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/v/' + ver + '/' + rel, bytes); }
-      const manifest = { id, kind, title: opts.title || base, publisher: me().user, latest: ver, acl, pin: pinFile, skill: kind === 'skill', ts: 0 };
+      rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
+      // Files live FLAT under packages/<id>/ (no v/<n>/ dirs) — overwritten each
+      // publish. Dropbox keeps prior revisions for rollback; `rev` just bumps so
+      // subscribers notice an update.
+      for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); }
+      const manifest = { id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', ts: 0 };
       await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(manifest, null, 2));
     }
     fire();
-    return { id, latest, kind, dests: dests.map(d => d.kind + ':' + d.root) };
+    return { id, rev, kind, dests: dests.map(d => d.kind + ':' + d.root) };
   }
 
   /* ── catalog (what's available TO ME) ─────────────────────────────────── */
@@ -169,19 +172,18 @@
 
   /* ── accept / install / activate ──────────────────────────────────────── */
   async function install(m) {
-    const store = m._store, ver = m.latest, dst = INSTALL_ROOT + '/' + m.id;
-    const files = await store.listFiles('packages/' + m.id + '/v/' + ver);
-    for (const rel of files) { const bytes = await store.readBytes('packages/' + m.id + '/v/' + ver + '/' + rel); if (bytes) await O().write(dst + '/' + rel, new Blob([bytes])); }
+    const store = m._store, dst = INSTALL_ROOT + '/' + m.id;
+    const files = (await store.listFiles('packages/' + m.id)).filter(rel => rel !== 'manifest.json');
+    for (const rel of files) { const bytes = await store.readBytes('packages/' + m.id + '/' + rel); if (bytes) await O().write(dst + '/' + rel, new Blob([bytes])); }
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
     // skill:true → nothing to move; context.js discovers sandpie/shared/<id>/SKILL.md and load_skill resolves it
-    try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, ver } })); } catch (_) {}
-    try { self.postMessage && 0; } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
   }
   async function accept(id) {
     const cat = await catalog(); const m = cat[id]; if (!m) return;
     await install(m);
-    const s = await subs(); s.accepted[id] = m.latest; s.dismissed = s.dismissed.filter(x => x !== id); await saveSubs(s);
+    const s = await subs(); s.accepted[id] = m.rev; s.dismissed = s.dismissed.filter(x => x !== id); await saveSubs(s);
     fire();
   }
   async function dismiss(id) { const s = await subs(); if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s); fire(); }
@@ -192,7 +194,7 @@
     if (syncing || !O()) return; syncing = true;
     try {
       const cat = await catalog(), s = await subs(); let changed = false;
-      for (const id in s.accepted) { const m = cat[id]; if (!m) continue; if (String(m.latest) !== String(s.accepted[id])) { await install(m); s.accepted[id] = m.latest; changed = true; } }
+      for (const id in s.accepted) { const m = cat[id]; if (!m) continue; if (String(m.rev) !== String(s.accepted[id])) { await install(m); s.accepted[id] = m.rev; changed = true; } }
       if (changed) { await saveSubs(s); fire(); }
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
