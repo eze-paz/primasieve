@@ -3042,6 +3042,7 @@ body.sp-decoding *::after {
 .shared-toggle { background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; width: 100%; text-align: left; }
 .shared-caret { font-size: 0.6rem; width: 0.8em; display: inline-block; flex: none; }
 .shared-list { display: flex; flex-direction: column; }
+.shared-pin { flex: none; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px 4px; }
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
 .share-banner {

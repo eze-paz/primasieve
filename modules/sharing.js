@@ -35,7 +35,8 @@
   const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
   const SUBS_PATH = 'sandpie/config/shares.json';   // team-share subscription state only (1:1 uses the filesystem)
   const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev}
-  const COLLAPSE_KEY = 'sandpie-shared-collapsed';  // "Shared with me" collapsed state (per device)
+  const COLLAPSE_KEY = 'sandpie-shared-collapsed';      // "Shared with me" collapsed state (per device)
+  const TEAM_COLLAPSE_KEY = 'sandpie-team-collapsed';   // "Team artifacts" collapsed state (per device)
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
   const localPart = (email) => String(email || '').split('@')[0].toLowerCase();
@@ -181,15 +182,12 @@
   //     it out (→ shared-installed) which clears the notification; a re-share re-delivers
   //     a fresh file and re-notifies. No accepted-state cache, so nothing goes stale.
   //   • team            → tracked in shares.json (accepted/dismissed) for silent auto-update.
+  // Invites are 1:1 only: a file present in shared-incoming = pending, cleared by accept
+  // (move). Team artifacts are NOT invited — they auto-install and always list under
+  // "Team artifacts" (see autoSync).
   async function pendingInvites() {
-    const who = me(), cat = await catalog(), s = await subs(), out = [];
-    for (const id in cat) {
-      const m = cat[id];
-      if (m.publisher === who.user) continue;
-      if (m._from === 'incoming') { out.push(m); continue; }   // present ⇒ pending (accept consumes it)
-      if (s.accepted[id] != null || s.dismissed.includes(id)) continue;
-      out.push(m);
-    }
+    const who = me(), cat = await catalog(), out = [];
+    for (const id in cat) { const m = cat[id]; if (m._from !== 'incoming') continue; if (m.publisher === who.user) continue; out.push(m); }
     return out;
   }
   // "Shared with me" = whatever is physically installed (each package carries a small
@@ -218,7 +216,7 @@
     }
     // marker so "Shared with me" + rollback-free identification work without shares.json
     const mp = dst + '/' + PKG_MARKER;
-    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev })], { type: 'application/json' }));
+    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming' })], { type: 'application/json' }));
     markDirty(mp);
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
@@ -250,18 +248,16 @@
     }
     try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
   }
-  // Remove an INSTALLED shared package: delete sandpie/shared-installed/<id>/ (local +
-  // Dropbox), unpin anything under it, and stop a team share from auto-reinstalling or
-  // re-appearing as an invite.
-  async function uninstall(id) {
+  // Delete a locally-installed package: sandpie/shared-installed/<id>/ (local + the
+  // user's own Dropbox copy), and unpin anything under it. Used by both the
+  // "Shared with me" ✕ (uninstall) and the team ✕ (unshare, after hub delete).
+  async function removeInstalledLocal(id) {
     const dst = INSTALL_ROOT + '/' + id;
     if (window.SandpiePins) { for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p); }
     try {
       const p = prov();
       if (cloudOn() && p && p.cloudDelete && p.workingRoot) {
-        const abs = String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + dst;
-        await p.cloudDelete(abs);
-        console.log('[sharing] uninstalled — deleted from Dropbox:', abs);
+        await p.cloudDelete(String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + dst);
       }
     } catch (e) { console.warn('[sharing] cloud delete of installed failed:', e); }
     for (const rel of await listOpfs(dst, '', [])) {
@@ -270,41 +266,64 @@
       try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
     }
     try { await O().remove(dst); } catch (_) {}
-    const s = await subs(); delete s.accepted[id]; if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s);
+  }
+  // "Shared with me" ✕ — remove my accepted 1:1 copy (a re-share re-delivers, so nothing to suppress).
+  async function uninstall(id) { await removeInstalledLocal(id); fire(); }
+  // Team ✕ (publisher-gated in the UI) — UNSHARE: delete the package from the team hub
+  // (gone for everyone), then drop the local auto-installed copy.
+  async function unshareTeam(id) {
+    try {
+      const p = prov();
+      if (cloudOn() && p && p.cloudDelete && p.cloudParent) {
+        const abs = String(p.cloudParent() || '').replace(/\/+$/, '') + '/shared-hub/packages/' + id;
+        await p.cloudDelete(abs);
+        console.log('[sharing] unshared team artifact from hub:', abs);
+      }
+    } catch (e) { console.warn('[sharing] unshare (hub delete) failed:', e); }
+    await removeInstalledLocal(id);
     fire();
   }
-  async function accept(id) {
+  async function accept(id) {   // 1:1 only (team never produces invites)
     const cat = await catalog(); const m = cat[id]; if (!m) return;
     await install(m);
-    if (m._from === 'incoming') { await consumeIncoming(m); }                 // MOVE: clears the notification
-    else { const s = await subs(); s.accepted[id] = m.rev; s.dismissed = s.dismissed.filter(x => x !== id); await saveSubs(s); }
+    if (m._from === 'incoming') await consumeIncoming(m);   // MOVE incoming → installed; clears the notification
     fire();
   }
-  async function dismiss(id) {
+  async function dismiss(id) {  // 1:1 only — delete the incoming delivery without installing
     const cat = await catalog(); const m = cat[id];
-    if (m && m._from === 'incoming') { await consumeIncoming(m); fire(); return; }   // delete without installing
-    const s = await subs(); if (!s.dismissed.includes(id)) s.dismissed.push(id); await saveSubs(s); fire();
+    if (m && m._from === 'incoming') await consumeIncoming(m);
+    fire();
   }
 
-  /* ── silent auto-update ───────────────────────────────────────────────── */
+  /* ── team artifacts: auto-install / auto-update / prune (no accept) ─────── */
+  // Every entitled team-hub package is silently installed and kept at latest rev, and
+  // ones removed from the hub (unshared) are dropped locally. 1:1 installs (from !=
+  // 'team') are never touched here.
   let syncing = false;
   async function autoSync() {
     if (syncing || !O()) return; syncing = true;
     try {
-      const cat = await catalog(), s = await subs(); let changed = false;
-      // Team subscriptions only. 1:1 shares are never in shares.json (they're accepted
-      // by moving the file), so a re-delivered 1:1 shows as a fresh invite instead of
-      // silently re-installing — the bug this guard prevents.
-      for (const id in s.accepted) { const m = cat[id]; if (!m || m._from !== 'team') continue; if (String(m.rev) !== String(s.accepted[id])) { await install(m); s.accepted[id] = m.rev; changed = true; } }
-      if (changed) { await saveSubs(s); fire(); }
-    } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
+      const cat = await catalog(); const teamIds = new Set(); let changed = false;
+      for (const id in cat) {
+        const m = cat[id]; if (m._from !== 'team') continue; teamIds.add(id);
+        let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+        if (!mk || String(mk.rev) !== String(m.rev)) { await install(m); changed = true; }   // install() marks from='team'
+      }
+      let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
+      for (const id of dirs) {
+        if (teamIds.has(id)) continue;
+        let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+        if (mk && mk.from === 'team') { await removeInstalledLocal(id); changed = true; }   // unshared from the hub → drop local
+      }
+      if (changed) fire();
+    } catch (e) { console.warn('[sharing] team autoSync failed:', e); } finally { syncing = false; }
   }
 
   /* ── events ───────────────────────────────────────────────────────────── */
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, acceptedList, accept, dismiss, uninstall, autoSync, subscribe, shareDialog, teamHub, recipientHub, INSTALL_ROOT, LOCAL_HUB };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, acceptedList, accept, dismiss, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, INSTALL_ROOT, LOCAL_HUB };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */
@@ -366,23 +385,18 @@
       try { invites = await pendingInvites(); installed = await acceptedList(); } catch (_) {}
       _pendingCount = invites.length;   // banner is updated in finally, once the box is populated/sized
       box.textContent = '';
-      if (!invites.length && !installed.length) { box.style.display = 'none'; return; }
+      const shared = installed.filter(m => m.from !== 'team');   // accepted 1:1
+      const team = installed.filter(m => m.from === 'team');     // auto, always shown
+      if (!invites.length && !shared.length && !team.length) { box.style.display = 'none'; return; }
       box.style.display = '';
       if (invites.length) { const h = document.createElement('div'); h.className = 'shared-home-title'; h.textContent = '📥 Shared with you'; box.appendChild(h); for (const m of invites) box.appendChild(inviteRow(m)); }
-      if (installed.length) {
-        let collapsed = true; try { if (localStorage.getItem(COLLAPSE_KEY) === '0') collapsed = false; } catch (_) {}   // collapsed by default; '0' = user expanded
-        const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
-        const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
-        const lbl = document.createElement('span'); lbl.textContent = '🔗 Shared with me (' + installed.length + ')';
-        h.append(caret, lbl);
-        const list = document.createElement('div'); list.className = 'shared-list'; list.style.display = collapsed ? 'none' : '';
-        for (const m of installed) list.appendChild(installedRow(m));
-        h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; try { localStorage.setItem(COLLAPSE_KEY, open ? '0' : '1'); } catch (_) {} };
-        box.appendChild(h); box.appendChild(list);
-      }
+      if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
+      // Team artifacts: ✕ (unshare) only on ones I published; everyone else gets pin only.
+      if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team, m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
     } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
   }
   const kindIcon = (k) => k === 'skill' ? '🧩' : k === 'folder' ? '📁' : '📄';
+  const entryOf = (m) => m.pin || (m.kind === 'artifact' ? m.title : (m.kind === 'skill' ? 'SKILL.md' : ''));   // the file to open/pin
   function inviteRow(m) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
     row.innerHTML = '<span class="shared-file-name">' + kindIcon(m.kind) + ' ' + esc(m.title) + '</span><span class="shared-by">from ' + esc(m.publisher) + '</span>';
@@ -390,14 +404,30 @@
     const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕'; dis.onclick = () => dismiss(m.id);
     row.append(acc, dis); return row;
   }
-  function installedRow(m) {
+  // A collapsible titled group (count in the title), collapsed by default; '0' = user expanded.
+  function group(title, key, items, rowFn) {
+    const frag = document.createDocumentFragment();
+    let collapsed = true; try { if (localStorage.getItem(key) === '0') collapsed = false; } catch (_) {}
+    const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
+    const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
+    const lbl = document.createElement('span'); lbl.textContent = title + ' (' + items.length + ')';
+    h.append(caret, lbl);
+    const list = document.createElement('div'); list.className = 'shared-list'; list.style.display = collapsed ? 'none' : '';
+    for (const m of items) list.appendChild(rowFn(m));
+    h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };
+    frag.append(h, list); return frag;
+  }
+  // A row for an installed item: open · pin toggle · (optional ✕). onDelete=null → no ✕.
+  function itemRow(m, onDelete) {
     const row = document.createElement('div'); row.className = 'shared-file';
+    const entry = entryOf(m), full = entry ? INSTALL_ROOT + '/' + m.id + '/' + entry : null;
     const open = document.createElement('button'); open.className = 'shared-file-open'; open.innerHTML = kindIcon(m.kind) + ' ' + esc(m.title);
     open.title = m.kind === 'skill' ? 'Shared skill — the model can load it by name' : INSTALL_ROOT + '/' + m.id;
-    open.onclick = () => { const entry = m.pin || (m.kind === 'artifact' ? m.title : ''); if (entry) { try { opfs.openFile(INSTALL_ROOT + '/' + m.id + '/' + entry, entry.split('/').pop()); } catch (_) {} } };
-    const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove from my shared items'; del.textContent = '✕';
-    del.onclick = (e) => { e.stopPropagation(); uninstall(m.id); };
-    row.append(open, del); return row;
+    open.onclick = () => { if (entry) { try { opfs.openFile(full, entry.split('/').pop()); } catch (_) {} } };
+    row.append(open);
+    if (full && window.SandpiePins) { const pin = document.createElement('button'); pin.className = 'shared-pin'; SandpiePins.bindButton(pin, full); row.append(pin); }
+    if (onDelete) { const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove'; del.textContent = '✕'; del.onclick = (e) => { e.stopPropagation(); onDelete(); }; row.append(del); }
+    return row;
   }
 
   /* ── off-home banner ──────────────────────────────────────────────────── */
