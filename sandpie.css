@@ -281,7 +281,7 @@
     max-width: 140px;
   }
   .dbx-status.error { background: var(--sp-danger-dim); color: var(--sp-danger); }
-  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 
   #messagesWrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; scrollbar-gutter: stable; min-width: 0; }
@@ -3034,7 +3034,7 @@ body.sp-decoding *::after {
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
 .share-banner {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3000;   /* scoped to <main>, not over the sidebar */
   background: var(--sp-accent); color: #fff;
   font-size: 0.82rem; font-weight: 500; text-align: center;
   padding: 0.5rem 1rem; cursor: pointer; user-select: none;

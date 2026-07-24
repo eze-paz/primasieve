@@ -377,7 +377,7 @@
       _banner.className = 'share-banner';
       _banner.setAttribute('data-chrome', '');
       _banner.onclick = () => { try { if (window.newConversation) newConversation(); } catch (_) {} };
-      document.body.appendChild(_banner);
+      (document.querySelector('main') || document.body).appendChild(_banner);   // scoped to the main pane
     }
     _banner.textContent = '📥 ' + _pendingCount + ' item' + (_pendingCount === 1 ? '' : 's') + ' shared with you — tap to view';
     _banner.style.display = '';
