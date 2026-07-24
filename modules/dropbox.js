@@ -1027,6 +1027,30 @@
         try { const st = syncState(); st[r] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(r) }; setSyncState(st); } catch (_) {}
         return true;
       },
+      // --- Sharing transport (sharing.js) -----------------------------------
+      // Read/write arbitrary TEAM-namespace paths OUTSIDE the per-user workspace
+      // (the shared hub + colleagues' folders), using the same authed API + team
+      // path-root the sync uses. Absolute paths resolve against the team root
+      // (e.g. /R+D+I/sandpie/shared-hub). cloudParent() = the workspace's parent,
+      // i.e. the shared area every team member's workspace sits under.
+      cloudConnected: () => !!tokens(),
+      cloudParent: () => (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, '').replace(/\/[^/]+$/, ''),
+      async cloudUpload(absPath, bytes) {
+        const token = await accessToken();
+        const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream',
+                     'Dropbox-API-Arg': apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }), ...pathRootHeaderObj() },
+          body: bytes,
+        });
+        if (!res.ok) throw new Error('cloudUpload ' + absPath + ': ' + res.status + ' ' + (await res.text()).slice(0, 200));
+        return await res.json();
+      },
+      cloudDownload: (absPath) => download(absPath),
+      async cloudList(absPath, recursive = false) {
+        try { return (await listFolder(absPath, { recursive })).entries; }
+        catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
+      },
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);

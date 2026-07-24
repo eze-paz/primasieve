@@ -3031,3 +3031,4 @@ body.sp-decoding *::after {
 .shared-dismiss { flex: none; background: transparent; border: none; color: var(--sp-text-dim); cursor: pointer; font-size: 0.8rem; padding: 2px 6px; }
 .shared-dismiss:hover { color: var(--sp-accent); }
 .shared-file.invite { background: var(--sp-accent-dim); border-color: transparent; }
+.share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
