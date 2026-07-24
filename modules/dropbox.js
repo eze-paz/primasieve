@@ -1047,6 +1047,7 @@
         return await res.json();
       },
       cloudDownload: (absPath) => download(absPath),
+      cloudDelete: (absPath) => del(absPath),   // delete_v2 (recursive for folders); no-op on not_found
       async cloudList(absPath, recursive = false) {
         try { return (await listFolder(absPath, { recursive })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }

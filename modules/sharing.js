@@ -220,6 +220,20 @@
   // and dismiss. file:deleted propagates the removal to the recipient's Dropbox folder.
   async function consumeIncoming(m) {
     const base = m._store.root + '/packages/' + m.id;
+    // 1) Remove from Dropbox DETERMINISTICALLY: one awaited, recursive folder delete at
+    //    the recipient's own incoming path. The file:deleted event alone was unreliable
+    //    here — its del() is fire-and-forget, so a concurrent sync pull could re-download
+    //    the still-present cloud file before the delete landed. Logged so the real
+    //    two-account test can confirm the exact path.
+    try {
+      const p = prov();
+      if (cloudOn() && p && p.cloudDelete && p.workingRoot) {
+        const abs = String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + base;   // = relToCloud(base)
+        await p.cloudDelete(abs);
+        console.log('[sharing] consumed incoming — deleted from Dropbox:', abs);
+      }
+    } catch (e) { console.warn('[sharing] cloud delete of incoming failed:', e); }
+    // 2) Remove locally + forget from sync state (file:deleted → forgetFromStateAndIndex).
     for (const rel of await listOpfs(base, '', [])) {
       const p = base + '/' + rel;
       try { await O().remove(p); } catch (_) {}
