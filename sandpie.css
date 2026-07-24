@@ -1595,8 +1595,12 @@ ul.conv-list li.active {
   #attachBtn { background: transparent; border: 1px solid var(--sp-border); color: var(--sp-text-dim); padding: 0 0.6rem; cursor: pointer; border-radius: 4px; }
   #attachBtn:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
   .welcome {
-    margin: auto 0;
-    padding: 2rem 1rem;
+    /* top-anchored, NOT vertically centred: margin:auto on a scrollable flex
+       container snaps between centred and top-aligned at the exact-fit boundary
+       (scrollHeight==clientHeight), which jitters on wheel scroll. A responsive
+       top offset keeps the empty state pleasantly placed without the snap. */
+    margin: 0;
+    padding: clamp(2rem, 8vh, 5.5rem) 1rem 2.5rem;
     text-align: center;
     color: var(--sp-text-dim);
     display: flex;
@@ -2996,6 +3000,15 @@ body.sp-decoding *::after {
   transition: transform .12s ease, border-color .12s, box-shadow .12s;
 }
 .pin-thumb.has-thumb { color: transparent; }   /* image covers the badge text */
+/* colourful, token-driven app-icon tiles: the typed extension sits on a colour
+   derived from the theme's semantic tokens (so it adapts to any theme). A resolved
+   real thumbnail (.has-thumb) still overrides. color-mix darkens one end for depth
+   + white-glyph legibility on both light and dark palettes. */
+.pin-thumb[data-ext="html"], .pin-thumb[data-ext="htm"], .pin-thumb[data-ext="svg"] { background: linear-gradient(145deg, var(--sp-accent), color-mix(in srgb, var(--sp-accent), #000 34%)); color: #fff; border-color: transparent; }
+.pin-thumb[data-ext="pdf"] { background: linear-gradient(145deg, var(--sp-danger), color-mix(in srgb, var(--sp-danger), #000 26%)); color: #fff; border-color: transparent; }
+.pin-thumb[data-ext="csv"], .pin-thumb[data-ext="xlsx"], .pin-thumb[data-ext="xls"], .pin-thumb[data-ext="ods"] { background: linear-gradient(145deg, var(--sp-success), color-mix(in srgb, var(--sp-success), #000 26%)); color: #fff; border-color: transparent; }
+.pin-thumb[data-ext="json"], .pin-thumb[data-ext="js"], .pin-thumb[data-ext="py"], .pin-thumb[data-ext="sh"], .pin-thumb[data-ext="ts"], .pin-thumb[data-ext="yaml"] { background: linear-gradient(145deg, var(--sp-warn), color-mix(in srgb, var(--sp-warn), #000 24%)); color: #fff; border-color: transparent; }
+.pin-thumb[data-ext="md"], .pin-thumb[data-ext="markdown"], .pin-thumb[data-ext="txt"], .pin-thumb[data-ext="doc"], .pin-thumb[data-ext="docx"] { background: linear-gradient(145deg, color-mix(in srgb, var(--sp-accent), var(--sp-surface) 40%), color-mix(in srgb, var(--sp-accent), #000 34%)); color: #fff; border-color: transparent; }
 .pin-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pin-tile-btn:hover .pin-thumb, .pin-tile-btn:focus-visible .pin-thumb {
   transform: translateY(-2px); border-color: var(--sp-accent); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
