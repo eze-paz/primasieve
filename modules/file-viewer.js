@@ -138,9 +138,22 @@
         const div = document.createElement('div');
         div.className = 'md-body';
         div.style.cssText = 'padding:14px 18px;max-width:820px;margin:0 auto;color:var(--sp-text,#e6edf3);line-height:1.6;';
+        // For memory files, turn [[name]] into clickable links to the sibling memory
+        // (rendered as a #mem: fragment href, which survives DOMPurify, then intercepted).
+        const isMem = /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(fullKey);
+        let src = text;
+        if (isMem) src = text
+          .replace(/^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n/, '')          // hide frontmatter in the rendered read (Source mode still shows it)
+          .replace(/\[\[([A-Za-z0-9][A-Za-z0-9_-]*)\]\]/g, (_m, n) => `[${n}](#mem:${n})`);
         // marked + DOMPurify are loaded blocking in the page head (same as chat rendering).
-        try { div.innerHTML = window.DOMPurify.sanitize(window.marked.parse(text)); }
+        try { div.innerHTML = window.DOMPurify.sanitize(window.marked.parse(src)); }
         catch (_) { const pre = document.createElement('pre'); pre.textContent = text; pre.style.whiteSpace = 'pre-wrap'; div.appendChild(pre); }
+        if (isMem) div.addEventListener('click', (e) => {
+          const a = e.target.closest('a[href^="#mem:"]'); if (!a) return;
+          e.preventDefault();
+          const n = a.getAttribute('href').slice(5);
+          if (n) open('sandpie/memory/' + n + '.md', n + '.md');
+        });
         fill(body, div);
       }
     }

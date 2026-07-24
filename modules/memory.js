@@ -673,7 +673,10 @@ const SandpieMemory = (function () {
       _sbNodes.push({ el, x: p.x, y: p.y, phase: _sbRand01(_sbHash(p.f.name), 4) * Math.PI * 2, isNew: el.classList.contains('sb-new') });
       el.addEventListener('mouseenter', () => { el.setAttribute('r', (p.s * 1.9).toFixed(1)); hover.innerHTML = `<b>${_sbEsc(p.f.name)}</b> · ${_sbEsc(p.f.description)}`; });
       el.addEventListener('mouseleave', () => { el.setAttribute('r', p.s.toFixed(1)); hover.textContent = 'hover a memory'; });
-      el.addEventListener('click', () => { if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + p.f.name); });
+      el.addEventListener('click', () => {
+        if (window.SandpieFileViewer && SandpieFileViewer.open) SandpieFileViewer.open(DIR + '/' + p.f.file, p.f.file);
+        else if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + p.f.name);
+      });
     });
     _sbStartAnim();
   }
