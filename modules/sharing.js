@@ -77,7 +77,15 @@
     const strip = (p) => { const i = p.toLowerCase().indexOf(absRoot.toLowerCase() + '/'); return i >= 0 ? p.slice(i + absRoot.length + 1) : p.replace(/^\/+/, ''); };
     return {
       kind: 'cloud', root: absRoot,
-      async listFiles(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, true)).filter(e => e.kind === 'file').map(e => strip(e.path)); },
+      async listFiles(sub) {
+        // Return paths RELATIVE TO `base` (the sub dir), like localStore — install()
+        // does readBytes('packages/<id>/' + rel), so rel must NOT re-include that prefix.
+        const base = absRoot + (sub ? '/' + sub : ''), bl = base.toLowerCase() + '/';
+        return (await P().cloudList(base, true)).filter(e => e.kind === 'file').map(e => {
+          const i = e.path.toLowerCase().indexOf(bl);
+          return i >= 0 ? e.path.slice(i + base.length + 1) : e.path.split('/').pop();
+        });
+      },
       async listDirs(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, false)).filter(e => e.kind === 'folder' || e.kind === 'directory').map(e => e.path.split('/').pop()); },   // Dropbox tags folders 'folder', not 'directory'
       async readText(rel) { try { return new TextDecoder().decode(await P().cloudDownload(absRoot + '/' + rel)); } catch (_) { return null; } },
       async readBytes(rel) { try { return await P().cloudDownload(absRoot + '/' + rel); } catch (_) { return null; } },
