@@ -246,7 +246,7 @@ Requires the local relay running; on a connection error, tell the user to start 
       },
     },
     remember: {
-      description: `Save something you've learned that should persist across conversations. Saved facts are auto-injected into your context every turn — saving IS remembering; there is no recall step.
+      description: `Save something you've learned that should persist across conversations. Facts for the project you're CURRENTLY working in are auto-injected in full every turn; the rest appear as a one-line index you can expand with recall(). So saving is usually enough — but if you need a fact that's only in the index, call recall().
 WRITE ONE AS SOON AS you learn any of these (capture it the moment it's clear — don't wait for the task to end):
   - a stable user preference or fact about the user  → type "user"
   - a correction or instruction on HOW to work, with the reason why  → type "feedback"
@@ -266,8 +266,21 @@ LINK related memories: reference other facts inside the body as [[their-name]] (
           type:        { type: 'string', enum: ['user', 'feedback', 'project', 'reference'], description: 'user = who they are/preferences; feedback = how to work + why; project = ongoing context; reference = pointer to a resource.' },
           body:        { type: 'string', description: 'The fact itself, in full. For feedback/project include the reasoning ("why") so it stays actionable.' },
           links:       { type: 'array', items: { type: 'string' }, description: 'Optional names of related memories to cross-link.' },
+          project:     { type: 'string', description: 'Optional: the project/topic this fact belongs to (e.g. "riscv-vm", "sandpie"). Omit to let it be derived from the files you touched. Facts sharing a project are grouped and recalled together.' },
         },
         required: ['name', 'body'],
+      },
+    },
+
+    recall: {
+      description: `Load memories that aren't currently shown in full. Your context shows the CURRENT project's memories in full plus a one-line index of the rest; call recall to pull any indexed fact (or a whole other project) into view by keyword or name. Use it when the task touches something outside your current project — a past decision, a gotcha, another project's setup.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Keywords or a memory name to search for across all saved memories.' },
+          limit: { type: 'number', description: 'Max memories to return (default 3, max 6).' },
+        },
+        required: ['query'],
       },
     },
 
@@ -300,8 +313,8 @@ function _toolAvailable(name) {
     try { const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); return !!(p && p.isConnected && p.isConnected()); }
     catch (_) { return false; }
   }
-  // remember is only offered when the memory feature is enabled (Settings → Memory).
-  if (name === 'remember') {
+  // remember/recall are only offered when the memory feature is enabled (Settings → Memory).
+  if (name === 'remember' || name === 'recall') {
     try { return !!(window.SandpieMemory && SandpieMemory.isEnabled()); }
     catch (_) { return false; }
   }

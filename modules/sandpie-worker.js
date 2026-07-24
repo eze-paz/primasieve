@@ -1300,6 +1300,7 @@ async function runTool(name, args, ctx) {
     case 'write_todos':   return tool_write_todos(args, ctx);
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
+    case 'recall':        return tool_recall(args, ctx);
     default:              return unknownTool(name);
   }
 }
@@ -1943,7 +1944,11 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
 // file with the same slug exists we preserve its `created` date and update.
 function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
 
-async function tool_remember({ name, description, type, body, links }, ctx) {
+// Deterministic project label from a path: first meaningful segment(s). Mirrors
+// memory.js _projLabel so injection/graph group by the same key.
+function _projFromPath(p) { const s = String(p || '').split('/').filter(Boolean); if (!s.length) return ''; return s.slice(0, (s[0] === 'skills' || s[0] === 'files') ? 2 : 1).join('/'); }
+
+async function tool_remember({ name, description, type, body, links, project }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
   // Provenance from THIS turn (back to the previous user message):
   //  - tool_calls: the [rN] result IDs (capped — was dumping the whole turn).
@@ -1996,8 +2001,12 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   try { const ex = await opfsReadText(path); const m = /^created:[ \t]*(.+)$/m.exec(ex); if (m) { created = m[1].trim(); verb = 'Updated memory'; } } catch (_) {}
   const desc = String(description || '').replace(/\s*\n\s*/g, ' ').trim();
   const convId = ctx && ctx._conversation_file_name ? ctx._conversation_file_name : 'unknown';
+  // project = the model's explicit hint if given, else derived from the top path.
+  // First-class grouping key for tiered injection + the graph (memory.js).
+  const projLabel = (project && String(project).trim()) || (toolPaths.length ? _projFromPath(toolPaths[0]) : '');
   let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.slice(0, 8).join(', ')}\n`;
   if (toolPaths.length) out += `paths: ${toolPaths.join(', ')}\n`;
+  if (projLabel) out += `project: ${projLabel}\n`;
   out += '---\n' + String(body).trim() + '\n';
   if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
   try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }
@@ -2006,6 +2015,31 @@ async function tool_remember({ name, description, type, body, links }, ctx) {
   // BEFORE it's ever pushed. Same mechanism tool_write_file uses.
   self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } });
   return { result: verb + ' "' + slug + '" (' + t + ').' };
+}
+
+// recall — pull memory facts NOT currently shown in full. Tiered injection shows
+// only the active project's memories in full + a 1-line index of the rest; this
+// loads any indexed fact by keyword. Deterministic term-overlap scan over the store.
+async function tool_recall({ query, limit }, ctx) {
+  const terms = [...new Set(String(query || '').toLowerCase().match(/[a-z0-9][a-z0-9_-]{2,}/g) || [])];
+  if (!terms.length) return { result: 'recall: provide a query (keywords or a memory name).' };
+  let dir; try { dir = await opfsResolveDir(['sandpie', 'memory'], false); } catch (_) { return { result: 'recall: no memory store found.' }; }
+  const scored = [];
+  try {
+    for await (const [nm, h] of dir.entries()) {
+      if (h.kind !== 'file' || !nm.endsWith('.md') || nm === 'MEMORY.md' || nm.endsWith('.lessons.md')) continue;
+      let text = ''; try { text = await opfsReadText('sandpie/memory/' + nm); } catch (_) { continue; }
+      const hay = text.toLowerCase();
+      let score = 0; for (const t of terms) if (hay.includes(t)) score++;
+      if (nm.toLowerCase().includes(terms[0])) score += 2;   // name match is a strong signal
+      if (score) scored.push({ nm, score, text });
+    }
+  } catch (_) { return { result: 'recall: could not read the memory store.' }; }
+  if (!scored.length) return { result: 'recall: no memory matched "' + query + '".' };
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored.slice(0, Math.max(1, Math.min(limit || 3, 6)));
+  const out = top.map(m => '### ' + m.nm.replace(/\.md$/, '') + '\n' + m.text.replace(/^﻿?---[\s\S]*?\r?\n---[ \t]*\r?\n/, '').trim());
+  return { result: out.join('\n\n') };
 }
 
 // Build the OpenRouter-native `reasoning` parameter from the provider config.

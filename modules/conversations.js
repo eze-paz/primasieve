@@ -1315,7 +1315,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=79');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=80');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -2935,7 +2935,17 @@ async function buildSystemPrompt(convMessages) {
   // lands on the NEXT prompt build; this one injects the current store as-is.
   if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
     try { SandpieMemory.maybeConsolidate().catch((e) => console.warn('[sandpie] memory consolidate failed:', e)); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
-    try { content += await SandpieMemory.systemBlock(); }
+    // Context for tiered injection: the latest user message (keyword activation) +
+    // the files touched recently (path activation) decide which project's memories
+    // get promoted to full this turn (the rest are indexed). Both best-effort.
+    let memCtx = {};
+    try {
+      const lastUser = [...(convMessages || [])].reverse().find(m => m && m.role === 'user');
+      const c = lastUser && lastUser.content;
+      memCtx.message = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '';
+    } catch (_) {}
+    try { if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getRecentPaths) memCtx.paths = await SandpieAugmentations.getRecentPaths(); } catch (_) {}
+    try { content += await SandpieMemory.systemBlock(memCtx); }
     catch (e) { console.warn('[sandpie] memory block failed:', e); }
   }
   if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {

@@ -42,6 +42,63 @@ const SandpieMemory = (function () {
   const estTokens = (s) => Math.ceil((s || '').length / 4);
   const _today = () => new Date().toISOString().slice(0, 10);
   function _slug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'note'; }
+
+  // ---- clustering (shared by injection + graph) -----------------------------
+  // Canonical path identity via SUFFIX-UNION with a bare-basename guard (see the
+  // graph section for the rationale). Facts are grouped into components by shared
+  // canonical path (present in >=2 facts) OR identical stored `project` label.
+  function _parsePaths(f) { return String(f.paths || '').split(',').map(s => s.trim()).filter(Boolean); }
+  function _canonMap(all) {
+    const uniq = [...new Set(all)]; const nseg = p => p.split('/').filter(Boolean).length; const map = {};
+    for (const p of uniq) { let best = p, bl = nseg(p); if (nseg(p) >= 2) for (const q of uniq) if (q !== p && q.endsWith('/' + p) && nseg(q) > bl) { best = q; bl = nseg(q); } map[p] = best; }
+    return map;
+  }
+  // Deterministic project label from a canonical path: first meaningful segment(s).
+  function _projLabel(path) { const s = String(path).split('/').filter(Boolean); if (!s.length) return ''; return s.slice(0, (s[0] === 'skills' || s[0] === 'files') ? 2 : 1).join('/'); }
+  function _clusterFacts(facts) {
+    const canon = _canonMap(facts.flatMap(_parsePaths));
+    const canByFact = facts.map(f => [...new Set(_parsePaths(f).map(p => canon[p]))]);
+    const freq = {}; for (const cs of canByFact) for (const c of cs) freq[c] = (freq[c] || 0) + 1;
+    const par = facts.map((_, i) => i); const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const edges = [];
+    for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
+      const shared = canByFact[i].filter(c => freq[c] >= 2 && canByFact[j].includes(c));
+      if (shared.length) { edges.push([i, j, shared.length]); par[find(i)] = find(j); }
+    }
+    // stored `project` is a first-class grouping key: union facts sharing one
+    const seenProj = {};
+    facts.forEach((f, i) => { const p = (f.project || '').trim(); if (p) { if (seenProj[p] !== undefined) par[find(i)] = find(seenProj[p]); else seenProj[p] = i; } });
+    const comp = {}; for (let i = 0; i < facts.length; i++) { const r = find(i); (comp[r] = comp[r] || []).push(i); }
+    const comps = Object.values(comp).sort((a, b) => b.length - a.length);
+    const compOf = [], labelOf = [];
+    comps.forEach((g, ci) => {
+      const cf = {}; const pf = {};
+      for (const i of g) { compOf[i] = ci; const sp = (facts[i].project || '').trim(); if (sp) pf[sp] = (pf[sp] || 0) + 1; for (const c of canByFact[i]) if (freq[c] >= 2) cf[c] = (cf[c] || 0) + 1; }
+      const topProj = Object.entries(pf).sort((a, b) => b[1] - a[1])[0];
+      const topPath = Object.entries(cf).sort((a, b) => b[1] - a[1])[0];
+      labelOf[ci] = topProj ? topProj[0] : (topPath ? _projLabel(topPath[0]) : '');
+    });
+    const projectOf = facts.map((f, i) => (f.project && f.project.trim()) ? f.project.trim() : (labelOf[compOf[i]] || ''));
+    return { canon, canByFact, freq, edges, comps, compOf, labelOf, projectOf };
+  }
+  // Which projects the current turn is "in": recent file paths that map to a fact,
+  // plus projects of any memory strongly keyword-matching the current user message.
+  function _activeProjects(facts, cl, ctx) {
+    const active = new Set();
+    const base = p => String(p).split('/').filter(Boolean).pop() || p;
+    const recent = (ctx && ctx.paths) || [];
+    for (const rp of recent) for (let i = 0; i < facts.length; i++) {
+      if (cl.canByFact[i].some(c => c === rp || c.endsWith('/' + rp) || rp.endsWith('/' + c) || base(c) === base(rp))) active.add(cl.projectOf[i]);
+    }
+    const terms = [...new Set((String((ctx && ctx.message) || '').toLowerCase().match(/[a-z0-9][a-z0-9_-]{3,}/g) || []))];
+    if (terms.length) for (let i = 0; i < facts.length; i++) {
+      const hay = (facts[i].name + ' ' + facts[i].description + ' ' + facts[i].paths + ' ' + cl.projectOf[i]).toLowerCase();
+      let hits = 0; for (const t of terms) if (hay.includes(t)) hits++;
+      if (hits >= 2 || (hits >= 1 && terms.length <= 3)) active.add(cl.projectOf[i]);
+    }
+    active.delete('');
+    return active;
+  }
   const FM_RE = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
   function _parse(text, file) {
@@ -58,7 +115,7 @@ const SandpieMemory = (function () {
     const name = fm.name || (file ? file.replace(/\.md$/, '') : 'note');
     const description = fm.description || (body.split(/\r?\n/)[0] || '').slice(0, 120);
     const type = VALID_TYPES.includes(fm.type) ? fm.type : 'reference';
-    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md'), conversation: fm.conversation || '', tool_calls: fm.tool_calls || '', paths: fm.paths || '' };
+    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md'), conversation: fm.conversation || '', tool_calls: fm.tool_calls || '', paths: fm.paths || '', project: fm.project || '' };
   }
 
   async function list() {
@@ -97,31 +154,54 @@ const SandpieMemory = (function () {
   // this stays fresh; 0 when memory is off/empty.
   let _lastBlockChars = 0;
   function blockChars() { return _lastBlockChars; }
-  async function systemBlock() {
+  // Char budget for Tier-2 promoted bodies (~5K tokens). Beyond this, active-project
+  // memories that don't fit drop to the index and the cluster is flagged to consolidate.
+  const TIER2_BUDGET = 20000;
+  const _INSTRUCTION = "Durable facts you've saved with the remember tool. Treat them as true unless the current conversation contradicts them. Each fact shows its verification age (verified Nd ago) — judge staleness yourself; when a tool observation CONFIRMS an aging fact, re-save it (same name) to bump the date; when one CONTRADICTS it, update or forget it. As soon as you learn something durable and non-derivable — a user preference, standing feedback on how to work, or lasting project context — SAVE IT with remember right then. Memories for your CURRENT work are shown in full below; the rest are listed in the index by name — call recall(\"keywords\") to pull any of them in full. [[name]] links a related fact.";
+  function _badge(f, now) {
+    const ref = Date.parse(f.last_verified || f.created || '');
+    if (!Number.isFinite(ref)) return ' · unverified';
+    const days = Math.max(0, Math.floor((now - ref) / 86400000));
+    return days === 0 ? ' · verified today' : ` · verified ${days}d ago`;
+  }
+  // ctx (optional): { message: <latest user text>, paths: [recent file paths] } — drives
+  // which project's memories are promoted to full this turn. Absent ctx (cold) = index only.
+  async function systemBlock(ctx) {
     if (!isEnabled()) { _lastBlockChars = 0; return ''; }
     const facts = await list();
-    // Inject the instruction ALWAYS — even with an empty store. Gating it behind
-    // "facts already exist" was a cold-start dead zone: no facts → no instruction
-    // → the model never saved the first one → memory stayed empty forever. The
-    // capability + expectation must be visible from turn one.
-    const lines = ['', '', '# Memory',
-      "Durable facts you've saved across conversations with the remember tool. Treat them as true unless the current conversation contradicts them. Memory reflects what was true WHEN it was written — every fact shows its verification age (verified Nd ago); judge staleness yourself: the older, the more you should re-check before relying on it. When a tool observation CONFIRMS an aging fact still holds, re-save it with remember (same name, same content) to bump its verification date; when an observation CONTRADICTS one, update or forget it immediately. [[name]] inside a body is a link to the fact with that name slug (dangling links mark facts worth writing). As soon as you learn something durable and non-derivable — a stable user preference, standing feedback on how to work, or lasting project context (e.g. where a project's real source tree lives, a key decision, a gotcha) — SAVE IT with the remember tool right then, without waiting for the task to end."];
+    const lines = ['', '', '# Memory', _INSTRUCTION];
     if (!facts.length) {
       lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
-    } else {
-      // Verification age on EVERY fact — raw signal, no threshold: the model (which
-      // knows "now" from the prompt header) judges staleness itself. Falls back to
-      // created when last_verified is absent; no date at all → "unverified".
-      const now = Date.now();
-      for (const f of facts) {
-        let badge = ' · unverified';
-        const ref = Date.parse(f.last_verified || f.created || '');
-        if (Number.isFinite(ref)) {
-          const days = Math.max(0, Math.floor((now - ref) / 86400000));
-          badge = days === 0 ? ' · verified today' : ` · verified ${days}d ago`;
-        }
-        lines.push('', `## ${f.description} _(${f.type}${badge})_`, f.body);
-      }
+      const b = lines.join('\n'); _lastBlockChars = b.length; return b;
+    }
+    const now = Date.now();
+    const full = f => `\n## ${f.description} _(${f.type}${_badge(f, now)})_\n${f.body}`;
+    // Legacy path (flag off): inject every body in full, as before.
+    if (localStorage.getItem('sandpie-memory-tiered') === '0') {
+      for (const f of facts) lines.push('', `## ${f.description} _(${f.type}${_badge(f, now)})_`, f.body);
+      const b = lines.join('\n'); _lastBlockChars = b.length; return b;
+    }
+    // TIERED. Tier 0: user/feedback always full (identity + how-to-work).
+    const cl = _clusterFacts(facts);
+    const always = [], contextual = [];
+    facts.forEach((f, i) => { (f.type === 'user' || f.type === 'feedback') ? always.push(f) : contextual.push({ f, i }); });
+    if (always.length) { lines.push('', '## Standing — always applies'); for (const f of always) lines.push(full(f)); }
+    // Tier 2: promote contextual memories whose project is active this turn, newest first, until budget.
+    const active = _activeProjects(facts, cl, ctx);
+    const activeFacts = contextual.filter(x => active.has(cl.projectOf[x.i]))
+      .sort((a, b) => (Date.parse(b.f.last_verified || b.f.created || 0) || 0) - (Date.parse(a.f.last_verified || a.f.created || 0) || 0));
+    const promoted = new Set(); let used = 0, overflow = 0;
+    const promotedLines = [];
+    for (const x of activeFacts) { const t = full(x.f); if (used + t.length <= TIER2_BUDGET) { promotedLines.push(t); promoted.add(x.i); used += t.length; } else overflow++; }
+    if (promotedLines.length) { lines.push('', `## Active project${active.size > 1 ? 's' : ''}: ${[...active].join(', ')}`); for (const t of promotedLines) lines.push(t); }
+    // Tier 1: everything else as a 1-line index, grouped by project.
+    const idx = contextual.filter(x => !promoted.has(x.i));
+    if (idx.length) {
+      lines.push('', '## Index — other memories (recall("keywords") to load in full)');
+      const byProj = {};
+      for (const x of idx) { const p = cl.projectOf[x.i] || 'misc'; (byProj[p] = byProj[p] || []).push(x.f); }
+      for (const p of Object.keys(byProj).sort()) { lines.push('', `### ${p}`); for (const f of byProj[p]) lines.push(`- ${f.name}: ${f.description}`); }
+      if (overflow) lines.push('', `_(+${overflow} active-project memories over budget — recall() to load; consider consolidating this project)_`);
     }
     const block = lines.join('\n');
     _lastBlockChars = block.length;
@@ -423,43 +503,11 @@ const SandpieMemory = (function () {
   function _sbEsc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
   // ---- path-based graph -----------------------------------------------------
-  // Group + link memories by the real files they touch (frontmatter `paths`),
-  // NOT by type-quadrant or [[links]]. Canonical identity uses SUFFIX-UNION: one
-  // path is the same node as another when it is a segment-suffix of it
-  // (crates/…/mmu.rs ≡ riscv-vm/crates/…/mmu.rs). A bare basename (<2 segments) is
-  // NEVER used to merge — a lone "SKILL.md" would falsely bridge unrelated skills.
-  // Edges join memories sharing a canonical path that occurs in ≥2 memories; the
-  // connected components are the "sections" (riscv, sandpie, tecnec, …).
-  function _memParsePaths(f) { return String(f.paths || '').split(',').map(s => s.trim()).filter(Boolean); }
-  function _memCanonMap(all) {
-    const uniq = [...new Set(all)];
-    const nseg = p => p.split('/').filter(Boolean).length;
-    const map = {};
-    for (const p of uniq) {
-      let best = p, bestLen = nseg(p);
-      if (nseg(p) >= 2) for (const q of uniq) { if (q !== p && q.endsWith('/' + p) && nseg(q) > bestLen) { best = q; bestLen = nseg(q); } }
-      map[p] = best;
-    }
-    return map;
-  }
-  function _memGraph(facts) {
-    const canon = _memCanonMap(facts.flatMap(_memParsePaths));
-    const canByFact = facts.map(f => [...new Set(_memParsePaths(f).map(p => canon[p]))]);
-    const freq = {};
-    for (const cs of canByFact) for (const c of cs) freq[c] = (freq[c] || 0) + 1;
-    const par = facts.map((_, i) => i);
-    const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
-    const edges = [];
-    for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
-      const shared = canByFact[i].filter(c => freq[c] >= 2 && canByFact[j].includes(c));
-      if (shared.length) { edges.push([i, j, shared.length]); par[find(i)] = find(j); }
-    }
-    const comp = {}; for (let i = 0; i < facts.length; i++) { const r = find(i); (comp[r] = comp[r] || []).push(i); }
-    const comps = Object.values(comp).sort((a, b) => b.length - a.length);
-    const compOf = new Array(facts.length);
-    comps.forEach((g, ci) => g.forEach(i => { compOf[i] = ci; }));
-    return { edges, comps, compOf, canByFact, freq };
-  }
+  // The graph shares ONE clustering with injection (_clusterFacts, module scope):
+  // components = memories linked by a shared canonical file path (suffix-union, with
+  // the bare-basename guard) OR an identical stored `project` label. Layout positions
+  // by component ("sections": riscv, sandpie, tecnec, …); colour still encodes type.
+  const _memGraph = _clusterFacts;
 
   async function _sbRender() {
     if (!_sbBody) return;
