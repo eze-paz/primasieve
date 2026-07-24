@@ -267,6 +267,7 @@ LINK related memories: reference other facts inside the body as [[their-name]] (
           body:        { type: 'string', description: 'The fact itself, in full. For feedback/project include the reasoning ("why") so it stays actionable.' },
           links:       { type: 'array', items: { type: 'string' }, description: 'Optional names of related memories to cross-link.' },
           project:     { type: 'string', description: 'Optional: the project/topic this fact belongs to (e.g. "riscv-vm", "sandpie"). Omit to let it be derived from the files you touched. Facts sharing a project are grouped and recalled together.' },
+          supersedes:  { type: 'array', items: { type: 'string' }, description: 'Optional names of older memories this one REPLACES (superseded snapshots, outdated status). They are archived (recoverable), not shown anymore. Use when you are updating a moving fact rather than adding a distinct one.' },
         },
         required: ['name', 'body'],
       },

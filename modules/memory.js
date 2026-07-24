@@ -115,7 +115,7 @@ const SandpieMemory = (function () {
     const name = fm.name || (file ? file.replace(/\.md$/, '') : 'note');
     const description = fm.description || (body.split(/\r?\n/)[0] || '').slice(0, 120);
     const type = VALID_TYPES.includes(fm.type) ? fm.type : 'reference';
-    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md'), conversation: fm.conversation || '', tool_calls: fm.tool_calls || '', paths: fm.paths || '', project: fm.project || '' };
+    return { name, description, type, created: fm.created || '', last_verified: fm.last_verified || '', body, file: file || (name + '.md'), conversation: fm.conversation || '', tool_calls: fm.tool_calls || '', paths: fm.paths || '', project: fm.project || '', supersedes: fm.supersedes || '' };
   }
 
   async function list() {
@@ -268,37 +268,95 @@ const SandpieMemory = (function () {
     return clusters;
   }
 
-  let _consolidating = false;
-  async function consolidate(facts) {
-    // Phase 3: path-based clustering replaces LLM merge/prune.
+  // ---- deterministic consolidation (supersede near-duplicates) --------------
+  // NO LLM rewrite (the model can't be trusted to prune — [[ralph-loop-no-auto-memory]]).
+  // Reduction is by SUPERSESSION: within one project, if two memories are near-identical
+  // (Jaccard token overlap), the older is archived to .pruned/ (recoverable). The AUTO
+  // threshold is deliberately HIGH — a dry-run over the real store showed lower thresholds
+  // archive DISTINCT facts (similarity ≠ supersession). Pairs in the mid band are only
+  // REPORTED as candidates, never auto-archived. user/feedback are never superseded.
+  const AUTO_TH = 0.65;   // >= this → auto-archive the older (zero false positives measured)
+  const CAND_TH = 0.4;    // [CAND_TH, AUTO_TH) → surface as a review candidate only
+  const AUTO_KEY = 'sandpie-memory-autoconsolidate';   // '0' disables the auto pass
+  const LAST_KEY = 'sandpie-memory-consolidate-ts';
+  const _MEM_STOP = new Set('the a an of to in on for and or is are was be it this that with at by from as into not no you your can will has have not are'.split(' '));
+  function _memTokens(f) { return new Set((`${f.name} ${f.description} ${f.body}`.toLowerCase().match(/[a-z0-9][a-z0-9_-]{2,}/g) || []).filter(w => !_MEM_STOP.has(w))); }
+  function _jaccard(a, b) { let inter = 0; for (const x of a) if (b.has(x)) inter++; const uni = a.size + b.size - inter; return uni ? inter / uni : 0; }
+  let _lastReport = null;
+  function lastConsolidateReport() { return _lastReport; }
+
+  // Run the deterministic pass. opts.dryRun => detect only, archive nothing.
+  async function consolidate(facts, opts) {
+    opts = opts || {};
     facts = facts || await list();
-    if (facts.length < 2) return { ok: false, reason: 'nothing to consolidate' };
-    const clusters = clusterByPaths(facts, 2);
-    if (!clusters.length) return { ok: false, reason: 'no path clusters found (need ≥3 memories sharing ≥2 paths)' };
-    let merged = 0;
-    for (const c of clusters) {
-      const slug = _slug(c.id + '-cluster');
-      const desc = 'Cluster: ' + c.sharedPaths.slice(0, 3).join(', ') + (c.sharedPaths.length > 3 ? '...' : '');
-      const t = c.types.has('project') ? 'project' : c.types.has('feedback') ? 'feedback' : c.types.has('user') ? 'user' : 'reference';
-      const today = _today();
-      const body = c.memories.map(m => `## ${m.name}\n${m.body}`).join('\n\n');
-      const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${today}\nlast_verified: ${today}\npaths: ${c.sharedPaths.join(', ')}\n---\n${body}\n`;
-      const fpath = DIR + '/' + slug + '.md';
-      try {
-        await opfs.write(fpath, text);
-        if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath);
-        merged += c.memories.length;
-      } catch (_) {}
+    if (facts.length < 2) return { ok: false, reason: 'nothing to consolidate', archived: [], candidates: [] };
+    const cl = _clusterFacts(facts);
+    const proj = cl.projectOf;
+    const tok = facts.map(_memTokens);
+    const dateOf = f => Date.parse(f.last_verified || f.created || '') || 0;
+    const archived = [], candidates = [], gone = new Set();
+    // (1) EXPLICIT supersession the model declared via remember(supersedes: [...]).
+    // Any confidence — the model understood the semantics; we just execute it.
+    for (let i = 0; i < facts.length; i++) {
+      if (!facts[i].supersedes) continue;
+      for (const on of String(facts[i].supersedes).split(',').map(s => s.trim()).filter(Boolean)) {
+        const oi = facts.findIndex((x, k) => k !== i && !gone.has(k) && x.name === on);
+        if (oi < 0) continue;
+        archived.push({ name: facts[oi].name, by: facts[i].name, sim: 'explicit' });
+        gone.add(oi);
+        if (!opts.dryRun) { try { await _tombstone(facts[oi]); } catch (_) {} }
+      }
     }
-    notify();
-    return { ok: true, before: facts.length, after: facts.length, clusters: clusters.length, merged };
+    // (2) AUTOMATIC supersession of near-identical same-project pairs.
+    const pairs = [];
+    for (let i = 0; i < facts.length; i++) for (let j = i + 1; j < facts.length; j++) {
+      if (gone.has(i) || gone.has(j)) continue;
+      if (!proj[i] || proj[i] !== proj[j]) continue;                       // same project only
+      if (/^(user|feedback)$/.test(facts[i].type) || /^(user|feedback)$/.test(facts[j].type)) continue;
+      const s = _jaccard(tok[i], tok[j]);
+      if (s >= CAND_TH) pairs.push({ i, j, s });
+    }
+    pairs.sort((a, b) => b.s - a.s);
+    for (const p of pairs) {
+      if (gone.has(p.i) || gone.has(p.j)) continue;
+      const older = dateOf(facts[p.i]) <= dateOf(facts[p.j]) ? p.i : p.j;
+      const newer = older === p.i ? p.j : p.i;
+      if (p.s >= AUTO_TH) {
+        archived.push({ name: facts[older].name, by: facts[newer].name, sim: +p.s.toFixed(2) });
+        gone.add(older);
+        if (!opts.dryRun) { try { await _tombstone(facts[older]); } catch (_) {} }
+      } else {
+        candidates.push({ older: facts[older].name, newer: facts[newer].name, sim: +p.s.toFixed(2) });
+      }
+    }
+    if (archived.length && !opts.dryRun) notify();
+    _lastReport = { at: Date.now(), archived, candidates, before: facts.length, after: facts.length - archived.length };
+    return { ok: true, ...(_lastReport) };
   }
 
-  // Phase 3: Auto-consolidation disabled. Path clustering is deterministic but
-  // still user-initiated via >>> memory cluster. The store grows unbounded until
-  // the user clusters it — no silent LLM pruning.
+  // Restore an auto-archived memory from .pruned/ back into the live store.
+  async function restore(name) {
+    const slug = _slug(name);
+    const src = PRUNED + '/' + slug + '.md';
+    let text; try { text = await opfs.read(src); } catch (_) { return { ok: false, reason: 'no archived memory "' + slug + '"' }; }
+    const dst = DIR + '/' + slug + '.md';
+    await opfs.write(dst, text);
+    try { await opfs.remove(src); } catch (_) {}
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', dst); } catch (_) {}
+    notify();
+    return { ok: true, name: slug };
+  }
+
+  // Auto pass: runs from buildSystemPrompt, but debounced to at most hourly and gated
+  // by the toggle. Deterministic + recoverable, so it's safe to leave on by default.
   async function maybeConsolidate() {
-    // No-op: clustering is user-initiated.
+    if (!isEnabled() || localStorage.getItem(AUTO_KEY) === '0') return;
+    const now = Date.now();
+    const last = parseInt(localStorage.getItem(LAST_KEY) || '0', 10) || 0;
+    if (now - last < 3600000) return;                 // ≤ once/hour
+    localStorage.setItem(LAST_KEY, String(now));
+    try { const r = await consolidate(); if (r.archived && r.archived.length) console.log('[sandpie memory] auto-superseded:', r.archived); }
+    catch (e) { console.warn('[sandpie] consolidate failed', e); }
   }
 
   // ---- commands -------------------------------------------------------------
@@ -306,10 +364,20 @@ const SandpieMemory = (function () {
     if (typeof SandpieCommands === 'undefined') return;
     SandpieCommands.register({
       name: 'memory', module: 'core',
-      help: 'List remembered facts; "show <name>" for one, "cluster" to group by paths',
-      usage: '>>> memory [show <name> | cluster]',
+      help: 'List memories; "show <name>", "consolidate" (supersede near-dupes), "restore <name>"',
+      usage: '>>> memory [show <name> | consolidate | restore <name>]',
       async run(text, parts) {
-        if (parts[1] === 'consolidate' || parts[1] === 'cluster') { const r = await consolidate(); return r.ok ? `Clustered: ${r.clusters} cluster(s), ${r.merged} fact(s) grouped by shared paths.` : 'Clustering: ' + (r.reason || 'failed') + '.'; }
+        if (parts[1] === 'consolidate' || parts[1] === 'cluster' || parts[1] === 'dedup') {
+          const dry = parts[2] === 'dry' || parts[2] === '--dry';
+          const r = await consolidate(null, { dryRun: dry });
+          if (!r.ok) return 'Consolidate: ' + (r.reason || 'failed') + '.';
+          const a = (r.archived || []).map(x => `  • ${x.name} → superseded by ${x.by} (${x.sim})`).join('\n');
+          const c = (r.candidates || []).map(x => `  • ${x.older} ~ ${x.newer} (${x.sim})`).join('\n');
+          return `${dry ? 'DRY RUN — ' : ''}${r.before}→${r.after} memories.\n`
+            + (a ? `Archived (recoverable via >>> memory restore <name>):\n${a}\n` : 'Nothing auto-archived.\n')
+            + (c ? `Review candidates (not archived; supersede manually if right):\n${c}` : 'No review candidates.');
+        }
+        if (parts[1] === 'restore') { const r = await restore(parts[2] || ''); return r.ok ? `Restored "${r.name}".` : (r.reason || 'restore failed') + '.'; }
         if (parts[1] === 'show') { const f = (await list()).find(x => x.name === parts[2]); return f ? f.body : 'No memory named "' + (parts[2] || '') + '".'; }
         // Default: DIAGNOSE + simulate the real system-prompt injection, so what you
         // see here is exactly what the model gets (systemBlock) — and when it's empty
@@ -393,6 +461,10 @@ const SandpieMemory = (function () {
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
       <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable automatic memory harvest
     </label>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidate</strong> &mdash; hourly, deterministic: archives near-identical memories within a project (recoverable via <code>&gt;&gt;&gt; memory restore</code>). No LLM.</p>
+    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
+      <input type="checkbox" id="autoConsolidate" style="width:auto;"> Enable auto-consolidation
+    </label>
     `;
 
   let _flashT = null;
@@ -419,6 +491,11 @@ const SandpieMemory = (function () {
       // distillLessons), whose output lives in the normal memory store/budget.
       lsEn.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
       lsEn.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', lsEn.checked ? 'true' : 'false'));
+    }
+    const acEn = panel.querySelector('#autoConsolidate');
+    if (acEn) {
+      acEn.checked = localStorage.getItem('sandpie-memory-autoconsolidate') !== '0';
+      acEn.addEventListener('change', () => { localStorage.setItem('sandpie-memory-autoconsolidate', acEn.checked ? '1' : '0'); flash('Saved'); });
     }
   }
 
@@ -625,7 +702,7 @@ const SandpieMemory = (function () {
     return { ok: true, name: slug };
   }
 
-  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, notify, init, save };
+  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
 })();
 window.SandpieMemory = SandpieMemory;
 

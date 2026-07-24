@@ -1948,7 +1948,7 @@ function _memSlug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-
 // memory.js _projLabel so injection/graph group by the same key.
 function _projFromPath(p) { const s = String(p || '').split('/').filter(Boolean); if (!s.length) return ''; return s.slice(0, (s[0] === 'skills' || s[0] === 'files') ? 2 : 1).join('/'); }
 
-async function tool_remember({ name, description, type, body, links, project }, ctx) {
+async function tool_remember({ name, description, type, body, links, project, supersedes }, ctx) {
   if (!name || !body || !String(body).trim()) return { result: 'Error: both name and body are required.' };
   // Provenance from THIS turn (back to the previous user message):
   //  - tool_calls: the [rN] result IDs (capped — was dumping the whole turn).
@@ -2007,6 +2007,9 @@ async function tool_remember({ name, description, type, body, links, project }, 
   let out = '---\n' + `name: ${slug}\n` + `description: ${desc}\n` + `type: ${t}\n` + `created: ${created}\n` + `last_verified: ${today}\n` + `conversation: ${convId}\n` + `tool_calls: ${toolCallIds.slice(0, 8).join(', ')}\n`;
   if (toolPaths.length) out += `paths: ${toolPaths.join(', ')}\n`;
   if (projLabel) out += `project: ${projLabel}\n`;
+  // Explicit supersession: name the memory(ies) this replaces. The page-side
+  // consolidation pass archives them to .pruned/ (recoverable) with correct sync.
+  if (supersedes) { const sup = (Array.isArray(supersedes) ? supersedes : [supersedes]).map(_memSlug).filter(s => s && s !== slug); if (sup.length) out += `supersedes: ${[...new Set(sup)].join(', ')}\n`; }
   out += '---\n' + String(body).trim() + '\n';
   if (Array.isArray(links) && links.length) out += '\n' + links.map(l => '[[' + _memSlug(l) + ']]').join(' ') + '\n';
   try { await opfsWriteText(path, out); } catch (e) { return { result: 'Error saving memory: ' + ((e && e.message) || e) }; }
