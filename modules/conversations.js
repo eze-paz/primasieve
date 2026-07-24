@@ -1329,6 +1329,13 @@ function getSandpieWorker() {
       // Relay opfs-deleted-by-python / sw-opfs-changed to existing SW message
       // listeners (dropbox.js) by dispatching onto navigator.serviceWorker.
       try { navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: msg.payload })); } catch (_) {}
+      // A worker write to sandpie/memory/*.md (e.g. remember()) reaches the page
+      // ONLY as this sw-opfs-changed relay — surface it as memory:changed so the
+      // sidebar refreshes and consolidation triggers (event-driven, not a clock).
+      try {
+        const paths = (msg.payload && msg.payload.type === 'sw-opfs-changed' && Array.isArray(msg.payload.paths)) ? msg.payload.paths : [];
+        if (paths.some(p => /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(p)) && typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:changed', {});
+      } catch (_) {}
       return;
     }
     if (msg.type === 'managed-token-refreshed') {
@@ -2934,7 +2941,7 @@ async function buildSystemPrompt(convMessages) {
   // every ralph turn, which builds this prompt — behind it. The pruned store simply
   // lands on the NEXT prompt build; this one injects the current store as-is.
   if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
-    try { SandpieMemory.maybeConsolidate().catch((e) => console.warn('[sandpie] memory consolidate failed:', e)); } catch (e) { console.warn('[sandpie] memory consolidate failed:', e); }
+    // (consolidation is event-driven off memory writes now — no per-turn / clock trigger)
     // Context for tiered injection: the latest user message (keyword activation) +
     // the files touched recently (path activation) decide which project's memories
     // get promoted to full this turn (the rest are indexed). Both best-effort.

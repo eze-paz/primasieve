@@ -347,17 +347,33 @@ const SandpieMemory = (function () {
     return { ok: true, name: slug };
   }
 
-  // Auto pass: runs from buildSystemPrompt, but debounced to at most hourly and gated
-  // by the toggle. Deterministic + recoverable, so it's safe to leave on by default.
-  async function maybeConsolidate() {
+  // EVENT-DRIVEN: consolidation runs a few seconds after a memory is WRITTEN — the
+  // only moment a new near-duplicate / supersession can appear — coalescing bursts.
+  // No clock, no per-turn cost. A run that archives something re-emits memory:changed,
+  // which schedules one more pass that finds nothing new and stops (self-terminating).
+  let _consTimer = null, _consolidating = false;
+  function scheduleConsolidate() {
     if (!isEnabled() || localStorage.getItem(AUTO_KEY) === '0') return;
-    const now = Date.now();
-    const last = parseInt(localStorage.getItem(LAST_KEY) || '0', 10) || 0;
-    if (now - last < 3600000) return;                 // ≤ once/hour
-    localStorage.setItem(LAST_KEY, String(now));
+    clearTimeout(_consTimer);
+    _consTimer = setTimeout(runAutoConsolidate, 4000);
+  }
+  async function runAutoConsolidate() {
+    if (_consolidating || !isEnabled() || localStorage.getItem(AUTO_KEY) === '0') return;
+    _consolidating = true;
     try { const r = await consolidate(); if (r.archived && r.archived.length) console.log('[sandpie memory] auto-superseded:', r.archived); }
     catch (e) { console.warn('[sandpie] consolidate failed', e); }
+    finally { _consolidating = false; }
   }
+  // Subscribe once to every memory-write signal (save/forget/restore/consolidate emit
+  // memory:changed via notify(); the harvester's save() emits file:changed; a worker
+  // remember() surfaces as memory:changed via the conversations.js relay).
+  function _wireAutoConsolidate() {
+    if (typeof Sandpie === 'undefined' || !Sandpie.events) return;
+    Sandpie.events.on('memory:changed', scheduleConsolidate);
+    Sandpie.events.on('file:changed', (p) => { if (typeof p === 'string' && /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(p) && !p.includes('/.pruned/')) scheduleConsolidate(); });
+  }
+  // Back-compat: any remaining caller just nudges a (debounced) pass.
+  function maybeConsolidate() { scheduleConsolidate(); return Promise.resolve(); }
 
   // ---- commands -------------------------------------------------------------
   function registerCommands() {
@@ -514,6 +530,7 @@ const SandpieMemory = (function () {
     else if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('memorySection', { title: 'Memory', dot: 'memoryDot', badge: null, open: false, html: HTML, onRender: wire }); }
     else if (_retry++ < 40) { setTimeout(init, 500); return; }
     initSecondBrain();
+    _wireAutoConsolidate();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
