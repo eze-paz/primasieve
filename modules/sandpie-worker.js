@@ -53,7 +53,7 @@ let _dbxCtx = null;
 // first touch. See the hydration helpers further down. Default off ⇒ no change.
 let _dehydrated = false;
 let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
-let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/shared', 'sandpie/shared-hub'];   // app metadata + shared packages, always eager; sandpie/scripts|artifacts|memory stay dehydratable
+let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata + shared packages, always eager; sandpie/scripts|artifacts|memory stay dehydratable
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
@@ -280,7 +280,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=2', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=3', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -733,7 +733,7 @@ async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
   const file = 'sandpie/skills/' + n + '/SKILL.md';
-  const sharedFile = 'sandpie/shared/' + n + '/SKILL.md';   // shared, installed skill package
+  const sharedFile = 'sandpie/shared-installed/' + n + '/SKILL.md';   // shared, installed skill package
   let text;
   try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
   catch (e) {
@@ -1111,13 +1111,13 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
   return { result: head + local.buf.replace(/\n$/, '') + cloudExtra };
 }
 
-// ── Shared, read-only packages (sandpie/shared/) ──────────────────────────
+// ── Shared, read-only packages (sandpie/shared-installed/) ────────────────
 // Installed shared packages live under this root. They auto-update from the team
 // registry, so local writes/edits are refused; the caller is pointed at a fork.
-const SHARED_ROOT = 'sandpie/shared/';
+const SHARED_ROOT = 'sandpie/shared-installed/';
 function _sharedReadOnly(norm) {
   if (!norm || !norm.startsWith(SHARED_ROOT)) return null;
-  return { result: `"${norm}" is a shared, read-only package — it's managed centrally and auto-updates, so any local change would be overwritten on the next sync. To modify it, fork your own editable copy first:\n    copy_to_workspace(src="${norm}")\nthen edit the copy it returns (it lands outside sandpie/shared/).` };
+  return { result: `"${norm}" is a shared, read-only package — it's managed centrally and auto-updates, so any local change would be overwritten on the next sync. To modify it, fork your own editable copy first:\n    copy_to_workspace(src="${norm}")\nthen edit the copy it returns (it lands outside sandpie/shared-installed/).` };
 }
 
 // If a destination already exists in OPFS, append _2/_3/… before the extension.
@@ -1144,7 +1144,7 @@ async function _forkLocal(src, dest) {
     destRel = srcRel.startsWith(SHARED_ROOT) ? 'sandpie/' + base : base;   // lift out of the managed area
   }
   if (!destRel || destRel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
-  if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared/ — that area is read-only. Pick an editable location.' };
+  if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared-installed/ — that area is read-only. Pick an editable location.' };
   let bytes;
   try { bytes = await opfsReadBytes(srcRel); }
   catch (_) { return { result: `Error: "${srcRel}" not found in your workspace. (If it's a folder, fork individual files — folder forking isn't supported yet.)` }; }
@@ -1164,7 +1164,7 @@ async function _forkLocal(src, dest) {
 async function tool_copy_to_workspace({ src, dest }) {
   const from = (src == null ? '' : String(src)).trim();
   if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
-  // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared/…): fork in OPFS, no Dropbox needed.
+  // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared-installed/…): fork in OPFS, no Dropbox needed.
   if (!from.startsWith('/')) return _forkLocal(from, dest);
   // Absolute path → import from elsewhere in the user's Dropbox (needs Dropbox connected).
   if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };

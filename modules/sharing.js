@@ -1,35 +1,38 @@
 // sharing.js — share skills / artifacts / folders across the org, scoped, with
 // silent auto-update. Browser-only; rides the existing Dropbox team folder.
 //
-// DELIVERY (fix per Ezequiel):
-//   • TEAM / everyone  → the shared hub  <parent>/shared-hub/         (Dropbox API;
+// PATHS (named for clarity):
+//   • TEAM hub (shared by all)    <parent>/shared-hub/                  (Dropbox API;
 //     outside every workspace, so recipients POLL it)
-//   • 1:1 (people)     → each recipient's own inbox
-//                         <parent>/<recipient>/sandpie/shared-hub/    (their normal
-//     sync pulls it — no polling — AND it's physically private to them)
+//   • per-user INCOMING (1:1)     <parent>/<recipient>/sandpie/shared-incoming/
+//     (a 1:1 delivery is written straight here; the recipient's own sync pulls it —
+//      no polling — and it's physically private to them)
+//   • per-user INSTALLED          <recipient>/sandpie/shared-installed/  (read-only,
+//     accepted packages; the worker's read-only guard keys on this prefix)
 //   where <parent> = the folder every user's workspace sits under (workspace root's
 //   parent), e.g. /R+D+I/sandpie ; workspace = <parent>/<email-local-part>.
 //
-// A published package is a folder:  packages/<id>/manifest.json + v/<n>/<files…>
-//   manifest = { id, kind:'skill'|'artifact'|'folder', title, publisher, latest,
+// A published package is a folder:  packages/<id>/manifest.json + <files…> (FLAT —
+//   overwritten each publish; Dropbox keeps prior revisions for rollback).
+//   manifest = { id, kind:'skill'|'artifact'|'folder', title, publisher, rev,
 //                acl:{org,users[],teams[]}, pin:<relFile>|null, skill:bool, ts }
 //   Per-package manifests (not one shared index) → no multi-writer clobber.
 //
-// ACCEPT (keep the accept step): install the latest version into the read-only
-//   sandpie/shared/<id>/, THEN apply manifest directives:
+// ACCEPT (keep the accept step): install the package into the read-only
+//   sandpie/shared-installed/<id>/, THEN apply manifest directives:
 //     • skill:true  → already discovered + loadable there (context.js/load_skill)
-//     • pin:<file>  → SandpiePins.add(sandpie/shared/<id>/<file>) → home grid
-//   Plain files just sit in sandpie/shared/ and show in "Shared with me".
-//   Silent auto-update advances accepted subs to latest on boot/focus.
+//     • pin:<file>  → SandpiePins.add(sandpie/shared-installed/<id>/<file>) → home grid
+//   Plain files just sit in sandpie/shared-installed/ and show in "Shared with me".
+//   Silent auto-update advances accepted subs to the latest rev on boot/focus.
 //
 // SEAM (needs 2 real team accounts to verify): the cloud transport
-//   (cloudUpload/Download/List via dropbox.js). Falls back to a LOCAL hub
-//   (sandpie/shared-hub) when Dropbox isn't connected, so the full lifecycle is
-//   testable offline via SandpieSharing.setIdentity({user,teams}).
+//   (cloudUpload/Download/List via dropbox.js). Falls back to a LOCAL sim hub
+//   (under sandpie/shared-incoming) when Dropbox isn't connected, so the full
+//   lifecycle is testable offline via SandpieSharing.setIdentity({user,teams}).
 (function () {
   'use strict';
-  const INSTALL_ROOT = 'sandpie/shared';           // read-only installed packages (Phase 1 guard)
-  const LOCAL_HUB = 'sandpie/shared-hub';          // 1:1 inbox (synced in) + offline fallback hub
+  const INSTALL_ROOT = 'sandpie/shared-installed';   // read-only accepted packages (worker guard keys on this)
+  const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
   const SUBS_PATH = 'sandpie/config/shares.json';
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
@@ -85,7 +88,7 @@
   // (_team = shared hub, _inbox/<user> = each person's private 1:1 inbox) so tests
   // faithfully model who-can-see-what.
   function teamHub() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? cloudStore(p.cloudParent() + '/shared-hub') : localStore(LOCAL_HUB + '/_team'); }
-  function recipientHub(email) { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? cloudStore(p.cloudParent() + '/' + localPart(email) + '/sandpie/shared-hub') : localStore(LOCAL_HUB + '/_inbox/' + localPart(email)); }
+  function recipientHub(email) { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? cloudStore(p.cloudParent() + '/' + localPart(email) + '/sandpie/shared-incoming') : localStore(LOCAL_HUB + '/_inbox/' + localPart(email)); }
   function myInbox() { return cloudOn() ? localStore(LOCAL_HUB) : localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user)); }   // real: 1:1 deliveries sync into my own hub
 
   /* ── subscriptions ────────────────────────────────────────────────────── */
@@ -186,7 +189,7 @@
     }
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
-    // skill:true → nothing to move; context.js discovers sandpie/shared/<id>/SKILL.md and load_skill resolves it
+    // skill:true → nothing to move; context.js discovers sandpie/shared-installed/<id>/SKILL.md and load_skill resolves it
     try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
   }
   async function accept(id) {

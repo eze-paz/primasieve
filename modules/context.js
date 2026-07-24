@@ -188,13 +188,13 @@ const SandpieContext = (() => {
       if (!desc) { errors.push(`${file} — missing "description"; the model needs it to decide when to load this skill`); continue; }
       skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
-    // Shared skills: installed, read-only packages under sandpie/shared/<id>/ that
+    // Shared skills: installed, read-only packages under sandpie/shared-installed/<id>/ that
     // carry a SKILL.md. Discovered + advertised like local skills; load_skill falls
     // back to the shared path. A local skill of the same name takes precedence.
     try {
-      for (const e of await opfs.listDir('sandpie/shared')) {
+      for (const e of await opfs.listDir('sandpie/shared-installed')) {
         if (e.kind !== 'directory' || !NAME_RE.test(e.name)) continue;
-        const path = 'sandpie/shared/' + e.name, file = path + '/' + SKILL_FILE;
+        const path = 'sandpie/shared-installed/' + e.name, file = path + '/' + SKILL_FILE;
         let text; try { text = await opfs.read(file); } catch { continue; }   // not a skill package
         const fm = parseFrontmatter(text);
         const desc = ((fm && fm.description) || '').replace(/\s+/g, ' ').trim();
