@@ -176,7 +176,14 @@
   async function install(m) {
     const store = m._store, dst = INSTALL_ROOT + '/' + m.id;
     const files = (await store.listFiles('packages/' + m.id)).filter(rel => rel !== 'manifest.json');
-    for (const rel of files) { const bytes = await store.readBytes('packages/' + m.id + '/' + rel); if (bytes) await O().write(dst + '/' + rel, new Blob([bytes])); }
+    for (const rel of files) {
+      const bytes = await store.readBytes('packages/' + m.id + '/' + rel);
+      if (!bytes) continue;
+      const p = dst + '/' + rel;
+      await O().write(p, new Blob([bytes]));
+      markDirty(p);   // emit file:changed so Dropbox marks it dirty + uploads it — without this the
+                      // reconciliation pass deletes it as a local-only orphan under the eager prefix
+    }
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
     // skill:true → nothing to move; context.js discovers sandpie/shared/<id>/SKILL.md and load_skill resolves it
