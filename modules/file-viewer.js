@@ -31,16 +31,17 @@
     pane.className = 'file-viewer side fv-panel';
     pane.setAttribute('data-chrome', '');
     pane.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+    // Match the show_artifact header: panel bar, monospace label, round icon buttons.
     const header = document.createElement('div');
-    header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 8px;flex:none;';
+    header.className = 'fv-header artifact-header';
+    header.style.cssText = 'display:flex;align-items:center;gap:5px;padding:2px 8px;flex:none;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);';
     const title = document.createElement('span');
     var _fname = fullKey.split('/').pop(); title.textContent = _fname;
-    title.style.cssText = 'flex:1;font-size:0.78rem;color:var(--sp-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;';
+    title.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'ghost';
+    closeBtn.className = 'artifact-icon-btn';
     closeBtn.textContent = '✕';
     closeBtn.title = 'Close';
-    closeBtn.style.cssText = 'font-size:0.72rem;padding:2px 8px;flex:none;';
     closeBtn.onclick = () => opfs.closeFile();
     header.append(title, closeBtn);
     const body = document.createElement('div');
@@ -67,8 +68,9 @@
   // Add a button to a pane's header (before the ✕ close button = header's last child).
   function addHeaderButton(header, label, title, onClick) {
     const b = document.createElement('button');
-    b.className = 'ghost'; b.textContent = label; b.title = title;
-    b.style.cssText = 'font-size:0.72rem;padding:2px 8px;flex:none;';
+    // single glyph/emoji → round artifact-icon-btn; a text label (Save/Source) → pill
+    b.className = String(label).length <= 2 ? 'artifact-icon-btn' : 'fv-hbtn-text';
+    b.textContent = label; b.title = title;
     b.onclick = onClick;
     header.insertBefore(b, header.lastChild);
     return b;
@@ -228,7 +230,7 @@
     // single view-mode dropdown (Page / Text / Rendered) in the header
     const modeSel = document.createElement('select');
     modeSel.title = 'View mode';
-    modeSel.style.cssText = 'font-size:0.72rem;padding:2px 6px;flex:none;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:4px;';
+    modeSel.style.cssText = 'font:10px monospace;height:20px;padding:0 4px;flex:none;background:var(--sp-surface);color:var(--sp-text-dim);border:1px solid var(--sp-border);border-radius:10px;cursor:pointer;';
     [['Editor', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
     modeSel.onchange = () => ({ page: showPage, text: showText, rendered: showRendered }[modeSel.value] || showPage)();
     header.insertBefore(modeSel, header.lastChild);
@@ -279,7 +281,7 @@
         : [['PDF (ZetaOffice)', 'zeta']];
       const sheetSel = document.createElement('select');
       sheetSel.title = 'Spreadsheet viewer';
-      sheetSel.style.cssText = 'font-size:0.72rem;padding:2px 6px;flex:none;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);border-radius:4px;';
+      sheetSel.style.cssText = 'font:10px monospace;height:20px;padding:0 4px;flex:none;background:var(--sp-surface);color:var(--sp-text-dim);border:1px solid var(--sp-border);border-radius:10px;cursor:pointer;';
       sheetModes.forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; sheetSel.appendChild(o); });
       header.insertBefore(sheetSel, header.lastChild);
 

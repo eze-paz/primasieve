@@ -340,6 +340,14 @@
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .artifact-icon-btn:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-text); }
+  /* file-viewer header text buttons (Save / Source) — pill sibling of artifact-icon-btn */
+  .fv-hbtn-text {
+    cursor: pointer; background: var(--sp-surface); border: 1px solid var(--sp-border);
+    color: var(--sp-text-dim); border-radius: 10px; height: 20px; padding: 0 8px;
+    display: inline-flex; align-items: center; font-size: 10px; line-height: 1; flex-shrink: 0;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+  .fv-hbtn-text:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-text); }
   .artifact-panel-btn {  }
   body.side-open.active-left  #messagesSide,
   body.side-open.active-right #messages {
