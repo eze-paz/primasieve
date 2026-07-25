@@ -1402,10 +1402,7 @@ function workerAgentStream(worker, id, signal) {
   });
 }
 
-// Byte size of what will actually be sent (system prompt + resolved messages +
-// tool defs), and the budget that keeps it under the upstream gateway's ~1 MB cap.
-// Used to decide whether the compaction boundary needs advancing before a send.
-const SEND_BYTE_BUDGET = 900 * 1024;
+// Byte size of what will actually be sent (system prompt + resolved messages + tool defs). No pre-send byte cap — the token-based guard (maybeAutoCompact) protects the model context.
 function _sentRequestBytes(config) {
   try { return new Blob([JSON.stringify(config.messages || []) + JSON.stringify(config.systemPrompt || '') + JSON.stringify(config.tools || [])]).size; }
   catch { try { return (JSON.stringify(config.messages || []) || '').length; } catch { return 0; } }
@@ -1474,11 +1471,8 @@ async function sendSingle(text, stream, opts = {}) {
   // on its next send (the advanced boundary is saved).
   if (typeof SandpieCompactor !== 'undefined' && SandpieCompactor.isEnabled && SandpieCompactor.isEnabled()) {
     const base = SandpieCompactor.config();
-    // Fit budget = the TIGHTER of the ~1 MB gateway cap and the provider's context
-    // WINDOW (converted to bytes at ~4 bytes/token, targeting base.pct% of it). The
-    // token window is usually far tighter than the gateway — which is why a chat can
-    // blow the model's context while sitting well under the 1 MB byte limit.
-    let budget = SEND_BYTE_BUDGET;
+        // Budget = the provider's context WINDOW (converted to bytes at ~4 bytes/token, targeting base.pct% of it). No artificial byte-size cap — the token-based compaction (maybeAutoCompact) protects the model context.
+    let budget = Infinity;
     try { const win = SandpieTokens.contextWindow && SandpieTokens.contextWindow(); if (win) budget = Math.min(budget, Math.round(win * (base.pct / 100) * 4)); } catch (_) {}
     // Shrink the kept tail until the request fits. keepTail=10 is only a STARTING
     // point: if the last 10 messages alone exceed the budget (big tool outputs),
