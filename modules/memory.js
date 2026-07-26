@@ -183,6 +183,19 @@ const SandpieMemory = (function () {
   // this stays fresh; 0 when memory is off/empty.
   let _lastBlockChars = 0;
   function blockChars() { return _lastBlockChars; }
+  // Names of the facts injected IN FULL on the last systemBlock() call = "activated"
+  // this turn (Tier-0 standing user/feedback + Tier-2 promoted active-project facts).
+  // The sidebar graph reads this to colour nodes (accent = activated, dim = not).
+  // Changing the set emits memory:active so an open graph re-colours live.
+  let _lastActiveNames = new Set();
+  function activeNames() { return _lastActiveNames; }
+  function _setActive(names) {
+    const next = names instanceof Set ? names : new Set(names);
+    let changed = next.size !== _lastActiveNames.size;
+    if (!changed) for (const n of next) if (!_lastActiveNames.has(n)) { changed = true; break; }
+    _lastActiveNames = next;
+    if (changed) { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:active', {}); } catch (_) {} }
+  }
   // Char budget for Tier-2 promoted bodies (~5K tokens). Beyond this, active-project
   // memories that don't fit drop to the index and the cluster is flagged to consolidate.
   const TIER2_BUDGET = 20000;
@@ -196,19 +209,19 @@ const SandpieMemory = (function () {
   // ctx (optional): { message: <latest user text>, paths: [recent file paths] } — drives
   // which project's memories are promoted to full this turn. Absent ctx (cold) = index only.
   async function systemBlock(ctx) {
-    if (!isEnabled()) { _lastBlockChars = 0; return ''; }
+    if (!isEnabled()) { _lastBlockChars = 0; _setActive([]); return ''; }
     const facts = await list();
     const lines = ['', '', '# Memory', _INSTRUCTION];
     if (!facts.length) {
       lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
-      const b = lines.join('\n'); _lastBlockChars = b.length; return b;
+      const b = lines.join('\n'); _lastBlockChars = b.length; _setActive([]); return b;
     }
     const now = Date.now();
     const full = f => `\n## ${f.description} _(${f.type}${_badge(f, now)})_\n${f.body}`;
     // Legacy path (flag off): inject every body in full, as before.
     if (localStorage.getItem('sandpie-memory-tiered') === '0') {
       for (const f of facts) lines.push('', `## ${f.description} _(${f.type}${_badge(f, now)})_`, f.body);
-      const b = lines.join('\n'); _lastBlockChars = b.length; return b;
+      const b = lines.join('\n'); _lastBlockChars = b.length; _setActive(facts.map(f => f.name)); return b;
     }
     // TIERED. Tier 0: user/feedback always full (identity + how-to-work).
     const cl = _clusterFacts(facts);
@@ -232,6 +245,10 @@ const SandpieMemory = (function () {
       for (const p of Object.keys(byProj).sort()) { lines.push('', `### ${p}`); for (const f of byProj[p]) lines.push(`- ${f.name}: ${f.description}`); }
       if (overflow) lines.push('', `_(+${overflow} active-project memories over budget — recall() to load; consider consolidating this project)_`);
     }
+    // Record what got injected in full = "activated" this turn (standing + promoted).
+    const activated = new Set(always.map(f => f.name));
+    for (const i of promoted) activated.add(facts[i].name);
+    _setActive(activated);
     const block = lines.join('\n');
     _lastBlockChars = block.length;
     return block;
@@ -567,8 +584,6 @@ const SandpieMemory = (function () {
 
   /* ============ Second Brain visualization (folded from second-brain.js) ============ */
   const SB_SECTION_ID = 'secondBrainSection';
-  const SB_TYPE_CLASS = { user: 'sb-user', feedback: 'sb-feedback', project: 'sb-project', reference: 'sb-reference' };
-  const SB_TYPE_LABEL = { user: 'you', feedback: 'feedback', project: 'projects', reference: 'reference' };
   const SB_W = 240, SB_H = 170;
 
   const SB_CSS = `
@@ -578,10 +593,8 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-today { font-size:0.65rem; color:var(--sp-success); border:1px solid var(--sp-success); border-radius:8px; padding:0 0.35rem; }
     #${SB_SECTION_ID} svg.sb-net { width:100%; height:auto; display:block; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:8px; }
     #${SB_SECTION_ID} .sb-node { cursor:pointer; }
-    #${SB_SECTION_ID} .sb-user      { fill:var(--sp-success); }
-    #${SB_SECTION_ID} .sb-feedback  { fill:var(--sp-warn); }
-    #${SB_SECTION_ID} .sb-project   { fill:var(--sp-accent); }
-    #${SB_SECTION_ID} .sb-reference { fill:var(--sp-text-dim); }
+    #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
+    #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); }
     #${SB_SECTION_ID} .sb-edge { stroke:var(--sp-border-bright); stroke-width:0.7; opacity:0.6; }
     #${SB_SECTION_ID} .sb-edge.sb-link { stroke:var(--sp-accent); opacity:0.5; }
     #${SB_SECTION_ID} .sb-new { stroke:var(--sp-accent); stroke-width:1.2; }
@@ -671,7 +684,7 @@ const SandpieMemory = (function () {
     // Edges = shared canonical path; strong (≥2 shared files) drawn in accent.
     const edges = G.edges.map(([i, j, w]) => [i, j, w >= 2]);
     const edgeSvg = edges.map(([i, j, isLink]) => `<line class="sb-edge${isLink ? ' sb-link' : ''}" x1="${pos[i].x.toFixed(1)}" y1="${pos[i].y.toFixed(1)}" x2="${pos[j].x.toFixed(1)}" y2="${pos[j].y.toFixed(1)}"/>`).join('');
-    const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; const cls = (SB_TYPE_CLASS[p.f.type] || 'sb-reference') + (p.isCluster ? ' sb-cluster' : '') + (isNew ? ' sb-new' : ''); return `<circle class="sb-node ${cls}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
+    const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; const cls = (_lastActiveNames.has(p.f.name) ? 'sb-active' : 'sb-inactive') + (p.isCluster ? ' sb-cluster' : '') + (isNew ? ' sb-new' : ''); return `<circle class="sb-node ${cls}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
     const now = Date.now();
     const counts = new Array(30).fill(0);
     let before = 0;
@@ -691,7 +704,7 @@ const SandpieMemory = (function () {
     _sbBody.innerHTML = `
       <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
       <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Constellation of ${facts.length}">${edgeSvg}${nodeSvg}</svg>
-      <div class="sb-legend">${Object.keys(SB_TYPE_CLASS).map(t => `<span><i class="${SB_TYPE_CLASS[t]}" style="background:var(${t === 'user' ? '--sp-success' : t === 'feedback' ? '--sp-warn' : t === 'project' ? '--sp-accent' : '--sp-text-dim'})"></i>${SB_TYPE_LABEL[t]}</span>`).join('')}</div>
+      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>activated</span><span><i style="background:var(--sp-text-dim)"></i>deactivated</span></div>
       <div class="sb-hover" id="sbHover">hover a memory</div>
       <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
       <div class="sb-spark-lbl">last 30 days</div>`;
@@ -729,6 +742,8 @@ const SandpieMemory = (function () {
         if (_sbDetails && _sbDetails.open) _sbRender();
         else { _sbDirty = true; list().then(f => SandpieMenu.updateBadge(SB_SECTION_ID, String(f.length || ''))).catch(() => {}); }
       });
+      // Activation changed (a new turn promoted a different project) → re-colour.
+      Sandpie.events.on('memory:active', () => { if (_sbDetails && _sbDetails.open) _sbRender(); else _sbDirty = true; });
     }
     _sbRender().then(() => { if (!_sbDetails.open) _sbStopAnim(); });
   }
@@ -751,7 +766,7 @@ const SandpieMemory = (function () {
     return { ok: true, name: slug };
   }
 
-  return { config, isEnabled, threshold, list, systemBlock, blockChars, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
+  return { config, isEnabled, threshold, list, systemBlock, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
 })();
 window.SandpieMemory = SandpieMemory;
 
