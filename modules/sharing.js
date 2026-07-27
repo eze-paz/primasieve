@@ -220,10 +220,36 @@
   // in memory only, never persisted, and dropped by invalidateIncoming() on every
   // poll tick.
   let _incomingCache = null, _lastProbe = [], _catalogCache = null;
+  // SELF-TEST MODE. Normally a delivery you sent is not a delivery to you, and
+  // Dropbox agrees: it will not list a file to that file's owner, so a package you
+  // shared with your own address can never come back through list_received_files.
+  // With this on, folders you OWN are considered too, which lets one account
+  // exercise the whole invite → accept → live-update path. It does NOT exercise
+  // real cross-account discovery — that still needs a second account.
+  const SELF_KEY = 'sandpie-share-allow-self';
+  const allowSelf = () => { try { return localStorage.getItem(SELF_KEY) === '1'; } catch (_) { return false; } };
+  function setAllowSelf(on) {
+    try { if (on) localStorage.setItem(SELF_KEY, '1'); else localStorage.removeItem(SELF_KEY); } catch (_) {}
+    invalidateIncoming(); fire();
+    return !!on;
+  }
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
-    try { _incomingCache = (await prov().shareListDeliveries(SHARE_MARKER)).filter(s => !s.isOwner); }   // my own outgoing shares are not deliveries to me
+    try {
+      const p = prov();
+      let list = await p.shareListDeliveries(SHARE_MARKER);
+      if (!allowSelf()) list = list.filter(s => !s.isOwner);   // my own outgoing shares are not deliveries to me
+      else {
+        // Fold in the folders I own. There are only ever a handful, so probing them
+        // for a marker in catalog() is cheap — and this path is test-only anyway.
+        const seen = new Set(list.map(s => s.id));
+        for (const s of (await p.shareListIncoming())) {
+          if (s.isOwner && !seen.has(s.id)) list.push({ ...s, self: true });
+        }
+      }
+      _incomingCache = list;
+    }
     catch (e) { console.warn('[sharing] could not list deliveries:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
@@ -415,7 +441,7 @@
     for (const id in cat) {
       const m = cat[id];
       if (m._from !== 'incoming') continue;
-      if (m.publisher === who.user) continue;              // my own delivery bouncing back
+      if (m.publisher === who.user && !allowSelf()) continue;   // my own delivery bouncing back
       if (consumed(s, m)) continue;
       out.push(m);
     }
@@ -688,11 +714,73 @@
     return out;
   }
 
+  /* ── self test ────────────────────────────────────────────────────────── */
+  // SandpieSharing.selfTest() — publish a throwaway package to your own address and
+  // walk the whole flow on one account. Turns self-mode on, creates a scratch skill
+  // folder, shares it, and reports what each Dropbox step actually returned. The
+  // one thing it CANNOT prove is cross-account discovery: Dropbox does not list a
+  // file to its owner, so whether list_received_files really carries the delivery
+  // to someone else still needs a second account. It reports that honestly rather
+  // than passing.
+  async function selfTest() {
+    const p = prov(), out = { steps: [] };
+    const say = (s, v) => { out.steps.push(s + ': ' + v); };
+    if (!canShare1to1()) { out.verdict = 'Dropbox not connected, or this build has no sharing transport.'; return out; }
+    const email = (p.accountEmail && p.accountEmail()) || me().user;
+    out.email = email;
+    setAllowSelf(true); say('self-mode', 'on');
+
+    const dir = 'sandpie/skills/sandpie-selftest';
+    const stamp = new Date().toISOString();
+    await O().write(dir + '/SKILL.md', new Blob(['# Sandpie self test\nCreated ' + stamp + '\n'], { type: 'text/markdown' }));
+    markDirty(dir + '/SKILL.md');
+    say('scratch folder', dir + ' (delete it when you are done)');
+
+    // It has to reach Dropbox before it can be shared.
+    say('waiting for sync', 'up to ~60s');
+    let synced = false;
+    for (let i = 0; i < 30 && !synced; i++) {
+      try { await Sandpie.syncProvider().sync(); } catch (_) {}
+      try { synced = !!(await p.cloudList(p.shareWorkspacePath(dir), false, { team: false })).length; } catch (_) {}
+      if (!synced) await new Promise(r => setTimeout(r, 2000));
+    }
+    if (!synced) { out.verdict = 'The scratch folder never reached Dropbox — sync may be stalled. Check the Cloud sync panel.'; return out; }
+    say('synced', 'yes');
+
+    try { out.publish = await publish(dir, { users: [email] }, { title: 'Sandpie self test' }); say('publish', JSON.stringify(out.publish.dests)); }
+    catch (e) { out.verdict = 'publish() failed: ' + ((e && e.message) || e); return out; }
+
+    // Did Dropbox accept a self-addressed file share, and does it come back?
+    try {
+      const got = await p.shareListDeliveries(SHARE_MARKER);
+      out.listReceivedFiles = got.map(g => ({ folderId: g.id, isOwner: g.isOwner }));
+      say('list_received_files', got.length ? got.length + ' delivery/deliveries (self-addressed shares DO come back)'
+                                            : '0 — expected for a self-share; Dropbox does not list a file to its owner');
+    } catch (e) { say('list_received_files', 'FAILED ' + ((e && e.message) || e)); }
+
+    invalidateIncoming();
+    out.pendingInvites = (await pendingInvites()).map(m => m.id + '@' + m.rev);
+    say('invite visible', out.pendingInvites.length ? out.pendingInvites.join(', ') : 'NO');
+    out.verdict = out.pendingInvites.length
+      ? 'Working. Accept it on the home screen, then edit ' + dir + '/SKILL.md and wait ~2 min — sandpie/shared-installed/ should follow. Cross-account discovery is still unproven; that needs a second account.'
+      : 'The package was published but no invite appeared. Run SandpieSharing.diagnose() for the per-step detail.';
+    return out;
+  }
+  async function selfTestCleanup() {
+    const p = prov(), dir = 'sandpie/skills/sandpie-selftest';
+    try { const id = await p.shareEnsureFolder(p.shareWorkspacePath(dir)); if (p.shareUnshare) await p.shareUnshare(id); } catch (_) {}
+    for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} try { Sandpie.events.emit('file:deleted', dir + '/' + rel); } catch (_) {} }
+    try { await O().remove(dir); } catch (_) {}
+    await removeInstalledLocal('sandpie-selftest');
+    setAllowSelf(false);
+    return 'Removed ' + dir + ', its installed copy, and turned self-mode off.';
+  }
+
   /* ── events ───────────────────────────────────────────────────────────── */
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, selfTest, selfTestCleanup, setAllowSelf, allowSelf, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */
