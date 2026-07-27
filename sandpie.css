@@ -765,31 +765,6 @@ ul.conv-list li.active {
   }
   ul.conv-list li.archived-toggle:hover { color: var(--sp-text-dim); background: transparent; border: none; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
-  ul.conv-list .conv-num {
-    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-    font-size: 0.55rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--sp-text-dim);
-    opacity: 0.45;
-    min-width: 0.9rem;
-    text-align: right;
-    margin-right: 0.35rem;
-    margin-left: 0;
-    user-select: none;
-    position: relative;
-  }
-  ul.conv-list .conv-num::after {
-    content: '';
-    position: absolute;
-    right: -0.2rem;
-    top: 15%;
-    height: 70%;
-    width: 1px;
-    background: var(--sp-border);
-    opacity: 0.4;
-  }
-
   ul.conv-list li .conv-meta.gen-dot,
   ul.conv-list li .gen-dot {
     display: inline-block;

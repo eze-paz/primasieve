@@ -926,15 +926,11 @@ function buildConvLi(c, idx) {
   if (c.id === activeConvId) li.classList.add('active');
   if (sidePanel?.isOpen && c.id === sidePanel.sideId) li.classList.add('in-panel');
   if (c.archived) li.classList.add('archived');
-  const num = document.createElement('span');
-  num.className = 'conv-num';
-  num.textContent = String(idx).padStart(2, '0');
   const span = document.createElement('span');
   span.className = 'name';
   span.textContent = (c.pinned ? '* ' : '') + c.title;
   span.title = c.updated || '';
   span.onclick = () => loadConv(c.id);
-  li.appendChild(num);
   li.appendChild(span);
 
   const meta = document.createElement('span');
