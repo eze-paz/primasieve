@@ -212,6 +212,17 @@
     catch (e) { if (String(e.message).includes('not_found')) return null; throw e; }
   }
   async function getCurrentAccount() { return await api('/2/users/get_current_account', null); }
+  async function dbxMeta(path, team) {
+    // Metadata, or null if absent. Rethrows other errors so the caller can abort.
+    // not_found ⇒ absent here. malformed_path ⇒ this path is invalid in THIS
+    // namespace — treat as absent so the caller can fall through.
+    try { return await api('/2/files/get_metadata', { path }, { team }); }
+    catch (e) { if (/not_found|malformed_path/.test(String(e && e.message))) return null; throw e; }
+  }
+  async function mkdirp(path) {
+    try { return await api('/2/files/create_folder_v2', { path, autorename: false }); }
+    catch (e) { if (/conflict/.test(String(e && e.message))) return null; throw e; }
+  }
 
   // ===========================================================================
   //  Working root  (/sandpie, in the user's own HOME namespace)
@@ -1032,13 +1043,6 @@
   const MIGRATE_TO_HOME  = true;                        // master switch
   const MIGRATED_KEY     = 'dbxfull-home-migrated-v1';  // set once the import is settled
   let _migrationChecked  = false;
-  async function dbxMeta(path, team) {
-    // Metadata, or null if absent. Rethrows other errors so the caller can abort.
-    // not_found ⇒ absent here. malformed_path ⇒ this path is invalid in THIS
-    // namespace — treat as absent so the caller can fall through.
-    try { return await api('/2/files/get_metadata', { path }, { team }); }
-    catch (e) { if (/not_found|malformed_path/.test(String(e && e.message))) return null; throw e; }
-  }
   // Strategy 1: one server-side copy_v2. `to` may be an "ns:<id>/…" path so the
   // copy can cross from the team namespace into the user's home namespace.
   async function copyAcrossNamespaces(from, to, team) {
@@ -1131,6 +1135,127 @@
   }
 
   // ===========================================================================
+  //  Dropbox sharing API — 1:1 delivery addressed by EMAIL, no team folder
+  // ===========================================================================
+  // The old 1:1 path needed a folder both people could already reach. This one
+  // doesn't: the sender shares a folder out of their OWN Dropbox and invites an
+  // email address; the recipient discovers the invite through the API and mounts
+  // it. Nothing is pre-arranged, so it reaches anyone the corp's Dropbox sharing
+  // policy allows.
+  //
+  // Layout, all in the SENDER's home namespace (deliberately outside /sandpie, so
+  // the sync engine never sees it):
+  //   /Sandpie Shares/<recipient-local>/Sandpie from <sender-local>/   ← the SHARED folder
+  //       packages/<id>/manifest.json + files…
+  // The recipient segment keeps one outbox per recipient (so two recipients never
+  // collide); the leaf carries the SENDER's name because the leaf is what shows up
+  // in the recipient's Dropbox once mounted.
+  //
+  // ONE outbox per (sender, recipient) pair, created once and reused for every
+  // later delivery — sharing per-package would mint a fresh Dropbox namespace and
+  // a fresh mount on their side for every artifact.
+  //
+  // Recipients are invited as VIEWER: a delivery must not give someone write
+  // access to the sender's Dropbox. That means the recipient cannot delete a
+  // consumed package, so accept/dismiss state lives in their own shares.json
+  // (keyed id@rev, so a re-share bumps rev and re-notifies) — see sharing.js.
+  //
+  // Requires the sharing.read + sharing.write scopes on the Dropbox app. A token
+  // minted before those were granted fails with missing_scope; that's surfaced as
+  // a reconnect prompt rather than a raw API error.
+  const OUTBOX_PARENT     = '/Sandpie Shares';
+  const SHARE_NAME_PREFIX = 'Sandpie from ';        // recipient-side folder name + the discovery filter
+  const OUTBOX_CACHE      = 'dbxfull-share-outbox'; // {recipientLocal: {path, id, email}}
+  function isShareFolderName(n) { return String(n || '').toLowerCase().startsWith(SHARE_NAME_PREFIX.toLowerCase()); }
+  async function shareApi(path, body) {
+    try { return await api(path, body); }
+    catch (e) {
+      if (/missing_scope|insufficient_scope/i.test(String((e && e.message) || e))) {
+        throw new Error('Dropbox sharing permission is missing for this login — reconnect Dropbox (Settings → Cloud sync → Disconnect, then Connect) to grant it.');
+      }
+      throw e;
+    }
+  }
+  function myLocalPart() { return sanitizeSeg(String(localStorage.getItem(EMAIL_KEY) || 'me').split('@')[0]).toLowerCase(); }
+  // Idempotent: the shared_folder_id for `path`, sharing the folder if it isn't
+  // already shared. share_folder can go async on a big folder, so poll for it.
+  async function shareFolderId(path) {
+    const md = await dbxMeta(path, false);
+    const existing = md && md.sharing_info && md.sharing_info.shared_folder_id;
+    if (existing) return existing;
+    let res = await shareApi('/2/sharing/share_folder', { path, acl_update_policy: 'owner', force_async: false });
+    if (res['.tag'] === 'async_job_id') {
+      const jobId = res.async_job_id;
+      res = null;
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const st = await shareApi('/2/sharing/check_share_job_status', { async_job_id: jobId });
+        if (st['.tag'] === 'in_progress') continue;
+        if (st['.tag'] === 'failed') throw new Error('share_folder failed: ' + JSON.stringify(st).slice(0, 200));
+        res = st;   // 'complete' → the ShareFolderMetadata, flattened
+        break;
+      }
+      if (!res) throw new Error('share_folder is still running — try sharing again in a moment.');
+    }
+    const id = res.shared_folder_id || '';
+    if (!id) throw new Error('share_folder did not return a shared_folder_id');
+    return id;
+  }
+  // Ensure (and cache) the outbox shared with `email`. Safe to call on every publish.
+  async function ensureOutbox(email) {
+    const to = sanitizeSeg(String(email).split('@')[0]).toLowerCase();
+    const path = OUTBOX_PARENT + '/' + to + '/' + SHARE_NAME_PREFIX + myLocalPart();
+    let cache = {}; try { cache = JSON.parse(localStorage.getItem(OUTBOX_CACHE) || '{}'); } catch (_) {}
+    if (cache[to] && cache[to].path === path && cache[to].id) return cache[to];
+    await mkdirp(OUTBOX_PARENT);
+    await mkdirp(OUTBOX_PARENT + '/' + to);
+    await mkdirp(path);
+    const id = await shareFolderId(path);
+    try {
+      await shareApi('/2/sharing/add_folder_member', {
+        shared_folder_id: id,
+        members: [{ member: { '.tag': 'email', email: String(email) }, access_level: { '.tag': 'viewer' } }],
+        quiet: true,   // no Dropbox notification email — the app is the notification
+      });
+    } catch (e) {
+      // Re-inviting someone already on the folder is the normal steady state.
+      if (!/already_a_member|already_invited/i.test(String((e && e.message) || e))) throw e;
+    }
+    cache[to] = { path, id, email: String(email) };
+    localStorage.setItem(OUTBOX_CACHE, JSON.stringify(cache));
+    return cache[to];
+  }
+  // Every Sandpie share folder this account is a member of. `path` is the mount
+  // point and is '' when the share is still UNMOUNTED — which is exactly the
+  // invited-but-not-yet-accepted state, i.e. a pending delivery.
+  async function listIncomingShares() {
+    const out = [];
+    let data = await shareApi('/2/sharing/list_folders', { limit: 100 });
+    for (let guard = 0; guard < 50; guard++) {
+      for (const e of (data.entries || [])) {
+        if (!isShareFolderName(e.name)) continue;
+        out.push({
+          id: e.shared_folder_id,
+          name: e.name,
+          from: e.name.slice(SHARE_NAME_PREFIX.length) || ((e.owner_display_names || [])[0] || ''),
+          owner: (e.owner_display_names || [])[0] || '',
+          path: e.path_lower || '',
+        });
+      }
+      if (!data.cursor) break;
+      data = await shareApi('/2/sharing/list_folders/continue', { cursor: data.cursor });
+    }
+    return out;
+  }
+  async function mountShare(sharedFolderId) {
+    const md = await shareApi('/2/sharing/mount_folder', { shared_folder_id: sharedFolderId });
+    return md.path_lower || '';
+  }
+  async function declineShare(sharedFolderId) {
+    await shareApi('/2/sharing/relinquish_folder_membership', { shared_folder_id: sharedFolderId, leave_a_copy: false });
+  }
+
+  // ===========================================================================
   //  Boot
   // ===========================================================================
   function boot() {
@@ -1195,6 +1320,14 @@
       // Workspace-scoped variants (home namespace) — used by sharing.js to clean up
       // its own copies inside the user's workspace, which is NOT in the team root.
       workspaceDelete: (absPath) => del(absPath, { team: false }),
+      // --- 1:1 delivery by email (Dropbox sharing API; no team folder) --------
+      // The Dropbox account's own email — the authoritative sender identity for a
+      // share, independent of whatever account.js reports.
+      accountEmail: () => localStorage.getItem(EMAIL_KEY) || '',
+      shareEnsureOutbox: (email) => ensureOutbox(email),   // → {path, id, email}; idempotent
+      shareListIncoming: () => listIncomingShares(),        // path:'' ⇒ pending (unmounted)
+      shareMount: (id) => mountShare(id),                   // accept → returns the mount path
+      shareDecline: (id) => declineShare(id),               // decline / leave
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);
