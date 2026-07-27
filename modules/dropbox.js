@@ -272,7 +272,14 @@
   function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
-    return EXEMPT_PREFIXES.some(p => { const pl = p.toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
+    return EXEMPT_PREFIXES.some(p => {
+      const pl = p.toLowerCase();
+      if (pl === 'sandpie/skills') {
+        // Only SKILL.md files, not scripts/templates/etc under skills folders
+        return r.startsWith(pl + '/') && r.split('/').pop() === 'skill.md';
+      }
+      return r === pl || r.startsWith(pl + '/');
+    });
   }
   // Convert an already-synced workspace to on-demand: remove LOCAL copies of clean
   // cloud files so they re-fetch lazily. SAFETY: deletes via opfs.remove() only —

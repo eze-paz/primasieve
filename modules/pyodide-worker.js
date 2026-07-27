@@ -237,7 +237,13 @@ function _reportHydrated(rel) {
 }
 function _relExempt(rel) {
   const r = String(rel).replace(/^\/+/, '').toLowerCase();
-  return _dbxExempt.some(p => { const pl = String(p).toLowerCase(); return r === pl || r.startsWith(pl + '/'); });
+  return _dbxExempt.some(p => {
+      const pl = String(p).toLowerCase();
+      if (pl === 'sandpie/skills') {
+        return r.startsWith(pl + '/') && r.split('/').pop() === 'skill.md';
+      }
+      return r === pl || r.startsWith(pl + '/');
+    });
 }
 function _indexEntry(rel) {
   if (!_dehydrated || !_dbxIndex) return null;
