@@ -219,34 +219,39 @@
   // _incomingCache / _catalogCache are per-pass request coalescing, NOT an index:
   // in memory only, never persisted, and dropped by invalidateIncoming() on every
   // poll tick.
-  let _incomingCache = null, _lastProbe = [], _catalogCache = null;
-  // SELF-TEST MODE. Normally a delivery you sent is not a delivery to you, and
-  // Dropbox agrees: it will not list a file to that file's owner, so a package you
+  let _incomingCache = null, _lastProbe = [], _catalogCache = null, _lastShareId = '';
+  // SELF-TEST MODE. Dropbox will not list a file to that file's owner, so a package
   // shared with your own address can never come back through list_received_files.
-  // With this on, folders you OWN are considered too, which lets one account
-  // exercise the whole invite → accept → live-update path. It does NOT exercise
-  // real cross-account discovery — that still needs a second account.
+  // This pretends ONE specific folder — the one selfTest() just published — is an
+  // incoming delivery, which is enough to walk invite → accept → live-update on a
+  // single account. It does NOT exercise real cross-account discovery.
+  //
+  // Deliberately scoped to a single {pkg, folder} rather than "every folder I own":
+  // a global switch turned every package the user had ever shared into an invite
+  // from themselves, and probed every markerless owned folder on each tick.
   const SELF_KEY = 'sandpie-share-allow-self';
-  const allowSelf = () => { try { return localStorage.getItem(SELF_KEY) === '1'; } catch (_) { return false; } };
-  function setAllowSelf(on) {
-    try { if (on) localStorage.setItem(SELF_KEY, '1'); else localStorage.removeItem(SELF_KEY); } catch (_) {}
+  function allowSelf() {
+    try {
+      const raw = localStorage.getItem(SELF_KEY);
+      if (!raw) return null;
+      const v = JSON.parse(raw);
+      return (v && v.folderId) ? v : null;
+    } catch (_) { return null; }
+  }
+  function setAllowSelf(v) {
+    try { if (v && v.folderId) localStorage.setItem(SELF_KEY, JSON.stringify(v)); else localStorage.removeItem(SELF_KEY); } catch (_) {}
     invalidateIncoming(); fire();
-    return !!on;
+    return allowSelf();
   }
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
     try {
-      const p = prov();
-      let list = await p.shareListDeliveries(SHARE_MARKER);
-      if (!allowSelf()) list = list.filter(s => !s.isOwner);   // my own outgoing shares are not deliveries to me
-      else {
-        // Fold in the folders I own. There are only ever a handful, so probing them
-        // for a marker in catalog() is cheap — and this path is test-only anyway.
-        const seen = new Set(list.map(s => s.id));
-        for (const s of (await p.shareListIncoming())) {
-          if (s.isOwner && !seen.has(s.id)) list.push({ ...s, self: true });
-        }
+      const self = allowSelf();
+      // Own shares are not deliveries to me — except the one self-test folder.
+      const list = (await prov().shareListDeliveries(SHARE_MARKER)).filter(s => !s.isOwner || (self && s.id === self.folderId));
+      if (self && !list.some(s => s.id === self.folderId)) {
+        list.push({ id: self.folderId, name: self.pkgId || 'self test', owner: 'you', from: 'you (self test)', isOwner: true, invitedAt: 0, path: '', self: true });
       }
       _incomingCache = list;
     }
@@ -369,12 +374,13 @@
       await store.writeText(SHARE_MARKER, JSON.stringify(mk(rev), null, 2));
       try { await store.invite(users); }
       catch (e) { throw new Error('Could not invite ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
+      _lastShareId = store.shareId || '';   // selfTest needs it to point self-mode at this one folder
       dests.push((store.live ? 'live:' : 'copy:') + store.root);
     }
 
     if (!dests.length) throw new Error('publish: no audience');
     fire();
-    return { id, rev, kind, live: dir && users.length > 0, access: level, dests };
+    return { id, rev, kind, live: dir && users.length > 0, access: level, shareId: _lastShareId, dests };
   }
 
   /* ── catalog (what's available TO ME) ─────────────────────────────────── */
@@ -402,9 +408,9 @@
         else console.warn('[sharing] could not read shared folder', store.shareName, '—', r.error);
         continue;
       }
-      // Dropbox already told us this folder holds a delivery, so a missing marker
-      // means the sender withdrew or moved it between the two calls.
-      if (!r.manifest) { console.info('[sharing] delivery marker gone from', store.shareName, '— withdrawn?'); continue; }
+      // Dropbox told us this folder holds a delivery, so a missing marker normally
+      // means the sender withdrew it. Not worth a console line every poll tick.
+      if (!r.manifest) { console.debug('[sharing] no', SHARE_MARKER, 'in', store.shareName); continue; }
       const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
@@ -441,7 +447,8 @@
     for (const id in cat) {
       const m = cat[id];
       if (m._from !== 'incoming') continue;
-      if (m.publisher === who.user && !allowSelf()) continue;   // my own delivery bouncing back
+      const self = allowSelf();
+      if (m.publisher === who.user && !(self && m.id === self.pkgId)) continue;   // my own delivery bouncing back
       if (consumed(s, m)) continue;
       out.push(m);
     }
@@ -728,7 +735,7 @@
     if (!canShare1to1()) { out.verdict = 'Dropbox not connected, or this build has no sharing transport.'; return out; }
     const email = (p.accountEmail && p.accountEmail()) || me().user;
     out.email = email;
-    setAllowSelf(true); say('self-mode', 'on');
+    setAllowSelf(null); say('self-mode', 'reset (armed after publish, scoped to the test package only)');
 
     const dir = 'sandpie/skills/sandpie-selftest';
     const stamp = new Date().toISOString();
@@ -749,6 +756,10 @@
 
     try { out.publish = await publish(dir, { users: [email] }, { title: 'Sandpie self test' }); say('publish', JSON.stringify(out.publish.dests)); }
     catch (e) { out.verdict = 'publish() failed: ' + ((e && e.message) || e); return out; }
+    // Arm self-mode for THIS folder only — not "every folder I own".
+    if (!out.publish.shareId) { out.verdict = 'Published, but no shared_folder_id came back, so self-mode cannot be scoped. Check the console for a share_folder error.'; return out; }
+    setAllowSelf({ pkgId: out.publish.id, folderId: out.publish.shareId });
+    say('self-mode', 'armed for ' + out.publish.id + ' only (folder ' + out.publish.shareId + ')');
 
     // Did Dropbox accept a self-addressed file share, and does it come back?
     try {
@@ -772,8 +783,14 @@
     for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} try { Sandpie.events.emit('file:deleted', dir + '/' + rel); } catch (_) {} }
     try { await O().remove(dir); } catch (_) {}
     await removeInstalledLocal('sandpie-selftest');
-    setAllowSelf(false);
-    return 'Removed ' + dir + ', its installed copy, and turned self-mode off.';
+    setAllowSelf(null);
+    // Its accept/dismiss record would otherwise linger and suppress a later re-run.
+    try { const s = await subs(); let n = 0;
+      for (const k of Object.keys(s.accepted)) if (k === 'sandpie-selftest' || k.startsWith('sandpie-selftest@')) { delete s.accepted[k]; n++; }
+      s.dismissed = (s.dismissed || []).filter(k => k !== 'sandpie-selftest' && !k.startsWith('sandpie-selftest@'));
+      if (n || s.dismissed) await saveSubs(s);
+    } catch (_) {}
+    return 'Removed ' + dir + ', its installed copy and accept record, and turned self-mode off.';
   }
 
   /* ── events ───────────────────────────────────────────────────────────── */
