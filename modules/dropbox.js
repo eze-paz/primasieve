@@ -1321,6 +1321,12 @@
           from: (e.owner_display_names || [])[0] || '',
           isOwner: ((e.access_type || {})['.tag'] || '') === 'owner',
           path: e.path_lower || '',
+          // Used to decide what to look at FIRST. A corporate account can be a
+          // member of hundreds of shared folders and we must not probe them all
+          // every tick: newest invitation wins, and team folders go last because a
+          // Sandpie package is always a personal-namespace folder.
+          invitedAt: Date.parse(e.time_invited || '') || 0,
+          isTeamFolder: !!e.is_team_folder || !!e.is_inside_team_folder,
         });
       }
       if (!data.cursor) break;

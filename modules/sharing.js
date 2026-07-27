@@ -210,6 +210,25 @@
   // in memory only, never persisted, and dropped by invalidateIncoming() on every
   // poll tick.
   let _incomingCache = null, _lastProbe = [], _catalogCache = null;
+
+  // A corporate Dropbox account is routinely a member of HUNDREDS of shared
+  // folders. Probing every one of them on every tick is what produced the flood of
+  // requests for a marker that mostly does not exist. Two bounds, neither persisted:
+  //
+  //   _verdict   what we learned this PAGE LOAD about each folder. Session-only, so
+  //              it cannot go stale across reloads the way the old localStorage
+  //              index did, and a "not ours" answer expires after VERDICT_TTL so a
+  //              folder published as a package mid-session is still picked up.
+  //   PROBE_CAP  how many not-yet-classified folders we look at per pass. Candidates
+  //              are ordered newest-invitation-first (a delivery you just received
+  //              is the newest thing on the account) and team folders last (a
+  //              package is always a personal-namespace folder), so the one that
+  //              matters is looked at on the very first tick even on an account
+  //              with hundreds of folders.
+  const _verdict = new Map();          // shareId -> {ours:boolean, at:ms}
+  const VERDICT_TTL = 10 * 60 * 1000;
+  const PROBE_CAP = 6;
+  let _probeDeferred = 0;              // how many we did not get to this pass (reported by diagnose)
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
@@ -223,11 +242,29 @@
   // folder itself, hence root ''.
   async function incomingStores(force) {
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
-    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id)).map(s => {
+    return (await candidateShares(force)).map(s => {
       const st = cloudStore('', { ns: s.id });
       st.from = s.from; st.shareId = s.id; st.shareName = s.name;
       return st;
     });
+  }
+  // The shared folders worth looking at THIS pass: everything already known to be a
+  // package, plus a capped slice of the not-yet-classified ones, best candidates
+  // first. Folders recently determined not to be ours are skipped until their
+  // verdict expires.
+  async function candidateShares(force) {
+    const now = Date.now();
+    const known = [], unknown = [];
+    for (const s of (await incomingShares(force))) {
+      if (_needsMount.has(s.id)) continue;
+      const v = _verdict.get(s.id);
+      if (v && v.ours) known.push(s);
+      else if (v && !v.ours && (now - v.at) < VERDICT_TTL) continue;
+      else unknown.push(s);
+    }
+    unknown.sort((a, b) => (a.isTeamFolder ? 1 : 0) - (b.isTeamFolder ? 1 : 0) || (b.invitedAt || 0) - (a.invitedAt || 0));
+    _probeDeferred = Math.max(0, unknown.length - PROBE_CAP);
+    return known.concat(unknown.slice(0, PROBE_CAP));
   }
   // Shares whose namespace read was REFUSED (PathRootError.no_permission, or a team
   // configuration that insists on the automounter). Those are the only ones that
@@ -365,7 +402,10 @@
         else console.warn('[sharing] could not read shared folder', store.shareName, '—', r.error);
         continue;
       }
-      if (!r.manifest) continue;   // definitively not one of ours; re-checked next pass, never recorded
+      // Session-only verdict (see _verdict above): bounds how often we look at a
+      // folder, expires on its own, and never survives a reload.
+      _verdict.set(store.shareId, { ours: !!r.manifest, at: Date.now() });
+      if (!r.manifest) continue;
       const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
@@ -644,9 +684,13 @@
     invalidateIncoming();
     try { out.rawShares = (await p.shareListIncoming()).map(s => ({ id: s.id, name: s.name, owner: s.owner, isOwner: s.isOwner, mountedAt: s.path || '(not mounted)' })); }
     catch (e) { out.listError = (e && e.message) || String(e); out.verdict = /sharing permission/i.test(out.listError) ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.' : 'list_folders failed: ' + out.listError; return out; }
+    _verdict.clear();
     out.incomingCount = (await incomingShares(true)).length;
-    const cat = await catalog();
+    out.teamFolders = (await incomingShares()).filter(s => s.isTeamFolder).length;
+    const cat = await catalog(true);
     out.probes = _lastProbe;
+    out.probedThisPass = _lastProbe.length;
+    out.probeDeferred = _probeDeferred;   // looked at next pass, newest-invited first
     out.packagesFound = Object.keys(cat).filter(k => cat[k]._from === 'incoming');
     out.needsMount = [..._needsMount];
     out.subs = await subs();
@@ -656,6 +700,7 @@
     else if (!out.rawShares.length) out.verdict = 'Dropbox reports NO shared folders for this account — the invite never arrived. Check the sender used this exact email, and look for a Dropbox invitation email.';
     else if (!out.incomingCount) out.verdict = 'All shared folders are owned by you; nothing incoming.';
     else if (errs.length && !out.packagesFound.length) out.verdict = 'Every incoming shared folder failed to read — see probes[].error. ' + (isPathRootRefusal(errs[0].error) ? 'These are permission refusals, so they are offered as "Add to Dropbox" rows instead.' : '');
+    else if (!out.packagesFound.length && out.probeDeferred) out.verdict = 'No package among the ' + out.probedThisPass + ' folders looked at this pass; ' + out.probeDeferred + ' more are queued (newest invitation first). If a delivery is genuinely missing, it should surface within a few minutes.';
     else if (!out.packagesFound.length) out.verdict = 'Shared folders are readable but none contains ' + SHARE_MARKER + ' — the sender shared the folder but the marker never got written.';
     else out.verdict = 'Package(s) found but already accepted/dismissed at this rev — see subs.';
     if (errs.length && out.pendingInvites.length) out.verdict += ' (Note: ' + errs.length + ' other shared folder(s) could not be read — see probes[].)';
