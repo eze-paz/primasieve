@@ -1302,13 +1302,60 @@
   async function unshareFolder(sharedFolderId) {
     await shareApi('/2/sharing/unshare_folder', { shared_folder_id: sharedFolderId, leave_a_copy: true });
   }
-  // EVERY shared folder this account is a member of, mounted or not — not just
-  // Sandpie's. The shared folder is now the sender's own workspace folder, so its
-  // name carries no signal; sharing.js identifies ours by probing each one for the
-  // .sandpie-share.json marker (and caches the verdict so it probes each id once).
-  // `path` is the mount point, '' when unmounted — informational, since we read by
-  // namespace either way. `isOwner` marks folders WE shared out, so a sender never
-  // sees their own package come back as an incoming delivery.
+  // ---- Delivery notifications -------------------------------------------------
+  // The marker file is shared with each recipient INDIVIDUALLY, on top of the folder
+  // share. That turns discovery from a scan into a single request: the recipient
+  // asks Dropbox for the files shared with them, and every SharedFileMetadata
+  // carries parent_shared_folder_id — which IS the package's namespace. One call,
+  // whether the account belongs to five shared folders or five hundred.
+  async function notifyFileMembers(filePath, emails, level) {
+    const want = (level === 'editor') ? 'editor' : 'viewer';
+    const res = await shareApi('/2/sharing/add_file_member', {
+      file: filePath,
+      members: (emails || []).map(e => ({ '.tag': 'email', email: String(e) })),
+      access_level: { '.tag': want },
+      quiet: true,
+    });
+    // Per-member outcomes come back in the RESULT array, not as an HTTP error.
+    // Already-a-member is the steady state and must not be treated as a failure.
+    for (const r of (Array.isArray(res) ? res : [])) {
+      const t = JSON.stringify((r && r.result) || r || '');
+      if (/error/i.test(t) && !/already|invalid_dropbox_id/i.test(t)) console.warn('[dropbox] add_file_member:', t.slice(0, 200));
+    }
+    return res;
+  }
+  // Every delivery addressed to this account, in one request (plus pagination).
+  // Filtering by `name` is what makes it ours; parent_shared_folder_id is where the
+  // package lives.
+  async function listDeliveries(markerName) {
+    const want = String(markerName).toLowerCase();
+    const out = [];
+    let data = await shareApi('/2/sharing/list_received_files', { limit: 300 });
+    for (let guard = 0; guard < 50; guard++) {
+      for (const e of (data.entries || [])) {
+        if (String(e.name || '').toLowerCase() !== want) continue;
+        if (!e.parent_shared_folder_id) continue;   // not inside a shared folder ⇒ no namespace to read
+        out.push({
+          id: e.parent_shared_folder_id,
+          fileId: e.id || '',
+          name: e.name,
+          owner: (e.owner_display_names || [])[0] || '',
+          from: (e.owner_display_names || [])[0] || '',
+          isOwner: ((e.access_type || {})['.tag'] || '') === 'owner',
+          invitedAt: Date.parse(e.time_invited || '') || 0,
+          path: e.path_lower || '',
+        });
+      }
+      if (!data.cursor) break;
+      data = await shareApi('/2/sharing/list_received_files/continue', { cursor: data.cursor });
+    }
+    return out;
+  }
+
+  // Every shared folder this account is a member of. Kept for diagnose() only —
+  // discovery no longer walks this list.
+  // `path` is the mount point, '' when unmounted. `isOwner` marks folders WE shared
+  // out, so a sender never sees their own package come back as an incoming delivery.
   async function listIncomingShares() {
     const out = [];
     let data = await shareApi('/2/sharing/list_folders', { limit: 100 });
@@ -1422,7 +1469,9 @@
       shareMembers: (id) => folderMembers(id),              // {emailLower: {level, accountId, invitee}}
       shareOutboxFolder: (id) => ensureOutboxFolder(id),    // wrapper for a single-file share
       shareWorkspacePath: (rel) => relToCloud(rel),         // OPFS rel → the live Dropbox path
-      shareListIncoming: () => listIncomingShares(),        // every shared folder; probe for our marker
+      shareNotify: (filePath, emails, level) => notifyFileMembers(filePath, emails, level),   // share the marker itself → the recipient's O(1) signal
+      shareListDeliveries: (markerName) => listDeliveries(markerName),   // ONE call: every delivery addressed to me
+      shareListIncoming: () => listIncomingShares(),        // every shared folder — diagnose() only
       shareMount: (id) => mountShare(id),                   // fallback when a namespace read is refused
       shareDecline: (id) => declineShare(id),               // leave a share (stop receiving)
       shareUnshare: (id) => unshareFolder(id),              // sender: revoke for everyone

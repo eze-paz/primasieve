@@ -186,7 +186,17 @@
     }
     const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
     st.shareId = id; st.live = isFolder; st.level = level;
-    st.invite = async (emails) => { const r = await p.shareInvite(id, emails, level); st.level = r.level; return r; };
+    st.invite = async (emails) => {
+      const r = await p.shareInvite(id, emails, level);          // folder membership → they can READ the package
+      st.level = r.level;
+      // …and share the marker file itself, which is how they FIND it: one
+      // list_received_files on their side instead of opening every shared folder.
+      if (p.shareNotify) {
+        try { await p.shareNotify(abs + '/' + SHARE_MARKER, emails, level); }
+        catch (e) { console.warn('[sharing] delivery notification failed (they may not see it until they look):', (e && e.message) || e); }
+      }
+      return r;
+    };
     return st;
   }
 
@@ -194,98 +204,38 @@
   // just ours, and the folder name is the sender's own so it proves nothing. Probe
   // each one for the marker and remember the verdict per folder id — otherwise a
   // user in twenty corporate shared folders pays twenty downloads every poll.
-  // NO PERSISTED INDEX of which shared folders are ours. There was one, keyed by
-  // shared_folder_id, and it caused the exact failure it was meant to optimise: an
-  // unreadable folder got recorded as "not a package" and real deliveries stayed
-  // invisible until the entry aged out. The verdict is now recomputed from Dropbox
-  // every pass and never written down.
-  //
-  // The cost is bounded and small. Probing a folder that ISN'T ours is a single
-  // get_temporary_link that fails not_found — no download. Only a real package
-  // costs a second request. And _catalogCache below collapses the several calls a
-  // render pass used to make into one, so this is fewer requests than before even
-  // without the index.
+  // Discovery is ONE request. The sender shares the marker file itself with each
+  // recipient (add_file_member) on top of the folder share, so the recipient can
+  // ask Dropbox directly for the deliveries addressed to them —
+  // list_received_files — and every result carries parent_shared_folder_id, which
+  // is the namespace the package lives in. Nothing is scanned and nothing is
+  // written down, so the cost does not grow with how many shared folders the
+  // account belongs to. (It used to: opening all 88 of them looking for a marker,
+  // three times per tick, was ~264 requests.)
   //
   // _incomingCache / _catalogCache are per-pass request coalescing, NOT an index:
   // in memory only, never persisted, and dropped by invalidateIncoming() on every
   // poll tick.
   let _incomingCache = null, _lastProbe = [], _catalogCache = null;
-
-  // A corporate Dropbox account is routinely a member of HUNDREDS of shared
-  // folders. Probing every one of them on every tick is what produced the flood of
-  // requests for a marker that mostly does not exist. Two bounds, neither persisted:
-  //
-  //   _verdict   what we learned this PAGE LOAD about each folder. Session-only, so
-  //              it cannot go stale across reloads the way the old localStorage
-  //              index did, and a "not ours" answer expires after VERDICT_TTL so a
-  //              folder published as a package mid-session is still picked up.
-  //   PROBE_CAP  how many not-yet-classified folders we look at per pass. Candidates
-  //              are ordered newest-invitation-first (a delivery you just received
-  //              is the newest thing on the account) and team folders last (a
-  //              package is always a personal-namespace folder), so the one that
-  //              matters is looked at on the very first tick even on an account
-  //              with hundreds of folders.
-  // A NEW delivery always arrives as a NEW invitation, so anything invited more
-  // recently than the newest thing we have already classified jumps the queue and
-  // is probed immediately, however long the backlog is. That keeps discovery
-  // instant in the normal case while the cap handles the historical folders.
-  const _verdict = new Map();          // shareId -> {ours:boolean, at:ms}
-  const VERDICT_TTL = 30 * 60 * 1000;  // > one full sweep of the backlog, so the queue actually drains
-  const PROBE_CAP = 6;                 // backlog folders per pass (on top of any new invitations)
-  let _newestClassified = 0;           // max invitedAt considered "already known", this session
-  let _baselineSet = false;            // has the first listing established that baseline?
-  let _probeDeferred = 0;              // how many we did not get to this pass (reported by diagnose)
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
-    try { _incomingCache = (await prov().shareListIncoming()).filter(s => !s.isOwner); }   // my own outgoing shares are not deliveries to me
-    catch (e) { console.warn('[sharing] could not list incoming shares:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
+    try { _incomingCache = (await prov().shareListDeliveries(SHARE_MARKER)).filter(s => !s.isOwner); }   // my own outgoing shares are not deliveries to me
+    catch (e) { console.warn('[sharing] could not list deliveries:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
   function invalidateIncoming() { _incomingCache = null; _catalogCache = null; _needsMount.clear(); }
-  // One store per incoming share, read BY NAMESPACE — nothing is mounted, so
-  // nothing appears in the recipient's Dropbox. Paths are relative to the shared
-  // folder itself, hence root ''.
+  // One store per delivery, read BY NAMESPACE — nothing is mounted, so nothing
+  // appears in the recipient's Dropbox. Paths are relative to the shared folder
+  // itself, hence root ''. Every entry here is already known to be a package
+  // (Dropbox told us), so there is nothing to probe or classify.
   async function incomingStores(force) {
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
-    return (await candidateShares(force)).map(s => {
+    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id)).map(s => {
       const st = cloudStore('', { ns: s.id });
       st.from = s.from; st.shareId = s.id; st.shareName = s.name; st.invitedAt = s.invitedAt || 0;
       return st;
     });
-  }
-  // The shared folders worth looking at THIS pass: everything already known to be a
-  // package, plus a capped slice of the not-yet-classified ones, best candidates
-  // first. Folders recently determined not to be ours are skipped until their
-  // verdict expires.
-  async function candidateShares(force) {
-    const now = Date.now();
-    const all = await incomingShares(force);
-    // On the FIRST listing nothing has been classified, so without this every folder
-    // looks "newly invited" and the queue-jump below would probe the whole account
-    // at once — the exact burst the cap exists to prevent. Treat the account as it
-    // stands when we arrive as history; only invitations that appear AFTER that are
-    // new. A delivery received while the tab was closed is still found on the first
-    // tick, because it sorts to the front of the backlog.
-    // Only an actual listing establishes it. At boot this runs before Dropbox has
-    // resolved and returns nothing; baselining on that empty result would leave the
-    // mark at zero and make the first real listing look entirely new — re-creating
-    // the burst.
-    if (!_baselineSet && all.length) { _newestClassified = all.reduce((mx, s) => Math.max(mx, s.invitedAt || 0), 0); _baselineSet = true; }
-    const known = [], fresh = [], backlog = [];
-    for (const s of all) {
-      if (_needsMount.has(s.id)) continue;
-      const v = _verdict.get(s.id);
-      if (v && v.ours) { known.push(s); continue; }
-      if (v && !v.ours && (now - v.at) < VERDICT_TTL) continue;
-      // Invited more recently than anything we've classified ⇒ this is new since we
-      // started looking. Never deferred: it's the case that actually matters, and
-      // there is at most a handful of them.
-      if ((s.invitedAt || 0) > _newestClassified) fresh.push(s); else backlog.push(s);
-    }
-    backlog.sort((a, b) => (a.isTeamFolder ? 1 : 0) - (b.isTeamFolder ? 1 : 0) || (b.invitedAt || 0) - (a.invitedAt || 0));
-    _probeDeferred = Math.max(0, backlog.length - PROBE_CAP);
-    return known.concat(fresh, backlog.slice(0, PROBE_CAP));
   }
   // Shares whose namespace read was REFUSED (PathRootError.no_permission, or a team
   // configuration that insists on the automounter). Those are the only ones that
@@ -423,11 +373,9 @@
         else console.warn('[sharing] could not read shared folder', store.shareName, '—', r.error);
         continue;
       }
-      // Session-only verdict (see _verdict above): bounds how often we look at a
-      // folder, expires on its own, and never survives a reload.
-      _verdict.set(store.shareId, { ours: !!r.manifest, at: Date.now() });
-      if (store.invitedAt > _newestClassified) _newestClassified = store.invitedAt;
-      if (!r.manifest) continue;
+      // Dropbox already told us this folder holds a delivery, so a missing marker
+      // means the sender withdrew or moved it between the two calls.
+      if (!r.manifest) { console.info('[sharing] delivery marker gone from', store.shareName, '— withdrawn?'); continue; }
       const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
@@ -696,10 +644,9 @@
 
   /* ── diagnose ─────────────────────────────────────────────────────────── */
   // Run SandpieSharing.diagnose() in the console on the RECIPIENT's machine when a
-  // delivery doesn't show up. It forgets every cached verdict, re-lists from
-  // Dropbox, re-probes each shared folder, and reports what each step actually
-  // returned — enough to tell a scope problem from a permission problem from a
-  // "the sender never wrote the marker" problem.
+  // delivery doesn't show up. It re-runs the real discovery call and reports what
+  // each step returned — enough to separate a scope problem, a permission refusal,
+  // a delivery that was never announced, and one already accepted.
   async function diagnose() {
     const p = prov();
     const out = { identity: me().user, cloudConnected: !!(p && p.cloudConnected && p.cloudConnected()), canShare1to1: canShare1to1() };
@@ -707,30 +654,34 @@
     if (!out.canShare1to1) { out.verdict = 'This build has no 1:1 sharing transport (provider.shareFolderWith missing).'; return out; }
     try { localStorage.removeItem(LEGACY_PROBE_KEY); } catch (_) {}   // clear the removed index if an old build left one
     invalidateIncoming();
-    try { out.rawShares = (await p.shareListIncoming()).map(s => ({ id: s.id, name: s.name, owner: s.owner, isOwner: s.isOwner, mountedAt: s.path || '(not mounted)' })); }
-    catch (e) { out.listError = (e && e.message) || String(e); out.verdict = /sharing permission/i.test(out.listError) ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.' : 'list_folders failed: ' + out.listError; return out; }
-    // diagnose() deliberately looks at EVERYTHING, cap and baseline included — the
-    // point is to answer "is my delivery there", not to be cheap.
-    _verdict.clear(); _baselineSet = true; _newestClassified = 0;
+    // THE discovery call — one request, regardless of how many shared folders exist.
+    try { out.deliveries = (await p.shareListDeliveries(SHARE_MARKER)).map(s => ({ folderId: s.id, from: s.owner, isOwner: s.isOwner, invitedAt: s.invitedAt ? new Date(s.invitedAt).toISOString() : '' })); }
+    catch (e) {
+      out.listError = (e && e.message) || String(e);
+      out.verdict = /sharing permission/i.test(out.listError)
+        ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.'
+        : 'list_received_files failed: ' + out.listError;
+      return out;
+    }
     out.incomingCount = (await incomingShares(true)).length;
-    out.teamFolders = (await incomingShares()).filter(s => s.isTeamFolder).length;
     const cat = await catalog(true);
-    out.probes = _lastProbe;
-    out.probedThisPass = _lastProbe.length;
-    out.probeDeferred = _probeDeferred;   // looked at next pass, newest-invited first
+    out.reads = _lastProbe;                 // one entry per delivery actually read
     out.packagesFound = Object.keys(cat).filter(k => cat[k]._from === 'incoming');
     out.needsMount = [..._needsMount];
     out.subs = await subs();
     out.pendingInvites = (await pendingInvites()).map(m => m.id + '@' + m.rev);
-    const errs = out.probes.filter(x => x.result === 'ERROR');
+    // Only for context when something is wrong — discovery no longer walks this.
+    if (!out.pendingInvites.length) {
+      try { out.sharedFolderCount = (await p.shareListIncoming()).length; } catch (_) {}
+    }
+    const errs = out.reads.filter(x => x.result === 'ERROR');
     if (out.pendingInvites.length) out.verdict = 'OK: ' + out.pendingInvites.join(', ') + ' should be showing on the home screen.';
-    else if (!out.rawShares.length) out.verdict = 'Dropbox reports NO shared folders for this account — the invite never arrived. Check the sender used this exact email, and look for a Dropbox invitation email.';
-    else if (!out.incomingCount) out.verdict = 'All shared folders are owned by you; nothing incoming.';
-    else if (errs.length && !out.packagesFound.length) out.verdict = 'Every incoming shared folder failed to read — see probes[].error. ' + (isPathRootRefusal(errs[0].error) ? 'These are permission refusals, so they are offered as "Add to Dropbox" rows instead.' : '');
-    else if (!out.packagesFound.length && out.probeDeferred) out.verdict = 'No package among the ' + out.probedThisPass + ' folders looked at this pass; ' + out.probeDeferred + ' more are queued (newest invitation first). If a delivery is genuinely missing, it should surface within a few minutes.';
-    else if (!out.packagesFound.length) out.verdict = 'Shared folders are readable but none contains ' + SHARE_MARKER + ' — the sender shared the folder but the marker never got written.';
-    else out.verdict = 'Package(s) found but already accepted/dismissed at this rev — see subs.';
-    if (errs.length && out.pendingInvites.length) out.verdict += ' (Note: ' + errs.length + ' other shared folder(s) could not be read — see probes[].)';
+    else if (!out.deliveries.length) out.verdict = 'Dropbox reports no ' + SHARE_MARKER + ' shared with this account. Either the sender never sent one, used a different email, or sent it from a build that predates delivery notifications — ask them to share it again.';
+    else if (!out.incomingCount) out.verdict = 'The only deliveries listed are ones you sent yourself.';
+    else if (errs.length && !out.packagesFound.length) out.verdict = 'A delivery is addressed to you but its folder could not be read — see reads[].error. ' + (isPathRootRefusal(errs[0].error) ? 'That is a permission refusal, so it is offered as an "Add to Dropbox" row instead.' : 'The sender may have shared the marker without sharing the folder.');
+    else if (!out.packagesFound.length) out.verdict = 'Delivery listed but its marker no longer parses — the sender may have withdrawn it.';
+    else out.verdict = 'Package(s) found but already accepted/dismissed — see subs.';
+    if (errs.length && out.pendingInvites.length) out.verdict += ' (Note: ' + errs.length + ' other delivery/deliveries could not be read — see reads[].)';
     return out;
   }
 
