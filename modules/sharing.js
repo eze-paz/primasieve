@@ -6,20 +6,26 @@
 //     outside every workspace, so recipients POLL it). <teamParent> =
 //     provider.cloudParent(), default /R+D+I/sandpie; '' on a non-team account.
 //   • 1:1 delivery                 addressed by EMAIL, no shared folder required.
-//     The sender's own Dropbox holds an outbox per recipient, shared with them via
-//     the Dropbox sharing API (provider.shareEnsureOutbox); the recipient finds the
-//     invite with shareListIncoming() and accepts it with shareMount(). See the
-//     "Dropbox sharing API" section of dropbox.js for the exact layout.
-//     This replaces the old assumption that both people could already reach one
-//     team folder — now the only input needed is an email address.
+//     ONE Dropbox shared folder per package, every recipient added as a member.
+//     A FOLDER is shared LIVE where it sits (sandpie/skills/thing) — the sender's
+//     later edits reach recipients through Dropbox with no re-publish, and
+//     autoSync() re-installs them silently. A SINGLE FILE cannot be shared by
+//     Dropbox (SharePathError.is_file), so it is wrapped in /Sandpie Outbox/<id>/
+//     as a copy and is NOT live.
+//     Recipients read the folder by namespace and never mount it, so nothing
+//     appears in their Dropbox. See dropbox.js "Dropbox sharing API".
 //   • per-user INSTALLED          sandpie/shared-installed/  (in the recipient's own
 //     workspace; read-only accepted packages, the worker's guard keys on this prefix)
 //
-// 1:1 recipients are VIEWERS on the sender's outbox, so they cannot delete a
-// package they've consumed. Accept/dismiss is therefore recorded in the
-// recipient's own shares.json, keyed "<id>@<rev>" — a re-share bumps rev, which
-// produces a new key and re-notifies. (Team packages are unchanged: auto-install,
-// tracked by the installed marker's rev.)
+// Because the shared folder is the sender's own workspace folder, its NAME carries
+// no signal — a recipient identifies Sandpie packages by probing each shared folder
+// for the .sandpie-share.json marker at its root (verdict cached per folder id).
+//
+// 1:1 recipients are VIEWERS, so they cannot delete a package they've consumed.
+// Accept/dismiss is recorded in the recipient's own shares.json, keyed "<id>@<rev>".
+// An explicit re-share bumps rev and re-notifies; plain content edits do not bump
+// rev and instead flow through as a silent auto-update. (Team packages are
+// unchanged: auto-install, tracked by the installed marker's rev.)
 //
 // A published package is a folder:  packages/<id>/manifest.json + <files…> (FLAT —
 //   overwritten each publish; Dropbox keeps prior revisions for rollback).
@@ -42,8 +48,10 @@
   'use strict';
   const INSTALL_ROOT = 'sandpie/shared-installed';   // read-only accepted packages (worker guard keys on this)
   const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
-  const SUBS_PATH = 'sandpie/config/shares.json';   // team-share subscription state only (1:1 uses the filesystem)
-  const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev}
+  const SUBS_PATH = 'sandpie/config/shares.json';   // accept/dismiss state (1:1) + team subscriptions
+  const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev,revs}
+  const SHARE_MARKER = '.sandpie-share.json';       // manifest at the root of a 1:1 shared folder
+  const PROBE_KEY = 'sandpie-share-probe';          // {sharedFolderId: 1|0} — is this shared folder one of ours?
   const COLLAPSE_KEY = 'sandpie-shared-collapsed';      // "Shared with me" collapsed state (per device)
   const TEAM_COLLAPSE_KEY = 'sandpie-team-collapsed';   // "Team artifacts" collapsed state (per device)
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
@@ -83,6 +91,7 @@
     return {
       kind: 'local', root,
       async listFiles(sub) { return await listOpfs(root + (sub ? '/' + sub : ''), '', []); },
+      async listEntries(sub) { return (await listOpfs(root + (sub ? '/' + sub : ''), '', [])).map(rel => ({ rel, rev: '', size: 0 })); },
       async listDirs(sub) { try { return (await O().listDir(root + (sub ? '/' + sub : ''))).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) { return []; } },
       async readText(rel) { try { return await O().read(root + '/' + rel); } catch (_) { return null; } },
       async readBytes(rel) { try { return await O().readBytes(root + '/' + rel); } catch (_) { return null; } },
@@ -101,16 +110,29 @@
     opt = (opt === true || opt === false) ? { team: opt } : (opt || { team: true });
     return {
       kind: 'cloud', root: absRoot, ns: opt.ns || '', team: !!opt.team,
+      // Paths RELATIVE TO `base` (the sub dir), like localStore — install() does
+      // readBytes(sub + '/' + rel), so rel must NOT re-include that prefix. When
+      // absRoot is '' the store is namespace-rooted and Dropbox already returns
+      // namespace-relative paths, so there is nothing to strip but the slash.
+      _rel(path, base) {
+        const s = String(path);
+        if (!base) return s.replace(/^\/+/, '');
+        const i = s.toLowerCase().indexOf(base.toLowerCase() + '/');
+        return i >= 0 ? s.slice(i + base.length + 1) : s.split('/').pop();
+      },
       async listFiles(sub) {
-        // Return paths RELATIVE TO `base` (the sub dir), like localStore — install()
-        // does readBytes('packages/<id>/' + rel), so rel must NOT re-include that prefix.
-        const base = absRoot + (sub ? '/' + sub : ''), bl = base.toLowerCase() + '/';
-        return (await P().cloudList(base, true, opt)).filter(e => e.kind === 'file').map(e => {
-          const i = e.path.toLowerCase().indexOf(bl);
-          return i >= 0 ? e.path.slice(i + base.length + 1) : e.path.split('/').pop();
-        });
+        const base = absRoot + (sub ? '/' + sub : '');
+        return (await P().cloudList(base, true, opt)).filter(e => e.kind === 'file').map(e => this._rel(e.path, base));
       },
       async listDirs(sub) { const base = absRoot + (sub ? '/' + sub : ''); return (await P().cloudList(base, false, opt)).filter(e => e.kind === 'folder' || e.kind === 'directory').map(e => e.path.split('/').pop()); },   // Dropbox tags folders 'folder', not 'directory'
+      // Same as listFiles but keeps each file's Dropbox rev. That rev is what tells
+      // a recipient a LIVE shared folder changed under them — the manifest rev only
+      // moves on an explicit re-share.
+      async listEntries(sub) {
+        const base = absRoot + (sub ? '/' + sub : '');
+        return (await P().cloudList(base, true, opt)).filter(e => e.kind === 'file')
+          .map(e => ({ rel: this._rel(e.path, base), rev: e.rev || '', size: e.size || 0 }));
+      },
       async readText(rel) { try { return new TextDecoder().decode(await P().cloudDownload(absRoot + '/' + rel, opt)); } catch (_) { return null; } },
       async readBytes(rel) { try { return await P().cloudDownload(absRoot + '/' + rel, opt); } catch (_) { return null; } },
       async writeBytes(rel, bytes) { await P().cloudUpload(absRoot + '/' + rel, bytes, opt); },
@@ -126,33 +148,57 @@
   // — it goes through the Dropbox sharing API instead.
   function hubRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? (p.cloudParent() + '/shared-hub') : ''; }
   function teamHub() { const h = hubRoot(); return h ? cloudStore(h, { team: true }) : localStore(LOCAL_HUB + '/_team'); }
-  const canShare1to1 = () => { const p = prov(); return !!(cloudOn() && p && p.shareEnsureOutbox); };
-  // SENDER side: the outbox shared with this email, created + invited on first use.
-  // Async because setting up a Dropbox share is a few API calls.
-  async function recipientHub(email) {
-    if (!canShare1to1()) return localStore(LOCAL_HUB + '/_inbox/' + localPart(email));
-    const box = await prov().shareEnsureOutbox(String(email));
-    return cloudStore(box.path, { team: false });   // the sender's own Dropbox = home namespace
+  const canShare1to1 = () => { const p = prov(); return !!(cloudOn() && p && p.shareFolderWith); };
+  // SENDER side. A folder is shared LIVE where it already sits; a single file has
+  // to be wrapped, because Dropbox will not share a file. Returns the store to
+  // write the manifest (and, for a file, the copy) into.
+  async function outboundStore(srcRel, isFolder, pkgId, emails) {
+    const p = prov();
+    if (!canShare1to1()) return localStore(LOCAL_HUB + '/_inbox/' + localPart(emails[0] || 'me'));
+    const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(pkgId);
+    const { id } = await p.shareFolderWith(abs, emails);
+    const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
+    st.shareId = id; st.live = isFolder;
+    return st;
   }
-  // RECIPIENT side. One cached listing per pass serves both the mounted stores and
-  // the pending-mount rows — shareListIncoming() is a couple of API calls and both
-  // renderHome() and autoSync() want it.
+
+  // RECIPIENT side. list_folders returns EVERY shared folder the user is in, not
+  // just ours, and the folder name is the sender's own so it proves nothing. Probe
+  // each one for the marker and remember the verdict per folder id — otherwise a
+  // user in twenty corporate shared folders pays twenty downloads every poll.
   let _incomingCache = null;
+  // A "not ours" verdict has to expire: a folder you already share with someone for
+  // ordinary work can be published as a package later, and a permanent negative
+  // would hide it forever. Positives never expire — a package stays a package.
+  const PROBE_TTL = 24 * 60 * 60 * 1000;
+  function probeCache() { try { return JSON.parse(localStorage.getItem(PROBE_KEY) || '{}'); } catch (_) { return {}; } }
+  function probeSaysSkip(c, id) {
+    const e = c[id];
+    if (!e || typeof e !== 'object') return false;                 // unknown, or a legacy 0/1 entry → re-probe
+    return e.v === 0 && (Date.now() - (e.t || 0)) < PROBE_TTL;
+  }
+  function setProbe(id, isOurs) {
+    const c = probeCache();
+    c[id] = { v: isOurs ? 1 : 0, t: Date.now() };
+    try { localStorage.setItem(PROBE_KEY, JSON.stringify(c)); } catch (_) {}
+  }
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
-    try { _incomingCache = await prov().shareListIncoming(); }
+    try { _incomingCache = (await prov().shareListIncoming()).filter(s => !s.isOwner); }   // my own outgoing shares are not deliveries to me
     catch (e) { console.warn('[sharing] could not list incoming shares:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
   function invalidateIncoming() { _incomingCache = null; _needsMount.clear(); }
-  // One store per sender, read BY NAMESPACE — mounted or not, nothing is added to
-  // the recipient's Dropbox. Paths are relative to the shared folder, so root ''.
+  // One store per incoming share, read BY NAMESPACE — nothing is mounted, so
+  // nothing appears in the recipient's Dropbox. Paths are relative to the shared
+  // folder itself, hence root ''.
   async function incomingStores(force) {
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
-    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id)).map(s => {
+    const known = probeCache();
+    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id) && !probeSaysSkip(known, s.id)).map(s => {
       const st = cloudStore('', { ns: s.id });
-      st.from = s.from; st.shareId = s.id;
+      st.from = s.from; st.shareId = s.id; st.shareName = s.name;
       return st;
     });
   }
@@ -167,6 +213,8 @@
     if (force || !_incomingCache) await catalog();   // catalog() is what discovers refusals
     return (await incomingShares()).filter(s => _needsMount.has(s.id));
   }
+  // Back-compat shim: recipientHub(email) used to be the outbound store.
+  async function recipientHub(email) { return localStore(LOCAL_HUB + '/_inbox/' + localPart(email)); }
 
   /* ── subscriptions ────────────────────────────────────────────────────── */
   // Real mode: one shares.json in the user's own (per-user) workspace. Offline sim:
@@ -184,11 +232,19 @@
   }
 
   /* ── package IO over a store ──────────────────────────────────────────── */
+  // TEAM hub layout: packages/<id>/manifest.json + files (many packages per store).
   async function readManifest(store, id) { const t = await store.readText('packages/' + id + '/manifest.json'); if (!t) return null; try { return JSON.parse(t); } catch (_) { return null; } }
   async function listManifests(store) {
     const ids = await store.listDirs('packages'); const out = [];
     for (const id of ids) { const m = await readManifest(store, id); if (m) out.push({ ...m, _store: store }); }
     return out;
+  }
+  // 1:1 layout: the shared folder IS the package — marker at its root, files
+  // alongside. Returns null when this shared folder isn't a Sandpie package.
+  async function readShareManifest(store) {
+    const t = await store.readText(SHARE_MARKER);
+    if (!t) return null;
+    try { const m = JSON.parse(t); return (m && m.id) ? m : null; } catch (_) { return null; }
   }
 
   /* ── publish ──────────────────────────────────────────────────────────── */
@@ -208,33 +264,42 @@
     const files = dir ? await listOpfs(src, '', []) : [base];
     const readSrc = (rel) => dir ? O().readBytes(src + '/' + rel) : O().readBytes(src);
 
-    // destinations: team → one team hub; 1:1 → one outbox per recipient email,
-    // each set up (created + shared + invited) on demand.
-    const dests = [];
-    if (audience.org || (audience.teams && audience.teams.length)) dests.push(teamHub());
-    for (const u of (audience.users || [])) {
-      try { dests.push(await recipientHub(u)); }
-      catch (e) { throw new Error('Could not set up delivery to ' + u + ': ' + ((e && e.message) || e)); }
-    }
-    if (!dests.length) throw new Error('publish: no audience');
-
     const acl = { org: !!audience.org, users: (audience.users || []).map(String), teams: (audience.teams || []).map(String) };
     // pin target: explicit opts.pinFile (a rel path within the folder) wins; else the
     // artifact itself, else the folder's first file as a fallback.
     const pinFile = opts.pin ? (opts.pinFile && files.includes(opts.pinFile) ? opts.pinFile : (kind === 'artifact' ? base : (files[0] || ''))) : null;
+    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', ts: 0 });
+    const dests = [], users = (audience.users || []).map(String);
     let rev = 1;
-    for (const store of dests) {
+
+    // ── TEAM: copy into the hub under packages/<id>/ (unchanged) ──
+    if (audience.org || (audience.teams && audience.teams.length)) {
+      const store = teamHub();
       const prev = await readManifest(store, id);
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
-      // Files live FLAT under packages/<id>/ (no v/<n>/ dirs) — overwritten each
-      // publish. Dropbox keeps prior revisions for rollback; `rev` just bumps so
-      // subscribers notice an update.
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); }
-      const manifest = { id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', ts: 0 };
-      await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(manifest, null, 2));
+      await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(mk(rev), null, 2));
+      dests.push(store.kind + ':' + store.root);
     }
+
+    // ── 1:1: ONE shared folder, every recipient added as a member ──
+    // A folder is shared LIVE in place, so there is nothing to copy — the sender's
+    // later edits are the update. A single file is copied into an outbox wrapper
+    // because Dropbox refuses to share a file.
+    if (users.length) {
+      let store;
+      try { store = await outboundStore(src, dir, id, users); }
+      catch (e) { throw new Error('Could not set up delivery to ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
+      const prev = await readShareManifest(store);
+      rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
+      if (!dir) { const bytes = await readSrc(base); if (bytes) await store.writeBytes(base, bytes); }
+      await store.writeText(SHARE_MARKER, JSON.stringify(mk(rev), null, 2));
+      dests.push((store.live ? 'live:' : 'copy:') + store.root);
+    }
+
+    if (!dests.length) throw new Error('publish: no audience');
     fire();
-    return { id, rev, kind, dests: dests.map(d => d.kind + ':' + d.root) };
+    return { id, rev, kind, live: dir && users.length > 0, dests };
   }
 
   /* ── catalog (what's available TO ME) ─────────────────────────────────── */
@@ -244,15 +309,21 @@
   async function catalog() {
     const who = me(), byId = {};
     for (const store of await incomingStores()) {
-      let ms = [];
-      try { ms = await listManifests(store); }
+      let m = null;
+      try { m = await readShareManifest(store); }
       catch (e) {
         const msg = (e && e.message) || String(e);
         // A refused namespace read is the one case that still needs a real mount.
-        if (isPathRootRefusal(msg)) { _needsMount.add(store.shareId); console.info('[sharing] namespace read refused for', store.from, '— will offer a mount'); }
-        else console.warn('[sharing] unreadable share from', store.from, msg);
+        if (isPathRootRefusal(msg)) { _needsMount.add(store.shareId); console.info('[sharing] namespace read refused for', store.shareName, '— will offer a mount'); continue; }
+        console.warn('[sharing] unreadable share', store.shareName, msg);
+        continue;
       }
-      for (const m of ms) { m._from = 'incoming'; m._sender = store.from || m.publisher; byId[m.id] = m; }
+      // Remember whether this shared folder is one of ours so the next poll can
+      // skip it entirely. Only a definite answer is cached; errors above are not.
+      setProbe(store.shareId, !!m);
+      if (!m) continue;
+      m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
+      byId[m.id] = m;
     }
     for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) { m._from = 'team'; byId[m.id] = m; }
     return byId;
@@ -301,25 +372,54 @@
   }
 
   /* ── accept / install / activate ──────────────────────────────────────── */
+  // Where a package's files live within its store: team packages sit under
+  // packages/<id>/ in the shared hub; a 1:1 shared folder IS the package, so its
+  // files are at the root (minus the marker).
+  const pkgSub = (m) => (m._from === 'team' ? 'packages/' + m.id : '');
+  const isPkgMeta = (rel) => rel === 'manifest.json' || rel === SHARE_MARKER;
   async function install(m) {
-    const store = m._store, dst = INSTALL_ROOT + '/' + m.id;
-    const files = (await store.listFiles('packages/' + m.id)).filter(rel => rel !== 'manifest.json');
-    for (const rel of files) {
-      const bytes = await store.readBytes('packages/' + m.id + '/' + rel);
+    const store = m._store, dst = INSTALL_ROOT + '/' + m.id, sub = pkgSub(m);
+    const entries = (await store.listEntries(sub)).filter(e => !isPkgMeta(e.rel));
+    const revs = {};
+    for (const e of entries) {
+      const bytes = await store.readBytes(sub ? sub + '/' + e.rel : e.rel);
       if (!bytes) continue;
-      const p = dst + '/' + rel;
+      const p = dst + '/' + e.rel;
       await O().write(p, new Blob([bytes]));
+      revs[e.rel] = e.rev || '';
       markDirty(p);   // emit file:changed so Dropbox marks it dirty + uploads it — without this the
                       // reconciliation pass deletes it as a local-only orphan under the eager prefix
     }
-    // marker so "Shared with me" + rollback-free identification work without shares.json
+    // Files the sender has since DELETED from a live shared folder must go too,
+    // otherwise an update leaves orphans behind in the installed copy.
+    const keep = new Set(Object.keys(revs));
+    for (const rel of await listOpfs(dst, '', [])) {
+      if (rel === PKG_MARKER || keep.has(rel)) continue;
+      const p = dst + '/' + rel;
+      try { await O().remove(p); } catch (_) {}
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
+    }
+    // marker so "Shared with me" + rollback-free identification work without shares.json.
+    // `revs` is the per-file Dropbox rev map — how autoSync notices that a LIVE
+    // shared folder changed without the manifest rev moving.
     const mp = dst + '/' + PKG_MARKER;
-    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming' })], { type: 'application/json' }));
+    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', revs })], { type: 'application/json' }));
     markDirty(mp);
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
     // skill:true → nothing to move; context.js discovers sandpie/shared-installed/<id>/SKILL.md and load_skill resolves it
     try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
+  }
+  // Has a LIVE shared folder changed since we installed it? Compares the per-file
+  // Dropbox revs, because the sender editing files in place never touches the
+  // manifest rev. Cheap: one list_folder, no downloads.
+  async function liveChanged(m, marker) {
+    if (!m._store || m._store.kind !== 'cloud') return false;
+    const was = (marker && marker.revs) || null;
+    if (!was) return false;   // installed before rev tracking → leave it alone
+    let entries; try { entries = (await m._store.listEntries(pkgSub(m))).filter(e => !isPkgMeta(e.rel)); } catch (_) { return false; }
+    if (entries.length !== Object.keys(was).length) return true;
+    return entries.some(e => was[e.rel] !== (e.rev || ''));
   }
   // Delete a 1:1 package from shared-incoming (local + Dropbox) — used by accept (move)
   // and dismiss. file:deleted propagates the removal to the recipient's Dropbox folder.
@@ -435,19 +535,35 @@
     fire();
   }
 
-  /* ── team artifacts: auto-install / auto-update / prune (no accept) ─────── */
-  // Every entitled team-hub package is silently installed and kept at latest rev, and
-  // ones removed from the hub (unshared) are dropped locally. 1:1 installs (from !=
-  // 'team') are never touched here.
+  /* ── auto-install / auto-update / prune ─────────────────────────────────── */
+  // TEAM packages: every entitled hub package is silently installed and kept at the
+  //   latest manifest rev; ones removed from the hub are dropped locally.
+  // 1:1 packages: only ones the user has ALREADY accepted are refreshed — an
+  //   un-accepted delivery stays an invite. A live shared folder changes without the
+  //   manifest rev moving, so the trigger is the per-file rev map (liveChanged).
+  //   This is what makes "I edit the folder, they get it" true end to end.
   let syncing = false;
   async function autoSync() {
     if (syncing || !O()) return; syncing = true;
     try {
       const cat = await catalog(); const teamIds = new Set(); let changed = false;
+      const accepted = (await subs()).accepted || {};
       for (const id in cat) {
-        const m = cat[id]; if (m._from !== 'team') continue; teamIds.add(id);
+        const m = cat[id];
         let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
-        if (!mk || String(mk.rev) !== String(m.rev)) { await install(m); changed = true; }   // install() marks from='team'
+        if (m._from === 'team') {
+          teamIds.add(id);
+          if (!mk || String(mk.rev) !== String(m.rev)) { await install(m); changed = true; }   // install() marks from='team'
+          continue;
+        }
+        // 1:1 — refresh only what's installed AND accepted at this rev.
+        if (!mk || mk.from === 'team') continue;
+        if (!accepted[consumeKey(m)]) continue;
+        if (String(mk.rev) !== String(m.rev) || await liveChanged(m, mk)) {
+          await install(m);
+          console.info('[sharing] refreshed', id, 'from', m._sender);
+          changed = true;
+        }
       }
       let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
       for (const id of dirs) {
@@ -456,14 +572,14 @@
         if (mk && mk.from === 'team') { await removeInstalledLocal(id); changed = true; }   // unshared from the hub → drop local
       }
       if (changed) fire();
-    } catch (e) { console.warn('[sharing] team autoSync failed:', e); } finally { syncing = false; }
+    } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
 
   /* ── events ───────────────────────────────────────────────────────────── */
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, incomingShares, incomingStores, invalidateIncoming, INSTALL_ROOT, LOCAL_HUB };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */
@@ -517,10 +633,15 @@
       msg.textContent = sel === 'users' ? 'Setting up delivery…' : 'Sharing…';
       try {
         const r = await publish(srcPath, audience, { kind: presetKind, pin, pinFile });
+        // A live folder share keeps updating on its own, which the sender should
+        // know — their later edits (and deletes) reach these people automatically.
+        const tail = !cloudOn() ? ' [local test — Dropbox not connected]'
+          : sel !== 'users' ? ''
+          : r.live ? '. This folder now stays in sync with them — your later edits and deletes reach them automatically.'
+                   : '. They see it next time Sandpie is open.';
         msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'the team' : audience.users.join(', '))
-          + (pin ? ', pinned ' + (pinFile || 'file') : '')
-          + (cloudOn() ? (sel === 'users' ? '. They see it next time Sandpie is open.' : '') : ' [local test — Dropbox not connected]');
-        setTimeout(close, sel === 'users' ? 2600 : 1400);
+          + (pin ? ', pinned ' + (pinFile || 'file') : '') + tail;
+        setTimeout(close, sel === 'users' ? 3600 : 1400);
       }
       catch (e) { msg.textContent = 'Share failed: ' + ((e && e.message) || e); }
     };

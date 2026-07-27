@@ -1159,30 +1159,34 @@
   // mount_folder survives only as a fallback for accounts where namespace reads
   // are refused (PathRootError.no_permission) — see sharing.js.
   //
-  // Layout, all in the SENDER's home namespace (deliberately outside /sandpie, so
-  // the sync engine never sees it):
-  //   /Sandpie Shares/<recipient-local>/Sandpie from <sender-local>/   ← the SHARED folder
-  //       packages/<id>/manifest.json + files…
-  // The recipient segment keeps one outbox per recipient (so two recipients never
-  // collide); the leaf carries the SENDER's name because the leaf is what shows up
-  // in the recipient's Dropbox once mounted.
+  // What gets shared is ONE Dropbox folder per package, with every recipient added
+  // as a member of it. Two cases:
   //
-  // ONE outbox per (sender, recipient) pair, created once and reused for every
-  // later delivery — sharing per-package would mint a fresh Dropbox namespace and
-  // a fresh mount on their side for every artifact.
+  //   FOLDER source (a skill, or any folder) — the LIVE workspace folder itself is
+  //     shared, e.g. /sandpie/skills/thing. Edits the sender makes propagate to
+  //     every recipient through Dropbox with no re-publish. Consequences the sender
+  //     is signing up for: deleting a file in there deletes it for everyone, and
+  //     Dropbox will then refuse to share that folder's parent or any folder inside
+  //     it (SharePathError contains_shared_folder / inside_shared_folder).
   //
-  // Recipients are invited as VIEWER: a delivery must not give someone write
-  // access to the sender's Dropbox. That means the recipient cannot delete a
-  // consumed package, so accept/dismiss state lives in their own shares.json
-  // (keyed id@rev, so a re-share bumps rev and re-notifies) — see sharing.js.
+  //   SINGLE FILE source — Dropbox cannot share a file (SharePathError.is_file), so
+  //     it is wrapped: /Sandpie Outbox/<id>/ holds a COPY. Not live; re-sharing
+  //     republishes it.
+  //
+  // The package manifest is a .sandpie-share.json at the root of the shared folder.
+  // That marker is also how a recipient recognises which of their shared folders
+  // are Sandpie packages — the folder name is the sender's own, so it carries no
+  // reliable signal.
+  //
+  // Recipients are invited as VIEWER: sharing must never hand out write access to
+  // the sender's workspace. A viewer cannot delete a consumed package, so
+  // accept/dismiss state lives in their own shares.json (keyed id@rev; an explicit
+  // re-share bumps rev and re-notifies, while plain content edits update silently).
   //
   // Requires the sharing.read + sharing.write scopes on the Dropbox app. A token
   // minted before those were granted fails with missing_scope; that's surfaced as
   // a reconnect prompt rather than a raw API error.
-  const OUTBOX_PARENT     = '/Sandpie Shares';
-  const SHARE_NAME_PREFIX = 'Sandpie from ';        // recipient-side folder name + the discovery filter
-  const OUTBOX_CACHE      = 'dbxfull-share-outbox'; // {recipientLocal: {path, id, email}}
-  function isShareFolderName(n) { return String(n || '').toLowerCase().startsWith(SHARE_NAME_PREFIX.toLowerCase()); }
+  const OUTBOX_PARENT = '/Sandpie Outbox';   // wrappers for single-file shares (sender's Dropbox)
   async function shareApi(path, body) {
     try { return await api(path, body); }
     catch (e) {
@@ -1192,7 +1196,6 @@
       throw e;
     }
   }
-  function myLocalPart() { return sanitizeSeg(String(localStorage.getItem(EMAIL_KEY) || 'me').split('@')[0]).toLowerCase(); }
   // Idempotent: the shared_folder_id for `path`, sharing the folder if it isn't
   // already shared. share_folder can go async on a big folder, so poll for it.
   async function shareFolderId(path) {
@@ -1217,44 +1220,55 @@
     if (!id) throw new Error('share_folder did not return a shared_folder_id');
     return id;
   }
-  // Ensure (and cache) the outbox shared with `email`. Safe to call on every publish.
-  async function ensureOutbox(email) {
-    const to = sanitizeSeg(String(email).split('@')[0]).toLowerCase();
-    const path = OUTBOX_PARENT + '/' + to + '/' + SHARE_NAME_PREFIX + myLocalPart();
-    let cache = {}; try { cache = JSON.parse(localStorage.getItem(OUTBOX_CACHE) || '{}'); } catch (_) {}
-    if (cache[to] && cache[to].path === path && cache[to].id) return cache[to];
-    await mkdirp(OUTBOX_PARENT);
-    await mkdirp(OUTBOX_PARENT + '/' + to);
-    await mkdirp(path);
+  // Share `path` (a folder in the user's OWN Dropbox — either a live workspace
+  // folder or an outbox wrapper) with these emails, as viewers. Idempotent: an
+  // already-shared folder keeps its id, an existing member is left alone.
+  async function shareFolderWith(path, emails) {
     const id = await shareFolderId(path);
-    try {
-      await shareApi('/2/sharing/add_folder_member', {
-        shared_folder_id: id,
-        members: [{ member: { '.tag': 'email', email: String(email) }, access_level: { '.tag': 'viewer' } }],
-        quiet: true,   // no Dropbox notification email — the app is the notification
-      });
-    } catch (e) {
-      // Re-inviting someone already on the folder is the normal steady state.
-      if (!/already_a_member|already_invited/i.test(String((e && e.message) || e))) throw e;
+    for (const email of (emails || [])) {
+      try {
+        await shareApi('/2/sharing/add_folder_member', {
+          shared_folder_id: id,
+          members: [{ member: { '.tag': 'email', email: String(email) }, access_level: { '.tag': 'viewer' } }],
+          quiet: true,   // no Dropbox notification email — the app is the notification
+        });
+      } catch (e) {
+        // Re-inviting someone already on the folder is the normal steady state.
+        if (!/already_a_member|already_invited/i.test(String((e && e.message) || e))) throw e;
+      }
     }
-    cache[to] = { path, id, email: String(email) };
-    localStorage.setItem(OUTBOX_CACHE, JSON.stringify(cache));
-    return cache[to];
+    return { id, path };
   }
-  // Every Sandpie share folder this account is a member of, mounted or not — we
-  // read them all by namespace, so `path` (the mount point, '' when unmounted) is
-  // informational rather than a gate.
+  // Outbox wrapper for a SINGLE FILE, which Dropbox refuses to share directly.
+  async function ensureOutboxFolder(id) {
+    const path = OUTBOX_PARENT + '/' + sanitizeSeg(id);
+    await mkdirp(OUTBOX_PARENT);
+    await mkdirp(path);
+    return path;
+  }
+  // Stop sharing entirely — the package disappears for every recipient. Used when
+  // the sender un-shares; leaves the sender's own files in place.
+  async function unshareFolder(sharedFolderId) {
+    await shareApi('/2/sharing/unshare_folder', { shared_folder_id: sharedFolderId, leave_a_copy: true });
+  }
+  // EVERY shared folder this account is a member of, mounted or not — not just
+  // Sandpie's. The shared folder is now the sender's own workspace folder, so its
+  // name carries no signal; sharing.js identifies ours by probing each one for the
+  // .sandpie-share.json marker (and caches the verdict so it probes each id once).
+  // `path` is the mount point, '' when unmounted — informational, since we read by
+  // namespace either way. `isOwner` marks folders WE shared out, so a sender never
+  // sees their own package come back as an incoming delivery.
   async function listIncomingShares() {
     const out = [];
     let data = await shareApi('/2/sharing/list_folders', { limit: 100 });
     for (let guard = 0; guard < 50; guard++) {
       for (const e of (data.entries || [])) {
-        if (!isShareFolderName(e.name)) continue;
         out.push({
           id: e.shared_folder_id,
           name: e.name,
-          from: e.name.slice(SHARE_NAME_PREFIX.length) || ((e.owner_display_names || [])[0] || ''),
           owner: (e.owner_display_names || [])[0] || '',
+          from: (e.owner_display_names || [])[0] || '',
+          isOwner: ((e.access_type || {})['.tag'] || '') === 'owner',
           path: e.path_lower || '',
         });
       }
@@ -1342,10 +1356,13 @@
       // The Dropbox account's own email — the authoritative sender identity for a
       // share, independent of whatever account.js reports.
       accountEmail: () => localStorage.getItem(EMAIL_KEY) || '',
-      shareEnsureOutbox: (email) => ensureOutbox(email),   // → {path, id, email}; idempotent
-      shareListIncoming: () => listIncomingShares(),        // path:'' ⇒ pending (unmounted)
-      shareMount: (id) => mountShare(id),                   // accept → returns the mount path
-      shareDecline: (id) => declineShare(id),               // decline / leave
+      shareFolderWith: (path, emails) => shareFolderWith(path, emails),   // → {id, path}; idempotent
+      shareOutboxFolder: (id) => ensureOutboxFolder(id),    // wrapper for a single-file share
+      shareWorkspacePath: (rel) => relToCloud(rel),         // OPFS rel → the live Dropbox path
+      shareListIncoming: () => listIncomingShares(),        // every shared folder; probe for our marker
+      shareMount: (id) => mountShare(id),                   // fallback when a namespace read is refused
+      shareDecline: (id) => declineShare(id),               // leave a share (stop receiving)
+      shareUnshare: (id) => unshareFolder(id),              // sender: revoke for everyone
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);
