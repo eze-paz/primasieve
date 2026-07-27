@@ -653,10 +653,7 @@
       setSyncState(state);
 
       // Dehydrate files not modified in the last 24h
-      if (dehydrated()) {
-        const { purged } = await dehydratePurge();
-        if (purged > 0) removedAny = true;
-      }
+      if (dehydrated()) await dehydratePurge();
 
       // Any cursor-delta activity should refresh the viewer, which renders the
       // cloud index in dehydrated mode. Adds of cloud-only files skip download
