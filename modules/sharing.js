@@ -152,13 +152,13 @@
   // SENDER side. A folder is shared LIVE where it already sits; a single file has
   // to be wrapped, because Dropbox will not share a file. Returns the store to
   // write the manifest (and, for a file, the copy) into.
-  async function outboundStore(srcRel, isFolder, pkgId, emails) {
+  async function outboundStore(srcRel, isFolder, pkgId, emails, level) {
     const p = prov();
     if (!canShare1to1()) return localStore(LOCAL_HUB + '/_inbox/' + localPart(emails[0] || 'me'));
     const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(pkgId);
-    const { id } = await p.shareFolderWith(abs, emails);
+    const res = await p.shareFolderWith(abs, emails, level);
     const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
-    st.shareId = id; st.live = isFolder;
+    st.shareId = res.id; st.live = isFolder; st.level = res.level;
     return st;
   }
 
@@ -268,7 +268,10 @@
     // pin target: explicit opts.pinFile (a rel path within the folder) wins; else the
     // artifact itself, else the folder's first file as a fallback.
     const pinFile = opts.pin ? (opts.pinFile && files.includes(opts.pinFile) ? opts.pinFile : (kind === 'artifact' ? base : (files[0] || ''))) : null;
-    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', ts: 0 });
+    // 'viewer' (default) or 'editor'. Recorded in the manifest so the recipient can
+    // tell whether they are looking at something they may write back to.
+    const level = opts.access === 'editor' ? 'editor' : 'viewer';
+    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', access: level, ts: 0 });
     const dests = [], users = (audience.users || []).map(String);
     let rev = 1;
 
@@ -288,7 +291,7 @@
     // because Dropbox refuses to share a file.
     if (users.length) {
       let store;
-      try { store = await outboundStore(src, dir, id, users); }
+      try { store = await outboundStore(src, dir, id, users, level); }
       catch (e) { throw new Error('Could not set up delivery to ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
       const prev = await readShareManifest(store);
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
@@ -299,7 +302,7 @@
 
     if (!dests.length) throw new Error('publish: no audience');
     fire();
-    return { id, rev, kind, live: dir && users.length > 0, dests };
+    return { id, rev, kind, live: dir && users.length > 0, access: level, dests };
   }
 
   /* ── catalog (what's available TO ME) ─────────────────────────────────── */
@@ -599,6 +602,12 @@
         // silently fall through to the local simulation, so default to 1:1 instead.
         '<label class="share-opt"' + (hubRoot() ? '' : ' style="opacity:.45"') + '><input type="radio" name="aud" value="org"' + (hubRoot() ? ' checked' : ' disabled') + '> Share with team' + (hubRoot() ? '' : ' <span style="font-size:.75em">(no team folder configured)</span>') + '</label>' +
         '<label class="share-opt"><input type="radio" name="aud" value="users"' + (hubRoot() ? '' : ' checked') + '> Specific people: <input class="share-in" data-k="users" placeholder="email, email…"></label>' +
+        // Dropbox access level for the 1:1 share. Team-hub shares are copies into a
+        // folder whose permissions the team already owns, so it does not apply there.
+        '<div class="share-access"><label class="share-opt">They can: <select class="share-in" data-k="access">' +
+          '<option value="viewer" selected>View only</option>' +
+          '<option value="editor">View and edit</option>' +
+        '</select></label><div class="share-warn" style="display:none; font-size:0.75rem; color:var(--sp-warn, #c93); margin:0.15rem 0 0 1.1rem;"></div></div>' +
         '<label class="share-opt share-pin"><input type="checkbox" data-k="pin" checked> Pin to their home screen</label>' +
         (folder ? '<div class="share-pin-file"><label class="share-opt">Pin which file: <select class="share-in" data-k="pinfile">' +
                     folderFiles.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
@@ -614,6 +623,24 @@
     const pinBox = back.querySelector('[data-k="pin"]');
     const pinFileRow = back.querySelector('.share-pin-file');
     if (pinFileRow) pinBox.addEventListener('change', () => { pinFileRow.style.display = pinBox.checked ? '' : 'none'; });
+    // Access level applies to 1:1 only, and "edit" on a LIVE folder share is real
+    // write access to the sender's own workspace folder — say so plainly, because
+    // it is not recoverable by unsharing after the fact.
+    const accessRow = back.querySelector('.share-access');
+    const accessSel = back.querySelector('.share-in[data-k="access"]');
+    const warnBox = back.querySelector('.share-warn');
+    const syncAccessUi = () => {
+      const to1to1 = back.querySelector('input[name="aud"]:checked').value === 'users';
+      accessRow.style.display = to1to1 ? '' : 'none';
+      const editor = accessSel.value === 'editor';
+      warnBox.style.display = (to1to1 && editor) ? '' : 'none';
+      warnBox.textContent = folder
+        ? '⚠ They can change and delete files in your own "' + src.split('/').pop() + '" folder.'
+        : '⚠ They can change and delete this shared copy.';
+    };
+    back.querySelectorAll('input[name="aud"]').forEach(r => r.addEventListener('change', syncAccessUi));
+    accessSel.addEventListener('change', syncAccessUi);
+    syncAccessUi();
     back.querySelector('[data-act="share"]').onclick = async () => {
       const sel = back.querySelector('input[name="aud"]:checked').value, audience = {};
       if (sel === 'org') audience.org = true;
@@ -632,13 +659,14 @@
       // First delivery to a new person sets up a Dropbox share (a few API calls).
       msg.textContent = sel === 'users' ? 'Setting up delivery…' : 'Sharing…';
       try {
-        const r = await publish(srcPath, audience, { kind: presetKind, pin, pinFile });
+        const r = await publish(srcPath, audience, { kind: presetKind, pin, pinFile, access: accessSel.value });
         // A live folder share keeps updating on its own, which the sender should
         // know — their later edits (and deletes) reach these people automatically.
         const tail = !cloudOn() ? ' [local test — Dropbox not connected]'
           : sel !== 'users' ? ''
-          : r.live ? '. This folder now stays in sync with them — your later edits and deletes reach them automatically.'
-                   : '. They see it next time Sandpie is open.';
+          : (r.access === 'editor' ? ' with edit access' : ' (view only)')
+            + (r.live ? '. This folder now stays in sync with them — your later edits and deletes reach them automatically.'
+                      : '. They see it next time Sandpie is open.');
         msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'the team' : audience.users.join(', '))
           + (pin ? ', pinned ' + (pinFile || 'file') : '') + tail;
         setTimeout(close, sel === 'users' ? 3600 : 1400);
@@ -681,7 +709,8 @@
   const entryOf = (m) => m.pin || (m.kind === 'artifact' ? m.title : (m.kind === 'skill' ? 'SKILL.md' : ''));   // the file to open/pin
   function inviteRow(m) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
-    row.innerHTML = '<span class="shared-file-name">' + kindIcon(m.kind) + ' ' + esc(m.title) + '</span><span class="shared-by">from ' + esc(m._sender || m.publisher) + '</span>';
+    const accNote = m.access === 'editor' ? ' · can edit' : '';
+    row.innerHTML = '<span class="shared-file-name">' + kindIcon(m.kind) + ' ' + esc(m.title) + '</span><span class="shared-by">from ' + esc(m._sender || m.publisher) + esc(accNote) + '</span>';
     const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Accept'; acc.onclick = () => accept(m.id);
     const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕'; dis.onclick = () => dismiss(m.id);
     row.append(acc, dis); return row;

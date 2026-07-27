@@ -1178,10 +1178,12 @@
   // are Sandpie packages — the folder name is the sender's own, so it carries no
   // reliable signal.
   //
-  // Recipients are invited as VIEWER: sharing must never hand out write access to
-  // the sender's workspace. A viewer cannot delete a consumed package, so
-  // accept/dismiss state lives in their own shares.json (keyed id@rev; an explicit
-  // re-share bumps rev and re-notifies, while plain content edits update silently).
+  // Recipients are invited as VIEWER by default; the share dialog can raise that to
+  // EDITOR. On a LIVE folder share, editor is real write access to the sender's own
+  // workspace folder, so the dialog says so rather than burying it. Accept/dismiss
+  // state lives in the recipient's own shares.json either way (keyed id@rev; an
+  // explicit re-share bumps rev and re-notifies, plain content edits update
+  // silently), so it does not depend on the recipient being able to delete anything.
   //
   // Requires the sharing.read + sharing.write scopes on the Dropbox app. A token
   // minted before those were granted fails with missing_scope; that's surfaced as
@@ -1220,24 +1222,73 @@
     if (!id) throw new Error('share_folder did not return a shared_folder_id');
     return id;
   }
+  // Current membership of a shared folder, as {emailLower: {level, accountId,
+  // invitee}}. `users` have joined and carry a dropbox_id; `invitees` were invited
+  // by email and have not joined, so they have no id yet — which decides how their
+  // access level can be changed (see below).
+  async function folderMembers(sharedFolderId) {
+    const out = {};
+    let data = await shareApi('/2/sharing/list_folder_members', { shared_folder_id: sharedFolderId, limit: 100 });
+    for (let guard = 0; guard < 50; guard++) {
+      for (const u of (data.users || [])) {
+        const em = String((u.user || {}).email || '').toLowerCase();
+        if (em) out[em] = { level: (u.access_type || {})['.tag'] || '', accountId: (u.user || {}).account_id || '', invitee: false };
+      }
+      for (const i of (data.invitees || [])) {
+        const em = String((i.invitee || {}).email || '').toLowerCase();
+        if (em && !out[em]) out[em] = { level: (i.access_type || {})['.tag'] || '', accountId: ((i.user || {}).account_id) || '', invitee: true };
+      }
+      if (!data.cursor) break;
+      data = await shareApi('/2/sharing/list_folder_members/continue', { cursor: data.cursor });
+    }
+    return out;
+  }
   // Share `path` (a folder in the user's OWN Dropbox — either a live workspace
-  // folder or an outbox wrapper) with these emails, as viewers. Idempotent: an
-  // already-shared folder keeps its id, an existing member is left alone.
-  async function shareFolderWith(path, emails) {
+  // folder or an outbox wrapper) with these emails at `level` ('viewer' | 'editor').
+  // Idempotent, and it CONVERGES: re-sharing to someone who already has a different
+  // access level moves them to the new one rather than silently keeping the old.
+  async function shareFolderWith(path, emails, level) {
+    const want = (level === 'editor') ? 'editor' : 'viewer';
     const id = await shareFolderId(path);
+    let members = null;   // fetched lazily; only needed when somebody is already on
     for (const email of (emails || [])) {
+      const em = String(email);
       try {
         await shareApi('/2/sharing/add_folder_member', {
           shared_folder_id: id,
-          members: [{ member: { '.tag': 'email', email: String(email) }, access_level: { '.tag': 'viewer' } }],
+          members: [{ member: { '.tag': 'email', email: em }, access_level: { '.tag': want } }],
           quiet: true,   // no Dropbox notification email — the app is the notification
         });
+        continue;
       } catch (e) {
-        // Re-inviting someone already on the folder is the normal steady state.
         if (!/already_a_member|already_invited/i.test(String((e && e.message) || e))) throw e;
       }
+      // Already on the folder. Change their level only if it actually differs.
+      if (!members) members = await folderMembers(id);
+      const cur = members[em.toLowerCase()];
+      if (!cur || cur.level === want || cur.level === 'owner') continue;
+      if (!cur.invitee && cur.accountId) {
+        // Joined members can be updated in place — but ONLY by dropbox_id;
+        // UpdateFolderMemberArg.member documents that email is not accepted.
+        await shareApi('/2/sharing/update_folder_member', {
+          shared_folder_id: id,
+          member: { '.tag': 'dropbox_id', dropbox_id: cur.accountId },
+          access_level: { '.tag': want },
+        });
+      } else {
+        // A pending invitee has no dropbox_id, so there is nothing to update —
+        // withdraw the invitation and re-issue it at the new level.
+        await shareApi('/2/sharing/remove_folder_member', {
+          shared_folder_id: id, member: { '.tag': 'email', email: em }, leave_a_copy: false,
+        });
+        await shareApi('/2/sharing/add_folder_member', {
+          shared_folder_id: id,
+          members: [{ member: { '.tag': 'email', email: em }, access_level: { '.tag': want } }],
+          quiet: true,
+        });
+      }
     }
-    return { id, path };
+    return { id, path, level: want };
   }
   // Outbox wrapper for a SINGLE FILE, which Dropbox refuses to share directly.
   async function ensureOutboxFolder(id) {
@@ -1356,7 +1407,8 @@
       // The Dropbox account's own email — the authoritative sender identity for a
       // share, independent of whatever account.js reports.
       accountEmail: () => localStorage.getItem(EMAIL_KEY) || '',
-      shareFolderWith: (path, emails) => shareFolderWith(path, emails),   // → {id, path}; idempotent
+      shareFolderWith: (path, emails, level) => shareFolderWith(path, emails, level),   // level 'viewer'|'editor'; → {id, path, level}
+      shareMembers: (id) => folderMembers(id),              // {emailLower: {level, accountId, invitee}}
       shareOutboxFolder: (id) => ensureOutboxFolder(id),    // wrapper for a single-file share
       shareWorkspacePath: (rel) => relToCloud(rel),         // OPFS rel → the live Dropbox path
       shareListIncoming: () => listIncomingShares(),        // every shared folder; probe for our marker
