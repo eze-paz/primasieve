@@ -330,11 +330,30 @@
   // then on that sender's deliveries arrive as ordinary per-package invites.
   // Mounting is NEVER automatic — it puts a folder in the user's Dropbox, so it
   // stays an explicit accept.
+  // MountFolderError cases that are NOT failures:
+  //   already_mounted — someone/something mounted it between our list and our click.
+  //   must_automount  — a team space handles mounting itself; Dropbox's automounter
+  //                     will add it shortly. Common on team accounts, where shares
+  //                     often arrive already mounted and never show a pending row
+  //                     at all. Either way the right move is to refresh, not error.
+  const MOUNT_OK_ANYWAY = /already_mounted|must_automount/i;
+  function mountErrorText(msg) {
+    const m = String(msg || '');
+    if (/insufficient_quota/i.test(m))    return 'Not enough space in your Dropbox to add this shared folder.';
+    if (/not_mountable/i.test(m))         return 'Dropbox will not let this folder be added directly — it sits inside a team folder.';
+    if (/inside_shared_folder/i.test(m))  return 'Cannot add this: it would put a shared folder inside another shared folder.';
+    if (/no_permission/i.test(m))         return 'You do not have permission to add this shared folder.';
+    return 'Could not accept that share: ' + m;
+  }
   async function acceptMount(shareId) {
     const p = prov();
     if (!(p && p.shareMount)) return;
     try { await p.shareMount(shareId); }
-    catch (e) { console.warn('[sharing] mount failed:', (e && e.message) || e); alert('Could not accept that share: ' + ((e && e.message) || e)); return; }
+    catch (e) {
+      const msg = (e && e.message) || String(e);
+      if (!MOUNT_OK_ANYWAY.test(msg)) { console.warn('[sharing] mount failed:', msg); alert(mountErrorText(msg)); return; }
+      console.info('[sharing] mount handled by Dropbox itself:', msg);
+    }
     invalidateIncoming();
     await autoSync();
     fire();
