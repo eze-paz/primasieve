@@ -92,6 +92,7 @@
       kind: 'local', root,
       async listFiles(sub) { return await listOpfs(root + (sub ? '/' + sub : ''), '', []); },
       async listEntries(sub) { return (await listOpfs(root + (sub ? '/' + sub : ''), '', [])).map(rel => ({ rel, rev: '', size: 0 })); },
+      async probeText(rel) { try { const t = await O().read(root + '/' + rel); return t == null ? { missing: true } : { text: t }; } catch (_) { return { missing: true }; } },
       async listDirs(sub) { try { return (await O().listDir(root + (sub ? '/' + sub : ''))).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) { return []; } },
       async readText(rel) { try { return await O().read(root + '/' + rel); } catch (_) { return null; } },
       async readBytes(rel) { try { return await O().readBytes(root + '/' + rel); } catch (_) { return null; } },
@@ -135,6 +136,19 @@
       },
       async readText(rel) { try { return new TextDecoder().decode(await P().cloudDownload(absRoot + '/' + rel, opt)); } catch (_) { return null; } },
       async readBytes(rel) { try { return await P().cloudDownload(absRoot + '/' + rel, opt); } catch (_) { return null; } },
+      // readText() cannot tell "the file isn't there" from "I wasn't allowed to
+      // look", and treating those the same is what made unreadable shares get
+      // cached as "not a Sandpie package". This keeps them apart.
+      //   {missing:true}          → definitively absent; safe to remember
+      //   {error:'...'}           → could not tell; must NOT be remembered
+      async probeText(rel) {
+        try { return { text: new TextDecoder().decode(await P().cloudDownload(absRoot + '/' + rel, opt)) }; }
+        catch (e) {
+          const msg = (e && e.message) || String(e);
+          if (/not_found|path\/not_found/i.test(msg)) return { missing: true };
+          return { error: msg };
+        }
+      },
       async writeBytes(rel, bytes) { await P().cloudUpload(absRoot + '/' + rel, bytes, opt); },
       async writeText(rel, txt) { await P().cloudUpload(absRoot + '/' + rel, new TextEncoder().encode(txt), opt); },
     };
@@ -152,13 +166,27 @@
   // SENDER side. A folder is shared LIVE where it already sits; a single file has
   // to be wrapped, because Dropbox will not share a file. Returns the store to
   // write the manifest (and, for a file, the copy) into.
-  async function outboundStore(srcRel, isFolder, pkgId, emails, level) {
+  // Shares the folder but does NOT invite anyone yet — publish() writes the marker
+  // first and calls store.invite() afterwards. Inviting first opens a window where
+  // the recipient sees a markerless share and concludes it isn't a package.
+  async function outboundStore(srcRel, isFolder, pkgId, level) {
     const p = prov();
-    if (!canShare1to1()) return localStore(LOCAL_HUB + '/_inbox/' + localPart(emails[0] || 'me'));
+    if (!canShare1to1()) { const st = localStore(LOCAL_HUB + '/_outbox/' + pkgId); st.invite = async () => {}; return st; }
     const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(pkgId);
-    const res = await p.shareFolderWith(abs, emails, level);
+    let id;
+    try { id = await p.shareEnsureFolder(abs); }
+    catch (e) {
+      // A folder created moments ago may not have reached Dropbox yet — the sync
+      // cycle is up to a minute. share_folder then fails with a bare not_found,
+      // which reads as a bug rather than "wait a moment".
+      if (isFolder && /not_found/i.test(String((e && e.message) || e))) {
+        throw new Error('"' + srcRel.split('/').pop() + '" has not finished syncing to Dropbox yet — wait for the sync to settle and share again.');
+      }
+      throw e;
+    }
     const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
-    st.shareId = res.id; st.live = isFolder; st.level = res.level;
+    st.shareId = id; st.live = isFolder; st.level = level;
+    st.invite = async (emails) => { const r = await p.shareInvite(id, emails, level); st.level = r.level; return r; };
     return st;
   }
 
@@ -166,11 +194,13 @@
   // just ours, and the folder name is the sender's own so it proves nothing. Probe
   // each one for the marker and remember the verdict per folder id — otherwise a
   // user in twenty corporate shared folders pays twenty downloads every poll.
-  let _incomingCache = null;
+  let _incomingCache = null, _lastProbe = [];
   // A "not ours" verdict has to expire: a folder you already share with someone for
   // ordinary work can be published as a package later, and a permanent negative
   // would hide it forever. Positives never expire — a package stays a package.
-  const PROBE_TTL = 24 * 60 * 60 * 1000;
+  // One hour, not a day: re-probing a miss costs a single not_found round-trip, and
+  // a stale negative is the difference between seeing a delivery and not.
+  const PROBE_TTL = 60 * 60 * 1000;
   function probeCache() { try { return JSON.parse(localStorage.getItem(PROBE_KEY) || '{}'); } catch (_) { return {}; } }
   function probeSaysSkip(c, id) {
     const e = c[id];
@@ -240,11 +270,15 @@
     return out;
   }
   // 1:1 layout: the shared folder IS the package — marker at its root, files
-  // alongside. Returns null when this shared folder isn't a Sandpie package.
+  // alongside. Returns {manifest} | {missing:true} | {error}. The caller MUST only
+  // remember a verdict for the first two: an `error` means we could not tell, and
+  // recording that as "not a package" is what hides a real delivery.
   async function readShareManifest(store) {
-    const t = await store.readText(SHARE_MARKER);
-    if (!t) return null;
-    try { const m = JSON.parse(t); return (m && m.id) ? m : null; } catch (_) { return null; }
+    const r = await store.probeText(SHARE_MARKER);
+    if (r.error) return { error: r.error };
+    if (r.missing || !r.text) return { missing: true };
+    try { const m = JSON.parse(r.text); return (m && m.id) ? { manifest: m } : { missing: true }; }
+    catch (_) { return { missing: true }; }   // present but unparseable → not one of ours
   }
 
   /* ── publish ──────────────────────────────────────────────────────────── */
@@ -291,12 +325,16 @@
     // because Dropbox refuses to share a file.
     if (users.length) {
       let store;
-      try { store = await outboundStore(src, dir, id, users, level); }
+      try { store = await outboundStore(src, dir, id, level); }
       catch (e) { throw new Error('Could not set up delivery to ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
-      const prev = await readShareManifest(store);
+      const prev = (await readShareManifest(store)).manifest;
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
       if (!dir) { const bytes = await readSrc(base); if (bytes) await store.writeBytes(base, bytes); }
+      // Marker BEFORE members: the first thing a recipient does with a new share is
+      // look for it, and a miss is remembered.
       await store.writeText(SHARE_MARKER, JSON.stringify(mk(rev), null, 2));
+      try { await store.invite(users); }
+      catch (e) { throw new Error('Could not invite ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
       dests.push((store.live ? 'live:' : 'copy:') + store.root);
     }
 
@@ -311,20 +349,22 @@
   // Dropbox itself enforced that when the sender invited my email.
   async function catalog() {
     const who = me(), byId = {};
+    _lastProbe = [];
     for (const store of await incomingStores()) {
-      let m = null;
-      try { m = await readShareManifest(store); }
-      catch (e) {
-        const msg = (e && e.message) || String(e);
-        // A refused namespace read is the one case that still needs a real mount.
-        if (isPathRootRefusal(msg)) { _needsMount.add(store.shareId); console.info('[sharing] namespace read refused for', store.shareName, '— will offer a mount'); continue; }
-        console.warn('[sharing] unreadable share', store.shareName, msg);
+      const r = await readShareManifest(store);
+      _lastProbe.push({ id: store.shareId, name: store.shareName, from: store.from, result: r.manifest ? 'package' : (r.missing ? 'not-a-package' : 'ERROR'), error: r.error || '' });
+      if (r.error) {
+        // Could not read it. A path-root refusal means the namespace read is not
+        // allowed here and the folder has to be mounted the old way; anything else
+        // is logged and retried next poll. Either way, DO NOT cache a verdict.
+        if (isPathRootRefusal(r.error)) { _needsMount.add(store.shareId); console.info('[sharing] namespace read refused for', store.shareName, '— offering a mount instead'); }
+        else console.warn('[sharing] could not read shared folder', store.shareName, '—', r.error);
         continue;
       }
-      // Remember whether this shared folder is one of ours so the next poll can
-      // skip it entirely. Only a definite answer is cached; errors above are not.
-      setProbe(store.shareId, !!m);
-      if (!m) continue;
+      // Definite answer: remember it so the next poll can skip this folder.
+      setProbe(store.shareId, !!r.manifest);
+      if (!r.manifest) continue;
+      const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
     }
@@ -578,11 +618,44 @@
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
 
+  /* ── diagnose ─────────────────────────────────────────────────────────── */
+  // Run SandpieSharing.diagnose() in the console on the RECIPIENT's machine when a
+  // delivery doesn't show up. It forgets every cached verdict, re-lists from
+  // Dropbox, re-probes each shared folder, and reports what each step actually
+  // returned — enough to tell a scope problem from a permission problem from a
+  // "the sender never wrote the marker" problem.
+  async function diagnose() {
+    const p = prov();
+    const out = { identity: me().user, cloudConnected: !!(p && p.cloudConnected && p.cloudConnected()), canShare1to1: canShare1to1() };
+    if (!out.cloudConnected) { out.verdict = 'Dropbox is not connected.'; return out; }
+    if (!out.canShare1to1) { out.verdict = 'This build has no 1:1 sharing transport (provider.shareFolderWith missing).'; return out; }
+    try { localStorage.removeItem(PROBE_KEY); } catch (_) {}
+    invalidateIncoming();
+    try { out.rawShares = (await p.shareListIncoming()).map(s => ({ id: s.id, name: s.name, owner: s.owner, isOwner: s.isOwner, mountedAt: s.path || '(not mounted)' })); }
+    catch (e) { out.listError = (e && e.message) || String(e); out.verdict = /sharing permission/i.test(out.listError) ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.' : 'list_folders failed: ' + out.listError; return out; }
+    out.incomingCount = (await incomingShares(true)).length;
+    const cat = await catalog();
+    out.probes = _lastProbe;
+    out.packagesFound = Object.keys(cat).filter(k => cat[k]._from === 'incoming');
+    out.needsMount = [..._needsMount];
+    out.subs = await subs();
+    out.pendingInvites = (await pendingInvites()).map(m => m.id + '@' + m.rev);
+    const errs = out.probes.filter(x => x.result === 'ERROR');
+    if (out.pendingInvites.length) out.verdict = 'OK: ' + out.pendingInvites.join(', ') + ' should be showing on the home screen.';
+    else if (!out.rawShares.length) out.verdict = 'Dropbox reports NO shared folders for this account — the invite never arrived. Check the sender used this exact email, and look for a Dropbox invitation email.';
+    else if (!out.incomingCount) out.verdict = 'All shared folders are owned by you; nothing incoming.';
+    else if (errs.length && !out.packagesFound.length) out.verdict = 'Every incoming shared folder failed to read — see probes[].error. ' + (isPathRootRefusal(errs[0].error) ? 'These are permission refusals, so they are offered as "Add to Dropbox" rows instead.' : '');
+    else if (!out.packagesFound.length) out.verdict = 'Shared folders are readable but none contains ' + SHARE_MARKER + ' — the sender shared the folder but the marker never got written.';
+    else out.verdict = 'Package(s) found but already accepted/dismissed at this rev — see subs.';
+    if (errs.length && out.pendingInvites.length) out.verdict += ' (Note: ' + errs.length + ' other shared folder(s) could not be read — see probes[].)';
+    return out;
+  }
+
   /* ── events ───────────────────────────────────────────────────────────── */
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */

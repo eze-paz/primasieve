@@ -1247,9 +1247,9 @@
   // folder or an outbox wrapper) with these emails at `level` ('viewer' | 'editor').
   // Idempotent, and it CONVERGES: re-sharing to someone who already has a different
   // access level moves them to the new one rather than silently keeping the old.
-  async function shareFolderWith(path, emails, level) {
+  async function shareFolderWith(path, emails, level) { return inviteToFolder(await shareFolderId(path), emails, level); }
+  async function inviteToFolder(id, emails, level) {
     const want = (level === 'editor') ? 'editor' : 'viewer';
-    const id = await shareFolderId(path);
     let members = null;   // fetched lazily; only needed when somebody is already on
     for (const email of (emails || [])) {
       const em = String(email);
@@ -1288,7 +1288,7 @@
         });
       }
     }
-    return { id, path, level: want };
+    return { id, level: want };
   }
   // Outbox wrapper for a SINGLE FILE, which Dropbox refuses to share directly.
   async function ensureOutboxFolder(id) {
@@ -1407,7 +1407,12 @@
       // The Dropbox account's own email — the authoritative sender identity for a
       // share, independent of whatever account.js reports.
       accountEmail: () => localStorage.getItem(EMAIL_KEY) || '',
-      shareFolderWith: (path, emails, level) => shareFolderWith(path, emails, level),   // level 'viewer'|'editor'; → {id, path, level}
+      shareFolderWith: (path, emails, level) => shareFolderWith(path, emails, level),   // level 'viewer'|'editor'; → {id, level}
+      // Split so a caller can write the package marker BEFORE anyone is invited —
+      // a recipient who polls between the invite and the marker would otherwise see
+      // a share that looks like it isn't ours.
+      shareEnsureFolder: (path) => shareFolderId(path),     // → shared_folder_id (shares it if needed)
+      shareInvite: (id, emails, level) => inviteToFolder(id, emails, level),
       shareMembers: (id) => folderMembers(id),              // {emailLower: {level, accountId, invitee}}
       shareOutboxFolder: (id) => ensureOutboxFolder(id),    // wrapper for a single-file share
       shareWorkspacePath: (rel) => relToCloud(rel),         // OPFS rel → the live Dropbox path
