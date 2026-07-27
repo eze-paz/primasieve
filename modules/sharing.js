@@ -187,14 +187,17 @@
     const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
     st.shareId = id; st.live = isFolder; st.level = level;
     st.invite = async (emails) => {
+      // ORDER MATTERS. Share the marker FILE first, then the folder.
+      // add_file_member on a file the recipient can already reach through the
+      // parent folder may be treated as a no-op — no explicit file membership, so
+      // nothing for list_received_files to return, so the delivery is invisible.
+      // Granting file access while they are still a stranger to the folder avoids
+      // depending on that behaviour.
+      // Not swallowed: without the notification the package is undiscoverable, so
+      // a failure here has to reach the sender rather than look like a success.
+      if (p.shareNotify) await p.shareNotify(abs + '/' + SHARE_MARKER, emails, level);
       const r = await p.shareInvite(id, emails, level);          // folder membership → they can READ the package
       st.level = r.level;
-      // …and share the marker file itself, which is how they FIND it: one
-      // list_received_files on their side instead of opening every shared folder.
-      if (p.shareNotify) {
-        try { await p.shareNotify(abs + '/' + SHARE_MARKER, emails, level); }
-        catch (e) { console.warn('[sharing] delivery notification failed (they may not see it until they look):', (e && e.message) || e); }
-      }
       return r;
     };
     return st;
