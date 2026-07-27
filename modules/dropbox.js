@@ -427,6 +427,14 @@
             // path_lower may differ in case from the original key — try case-insensitive too
             const rl = rel.toLowerCase();
             for (const k of Object.keys(idx)) { if (k.toLowerCase() === rl) { delete idx[k]; break; } }
+            // Dropbox reports only the folder itself as deleted — not its descendants.
+            // Remove them from the index or they'd persist in cloudSet and never be
+            // deleted locally on incremental (cursor-delta) syncs.
+            const prefix = rel + '/';
+            const prefixLc = prefix.toLowerCase();
+            for (const k of Object.keys(idx)) {
+              if (k.toLowerCase().startsWith(prefixLc)) { delete idx[k]; deletions.push(k); }
+            }
           } else { idx[rel] = e; delta.push([rel, e]); }
           confirmed.push(rel);   // clear pending for any cursor entry (present or deleted)
         }
