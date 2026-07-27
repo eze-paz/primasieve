@@ -521,7 +521,17 @@ function spLpTokenHtml(t) {
   const p = isNaN(lp) ? 1 : Math.exp(lp);
   const conf = p < 0.05 ? 'sp-lp-lo' : (p < 0.3 ? 'sp-lp-mid' : 'sp-lp-hi');
   const alts = Array.isArray(t.alts) ? escHtml(JSON.stringify(t.alts)) : '';
-  return '<span class="sp-lp-tok ' + conf + '" data-lp="' + escHtml(isNaN(lp) ? '' : lp.toFixed(4)) + '" data-alts="' + alts + '">' + escHtml(t.text) + '</span>';
+  // Tier-1 stats ride along as data-* so the popup can show them without
+  // re-deriving anything. `fork` marks high-varentropy picks: the model was
+  // genuinely torn (not merely spoiled for equally-good choices), which is the
+  // hallucination tell that P alone misses -- underlined rather than recolored
+  // so it composes with the existing P-based shading.
+  const vent = parseFloat(t.vent);
+  const fork = (!isNaN(vent) && vent > 1.5 && p < 0.75) ? ' sp-lp-fork' : '';
+  const at = (k, v) => (v === undefined || v === null || isNaN(parseFloat(v))) ? '' : ' data-' + k + '="' + escHtml(parseFloat(v)) + '"';
+  return '<span class="sp-lp-tok ' + conf + fork + '" data-lp="' + escHtml(isNaN(lp) ? '' : lp.toFixed(4)) + '"'
+    + at('ent', t.ent) + at('vent', t.vent) + at('mgn', t.mgn) + at('esup', t.esup)
+    + ' data-alts="' + alts + '">' + escHtml(t.text) + '</span>';
 }
 function showLogprobPopup(span, x, y) {
   let pop = document.getElementById('sp-lp-popup');
@@ -530,6 +540,21 @@ function showLogprobPopup(span, x, y) {
   const prob = Math.exp(lp);
   let html = '<div class="sp-lp-h">log P = ' + (isNaN(lp) ? '?' : lp.toFixed(4)) + '</div>'
     + '<div class="sp-lp-p">P(token) = ' + (isNaN(lp) ? '?' : (prob * 100).toFixed(2) + '%') + '</div>';
+  // Tier-1 distribution stats. Read the whole shape of the distribution, not
+  // just the winner: high entropy + LOW varentropy = many equally-good options
+  // (safe); high varentropy = a real fork (risk).
+  const num = (k) => { const v = parseFloat(span.getAttribute('data-' + k)); return isNaN(v) ? null : v; };
+  const ent = num('ent'), vent = num('vent'), mgn = num('mgn'), esup = num('esup');
+  if (ent !== null || vent !== null || mgn !== null) {
+    html += '<div class="sp-lp-alt-h">distribution</div><div class="sp-lp-stats">';
+    const row = (label, val, hint) => '<div class="sp-lp-stat"><span>' + label + '</span><b>' + val + '</b>'
+      + (hint ? '<i>' + escHtml(hint) + '</i>' : '') + '</div>';
+    if (ent !== null) html += row('entropy', (ent * 100).toFixed(1) + '%', ent < 0.15 ? 'peaked' : (ent > 0.5 ? 'diffuse' : ''));
+    if (vent !== null) html += row('varentropy', vent.toFixed(2), vent > 1.5 ? 'forked' : 'settled');
+    if (mgn !== null) html += row('margin', (mgn * 100).toFixed(1) + '%', mgn < 0.05 ? 'near-tie' : '');
+    if (esup !== null) html += row('eff. support', esup.toFixed(1) + ' tok', '');
+    html += '</div>';
+  }
   const raw = span.getAttribute('data-alts');
   if (raw) {
     try {
@@ -2342,6 +2367,7 @@ class RoundRenderer {
     this.lpCount = 0;
     this.lpMin = Infinity;
     this.lpLow = 0;
+    this.lpFork = 0;
     this.lpScoreEl = null;
   }
 
@@ -2367,6 +2393,7 @@ class RoundRenderer {
     this.lpCount = 0;
     this.lpMin = Infinity;
     this.lpLow = 0;
+    this.lpFork = 0;
     this.lpScoreEl = null;
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
@@ -2389,8 +2416,11 @@ class RoundRenderer {
     const mean = this.lpSum / this.lpCount;
     const p = Math.exp(mean);
     const minP = Math.exp(this.lpMin);
-    let label = (p * 100).toFixed(1) + '% avg · min ' + (minP * 100).toFixed(1) + '% (' + this.lpCount + ' tok)';
+    const ppl = Math.exp(-mean);   // perplexity -- one exp over the mean we already track
+    let label = (p * 100).toFixed(1) + '% avg · min ' + (minP * 100).toFixed(1) + '% · ppl ' + ppl.toFixed(1)
+      + ' (' + this.lpCount + ' tok)';
     if (this.lpLow) label += ' · ' + this.lpLow + ' below 5%';
+    if (this.lpFork) label += ' · ' + this.lpFork + ' forked';
     if (!this.lpScoreEl) {
       this.lpScoreEl = document.createElement('div');
       this.lpScoreEl.className = 'sp-lp-score';
@@ -2629,6 +2659,8 @@ class RoundRenderer {
         this.lpSum += lp; this.lpCount++;
         if (lp < this.lpMin) this.lpMin = lp;
         if (Math.exp(lp) < 0.05) this.lpLow++;
+        const vent = parseFloat(token.vent);
+        if (!isNaN(vent) && vent > 1.5 && Math.exp(lp) < 0.75) this.lpFork++;
       }
       this._finishThinking();
       this.content += html;

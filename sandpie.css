@@ -2973,6 +2973,16 @@ body.sp-decoding *::after {
 .sp-lp-alt-bar { flex: 1; min-width: 48px; height: 6px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
 .sp-lp-alt-bar i { display: block; height: 100%; background: var(--sp-accent, #58a6ff); }
 .sp-lp-alt-p { min-width: 46px; text-align: right; color: var(--sp-text-dim, #aaa); }
+/* high-varentropy tokens: the model was genuinely torn (a real fork), as opposed
+   to merely spread across equally-good options. Underline instead of a background
+   so it layers on top of the P-based shading above rather than fighting it. */
+.sp-lp-tok.sp-lp-fork { text-decoration: underline wavy rgba(255, 138, 138, 0.75); text-underline-offset: 3px; }
+/* popover: whole-distribution stats (entropy / varentropy / margin) */
+.sp-lp-stats { margin-top: 4px; }
+.sp-lp-stat { display: flex; align-items: baseline; gap: 6px; font-size: 11px; margin: 2px 0; }
+.sp-lp-stat span { min-width: 78px; color: var(--sp-text-dim, #aaa); }
+.sp-lp-stat b { font-weight: 600; font-family: var(--sp-mono, monospace); }
+.sp-lp-stat i { font-style: normal; font-size: 10px; opacity: .75; margin-left: auto; }
 
 /* ═══════════════ pinned files ═══════════════ */
 /* Pin toggle icon (viewer header + artifact header). Unpinned = greyed-out /
