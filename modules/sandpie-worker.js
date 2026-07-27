@@ -53,7 +53,7 @@ let _dbxCtx = null;
 // first touch. See the hydration helpers further down. Default off ⇒ no change.
 let _dehydrated = false;
 let _dbxIndex = null;                 // { [rel]: {name,kind,path,size,rev,cloudMtime} } or null
-let _dbxExempt = ['sandpie/conversations', 'sandpie/agents', 'sandpie/skills', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata + shared packages, always eager; sandpie/scripts|artifacts|memory stay dehydratable
+let _dbxExempt = ['sandpie/conversations', 'sandpie/skills', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata + shared packages, always eager; sandpie/scripts|artifacts|agents|memory stay dehydratable
 
 // Track active agent AbortControllers so abort messages can cancel them.
 const _agentAborts = new Map();
