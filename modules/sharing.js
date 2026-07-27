@@ -225,9 +225,15 @@
   //              package is always a personal-namespace folder), so the one that
   //              matters is looked at on the very first tick even on an account
   //              with hundreds of folders.
+  // A NEW delivery always arrives as a NEW invitation, so anything invited more
+  // recently than the newest thing we have already classified jumps the queue and
+  // is probed immediately, however long the backlog is. That keeps discovery
+  // instant in the normal case while the cap handles the historical folders.
   const _verdict = new Map();          // shareId -> {ours:boolean, at:ms}
-  const VERDICT_TTL = 10 * 60 * 1000;
-  const PROBE_CAP = 6;
+  const VERDICT_TTL = 30 * 60 * 1000;  // > one full sweep of the backlog, so the queue actually drains
+  const PROBE_CAP = 6;                 // backlog folders per pass (on top of any new invitations)
+  let _newestClassified = 0;           // max invitedAt considered "already known", this session
+  let _baselineSet = false;            // has the first listing established that baseline?
   let _probeDeferred = 0;              // how many we did not get to this pass (reported by diagnose)
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
@@ -244,7 +250,7 @@
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
     return (await candidateShares(force)).map(s => {
       const st = cloudStore('', { ns: s.id });
-      st.from = s.from; st.shareId = s.id; st.shareName = s.name;
+      st.from = s.from; st.shareId = s.id; st.shareName = s.name; st.invitedAt = s.invitedAt || 0;
       return st;
     });
   }
@@ -254,17 +260,32 @@
   // verdict expires.
   async function candidateShares(force) {
     const now = Date.now();
-    const known = [], unknown = [];
-    for (const s of (await incomingShares(force))) {
+    const all = await incomingShares(force);
+    // On the FIRST listing nothing has been classified, so without this every folder
+    // looks "newly invited" and the queue-jump below would probe the whole account
+    // at once — the exact burst the cap exists to prevent. Treat the account as it
+    // stands when we arrive as history; only invitations that appear AFTER that are
+    // new. A delivery received while the tab was closed is still found on the first
+    // tick, because it sorts to the front of the backlog.
+    // Only an actual listing establishes it. At boot this runs before Dropbox has
+    // resolved and returns nothing; baselining on that empty result would leave the
+    // mark at zero and make the first real listing look entirely new — re-creating
+    // the burst.
+    if (!_baselineSet && all.length) { _newestClassified = all.reduce((mx, s) => Math.max(mx, s.invitedAt || 0), 0); _baselineSet = true; }
+    const known = [], fresh = [], backlog = [];
+    for (const s of all) {
       if (_needsMount.has(s.id)) continue;
       const v = _verdict.get(s.id);
-      if (v && v.ours) known.push(s);
-      else if (v && !v.ours && (now - v.at) < VERDICT_TTL) continue;
-      else unknown.push(s);
+      if (v && v.ours) { known.push(s); continue; }
+      if (v && !v.ours && (now - v.at) < VERDICT_TTL) continue;
+      // Invited more recently than anything we've classified ⇒ this is new since we
+      // started looking. Never deferred: it's the case that actually matters, and
+      // there is at most a handful of them.
+      if ((s.invitedAt || 0) > _newestClassified) fresh.push(s); else backlog.push(s);
     }
-    unknown.sort((a, b) => (a.isTeamFolder ? 1 : 0) - (b.isTeamFolder ? 1 : 0) || (b.invitedAt || 0) - (a.invitedAt || 0));
-    _probeDeferred = Math.max(0, unknown.length - PROBE_CAP);
-    return known.concat(unknown.slice(0, PROBE_CAP));
+    backlog.sort((a, b) => (a.isTeamFolder ? 1 : 0) - (b.isTeamFolder ? 1 : 0) || (b.invitedAt || 0) - (a.invitedAt || 0));
+    _probeDeferred = Math.max(0, backlog.length - PROBE_CAP);
+    return known.concat(fresh, backlog.slice(0, PROBE_CAP));
   }
   // Shares whose namespace read was REFUSED (PathRootError.no_permission, or a team
   // configuration that insists on the automounter). Those are the only ones that
@@ -405,6 +426,7 @@
       // Session-only verdict (see _verdict above): bounds how often we look at a
       // folder, expires on its own, and never survives a reload.
       _verdict.set(store.shareId, { ours: !!r.manifest, at: Date.now() });
+      if (store.invitedAt > _newestClassified) _newestClassified = store.invitedAt;
       if (!r.manifest) continue;
       const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
@@ -418,10 +440,14 @@
   // is a viewer on the sender's folder and has no write access there. Keyed by
   // id@rev so a re-share (rev+1) produces a fresh key and notifies again.
   const consumeKey = (m) => m.id + '@' + (m.rev == null ? '?' : m.rev);
-  async function isConsumed(m) {
-    const s = await subs(), k = consumeKey(m);
-    return !!s.accepted[k] || (s.dismissed || []).includes(k);
+  // An earlier build keyed these by bare id (accepted[id] = rev). Honour those so a
+  // package someone already accepted doesn't reappear as a fresh invite after the
+  // key format changed. Read-only compatibility — nothing is rewritten.
+  function consumed(s, m) {
+    const k = consumeKey(m), d = s.dismissed || [];
+    return !!s.accepted[k] || !!s.accepted[m.id] || d.includes(k) || d.includes(m.id);
   }
+  async function isConsumed(m) { return consumed(await subs(), m); }
   async function markConsumed(m, how) {
     const s = await subs(), k = consumeKey(m);
     if (how === 'accept') s.accepted[k] = { id: m.id, rev: m.rev, from: m._sender || m.publisher || '' };
@@ -439,8 +465,7 @@
       const m = cat[id];
       if (m._from !== 'incoming') continue;
       if (m.publisher === who.user) continue;              // my own delivery bouncing back
-      const k = consumeKey(m);
-      if (s.accepted[k] || (s.dismissed || []).includes(k)) continue;
+      if (consumed(s, m)) continue;
       out.push(m);
     }
     return out;
@@ -652,7 +677,7 @@
         }
         // 1:1 — refresh only what's installed AND accepted at this rev.
         if (!mk || mk.from === 'team') continue;
-        if (!accepted[consumeKey(m)]) continue;
+        if (!accepted[consumeKey(m)] && !accepted[m.id]) continue;   // bare id = legacy accept key
         if (String(mk.rev) !== String(m.rev) || await liveChanged(m, mk)) {
           await install(m);
           console.info('[sharing] refreshed', id, 'from', m._sender);
@@ -684,7 +709,9 @@
     invalidateIncoming();
     try { out.rawShares = (await p.shareListIncoming()).map(s => ({ id: s.id, name: s.name, owner: s.owner, isOwner: s.isOwner, mountedAt: s.path || '(not mounted)' })); }
     catch (e) { out.listError = (e && e.message) || String(e); out.verdict = /sharing permission/i.test(out.listError) ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.' : 'list_folders failed: ' + out.listError; return out; }
-    _verdict.clear();
+    // diagnose() deliberately looks at EVERYTHING, cap and baseline included — the
+    // point is to answer "is my delivery there", not to be cheap.
+    _verdict.clear(); _baselineSet = true; _newestClassified = 0;
     out.incomingCount = (await incomingShares(true)).length;
     out.teamFolders = (await incomingShares()).filter(s => s.isTeamFolder).length;
     const cat = await catalog(true);
