@@ -300,6 +300,7 @@
       const s = st[rel];
       const lm = await Sandpie.opfsMtime(rel);
       if (!s || lm > s.syncedMtime) { kept++; continue; }      // untracked or locally modified — keep
+      if (Date.now() - lm < 86400000) { kept++; continue; }    // modified in the last 24h — keep
       try { await opfs.remove(rel); delete st[rel]; purged++; } // OPFS-only delete; Dropbox untouched
       catch (_) {}
     }
@@ -650,6 +651,12 @@
         _setSyncProgress(upDone, dirty.length, 'Uploading');
       }
       setSyncState(state);
+
+      // Dehydrate files not modified in the last 24h
+      if (dehydrated()) {
+        const { purged } = await dehydratePurge();
+        if (purged > 0) removedAny = true;
+      }
 
       // Any cursor-delta activity should refresh the viewer, which renders the
       // cloud index in dehydrated mode. Adds of cloud-only files skip download
