@@ -90,14 +90,17 @@
       async writeText(rel, txt) { await O().write(root + '/' + rel, new Blob([txt], { type: 'application/json' })); markDirty(root + '/' + rel); },
     };
   }
-  // `team` picks the namespace the absolute paths resolve in: true = the team
-  // space (the shared hub), false = the home namespace (1:1 outboxes and mounted
-  // share folders, which live in somebody's personal Dropbox).
-  function cloudStore(absRoot, team) {
+  // `opt` picks the namespace the paths resolve in:
+  //   {team:true}  the team space  — the shared hub
+  //   {team:false} the home namespace — my own Dropbox
+  //   {ns:'<shared_folder_id>'} somebody else's shared folder, read IN PLACE
+  //     without mounting it. Paths are then relative to that folder, so absRoot
+  //     is '' and rel becomes '/packages/…'.
+  function cloudStore(absRoot, opt) {
     const P = () => prov();
-    const opt = { team: team !== false };
+    opt = (opt === true || opt === false) ? { team: opt } : (opt || { team: true });
     return {
-      kind: 'cloud', root: absRoot, team: opt.team,
+      kind: 'cloud', root: absRoot, ns: opt.ns || '', team: !!opt.team,
       async listFiles(sub) {
         // Return paths RELATIVE TO `base` (the sub dir), like localStore — install()
         // does readBytes('packages/<id>/' + rel), so rel must NOT re-include that prefix.
@@ -122,14 +125,14 @@
   // to the local simulation, same as being offline. 1:1 does NOT need a team space
   // — it goes through the Dropbox sharing API instead.
   function hubRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? (p.cloudParent() + '/shared-hub') : ''; }
-  function teamHub() { const h = hubRoot(); return h ? cloudStore(h, true) : localStore(LOCAL_HUB + '/_team'); }
+  function teamHub() { const h = hubRoot(); return h ? cloudStore(h, { team: true }) : localStore(LOCAL_HUB + '/_team'); }
   const canShare1to1 = () => { const p = prov(); return !!(cloudOn() && p && p.shareEnsureOutbox); };
   // SENDER side: the outbox shared with this email, created + invited on first use.
   // Async because setting up a Dropbox share is a few API calls.
   async function recipientHub(email) {
     if (!canShare1to1()) return localStore(LOCAL_HUB + '/_inbox/' + localPart(email));
     const box = await prov().shareEnsureOutbox(String(email));
-    return cloudStore(box.path, false);   // the sender's own Dropbox = home namespace
+    return cloudStore(box.path, { team: false });   // the sender's own Dropbox = home namespace
   }
   // RECIPIENT side. One cached listing per pass serves both the mounted stores and
   // the pending-mount rows — shareListIncoming() is a couple of API calls and both
@@ -142,20 +145,27 @@
     catch (e) { console.warn('[sharing] could not list incoming shares:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
-  function invalidateIncoming() { _incomingCache = null; }
-  // Stores for shares already mounted — each is one sender's outbox.
+  function invalidateIncoming() { _incomingCache = null; _needsMount.clear(); }
+  // One store per sender, read BY NAMESPACE — mounted or not, nothing is added to
+  // the recipient's Dropbox. Paths are relative to the shared folder, so root ''.
   async function incomingStores(force) {
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
-    return (await incomingShares(force)).filter(s => s.path).map(s => {
-      const st = cloudStore(s.path, false);
+    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id)).map(s => {
+      const st = cloudStore('', { ns: s.id });
       st.from = s.from; st.shareId = s.id;
       return st;
     });
   }
-  // Shares invited but not yet accepted — "unmounted" in Dropbox terms.
+  // Shares whose namespace read was REFUSED (PathRootError.no_permission, or a team
+  // configuration that insists on the automounter). Those are the only ones that
+  // still need an explicit mount, so they're the only ones that surface a mount row.
+  // Populated by catalog(); normally empty.
+  const _needsMount = new Set();
+  function isPathRootRefusal(msg) { return /no_permission|invalid_root|path_root/i.test(String(msg || '')); }
   async function pendingMounts(force) {
     if (!canShare1to1()) return [];
-    return (await incomingShares(force)).filter(s => !s.path);
+    if (force || !_incomingCache) await catalog();   // catalog() is what discovers refusals
+    return (await incomingShares()).filter(s => _needsMount.has(s.id));
   }
 
   /* ── subscriptions ────────────────────────────────────────────────────── */
@@ -234,7 +244,14 @@
   async function catalog() {
     const who = me(), byId = {};
     for (const store of await incomingStores()) {
-      let ms = []; try { ms = await listManifests(store); } catch (e) { console.warn('[sharing] unreadable share', store.root, (e && e.message) || e); }
+      let ms = [];
+      try { ms = await listManifests(store); }
+      catch (e) {
+        const msg = (e && e.message) || String(e);
+        // A refused namespace read is the one case that still needs a real mount.
+        if (isPathRootRefusal(msg)) { _needsMount.add(store.shareId); console.info('[sharing] namespace read refused for', store.from, '— will offer a mount'); }
+        else console.warn('[sharing] unreadable share from', store.from, msg);
+      }
       for (const m of ms) { m._from = 'incoming'; m._sender = store.from || m.publisher; byId[m.id] = m; }
     }
     for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) { m._from = 'team'; byId[m.id] = m; }
@@ -324,12 +341,13 @@
       try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
     }
   }
-  /* ── pending SHARE MOUNTS (first contact from a new sender) ─────────────── */
-  // A brand-new sender shows up as an unmounted Dropbox share, before we can read
-  // any manifest out of it. Accepting mounts it into the recipient's Dropbox; from
-  // then on that sender's deliveries arrive as ordinary per-package invites.
-  // Mounting is NEVER automatic — it puts a folder in the user's Dropbox, so it
-  // stays an explicit accept.
+  /* ── mounting: the FALLBACK path ────────────────────────────────────────── */
+  // Shares are normally read in place by namespace and never mounted, so nothing
+  // lands in the recipient's Dropbox. This runs only when that read is refused.
+  // Even then it stays an explicit user action — it adds a folder to their Dropbox.
+  // declineMount() is also the "stop receiving from this person" action: it
+  // relinquishes membership, which is the ONLY way to sever the channel (a
+  // sender's outbox is reused for every later delivery).
   // MountFolderError cases that are NOT failures:
   //   already_mounted — someone/something mounted it between our list and our click.
   //   must_automount  — a team space handles mounting itself; Dropbox's automounter
@@ -517,7 +535,9 @@
       let box = document.getElementById('sharedHome');
       if (!box) { box = document.createElement('div'); box.id = 'sharedHome'; box.className = 'shared-home'; welcome.appendChild(box); observeInbox(); }
       let invites = [], installed = [], mounts = [];
-      try { mounts = await pendingMounts(); invites = await pendingInvites(); installed = await acceptedList(); } catch (_) {}
+      // invites first: pendingInvites() runs catalog(), which is what discovers any
+      // namespace-read refusal, so pendingMounts() is then a cache hit.
+      try { invites = await pendingInvites(); mounts = await pendingMounts(); installed = await acceptedList(); } catch (_) {}
       _pendingCount = invites.length + mounts.length;   // banner is updated in finally, once the box is populated/sized
       box.textContent = '';
       const shared = installed.filter(m => m.from !== 'team');   // accepted 1:1
@@ -545,14 +565,15 @@
     const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕'; dis.onclick = () => dismiss(m.id);
     row.append(acc, dis); return row;
   }
-  // First contact from a sender: the Dropbox share itself is still unmounted, so we
-  // can't read a manifest out of it yet. Accepting mounts it; after that this
-  // sender's packages arrive as ordinary invite rows above.
+  // FALLBACK row, normally never shown: this account wouldn't let us read the
+  // sender's shared folder by namespace, so the only way in is to actually add it
+  // to the user's Dropbox. Everyone else's shares are read in place and go straight
+  // to the invite rows above.
   function mountRow(s) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
-    row.innerHTML = '<span class="shared-file-name">🤝 ' + esc(s.from || s.name) + ' wants to share with you</span><span class="shared-by">' + esc(s.owner || '') + '</span>';
-    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Accept'; acc.onclick = () => acceptMount(s.id);
-    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Decline'; dis.textContent = '✕'; dis.onclick = () => declineMount(s.id);
+    row.innerHTML = '<span class="shared-file-name">🤝 ' + esc(s.from || s.name) + ' shared files with you</span><span class="shared-by">' + esc(s.owner || '') + ' · needs adding to your Dropbox</span>';
+    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Add'; acc.onclick = () => acceptMount(s.id);
+    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Decline and stop receiving from this person'; dis.textContent = '✕'; dis.onclick = () => declineMount(s.id);
     row.append(acc, dis); return row;
   }
   // A collapsible titled group (count in the title), collapsed by default; '0' = user expanded.

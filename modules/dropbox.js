@@ -107,10 +107,17 @@
   // lives; that is the default for every transport helper below. Pass `team: true`
   // to reach team/department folders (e.g. /R+D+I) instead: the sharing hub and
   // cloud browse/search. No-op on a non-team account (no team root namespace).
-  function pathRootHeaderObj() {
-    const ns = localStorage.getItem(NS_KEY);
-    return ns ? { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'root', root: ns }) } : {};
+  // `ns` roots the call at an arbitrary namespace instead. A shared folder IS a
+  // namespace (the spec has `alias SharedFolderId = NamespaceId`), so passing a
+  // shared_folder_id here reads that folder IN PLACE — no mounting, nothing added
+  // to the user's Dropbox. Membership is the only gate; PathRootError.no_permission
+  // is what you get without it.
+  function pathRootHeader({ team = false, ns = '' } = {}) {
+    if (ns) return { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'namespace_id', namespace_id: String(ns) }) };
+    const t = localStorage.getItem(NS_KEY);
+    return (team && t) ? { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'root', root: t }) } : {};
   }
+  function pathRootHeaderObj() { return pathRootHeader({ team: true }); }
   // Dropbox-API-Arg travels in an HTTP header, which must be ASCII. Escape every
   // non-ASCII char as \uXXXX (Dropbox un-escapes server-side) — otherwise a path
   // with accents (e.g. "DOCUMENTACIÓ", "Pràctiques") is sent as raw Latin-1 and
@@ -119,10 +126,10 @@
   function apiArg(obj) {
     return JSON.stringify(obj).replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
   }
-  async function api(path, body, { team = false } = {}) {
+  async function api(path, body, { team = false, ns = '' } = {}) {
     const token = await accessToken();
     const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-    if (team) Object.assign(headers, pathRootHeaderObj());
+    Object.assign(headers, pathRootHeader({ team, ns }));
     const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
       method: 'POST', headers, body: JSON.stringify(body),
     });
@@ -132,10 +139,10 @@
   // DeletedMetadata sometimes lacks path_display (only path_lower). Fallback so
   // deletion entries survive `cloudToRel` and actually remove items from index.
   const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
-  async function listFolder(folderPath, { recursive = false, team = false } = {}) {
-    let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true }, { team });
+  async function listFolder(folderPath, { recursive = false, team = false, ns = '' } = {}) {
+    let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true }, { team, ns });
     let entries = data.entries.slice();
-    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }, { team }); entries = entries.concat(data.entries); }
+    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }, { team, ns }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
   async function listContinue(cursor) {
@@ -144,7 +151,7 @@
     while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
-  async function download(path, signal, { team = false } = {}) {
+  async function download(path, signal, { team = false, ns = '' } = {}) {
     // /2/files/download's SUCCESS (200) response does NOT carry CORS headers — only
     // its preflight and ERROR responses do. So a direct browser fetch can read an
     // error but not the file: a 200 fails the browser CORS check ("No
@@ -154,7 +161,7 @@
     // get_temporary_link (a normal RPC — fully CORS-enabled) → GET the returned URL
     // (a plain GET = no custom headers = NO preflight, and the temp-link host returns
     // ACAO), which works cross-origin even under the prod COOP/COEP isolation.
-    const tl = await api('/2/files/get_temporary_link', { path }, { team });
+    const tl = await api('/2/files/get_temporary_link', { path }, { team, ns });
     const res = await fetch(dbxRoute(tl.link), { method: 'GET', signal });
     if (!res.ok) throw new Error(`Download ${path}: ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
@@ -207,8 +214,8 @@
     if (!result.entries) { console.warn('[dropbox] unexpected finish_batch response:', result); return []; }
     return sessions.map((x, i) => ({ ...x, meta: result.entries[i] }));
   }
-  async function del(path, { team = false } = {}) {
-    try { return await api('/2/files/delete_v2', { path }, { team }); }
+  async function del(path, { team = false, ns = '' } = {}) {
+    try { return await api('/2/files/delete_v2', { path }, { team, ns }); }
     catch (e) { if (String(e.message).includes('not_found')) return null; throw e; }
   }
   async function getCurrentAccount() { return await api('/2/users/get_current_account', null); }
@@ -1139,9 +1146,18 @@
   // ===========================================================================
   // The old 1:1 path needed a folder both people could already reach. This one
   // doesn't: the sender shares a folder out of their OWN Dropbox and invites an
-  // email address; the recipient discovers the invite through the API and mounts
-  // it. Nothing is pre-arranged, so it reaches anyone the corp's Dropbox sharing
-  // policy allows.
+  // email address; the recipient discovers the invite through the API. Nothing is
+  // pre-arranged, so it reaches anyone the corp's Dropbox sharing policy allows.
+  //
+  // The recipient does NOT mount anything. A shared folder is a namespace
+  // (`alias SharedFolderId = NamespaceId`), so we read it in place with
+  // Dropbox-API-Path-Root {".tag":"namespace_id"} — membership is the only gate.
+  // Nothing appears in the recipient's Dropbox: no "Sandpie from bob" folder
+  // cluttering their root, nothing to clean up after accept or decline. The
+  // accepted package is COPIED into their own workspace (sandpie/shared-installed),
+  // which is the only copy they actually use.
+  // mount_folder survives only as a fallback for accounts where namespace reads
+  // are refused (PathRootError.no_permission) — see sharing.js.
   //
   // Layout, all in the SENDER's home namespace (deliberately outside /sandpie, so
   // the sync engine never sees it):
@@ -1225,9 +1241,9 @@
     localStorage.setItem(OUTBOX_CACHE, JSON.stringify(cache));
     return cache[to];
   }
-  // Every Sandpie share folder this account is a member of. `path` is the mount
-  // point and is '' when the share is still UNMOUNTED — which is exactly the
-  // invited-but-not-yet-accepted state, i.e. a pending delivery.
+  // Every Sandpie share folder this account is a member of, mounted or not — we
+  // read them all by namespace, so `path` (the mount point, '' when unmounted) is
+  // informational rather than a gate.
   async function listIncomingShares() {
     const out = [];
     let data = await shareApi('/2/sharing/list_folders', { limit: 100 });
@@ -1297,24 +1313,26 @@
       // sharing hub is the only thing that still uses it.
       // cloudParent() = the team shared area (e.g. /R+D+I/sandpie); '' on a
       // non-team account, which makes sharing.js fall back to its local hub.
+      // Each takes {team} (team-space root) or {ns} (an arbitrary namespace, e.g. a
+      // shared_folder_id — reads someone's shared folder without mounting it).
       cloudConnected: () => !!tokens(),
       cloudParent: () => teamParent(),
-      async cloudUpload(absPath, bytes, { team = true } = {}) {
+      async cloudUpload(absPath, bytes, { team = true, ns = '' } = {}) {
         const token = await accessToken();
         const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream',
                      'Dropbox-API-Arg': apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }),
-                     ...(team ? pathRootHeaderObj() : {}) },
+                     ...pathRootHeader({ team, ns }) },
           body: bytes,
         });
         if (!res.ok) throw new Error('cloudUpload ' + absPath + ': ' + res.status + ' ' + (await res.text()).slice(0, 200));
         return await res.json();
       },
-      cloudDownload: (absPath, { team = true } = {}) => download(absPath, undefined, { team }),
-      cloudDelete: (absPath, { team = true } = {}) => del(absPath, { team }),   // delete_v2 (recursive for folders); no-op on not_found
-      async cloudList(absPath, recursive = false, { team = true } = {}) {
-        try { return (await listFolder(absPath, { recursive, team })).entries; }
+      cloudDownload: (absPath, { team = true, ns = '' } = {}) => download(absPath, undefined, { team, ns }),
+      cloudDelete: (absPath, { team = true, ns = '' } = {}) => del(absPath, { team, ns }),   // delete_v2 (recursive for folders); no-op on not_found
+      async cloudList(absPath, recursive = false, { team = true, ns = '' } = {}) {
+        try { return (await listFolder(absPath, { recursive, team, ns })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
       },
       // Workspace-scoped variants (home namespace) — used by sharing.js to clean up
