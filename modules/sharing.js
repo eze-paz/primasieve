@@ -51,7 +51,7 @@
   const SUBS_PATH = 'sandpie/config/shares.json';   // accept/dismiss state (1:1) + team subscriptions
   const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev,revs}
   const SHARE_MARKER = '.sandpie-share.json';       // manifest at the root of a 1:1 shared folder
-  const PROBE_KEY = 'sandpie-share-probe';          // {sharedFolderId: 1|0} — is this shared folder one of ours?
+  const LEGACY_PROBE_KEY = 'sandpie-share-probe';   // removed: a persisted "is this ours" index that went stale and hid deliveries
   const COLLAPSE_KEY = 'sandpie-shared-collapsed';      // "Shared with me" collapsed state (per device)
   const TEAM_COLLAPSE_KEY = 'sandpie-team-collapsed';   // "Team artifacts" collapsed state (per device)
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
@@ -194,24 +194,22 @@
   // just ours, and the folder name is the sender's own so it proves nothing. Probe
   // each one for the marker and remember the verdict per folder id — otherwise a
   // user in twenty corporate shared folders pays twenty downloads every poll.
-  let _incomingCache = null, _lastProbe = [];
-  // A "not ours" verdict has to expire: a folder you already share with someone for
-  // ordinary work can be published as a package later, and a permanent negative
-  // would hide it forever. Positives never expire — a package stays a package.
-  // One hour, not a day: re-probing a miss costs a single not_found round-trip, and
-  // a stale negative is the difference between seeing a delivery and not.
-  const PROBE_TTL = 60 * 60 * 1000;
-  function probeCache() { try { return JSON.parse(localStorage.getItem(PROBE_KEY) || '{}'); } catch (_) { return {}; } }
-  function probeSaysSkip(c, id) {
-    const e = c[id];
-    if (!e || typeof e !== 'object') return false;                 // unknown, or a legacy 0/1 entry → re-probe
-    return e.v === 0 && (Date.now() - (e.t || 0)) < PROBE_TTL;
-  }
-  function setProbe(id, isOurs) {
-    const c = probeCache();
-    c[id] = { v: isOurs ? 1 : 0, t: Date.now() };
-    try { localStorage.setItem(PROBE_KEY, JSON.stringify(c)); } catch (_) {}
-  }
+  // NO PERSISTED INDEX of which shared folders are ours. There was one, keyed by
+  // shared_folder_id, and it caused the exact failure it was meant to optimise: an
+  // unreadable folder got recorded as "not a package" and real deliveries stayed
+  // invisible until the entry aged out. The verdict is now recomputed from Dropbox
+  // every pass and never written down.
+  //
+  // The cost is bounded and small. Probing a folder that ISN'T ours is a single
+  // get_temporary_link that fails not_found — no download. Only a real package
+  // costs a second request. And _catalogCache below collapses the several calls a
+  // render pass used to make into one, so this is fewer requests than before even
+  // without the index.
+  //
+  // _incomingCache / _catalogCache are per-pass request coalescing, NOT an index:
+  // in memory only, never persisted, and dropped by invalidateIncoming() on every
+  // poll tick.
+  let _incomingCache = null, _lastProbe = [], _catalogCache = null;
   async function incomingShares(force) {
     if (!canShare1to1()) return [];
     if (_incomingCache && !force) return _incomingCache;
@@ -219,14 +217,13 @@
     catch (e) { console.warn('[sharing] could not list incoming shares:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
-  function invalidateIncoming() { _incomingCache = null; _needsMount.clear(); }
+  function invalidateIncoming() { _incomingCache = null; _catalogCache = null; _needsMount.clear(); }
   // One store per incoming share, read BY NAMESPACE — nothing is mounted, so
   // nothing appears in the recipient's Dropbox. Paths are relative to the shared
   // folder itself, hence root ''.
   async function incomingStores(force) {
     if (!canShare1to1()) return [localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user))];
-    const known = probeCache();
-    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id) && !probeSaysSkip(known, s.id)).map(s => {
+    return (await incomingShares(force)).filter(s => !_needsMount.has(s.id)).map(s => {
       const st = cloudStore('', { ns: s.id });
       st.from = s.from; st.shareId = s.id; st.shareName = s.name;
       return st;
@@ -240,7 +237,7 @@
   function isPathRootRefusal(msg) { return /no_permission|invalid_root|path_root/i.test(String(msg || '')); }
   async function pendingMounts(force) {
     if (!canShare1to1()) return [];
-    if (force || !_incomingCache) await catalog();   // catalog() is what discovers refusals
+    await catalog(force);   // catalog() is what discovers refusals; memoised, so this is free after the first call
     return (await incomingShares()).filter(s => _needsMount.has(s.id));
   }
   // Back-compat shim: recipientHub(email) used to be the outbound store.
@@ -347,7 +344,14 @@
   // Merge every mounted 1:1 outbox (one per sender) + the team hub (polled). Team
   // manifests are ACL-filtered; 1:1 manifests are addressed to me by construction —
   // Dropbox itself enforced that when the sender invited my email.
-  async function catalog() {
+  // MEMOISED for the current poll pass. Every caller here (autoSync, pendingInvites,
+  // pendingMounts, each renderHome) used to re-run it, and each run downloads
+  // .sandpie-share.json once per shared folder — so a single tick fired several
+  // probes per share, and fire()→renderHome() multiplied that again. The listing
+  // and the probes are refreshed together by invalidateIncoming(), which the poll
+  // ticks already call, so the cache never goes stale for longer than one tick.
+  async function catalog(force) {
+    if (_catalogCache && !force) return _catalogCache;
     const who = me(), byId = {};
     _lastProbe = [];
     for (const store of await incomingStores()) {
@@ -361,14 +365,13 @@
         else console.warn('[sharing] could not read shared folder', store.shareName, '—', r.error);
         continue;
       }
-      // Definite answer: remember it so the next poll can skip this folder.
-      setProbe(store.shareId, !!r.manifest);
-      if (!r.manifest) continue;
+      if (!r.manifest) continue;   // definitively not one of ours; re-checked next pass, never recorded
       const m = r.manifest;
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
     }
     for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) { m._from = 'team'; byId[m.id] = m; }
+    _catalogCache = byId;
     return byId;
   }
   // A 1:1 delivery is consumed by RECORDING it, not by deleting it: the recipient
@@ -506,13 +509,15 @@
     if (/no_permission/i.test(m))         return 'You do not have permission to add this shared folder.';
     return 'Could not accept that share: ' + m;
   }
+  // These THROW on real failure so the caller (busyClick) can restore the row and
+  // show why, instead of an alert() that leaves the row looking like it worked.
   async function acceptMount(shareId) {
     const p = prov();
     if (!(p && p.shareMount)) return;
     try { await p.shareMount(shareId); }
     catch (e) {
       const msg = (e && e.message) || String(e);
-      if (!MOUNT_OK_ANYWAY.test(msg)) { console.warn('[sharing] mount failed:', msg); alert(mountErrorText(msg)); return; }
+      if (!MOUNT_OK_ANYWAY.test(msg)) throw new Error(mountErrorText(msg));
       console.info('[sharing] mount handled by Dropbox itself:', msg);
     }
     invalidateIncoming();
@@ -522,8 +527,7 @@
   async function declineMount(shareId) {
     const p = prov();
     if (!(p && p.shareDecline)) return;
-    try { await p.shareDecline(shareId); }
-    catch (e) { console.warn('[sharing] decline failed:', (e && e.message) || e); }
+    await p.shareDecline(shareId);
     invalidateIncoming();
     fire();
   }
@@ -585,9 +589,16 @@
   //   un-accepted delivery stays an invite. A live shared folder changes without the
   //   manifest rev moving, so the trigger is the per-file rev map (liveChanged).
   //   This is what makes "I edit the folder, they get it" true end to end.
+  // Checking a LIVE folder for changes costs one list_folder per accepted package.
+  // That does not need to happen on every render — only on a slow tick — or a busy
+  // home screen turns into a steady stream of Dropbox calls.
+  let _liveCheckAt = 0;
+  const LIVE_CHECK_EVERY = 120000;
   let syncing = false;
   async function autoSync() {
     if (syncing || !O()) return; syncing = true;
+    const checkLive = (Date.now() - _liveCheckAt) > LIVE_CHECK_EVERY;
+    if (checkLive) _liveCheckAt = Date.now();
     try {
       const cat = await catalog(); const teamIds = new Set(); let changed = false;
       const accepted = (await subs()).accepted || {};
@@ -629,7 +640,7 @@
     const out = { identity: me().user, cloudConnected: !!(p && p.cloudConnected && p.cloudConnected()), canShare1to1: canShare1to1() };
     if (!out.cloudConnected) { out.verdict = 'Dropbox is not connected.'; return out; }
     if (!out.canShare1to1) { out.verdict = 'This build has no 1:1 sharing transport (provider.shareFolderWith missing).'; return out; }
-    try { localStorage.removeItem(PROBE_KEY); } catch (_) {}
+    try { localStorage.removeItem(LEGACY_PROBE_KEY); } catch (_) {}   // clear the removed index if an old build left one
     invalidateIncoming();
     try { out.rawShares = (await p.shareListIncoming()).map(s => ({ id: s.id, name: s.name, owner: s.owner, isOwner: s.isOwner, mountedAt: s.path || '(not mounted)' })); }
     catch (e) { out.listError = (e && e.message) || String(e); out.verdict = /sharing permission/i.test(out.listError) ? 'The Dropbox app is missing the sharing scopes for THIS login — disconnect and reconnect Dropbox.' : 'list_folders failed: ' + out.listError; return out; }
@@ -778,14 +789,50 @@
       if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team, m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
     } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
   }
+  // Every row action here is async and can take seconds (accept downloads the
+  // package; mount/decline are Dropbox round-trips). Without feedback the button
+  // just sits there looking untouched, so people click it again and conclude it's
+  // broken. This makes the click land immediately: the row goes inert, the button
+  // says what it's doing, and re-entry is impossible even before the first await.
+  // On success the row is normally replaced by renderHome(); on failure the row
+  // comes back so the action can be retried, with the reason attached.
+  function busyClick(btn, busyLabel, fn) {
+    btn.onclick = async (e) => {
+      if (e) e.stopPropagation();
+      const row = btn.closest('.shared-file') || btn.parentNode;
+      if (row.dataset.busy === '1') return;      // set synchronously — a double-click cannot slip past
+      row.dataset.busy = '1';
+      const btns = [...row.querySelectorAll('button')];
+      const prev = btns.map(b => ({ b, html: b.innerHTML, dis: b.disabled }));
+      btns.forEach(b => { b.disabled = true; });
+      btn.textContent = busyLabel;
+      row.style.opacity = '0.6';
+      row.title = busyLabel;
+      try { await fn(); }
+      catch (err) {
+        console.warn('[sharing] action failed:', err);
+        // Restore only if this row still exists — a successful action re-renders it away.
+        if (row.isConnected) {
+          prev.forEach(({ b, html, dis }) => { b.innerHTML = html; b.disabled = dis; });
+          row.style.opacity = ''; row.dataset.busy = ''; row.title = '';
+          let note = row.querySelector('.share-row-err');
+          if (!note) { note = document.createElement('div'); note.className = 'share-row-err'; note.style.cssText = 'flex:1 0 100%; font-size:0.72rem; color:var(--sp-danger, #c33); margin-top:0.2rem;'; row.append(note); }
+          note.textContent = (err && err.message) || String(err);
+        }
+      }
+    };
+    return btn;
+  }
   const kindIcon = (k) => k === 'skill' ? '🧩' : k === 'folder' ? '📁' : '📄';
   const entryOf = (m) => m.pin || (m.kind === 'artifact' ? m.title : (m.kind === 'skill' ? 'SKILL.md' : ''));   // the file to open/pin
   function inviteRow(m) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
     const accNote = m.access === 'editor' ? ' · can edit' : '';
     row.innerHTML = '<span class="shared-file-name">' + kindIcon(m.kind) + ' ' + esc(m.title) + '</span><span class="shared-by">from ' + esc(m._sender || m.publisher) + esc(accNote) + '</span>';
-    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Accept'; acc.onclick = () => accept(m.id);
-    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕'; dis.onclick = () => dismiss(m.id);
+    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Accept';
+    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕';
+    busyClick(acc, 'Accepting…', () => accept(m.id));
+    busyClick(dis, '…', () => dismiss(m.id));
     row.append(acc, dis); return row;
   }
   // FALLBACK row, normally never shown: this account wouldn't let us read the
@@ -795,8 +842,10 @@
   function mountRow(s) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
     row.innerHTML = '<span class="shared-file-name">🤝 ' + esc(s.from || s.name) + ' shared files with you</span><span class="shared-by">' + esc(s.owner || '') + ' · needs adding to your Dropbox</span>';
-    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Add'; acc.onclick = () => acceptMount(s.id);
-    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Decline and stop receiving from this person'; dis.textContent = '✕'; dis.onclick = () => declineMount(s.id);
+    const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Add';
+    const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Decline and stop receiving from this person'; dis.textContent = '✕';
+    busyClick(acc, 'Adding…', () => acceptMount(s.id));
+    busyClick(dis, '…', () => declineMount(s.id));
     row.append(acc, dis); return row;
   }
   // A collapsible titled group (count in the title), collapsed by default; '0' = user expanded.
@@ -822,7 +871,7 @@
     open.onclick = () => { if (entry) { try { opfs.openFile(full, entry.split('/').pop()); } catch (_) {} } };
     row.append(open);
     if (full && window.SandpiePins) { const pin = document.createElement('button'); pin.className = 'shared-pin'; SandpiePins.bindButton(pin, full); row.append(pin); }
-    if (onDelete) { const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove'; del.textContent = '✕'; del.onclick = (e) => { e.stopPropagation(); onDelete(); }; row.append(del); }
+    if (onDelete) { const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove'; del.textContent = '✕'; busyClick(del, '…', () => onDelete()); row.append(del); }
     return row;
   }
 
@@ -854,12 +903,22 @@
   }
 
   /* ── boot ─────────────────────────────────────────────────────────────── */
+  // An earlier build persisted an "is this shared folder ours" index; a stale entry
+  // in it hides real deliveries, so drop any leftover once on load.
+  try { localStorage.removeItem(LEGACY_PROBE_KEY); } catch (_) {}
   function boot() { renderHome(); autoSync(); observeInbox(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-  // Neither 1:1 nor team deliveries sync into the workspace any more — both are
-  // polled. These two are the poll ticks: refocusing the tab, and the end of each
-  // sync cycle (~60s). invalidateIncoming() forces a fresh list_folders so a share
-  // invited while the tab was open still shows up.
-  window.addEventListener('focus', () => { invalidateIncoming(); autoSync(); renderHome(); });
-  try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', () => { invalidateIncoming(); autoSync(); renderHome(); }); } catch (_) {}
+  // Deliveries live OUTSIDE the workspace now, so workspace sync activity says
+  // nothing about them — and 'sync:done' only fires when the workspace actually
+  // changed, so an idle recipient would never re-check. Poll on our own clock.
+  // One round is 1 list_folders plus one cheap probe per shared folder (a folder
+  // that isn't ours costs a single not_found and no download), and the per-pass
+  // memo in catalog() keeps any burst of re-renders free.
+  const SHARE_POLL_MS = 60000;
+  const pollShares = () => { invalidateIncoming(); autoSync(); renderHome(); };
+  setInterval(() => { if (!document.hidden) pollShares(); }, SHARE_POLL_MS);
+  window.addEventListener('focus', pollShares);
+  // A sync that pulled files still warrants a re-render, but NOT a fresh probe
+  // round — invalidating here would double the request rate for no new information.
+  try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', () => { renderHome(); }); } catch (_) {}
 })();
