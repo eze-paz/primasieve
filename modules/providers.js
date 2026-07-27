@@ -16,6 +16,12 @@
 
 const PROVIDERS_KEY = 'sandpie-providers';
 const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
+// Per-model thinking level chosen from the composer picker for COMPANY (managed)
+// models. Managed providers are rebuilt from the catalog on every setManaged()
+// (including the 30-min token refresh), so an in-memory edit would evaporate;
+// this map { managedId: effort } is replayed onto them after each injection.
+// A present key with '' means "explicitly no effort" (send nothing on the wire).
+const MANAGED_EFFORT_KEY = 'sandpie-managed-reasoning';
 
 let _providers = [];
 let _activeProviderId = null;
@@ -424,6 +430,63 @@ function renderChips() {
   }
 }
 
+// ---- Per-model thinking level (composer picker slider) --------------------
+// Stops for the slider under each API model, left→right. '' = leave the model's
+// own default alone (nothing on the wire); the rest are written to the provider's
+// `reasoningEffort`, the same field the Settings text box edits. In-browser
+// engines (litertlm / webgpu) have no such knob, so they get no slider.
+const THINK_STOPS = [
+  { v: '',        label: 'Default' },
+  { v: 'none',    label: 'Off' },
+  { v: 'minimal', label: 'Minimal' },
+  { v: 'low',     label: 'Low' },
+  { v: 'medium',  label: 'Medium' },
+  { v: 'high',    label: 'High' },
+];
+
+function isLocalProvider(p) { const t = p && p.type; return t === 'litertlm' || t === 'webgpu'; }
+
+// Index of the provider's current effort; unknown/absent values land on "Default".
+function thinkIndexOf(p) {
+  const cur = String((p && p.reasoningEffort) || '').toLowerCase();
+  const i = THINK_STOPS.findIndex(s => s.v === cur);
+  return i > 0 ? i : 0;
+}
+
+function loadManagedEfforts() {
+  try { const o = JSON.parse(localStorage.getItem(MANAGED_EFFORT_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; }
+  catch (_) { return {}; }
+}
+
+// Replay saved thinking levels onto freshly injected managed providers.
+function applyManagedEfforts() {
+  const ov = loadManagedEfforts();
+  for (const p of _managed) {
+    if (!Object.prototype.hasOwnProperty.call(ov, p.id)) continue;
+    if (ov[p.id]) p.reasoningEffort = ov[p.id]; else delete p.reasoningEffort;
+  }
+}
+
+// Write a slider stop back to the provider. Deliberately does NOT re-render the
+// picker (that would rebuild — and hide — the panel the user is dragging in);
+// the label next to the slider is updated by the caller.
+function setThinkingLevel(p, value) {
+  if (!p) return;
+  if (value) p.reasoningEffort = value; else delete p.reasoningEffort;
+  if (p.managed) {
+    const ov = loadManagedEfforts();
+    ov[p.id] = value;
+    try { localStorage.setItem(MANAGED_EFFORT_KEY, JSON.stringify(ov)); } catch (_) {}
+  } else {
+    saveProviders();
+  }
+  // Keep the Settings form's text box in sync when it's showing this provider.
+  if (p.id === _activeProviderId && !p.managed) {
+    const el = document.getElementById('spReasoningEffort');
+    if (el) el.value = value;
+  }
+}
+
 // Compact model selector for the composer — a "dropup" chip. Mirrors renderChips'
 // Company / Your-models split (a clean separator line between them, only when there
 // ARE company models, i.e. not anonymous). Lives in the input bar so the model is
@@ -463,18 +526,57 @@ function renderModelPicker() {
     b.addEventListener('click', () => { host.classList.remove('open'); const mp = document.querySelector('.mp-panel'); if (mp) mp.classList.remove('visible'); selectProvider(p.id); });
     return b;
   };
+  // API models get a thinking slider right under their name so the reasoning
+  // level is switchable without opening Settings. Local in-browser engines
+  // don't take a reasoning effort, so they stay a bare row.
+  const row = (p) => {
+    const btn = item(p);
+    if (isLocalProvider(p)) return btn;
+    const wrap = document.createElement('div');
+    wrap.className = 'mp-row';
+    const think = document.createElement('div');
+    think.className = 'mp-think';
+    const lbl = document.createElement('span');
+    lbl.className = 'mp-think-lbl';
+    lbl.textContent = 'Thinking';
+    const idx = thinkIndexOf(p);
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.className = 'mp-think-range';
+    range.min = '0'; range.max = String(THINK_STOPS.length - 1); range.step = '1';
+    range.value = String(idx);
+    range.setAttribute('aria-label', 'Thinking effort — ' + (p.name || p.model || 'model'));
+    const val = document.createElement('span');
+    val.className = 'mp-think-val';
+    val.textContent = THINK_STOPS[idx].label;
+    // Dragging/clicking the slider must not bubble up into "pick this model".
+    const swallow = (e) => e.stopPropagation();
+    think.addEventListener('click', swallow);
+    think.addEventListener('mousedown', swallow);
+    think.addEventListener('touchstart', swallow, { passive: true });
+    range.addEventListener('input', () => {
+      const s = THINK_STOPS[Number(range.value)] || THINK_STOPS[0];
+      val.textContent = s.label;
+      think.title = 'Thinking effort: ' + s.label;
+      setThinkingLevel(p, s.v);
+    });
+    think.title = 'Thinking effort: ' + THINK_STOPS[idx].label;
+    think.append(lbl, range, val);
+    wrap.append(btn, think);
+    return wrap;
+  };
   const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
   const empty = (t) => { const d = document.createElement('div'); d.className = 'mp-empty'; d.textContent = t; return d; };
 
   if (_managed.length) {
     panel.appendChild(hdr('Company'));
-    _managed.forEach(p => panel.appendChild(item(p)));
+    _managed.forEach(p => panel.appendChild(row(p)));
     panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
     panel.appendChild(hdr('Your models'));
-    if (_providers.length) _providers.forEach(p => panel.appendChild(item(p)));
+    if (_providers.length) _providers.forEach(p => panel.appendChild(row(p)));
     else panel.appendChild(empty('None yet — add one in Settings'));
   } else if (_providers.length) {
-    _providers.forEach(p => panel.appendChild(item(p)));
+    _providers.forEach(p => panel.appendChild(row(p)));
   } else {
     panel.appendChild(empty('No models — add one in Settings → AI provider'));
   }
@@ -671,6 +773,7 @@ function setManaged(defs, defaultModel) {
   const firstInjection = _managed.length === 0;
   const list = Array.isArray(defs) ? defs : (defs ? [defs] : []);
   _managed = list.map(d => Object.assign({}, d, { id: MANAGED_ID + ':' + (d.model || d.name), managed: true }));
+  applyManagedEfforts();   // re-apply thinking levels picked in the composer (catalog rebuild wipes them)
   if (_managed.length) {
     if (firstInjection || !getProviderById(_activeProviderId)) _activeProviderId = managedDefault(defaultModel).id;
   } else if (!getProviderById(_activeProviderId)) {

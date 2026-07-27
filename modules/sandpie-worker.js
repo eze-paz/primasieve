@@ -2104,6 +2104,9 @@ function _openRouterReasoning(config) {
   const eff = config && config.reasoningEffort;
   if (!eff) return null;
   const e = String(eff).toLowerCase();
+  // "Off" (the picker's leftmost real stop) is not an effort level — OpenRouter
+  // turns thinking off with { enabled: false }, and an effort of "none" 400s.
+  if (e === 'none' || e === 'off' || e === 'disabled') return { enabled: false };
   const effort = e === 'minimal' ? 'low' : e; // OpenRouter effort vocab is low|medium|high
   return { effort };
 }
@@ -2299,10 +2302,13 @@ async function runAgent(config, ctx) {
             stream_options: { include_usage: true },
             tools: config.tools,
           };
-          if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
+          // Same reasoning shape as the first attempt (_openRouterReasoning), so a
+          // compaction retry doesn't silently change the model's thinking level.
+          const compactedReasoning = _openRouterReasoning(config);
+          if (config.maxTokens != null) compactedReqBody[compactedReasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
-          if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
+          if (compactedReasoning) compactedReqBody.reasoning = compactedReasoning;
           if (config.providerRouting) compactedReqBody.provider = config.providerRouting;
           round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
         } catch (compactErr) {
