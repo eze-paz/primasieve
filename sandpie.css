@@ -3067,7 +3067,7 @@ body.sp-decoding *::after {
 .shared-file.invite { background: var(--sp-bg); border-color: transparent; margin-top: 0.3rem; }
 /* collapsible group bars (Shared with me / Team artifacts) — count pushed right */
 .shared-toggle { background: none; border: none; border-top: 1px solid var(--sp-border); cursor: pointer; display: flex; align-items: center; gap: 0.45rem; width: 100%; text-align: left; text-transform: none; letter-spacing: 0; font-size: 0.82rem; font-weight: 600; color: var(--sp-text-dim); padding: 0.62rem 0.15rem; margin: 0; transition: color .12s; }
-.shared-toggle:hover { color: var(--sp-text); }
+.shared-toggle:hover { color: var(--sp-text); border-top: 1px solid var(--sp-border); }
 .shared-caret { font-size: 0.6rem; width: 0.8em; display: inline-block; flex: none; color: var(--sp-text-dim); }
 .shared-group-name { flex: none; }
 .shared-count { margin-left: auto; font-size: 0.64rem; font-weight: 600; font-family: ui-monospace, monospace; color: var(--sp-text-dim); background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 12px; padding: 0.14rem 0.46rem; }
