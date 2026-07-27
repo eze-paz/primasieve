@@ -2,15 +2,17 @@
 // silent auto-update. Browser-only; rides the existing Dropbox team folder.
 //
 // PATHS (named for clarity):
-//   • TEAM hub (shared by all)    <parent>/shared-hub/                  (Dropbox API;
+//   • TEAM hub (shared by all)    <teamParent>/shared-hub/              (Dropbox API;
 //     outside every workspace, so recipients POLL it)
-//   • per-user INCOMING (1:1)     <parent>/<recipient>/sandpie/shared-incoming/
-//     (a 1:1 delivery is written straight here; the recipient's own sync pulls it —
-//      no polling — and it's physically private to them)
-//   • per-user INSTALLED          <recipient>/sandpie/shared-installed/  (read-only,
-//     accepted packages; the worker's read-only guard keys on this prefix)
-//   where <parent> = the folder every user's workspace sits under (workspace root's
-//   parent), e.g. /R+D+I/sandpie ; workspace = <parent>/<email-local-part>.
+//   • per-user INCOMING (1:1)     <teamParent>/shared-hub/inbox/<recipient>/
+//     (also POLLED. It used to be written straight into the recipient's workspace,
+//      but workspaces now live in each user's OWN Dropbox home namespace — which a
+//      publisher cannot write to — so 1:1 rides the team hub too. Only the inbox
+//      LOCATION changed; accept/dismiss still consume the delivery.)
+//   • per-user INSTALLED          sandpie/shared-installed/  (in the recipient's own
+//     workspace; read-only accepted packages, the worker's guard keys on this prefix)
+//   where <teamParent> = the team shared area (provider.cloudParent(), default
+//   /R+D+I/sandpie). '' on a non-team account ⇒ the local sim hub below.
 //
 // A published package is a folder:  packages/<id>/manifest.json + <files…> (FLAT —
 //   overwritten each publish; Dropbox keeps prior revisions for rollback).
@@ -98,9 +100,12 @@
   // mode simulates the per-user folders under one local hub, partitioned by identity
   // (_team = shared hub, _inbox/<user> = each person's private 1:1 inbox) so tests
   // faithfully model who-can-see-what.
-  function teamHub() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? cloudStore(p.cloudParent() + '/shared-hub') : localStore(LOCAL_HUB + '/_team'); }
-  function recipientHub(email) { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? cloudStore(p.cloudParent() + '/' + localPart(email) + '/sandpie/shared-incoming') : localStore(LOCAL_HUB + '/_inbox/' + localPart(email)); }
-  function myInbox() { return cloudOn() ? localStore(LOCAL_HUB) : localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user)); }   // real: 1:1 deliveries sync into my own hub
+  // Cloud mode needs a team space; without one (cloudParent() === '') everything
+  // falls back to the local simulation, same as being offline.
+  function hubRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? (p.cloudParent() + '/shared-hub') : ''; }
+  function teamHub() { const h = hubRoot(); return h ? cloudStore(h) : localStore(LOCAL_HUB + '/_team'); }
+  function recipientHub(email) { const h = hubRoot(); return h ? cloudStore(h + '/inbox/' + localPart(email)) : localStore(LOCAL_HUB + '/_inbox/' + localPart(email)); }
+  function myInbox() { const h = hubRoot(); return h ? cloudStore(h + '/inbox/' + localPart(me().user)) : localStore(LOCAL_HUB + '/_inbox/' + localPart(me().user)); }
 
   /* ── subscriptions ────────────────────────────────────────────────────── */
   // Real mode: one shares.json in the user's own (per-user) workspace. Offline sim:
@@ -226,27 +231,35 @@
   // Delete a 1:1 package from shared-incoming (local + Dropbox) — used by accept (move)
   // and dismiss. file:deleted propagates the removal to the recipient's Dropbox folder.
   async function consumeIncoming(m) {
-    const base = m._store.root + '/packages/' + m.id;
-    // 1) Remove from Dropbox DETERMINISTICALLY: one awaited, recursive folder delete at
-    //    the recipient's own incoming path. The file:deleted event alone was unreliable
-    //    here — its del() is fire-and-forget, so a concurrent sync pull could re-download
-    //    the still-present cloud file before the delete landed. Logged so the real
-    //    two-account test can confirm the exact path.
-    try {
-      const p = prov();
-      if (cloudOn() && p && p.cloudDelete && p.workingRoot) {
-        const abs = String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + base;   // = relToCloud(base)
-        await p.cloudDelete(abs);
-        console.log('[sharing] consumed incoming — deleted from Dropbox:', abs);
-      }
-    } catch (e) { console.warn('[sharing] cloud delete of incoming failed:', e); }
-    // 2) Remove locally + forget from sync state (file:deleted → forgetFromStateAndIndex).
-    for (const rel of await listOpfs(base, '', [])) {
-      const p = base + '/' + rel;
-      try { await O().remove(p); } catch (_) {}
-      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
+    const store = m._store;
+    // 1) Cloud delivery → remove from the hub inbox DETERMINISTICALLY: one awaited,
+    //    recursive folder delete at the exact path the store reads from. (It used to
+    //    be derived from the recipient's workspace root; deliveries now land in the
+    //    team hub, so the store's own absolute root IS the path.) Logged so the real
+    //    two-account test can confirm it.
+    if (store && store.kind === 'cloud') {
+      try {
+        const p = prov();
+        if (cloudOn() && p && p.cloudDelete) {
+          const abs = store.root + '/packages/' + m.id;
+          await p.cloudDelete(abs);
+          console.log('[sharing] consumed incoming — deleted from Dropbox:', abs);
+        }
+      } catch (e) { console.warn('[sharing] cloud delete of incoming failed:', e); }
     }
-    try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
+    // 2) Remove any LOCAL copy + forget from sync state (file:deleted →
+    //    forgetFromStateAndIndex). Covers the offline sim hub AND leftovers from the
+    //    pre-home-namespace flow, where 1:1 deliveries synced into the workspace.
+    const bases = new Set([LOCAL_HUB + '/packages/' + m.id]);
+    if (store && store.kind === 'local') bases.add(store.root + '/packages/' + m.id);
+    for (const base of bases) {
+      for (const rel of await listOpfs(base, '', [])) {
+        const p = base + '/' + rel;
+        try { await O().remove(p); } catch (_) {}
+        try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
+      }
+      try { await O().remove(base); } catch (_) {}   // drop the now-empty package dir (local)
+    }
   }
   // Delete a locally-installed package: sandpie/shared-installed/<id>/ (local + the
   // user's own Dropbox copy), and unpin anything under it. Used by both the
@@ -256,8 +269,12 @@
     if (window.SandpiePins) { for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p); }
     try {
       const p = prov();
-      if (cloudOn() && p && p.cloudDelete && p.workingRoot) {
-        await p.cloudDelete(String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + dst);
+      // The installed copy lives in MY workspace (home namespace), not the team
+      // space — so this delete must NOT carry the team path-root.
+      if (cloudOn() && p && p.workingRoot) {
+        const abs = String(p.workingRoot() || '').replace(/\/+$/, '') + '/' + dst;
+        if (p.workspaceDelete) await p.workspaceDelete(abs);
+        else if (p.cloudDelete) await p.cloudDelete(abs, { team: false });
       }
     } catch (e) { console.warn('[sharing] cloud delete of installed failed:', e); }
     for (const rel of await listOpfs(dst, '', [])) {
@@ -274,7 +291,7 @@
   async function unshareTeam(id) {
     try {
       const p = prov();
-      if (cloudOn() && p && p.cloudDelete && p.cloudParent) {
+      if (cloudOn() && p && p.cloudDelete && p.cloudParent && p.cloudParent()) {
         const abs = String(p.cloudParent() || '').replace(/\/+$/, '') + '/shared-hub/packages/' + id;
         await p.cloudDelete(abs);
         console.log('[sharing] unshared team artifact from hub:', abs);
@@ -459,7 +476,8 @@
   function boot() { renderHome(); autoSync(); observeInbox(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   window.addEventListener('focus', () => { autoSync(); renderHome(); });
-  // Dropbox cursor pull finished: if a new file landed in shared-incoming, this
-  // re-renders the invite list (and banner) automatically — no manual refresh.
+  // Dropbox cursor pull finished. 1:1 deliveries no longer sync into the workspace
+  // (they're polled from the team hub inbox), so this is now just a convenient
+  // once-a-minute poll tick that re-checks the hub and re-renders — same effect.
   try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', () => { autoSync(); renderHome(); }); } catch (_) {}
 })();

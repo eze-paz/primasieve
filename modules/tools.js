@@ -372,16 +372,21 @@ const toolDefs = () => Object.entries(tools)
   .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
   .map(([name]) => {
     let description = SandpieTools.description(name);
-    // Tell the model WHERE its workspace sits in Dropbox so a scope:"dropbox"
-    // search can target the parent shared folder precisely (e.g. /R+D+I) instead
-    // of guessing. Only when Dropbox is connected + the working root is resolved.
+    // Tell the model WHERE its workspace sits in Dropbox, and where the team's
+    // shared area is, so a scope:"dropbox" search can target the shared folder
+    // precisely (e.g. /R+D+I) instead of guessing. The workspace is in the user's
+    // OWN Dropbox and the shared area is in the team space — two different places,
+    // so the shared path is asked for directly rather than derived from the
+    // workspace path. Only when Dropbox is connected + the working root resolved.
     if (name === 'search') {
       try {
         const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
         const wr = p && p.workingRoot && p.workingRoot();
         if (wr) {
-          const parent = wr.replace(/\/[^/]+$/, '') || '/';
-          description += `\nYour workspace is the Dropbox folder "${wr}"; its parent shared folder is "${parent}". To search the wider shared area, use scope:"dropbox" with path:"${parent}" (or another absolute folder).`;
+          const team = (p.teamParent && p.teamParent()) || '';
+          description += `\nYour workspace is the Dropbox folder "${wr}", in the user's own Dropbox.`
+            + (team ? ` The team's shared area is "${team}" — to search it, use scope:"dropbox" with path:"${team}" (or another absolute folder).`
+                    : ` To search elsewhere in Dropbox, use scope:"dropbox" with an absolute folder path.`);
         }
       } catch (_) {}
     }

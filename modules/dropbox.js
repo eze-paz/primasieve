@@ -12,13 +12,18 @@
    Model
    -----
    - The user's OWN working files (the OPFS root: conversations, scripts, …) sync
-     TWO-WAY into a per-user working folder: <parent>/<email-local-part>/, where
-     <parent> is set in the Cloud sync section (default /sandpie). That folder is
-     the ONLY place this module ever writes.
-   - On a Dropbox **team space**, the API is pointed at the team-space ROOT
-     namespace (via the Dropbox-API-Path-Root header) so team/department folders
-     are reachable — e.g. set the parent to /R+D+I/sandpie to sync into a shared
-     department folder, with each user landing in their own /<email> subfolder.
+     TWO-WAY into /sandpie in the user's OWN Dropbox — i.e. their HOME namespace,
+     with NO Dropbox-API-Path-Root header. On a team space that home namespace is
+     the member's personal folder (what shows as /<Member Name>/sandpie from the
+     team root), so each user's workspace is physically private to them. That
+     folder is the ONLY place the sync engine ever writes.
+     (Was: <teamParent>/<email-local-part>/ under the team-space root namespace.
+      See maybeMigrateToHome() — one-time import of the old team workspace.)
+   - The TEAM path-root is still used, but ONLY for the sharing hub and for
+     cloud browse/search (`team: true` on the transport helpers). Sync never
+     touches it. Everything team-scoped hangs off teamParent(), default
+     /R+D+I/sandpie (overridable; the deployment's GET /config dropboxParent
+     supplies the org default).
    - NOTHING else syncs by default (full Dropbox can be 100s of GB). In on-demand
      ("dehydrated") mode the working folder is browsed/hydrated lazily instead of
      bulk-downloaded.
@@ -35,15 +40,23 @@
   const INDEX_KEY  = 'dbxfull-cloud-index';
   const CURSOR_KEY = 'dbxfull-cursor';
   const APPKEY_CFG = 'dbxfull-appkey';
-  const PARENT_KEY = 'dbxfull-parent';          // parent folder; <email-local> is appended
-  const DEFAULT_PARENT = '/R+D+I/sandpie';      // default sync parent (deployment default)
+  // LEGACY (pre-home-namespace): the team parent the workspace used to hang off,
+  // with <email-local> appended. Still read — by legacyTeamRoot(), to locate the
+  // old workspace for the one-time import — but no longer drives the sync target.
+  const PARENT_KEY = 'dbxfull-parent';
+  const WSROOT_KEY = 'dbxfull-workspace-root';  // personal workspace root, home namespace (user override)
+  const DEFAULT_WSROOT = '/sandpie';            // default personal workspace root
+  const TEAMPARENT_KEY = 'dbxfull-team-parent';         // team shared area (sharing hub lives here); user override
+  const TEAMPARENT_RES = 'dbxfull-team-parent-server';  // cached GET /config dropboxParent (org default)
+  const DEFAULT_TEAM_PARENT = '/R+D+I/sandpie'; // fallback team shared area
   const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
   const AUTOCONN_TRIED  = 'dbxfull-autoconn-tried';   // sessionStorage: per-session auto-connect loop guard
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
+  const HOMENS_KEY = 'dbxfull-homens';          // home namespace id — needed for cross-namespace `ns:` paths
   const NS_VER_KEY = 'dbxfull-ns-ver';          // detection-logic version; bump ⇒ force a one-time re-fetch
-  const EMAIL_KEY  = 'dbxfull-email';           // cached account email for the per-user subfolder
+  const EMAIL_KEY  = 'dbxfull-email';           // cached account email (sharing identity + legacy root)
   const SIG_KEY    = 'dbxfull-target-sig';      // namespace|path signature; change ⇒ reset sync state
-  const NS_DETECT_VER = '2';                    // bumped: detect via root !== home (was tag==='team', which missed team spaces reported as 'user')
+  const NS_DETECT_VER = '3';                    // 2: detect via root !== home. 3: also capture home_namespace_id.
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
@@ -89,9 +102,11 @@
     pushDbxTokenToSW();
     return data.access_token;
   }
-  // On a team space we operate relative to the team-space ROOT namespace so team
-  // folders (e.g. /R+D+I) are reachable; default API behavior is the member's home
-  // namespace. The namespace id comes from get_current_account (team accounts only).
+  // TEAM-scoped calls only. The default API behavior — no header — resolves paths
+  // against the member's HOME namespace, which is where the personal workspace now
+  // lives; that is the default for every transport helper below. Pass `team: true`
+  // to reach team/department folders (e.g. /R+D+I) instead: the sharing hub and
+  // cloud browse/search. No-op on a non-team account (no team root namespace).
   function pathRootHeaderObj() {
     const ns = localStorage.getItem(NS_KEY);
     return ns ? { 'Dropbox-API-Path-Root': JSON.stringify({ '.tag': 'root', root: ns }) } : {};
@@ -104,10 +119,10 @@
   function apiArg(obj) {
     return JSON.stringify(obj).replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
   }
-  async function api(path, body, { pathRoot = true } = {}) {
+  async function api(path, body, { team = false } = {}) {
     const token = await accessToken();
     const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-    if (pathRoot) Object.assign(headers, pathRootHeaderObj());
+    if (team) Object.assign(headers, pathRootHeaderObj());
     const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
       method: 'POST', headers, body: JSON.stringify(body),
     });
@@ -117,10 +132,10 @@
   // DeletedMetadata sometimes lacks path_display (only path_lower). Fallback so
   // deletion entries survive `cloudToRel` and actually remove items from index.
   const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
-  async function listFolder(folderPath, { recursive = false } = {}) {
-    let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true });
+  async function listFolder(folderPath, { recursive = false, team = false } = {}) {
+    let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true }, { team });
     let entries = data.entries.slice();
-    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }); entries = entries.concat(data.entries); }
+    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }, { team }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
   async function listContinue(cursor) {
@@ -129,7 +144,7 @@
     while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
-  async function download(path, signal) {
+  async function download(path, signal, { team = false } = {}) {
     // /2/files/download's SUCCESS (200) response does NOT carry CORS headers — only
     // its preflight and ERROR responses do. So a direct browser fetch can read an
     // error but not the file: a 200 fails the browser CORS check ("No
@@ -139,7 +154,7 @@
     // get_temporary_link (a normal RPC — fully CORS-enabled) → GET the returned URL
     // (a plain GET = no custom headers = NO preflight, and the temp-link host returns
     // ACAO), which works cross-origin even under the prod COOP/COEP isolation.
-    const tl = await api('/2/files/get_temporary_link', { path });
+    const tl = await api('/2/files/get_temporary_link', { path }, { team });
     const res = await fetch(dbxRoute(tl.link), { method: 'GET', signal });
     if (!res.ok) throw new Error(`Download ${path}: ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
@@ -148,7 +163,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': apiArg({ close }), ...pathRootHeaderObj() },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': apiArg({ close }) },
       body: content,
     });
     if (!res.ok) throw new Error(`Upload session start: ${res.status} ${await res.text()}`);
@@ -158,7 +173,7 @@
     const token = await accessToken();
     const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...pathRootHeaderObj() },
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries }),
     });
     if (!res.ok) throw new Error(`Finish batch: ${res.status} ${await res.text()}`);
@@ -192,20 +207,43 @@
     if (!result.entries) { console.warn('[dropbox] unexpected finish_batch response:', result); return []; }
     return sessions.map((x, i) => ({ ...x, meta: result.entries[i] }));
   }
-  async function del(path) {
-    try { return await api('/2/files/delete_v2', { path }); }
+  async function del(path, { team = false } = {}) {
+    try { return await api('/2/files/delete_v2', { path }, { team }); }
     catch (e) { if (String(e.message).includes('not_found')) return null; throw e; }
   }
-  async function getCurrentAccount() { return await api('/2/users/get_current_account', null, { pathRoot: false }); }
+  async function getCurrentAccount() { return await api('/2/users/get_current_account', null); }
 
   // ===========================================================================
-  //  Working root  (<parent>/<email-local-part>/)
+  //  Working root  (/sandpie, in the user's own HOME namespace)
   // ===========================================================================
   function workingRoot() { return localStorage.getItem(ROOT_KEY) || ''; }
   function sanitizeSeg(s) { return String(s).replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^_+|_+$/g, '') || 'user'; }
+  function normPath(p, fallback) {
+    let s = String(p == null ? '' : p).trim() || fallback;
+    if (!s.startsWith('/')) s = '/' + s;
+    return s.replace(/\/+$/, '') || fallback;
+  }
+  // The TEAM shared area — where the sharing hub lives. Always resolved against the
+  // team-space root namespace (`team: true`), independent of the personal workspace.
+  // '' on a non-team account: there is no team space, so sharing falls back to its
+  // local simulation (see sharing.js cloudOn()/cloudParent()).
+  function teamParent() {
+    if (!localStorage.getItem(NS_KEY)) return '';
+    const cfg = localStorage.getItem(TEAMPARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT;
+    return normPath(cfg, DEFAULT_TEAM_PARENT);
+  }
+  // Where this user's workspace USED to live: <old team parent>/<email-local>, under
+  // the team path-root. Only used to locate data for the one-time import; '' if we
+  // never knew the email (nothing to import from).
+  function legacyTeamRoot() {
+    const email = localStorage.getItem(EMAIL_KEY);
+    if (!email) return '';
+    const parent = normPath(localStorage.getItem(PARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT, DEFAULT_TEAM_PARENT);
+    return parent + '/' + sanitizeSeg(String(email).split('@')[0]);
+  }
   async function ensureWorkingRoot() {
     // Account fetched once (cached): the team-space root namespace (team accounts
-    // only) + the email used for the per-user subfolder.
+    // only) + the home namespace id + the account email (sharing identity).
     let ns = localStorage.getItem(NS_KEY);
     let email = localStorage.getItem(EMAIL_KEY);
     if (ns === null || !email || localStorage.getItem(NS_VER_KEY) !== NS_DETECT_VER) {
@@ -215,33 +253,30 @@
       // root_info['.tag']: an account sitting in a team space can still report '.tag' ===
       // 'user' while having a distinct root_namespace_id (confirmed in the field). Gating on
       // the tag left the path-root header off, so team paths like /R+D+I resolved against the
-      // personal home folder instead of the team space. '' ⇒ no header ⇒ home namespace.
+      // personal home folder instead of the team space. '' ⇒ no team space at all.
       ns = (ri.root_namespace_id && ri.root_namespace_id !== ri.home_namespace_id) ? ri.root_namespace_id : '';
       email = acct.email || acct.account_id || 'user';
       localStorage.setItem(NS_KEY, ns);
+      localStorage.setItem(HOMENS_KEY, ri.home_namespace_id || '');
       localStorage.setItem(EMAIL_KEY, email);
       localStorage.setItem(NS_VER_KEY, NS_DETECT_VER);
-      console.info('[dropbox] path-root', ns ? ('→ team root ' + ns) : '→ home', '(root=' + ri.root_namespace_id + ', home=' + ri.home_namespace_id + ')');
+      console.info('[dropbox] workspace → home namespace ' + (ri.home_namespace_id || '(default)') + '; team root ' + (ns || '(none)'));
     }
-    // Working dir = <parent>/<email-local>. Parent is set in the Cloud sync
-    // section (default DEFAULT_PARENT = /R+D+I/sandpie, the department folder).
-    const local = sanitizeSeg(String(email).split('@')[0]);
-    // Default parent is inherited from the server (GET /config) so it's managed
-    // centrally; a user override in the Cloud-sync UI (PARENT_KEY) still wins.
-    // Falls back to the hardcoded DEFAULT_PARENT if the server didn't provide one.
-    const defaultParent = (await serverParent()) || DEFAULT_PARENT;
-    let parent = (localStorage.getItem(PARENT_KEY) || defaultParent).trim() || defaultParent;
-    if (!parent.startsWith('/')) parent = '/' + parent;
-    parent = parent.replace(/\/+$/, '');
-    const root = parent + '/' + local;
+    // Cache the deployment's team parent (GET /config dropboxParent) so teamParent()
+    // — which is called synchronously all over — can see the org default. It now
+    // configures the SHARING hub only; the workspace root is always personal.
+    try { const sp = await serverParent(); if (sp) localStorage.setItem(TEAMPARENT_RES, normPath(sp, DEFAULT_TEAM_PARENT)); } catch (_) {}
+    // Workspace = /sandpie in the user's own Dropbox. No <email> subfolder: the home
+    // namespace is already per-user. Overridable in the Cloud sync section.
+    const root = normPath(localStorage.getItem(WSROOT_KEY) || DEFAULT_WSROOT, DEFAULT_WSROOT);
     // Relocate guard. The sync target is (namespace + path): the SAME path string
     // resolves to DIFFERENT folders under different path-roots (home namespace vs
     // team space), so the namespace MUST be part of the signature — otherwise
     // switching roots reuses stale state and wrongly deletes local files as
-    // "removed remotely". When the signature changes (parent edit, or first run
-    // under a new namespace) drop the old sync state so the new location starts
+    // "removed remotely". When the signature changes (root edit, or the one-time
+    // move off the team space) drop the old sync state so the new location starts
     // fresh: re-pull there + re-push the local working dir, deleting nothing.
-    const sig = (ns || 'home') + '|' + root;
+    const sig = 'home|' + root;
     if (localStorage.getItem(SIG_KEY) !== sig) {
       localStorage.setItem(SIG_KEY, sig);
       localStorage.removeItem(STATE_KEY);
@@ -719,10 +754,15 @@
     }
     const t = tokens();
     if (!t) return;
+    // pathRoot is now TEAM-ONLY: the worker uses it for cloud browse/search (so the
+    // model can still see /R+D+I), never for workspace paths. The workspace lives in
+    // the home namespace, i.e. NO header — see _dbxHeaders() in sandpie-worker.js.
     worker.postMessage({
       type: 'dbx-token',
       token: t.access_token,
-      pathRoot: localStorage.getItem(NS_KEY) || null,
+      pathRoot: null,                                    // workspace ops: home namespace
+      teamRoot: localStorage.getItem(NS_KEY) || null,    // cloud browse/search: team namespace
+      homeNs: localStorage.getItem(HOMENS_KEY) || '',    // for cross-namespace copy_to_workspace
       workingRoot: localStorage.getItem(ROOT_KEY) || '',
       dehydrated: dehydrated(),
     });
@@ -816,9 +856,11 @@
     // Explicit disconnect opts out of auto-connect (see maybeAutoConnect) so a
     // managed-login user who disconnects isn't silently reconnected on reload.
     localStorage.setItem(AUTOCONN_OPTOUT, '1');
-    // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the configured folder/key.
+    // Keep WSROOT_KEY / TEAMPARENT_KEY / PARENT_KEY + APPKEY_CFG so a reconnect
+    // reuses the configured folders and key (PARENT_KEY also still locates the
+    // legacy team workspace if the import hasn't happened yet).
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
+    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, HOMENS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
@@ -897,9 +939,12 @@
     if (btn)  { btn.textContent = connected ? 'Disconnect' : 'Connect'; }
     if (key)  { key.style.display = connected ? 'none' : ''; }   // app key only matters before connecting
     if (root) {
+      const tp = teamParent();
       root.textContent = connected
-        ? (workingRoot() ? ('Syncing to ' + workingRoot()) : 'Resolving folder…')
-        : 'Your username is appended to the sync folder automatically.';
+        ? (workingRoot()
+            ? ('Syncing to ' + workingRoot() + ' in your own Dropbox' + (tp ? ' · sharing via ' + tp : ''))
+            : 'Resolving folder…')
+        : 'Syncs to a folder in your own Dropbox — nobody else on the team can see it.';
     }
   }
   const CLOUD_HTML = `
@@ -909,8 +954,10 @@
           <span id="dbxfullAccount" style="font-size:0.7rem; color:var(--sp-text-dim); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:55%;"></span>
         </div>
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Sync folder</label>
-        <input id="dbxfullParent" autocomplete="off" placeholder="${DEFAULT_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Sync folder (in your own Dropbox)</label>
+        <input id="dbxfullWsRoot" autocomplete="off" placeholder="${DEFAULT_WSROOT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Team shared folder (sharing only)</label>
+        <input id="dbxfullTeamParent" autocomplete="off" placeholder="${DEFAULT_TEAM_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
 
@@ -925,12 +972,22 @@
       // Connect is one click. Async; only fill if the user hasn't typed since.
       if (!existing) serverAppKey().then(k => { if (k && !input.value) input.value = k; });
     }
-    const parent = body.querySelector('#dbxfullParent');
-    if (parent) {
-      parent.value = localStorage.getItem(PARENT_KEY) || DEFAULT_PARENT;
+    const wsRoot = body.querySelector('#dbxfullWsRoot');
+    if (wsRoot) {
+      wsRoot.value = localStorage.getItem(WSROOT_KEY) || DEFAULT_WSROOT;
       // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
-      parent.addEventListener('change', () => {
-        localStorage.setItem(PARENT_KEY, parent.value.trim() || DEFAULT_PARENT);
+      // ensureWorkingRoot() picks the new value up on the next cycle; the changed
+      // target signature resets sync state there, so nothing is deleted remotely.
+      wsRoot.addEventListener('change', () => {
+        localStorage.setItem(WSROOT_KEY, normPath(wsRoot.value, DEFAULT_WSROOT));
+        ensureWorkingRoot().catch(() => {}).then(renderCloudState);
+      });
+    }
+    const teamP = body.querySelector('#dbxfullTeamParent');
+    if (teamP) {
+      teamP.value = localStorage.getItem(TEAMPARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT;
+      teamP.addEventListener('change', () => {
+        localStorage.setItem(TEAMPARENT_KEY, normPath(teamP.value, DEFAULT_TEAM_PARENT));
         renderCloudState();
       });
     }
@@ -948,71 +1005,128 @@
   }
 
   // ===========================================================================
-  //  ⚠️  TEMPORARY ONE-TIME MIGRATION — REMOVE AFTER ALL USERS HAVE MIGRATED.
-  //  The old site (gasn2cloud.com/sandpie) synced each user's files to their
-  //  Dropbox App folder /Apps/AI_Sandbox. The new site syncs to the team folder
-  //  /R+D+I/sandpie/<user>. On a user's first connect, if their new root doesn't
-  //  exist yet, locate the old AI_Sandbox folder (the one holding _conversations)
-  //  and COPY it to the new root. Non-destructive (copy), guarded (only when the
-  //  new root is absent → runs once), best-effort (never blocks sync).
-  //  PILOT SAFELY: MIGRATION_DRY_RUN=true LOCATES + logs only (no copy). Once the
-  //  console shows the correct source folder, set it to false to copy for real.
-  //  TO REMOVE LATER: delete this whole block + the two maybeMigrateAiSandbox()
-  //  calls in boot(). Grep token: MIGRATE_AI_SANDBOX
+  //  ⚠️  ONE-TIME MIGRATION — team workspace → personal (home-namespace) workspace.
+  //
+  //  Old:  <teamParent>/<email-local>/…   e.g. /R+D+I/sandpie/ezequiel/…  (team path-root)
+  //  New:  /sandpie/…                     in the user's own Dropbox      (home namespace)
+  //
+  //  Guarded (skips once the new root exists / once the guard key is set),
+  //  NON-DESTRUCTIVE (copies — the old team folder is left completely untouched,
+  //  so a rollback is just flipping the root back), and best-effort: any failure
+  //  is logged and retried next boot rather than blocking sync.
+  //
+  //  Two strategies, in order:
+  //    1. Server-side folder copy. The two roots live in DIFFERENT namespaces, so
+  //       the destination is written as a namespace-relative path
+  //       ("ns:<home_namespace_id>/sandpie") while the request carries the team
+  //       path-root. One call, no bytes through the browser.
+  //    2. Fallback — pull-then-push. List the old folder, download every file into
+  //       OPFS, and let the normal dirty-push upload it to the new root. Slower and
+  //       it pulls everything local for one boot (dehydratePurge trims it later),
+  //       but it only uses transport paths that are already proven in daily sync.
+  //
+  //  TO REMOVE LATER (once every user has migrated): delete this block, the
+  //  maybeMigrateToHome() calls in boot(), PARENT_KEY, and legacyTeamRoot().
+  //  Grep token: MIGRATE_TO_HOME
   // ===========================================================================
-  const MIGRATE_AI_SANDBOX = true;        // master switch — set false / delete to disable
-  const MIGRATION_DRY_RUN  = true;        // true = locate + log only; false = actually copy
-  const OLD_APP_FOLDER     = 'AI_Sandbox';
-  const OLD_CONV_DIR       = '_conversations';
-  let _migrationChecked = false;
-  async function dbxMeta(path, pathRoot) {
+  const MIGRATE_TO_HOME  = true;                        // master switch
+  const MIGRATED_KEY     = 'dbxfull-home-migrated-v1';  // set once the import is settled
+  let _migrationChecked  = false;
+  async function dbxMeta(path, team) {
     // Metadata, or null if absent. Rethrows other errors so the caller can abort.
     // not_found ⇒ absent here. malformed_path ⇒ this path is invalid in THIS
-    // namespace (e.g. an /Apps/ virtual path probed under the team path-root) —
-    // treat as absent so the caller can fall through to the home namespace.
-    try { return await api('/2/files/get_metadata', { path }, { pathRoot }); }
+    // namespace — treat as absent so the caller can fall through.
+    try { return await api('/2/files/get_metadata', { path }, { team }); }
     catch (e) { if (/not_found|malformed_path/.test(String(e && e.message))) return null; throw e; }
   }
-  async function findOldRoot() {
-    // /Apps/AI_Sandbox, but under a team space it sits beneath the member's folder
-    // (e.g. /Ezequiel De Paz/Apps/AI_Sandbox) whose name we can't predict — so try
-    // the canonical path in both namespaces, then scan for the _conversations dir.
-    for (const pr of [true, false]) {
-      if (await dbxMeta('/Apps/' + OLD_APP_FOLDER + '/' + OLD_CONV_DIR, pr)) return { path: '/Apps/' + OLD_APP_FOLDER, pathRoot: pr };
+  // Strategy 1: one server-side copy_v2. `to` may be an "ns:<id>/…" path so the
+  // copy can cross from the team namespace into the user's home namespace.
+  async function copyAcrossNamespaces(from, to, team) {
+    await api('/2/files/copy_v2', { from_path: from, to_path: to, autorename: false }, { team });
+  }
+  // Strategy 2: download the old workspace into OPFS. The sync-state reset that
+  // ensureWorkingRoot() already performed on the root change means every local
+  // file counts as dirty, so the next sync() pushes all of this to the new root.
+  // Never overwrites a local file that already exists — local wins, so nothing the
+  // user has since edited on this device is clobbered by a stale cloud copy.
+  async function pullOldWorkspace(oldRoot, team) {
+    const opfs = Sandpie.opfs;
+    const { entries } = await listFolder(oldRoot, { recursive: true, team });
+    const prefix = oldRoot.replace(/^\/+/, '').toLowerCase() + '/';
+    const files = [];
+    for (const e of entries) {
+      if (e.kind !== 'file' || !e.path) continue;
+      const s = String(e.path).replace(/^\/+/, '');
+      if (!s.toLowerCase().startsWith(prefix)) continue;
+      files.push({ rel: s.slice(prefix.length), path: e.path });
     }
-    const tail = new RegExp('/' + OLD_APP_FOLDER + '/' + OLD_CONV_DIR + '$', 'i');
-    for (const pr of [true, false]) {
-      let data;
-      try { data = await api('/2/files/search_v2', { query: OLD_CONV_DIR, options: { file_status: 'active', filename_only: true, max_results: 100 } }, { pathRoot: pr }); }
-      catch { continue; }
-      for (const m of (data && data.matches) || []) {
-        const p = m.metadata && m.metadata.metadata && m.metadata.metadata.path_display;
-        if (p && tail.test(p)) return { path: p.slice(0, -(OLD_CONV_DIR.length + 1)), pathRoot: pr };
+    if (!files.length) return 0;
+    let i = 0, done = 0, failed = 0;
+    const worker = async () => {
+      while (i < files.length) {
+        const f = files[i++];
+        try {
+          if (!(await opfs.exists(f.rel))) {
+            await opfs.write(f.rel, await download(f.path, undefined, { team }));
+          }
+          onFileChanged(f.rel);   // mark dirty ⇒ next sync uploads it to the new root
+        } catch (err) { failed++; console.warn('[migrate:home] pull failed:', f.rel, err && err.message); }
+        try { _setSyncProgress(++done, files.length, 'Moving your files'); } catch (_) {}
       }
-    }
-    return null;
+    };
+    await Promise.all(Array.from({ length: Math.min(DL_CONCURRENCY, files.length) }, worker));
+    try { _setSyncProgress(0, 0); } catch (_) {}
+    if (failed) throw new Error(failed + ' of ' + files.length + ' files could not be pulled');
+    return files.length;
   }
-  async function dbxCopyFolder(from, to, pathRoot) {
-    const parent = to.slice(0, to.lastIndexOf('/'));
-    if (parent) { try { await api('/2/files/create_folder_v2', { path: parent, autorename: false }, { pathRoot }); } catch (_) {} }
-    await api('/2/files/copy_v2', { from_path: from, to_path: to, autorename: false }, { pathRoot });
-  }
-  async function maybeMigrateAiSandbox() {
-    if (!MIGRATE_AI_SANDBOX || _migrationChecked) return;
+  async function maybeMigrateToHome() {
+    if (!MIGRATE_TO_HOME || _migrationChecked) return;
+    if (localStorage.getItem(MIGRATED_KEY) === '1') return;
+    if (!tokens()) return;
     _migrationChecked = true;
+    const newRoot = workingRoot();
+    if (!newRoot) { _migrationChecked = false; return; }   // root unresolved → retry next boot
     try {
-      const newRoot = workingRoot();
-      if (!newRoot) return;
-      if (await dbxMeta(newRoot, true)) return;     // new root already set up → skip (one-time guard)
-      const old = await findOldRoot();
-      if (!old) { console.info('[migrate] AI_Sandbox: nothing to migrate (no old ' + OLD_CONV_DIR + ')'); return; }
-      console.info('[migrate] AI_Sandbox: found', JSON.stringify(old), '→', newRoot, MIGRATION_DRY_RUN ? '(DRY RUN — not copying)' : '(copying…)');
-      if (MIGRATION_DRY_RUN) return;
-      if (old.pathRoot !== true) { console.warn('[migrate] AI_Sandbox: old folder is in the home namespace, not the team root — cross-namespace copy not handled; skipping. Tell the dev.'); return; }
-      await dbxCopyFolder(old.path, newRoot, true);
-      console.info('[migrate] AI_Sandbox: copied', old.path, '→', newRoot);
+      // Already have a personal workspace? Then either we've migrated before or the
+      // user started fresh here — either way, importing on top would collide.
+      if (await dbxMeta(newRoot, false)) {
+        console.info('[migrate:home]', newRoot, 'already exists — nothing to import');
+        localStorage.setItem(MIGRATED_KEY, '1');
+        return;
+      }
+      const teamNs = localStorage.getItem(NS_KEY) || '';
+      const oldRoot = legacyTeamRoot();
+      if (!oldRoot || !(await dbxMeta(oldRoot, !!teamNs))) {
+        console.info('[migrate:home] no old workspace at', oldRoot || '(unknown)', '— nothing to import');
+        localStorage.setItem(MIGRATED_KEY, '1');
+        return;
+      }
+      // 1) server-side copy (cross-namespace via ns: when there's a team space)
+      const homeNs = localStorage.getItem(HOMENS_KEY) || '';
+      const dest = (teamNs && homeNs) ? ('ns:' + homeNs + newRoot) : newRoot;
+      try {
+        await copyAcrossNamespaces(oldRoot, dest, !!teamNs);
+        console.info('[migrate:home] server-side copied', oldRoot, '→', dest);
+        localStorage.setItem(MIGRATED_KEY, '1');
+        // The copy landed outside anything the local sync state knows about; drop
+        // it so the next sync does a clean full listing of the new root.
+        localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY);
+        localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
+        return;
+      } catch (e) {
+        console.warn('[migrate:home] server-side copy unavailable (' + (e && e.message) + ') — falling back to download+re-upload');
+      }
+      // 2) pull-then-push
+      dbxStatus('Moving your files to your own Dropbox…', '');
+      const n = await pullOldWorkspace(oldRoot, !!teamNs);
+      console.info('[migrate:home] pulled', n, 'file(s) from', oldRoot, '— sync will push them to', newRoot);
+      localStorage.setItem(MIGRATED_KEY, '1');
+      dbxStatus('', 'connected');
+      try { await Sandpie.refreshFiles(); await Sandpie.refreshConversations(); } catch (_) {}
     } catch (e) {
-      console.warn('[migrate] AI_Sandbox failed (non-fatal):', e && e.message);
+      // Leave the guard UNSET so the next boot retries. The old folder is untouched.
+      _migrationChecked = false;
+      console.warn('[migrate:home] failed (non-fatal, will retry):', e && e.message);
     }
   }
 
@@ -1024,10 +1138,11 @@
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),
-      // Absolute Dropbox path of the synced workspace (e.g. /R+D+I/sandpie). Lets the
-      // search tool tell the model where it is, so it can scope a cloud search to the
-      // parent shared folder instead of guessing.
+      // Absolute Dropbox path of the synced workspace (/sandpie, home namespace).
+      // Lets the search tool tell the model where it is, so it can scope a cloud
+      // search to the team shared folder instead of guessing.
       workingRoot: () => (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''),
+      teamParent: () => teamParent(),
       get initialSyncDone() { return initialSyncDone; },
       // Dehydrated-mode hooks: let the file browser show the full Dropbox tree
       // (what the LLM sees) as cloud placeholders and fetch one on demand when
@@ -1050,30 +1165,36 @@
         return true;
       },
       // --- Sharing transport (sharing.js) -----------------------------------
-      // Read/write arbitrary TEAM-namespace paths OUTSIDE the per-user workspace
-      // (the shared hub + colleagues' folders), using the same authed API + team
-      // path-root the sync uses. Absolute paths resolve against the team root
-      // (e.g. /R+D+I/sandpie/shared-hub). cloudParent() = the workspace's parent,
-      // i.e. the shared area every team member's workspace sits under.
+      // Read/write arbitrary paths OUTSIDE the per-user workspace, using the same
+      // authed API. `team: true` (the default for these, since sharing is
+      // team-scoped) resolves the path against the TEAM root namespace via the
+      // path-root header — the personal workspace no longer lives there, so the
+      // sharing hub is the only thing that still uses it.
+      // cloudParent() = the team shared area (e.g. /R+D+I/sandpie); '' on a
+      // non-team account, which makes sharing.js fall back to its local hub.
       cloudConnected: () => !!tokens(),
-      cloudParent: () => (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, '').replace(/\/[^/]+$/, ''),
-      async cloudUpload(absPath, bytes) {
+      cloudParent: () => teamParent(),
+      async cloudUpload(absPath, bytes, { team = true } = {}) {
         const token = await accessToken();
         const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream',
-                     'Dropbox-API-Arg': apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }), ...pathRootHeaderObj() },
+                     'Dropbox-API-Arg': apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }),
+                     ...(team ? pathRootHeaderObj() : {}) },
           body: bytes,
         });
         if (!res.ok) throw new Error('cloudUpload ' + absPath + ': ' + res.status + ' ' + (await res.text()).slice(0, 200));
         return await res.json();
       },
-      cloudDownload: (absPath) => download(absPath),
-      cloudDelete: (absPath) => del(absPath),   // delete_v2 (recursive for folders); no-op on not_found
-      async cloudList(absPath, recursive = false) {
-        try { return (await listFolder(absPath, { recursive })).entries; }
+      cloudDownload: (absPath, { team = true } = {}) => download(absPath, undefined, { team }),
+      cloudDelete: (absPath, { team = true } = {}) => del(absPath, { team }),   // delete_v2 (recursive for folders); no-op on not_found
+      async cloudList(absPath, recursive = false, { team = true } = {}) {
+        try { return (await listFolder(absPath, { recursive, team })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
       },
+      // Workspace-scoped variants (home namespace) — used by sharing.js to clean up
+      // its own copies inside the user's workspace, which is NOT in the team root.
+      workspaceDelete: (absPath) => del(absPath, { team: false }),
     });
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);
@@ -1086,7 +1207,7 @@
       exchangeCode(code).then(async () => {
         history.replaceState({}, '', location.pathname);
         await ensureWorkingRoot();
-        await maybeMigrateAiSandbox();   // MIGRATE_AI_SANDBOX (temporary)
+        await maybeMigrateToHome();   // MIGRATE_TO_HOME (temporary) — must precede the first sync
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
         await migrateExemptToSandpie();
@@ -1094,7 +1215,7 @@
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
       (async () => {
-        try { await ensureWorkingRoot(); await maybeMigrateAiSandbox(); }   // MIGRATE_AI_SANDBOX (temporary)
+        try { await ensureWorkingRoot(); await maybeMigrateToHome(); }   // MIGRATE_TO_HOME (temporary)
         catch (e) { console.warn('[dropbox] pre-sync:', e && e.message); }
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();

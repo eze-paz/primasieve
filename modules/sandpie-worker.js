@@ -153,7 +153,12 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'dbx-token') {
-    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, workingRoot: data.workingRoot || '' };
+    // pathRoot = namespace for WORKSPACE paths. It is now always null: the workspace
+    // lives in the user's home namespace (no Dropbox-API-Path-Root header).
+    // teamRoot  = the team-space root namespace, used ONLY to browse/search team
+    // folders (e.g. /R+D+I) — a different namespace from the workspace, hence the
+    // split. homeNs lets copy_to_workspace pull a team file across into it.
+    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, homeNs: data.homeNs || '', workingRoot: data.workingRoot || '' };
     _dehydrated = !!data.dehydrated;
     _pyBroadcast(data);   // keep the Pyodide pool's sync-hydrate context in step
     return;
@@ -303,7 +308,7 @@ function _spawnPyWorker() {
     _pyDrainQueue();
   });
   // Bring the fresh worker up to date with current Dropbox context/index.
-  if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated }); } catch (_) {} }
+  if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, teamRoot: _dbxCtx.teamRoot, homeNs: _dbxCtx.homeNs, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated }); } catch (_) {} }
   if (_dbxIndex) { try { worker.postMessage({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt }); } catch (_) {} }
   _pyPool.push(slot);
   return slot;
@@ -435,10 +440,13 @@ function _cloudPathFor(rel, entry) {
   const root = (_dbxCtx && _dbxCtx.workingRoot) || '';
   return root + '/' + String(rel).replace(/^\/+/, '');
 }
-function _dbxHeaders(json) {
+// Headers for WORKSPACE paths (home namespace — pathRoot is null in the current
+// layout, so no path-root header). Pass team:true for team-space paths instead.
+function _dbxHeaders(json, team) {
   const h = { Authorization: 'Bearer ' + (_dbxCtx && _dbxCtx.token) };
   if (json) h['Content-Type'] = 'application/json';
-  if (_dbxCtx && _dbxCtx.pathRoot) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: _dbxCtx.pathRoot });
+  const ns = _dbxCtx && (team ? _dbxCtx.teamRoot : _dbxCtx.pathRoot);
+  if (ns) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: ns });
   return h;
 }
 // Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
@@ -940,10 +948,11 @@ function _relUnderRoot(absPath) {
   return null;
 }
 // Dropbox search_v2 → sorted path_display list. Throws on API error.
-async function _dropboxSearchPaths(query, searchPath, filenameOnly, fileExtensions) {
-  const { token, pathRoot } = _dbxCtx;
-  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
+// `team` picks the namespace: true = the TEAM space (so /R+D+I and friends are
+// reachable from a scope:"dropbox" search), false = the user's home namespace,
+// which is where the workspace itself lives (the dehydrated in-workspace merge).
+async function _dropboxSearchPaths(query, searchPath, filenameOnly, fileExtensions, team = true) {
+  const headers = _dbxHeaders(true, team);
   // max_results max is 1000; fetch up to that so we can report a count AND
   // paginate the display. has_more ⇒ still more beyond 1000 (reported as "1000+").
   const opts = { path: searchPath || '', max_results: 1000, file_status: 'active', filename_only: !!filenameOnly };
@@ -974,9 +983,7 @@ function _formatCloudPage(r, query, scope, offset) {
   return `${totalStr} cloud files match "${query}" in ${scope} — showing ${off + 1}-${end} (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it):\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
 }
 async function _dropboxListFolder(folderPath, recursive) {
-  const { token, pathRoot } = _dbxCtx;
-  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-  if (pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: pathRoot });
+  const headers = _dbxHeaders(true, true);   // team namespace — cloud browse
   const body = JSON.stringify({ path: folderPath || '', recursive: !!recursive, include_mounted_folders: false, include_deleted: false, include_has_explicit_shared_members: false, limit: 999 });
   let res = await fetch('https://api.dropboxapi.com/2/files/list_folder', { method: 'POST', headers, body });
   if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox list failed (' + res.status + '): ' + txt.slice(0, 300)); }
@@ -1085,7 +1092,8 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
     const lits = _searchLiterals(pattern);
     if (lits.length) {
       try {
-        const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false, _globExtensions(include));
+        // team:false — cloudScope is under the workspace root, i.e. the home namespace.
+        const r = await _dropboxSearchPaths(lits.join(' '), cloudScope, false, _globExtensions(include), false);
         const CAP = 100;
         const cloudOnly = [];
         let scanned = 0;
@@ -1164,8 +1172,17 @@ async function _forkLocal(src, dest) {
 }
 
 // ---- copy_to_workspace — fork a local workspace file (e.g. a read-only shared
-// package) into an editable copy, OR server-side copy a file from elsewhere in
-// the user's Dropbox INTO the working root. READ-ONLY on the source either way.
+// package) into an editable copy, OR import a file from elsewhere in Dropbox INTO
+// the working root. READ-ONLY on the source either way.
+//
+// The source (a team/department folder) and the destination (the workspace) are in
+// DIFFERENT Dropbox namespaces now — team root vs the user's home namespace — so a
+// single server-side copy_v2 can't span them with one path-root header. Instead we
+// pull the bytes down into OPFS as a NEW local file; it has no sync-state entry, so
+// the next sync pushes it up to the workspace. (The old code copied server-side and
+// then downloaded the result anyway, so this is the same number of transfers.)
+// Folders still use copy_v2, with the destination written as a namespace-relative
+// "ns:<home_namespace_id>/…" path so the copy can cross namespaces server-side.
 // Only offered when Dropbox is connected (gated in tools.js toolDefs).
 async function tool_copy_to_workspace({ src, dest }) {
   const from = (src == null ? '' : String(src)).trim();
@@ -1180,57 +1197,51 @@ async function tool_copy_to_workspace({ src, dest }) {
     ? String(dest).trim().replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '')
     : from.split('/').filter(Boolean).pop();
   if (!rel || rel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
-  const headers = { Authorization: 'Bearer ' + _dbxCtx.token, 'Content-Type': 'application/json' };
-  if (_dbxCtx.pathRoot) headers['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: _dbxCtx.pathRoot });
-  let res;
-  try { res = await fetch('https://api.dropboxapi.com/2/files/copy_v2', { method: 'POST', headers, body: JSON.stringify({ from_path: from, to_path: wr + '/' + rel, autorename: true }) }); }
-  catch (e) { return { result: 'Error reaching Dropbox: ' + (e && e.message || e) }; }
-  if (!res.ok) { const txt = await res.text().catch(() => ''); return { result: 'Copy failed (' + res.status + '): ' + txt.slice(0, 400) }; }
-  const meta = ((await res.json().catch(() => ({}))) || {}).metadata || {};
-  const finalPath = meta.path_display || (wr + '/' + rel);
-  const finalRel = _relUnderRoot(finalPath) || rel;
+  const teamHeaders = _dbxHeaders(true, true);    // source: team namespace (cloud browse)
+  const homeHeaders = _dbxHeaders(true, false);   // destination: the workspace
+
+  // What is the source? Determines file (pull bytes) vs folder (server-side copy).
+  let meta = {};
+  try {
+    const mRes = await fetch('https://api.dropboxapi.com/2/files/get_metadata', { method: 'POST', headers: teamHeaders, body: JSON.stringify({ path: from }) });
+    if (!mRes.ok) { const txt = await mRes.text().catch(() => ''); return { result: 'Copy failed — cannot read "' + from + '" (' + mRes.status + '): ' + txt.slice(0, 300) }; }
+    meta = (await mRes.json().catch(() => ({}))) || {};
+  } catch (e) { return { result: 'Error reaching Dropbox: ' + (e && e.message || e) }; }
+
   if (meta['.tag'] === 'folder') {
+    const homeNs = _dbxCtx.homeNs || '';
+    const toPath = (_dbxCtx.teamRoot && homeNs) ? ('ns:' + homeNs + wr + '/' + rel) : (wr + '/' + rel);
+    let res;
+    try { res = await fetch('https://api.dropboxapi.com/2/files/copy_v2', { method: 'POST', headers: teamHeaders, body: JSON.stringify({ from_path: from, to_path: toPath, autorename: true }) }); }
+    catch (e) { return { result: 'Error reaching Dropbox: ' + (e && e.message || e) }; }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      return { result: 'Folder copy failed (' + res.status + '): ' + txt.slice(0, 400) + '\nYour workspace is in your own Dropbox, so copying a whole team folder across is not always possible — copy the individual files you need instead.' };
+    }
+    const fm = ((await res.json().catch(() => ({}))) || {}).metadata || {};
+    const finalRel = rel.replace(/[^/]+$/, fm.name || rel.split('/').pop());
     if (_dehydrated) {
       if (!_dbxIndex) _dbxIndex = {};
-      _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'folder', path: finalPath, cloudMtime: meta.server_modified };
+      _dbxIndex[finalRel] = { name: fm.name || finalRel.split('/').pop(), kind: 'folder', path: wr + '/' + finalRel, cloudMtime: fm.server_modified };
     }
     return { result: `Copied folder into your workspace as ${finalRel}/. Its files appear after the next sync; then use list_files / read_file on them.` };
   }
 
-  // Download the copied file into OPFS immediately so the LLM can work on it.
-  let dlOk = false;
+  // File: pull the bytes straight into OPFS.
+  const finalRel = rel;
   try {
-    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers, body: JSON.stringify({ path: finalPath }) });
-    if (tlRes.ok) {
-      const { link } = await tlRes.json();
-      const dl = await fetch(link, { method: 'GET' });
-      if (dl.ok) {
-        const bytes = new Uint8Array(await dl.arrayBuffer());
-        await opfsWriteBytes(finalRel, bytes);
-        dlOk = true;
+    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: teamHeaders, body: JSON.stringify({ path: from }) });
+    if (!tlRes.ok) { const txt = await tlRes.text().catch(() => ''); return { result: 'Copy failed — cannot download "' + from + '" (' + tlRes.status + '): ' + txt.slice(0, 300) }; }
+    const dl = await fetch((await tlRes.json()).link, { method: 'GET' });
+    if (!dl.ok) return { result: 'Copy failed — download returned ' + dl.status + '.' };
+    await opfsWriteBytes(finalRel, new Uint8Array(await dl.arrayBuffer()));
+  } catch (e) { return { result: 'Copy failed: ' + ((e && e.message) || e) }; }
 
-        // 1. Record in cloud index so it's known as synced (and push it to the pool)
-        if (_dehydrated) {
-          if (!_dbxIndex) _dbxIndex = {};
-          _dbxIndex[finalRel] = { name: meta.name || finalRel.split('/').pop(), kind: 'file', path: finalPath, size: meta.size, rev: meta.rev, cloudMtime: meta.server_modified };
-          _pyBroadcast({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt });
-        }
-
-        // 2. Notify the page (dropbox.js) so file viewer renders it
-        _reportHydrated(finalRel);
-
-        // 3. Sync the new file into every pool worker's MEMFS so run_python sees it
-        _pyBroadcast({ type: 'fs-changed', rel: finalRel });
-      }
-    }
-  } catch (e) {
-    console.warn('[sandpie-worker] copy_to_workspace download failed:', e);
-  }
-
-  let extra = dlOk
-    ? ' — downloaded and ready to use'
-    : ' (Dropbox copy succeeded, but download to workspace failed — will appear after next sync)';
-  return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''}${extra}. Use read_file or run_python on "${finalRel}".` };
+  // Deliberately NOT _reportHydrated(): that would record the file as an already-
+  // synced cloud copy. It's a brand-new local file with no sync state, which is
+  // exactly what makes the next sync upload it into the workspace.
+  _pyBroadcast({ type: 'fs-changed', rel: finalRel });   // run_python sees it now
+  return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
 const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent'];
