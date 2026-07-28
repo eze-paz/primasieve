@@ -8,22 +8,49 @@ self.addEventListener('fetch', (e) => {
   }
 });
 
+// Files under a dehydrated (on-demand) workspace exist in Dropbox but not in OPFS,
+// so reading straight from OPFS 404s — which breaks any artifact that fetches its
+// own sibling assets. The SW has no Dropbox credentials and shouldn't; instead it
+// asks a page client to fetch the file and then retries the read once.
+async function askClientToHydrate(rel) {
+  let clients = [];
+  try { clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' }); } catch (_) {}
+  if (!clients.length) return false;
+  return await new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    const timer = setTimeout(() => finish(false), 20000);   // never hang a fetch on an unresponsive page
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (ev) => { clearTimeout(timer); finish(!!(ev.data && ev.data.ok)); };
+      clients[0].postMessage({ type: 'sw-hydrate', rel }, [ch.port2]);
+    } catch (_) { clearTimeout(timer); finish(false); }
+  });
+}
+
 async function handleFiles(pathname, request) {
   const relPath = pathname.replace(/^\/files\//, '');
   const parts = relPath.split('/').map(s => {
     try { return decodeURIComponent(s); } catch (_) { return s; }
   });
   const fileName = parts.pop();
-  try {
+  const decodedRel = parts.concat([fileName]).filter(Boolean).join('/');
+
+  // Walk + read as one unit. When a whole folder is dehydrated the DIRECTORY is
+  // missing too, not just the file, so retrying only the file handle would never
+  // recover — the retry has to redo the walk.
+  const readLocal = async () => {
     const root = await navigator.storage.getDirectory();
     let dir = root;
-    const createDirs = request.method === 'PUT';
-    for (const p of parts) {
-      if (!p) continue;
-      dir = await dir.getDirectoryHandle(p, { create: createDirs });
-    }
+    for (const p of parts) { if (!p) continue; dir = await dir.getDirectoryHandle(p); }
+    return await (await dir.getFileHandle(fileName)).getFile();
+  };
 
+  try {
     if (request.method === 'PUT') {
+      const root = await navigator.storage.getDirectory();
+      let dir = root;
+      for (const p of parts) { if (!p) continue; dir = await dir.getDirectoryHandle(p, { create: true }); }
       const body = await request.text();
       const fh = await dir.getFileHandle(fileName, { create: true });
       const w = await fh.createWritable();
@@ -38,12 +65,17 @@ async function handleFiles(pathname, request) {
     }
 
     // GET
-    const fh = await dir.getFileHandle(fileName);
-    const blob = await fh.getFile();
-    const ct = contentType(fileName);
+    let blob;
+    try { blob = await readLocal(); }
+    catch (_) {
+      // Not local — it may simply be dehydrated. hydrateRel() consults the cloud
+      // index first, so a file that genuinely doesn't exist costs no network.
+      if (!(await askClientToHydrate(decodedRel))) throw new Error('not found');
+      blob = await readLocal();
+    }
     return new Response(blob, {
       headers: {
-        'Content-Type': ct,
+        'Content-Type': contentType(fileName),
         'Cross-Origin-Embedder-Policy': 'credentialless',
         'X-Sandpie-SW': '1',
       },

@@ -233,9 +233,14 @@
     try { return await api('/2/files/get_metadata', { path }, { team }); }
     catch (e) { if (/not_found|malformed_path/.test(String(e && e.message))) return null; throw e; }
   }
+  // Creating a folder that already exists answers 409, which the browser logs as a
+  // failed request even though we handle it — and on a re-share EVERY folder
+  // already exists, so the console fills with alarming noise on a working path.
+  // Ask first; only create when it is genuinely absent. Returns true if created.
   async function mkdirp(path) {
-    try { return await api('/2/files/create_folder_v2', { path, autorename: false }); }
-    catch (e) { if (/conflict/.test(String(e && e.message))) return null; throw e; }
+    if (await dbxMeta(path, false)) return false;
+    try { await api('/2/files/create_folder_v2', { path, autorename: false }); return true; }
+    catch (e) { if (/conflict/.test(String(e && e.message))) return false; throw e; }   // lost a race; fine
   }
 
   // ===========================================================================
@@ -800,6 +805,22 @@
     forgetFromStateAndIndex(rel);
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
+  // Fetch one dehydrated file into OPFS. Shared by the provider's hydrate() hook
+  // and the service worker's /files/ fault-in — both need exactly this, and a
+  // second copy would drift.
+  async function hydrateRel(rel) {
+    const r = String(rel).replace(/^\/+/, '');
+    if (!dehydrated() || isExemptRel(r)) return false;
+    const e = cloudIndex()[r];
+    if (!e || e.kind !== 'file') return false;      // unknown to the cloud index ⇒ genuinely absent, no request
+    if (await Sandpie.opfs.exists(r)) return true;
+    const bytes = await download(e.path || relToCloud(r));
+    await Sandpie.opfs.write(r, bytes);
+    // Record as a clean synced copy (same as worker-hydrated) so it's flushed
+    // on next boot and writes back if edited.
+    try { const st = syncState(); st[r] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(r) }; setSyncState(st); } catch (_) {}
+    return true;
+  }
   function pushDbxTokenToSW() {
     const worker = window._sandpieWorker;
     if (!worker) {
@@ -835,6 +856,19 @@
     pushDbxIndexToSW();
     navigator.serviceWorker.addEventListener('message', (ev) => {
       const d = ev.data; if (!d) return;
+      // The SW serves /files/ straight out of OPFS, so a dehydrated file 404s and
+      // an artifact fetching its own sibling assets breaks. It asks us to fetch the
+      // file first; we answer on the port it supplied and it retries the read.
+      if (d.type === 'sw-hydrate' && d.rel) {
+        const port = ev.ports && ev.ports[0];
+        (async () => {
+          let ok = false;
+          try { ok = await hydrateRel(d.rel); }
+          catch (e) { console.warn('[dropbox] sw hydrate failed:', d.rel, (e && e.message) || e); }
+          if (port) { try { port.postMessage({ ok }); } catch (_) {} }
+        })();
+        return;
+      }
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
         (async () => { if (!tokens()) return; for (const p of d.paths) { try { await del(relToCloud(p)); } catch {} } })();
         for (const p of d.paths) forgetFromStateAndIndex(p);
@@ -1262,22 +1296,22 @@
   async function shareFolderWith(path, emails, level) { return inviteToFolder(await shareFolderId(path), emails, level); }
   async function inviteToFolder(id, emails, level) {
     const want = (level === 'editor') ? 'editor' : 'viewer';
-    let members = null;   // fetched lazily; only needed when somebody is already on
+    // Read the membership FIRST rather than adding and handling the failure. On a
+    // re-share every recipient is already a member, so the add-then-recover shape
+    // meant a 409 per recipient every single time — the same call count, but the
+    // console read like the share had failed.
+    const members = await folderMembers(id);
     for (const email of (emails || [])) {
       const em = String(email);
-      try {
+      const cur = members[em.toLowerCase()];
+      if (!cur) {
         await shareApi('/2/sharing/add_folder_member', {
           shared_folder_id: id,
           members: [{ member: { '.tag': 'email', email: em }, access_level: { '.tag': want } }],
           quiet: true,   // no Dropbox notification email — the app is the notification
         });
         continue;
-      } catch (e) {
-        if (!/already_a_member|already_invited/i.test(String((e && e.message) || e))) throw e;
       }
-      // Already on the folder. Change their level only if it actually differs.
-      if (!members) members = await folderMembers(id);
-      const cur = members[em.toLowerCase()];
       if (!cur || cur.level === want || cur.level === 'owner') continue;
       if (!cur.invitee && cur.accountId) {
         // Joined members can be updated in place — but ONLY by dropbox_id;
@@ -1311,11 +1345,20 @@
   function sanitizeName(s) {
     return String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/[\x00-\x1f]/g, '').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 120) || 'shared';
   }
+  // `created` lets the caller skip probing a brand-new folder for a manifest that
+  // cannot be there yet — one less request that could only ever answer not_found.
   async function ensureOutboxFolder(displayName) {
     const path = OUTBOX_PARENT + '/' + sanitizeName(displayName);
-    await mkdirp(OUTBOX_PARENT);
-    await mkdirp(path);
-    return path;
+    // create_folder_v2 makes missing parents, so don't probe for the parent as
+    // well — that was a second guaranteed 409 on the first ever share.
+    let created;
+    try { created = await mkdirp(path); }
+    catch (e) {
+      if (!/not_found|malformed_path/i.test(String((e && e.message) || e))) throw e;
+      await mkdirp(OUTBOX_PARENT);
+      created = await mkdirp(path);
+    }
+    return { path, created };
   }
   // Stop sharing entirely — the package disappears for every recipient. Used when
   // the sender un-shares; leaves the sender's own files in place.
@@ -1430,19 +1473,7 @@
       isDehydrated: () => dehydrated(),
       cloudIndex: () => (dehydrated() ? cloudIndex() : null),
       isExempt: (rel) => isExemptRel(rel),
-      hydrate: async (rel) => {
-        const r = String(rel).replace(/^\/+/, '');
-        if (!dehydrated() || isExemptRel(r)) return false;
-        const e = cloudIndex()[r];
-        if (!e || e.kind !== 'file') return false;
-        if (await Sandpie.opfs.exists(r)) return true;
-        const bytes = await download(e.path || relToCloud(r));
-        await Sandpie.opfs.write(r, bytes);
-        // Record as a clean synced copy (same as worker-hydrated) so it's flushed
-        // on next boot and writes back if edited.
-        try { const st = syncState(); st[r] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(r) }; setSyncState(st); } catch (_) {}
-        return true;
-      },
+      hydrate: (rel) => hydrateRel(rel),
       // --- Sharing transport (sharing.js) -----------------------------------
       // Read/write arbitrary paths OUTSIDE the per-user workspace, using the same
       // authed API. `team: true` (the default for these, since sharing is

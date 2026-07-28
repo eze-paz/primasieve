@@ -200,7 +200,9 @@
     if (!canShare1to1()) { const st = localStore(LOCAL_HUB + '/_outbox/' + pkgId); st.invite = async () => {}; return st; }
     // A folder is shared where it lives; a single file gets a wrapper named after
     // the file, since Dropbox will not share a file on its own.
-    const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(fileName || pkgId);
+    let abs, freshFolder = false;
+    if (isFolder) abs = p.shareWorkspacePath(srcRel);
+    else { const box = await p.shareOutboxFolder(fileName || pkgId); abs = box.path; freshFolder = !!box.created; }
     let id;
     try { id = await p.shareEnsureFolder(abs); }
     catch (e) {
@@ -213,7 +215,7 @@
       throw e;
     }
     const st = cloudStore(abs, { team: false });   // the sender's own Dropbox = home namespace
-    st.shareId = id; st.live = isFolder; st.level = level;
+    st.shareId = id; st.live = isFolder; st.level = level; st.fresh = freshFolder;
     st.invite = async (emails) => {
       // ORDER MATTERS. Share the marker FILE first, then the folder.
       // add_file_member on a file the recipient can already reach through the
@@ -366,8 +368,36 @@
     const id = opts.id || slug(base);
 
     // collect the source file list (rel paths under the version dir)
-    const files = dir ? await listOpfs(src, '', []) : [base];
-    const readSrc = (rel) => dir ? O().readBytes(src + '/' + rel) : O().readBytes(src);
+    // A workspace file can be DEHYDRATED — present in Dropbox, absent from OPFS —
+    // which is the normal state for anything under sandpie/skills that isn't a
+    // SKILL.md. Copying a share needs the actual bytes, so fetch them back first.
+    // Without this the read returned nothing and the package shipped with a
+    // manifest and no file.
+    const readSourceBytes = async (rel) => {
+      try { const b = await O().readBytes(rel); if (b) return b; } catch (_) {}
+      const p = prov();
+      if (p && p.hydrate) {
+        try { if (await p.hydrate(rel)) return await O().readBytes(rel); }
+        catch (e) { console.warn('[sharing] could not fetch', rel, (e && e.message) || e); }
+      }
+      return null;
+    };
+    // listOpfs only sees what is local, so a folder with dehydrated files would be
+    // published incomplete. Union in whatever the cloud index knows under it.
+    const listSourceFiles = async () => {
+      const local = await listOpfs(src, '', []);
+      const p = prov(), idx = (p && p.cloudIndex && p.cloudIndex()) || null;
+      if (!idx) return local;
+      const seen = new Set(local), pre = src + '/';
+      for (const k of Object.keys(idx)) {
+        if (!k.startsWith(pre) || (idx[k] && idx[k].kind !== 'file')) continue;
+        const rel = k.slice(pre.length);
+        if (!seen.has(rel)) { seen.add(rel); local.push(rel); }
+      }
+      return local;
+    };
+    const files = dir ? await listSourceFiles() : [base];
+    const readSrc = (rel) => readSourceBytes(dir ? src + '/' + rel : src);
 
     const acl = { org: !!audience.org, users: (audience.users || []).map(String), teams: (audience.teams || []).map(String) };
     // pin target: explicit opts.pinFile (a rel path within the folder) wins; else the
@@ -387,7 +417,10 @@
       const store = teamHub(dept);
       const prev = await readManifest(store, id);
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
-      for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); }
+      const missed = [];
+      for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); else missed.push(rel); }
+      if (missed.length === files.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
+      if (missed.length) console.warn('[sharing] published without ' + missed.length + ' unreadable file(s):', missed);
       await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(mk(rev), null, 2));
       invalidateTeams();   // my own publish should appear now, not on the next slow scan
       dests.push(store.kind + ':' + store.root);
@@ -401,9 +434,16 @@
       let store;
       try { store = await outboundStore(src, dir, id, level, base); }
       catch (e) { throw new Error('Could not set up delivery to ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
-      const prev = (await readShareManifest(store)).manifest;
+      // A folder we just created cannot hold a manifest — don't ask.
+      const prev = store.fresh ? null : (await readShareManifest(store)).manifest;
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
-      if (!dir) { const bytes = await readSrc(base); if (bytes) await store.writeBytes(base, bytes); }
+      if (!dir) {
+        const bytes = await readSrc(base);
+        // Never publish a manifest with no file behind it — that reads as a
+        // successful share and delivers nothing.
+        if (!bytes) throw new Error('Could not read "' + base + '". It is not stored on this device and could not be fetched from Dropbox — open it once, then share again.');
+        await store.writeBytes(base, bytes);
+      }
       // Marker BEFORE members: the first thing a recipient does with a new share is
       // look for it, and a miss is remembered.
       await store.writeText(SHARE_MARKER, JSON.stringify(mk(rev), null, 2));
