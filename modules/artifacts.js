@@ -187,11 +187,17 @@ function renderArtifact(host, path) {
     openLink.title = 'Open in new tab';
     openLink.textContent = '↗';
     openLink.className = 'artifact-icon-btn';
+    // Point the anchor at the file's real /files/ URL (served out of OPFS by
+    // sw.js) as soon as the path resolves: a genuine href means the browser
+    // handles the click — middle-click, ctrl-click and "Copy link address" all
+    // work, and the new tab shows a readable URL instead of blob:…
+    Promise.resolve(resolvedP).then(rp => { if (rp) openLink.href = opfs.filesUrl(rp); });
     openLink.onclick = async (e) => {
+      if (opfs.filesUrlReady() && openLink.href && !openLink.href.endsWith('#')) return;   // let the real link through
       e.preventDefault();
       try {
         const url = await opfs.toUrl(await resolvedP);
-        const win = window.open(url, '_blank');
+        window.open(url, '_blank');
         // Revoke after a minute — enough for the new tab to finish loading.
         setTimeout(() => URL.revokeObjectURL(url), 60000);
       } catch (err) { console.error('[artifact] open in tab failed:', err); }
@@ -255,11 +261,8 @@ function renderArtifact(host, path) {
     const cb = wrap.querySelector('.artifact-collapse-btn');
     if (cb) cb.remove();
     wrap.appendChild(buildArtifactCard(clean, ext, async () => {
-      try {
-        const url = await opfs.toUrl(await resolvedP);
-        window.open(url, '_blank');
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } catch (e) { console.error('[artifact] open failed:', e); }
+      try { await opfs.openInNewTab(await resolvedP); }
+      catch (e) { console.error('[artifact] open failed:', e); }
     }));
     target.appendChild(wrap);
     return;

@@ -85,8 +85,15 @@
   // ↗ open-in-new-tab + ⬇ download, like the show_artifact buttons. getBlob()
   // returns the content to serve (a Blob/File; may be async) so it can reflect
   // live edits, and getName() the download filename.
-  function addOpenDownload(header, getBlob, getName) {
+  //   ↗ prefers the file's real /files/ URL (sw.js serves it out of OPFS) — a
+  // clean, reloadable, copy-pasteable address instead of blob:… . That serves
+  // the SAVED file, so a viewer with unsaved edits says so via hasUnsaved() and
+  // gets the blob URL, which is the only way to show content that isn't on disk.
+  function addOpenDownload(header, getBlob, getName, fullKey, hasUnsaved) {
     addHeaderButton(header, '↗', 'Open in new tab', async () => {
+      if (fullKey && opfs.filesUrlReady() && !(hasUnsaved && hasUnsaved())) {
+        window.open(filesUrl(fullKey), '_blank'); return;
+      }
       const b = await getBlob(); const url = URL.createObjectURL(b);
       window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000);
     });
@@ -98,7 +105,7 @@
   }
 
   // Encode each path segment for a /files/ URL; sw.js decodeURIComponent-s them back.
-  function filesUrl(fullKey) { return '/files/' + String(fullKey).split('/').filter(Boolean).map(encodeURIComponent).join('/'); }
+  const filesUrl = (fullKey) => opfs.filesUrl(fullKey);
 
   /* ════════════════════ text viewer/editor ══════════════════════════════ */
 
@@ -168,6 +175,7 @@
   // the latest (unsaved) content across modes so nothing is lost.
   function openHtmlModes(fullKey, name, initialHtml, header, body) {
     let html = initialHtml;
+    let savedHtml = initialHtml;   // last content written to OPFS — ↗ can use /files/ while it matches
     let active = null;       // { getHTML?, destroy? } of the current mode, if any
     let textSave = null;     // Text-mode Save button (removed on mode change)
 
@@ -186,7 +194,7 @@
     function showPage() {
       teardown(); modeSel.value = 'page'; body.style.padding = '0';
       if (window.SandpieHtmlEditor) {
-        active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; return opfs.write(fullKey, out); } });
+        active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; savedHtml = out; return opfs.write(fullKey, out); } });
       } else {
         body.innerHTML = loading('Editor module not loaded.');
       }
@@ -200,7 +208,7 @@
         + 'font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);';
       const save = async () => {
         textSave.textContent = 'Saving…'; textSave.disabled = true;
-        try { html = ta.value; await opfs.write(fullKey, html); textSave.textContent = 'Saved ✓'; }
+        try { html = ta.value; await opfs.write(fullKey, html); savedHtml = html; textSave.textContent = 'Saved ✓'; }
         catch (e) { textSave.textContent = 'Save failed'; console.error(e); }
         finally { setTimeout(() => { textSave.textContent = 'Save'; textSave.disabled = false; }, 1200); }
       };
@@ -234,8 +242,10 @@
     [['Editor', 'page'], ['Text', 'text'], ['Rendered', 'rendered']].forEach(([l, v]) => { const o = document.createElement('option'); o.textContent = l; o.value = v; modeSel.appendChild(o); });
     modeSel.onchange = () => ({ page: showPage, text: showText, rendered: showRendered }[modeSel.value] || showPage)();
     header.insertBefore(modeSel, header.firstElementChild.nextElementSibling);   // right after the title, not sandwiched among the icons
-    // ↗ / ⬇ serving the LIVE document (reflects unsaved edits in any mode)
-    addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name);
+    // ↗ / ⬇ serving the LIVE document (reflects unsaved edits in any mode). ↗ gets
+    // the clean /files/ URL whenever the doc on disk IS the live one.
+    addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name,
+      fullKey, () => currentHtml() !== savedHtml);
 
     showRendered();   // default (falls back to Editor/Text via the dropdown)
   }
@@ -273,7 +283,7 @@
     if (window.SandpieSharing) addHeaderButton(header, '🔗', 'Share', () => SandpieSharing.shareDialog(fullKey));
     // ↗ / ⬇ for every file. HTML serves live content via openHtmlModes; all
     // other types serve the original file bytes.
-    if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name);
+    if (ext !== 'html' && ext !== 'htm') addOpenDownload(header, () => file, () => name, fullKey);
 
     /* spreadsheet (xlsx / xls / csv) → viewer dropdown (default Univer) */
     if (SPREADSHEET_EXTS.has(ext)) {

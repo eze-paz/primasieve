@@ -2753,6 +2753,38 @@ opfs.readBytesHydrating = async function(path) {
 
 
 
+// ── clean, shareable URLs for OPFS files ────────────────────────────────────
+// sw.js serves /files/<path> straight out of OPFS (hydrating a cloud-only file
+// via a page round-trip), so anything we'd otherwise hand out as an opaque
+// blob: URL can be a real https://<host>/files/sandpie/artifacts/x.html instead:
+// readable, copy-pasteable, reloadable, and — being a real same-origin URL —
+// able to resolve its own sibling assets (../img/foo.png) through the SW too.
+// Each segment is encoded; sw.js decodeURIComponent-s them back.
+opfs.filesUrl = function(path) {
+  return '/files/' + String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+};
+
+// Only usable while sw.js is actually CONTROLLING this page — with no controller
+// a /files/ URL goes to the server, which knows nothing about OPFS and 404s. So
+// every caller keeps the blob: path as a fallback (first load before the SW
+// activates, a hard-reloaded page, an insecure context, SW registration failed).
+opfs.filesUrlReady = function() {
+  try { return !!(navigator.serviceWorker && navigator.serviceWorker.controller); }
+  catch (_) { return false; }
+};
+
+// Open an OPFS file in a new tab: the clean /files/ URL when the SW can serve
+// it, otherwise a blob: URL from the bytes. opts.blobUrl() overrides how the
+// fallback URL is built (used by the viewer, which serves unsaved edits).
+opfs.openInNewTab = async function(path, opts = {}) {
+  const clean = String(path).replace(/^\/+/, '');
+  if (opfs.filesUrlReady()) { window.open(opfs.filesUrl(clean), '_blank'); return true; }
+  const url = opts.blobUrl ? await opts.blobUrl() : await opfs.toUrl(clean);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return false;
+};
+
 opfs.toUrl = async function(path) {
 
 
@@ -3534,6 +3566,11 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
             action: async () => {
 
               try {
+
+                // Clean /files/ URL when the SW is live (it hydrates a cloud-only
+                // file itself); otherwise fall back to a blob URL, hydrating here.
+
+                if (opfs.filesUrlReady()) { window.open(opfs.filesUrl(it.fullKey), '_blank'); return; }
 
                 let url;
 
