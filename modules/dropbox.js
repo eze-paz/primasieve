@@ -46,9 +46,9 @@
   const PARENT_KEY = 'dbxfull-parent';
   const WSROOT_KEY = 'dbxfull-workspace-root';  // personal workspace root, home namespace (user override)
   const DEFAULT_WSROOT = '/sandpie';            // default personal workspace root
-  const TEAMPARENT_KEY = 'dbxfull-team-parent';         // team shared area (sharing hub lives here); user override
+  const TEAMPARENT_KEY = 'dbxfull-team-parent';         // team-folders root; user override
   const TEAMPARENT_RES = 'dbxfull-team-parent-server';  // cached GET /config dropboxParent (org default)
-  const DEFAULT_TEAM_PARENT = '/R+D+I/sandpie'; // fallback team shared area
+  const DEFAULT_TEAM_PARENT = '/IA';            // one folder per department underneath (IA/R+D+I, …)
   const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
   const AUTOCONN_TRIED  = 'dbxfull-autoconn-tried';   // sessionStorage: per-session auto-connect loop guard
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
@@ -138,7 +138,9 @@
   }
   // DeletedMetadata sometimes lacks path_display (only path_lower). Fallback so
   // deletion entries survive `cloudToRel` and actually remove items from index.
-  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified });
+  // sharingInfo carries no_access / traverse_only, which is how Dropbox tells us the
+  // user can see a folder exists but isn't a member — the basis of the team picker.
+  const mapEntry = e => ({ name: e.name, kind: e['.tag'], path: e.path_display || e.path_lower, size: e.size, rev: e.rev, hash: e.content_hash, cloudMtime: e.server_modified, sharingInfo: e.sharing_info || null });
   async function listFolder(folderPath, { recursive = false, team = false, ns = '' } = {}) {
     let data = await api('/2/files/list_folder', { path: folderPath === '/' ? '' : folderPath, recursive, include_deleted: true }, { team, ns });
     let entries = data.entries.slice();
@@ -246,9 +248,33 @@
   // '' on a non-team account: there is no team space, so sharing falls back to its
   // local simulation (see sharing.js cloudOn()/cloudParent()).
   function teamParent() {
-    if (!localStorage.getItem(NS_KEY)) return '';
     const cfg = localStorage.getItem(TEAMPARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT;
     return normPath(cfg, DEFAULT_TEAM_PARENT);
+  }
+  // The department folders under the team root that THIS user can actually reach.
+  // Dropbox already enforces cross-visibility: a department folder the user is not
+  // a member of either doesn't come back at all, or comes back flagged no_access /
+  // traverse_only. Filtering on those flags is what makes the share picker show
+  // only the teams they're allowed to see, without us maintaining any list.
+  //
+  // The root may live in the team space (a team folder) or be a plain shared folder
+  // mounted in the user's own Dropbox, so try the team path-root first and fall
+  // back to the home namespace.
+  async function listTeamFolders() {
+    const root = teamParent();
+    if (!root) return [];
+    const read = async (team) => {
+      try { return (await listFolder(root, { recursive: false, team })).entries; }
+      catch (e) { if (/not_found|malformed_path|no_permission|path_root/i.test(String((e && e.message) || e))) return null; throw e; }
+    };
+    let entries = await read(true), team = true;
+    if (entries === null) { entries = await read(false); team = false; }
+    if (entries === null) return [];
+    return entries
+      .filter(e => e.kind === 'folder')
+      .filter(e => { const si = e.sharingInfo || {}; return !si.no_access && !si.traverse_only; })
+      .map(e => ({ name: e.name, path: e.path, team }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
   // Where this user's workspace USED to live: <old team parent>/<email-local>, under
   // the team path-root. Only used to locate data for the one-time import; '' if we
@@ -974,7 +1000,7 @@
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Sync folder (in your own Dropbox)</label>
         <input id="dbxfullWsRoot" autocomplete="off" placeholder="${DEFAULT_WSROOT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Team shared folder (sharing only)</label>
+        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Team folders root (one folder per department)</label>
         <input id="dbxfullTeamParent" autocomplete="off" placeholder="${DEFAULT_TEAM_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
@@ -1434,7 +1460,8 @@
       // Each takes {team} (team-space root) or {ns} (an arbitrary namespace, e.g. a
       // shared_folder_id — reads someone's shared folder without mounting it).
       cloudConnected: () => !!tokens(),
-      cloudParent: () => teamParent(),
+      cloudParent: () => teamParent(),               // the team-folders ROOT, e.g. /IA
+      listTeamFolders: () => listTeamFolders(),      // departments this user may see
       async cloudUpload(absPath, bytes, { team = true, ns = '' } = {}) {
         const token = await accessToken();
         const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {

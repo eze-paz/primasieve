@@ -160,8 +160,26 @@
   // TEAM hub needs a team space; without one (cloudParent() === '') it falls back
   // to the local simulation, same as being offline. 1:1 does NOT need a team space
   // — it goes through the Dropbox sharing API instead.
-  function hubRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) ? (p.cloudParent() + '/shared-hub') : ''; }
-  function teamHub() { const h = hubRoot(); return h ? cloudStore(h, { team: true }) : localStore(LOCAL_HUB + '/_team'); }
+  // TEAM sharing is per DEPARTMENT. The team root (default /IA) holds one folder per
+  // department, and Dropbox's own membership decides which of them a user can see —
+  // so the share picker lists exactly the teams they're entitled to, and a package
+  // published to a department is visible only to that department. Each department
+  // carries its own hub at <root>/<dept>/shared-hub/packages/<id>/.
+  function teamRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) || ''; }
+  function hubRoot(dept) { const r = teamRoot(); return (r && dept) ? (r + '/' + dept + '/shared-hub') : ''; }
+  function teamHub(dept) { const h = hubRoot(dept); return h ? cloudStore(h, { team: true }) : localStore(LOCAL_HUB + '/_team' + (dept ? '/' + dept : '')); }
+  // Departments visible to this user, cached for the session — membership changes
+  // are rare and this is only used to populate a picker and to know which hubs to
+  // read. invalidateIncoming() clears it along with everything else.
+  let _teamsCache = null;
+  async function teams(force) {
+    if (_teamsCache && !force) return _teamsCache;
+    const p = prov();
+    if (!(cloudOn() && p && p.listTeamFolders)) return (_teamsCache = []);
+    try { _teamsCache = await p.listTeamFolders(); }
+    catch (e) { console.warn('[sharing] could not list team folders:', (e && e.message) || e); _teamsCache = _teamsCache || []; }
+    return _teamsCache;
+  }
   const canShare1to1 = () => { const p = prov(); return !!(cloudOn() && p && p.shareFolderWith); };
   // SENDER side. A folder is shared LIVE where it already sits; a single file has
   // to be wrapped, because Dropbox will not share a file. Returns the store to
@@ -258,7 +276,7 @@
     catch (e) { console.warn('[sharing] could not list deliveries:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
-  function invalidateIncoming() { _incomingCache = null; _catalogCache = null; _needsMount.clear(); }
+  function invalidateIncoming() { _incomingCache = null; _catalogCache = null; _teamsCache = null; _needsMount.clear(); }
   // One store per delivery, read BY NAMESPACE — nothing is mounted, so nothing
   // appears in the recipient's Dropbox. Paths are relative to the shared folder
   // itself, hence root ''. Every entry here is already known to be a package
@@ -348,9 +366,11 @@
     const dests = [], users = (audience.users || []).map(String);
     let rev = 1;
 
-    // ── TEAM: copy into the hub under packages/<id>/ (unchanged) ──
-    if (audience.org || (audience.teams && audience.teams.length)) {
-      const store = teamHub();
+    // ── TEAM: copy into the chosen DEPARTMENT's hub under packages/<id>/ ──
+    // Only that department can read it — Dropbox membership on <root>/<dept> is the
+    // boundary, so there is no cross-visibility to enforce ourselves.
+    for (const dept of (audience.teams || [])) {
+      const store = teamHub(dept);
       const prev = await readManifest(store, id);
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); }
@@ -395,7 +415,7 @@
   // ticks already call, so the cache never goes stale for longer than one tick.
   async function catalog(force) {
     if (_catalogCache && !force) return _catalogCache;
-    const who = me(), byId = {};
+    const byId = {};
     _lastProbe = [];
     for (const store of await incomingStores()) {
       const r = await readShareManifest(store);
@@ -415,7 +435,13 @@
       m._from = 'incoming'; m._sender = m.publisher || store.from; m._store = store; m._shareId = store.shareId;
       byId[m.id] = m;
     }
-    for (const m of await listManifests(teamHub())) if (!byId[m.id] && entitled(m, who)) { m._from = 'team'; byId[m.id] = m; }
+    // Every department hub this user can see. Dropbox membership on <root>/<dept>
+    // already decided that list, so anything readable here is theirs by definition —
+    // the manifest ACL is not consulted for team packages any more.
+    for (const t of await teams()) {
+      let ms = []; try { ms = await listManifests(teamHub(t.name)); } catch (e) { console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
+      for (const m of ms) { if (byId[m.id]) continue; m._from = 'team'; m._team = t.name; byId[m.id] = m; }
+    }
     _catalogCache = byId;
     return byId;
   }
@@ -498,7 +524,7 @@
     // `revs` is the per-file Dropbox rev map — how autoSync notices that a LIVE
     // shared folder changed without the manifest rev moving.
     const mp = dst + '/' + PKG_MARKER;
-    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', revs })], { type: 'application/json' }));
+    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', revs })], { type: 'application/json' }));
     markDirty(mp);
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
@@ -607,14 +633,20 @@
   async function uninstall(id) { await removeInstalledLocal(id); fire(); }
   // Team ✕ (publisher-gated in the UI) — UNSHARE: delete the package from the team hub
   // (gone for everyone), then drop the local auto-installed copy.
+  // Which department's hub a package came from — the catalog knows during a
+  // session, the installed marker knows across reloads.
+  async function teamOf(id) {
+    try { const cat = await catalog(); if (cat[id] && cat[id]._team) return cat[id]._team; } catch (_) {}
+    try { return (JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)) || {}).team || ''; } catch (_) { return ''; }
+  }
   async function unshareTeam(id) {
     try {
-      const p = prov();
-      if (cloudOn() && p && p.cloudDelete && p.cloudParent && p.cloudParent()) {
-        const abs = String(p.cloudParent() || '').replace(/\/+$/, '') + '/shared-hub/packages/' + id;
+      const p = prov(), dept = await teamOf(id), hub = hubRoot(dept);
+      if (cloudOn() && p && p.cloudDelete && hub) {
+        const abs = hub + '/packages/' + id;
         await p.cloudDelete(abs);
         console.log('[sharing] unshared team artifact from hub:', abs);
-      }
+      } else if (!hub) console.warn('[sharing] cannot unshare', id, '— unknown department');
     } catch (e) { console.warn('[sharing] unshare (hub delete) failed:', e); }
     await removeInstalledLocal(id);
     fire();
@@ -797,7 +829,7 @@
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, selfTest, selfTestCleanup, setAllowSelf, allowSelf, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, teams, teamRoot, hubRoot, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, selfTest, selfTestCleanup, setAllowSelf, allowSelf, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */
@@ -815,8 +847,11 @@
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
         // "Share with team" needs the team hub; without a team space it would
         // silently fall through to the local simulation, so default to 1:1 instead.
-        '<label class="share-opt"' + (hubRoot() ? '' : ' style="opacity:.45"') + '><input type="radio" name="aud" value="org"' + (hubRoot() ? ' checked' : ' disabled') + '> Share with team' + (hubRoot() ? '' : ' <span style="font-size:.75em">(no team folder configured)</span>') + '</label>' +
-        '<label class="share-opt"><input type="radio" name="aud" value="users"' + (hubRoot() ? '' : ' checked') + '> Specific people: <input class="share-in" data-k="users" placeholder="email, email…"></label>' +
+        // Team target = one of the department folders under the team root that this
+        // user is a member of. Populated async below; disabled until it resolves.
+        '<label class="share-opt"><input type="radio" name="aud" value="org" disabled> Share with team: ' +
+          '<select class="share-in" data-k="team" disabled><option value="">loading…</option></select></label>' +
+        '<label class="share-opt"><input type="radio" name="aud" value="users" checked> Specific people: <input class="share-in" data-k="users" placeholder="email, email…"></label>' +
         // Dropbox access level for the 1:1 share. Team-hub shares are copies into a
         // folder whose permissions the team already owns, so it does not apply there.
         '<div class="share-access"><label class="share-opt">They can: <select class="share-in" data-k="access">' +
@@ -841,6 +876,24 @@
     // Access level applies to 1:1 only, and "edit" on a LIVE folder share is real
     // write access to the sender's own workspace folder — say so plainly, because
     // it is not recoverable by unsharing after the fact.
+    // Fill the team picker from what Dropbox says this user can reach. If they are
+    // in no department folder, the option simply stays disabled — that is the
+    // cross-visibility rule doing its job, not an error.
+    const teamSel = back.querySelector('.share-in[data-k="team"]');
+    const orgRadio = back.querySelector('input[value="org"]');
+    teams().then(list => {
+      if (!teamSel.isConnected) return;
+      if (!list.length) {
+        teamSel.innerHTML = '<option value="">no team folders available to you</option>';
+        return;
+      }
+      teamSel.innerHTML = list.map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>').join('');
+      teamSel.disabled = false; orgRadio.disabled = false;
+    }).catch(() => { if (teamSel.isConnected) teamSel.innerHTML = '<option value="">could not load teams</option>'; });
+    // Picking a team should also select it as the audience — clicking the dropdown
+    // and then having it silently share 1:1 would be a nasty surprise.
+    teamSel.addEventListener('change', () => { if (teamSel.value) { orgRadio.checked = true; orgRadio.dispatchEvent(new Event('change')); } });
+
     const accessRow = back.querySelector('.share-access');
     const accessSel = back.querySelector('.share-in[data-k="access"]');
     const warnBox = back.querySelector('.share-warn');
@@ -858,9 +911,12 @@
     syncAccessUi();
     back.querySelector('[data-act="share"]').onclick = async () => {
       const sel = back.querySelector('input[name="aud"]:checked').value, audience = {};
-      if (sel === 'org') audience.org = true;
-      else audience.users = splitList(back.querySelector('.share-in[data-k="users"]').value);
       const msg = back.querySelector('.share-modal-msg');
+      if (sel === 'org') {
+        if (!teamSel.value) { msg.textContent = 'Pick a team to share with.'; return; }
+        audience.teams = [teamSel.value];
+      }
+      else audience.users = splitList(back.querySelector('.share-in[data-k="users"]').value);
       if (sel === 'users') {
         // The email IS the address now — a typo means the delivery silently goes
         // to a folder nobody will ever mount, so reject anything unaddressable.
@@ -882,7 +938,7 @@
           : (r.access === 'editor' ? ' with edit access' : ' (view only)')
             + (r.live ? '. This folder now stays in sync with them — your later edits and deletes reach them automatically.'
                       : '. They see it next time Sandpie is open.');
-        msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'the team' : audience.users.join(', '))
+        msg.textContent = 'Shared (v' + r.rev + ') → ' + (sel === 'org' ? 'the ' + teamSel.value + ' team' : audience.users.join(', '))
           + (pin ? ', pinned ' + (pinFile || 'file') : '') + tail;
         setTimeout(close, sel === 'users' ? 3600 : 1400);
       }
@@ -917,7 +973,7 @@
       }
       if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
       // Team artifacts: ✕ (unshare) only on ones I published; everyone else gets pin only.
-      if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team, m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
+      if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
     } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
   }
   // Every row action here is async and can take seconds (accept downloads the
