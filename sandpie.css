@@ -469,7 +469,7 @@
   .model-picker.open .mp-caret { transform: rotate(180deg); }
   /* position:fixed (JS sets bottom/left from the trigger rect) so the dropup escapes
      .input-wrap's overflow:hidden instead of being clipped above the composer. */
-  .mp-panel { display: none; position: fixed; min-width: 240px; max-width: 300px; max-height: 50vh; overflow-y: auto; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); z-index: 1000; padding: 0.3rem; }
+  .mp-panel { display: none; position: fixed; min-width: 200px; max-width: 300px; max-height: 50vh; overflow-y: auto; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); z-index: 1000; padding: 0.3rem; }
   .mp-panel.visible { display: block; }
   .mp-hdr { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-text-dim); padding: 0.3rem 0.5rem 0.2rem; }
   .mp-sep { height: 1px; background: var(--sp-border); margin: 0.35rem 0.3rem; }
@@ -477,14 +477,6 @@
   .mp-item:hover { background: var(--sp-panel); }
   .mp-item.active { background: var(--sp-accent-dim); }
   .mp-empty { padding: 0.4rem 0.5rem; font-size: 0.72rem; color: var(--sp-text-dim); }
-  /* Per-model thinking slider (API models only) — sits under the model's name. */
-  .mp-row { border-radius: 5px; }
-  .mp-row:hover { background: var(--sp-panel); }
-  .mp-row:hover .mp-item:hover { background: transparent; }
-  .mp-think { display: flex; align-items: center; gap: 0.4rem; padding: 0 0.5rem 0.35rem; }
-  .mp-think-lbl { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sp-text-dim); }
-  .mp-think-range { flex: 1; min-width: 60px; height: 0.75rem; margin: 0; accent-color: var(--sp-accent); cursor: pointer; }
-  .mp-think-val { font-size: 0.62rem; color: var(--sp-text-dim); min-width: 3.2rem; text-align: right; }
   .send-btn {
     margin-left: auto;
     width: 32px;
@@ -3030,6 +3022,10 @@ body.sp-decoding *::after {
    dims so the gap it will land in is obvious. The unpin ✕ is suppressed mid-drag —
    it sits under the cursor and inviting a mis-click there would be cruel. */
 .pin-tile { transition: transform .15s ease; }
+/* Never let a native image/text drag start here — it would fire the app's
+   "Drop files to attach" overlay and swallow the reorder gesture. */
+.pin-tile, .pin-tile * { -webkit-user-drag: none; user-drag: none; }
+.pin-thumb-img { pointer-events: none; }
 .pin-reordering .pin-tile { cursor: grabbing; }
 .pin-reordering .pin-tile-unpin { opacity: 0 !important; pointer-events: none; }
 .pin-tile.pin-dragging { opacity: 0.55; transform: scale(1.06); transition: none; }

@@ -229,6 +229,10 @@
     if (res.url) liveThumbUrls.push(res.url);
     const img = document.createElement('img');
     img.className = 'pin-thumb-img'; img.alt = '';
+    // An <img> is natively draggable, and Chromium puts 'Files' in the dataTransfer
+    // for one it can materialise — so pressing a thumbnail to reorder started a
+    // real file drag and raised the "Drop files to attach" overlay instead.
+    img.draggable = false;
     img.onload = () => { if (thumbEl.isConnected) { thumbEl.textContent = ''; thumbEl.appendChild(img); thumbEl.classList.add('has-thumb'); } };
     img.onerror = () => { if (res.url) { URL.revokeObjectURL(res.url); const i = liveThumbUrls.indexOf(res.url); if (i >= 0) liveThumbUrls.splice(i, 1); } };
     img.src = src;
@@ -360,6 +364,11 @@
     };
     grid.addEventListener('click', (e) => { if (suppressClick) { e.preventDefault(); e.stopPropagation(); } }, true);
 
+    // Belt and braces for the same problem: anything inside the grid that the
+    // browser considers draggable (a thumbnail, a selected label) must never start
+    // a native HTML5 drag. One suppressed dragstart covers every such element,
+    // including ones added later by the async thumbnailer.
+    grid.addEventListener('dragstart', (e) => { e.preventDefault(); e.stopPropagation(); });
     grid.addEventListener('pointerdown', (e) => {
       if (e.button != null && e.button !== 0) return;
       const t = e.target.closest ? e.target.closest('.pin-tile') : null;

@@ -97,9 +97,7 @@ const SandpieAccount = (() => {
         contextWindow: m.contextWindow,
         maxTokens: m.maxOutput,
         temperature: m.temperature,
-        // No reasoningEffort from the catalog: the thinking level is the user's
-        // own per-model choice (the composer picker's slider, persisted by
-        // providers.js). The server strips the field from /models too.
+        reasoningEffort: m.reasoningEffort,
       })), cat.defaultModel);
     } else {
       SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });
