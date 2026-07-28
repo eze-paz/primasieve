@@ -179,13 +179,19 @@
   // are rare and this is only used to populate a picker and to know which hubs to
   // read. invalidateIncoming() clears it along with everything else.
   let _teamsCache = null, _teamCatalog = null, _teamScanAt = 0;
+  // Did the last department listing / hub scan actually SUCCEED? Pruning keys on
+  // this. An empty result from a failed or not-yet-ready lookup looks identical to
+  // "you were removed from every department", and acting on it deletes installed
+  // packages and unpins them. At boot that is guaranteed: autoSync() runs before
+  // Dropbox has resolved its namespace, so the listing comes back empty.
+  let _teamsOk = false, _teamScanOk = false;
   const TEAM_SCAN_EVERY = 120000;
   async function teams(force) {
     if (_teamsCache && !force) return _teamsCache;
     const p = prov();
-    if (!(cloudOn() && p && p.listTeamFolders)) return (_teamsCache = []);
-    try { _teamsCache = (await p.listTeamFolders()).filter(t => hubRoot(t.name)); }
-    catch (e) { console.warn('[sharing] could not list team folders:', (e && e.message) || e); _teamsCache = _teamsCache || []; }
+    if (!(cloudOn() && p && p.listTeamFolders)) { _teamsOk = false; return (_teamsCache = []); }
+    try { _teamsCache = (await p.listTeamFolders()).filter(t => hubRoot(t.name)); _teamsOk = true; }
+    catch (e) { console.warn('[sharing] could not list team folders:', (e && e.message) || e); _teamsOk = false; _teamsCache = _teamsCache || []; }
     return _teamsCache;
   }
   const canShare1to1 = () => { const p = prov(); return !!(cloudOn() && p && p.shareFolderWith); };
@@ -337,10 +343,44 @@
   /* ── package IO over a store ──────────────────────────────────────────── */
   // TEAM hub layout: packages/<id>/manifest.json + files (many packages per store).
   async function readManifest(store, id) { const t = await store.readText('packages/' + id + '/manifest.json'); if (!t) return null; try { return JSON.parse(t); } catch (_) { return null; } }
-  async function listManifests(store) {
-    const ids = await store.listDirs('packages'); const out = [];
-    for (const id of ids) { const m = await readManifest(store, id); if (m) out.push({ ...m, _store: store }); }
+  // Run fn over items with at most n in flight. Round-trip latency dominates here,
+  // so serial vs 8-wide is the difference between half a minute and a second.
+  async function mapLimited(items, n, fn) {
+    const out = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(n, items.length) || 0 }, async () => {
+      while (i < items.length) { const k = i++; try { out[k] = await fn(items[k]); } catch (_) { out[k] = null; } }
+    }));
     return out;
+  }
+  // Per-hub manifest cache keyed by each manifest's Dropbox rev. Session-only, and
+  // the rev arrives in the listing we already have to make — so a scan where
+  // nothing changed costs exactly ONE request per department.
+  const _hubRev = new Map();   // hubRoot -> { id: rev }
+  const _hubMan = new Map();   // hubRoot -> { id: manifest }
+  async function listManifests(store) {
+    const key = store.root;
+    const prevRev = _hubRev.get(key) || {}, prevMan = _hubMan.get(key) || {};
+    // ONE recursive listing yields every manifest AND its rev. The previous version
+    // did a listDirs plus two round trips per package, strictly one after another —
+    // so a handful of departments with a few packages each took tens of seconds.
+    let entries = [];
+    try { entries = await store.listEntries('packages'); } catch (_) { return []; }
+    const revs = {}, ids = [], stale = [];
+    for (const e of entries) {
+      const m = /^([^/]+)\/manifest\.json$/.exec(e.rel);
+      if (!m) continue;
+      const id = m[1];
+      revs[id] = e.rev || '';
+      ids.push(id);
+      if (!(prevRev[id] === revs[id] && prevMan[id])) stale.push(id);
+    }
+    const fetched = await mapLimited(stale, 8, (id) => readManifest(store, id));
+    const mans = {};
+    for (const id of ids) if (prevMan[id]) mans[id] = prevMan[id];
+    stale.forEach((id, k) => { const m = fetched[k]; if (m && m.id) mans[id] = m; else delete mans[id]; });
+    _hubRev.set(key, revs); _hubMan.set(key, mans);
+    return ids.map(id => mans[id]).filter(Boolean).map(m => ({ ...m, _store: store }));
   }
   // 1:1 layout: the shared folder IS the package — marker at its root, files
   // alongside. Returns {manifest} | {missing:true} | {error}. The caller MUST only
@@ -501,12 +541,19 @@
     const dueTeam = (Date.now() - _teamScanAt) > TEAM_SCAN_EVERY;
     if (dueTeam || !_teamCatalog) {
       _teamScanAt = Date.now();
-      _teamCatalog = {};
-      for (const t of await teams()) {
-        if (!hubRoot(t.name)) continue;   // not a usable department (e.g. the hub dir itself)
-        let ms = []; try { ms = await listManifests(teamHub(t.name)); } catch (e) { console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
-        for (const m of ms) { m._from = 'team'; m._team = t.name; _teamCatalog[m.id] = m; }
-      }
+      const found = {};
+      const list = await teams();
+      let allRead = _teamsOk;
+      // Departments in PARALLEL. Serially, one slow hub delayed every other one and
+      // the whole home screen waited on the sum.
+      await Promise.all(list.map(async (t) => {
+        if (!hubRoot(t.name)) return;   // not a usable department (e.g. the hub dir itself)
+        try {
+          for (const m of await listManifests(teamHub(t.name))) { m._from = 'team'; m._team = t.name; found[m.id] = m; }
+        } catch (e) { allRead = false; console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
+      }));
+      _teamCatalog = found;
+      _teamScanOk = allRead;   // only a clean, complete scan may authorise pruning
     }
     for (const id in _teamCatalog) if (!byId[id]) byId[id] = _teamCatalog[id];
     _catalogCache = byId;
@@ -768,11 +815,17 @@
           changed = true;
         }
       }
-      let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
-      for (const id of dirs) {
-        if (teamIds.has(id)) continue;
-        let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
-        if (mk && mk.from === 'team') { await removeInstalledLocal(id); changed = true; }   // unshared from the hub → drop local
+      // Prune ONLY after a scan we can trust. removeInstalledLocal() deletes the
+      // package and unpins it, so acting on an empty-because-it-failed team list
+      // wipes the user's pinned team artifacts — which is exactly what made them
+      // vanish on reload and come back once the real scan landed.
+      if (_teamScanOk) {
+        let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
+        for (const id of dirs) {
+          if (teamIds.has(id)) continue;
+          let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+          if (mk && mk.from === 'team') { await removeInstalledLocal(id); changed = true; }   // unshared from the hub → drop local
+        }
       }
       if (changed) fire();
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
@@ -897,7 +950,7 @@
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
 
-  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, teams, teamRoot, hubRoot, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, liveChanged, diagnose, selfTest, selfTestCleanup, setAllowSelf, allowSelf, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
+  const Sharing = { me, setIdentity, catalog, subs, entitled, publish, pendingInvites, pendingMounts, acceptedList, accept, dismiss, acceptMount, declineMount, uninstall, unshareTeam, autoSync, subscribe, shareDialog, teamHub, teams, teamRoot, hubRoot, recipientHub, outboundStore, incomingShares, incomingStores, invalidateIncoming, invalidateTeams, liveChanged, diagnose, selfTest, selfTestCleanup, setAllowSelf, allowSelf, INSTALL_ROOT, LOCAL_HUB, SHARE_MARKER };
   window.SandpieSharing = Sharing;
 
   /* ── share dialog ─────────────────────────────────────────────────────── */

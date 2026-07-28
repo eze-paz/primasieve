@@ -335,9 +335,14 @@
       grid.classList.remove('pin-reordering');
       tile = null; dragging = false; moved = false;
     };
-    const begin = () => {
+    const begin = (pointerId) => {
       if (!tile || dragging) return;
       dragging = true;
+      // Capture only NOW, never on pointerdown. While the grid holds the capture,
+      // pointerdown and pointerup both target the grid, so the browser fires click
+      // on the grid instead of the tile's button — which silently killed opening a
+      // pinned file by clicking it.
+      if (pointerId != null) { try { grid.setPointerCapture(pointerId); } catch (_) {} }
       tile.classList.add('pin-dragging');
       grid.classList.add('pin-reordering');
     };
@@ -374,14 +379,14 @@
       const t = e.target.closest ? e.target.closest('.pin-tile') : null;
       if (!t || (e.target.closest && e.target.closest('.pin-tile-unpin'))) return;
       tile = t; startX = e.clientX; startY = e.clientY; moved = false;
-      try { grid.setPointerCapture(e.pointerId); } catch (_) {}
-      if (e.pointerType === 'touch') holdTimer = setTimeout(begin, TOUCH_HOLD);
+      // No pointer capture here — see begin(). A plain click must reach the tile.
+      if (e.pointerType === 'touch') { const id = e.pointerId; holdTimer = setTimeout(() => begin(id), TOUCH_HOLD); }
     });
     grid.addEventListener('pointermove', (e) => {
       if (!tile) return;
       if (Math.abs(e.clientX - startX) > DRAG_SLOP || Math.abs(e.clientY - startY) > DRAG_SLOP) {
         moved = true;
-        if (!dragging && e.pointerType !== 'touch') begin();
+        if (!dragging && e.pointerType !== 'touch') begin(e.pointerId);
         // A touch that moves before the hold elapses is a scroll, not a drag.
         if (!dragging && e.pointerType === 'touch') { clearTimeout(holdTimer); cleanup(); return; }
       }
