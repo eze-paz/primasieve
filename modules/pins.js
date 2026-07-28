@@ -96,6 +96,17 @@
     add(p) { const n = norm(p); if (n && cache.indexOf(n) === -1) persist(cache.concat(n)); return true; },
     remove(p) { const n = norm(p); persist(cache.filter(x => x !== n)); return false; },
     toggle(p) { return this.isPinned(p) ? this.remove(p) : this.add(p); },
+    // Reorder to exactly `order`. Only a PERMUTATION of what is already pinned is
+    // accepted — a drag that raced an unpin (or a stale DOM read) must not be able
+    // to drop or resurrect pins. Anything the caller missed keeps its place at the
+    // end rather than vanishing.
+    reorder(order) {
+      const want = uniqNorm(order).filter(p => cache.indexOf(p) !== -1);
+      const rest = cache.filter(p => want.indexOf(p) === -1);
+      const next = want.concat(rest);
+      if (same(next, cache)) return cache.slice();
+      return persist(next).slice();
+    },
     refresh() { return refreshFromDisk(); },
     subscribe(cb) {
       const h = (e) => cb((e && e.detail) || cache.slice());
@@ -236,6 +247,14 @@
       box.className = 'pinned-home';
       welcome.appendChild(box);   // after the title / taglines
     }
+    // The pin grid must sit ABOVE the shared/team lists. Both this and #sharedHome
+    // (sharing.js) just append to #welcome, so whichever painted first won — which
+    // is why the order looked random. Assert it on every render instead of relying
+    // on who got there first.
+    const shared = document.getElementById('sharedHome');
+    if (shared && (box.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_PRECEDING)) {
+      welcome.insertBefore(box, shared);
+    }
     const list = Pins.list();
     box.textContent = '';
     box.style.display = '';
@@ -287,9 +306,82 @@
       unpin.onclick = (e) => { e.stopPropagation(); Pins.remove(path); };
 
       tile.append(open, label, unpin);
+      tile.dataset.path = path;
       grid.appendChild(tile);
     }
     box.appendChild(grid);
+    wireReorder(grid);
+  }
+
+  /* ─────────────── drag to reorder ───────────────
+     Pointer Events rather than HTML5 drag-and-drop, because DnD does not fire on
+     touch and the grid is used on phones. Mouse starts dragging after a few pixels
+     of movement; touch requires a short hold first, so an ordinary swipe still
+     scrolls the page. While dragging we preventDefault on touchmove (needs a
+     non-passive listener) — that is what actually stops the scroll, since changing
+     touch-action mid-gesture has no effect. */
+  const DRAG_SLOP = 6;        // px before a mouse press counts as a drag
+  const TOUCH_HOLD = 220;     // ms to hold before a touch starts dragging
+  function wireReorder(grid) {
+    let tile = null, dragging = false, holdTimer = null, startX = 0, startY = 0, moved = false;
+
+    const cleanup = () => {
+      clearTimeout(holdTimer); holdTimer = null;
+      if (tile) tile.classList.remove('pin-dragging');
+      grid.classList.remove('pin-reordering');
+      tile = null; dragging = false; moved = false;
+    };
+    const begin = () => {
+      if (!tile || dragging) return;
+      dragging = true;
+      tile.classList.add('pin-dragging');
+      grid.classList.add('pin-reordering');
+    };
+    // Insert the dragged tile before or after whichever tile the pointer is over,
+    // picking the side by the midpoint so the swap feels like it follows the cursor.
+    const moveOver = (x, y) => {
+      const el = document.elementFromPoint(x, y);
+      const over = el && el.closest ? el.closest('.pin-tile') : null;
+      if (!over || over === tile || over.parentNode !== grid) return;
+      const r = over.getBoundingClientRect();
+      const after = (x - r.left) > r.width / 2;
+      grid.insertBefore(tile, after ? over.nextSibling : over);
+    };
+    // `click` fires AFTER pointerup, by which point cleanup() has reset state — so
+    // the suppression flag has to outlive it. Cleared on the next task.
+    let suppressClick = false;
+    const commit = () => {
+      if (dragging) {
+        const order = [...grid.querySelectorAll('.pin-tile')].map(t => t.dataset.path).filter(Boolean);
+        Pins.reorder(order);   // fires sandpie-pins-changed → renderHome repaints from the new order
+      }
+      if (moved) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 0); }
+      cleanup();
+    };
+    grid.addEventListener('click', (e) => { if (suppressClick) { e.preventDefault(); e.stopPropagation(); } }, true);
+
+    grid.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button !== 0) return;
+      const t = e.target.closest ? e.target.closest('.pin-tile') : null;
+      if (!t || (e.target.closest && e.target.closest('.pin-tile-unpin'))) return;
+      tile = t; startX = e.clientX; startY = e.clientY; moved = false;
+      try { grid.setPointerCapture(e.pointerId); } catch (_) {}
+      if (e.pointerType === 'touch') holdTimer = setTimeout(begin, TOUCH_HOLD);
+    });
+    grid.addEventListener('pointermove', (e) => {
+      if (!tile) return;
+      if (Math.abs(e.clientX - startX) > DRAG_SLOP || Math.abs(e.clientY - startY) > DRAG_SLOP) {
+        moved = true;
+        if (!dragging && e.pointerType !== 'touch') begin();
+        // A touch that moves before the hold elapses is a scroll, not a drag.
+        if (!dragging && e.pointerType === 'touch') { clearTimeout(holdTimer); cleanup(); return; }
+      }
+      if (dragging) moveOver(e.clientX, e.clientY);
+    });
+    // Non-passive: preventDefault here is what keeps the page still mid-drag.
+    grid.addEventListener('touchmove', (e) => { if (dragging) e.preventDefault(); }, { passive: false });
+    grid.addEventListener('pointerup', commit);
+    grid.addEventListener('pointercancel', cleanup);
   }
 
   function init() {

@@ -3026,6 +3026,15 @@ body.sp-decoding *::after {
 }
 .pin-tile:hover .pin-tile-unpin { opacity: 1; }
 .pin-tile-unpin:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
+/* drag to reorder. Tiles slide to their new slot; the one being dragged lifts and
+   dims so the gap it will land in is obvious. The unpin ✕ is suppressed mid-drag —
+   it sits under the cursor and inviting a mis-click there would be cruel. */
+.pin-tile { transition: transform .15s ease; }
+.pin-reordering .pin-tile { cursor: grabbing; }
+.pin-reordering .pin-tile-unpin { opacity: 0 !important; pointer-events: none; }
+.pin-tile.pin-dragging { opacity: 0.55; transform: scale(1.06); transition: none; }
+.pin-tile.pin-dragging .pin-thumb { box-shadow: 0 6px 18px rgba(0,0,0,0.28); }
+@media (prefers-reduced-motion: reduce) { .pin-tile { transition: none; } }
 /* empty pinned state — shown (instead of hiding) so a user with no pins still lands on something composed */
 .pin-empty { border: 1.5px dashed var(--sp-border); border-radius: 14px; padding: 1.35rem 1rem; text-align: center; max-width: 340px; margin: 0 auto; }
 .pin-empty-ghosts { display: flex; justify-content: center; gap: 0.55rem; margin-bottom: 0.85rem; }
