@@ -165,18 +165,26 @@
   // so the share picker lists exactly the teams they're entitled to, and a package
   // published to a department is visible only to that department. Each department
   // carries its own hub at <root>/<dept>/shared-hub/packages/<id>/.
+  const HUB_DIR = 'shared-hub';   // must match dropbox.js HUB_DIR
   function teamRoot() { const p = prov(); return (cloudOn() && p.cloudParent && p.cloudParent()) || ''; }
-  function hubRoot(dept) { const r = teamRoot(); return (r && dept) ? (r + '/' + dept + '/shared-hub') : ''; }
+  // A department named after the hub itself would build <root>/shared-hub/shared-hub
+  // — refuse rather than emit a listing for a path that cannot exist.
+  function hubRoot(dept) {
+    const r = teamRoot(), d = String(dept || '');
+    if (!r || !d || d.toLowerCase() === HUB_DIR) return '';
+    return r + '/' + d + '/' + HUB_DIR;
+  }
   function teamHub(dept) { const h = hubRoot(dept); return h ? cloudStore(h, { team: true }) : localStore(LOCAL_HUB + '/_team' + (dept ? '/' + dept : '')); }
   // Departments visible to this user, cached for the session — membership changes
   // are rare and this is only used to populate a picker and to know which hubs to
   // read. invalidateIncoming() clears it along with everything else.
-  let _teamsCache = null;
+  let _teamsCache = null, _teamCatalog = null, _teamScanAt = 0;
+  const TEAM_SCAN_EVERY = 120000;
   async function teams(force) {
     if (_teamsCache && !force) return _teamsCache;
     const p = prov();
     if (!(cloudOn() && p && p.listTeamFolders)) return (_teamsCache = []);
-    try { _teamsCache = await p.listTeamFolders(); }
+    try { _teamsCache = (await p.listTeamFolders()).filter(t => hubRoot(t.name)); }
     catch (e) { console.warn('[sharing] could not list team folders:', (e && e.message) || e); _teamsCache = _teamsCache || []; }
     return _teamsCache;
   }
@@ -278,7 +286,11 @@
     catch (e) { console.warn('[sharing] could not list deliveries:', (e && e.message) || e); _incomingCache = _incomingCache || []; }
     return _incomingCache;
   }
+  // _teamCatalog is NOT dropped here — it is on its own slower cadence (see
+  // TEAM_SCAN_EVERY). publish() and unshareTeam() reset it so their own change shows
+  // up at once rather than after the next scan.
   function invalidateIncoming() { _incomingCache = null; _catalogCache = null; _teamsCache = null; _needsMount.clear(); }
+  function invalidateTeams() { _teamsCache = null; _teamCatalog = null; _teamScanAt = 0; }
   // One store per delivery, read BY NAMESPACE — nothing is mounted, so nothing
   // appears in the recipient's Dropbox. Paths are relative to the shared folder
   // itself, hence root ''. Every entry here is already known to be a package
@@ -377,6 +389,7 @@
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); }
       await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(mk(rev), null, 2));
+      invalidateTeams();   // my own publish should appear now, not on the next slow scan
       dests.push(store.kind + ':' + store.root);
     }
 
@@ -440,10 +453,22 @@
     // Every department hub this user can see. Dropbox membership on <root>/<dept>
     // already decided that list, so anything readable here is theirs by definition —
     // the manifest ACL is not consulted for team packages any more.
-    for (const t of await teams()) {
-      let ms = []; try { ms = await listManifests(teamHub(t.name)); } catch (e) { console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
-      for (const m of ms) { if (byId[m.id]) continue; m._from = 'team'; m._team = t.name; byId[m.id] = m; }
+    //
+    // Scanned on a SLOWER cadence than 1:1: it costs a listing per department per
+    // pass, and team packages auto-install without an invite, so a couple of minutes
+    // of staleness costs nothing. 1:1 deliveries keep the 60s tick because someone
+    // is waiting on them.
+    const dueTeam = (Date.now() - _teamScanAt) > TEAM_SCAN_EVERY;
+    if (dueTeam || !_teamCatalog) {
+      _teamScanAt = Date.now();
+      _teamCatalog = {};
+      for (const t of await teams()) {
+        if (!hubRoot(t.name)) continue;   // not a usable department (e.g. the hub dir itself)
+        let ms = []; try { ms = await listManifests(teamHub(t.name)); } catch (e) { console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
+        for (const m of ms) { m._from = 'team'; m._team = t.name; _teamCatalog[m.id] = m; }
+      }
     }
+    for (const id in _teamCatalog) if (!byId[id]) byId[id] = _teamCatalog[id];
     _catalogCache = byId;
     return byId;
   }
@@ -650,6 +675,7 @@
         console.log('[sharing] unshared team artifact from hub:', abs);
       } else if (!hub) console.warn('[sharing] cannot unshare', id, '— unknown department');
     } catch (e) { console.warn('[sharing] unshare (hub delete) failed:', e); }
+    invalidateTeams();
     await removeInstalledLocal(id);
     fire();
   }

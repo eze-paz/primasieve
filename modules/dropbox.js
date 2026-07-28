@@ -52,6 +52,8 @@
   const DEFAULT_WSROOT = '/sandpie';            // personal workspace, in the user's own Dropbox
   const DEFAULT_TEAM_PARENT = '/IA';            // team-folders root; one folder per department (IA/R+D+I, …)
   const LEGACY_TEAM_PARENT = '/R+D+I/sandpie';  // where workspaces lived before the move to personal folders
+  const HUB_DIR = 'shared-hub';                 // per-department hub dir name (lowercase; must match sharing.js)
+  const MAX_TEAM_FOLDERS = 50;                  // sanity bound on a misconfigured team root
   const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
   const AUTOCONN_TRIED  = 'dbxfull-autoconn-tried';   // sessionStorage: per-session auto-connect loop guard
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
@@ -270,11 +272,24 @@
     let entries = await read(true), team = true;
     if (entries === null) { entries = await read(false); team = false; }
     if (entries === null) return [];
-    return entries
+    const out = entries
       .filter(e => e.kind === 'folder')
+      // Never treat our own hub as a department. A root that already contains a
+      // shared-hub (an older layout, or a root pointed one level too deep) would
+      // otherwise yield <root>/shared-hub/shared-hub and a listing per pass for a
+      // path that cannot exist.
+      .filter(e => String(e.name || '').toLowerCase() !== HUB_DIR)
       .filter(e => { const si = e.sharingInfo || {}; return !si.no_access && !si.traverse_only; })
       .map(e => ({ name: e.name, path: e.path, team }))
       .sort((a, b) => a.name.localeCompare(b.name));
+    // A correctly pointed root holds a handful of departments. Many more means it
+    // is aimed at something else — every extra entry costs a listing per poll tick,
+    // which is how the sharing calls get rate-limited out.
+    if (out.length > MAX_TEAM_FOLDERS) {
+      console.warn('[dropbox] team root ' + root + ' has ' + out.length + ' subfolders — is it pointing at the department root? Using the first ' + MAX_TEAM_FOLDERS + '.');
+      return out.slice(0, MAX_TEAM_FOLDERS);
+    }
+    return out;
   }
   // Where this user's workspace USED to live: <old team parent>/<email-local>, under
   // the team path-root. Only used to locate data for the one-time import; '' if we
