@@ -109,6 +109,19 @@ async function convLocation(id) {
   return { archived: false, format: null };
 }
 
+// Just the metadata object, whichever format the conversation is stored in — no
+// messages read (a legacy .json carries both, the new format keeps meta tiny).
+// null when the conversation isn't on disk yet or the file is unreadable.
+async function readConvMeta(id) {
+  const loc = await convLocation(id);
+  if (!loc.format) return null;
+  const p = loc.format === 'new' ? metaPath(id, loc.archived) : convPath(id, loc.archived);
+  try { return JSON.parse(await opfs.read(p)); } catch (_) { return null; }
+}
+// The conversation's stored title ('' when unknown) — for callers that only need
+// the name, e.g. the completion notification.
+async function convTitle(id) { const m = await readConvMeta(id); return (m && m.title) || ''; }
+
 // Unified loader → { id, title, updated, pinned, archived, compaction, todos,
 // usage, messages, _format } or null. Callers don't care about on-disk format.
 async function readConvData(id) {
@@ -254,6 +267,11 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   // Keep the stable cache key across saves; otherwise the first save after
   // ensureSessionId() rewrites meta and would drop session_id.
   if (prevMeta && prevMeta.session_id) meta.session_id = prevMeta.session_id;
+  // Same reason: meta is rebuilt from scratch here, so the "this title is real,
+  // don't auto-title over it" flag (set by renameConv / maybeAutoTitle) has to be
+  // carried forward — otherwise every save would make the conversation eligible
+  // for auto-titling again.
+  if (prevMeta && prevMeta.titleLocked) meta.titleLocked = true;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -800,7 +818,9 @@ async function renameConv(id, current) {
   if (next == null) return;
   const trimmed = next.trim();
   if (!trimmed || trimmed === current) return;
-  await updateConvFile(id, { title: trimmed });
+  // titleLocked: a title the user typed is final — auto-titling must never
+  // overwrite it, however the conversation is used later.
+  await updateConvFile(id, { title: trimmed, titleLocked: true });
   await refreshConversationList();
 }
 async function togglePinConv(id, currentlyPinned) {
@@ -1637,10 +1657,16 @@ async function sendSingle(text, stream, opts = {}) {
     flushIncrementalSave(convId);
     await saveConv(convId);
 
+    // Name the conversation from its opening exchange, if it's still carrying the
+    // derived placeholder title. Awaited (the UI was released above, so this costs
+    // no visible latency) so the new title is on disk before the sync below —
+    // one write, one sync — and before the notification reads it.
+    const _newTitle = await maybeAutoTitle(convId);
+
     // Optional capability: notifications.js (if loaded) listens for this and
     // fires a system toast. No listener ⇒ no-op. saveConv ran first so the
     // listener can read the canonical (possibly renamed) conv title.
-    Sandpie.events.emit('generation:complete', { convId, aborted: wasAborted });
+    Sandpie.events.emit('generation:complete', { convId, aborted: wasAborted, title: _newTitle || undefined });
     try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
@@ -3166,6 +3192,86 @@ async function maybeAutoCompact(convId) {
     return { triggered: true, ok: false, reason: (e && e.message) || String(e) };
   }
 }
+/* ---- automatic conversation titles -------------------------------------- */
+// A conversation's stored title starts life as _deriveTitle() — the first user
+// message clipped to 60 chars — which reads as a truncated sentence in the
+// sidebar. Once an opening exchange exists, ask the model for a real one
+// (auto-title.js owns the prompt, the budget and the call) and lock it in.
+//
+// Eligibility is a property of the STORED TITLE, not of the turn number: a title
+// is replaceable while it is still the derived placeholder and nothing has locked
+// it. So a failed attempt (offline, empty answer) simply retries on the next turn,
+// and a conversation that predates this feature gets named the next time it's
+// used — while a hand-typed title (renameConv sets titleLocked, and saveConv
+// carries it forward) is never touched. force:true ignores all of that, for
+// `>>> retitle`.
+const _titling = new Set();
+async function maybeAutoTitle(convId, { force = false } = {}) {
+  if (!convId || _titling.has(convId)) return '';
+  if (typeof SandpieAutoTitle === 'undefined' || !SandpieAutoTitle.generate) return '';
+  if (!force && !SandpieAutoTitle.isEnabled()) return '';
+  _titling.add(convId);
+  try {
+    // Warm stream or cold conv on disk — same resolver the compactor uses.
+    const res = await _resolveConvForCompaction(convId);
+    const msgs = (res && res.msgs) || [];
+    const firstUser = msgs.find(m => m.role === 'user' && _convText(m.content).trim());
+    if (!firstUser) return '';               // nothing to name it after
+    const meta = await readConvMeta(convId);
+    if (!meta) return '';                    // not persisted yet — nothing to patch
+    const stored = meta.title || '';
+    if (!force) {
+      if (meta.titleLocked) return '';
+      // A title that isn't the derived placeholder was set deliberately — by a
+      // rename made before titleLocked existed, or by a previous auto-title.
+      if (stored && stored !== _deriveTitle(msgs)) return '';
+    }
+    const firstAsst = msgs.find(m => m.role === 'assistant' && _convText(m.content).trim());
+    const title = await SandpieAutoTitle.generate({
+      userText: _convText(firstUser.content),
+      assistantText: firstAsst ? _convText(firstAsst.content) : '',
+    });
+    if (!title || title === stored) return '';
+    await updateConvFile(convId, { title, titleLocked: true });
+    await refreshConversationList();
+    return title;
+  } catch (e) {
+    // Best-effort: the conversation keeps its derived title and stays eligible.
+    console.warn('[sandpie] auto-title failed:', e);
+    return '';
+  } finally {
+    _titling.delete(convId);
+  }
+}
+/* ---- command registration: retitle -------------------------------------- */
+function registerRetitleCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'retitle',
+    module: 'core',
+    help: 'Regenerate a conversation title from its opening exchange, ignoring the usual "only if untouched" rule (and even when auto-titling is off). Defaults to the active conversation; pass a conversation file name/id/title to retitle another.',
+    usage: '>>> retitle [conversation]',
+    async run(text, parts) {
+      if (typeof SandpieAutoTitle === 'undefined') return 'Auto-titling is not available.';
+      let targetId = null;
+      for (const p of parts.slice(1)) {
+        if (targetId != null) continue;
+        const rid = await _resolveConvArg(p);
+        if (!rid) return `No conversation matched "${p}". Pass the file name, id, or exact title.`;
+        targetId = rid;
+      }
+      const convId = targetId || activeConvId;
+      if (!convId) return 'No active conversation to retitle — pass a conversation file name.';
+      if (_titling.has(convId)) return 'A title is already being generated for that conversation — try again in a moment.';
+      const before = await convTitle(convId);
+      const title = await maybeAutoTitle(convId, { force: true });
+      if (!title) return 'Could not generate a title — the model returned nothing usable (the current title is unchanged).';
+      return `Retitled: "${before}" → "${title}"`;
+    }
+  });
+}
+registerRetitleCommand();
+
 /* ---- command registration: compact ------------------------------------- */
 // Manually force a compaction NOW, at any context %, ignoring the auto trigger
 // (and even when auto-compaction is disabled). Optional arg overrides keepTail.
@@ -3621,7 +3727,9 @@ window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
 // buildSystemPrompt exposed so Loop Lab can inject the app's full system prompt
 // (memories, lessons, skills index) into its harness-loop agents — read-only.
-window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, buildSystemPrompt };
+// getTitle/autoTitle are read/write access to a conversation's name for modules
+// that only need that (notifications.js reads it for the toast body).
+window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, buildSystemPrompt, getTitle: convTitle, autoTitle: maybeAutoTitle };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;

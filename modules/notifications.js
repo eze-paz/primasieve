@@ -118,19 +118,24 @@ const SandpieNotifications = (function() {
    * already looking at sandpie — they don't need a system toast for
    * something happening on screen in front of them).
    *
-   * Reads the canonical title from the conv JSON (so renames are
-   * reflected) — the caller must have just saved the conv.
+   * Title comes from the generation:complete payload when the emitter knows it
+   * (it has just saved the conv, so it's canonical — including a title generated
+   * by auto-title.js on this very turn). Otherwise ask conversations.js, which
+   * knows both on-disk formats; the direct read of the legacy monolithic conv
+   * JSON is the last resort, for pages without that module.
    *
    * @param {string} convId
+   * @param {string} [knownTitle]
    */
-  async function notifyComplete(convId) {
+  async function notifyComplete(convId, knownTitle) {
     if (!effectivelyOn()) return;
     if (!document.hidden) return;
     let title = 'Conversation complete';
-    try {
-      // Pull canonical title from the just-saved conv JSON.
-      const data = JSON.parse(await opfs.read(convPath(convId)));
-      if (data && data.title) title = data.title;
+    if (knownTitle && String(knownTitle).trim()) title = String(knownTitle).trim();
+    else try {
+      const getTitle = window.SandpieConversations && SandpieConversations.getTitle;
+      const t = getTitle ? await getTitle(convId) : (JSON.parse(await opfs.read(convPath(convId))) || {}).title;
+      if (t) title = t;
     } catch (e) {
       console.warn('[sandpie] notify: title read failed:', e);
     }
@@ -161,7 +166,7 @@ const SandpieNotifications = (function() {
     if (_wired || !(window.Sandpie && window.Sandpie.events)) return;
     _wired = true;
     Sandpie.events.on('generation:complete', (p) => {
-      if (p && !p.aborted) notifyComplete(p.convId);
+      if (p && !p.aborted) notifyComplete(p.convId, p.title);
     });
   }
 
