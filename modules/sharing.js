@@ -187,10 +187,12 @@
   // Shares the folder but does NOT invite anyone yet — publish() writes the marker
   // first and calls store.invite() afterwards. Inviting first opens a window where
   // the recipient sees a markerless share and concludes it isn't a package.
-  async function outboundStore(srcRel, isFolder, pkgId, level) {
+  async function outboundStore(srcRel, isFolder, pkgId, level, fileName) {
     const p = prov();
     if (!canShare1to1()) { const st = localStore(LOCAL_HUB + '/_outbox/' + pkgId); st.invite = async () => {}; return st; }
-    const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(pkgId);
+    // A folder is shared where it lives; a single file gets a wrapper named after
+    // the file, since Dropbox will not share a file on its own.
+    const abs = isFolder ? p.shareWorkspacePath(srcRel) : await p.shareOutboxFolder(fileName || pkgId);
     let id;
     try { id = await p.shareEnsureFolder(abs); }
     catch (e) {
@@ -384,7 +386,7 @@
     // because Dropbox refuses to share a file.
     if (users.length) {
       let store;
-      try { store = await outboundStore(src, dir, id, level); }
+      try { store = await outboundStore(src, dir, id, level, base); }
       catch (e) { throw new Error('Could not set up delivery to ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
       const prev = (await readShareManifest(store)).manifest;
       rev = (prev ? parseInt(prev.rev, 10) || 0 : 0) + 1;

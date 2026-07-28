@@ -44,11 +44,14 @@
   // with <email-local> appended. Still read — by legacyTeamRoot(), to locate the
   // old workspace for the one-time import — but no longer drives the sync target.
   const PARENT_KEY = 'dbxfull-parent';
-  const WSROOT_KEY = 'dbxfull-workspace-root';  // personal workspace root, home namespace (user override)
-  const DEFAULT_WSROOT = '/sandpie';            // default personal workspace root
-  const TEAMPARENT_KEY = 'dbxfull-team-parent';         // team-folders root; user override
-  const TEAMPARENT_RES = 'dbxfull-team-parent-server';  // cached GET /config dropboxParent (org default)
-  const DEFAULT_TEAM_PARENT = '/IA';            // one folder per department underneath (IA/R+D+I, …)
+  // ---- FIXED LAYOUT. Deliberately not configurable ------------------------
+  // Both roots are part of the org's agreed structure, not a per-user preference:
+  // a workspace somewhere unexpected is invisible to nobody but its owner, and a
+  // mistyped team root silently detaches someone from every department hub. Change
+  // them here, not in the UI.
+  const DEFAULT_WSROOT = '/sandpie';            // personal workspace, in the user's own Dropbox
+  const DEFAULT_TEAM_PARENT = '/IA';            // team-folders root; one folder per department (IA/R+D+I, …)
+  const LEGACY_TEAM_PARENT = '/R+D+I/sandpie';  // where workspaces lived before the move to personal folders
   const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
   const AUTOCONN_TRIED  = 'dbxfull-autoconn-tried';   // sessionStorage: per-session auto-connect loop guard
   const NS_KEY     = 'dbxfull-pathroot';        // team-space root namespace id ('' when root === home)
@@ -247,10 +250,7 @@
   // team-space root namespace (`team: true`), independent of the personal workspace.
   // '' on a non-team account: there is no team space, so sharing falls back to its
   // local simulation (see sharing.js cloudOn()/cloudParent()).
-  function teamParent() {
-    const cfg = localStorage.getItem(TEAMPARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT;
-    return normPath(cfg, DEFAULT_TEAM_PARENT);
-  }
+  function teamParent() { return DEFAULT_TEAM_PARENT; }
   // The department folders under the team root that THIS user can actually reach.
   // Dropbox already enforces cross-visibility: a department folder the user is not
   // a member of either doesn't come back at all, or comes back flagged no_access /
@@ -282,7 +282,7 @@
   function legacyTeamRoot() {
     const email = localStorage.getItem(EMAIL_KEY);
     if (!email) return '';
-    const parent = normPath(localStorage.getItem(PARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT, DEFAULT_TEAM_PARENT);
+    const parent = normPath(localStorage.getItem(PARENT_KEY) || LEGACY_TEAM_PARENT, LEGACY_TEAM_PARENT);
     return parent + '/' + sanitizeSeg(String(email).split('@')[0]);
   }
   async function ensureWorkingRoot() {
@@ -306,13 +306,9 @@
       localStorage.setItem(NS_VER_KEY, NS_DETECT_VER);
       console.info('[dropbox] workspace → home namespace ' + (ri.home_namespace_id || '(default)') + '; team root ' + (ns || '(none)'));
     }
-    // Cache the deployment's team parent (GET /config dropboxParent) so teamParent()
-    // — which is called synchronously all over — can see the org default. It now
-    // configures the SHARING hub only; the workspace root is always personal.
-    try { const sp = await serverParent(); if (sp) localStorage.setItem(TEAMPARENT_RES, normPath(sp, DEFAULT_TEAM_PARENT)); } catch (_) {}
     // Workspace = /sandpie in the user's own Dropbox. No <email> subfolder: the home
-    // namespace is already per-user. Overridable in the Cloud sync section.
-    const root = normPath(localStorage.getItem(WSROOT_KEY) || DEFAULT_WSROOT, DEFAULT_WSROOT);
+    // namespace is already per-user, and the path is fixed (see DEFAULT_WSROOT).
+    const root = DEFAULT_WSROOT;
     // Relocate guard. The sync target is (namespace + path): the SAME path string
     // resolves to DIFFERENT folders under different path-roots (home namespace vs
     // team space), so the namespace MUST be part of the signature — otherwise
@@ -862,21 +858,20 @@
   // The key is a PUBLIC PKCE client_id, not a secret. null = not fetched yet;
   // '' = no server / unset → fall back to the user-entered or saved key. Cached.
   let _serverAppKey = null;
-  let _serverParent = null;
-  // Fetch GET /config once and cache what the deployment provides: the Dropbox
-  // app key AND the default sync parent (see app.js). Both non-secret. Lets the
-  // panel one-click connect and inherit the org sync root instead of hardcoding it.
+
+  // Fetch GET /config once for the deployment's Dropbox app key (non-secret) so the
+  // panel can one-click connect. The folder layout is NOT taken from here any more:
+  // both roots are fixed constants, so a stale server value cannot detach a user
+  // from their workspace or from the department hubs.
   async function loadServerConfig() {
     if (_serverAppKey !== null) return;
     try {
       const res = await fetch('/config', { headers: { Accept: 'application/json' } });
       const cfg = res.ok ? ((await res.json()) || {}) : {};
       _serverAppKey = cfg.dropboxAppKey || '';
-      _serverParent = cfg.dropboxParent || '';
-    } catch { _serverAppKey = ''; _serverParent = ''; }
+    } catch { _serverAppKey = ''; }
   }
   async function serverAppKey() { await loadServerConfig(); return _serverAppKey; }
-  async function serverParent() { await loadServerConfig(); return _serverParent; }
   function saveConfig() {
     const el = document.getElementById('dbxfullAppKey');
     if (el) localStorage.setItem(APPKEY_CFG, el.value || '');
@@ -900,9 +895,8 @@
     // Explicit disconnect opts out of auto-connect (see maybeAutoConnect) so a
     // managed-login user who disconnects isn't silently reconnected on reload.
     localStorage.setItem(AUTOCONN_OPTOUT, '1');
-    // Keep WSROOT_KEY / TEAMPARENT_KEY / PARENT_KEY + APPKEY_CFG so a reconnect
-    // reuses the configured folders and key (PARENT_KEY also still locates the
-    // legacy team workspace if the import hasn't happened yet).
+    // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the key, and so PARENT_KEY
+    // can still locate the legacy team workspace if the import hasn't happened yet.
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
     [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, HOMENS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
     dbxStatus('Not connected', 'disconnected');
@@ -998,10 +992,6 @@
           <span id="dbxfullAccount" style="font-size:0.7rem; color:var(--sp-text-dim); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:55%;"></span>
         </div>
         <input id="dbxfullAppKey" autocomplete="off" placeholder="Dropbox app key (Full Dropbox access)" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Sync folder (in your own Dropbox)</label>
-        <input id="dbxfullWsRoot" autocomplete="off" placeholder="${DEFAULT_WSROOT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
-        <label style="display:block; font-size:0.7rem; color:var(--sp-text-dim); margin:0 0 0.25rem 0.1rem;">Team folders root (one folder per department)</label>
-        <input id="dbxfullTeamParent" autocomplete="off" placeholder="${DEFAULT_TEAM_PARENT}" style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <button class="ghost" id="dbxfullToggleBtn" style="width:100%;">Connect</button>
         <div id="dbxfullRoot" style="font-size:0.65rem; color:var(--sp-text-dim); margin-top:0.4rem;"></div>
 
@@ -1015,25 +1005,6 @@
       // No key of their own → pre-fill the deployment's company key (if any) so
       // Connect is one click. Async; only fill if the user hasn't typed since.
       if (!existing) serverAppKey().then(k => { if (k && !input.value) input.value = k; });
-    }
-    const wsRoot = body.querySelector('#dbxfullWsRoot');
-    if (wsRoot) {
-      wsRoot.value = localStorage.getItem(WSROOT_KEY) || DEFAULT_WSROOT;
-      // Commit on blur/Enter (not each keystroke) so a half-typed path never syncs.
-      // ensureWorkingRoot() picks the new value up on the next cycle; the changed
-      // target signature resets sync state there, so nothing is deleted remotely.
-      wsRoot.addEventListener('change', () => {
-        localStorage.setItem(WSROOT_KEY, normPath(wsRoot.value, DEFAULT_WSROOT));
-        ensureWorkingRoot().catch(() => {}).then(renderCloudState);
-      });
-    }
-    const teamP = body.querySelector('#dbxfullTeamParent');
-    if (teamP) {
-      teamP.value = localStorage.getItem(TEAMPARENT_KEY) || localStorage.getItem(TEAMPARENT_RES) || DEFAULT_TEAM_PARENT;
-      teamP.addEventListener('change', () => {
-        localStorage.setItem(TEAMPARENT_KEY, normPath(teamP.value, DEFAULT_TEAM_PARENT));
-        renderCloudState();
-      });
     }
     body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
     renderCloudState();   // paint the live connection state on (re)render — the fix
@@ -1316,9 +1287,17 @@
     }
     return { id, level: want };
   }
-  // Outbox wrapper for a SINGLE FILE, which Dropbox refuses to share directly.
-  async function ensureOutboxFolder(id) {
-    const path = OUTBOX_PARENT + '/' + sanitizeSeg(id);
+  // Outbox wrapper for a SINGLE FILE, which Dropbox refuses to share directly
+  // (SharePathError.is_file). Named after the FILE, extension and all, because in
+  // the mount fallback this folder is what shows up in the recipient's Dropbox —
+  // "report.html" tells them what they got; the slugged package id would not.
+  // Keeps spaces and accents — this name is meant to be read. Only strips what
+  // Dropbox or a path parser would choke on.
+  function sanitizeName(s) {
+    return String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/[\x00-\x1f]/g, '').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 120) || 'shared';
+  }
+  async function ensureOutboxFolder(displayName) {
+    const path = OUTBOX_PARENT + '/' + sanitizeName(displayName);
     await mkdirp(OUTBOX_PARENT);
     await mkdirp(path);
     return path;
@@ -1494,7 +1473,7 @@
       shareEnsureFolder: (path) => shareFolderId(path),     // → shared_folder_id (shares it if needed)
       shareInvite: (id, emails, level) => inviteToFolder(id, emails, level),
       shareMembers: (id) => folderMembers(id),              // {emailLower: {level, accountId, invitee}}
-      shareOutboxFolder: (id) => ensureOutboxFolder(id),    // wrapper for a single-file share
+      shareOutboxFolder: (name) => ensureOutboxFolder(name),   // wrapper for a single-file share, named after the file
       shareWorkspacePath: (rel) => relToCloud(rel),         // OPFS rel → the live Dropbox path
       shareNotify: (filePath, emails, level) => notifyFileMembers(filePath, emails, level),   // share the marker itself → the recipient's O(1) signal
       shareListDeliveries: (markerName) => listDeliveries(markerName),   // ONE call: every delivery addressed to me
