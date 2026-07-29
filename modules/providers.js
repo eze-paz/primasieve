@@ -237,7 +237,7 @@ function getActiveProvider() {
 // maxTokens: null (default) sends NO max_tokens on the wire for cloud providers
 // (OpenAI-spec default — the model's own cap). In-browser engines still need a
 // concrete generation budget, so the local paths below fall back to 1024.
-async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal } = {}) {
+async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal, noReasoning = false } = {}) {
   const active = getActiveProvider();
   const localMax = maxTokens != null ? maxTokens : 1024;
   if (active && active.type === 'litertlm') {
@@ -280,14 +280,42 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
   const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: true, stream_options: { include_usage: true } };
   if (maxTokens != null) body.max_tokens = maxTokens;
   if (active && active.temperature != null) body.temperature = active.temperature;
+  // noReasoning: for a short utility call (a conversation title), thinking is pure
+  // cost — and on a hybrid model it's fatal, because reasoning tokens are billed
+  // against max_tokens, so a small budget is spent thinking and the response
+  // carries no content at all. There is no standard switch, so send the two that
+  // cover the field and let _REASONING_KEYS below undo them if the server is
+  // strict about unknown parameters:
+  //   reasoning.enabled          — OpenRouter (any hybrid model behind it)
+  //   chat_template_kwargs       — the DeepSeek/Qwen chat-template flag, as used
+  //                                by vLLM / SGLang / DeepSeek's own API
+  if (noReasoning) {
+    body.reasoning = { enabled: false };
+    body.chat_template_kwargs = { thinking: false, enable_thinking: false };
+  }
+  // A reasoning model streams its chain-of-thought in delta.reasoning (OpenRouter)
+  // or delta.reasoning_content (DeepSeek) and leaves delta.content EMPTY until it
+  // has finished thinking — and reasoning tokens are billed against max_tokens. So
+  // a budget too small for the thinking yields a stream where every content delta
+  // is '' and finish_reason is 'length': the call "succeeds" with an empty string,
+  // which every caller then has to guess about. Count the reasoning and turn that
+  // case into a diagnosis instead of silence. Reasoning text is never RETURNED —
+  // it isn't an answer, and passing it off as one produces convincing garbage.
+  const _emptyErr = (think, finish) => new Error(
+    'model produced only reasoning tokens (' + think.length + ' chars' +
+    (finish ? ', finish_reason=' + finish : '') + ') and no content — max_tokens was spent thinking, raise it');
+
   async function readStreamText(res) {
     if (!res.body || !res.body.getReader) {   // buffering proxy: whole JSON despite stream:true
       const data = await res.json();
       if (data.error) throw new Error(String(data.error.message || JSON.stringify(data.error)));
-      return data?.choices?.[0]?.message?.content || '';
+      const m = data?.choices?.[0]?.message || {};
+      const think = String(m.reasoning || m.reasoning_content || '');
+      if (!m.content && think) throw _emptyErr(think, data?.choices?.[0]?.finish_reason);
+      return m.content || '';
     }
     const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = '', out = '';
+    let buf = '', out = '', think = '', finish = '';
     for (;;) {
       if (signal && signal.aborted) { try { reader.cancel(); } catch (_) {} throw new DOMException('aborted', 'AbortError'); }
       const { value, done } = await reader.read();
@@ -301,10 +329,15 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
         if (payload === '[DONE]') continue;
         let j; try { j = JSON.parse(payload); } catch (_) { continue; }
         if (j.error) throw new Error(String(j.error.message || JSON.stringify(j.error)));
-        const c = j.choices?.[0]?.delta?.content;
-        if (c) out += c;
+        const ch = j.choices?.[0] || {};
+        const d = ch.delta || {};
+        if (d.content) out += d.content;
+        if (typeof d.reasoning === 'string') think += d.reasoning;
+        else if (typeof d.reasoning_content === 'string') think += d.reasoning_content;
+        if (ch.finish_reason) finish = ch.finish_reason;
       }
     }
+    if (!out && think) throw _emptyErr(think, finish);
     return out;
   }
   // Retry transient/5xx/network failures with backoff, like a standard completion,
@@ -313,6 +346,12 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
   // fire again on their next trigger; a non-retryable error (4xx) surfaces at once.
   const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
   const BACKOFF_MS = [1000, 2000, 5000, 10000];
+  // The reasoning switches above are non-standard: OpenAI-spec servers reject an
+  // unrecognized body parameter with a 400 rather than ignoring it. Rather than
+  // maintain a per-provider allowlist, drop them and retry ONCE on the first 4xx —
+  // worst case the model thinks and the (generous) budget absorbs it.
+  const _REASONING_KEYS = ['reasoning', 'chat_template_kwargs'];
+  let strippedReasoning = false;
   let lastErr = null;
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
     if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError');
@@ -327,6 +366,13 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
     } catch (e) {
       if (signal && signal.aborted) throw e;
       lastErr = e;
+      if (noReasoning && !strippedReasoning && e && e.status >= 400 && e.status < 500) {
+        strippedReasoning = true;
+        for (const k of _REASONING_KEYS) delete body[k];
+        console.warn('[sandpie] provider rejected the disable-reasoning parameters — retrying without them:', e.message);
+        attempt--;                               // this retry is the fallback, not one of the backoff attempts
+        continue;
+      }
       const retryable = (e && RETRYABLE.has(e.status)) || (e instanceof TypeError);   // TypeError = network failure
       if (!retryable || attempt === BACKOFF_MS.length) throw e;
       await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));

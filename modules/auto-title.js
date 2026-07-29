@@ -23,13 +23,16 @@ const SandpieAutoTitle = (function () {
 
   const DEFAULTS = { enabled: true };
 
-  // Token budgets. A title is ~8 tokens, but an in-browser reasoning model
-  // (Qwen3, Bonsai) opens with a <think> block and would spend the whole cloud
-  // budget in there and return nothing usable — local gets more room, plus a
-  // /no_think hint appended to the prompt (honoured by the Qwen3 family, inert
-  // text elsewhere).
-  const MAXTOK_CLOUD = 24;
-  const MAXTOK_LOCAL = 96;
+  // Token budgets. A title is ~8 tokens, but a REASONING model spends tokens
+  // thinking first and they are billed against max_tokens — a hybrid cloud model
+  // (DeepSeek V4, Qwen3, GLM…) burned a 24-token budget mid-thought and returned
+  // a response with no content at all. The primary fix is asking the provider to
+  // turn thinking OFF (noReasoning below); these budgets are the backstop for a
+  // provider that ignores the request, so they must fit a short think block.
+  // In-browser engines also get a /no_think hint, honoured by the Qwen3 family
+  // that all of them descend from.
+  const MAXTOK_CLOUD = 256;
+  const MAXTOK_LOCAL = 192;
   const CHARS_PER_MSG = 800;   // how much of each opening message the model sees
 
   const BUILT_IN_PROMPT = [
@@ -92,9 +95,14 @@ const SandpieAutoTitle = (function () {
       system: getPrompt(),
       user,
       maxTokens: isLocal ? MAXTOK_LOCAL : MAXTOK_CLOUD,
+      noReasoning: true,
       signal,
     });
-    return clean(out);
+    const title = clean(out);
+    // Don't fail silently: a model that answered but whose answer was unusable is
+    // indistinguishable from "no provider" at the call site otherwise.
+    if (!title && out && out.trim()) console.warn('[sandpie] auto-title: unusable answer, keeping the derived title:', JSON.stringify(out.slice(0, 200)));
+    return title;
   }
 
   // ---- landing animation ----------------------------------------------------
