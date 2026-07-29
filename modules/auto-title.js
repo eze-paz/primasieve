@@ -97,6 +97,64 @@ const SandpieAutoTitle = (function () {
     return clean(out);
   }
 
+  // ---- landing animation ----------------------------------------------------
+  // The row pulses accent (CSS: li.conv-retitled) while the new name types itself
+  // in. Called by conversations.js from buildConvLi, on the freshly rebuilt <li>
+  // — refreshConversationList() replaces the whole list, so there is no old row
+  // left to animate. Pure presentation: it owns no state and is safe to no-op.
+  //
+  // Typing writes textContent on the existing .name span, so nowrap/ellipsis
+  // behave exactly as they do normally. Fire-and-forget; the row already carries
+  // the final title before this runs, so any interruption (another list rebuild
+  // mid-typing) just leaves the correct text on screen.
+  const MS_PER_CHAR = 20;      // ~25-char title ≈ 500ms, inside the 900ms pulse
+  const CARET_HOLD  = 90;      // caret lingers a beat after the last character
+  const PULSE_MS    = 900;     // must match conv-retitle-pulse in sandpie.css
+
+  function animateRetitle(li, nameEl, newTitle) {
+    if (!li || !nameEl) return;
+    const text = String(newTitle == null ? nameEl.textContent : newTitle);
+    const snap = () => { nameEl.textContent = text; nameEl.classList.remove('conv-typing'); li.classList.remove('conv-retitled'); };
+
+    let reduced = false;
+    try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    // A hidden tab is the common case here (titles land as a turn finishes, which
+    // is exactly when the user has switched away) and it must NOT animate: a
+    // background tab clamps setTimeout to ~1s, so the title would type at one
+    // character per second, and CSS animations don't advance at all, so the pulse
+    // class would never see its animationend. Skip straight to the final title.
+    if (reduced || document.hidden) { snap(); return; }
+
+    li.classList.add('conv-retitled');
+    // animationend is the normal cleanup, but it only fires if the animation
+    // actually ran — a row left with .conv-retitled keeps an accent tint forever,
+    // so back it with a timer sized to the keyframes (900ms) plus slack.
+    const kill = setTimeout(() => li.classList.remove('conv-retitled'), PULSE_MS + 300);
+    li.addEventListener('animationend', function done(e) {
+      if (e.target !== li) return;                  // ignore the .name/caret animations
+      clearTimeout(kill);
+      li.classList.remove('conv-retitled');
+      li.removeEventListener('animationend', done);
+    });
+
+    nameEl.classList.add('conv-typing');
+    nameEl.textContent = '';
+    let i = 0;
+    const onHide = () => { if (document.hidden) { document.removeEventListener('visibilitychange', onHide); i = text.length; snap(); } };
+    document.addEventListener('visibilitychange', onHide);
+    const tick = () => {
+      // Stop if the list was rebuilt under us — the new row already has the full
+      // title, so there is nothing to finish. Same for a tab hidden mid-typing
+      // (onHide already snapped the text): drop the timer chain.
+      if (!nameEl.isConnected || i >= text.length) { document.removeEventListener('visibilitychange', onHide); return; }
+      nameEl.textContent = text.slice(0, ++i);
+      if (i < text.length) { setTimeout(tick, MS_PER_CHAR); return; }
+      document.removeEventListener('visibilitychange', onHide);
+      setTimeout(() => nameEl.classList.remove('conv-typing'), CARET_HOLD);
+    };
+    setTimeout(tick, MS_PER_CHAR);
+  }
+
   // ---- Settings section -----------------------------------------------------
   const HTML = `
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.6rem;">After a conversation's first exchange, the model is asked for a short title for it — so the sidebar lists topics instead of truncated first messages. One tiny extra request per conversation, never repeated. A title you set yourself is never overwritten. Stored locally in this browser only.</p>
@@ -137,6 +195,6 @@ const SandpieAutoTitle = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { config, isEnabled, getPrompt, generate, clean, BUILT_IN_PROMPT, init };
+  return { config, isEnabled, getPrompt, generate, clean, animateRetitle, BUILT_IN_PROMPT, init };
 })();
 window.SandpieAutoTitle = SandpieAutoTitle;

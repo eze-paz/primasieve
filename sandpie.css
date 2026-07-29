@@ -747,6 +747,34 @@ ul.conv-list li.active {
   outline: 1px solid var(--sp-accent);
 }
   ul.conv-list li.lp-active { background: var(--sp-accent-dim); border-color: var(--sp-accent); }
+
+  /* Auto-title landing (auto-title.js → maybeAutoTitle): the row pulses accent
+     while the generated name types itself in. The ring is a box-shadow, NOT
+     border-color — the retitled row is usually the ACTIVE one, whose accent
+     border/outline would visibly blink off when the keyframes ended. */
+  ul.conv-list li.conv-retitled { animation: conv-retitle-pulse 900ms cubic-bezier(.22,.61,.36,1) 1; }
+  @keyframes conv-retitle-pulse {
+      0% { background: var(--sp-accent-dim); box-shadow: 0 0 0 1px var(--sp-accent), 0 0 10px 0 var(--sp-accent-dim); }
+     55% { background: var(--sp-accent-dim); box-shadow: 0 0 0 1px var(--sp-accent), 0 0 6px 0 var(--sp-accent-dim); }
+    100% { background: transparent; box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+  }
+  ul.conv-list li.conv-retitled .name { animation: conv-retitle-ink 900ms ease-out 1; }
+  @keyframes conv-retitle-ink { 0%, 40% { color: var(--sp-accent); } 100% { color: var(--sp-text); } }
+  /* Caret, only while characters are still being written. It rides at the end of
+     .name, so on a title too long for the sidebar it is clipped along with the
+     tail (text-overflow: ellipsis) — titles are 3-6 words, so that's rare. */
+  ul.conv-list .name.conv-typing::after {
+    content: '▌'; color: var(--sp-accent); margin-left: 1px;
+    animation: conv-caret-blink 0.7s step-end infinite;
+  }
+  @keyframes conv-caret-blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    /* No pulse, no typing — the new title is simply there (JS checks the same
+       query and skips straight to the final text). */
+    ul.conv-list li.conv-retitled,
+    ul.conv-list li.conv-retitled .name { animation: none; }
+    ul.conv-list .name.conv-typing::after { content: none; }
+  }
   ul.conv-list li.archived { opacity: 0.55; }
 
 /* Shared file section — mirrors Archived conversation pattern */

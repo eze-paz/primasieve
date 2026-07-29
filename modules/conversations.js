@@ -952,6 +952,14 @@ function buildConvLi(c, idx) {
   span.title = c.updated || '';
   span.onclick = () => loadConv(c.id);
   li.appendChild(span);
+  // This conversation was just auto-titled: play the landing animation on the row
+  // we're building (the old one is already gone — see maybeAutoTitle). The final
+  // title is set above first, so if anything interrupts the animation the correct
+  // text is what's left on screen.
+  if (_titleAnim.has(c.id) && typeof SandpieAutoTitle !== 'undefined' && SandpieAutoTitle.animateRetitle) {
+    _titleAnim.delete(c.id);
+    SandpieAutoTitle.animateRetitle(li, span, span.textContent);
+  }
 
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
@@ -3206,6 +3214,9 @@ async function maybeAutoCompact(convId) {
 // carries it forward) is never touched. force:true ignores all of that, for
 // `>>> retitle`.
 const _titling = new Set();
+// Conversations whose next rendered row should play the retitle animation. Held
+// only across the one refreshConversationList() that follows the meta write.
+const _titleAnim = new Set();
 async function maybeAutoTitle(convId, { force = false } = {}) {
   if (!convId || _titling.has(convId)) return '';
   if (typeof SandpieAutoTitle === 'undefined' || !SandpieAutoTitle.generate) return '';
@@ -3233,7 +3244,12 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
     });
     if (!title || title === stored) return '';
     await updateConvFile(convId, { title, titleLocked: true });
+    // Flag the row for its landing animation BEFORE the refresh: the refresh
+    // rebuilds every <li> from scratch, so buildConvLi is the only place that can
+    // animate the row that will actually be on screen.
+    _titleAnim.add(convId);
     await refreshConversationList();
+    _titleAnim.delete(convId);   // consumed by buildConvLi; never animate twice
     return title;
   } catch (e) {
     // Best-effort: the conversation keeps its derived title and stays eligible.
