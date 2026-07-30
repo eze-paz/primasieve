@@ -726,6 +726,27 @@
     0%, 100% { transform: scale(1);    opacity: 1;   }
     50%      { transform: scale(1.55); opacity: 0.55; }
   }
+  /* ---- device-switch splash screen (full-screen Globe) ----------------- */
+  #deviceSyncSplash { position: fixed; inset: 0; z-index: 9999; background: var(--sp-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #deviceSyncSplash .splash-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, var(--sp-border) 1px, transparent 1px); background-size: 24px 24px; opacity: 0.15; pointer-events: none; }
+  #deviceSyncSplash .splash-glow { position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, var(--sp-accent-dim) 0%, transparent 65%); border-radius: 50%; pointer-events: none; animation: splash-glow-pulse 4s ease-in-out infinite; }
+  @keyframes splash-glow-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .6; } 50% { transform: translate(-50%, -50%) scale(1.12); opacity: .9; } }
+  #deviceSyncSplash .splash-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+  #deviceSyncSplash .splash-icon-ring { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 1.8rem; }
+  #deviceSyncSplash .splash-icon-ring .ring-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--sp-border); animation: splash-ring-spin 6s linear infinite; }
+  #deviceSyncSplash .splash-icon-ring .ring-inner { position: absolute; inset: 14px; border-radius: 50%; border: 1.5px dashed var(--sp-accent-dim); animation: splash-ring-spin 10s linear infinite reverse; }
+  @keyframes splash-ring-spin { to { transform: rotate(360deg); } }
+  #deviceSyncSplash .splash-icon-ring .ring-emoji { font-size: 2.8rem; line-height: 1; position: relative; z-index: 1; }
+  #deviceSyncSplash .splash-brand { font-family: 'Share Tech Mono'; font-size: 2.2rem; letter-spacing: 5px; color: var(--sp-text); }
+  #deviceSyncSplash .splash-brand .bracket { color: var(--sp-accent); }
+  #deviceSyncSplash .splash-tagline { font-size: 0.75rem; color: var(--sp-text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 1.4rem; }
+  #deviceSyncSplash .splash-progress { margin-top: 2.2rem; width: 220px; }
+  #deviceSyncSplash .splash-progress-track { height: 4px; background: var(--sp-border); border-radius: 4px; overflow: hidden; }
+  #deviceSyncSplash .splash-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--sp-accent), var(--sp-success)); border-radius: 4px; transition: width .3s ease; position: relative; }
+  #deviceSyncSplash .splash-progress-fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.12) 50%, transparent 100%); animation: splash-shimmer 1.6s infinite; }
+  @keyframes splash-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  #deviceSyncSplash .splash-progress-label { display: flex; justify-content: space-between; margin-top: 0.55rem; font-size: 0.62rem; color: var(--sp-text-dim); letter-spacing: 1px; }
+
   /* Generic indeterminate loading state (file viewer office render, etc.) */
   .sp-loading { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; padding: 2.5rem 1rem; color: var(--sp-text-dim); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; }
   .sp-loading .sp-bar { position: relative; width: 180px; height: 3px; background: var(--sp-border); border-radius: 2px; overflow: hidden; }

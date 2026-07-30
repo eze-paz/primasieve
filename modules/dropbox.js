@@ -592,11 +592,60 @@
     await Promise.all(Array.from({ length: Math.min(DL_CONCURRENCY, items.length) }, worker));
   }
 
+  // ---- device-switch splash screen (full-screen Globe) -----------------------
+  // Shows a branded overlay when sync detects files changed on another device.
+  // Hidden as soon as sync completes. Uses sandpie CSS vars for dark/light mode.
+  let _splashActive = false;
+
+  function _showSyncSplash(totalFiles) {
+    _splashActive = true;
+    const el = document.getElementById('deviceSyncSplash');
+    if (el) el.remove();
+    const splash = document.createElement('div');
+    splash.id = 'deviceSyncSplash';
+    splash.innerHTML =
+      '<div class="splash-grid"></div>' +
+      '<div class="splash-glow"></div>' +
+      '<div class="splash-content">' +
+        '<div class="splash-icon-ring">' +
+          '<div class="ring-outer"></div>' +
+          '<div class="ring-inner"></div>' +
+          '<span class="ring-emoji">\ud83c\udf70</span>' +
+        '</div>' +
+        '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
+        '<div class="splash-tagline">Catching up from another device</div>' +
+        '<div class="splash-progress">' +
+          '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>' +
+          '<div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(splash);
+    _updateSyncSplash(0, totalFiles);
+  }
+
+  function _updateSyncSplash(done, total) {
+    const fill = document.getElementById('spProgFill');
+    const label = document.getElementById('spProgLabel');
+    if (!fill || !label || !total) return;
+    const pct = Math.min(100, Math.round((done / total) * 100));
+    fill.style.width = pct + '%';
+    label.innerHTML = '<span>' + done + ' downloaded</span><span>' + (total - done) + ' remaining</span>';
+  }
+
+  function _hideSyncSplash() {
+    _splashActive = false;
+    const el = document.getElementById('deviceSyncSplash');
+    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s ease'; setTimeout(function() { el.remove(); }, 350); }
+  }
+
   // ---- the sync engine (working dir only) ------------------------------------
   async function sync(opts = {}) {
     if (!tokens()) return;
     if (_syncing) return;
     if (Sandpie.isGenerating()) return;
+    // Device-switch detection: if last sync was < 5 min ago, skip the splash
+    const _lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    const _isRecent = (Date.now() - _lastSync) < 300000;
     _syncing = true; setBusy(true); _syncCount++;
     const firstSync = !initialSyncDone;
     const opfs = Sandpie.opfs;
@@ -605,6 +654,10 @@
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
       const { index: cloud, delta, deletions } = await cloudListWorking();
+      // Show splash if last sync was stale AND multiple files changed (device switch)
+      if (!_splashActive && !_isRecent && delta && delta.length > 1) {
+        _showSyncSplash(delta.length);
+      }
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
@@ -681,7 +734,7 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      await bulkDownload(toDownload, state, opfs, null);
+      await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
 
       // push: only files explicitly marked dirty (syncedMtime===0) by edit events.
       // A full-scan upload that treated "no state entry" as dirty has been removed
@@ -742,6 +795,7 @@
       console.warn('[dropbox] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
+      if (_splashActive) _hideSyncSplash();
     }
   }
 
