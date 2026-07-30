@@ -577,25 +577,6 @@
   // actually visible in normal use. (The old bar replaced #convList and only ran
   // on the very first sync's downloads, which a returning user whose files are
   // already local never hits — hence "I never see it".) It's a sibling of
-  // #convList, so refreshConversationList()'s replaceChildren doesn't touch it;
-  // sync()'s finally clears it. Hidden whenever nothing is transferring.
-  function _setSyncProgress(done, total, phase) {
-    const ul = document.getElementById('convList');
-    if (!ul || !ul.parentNode) return;
-    let bar = document.getElementById('dbxSyncProgress');
-    if (!total) { if (bar) bar.remove(); return; }
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'dbxSyncProgress';
-      bar.className = 'sync-progress';
-      ul.parentNode.insertBefore(bar, ul);
-    }
-    const pct = Math.min(100, Math.round((done / total) * 100));
-    bar.innerHTML =
-      `<div class="sp-row"><span>${phase || 'Syncing'}…</span><span>${done} / ${total}</span></div>` +
-      `<div class="sp-track"><div class="sp-fill" style="width:${pct}%"></div></div>`;
-  }
-
   // ---- bounded-parallel per-file download ------------------------------------
   const DL_CONCURRENCY = 16;
   async function bulkDownload(items, state, opfs, onProgress) {
@@ -706,8 +687,7 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      if (toDownload.length) _setSyncProgress(0, toDownload.length, 'Downloading');
-      await bulkDownload(toDownload, state, opfs, toDownload.length ? (d, t) => _setSyncProgress(d, t, 'Downloading') : null);
+      await bulkDownload(toDownload, state, opfs, null);
 
       // push: only files explicitly marked dirty (syncedMtime===0) by edit events.
       // A full-scan upload that treated "no state entry" as dirty has been removed
@@ -723,7 +703,6 @@
       }
       const BATCH_SIZE = 50;
       let upDone = 0;
-      if (dirty.length) _setSyncProgress(0, dirty.length, 'Uploading');
       for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
         const chunk = dirty.slice(i, i + BATCH_SIZE);
         const files = await Promise.all(chunk.map(async ({ rel, lm, s }) => ({ rel, lm, s, content: await opfs.readBytes(rel) })));
@@ -743,7 +722,6 @@
           }
         } catch (err) { console.warn('[dropbox] batch upload failed:', err); }
         upDone += chunk.length;
-        _setSyncProgress(upDone, dirty.length, 'Uploading');
       }
       setSyncState(state);
 
@@ -768,7 +746,6 @@
       console.warn('[dropbox] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
-      try { _setSyncProgress(0, 0); } catch (_) {}   // clear the bar when the cycle ends
     }
   }
 
@@ -1128,11 +1105,9 @@
           }
           onFileChanged(f.rel);   // mark dirty ⇒ next sync uploads it to the new root
         } catch (err) { failed++; console.warn('[migrate:home] pull failed:', f.rel, err && err.message); }
-        try { _setSyncProgress(++done, files.length, 'Moving your files'); } catch (_) {}
       }
     };
     await Promise.all(Array.from({ length: Math.min(DL_CONCURRENCY, files.length) }, worker));
-    try { _setSyncProgress(0, 0); } catch (_) {}
     if (failed) throw new Error(failed + ' of ' + files.length + ' files could not be pulled');
     return files.length;
   }
