@@ -1383,7 +1383,6 @@ ul.conv-list li.active {
     opacity: 0.5;
   }
   .tool-box .tool-sep {
-    border-top: 1px solid var(--sp-border);
     margin: 0 0.6rem;
   }
   .tool-box .tool-result {
