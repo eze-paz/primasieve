@@ -1605,6 +1605,7 @@ ul.conv-list li.active {
        top offset keeps the empty state pleasantly placed without the snap. */
     margin-top: auto;
     padding: clamp(2rem, 8vh, 5.5rem) 1rem 2.5rem;
+    margin-bottom: auto;
     text-align: center;
     color: var(--sp-text-dim);
     display: flex;
