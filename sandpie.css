@@ -892,7 +892,7 @@ ul.conv-list li.active {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0.5rem 0.5rem 0.25rem;
+    padding: 0 0 0.5rem 0.25rem;
     margin-bottom: 0.25rem;
     flex-shrink: 0;
   }
