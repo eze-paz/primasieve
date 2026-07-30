@@ -3878,7 +3878,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
 
 
-  // Collapsible SANDPIE section: a "▸ SANDPIE" header at the bottom that expands
+  // Collapsible SANDPIE section: a "SANDPIE ▸" header at the bottom that expands
 
 
   // in place to list sandpie/'s children (conversations, agents, skills, scripts,
@@ -3902,7 +3902,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
     toggle.className = 'sandpie-toggle';
 
 
-    toggle.textContent = `${open ? '▾' : '▸'} SANDPIE`;
+    toggle.textContent = `SANDPIE ${open ? '▾' : '▸'}`;
 
 
     toggle.title = "sandpie's own files — conversations, agents, skills, scripts, artifacts, memory";
