@@ -1156,10 +1156,15 @@
     busyClick(dis, '…', () => declineMount(s.id));
     row.append(acc, dis); return row;
   }
-  // A collapsible titled group (count in the title), starts collapsed unless localStorage has '0'. The toggle
+  // Track user's toggle state per key across re-renders within the same session.
+  // Always starts collapsed on first-ever render for that key; subsequent renders
+  // (e.g. after list_files -> renderHome) preserve whatever the user chose.
+  const _groupOpen = new Map();
+  // A collapsible titled group (count in the title). The toggle
   function group(title, key, items, rowFn) {
     const frag = document.createDocumentFragment();
-    let collapsed = localStorage.getItem(key) !== '0'; // default collapsed; '0' = previously expanded
+    if (!_groupOpen.has(key)) _groupOpen.set(key, false); // default collapsed on first render
+    const collapsed = !_groupOpen.get(key);
     const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
     const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
     const lbl = document.createElement('span'); lbl.className = 'shared-group-name'; lbl.textContent = title;
@@ -1167,7 +1172,7 @@
     h.append(caret, lbl, cnt);
     const list = document.createElement('div'); list.className = 'shared-list'; list.style.display = collapsed ? 'none' : '';
     for (const m of items) list.appendChild(rowFn(m));
-    h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };
+    h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; _groupOpen.set(key, open); try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };
     frag.append(h, list); return frag;
   }
   // A row for an installed item: open · pin toggle · (optional ✕). onDelete=null → no ✕.
