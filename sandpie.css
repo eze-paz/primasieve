@@ -123,6 +123,7 @@
   aside .hint { font-size: 0.7rem; color: var(--sp-text-dim); }
   aside .navbar { display: flex; gap: 0.25rem; align-items: stretch; }
   aside .navbar input {
+    width: 100%;
     flex: 1;
     border: none;
     background: var(--sp-bg);
