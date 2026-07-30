@@ -1156,10 +1156,10 @@
     busyClick(dis, '…', () => declineMount(s.id));
     row.append(acc, dis); return row;
   }
-  // A collapsible titled group (count in the title), always starts collapsed. The toggle
+  // A collapsible titled group (count in the title), starts collapsed unless localStorage has '0'. The toggle
   function group(title, key, items, rowFn) {
     const frag = document.createDocumentFragment();
-    let collapsed = true; // start collapsed — ignore localStorage
+    let collapsed = localStorage.getItem(key) !== '0'; // default collapsed; '0' = previously expanded
     const h = document.createElement('button'); h.className = 'shared-home-title shared-toggle';
     const caret = document.createElement('span'); caret.className = 'shared-caret'; caret.textContent = collapsed ? '▸' : '▾';
     const lbl = document.createElement('span'); lbl.className = 'shared-group-name'; lbl.textContent = title;
