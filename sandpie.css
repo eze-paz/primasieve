@@ -126,7 +126,7 @@
     width: 100%;
     flex: 1;
     border: none;
-    background: var(--sp-bg);
+    background: var(--sp-panel);
     color: var(--sp-text);
     padding: 0.45rem 0.625rem;
     border-radius: 4px;
@@ -136,7 +136,7 @@
     flex: 0 0 32px;
     padding: 0;
     border: none;
-    background: var(--sp-bg);
+    background: var(--sp-panel);
     color: var(--sp-text);
     cursor: pointer;
     border-radius: 4px;
