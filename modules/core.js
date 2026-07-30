@@ -287,7 +287,7 @@ window.SandpieCommandView = SandpieCommandView;
 let messages = [];
 const convStreams = new Map();
 const convLastViewed = new Map();
-let activeConvId = localStorage.getItem('sandpie-active-conv') || null;
+let activeConvId = null; // always start on homescreen (was: localStorage read)
 
 /* --- API URL routing: remote proxy, local /proxy/, or direct --- */
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
