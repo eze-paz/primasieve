@@ -948,7 +948,7 @@ function buildConvLi(c, idx) {
   if (c.archived) li.classList.add('archived');
   const span = document.createElement('span');
   span.className = 'name';
-  span.textContent = (c.pinned ? '* ' : '') + c.title;
+  span.textContent = (c.pinned ? '> ' : '') + c.title;
   span.title = c.updated || '';
   span.onclick = () => loadConv(c.id);
   li.appendChild(span);
