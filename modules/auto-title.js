@@ -195,8 +195,8 @@ const SandpieAutoTitle = (function () {
 
   let _retry = 0;
   function init() {
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'titles', title: 'Conversation titles', order: 18, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('autoTitleSection', { title: 'Conversation titles', badge: null, open: false, html: HTML, onRender: wire }); return; }
+    if (window.SandpieSettings) { SandpieSettings.register({ id: 'titles', title: 'Titles', order: 18, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
+    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('autoTitleSection', { title: 'Titles', badge: null, open: false, html: HTML, onRender: wire }); return; }
     if (_retry++ < 40) setTimeout(init, 500);
   }
 
