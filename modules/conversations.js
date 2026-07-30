@@ -1043,7 +1043,7 @@ async function refreshConversationList() {
   if (archived.length) {
     const header = document.createElement('li');
     header.className = 'archived-toggle';
-    header.textContent = `${archivedExpanded ? '▾' : '▸'} Archived (${archived.length})`;
+    header.textContent = `Archived (${archived.length}) ${archivedExpanded ? '▾' : '▸'}`;
     header.onclick = () => { archivedExpanded = !archivedExpanded; refreshConversationList(); };
     frag.appendChild(header);
     if (archivedExpanded) archived.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + regular.length + i)));
