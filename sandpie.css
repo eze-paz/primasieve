@@ -1603,7 +1603,7 @@ ul.conv-list li.active {
        container snaps between centred and top-aligned at the exact-fit boundary
        (scrollHeight==clientHeight), which jitters on wheel scroll. A responsive
        top offset keeps the empty state pleasantly placed without the snap. */
-    margin: 0;
+    margin-top: auto;
     padding: clamp(2rem, 8vh, 5.5rem) 1rem 2.5rem;
     text-align: center;
     color: var(--sp-text-dim);
