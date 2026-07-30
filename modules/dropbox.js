@@ -64,6 +64,7 @@
   const NS_DETECT_VER = '3';                    // 2: detect via root !== home. 3: also capture home_namespace_id.
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
+  const LAST_SYNC_KEY = 'dbxfull-last-sync-ts';   // Date.now() after each successful sync (device-switch detection)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
   const DBX_REDIRECT = location.origin + location.pathname;
 
@@ -570,13 +571,6 @@
     setCursor(result.cursor); setCloudIndex(out);
     return { index: out, delta: null };
   }
-
-  // ---- sync progress bar (non-disruptive) -----------------------------------
-  // Live transfer progress shown ABOVE the conversation list during ANY sync —
-  // downloads (pulling cloud files) AND uploads (pushing local changes) — so it's
-  // actually visible in normal use. (The old bar replaced #convList and only ran
-  // on the very first sync's downloads, which a returning user whose files are
-  // already local never hits — hence "I never see it".) It's a sibling of
   // ---- bounded-parallel per-file download ------------------------------------
   const DL_CONCURRENCY = 16;
   async function bulkDownload(items, state, opfs, onProgress) {
@@ -741,6 +735,8 @@
         // → refresh the invite notifications + banner without a manual refresh).
         try { Sandpie.events.emit('sync:done', { downloaded: toDownload.map(d => d.rel), deletions: deletions || [] }); } catch (_) {}
       }
+      // Remember when sync last completed — used to detect device switches on next load
+      localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
       console.warn('[dropbox] sync:', e);
