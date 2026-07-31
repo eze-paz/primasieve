@@ -16,6 +16,16 @@ document.addEventListener('submit', () => {
   if (btn) btn.textContent = '☰';
 });
 
+// On mobile, tapping "+ New chat" should also dismiss the sidebar so the user
+// lands straight on the fresh conversation. Desktop keeps the sidebar open.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest || !e.target.closest('#newChatBtn')) return;
+  if (!isMobileViewport()) return;
+  document.body.classList.remove('sidebar-open');
+  const btn = document.querySelector('.hamburger');
+  if (btn) btn.textContent = '☰';
+});
+
 function isMobileViewport() {
   return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
 }
