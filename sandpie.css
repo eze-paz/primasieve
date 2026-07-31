@@ -1048,10 +1048,6 @@ ul.conv-list li.active {
     max-width: 100%; transition: color 0.15s ease;
   }
   .sidebar-id-btn .sb-role { font-size: 0.68rem; color: var(--sp-text-dim); }
-  .sidebar-id-btn .sb-chev {
-    flex: none; font-size: 0.9rem; color: var(--sp-text-dim);
-    transition: color 0.15s ease, transform 0.15s ease;
-  }
   .sidebar-id-btn:hover {
     background: var(--sp-panel);
     border-color: var(--sp-border-bright);
@@ -1059,7 +1055,6 @@ ul.conv-list li.active {
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
   }
   .sidebar-id-btn:hover .sb-email { color: var(--sp-accent); }
-  .sidebar-id-btn:hover .sb-chev { color: var(--sp-accent); transform: translateX(2px); }
   .sidebar-id-btn:active { transform: translateY(0); box-shadow: none; }
 
   @keyframes chromaShift {
