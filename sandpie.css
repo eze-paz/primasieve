@@ -1025,6 +1025,43 @@ ul.conv-list li.active {
     margin-left: 0;
   }
 
+  /* Sidebar identity row = settings button (card-lift hover + always-visible chevron) */
+  .sidebar-id-btn {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.55rem 0.6rem; border-radius: 10px;
+    cursor: pointer; user-select: none;
+    border: 1px solid transparent;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .sidebar-id-btn .sb-avatar {
+    flex: none; aspect-ratio: 1; width: 36px; height: 36px; border-radius: 50%;
+    background: var(--sp-accent-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.82rem;
+  }
+  .sidebar-id-btn .sb-meta {
+    display: flex; flex-direction: column; min-width: 0; flex: 1;
+    text-align: left; align-items: flex-start;
+  }
+  .sidebar-id-btn .sb-email {
+    font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%; transition: color 0.15s ease;
+  }
+  .sidebar-id-btn .sb-role { font-size: 0.68rem; color: var(--sp-text-dim); }
+  .sidebar-id-btn .sb-chev {
+    flex: none; font-size: 0.9rem; color: var(--sp-text-dim);
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+  .sidebar-id-btn:hover {
+    background: var(--sp-panel);
+    border-color: var(--sp-border-bright);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  }
+  .sidebar-id-btn:hover .sb-email { color: var(--sp-accent); }
+  .sidebar-id-btn:hover .sb-chev { color: var(--sp-accent); transform: translateX(2px); }
+  .sidebar-id-btn:active { transform: translateY(0); box-shadow: none; }
+
   @keyframes chromaShift {
     0% { opacity: 0; transform: translateX(0); }
     15% { opacity: 0.9; transform: translateX(-3px); }
