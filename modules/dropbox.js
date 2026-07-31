@@ -596,6 +596,7 @@
   // Shows a branded overlay when sync detects files changed on another device.
   // Hidden as soon as sync completes. Uses sandpie CSS vars for dark/light mode.
   let _splashActive = false;
+  let _splashTotal = 0;
 
   function _showSyncSplash(totalFiles) {
     _splashActive = true;
@@ -626,6 +627,7 @@
       splash.style.opacity = '1';
       splash.style.transition = '';
     }
+    _splashTotal = totalFiles;
     const fill = document.getElementById('spProgFill');
     const label = document.getElementById('spProgLabel');
     if (fill) fill.classList.remove('indeterminate');
@@ -651,6 +653,19 @@
     _splashActive = false;
     const el = document.getElementById('deviceSyncSplash');
     if (!el) return;
+    // Unconditional: the bar ALWAYS lands at 100% before any close (determinate
+    // run, indeterminate dehydrated-only sync, no-delta flash, or error path).
+    const fill = document.getElementById('spProgFill');
+    const label = document.getElementById('spProgLabel');
+    if (fill) {
+      fill.classList.remove('indeterminate');
+      fill.style.width = '100%';
+    }
+    if (label) {
+      label.innerHTML = _splashTotal > 0
+        ? '<span>' + _splashTotal + ' downloaded</span><span>0 remaining</span>'
+        : '<span>Synchronized</span><span></span>';
+    }
     if (instant) { el.remove(); return; }
     el.style.opacity = '0'; el.style.transition = 'opacity .3s ease';
     setTimeout(function() { el.remove(); }, 350);
