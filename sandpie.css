@@ -2959,6 +2959,10 @@ body.sp-decoding *::after {
 .shared-dismiss:hover { color: var(--sp-danger); }
 .shared-dismiss.disabled { color: var(--sp-text-dim); cursor: not-allowed; opacity: 0.6; }
 .shared-dismiss.disabled:hover { color: var(--sp-text-dim); }
+  .shared-tip { position: fixed; z-index: 9999; display: none; background: var(--sp-surface);
+    color: var(--sp-text); border: 1px solid var(--sp-border); border-radius: 8px;
+    padding: 6px 10px; font-size: 0.78rem; line-height: 1.4; max-width: 240px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5); pointer-events: none; }
 /* pending invites, grouped into one accent-tinted card (the on-home notification surface) */
 .share-invites { border: 1px solid var(--sp-accent); background: var(--sp-accent-dim); border-radius: 12px; padding: 0.5rem 0.55rem; margin: 0.5rem 0 1.1rem; }
 .share-invites .shared-home-title { margin: 0.15rem 0.3rem 0.45rem; }

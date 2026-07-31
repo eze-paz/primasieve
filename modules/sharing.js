@@ -1234,6 +1234,42 @@
     h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; _groupOpen.set(key, open); try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };
     frag.append(h, list); return frag;
   }
+  // One shared popup for the deactivated-✕ reason. Fixed-position so it survives
+  // scrolling parents; anchored near the clicked element. Dismiss: tap-away,
+  // Escape, scroll, 3s timeout.
+  let _dismissTipEl = null, _dismissTipTimer = null, _dismissTipDismiss = null;
+  function _showDismissTooltip(anchorEl, text) {
+    try { if (_dismissTipDismiss) _dismissTipDismiss(); } catch (_) {}
+    let tip = document.getElementById('sharingDismissTip');
+    if (!tip) { tip = document.createElement('div'); tip.id = 'sharingDismissTip'; tip.className = 'shared-tip'; document.body.appendChild(tip); }
+    tip.textContent = text;
+    tip.style.display = 'block';
+    const r = (anchorEl || document.body).getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = r.left + r.width / 2 - tw / 2;
+    let y = r.top - th - 8;
+    if (y < 8) y = r.bottom + 8;                       // flip below if no room above
+    x = Math.max(8, Math.min(x, window.innerWidth - tw - 8));
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    clearTimeout(_dismissTipTimer);
+    _dismissTipTimer = setTimeout(() => { try { if (_dismissTipDismiss) _dismissTipDismiss(); } catch (_) {} }, 3000);
+    const dismiss = () => { try { if (_dismissTipDismiss) _dismissTipDismiss(); } catch (_) {} };
+    _dismissTipDismiss = () => {
+      try { tip.style.display = 'none'; } catch (_) {}
+      window.removeEventListener('pointerdown', onAny, true);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('scroll', onScroll, true);
+      _dismissTipDismiss = null;
+    };
+    const onAny = () => dismiss();
+    const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+    const onScroll = () => dismiss();
+    window.addEventListener('pointerdown', onAny, true);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onScroll, true);
+    setTimeout(() => { _dismissTipEl = tip; }, 0);
+  }
+
   // A row for an installed item: open · pin toggle · ✕.
   // onDelete: fn → active ✕ (removes); { reason } → FADED ✕ — not deletable by this
   // user (e.g. someone else published the team package); clicking shows the reason.
@@ -1255,15 +1291,13 @@
       const reason = (onDelete && onDelete.reason) || 'Cannot remove this item';
       del.classList.add('disabled');
       del.title = reason;
-      // Click on a deactivated ✕: no deletion — surface the reason as a tooltip.
-      del.onclick = () => {
+      // Click on a deactivated ✕: no deletion — show a positioned popup tooltip
+      // (hover tooltips don't exist on touch devices). Dismisses on tap-away,
+      // Escape, scroll, or after 3s.
+      del.onclick = (ev) => {
         try {
-          del.title = reason;                    // ensure tooltip text
-          del.blur();
-          // Native tooltips only appear on hover, so flash the reason in the row
-          // title too — both the ✕ and the row carry it.
-          row.title = reason;
-          setTimeout(() => { row.title = ''; }, 2500);
+          if (ev) { ev.stopPropagation(); }
+          _showDismissTooltip(ev && ev.target, reason);
         } catch (_) {}
       };
     }
