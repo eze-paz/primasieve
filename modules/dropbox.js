@@ -614,7 +614,7 @@
             '<span class="ring-emoji">\ud83c\udf70</span>' +
           '</div>' +
           '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
-          '<div class="splash-tagline">Catching up from another device</div>' +
+          '<div class="splash-tagline">Synchronizing</div>' +
           '<div class="splash-progress">' +
             '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>' +
             '<div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>' +
