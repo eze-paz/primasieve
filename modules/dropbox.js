@@ -647,10 +647,13 @@
     label.innerHTML = '<span>' + done + ' downloaded</span><span>' + (total - done) + ' remaining</span>';
   }
 
-  function _hideSyncSplash() {
+  function _hideSyncSplash(instant) {
     _splashActive = false;
     const el = document.getElementById('deviceSyncSplash');
-    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity .3s ease'; setTimeout(function() { el.remove(); }, 350); }
+    if (!el) return;
+    if (instant) { el.remove(); return; }
+    el.style.opacity = '0'; el.style.transition = 'opacity .3s ease';
+    setTimeout(function() { el.remove(); }, 350);
   }
 
   // ---- the sync engine (working dir only) ------------------------------------
@@ -756,7 +759,7 @@
         if (_deviceSwitch) {
           _showSyncSplash(toDownload.length);
         } else {
-          _hideSyncSplash();
+          _hideSyncSplash(true);   // no delta — remove instantly, no fade
         }
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
