@@ -1046,7 +1046,7 @@ ul.conv-list li.active {
   }
   .sidebar-id-btn .sb-email {
     font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    max-width: 100%; transition: color 0.15s ease;
+    max-width: 100%; color: var(--sp-text-dim); transition: color 0.15s ease;
   }
   .sidebar-id-btn .sb-role { font-size: 0.68rem; color: var(--sp-text-dim); }
   .sidebar-id-btn:hover {
