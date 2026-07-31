@@ -612,7 +612,7 @@
           '<div class="splash-icon-ring">' +
             '<div class="ring-outer"></div>' +
             '<div class="ring-inner"></div>' +
-            '<span class="ring-emoji">\ud83c\udf70</span>' +
+            '<span class="ring-emoji"><svg class="ring-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" fill="currentColor" stroke="currentColor"><g transform="translate(-44.341361-141.326128)"><ellipse rx="50" ry="50" transform="matrix(.112215 0 0 0.112215 66.181612 150.285667)" fill="currentColor" stroke="currentColor" stroke-width="0"></ellipse><ellipse rx="50" ry="50" transform="matrix(.112215 0 0 0.112215 51.960112 172.258787)" fill="currentColor" stroke="currentColor" stroke-width="0"></ellipse><line x1="-25" y1="0" x2="25" y2="0" transform="matrix(-.261472 0.406229 0.840873 0.541233 58.552318 162.138739)" fill="currentColor" stroke="currentColor"></line><line x1="-25" y1="0" x2="25" y2="0" transform="matrix(-.261472 0.406229 0.840873 0.541233 61.570862 162.138739)" fill="currentColor" stroke="currentColor"></line><line x1="-25" y1="0" x2="25" y2="0" transform="matrix(-.261472 0.406229 0.840873 0.541233 55.552318 162.138739)" fill="currentColor" stroke="currentColor"></line></g></svg></span>' +
           '</div>' +
           '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
           '<div class="splash-tagline">Synchronizing</div>' +
