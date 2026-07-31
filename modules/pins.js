@@ -272,12 +272,27 @@
 
     // App-style grid of tiles (phone home-screen feel): thumbnail placeholder +
     // short label (filename, no path, no extension). Click a tile → open in viewer.
+    // Shared/team pins point at a file inside the package
+    // (sandpie/shared-installed/<id>/<file>). Show the FOLDER name instead of the
+    // file basename — consistent with the Shared with me / Team artifacts lists.
+    // The installed mirror (written by sharing.js renderHome) maps id → title.
+    let installedTitles = null;
+    try { installedTitles = JSON.parse(localStorage.getItem('sharing-installed-cache') || 'null'); } catch (_) {}
+    const titleFor = (path) => {
+      const m = /^sandpie\/shared-installed\/([^\/]+)\//.exec(path);
+      if (m && Array.isArray(installedTitles)) {
+        const hit = installedTitles.find(x => x && x.id === m[1]);
+        if (hit && hit.title) return hit.title;
+      }
+      return null;
+    };
     const grid = document.createElement('div');
     grid.className = 'pin-grid';
     for (const path of list) {
       const fname = path.split('/').pop();
       const dot = fname.lastIndexOf('.');
-      const shortName = dot > 0 ? fname.slice(0, dot) : fname;      // drop the extension
+      const folderTitle = titleFor(path);
+      const shortName = folderTitle || (dot > 0 ? fname.slice(0, dot) : fname);   // folder name, else basename minus ext
       const ext = dot > 0 ? fname.slice(dot + 1).toLowerCase() : '';
 
       const tile = document.createElement('div');
