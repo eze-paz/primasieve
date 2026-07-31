@@ -1084,7 +1084,7 @@
     const shared = cached.filter(m => m.from !== 'team');
     const team = cached.filter(m => m.from === 'team');
     if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
-    if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
+    if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : { reason: 'Cannot delete — published by ' + (m.publisher || 'another user') })));
     box.style.display = '';
     return true;
   }
@@ -1123,7 +1123,7 @@
       }
       if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
       // Team artifacts: ✕ (unshare) only on ones I published; everyone else gets pin only.
-      if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
+      if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : { reason: 'Cannot delete — published by ' + (m.publisher || 'another user') })));
     } finally {
       homeBusy = false; updateBanner();
       // Splash coordination: dropbox.js waits for the first home render before
@@ -1234,7 +1234,9 @@
     h.onclick = () => { const open = list.style.display === 'none'; list.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '▸'; _groupOpen.set(key, open); try { localStorage.setItem(key, open ? '0' : '1'); } catch (_) {} };
     frag.append(h, list); return frag;
   }
-  // A row for an installed item: open · pin toggle · (optional ✕). onDelete=null → no ✕.
+  // A row for an installed item: open · pin toggle · ✕.
+  // onDelete: fn → active ✕ (removes); { reason } → FADED ✕ — not deletable by this
+  // user (e.g. someone else published the team package); clicking shows the reason.
   function itemRow(m, onDelete) {
     const row = document.createElement('div'); row.className = 'shared-file';
     const entry = entryOf(m), full = entry ? INSTALL_ROOT + '/' + m.id + '/' + entry : null;
@@ -1243,7 +1245,29 @@
     open.onclick = () => { if (entry) { try { opfs.openFile(full, entry.split('/').pop()); } catch (_) {} } };
     row.append(kindTile(m), open);
     if (full && window.SandpiePins) { const pin = document.createElement('button'); pin.className = 'shared-pin'; SandpiePins.bindButton(pin, full); row.append(pin); }
-    if (onDelete) { const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove'; del.textContent = '✕'; busyClick(del, '…', () => onDelete()); row.append(del); }
+    const del = document.createElement('button');
+    del.className = 'shared-dismiss';
+    del.textContent = '✕';
+    if (onDelete && typeof onDelete === 'function') {
+      del.title = 'Remove';
+      busyClick(del, '…', () => onDelete());
+    } else {
+      const reason = (onDelete && onDelete.reason) || 'Cannot remove this item';
+      del.classList.add('disabled');
+      del.title = reason;
+      // Click on a deactivated ✕: no deletion — surface the reason as a tooltip.
+      del.onclick = () => {
+        try {
+          del.title = reason;                    // ensure tooltip text
+          del.blur();
+          // Native tooltips only appear on hover, so flash the reason in the row
+          // title too — both the ✕ and the row carry it.
+          row.title = reason;
+          setTimeout(() => { row.title = ''; }, 2500);
+        } catch (_) {}
+      };
+    }
+    row.append(del);
     return row;
   }
 
