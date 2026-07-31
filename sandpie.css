@@ -748,7 +748,7 @@
   #deviceSyncSplash .splash-brand .bracket { color: var(--sp-accent); }
   #deviceSyncSplash .splash-tagline { font-size: 0.75rem; color: var(--sp-text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 1.4rem; }
   #deviceSyncSplash .splash-progress { margin-top: 2.2rem; width: 220px; }
-  #deviceSyncSplash .splash-progress-track { height: 4px; background: var(--sp-border); border-radius: 4px; overflow: hidden; }
+  #deviceSyncSplash .splash-progress-track { height: 4px; background: var(--sp-bg); border-radius: 4px; overflow: hidden; }
   /* BASE STATE = indeterminate pulse: the bar always animates, even before the
      cursor check returns. `.determinate` (added by JS) stops the pulse and lets
      the width be driven by download progress. */
