@@ -1167,12 +1167,31 @@
     };
     return btn;
   }
-  const kindIcon = (k) => k === 'skill' ? '🧩' : k === 'folder' ? '📁' : '📄';
+  // Kind tile: a 34px rounded square replacing the emoji. Only skills get the
+  // accent color — everything else is a homogenous neutral tile.
+  function kindTile(m) {
+    const t = document.createElement('span');
+    t.className = 'shared-tile' + (m.kind === 'skill' ? ' skill' : '');
+    let label;
+    if (m.kind === 'skill') label = 'SK';
+    else if (m.kind === 'folder') label = 'DIR';
+    else {
+      // artifact — show the file extension in caps, or 'FILE' if none
+      const dot = String(m.title || '').lastIndexOf('.');
+      label = dot > 0 ? String(m.title).slice(dot + 1).toUpperCase() : 'FILE';
+    }
+    t.textContent = label.slice(0, 4);
+    t.title = m.kind === 'skill' ? 'Shared skill — the model can load it by name' : m.kind;
+    return t;
+  }
   const entryOf = (m) => m.pin || (m.kind === 'artifact' ? m.title : (m.kind === 'skill' ? 'SKILL.md' : ''));   // the file to open/pin
   function inviteRow(m) {
     const row = document.createElement('div'); row.className = 'shared-file invite';
     const accNote = m.access === 'editor' ? ' · can edit' : '';
-    row.innerHTML = '<span class="shared-file-name">' + kindIcon(m.kind) + ' ' + esc(m.title) + '</span><span class="shared-by">from ' + esc(m._sender || m.publisher) + esc(accNote) + '</span>';
+    row.prepend(kindTile(m));
+    const name = document.createElement('span'); name.className = 'shared-file-name'; name.textContent = m.title;
+    const by = document.createElement('span'); by.className = 'shared-by'; by.textContent = 'from ' + (m._sender || m.publisher) + accNote;
+    row.append(name, by);
     const acc = document.createElement('button'); acc.className = 'ghost shared-accept'; acc.textContent = 'Accept';
     const dis = document.createElement('button'); dis.className = 'shared-dismiss'; dis.title = 'Dismiss'; dis.textContent = '✕';
     busyClick(acc, 'Accepting…', () => accept(m.id));
@@ -1215,10 +1234,10 @@
   function itemRow(m, onDelete) {
     const row = document.createElement('div'); row.className = 'shared-file';
     const entry = entryOf(m), full = entry ? INSTALL_ROOT + '/' + m.id + '/' + entry : null;
-    const open = document.createElement('button'); open.className = 'shared-file-open'; open.innerHTML = kindIcon(m.kind) + ' ' + esc(m.title);
+    const open = document.createElement('button'); open.className = 'shared-file-open'; open.textContent = m.title;
     open.title = m.kind === 'skill' ? 'Shared skill — the model can load it by name' : INSTALL_ROOT + '/' + m.id;
     open.onclick = () => { if (entry) { try { opfs.openFile(full, entry.split('/').pop()); } catch (_) {} } };
-    row.append(open);
+    row.append(kindTile(m), open);
     if (full && window.SandpiePins) { const pin = document.createElement('button'); pin.className = 'shared-pin'; SandpiePins.bindButton(pin, full); row.append(pin); }
     if (onDelete) { const del = document.createElement('button'); del.className = 'shared-dismiss'; del.title = 'Remove'; del.textContent = '✕'; busyClick(del, '…', () => onDelete()); row.append(del); }
     return row;
