@@ -737,7 +737,7 @@
   #deviceSyncSplash .splash-icon-ring .ring-inner { position: absolute; inset: 14px; border-radius: 50%; border: 1.5px dashed var(--sp-accent-dim); animation: splash-ring-spin 10s linear infinite reverse; }
   @keyframes splash-ring-spin { to { transform: rotate(360deg); } }
   #deviceSyncSplash .splash-icon-ring .ring-emoji { font-size: 2.8rem; line-height: 1; position: relative; z-index: 1; }
-  #deviceSyncSplash .splash-brand { font-family: 'Share Tech Mono'; font-size: 2.2rem; letter-spacing: 5px; color: var(--sp-text); }
+  #deviceSyncSplash .splash-brand { font-family: 'Share Tech Mono', monospace; font-weight: 400; font-size: 2.2rem; letter-spacing: 2px; color: var(--sp-text); }
   #deviceSyncSplash .splash-brand .bracket { color: var(--sp-accent); }
   #deviceSyncSplash .splash-tagline { font-size: 0.75rem; color: var(--sp-text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 1.4rem; }
   #deviceSyncSplash .splash-progress { margin-top: 2.2rem; width: 220px; }

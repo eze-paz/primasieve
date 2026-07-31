@@ -654,10 +654,6 @@
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
       const { index: cloud, delta, deletions } = await cloudListWorking();
-      // Show splash if last sync was stale AND multiple files changed (device switch)
-      if (!_splashActive && !_isRecent && delta && delta.length > 0) {
-        _showSyncSplash(delta.length);
-      }
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
@@ -733,6 +729,12 @@
         if (path === openFilePath) continue;
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
+      }
+      // Show splash when a device switch is detected (stale last-sync) AND files
+      // will actually download — total is the real download count, so the bar
+      // always completes. Dehydrated non-exempt files never reach toDownload.
+      if (!_splashActive && !_isRecent && toDownload.length > 0) {
+        _showSyncSplash(toDownload.length);
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
 
