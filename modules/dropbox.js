@@ -664,7 +664,7 @@
       const { index: cloud, delta, deletions } = await cloudListWorking();
       // Device-switch signal: stale last-sync AND the cursor reported changes.
       // (delta covers dehydrated files too — they still changed on another device.)
-      const _deviceSwitch = !_isRecent && !!delta && delta.length > 0;
+      const _deviceSwitch = !_isRecent && ((delta && delta.length > 0) || (deletions && deletions.length > 0));
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
