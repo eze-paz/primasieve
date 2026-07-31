@@ -655,7 +655,7 @@
       dbxStatus('', 'connected');
       const { index: cloud, delta, deletions } = await cloudListWorking();
       // Show splash if last sync was stale AND multiple files changed (device switch)
-      if (!_splashActive && !_isRecent && delta && delta.length > 1) {
+      if (!_splashActive && !_isRecent && delta && delta.length > 0) {
         _showSyncSplash(delta.length);
       }
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
