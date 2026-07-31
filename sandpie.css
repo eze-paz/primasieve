@@ -731,7 +731,12 @@
   #deviceSyncSplash .splash-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, var(--sp-border) 1px, transparent 1px); background-size: 24px 24px; opacity: 0.15; pointer-events: none; }
   #deviceSyncSplash .splash-glow { position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, var(--sp-accent-dim) 0%, transparent 65%); border-radius: 50%; pointer-events: none; animation: splash-glow-pulse 4s ease-in-out infinite; }
   @keyframes splash-glow-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .6; } 50% { transform: translate(-50%, -50%) scale(1.12); opacity: .9; } }
-  #deviceSyncSplash .splash-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; animation: splash-content-in .45s ease-out both; }
+  #deviceSyncSplash .splash-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+  /* Entrance fade applies to the decorative elements only — the progress bar
+     below is excluded so it's visible (and animating) from the very first frame. */
+  #deviceSyncSplash .splash-icon-ring,
+  #deviceSyncSplash .splash-brand,
+  #deviceSyncSplash .splash-tagline { animation: splash-content-in .45s ease-out both; }
   @keyframes splash-content-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
   #deviceSyncSplash .splash-icon-ring { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 1.8rem; }
   #deviceSyncSplash .splash-icon-ring .ring-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--sp-border); animation: splash-ring-spin 6s linear infinite; }
@@ -743,10 +748,13 @@
   #deviceSyncSplash .splash-tagline { font-size: 0.75rem; color: var(--sp-text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 1.4rem; }
   #deviceSyncSplash .splash-progress { margin-top: 2.2rem; width: 220px; }
   #deviceSyncSplash .splash-progress-track { height: 4px; background: var(--sp-border); border-radius: 4px; overflow: hidden; }
-  #deviceSyncSplash .splash-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--sp-accent), var(--sp-success)); border-radius: 4px; transition: width .3s ease; position: relative; }
+  /* BASE STATE = indeterminate pulse: the bar always animates, even before the
+     cursor check returns. `.determinate` (added by JS) stops the pulse and lets
+     the width be driven by download progress. */
+  #deviceSyncSplash .splash-progress-fill { height: 100%; width: 40%; background: linear-gradient(90deg, var(--sp-accent), var(--sp-success)); border-radius: 4px; position: relative; animation: splash-indeterminate 1.1s ease-in-out infinite; }
   #deviceSyncSplash .splash-progress-fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.12) 50%, transparent 100%); animation: splash-shimmer 1.6s infinite; }
   @keyframes splash-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-  #deviceSyncSplash .splash-progress-fill.indeterminate { width: 40%; animation: splash-indeterminate 1.1s ease-in-out infinite; }
+  #deviceSyncSplash .splash-progress-fill.determinate { width: 0%; animation: none; transition: width .3s ease; }
   @keyframes splash-indeterminate { 0% { margin-left: -42%; } 100% { margin-left: 100%; } }
   #deviceSyncSplash .splash-progress-label { display: flex; justify-content: space-between; margin-top: 0.55rem; font-size: 0.62rem; color: var(--sp-text-dim); letter-spacing: 1px; }
 

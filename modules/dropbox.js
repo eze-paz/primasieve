@@ -617,7 +617,7 @@
           '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
           '<div class="splash-tagline">Synchronizing</div>' +
           '<div class="splash-progress">' +
-            '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>' +
+            '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill"></div></div>' +
             '<div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>' +
           '</div>' +
         '</div>';
@@ -630,12 +630,13 @@
     _splashTotal = totalFiles;
     const fill = document.getElementById('spProgFill');
     const label = document.getElementById('spProgLabel');
-    if (fill) fill.classList.remove('indeterminate');
     if (totalFiles > 0) {
+      // Determinate: stop the pulse, width is driven by _updateSyncSplash.
+      if (fill) { fill.classList.add('determinate'); fill.style.marginLeft = '0'; }
       _updateSyncSplash(0, totalFiles);
     } else {
-      // Nothing to download — indeterminate pulse; hides when sync completes.
-      if (fill) fill.classList.add('indeterminate');
+      // Base state is the indeterminate pulse — just drop determinate.
+      if (fill) fill.classList.remove('determinate');
       if (label) label.innerHTML = '<span>Syncing…</span><span></span>';
     }
   }
@@ -644,6 +645,8 @@
     const fill = document.getElementById('spProgFill');
     const label = document.getElementById('spProgLabel');
     if (!fill || !label || !total) return;
+    fill.classList.add('determinate');
+    fill.style.marginLeft = '0';
     const pct = Math.min(100, Math.round((done / total) * 100));
     fill.style.width = pct + '%';
     label.innerHTML = '<span>' + done + ' downloaded</span><span>' + (total - done) + ' remaining</span>';
@@ -658,7 +661,8 @@
     const fill = document.getElementById('spProgFill');
     const label = document.getElementById('spProgLabel');
     if (fill) {
-      fill.classList.remove('indeterminate');
+      fill.classList.add('determinate');   // stop the pulse
+      fill.style.marginLeft = '0';
       fill.style.width = '100%';
     }
     if (label) {
