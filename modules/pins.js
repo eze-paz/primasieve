@@ -242,22 +242,23 @@
   function renderHome() {
     for (const u of liveThumbUrls) { try { URL.revokeObjectURL(u); } catch (_) {} }
     liveThumbUrls = [];
-    const welcome = document.getElementById('welcome');
-    if (!welcome) return;
+    // #welcome was removed — the home lists now live directly in #messages.
+    const host = document.getElementById('messages');
+    if (!host) return;
     let box = document.getElementById('pinnedHome');
     if (!box) {
       box = document.createElement('div');
       box.id = 'pinnedHome';
       box.className = 'pinned-home';
-      welcome.appendChild(box);   // after the title / taglines
+      host.appendChild(box);
     }
     // The pin grid must sit ABOVE the shared/team lists. Both this and #sharedHome
-    // (sharing.js) just append to #welcome, so whichever painted first won — which
+    // (sharing.js) render into #messages, so whichever painted first won — which
     // is why the order looked random. Assert it on every render instead of relying
     // on who got there first.
     const shared = document.getElementById('sharedHome');
     if (shared && (box.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_PRECEDING)) {
-      welcome.insertBefore(box, shared);
+      host.insertBefore(box, shared);
     }
     const list = Pins.list();
     box.textContent = '';

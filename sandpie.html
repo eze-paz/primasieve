@@ -28,7 +28,7 @@ if("serviceWorker"in navigator){
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="modules/core.js?v=1"></script>
   <script src="modules/config.js?v=2"></script>
-  <script src="modules/pins.js?v=8"></script>
+  <script src="modules/pins.js?v=9"></script>
   <script src="modules/settings.js"></script>
   <script src="modules/account.js?v=3"></script>
   <script src="modules/themes.js"></script>
@@ -183,19 +183,9 @@ if("serviceWorker"in navigator){
 
   <div id="messagesWrap">
     <div id="messages">
-      <div id="welcome" class="welcome">
-        <div class="welcome-title"><span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span></div>
-        <span class="welcome-by">by GasN2</span>
-        <div class="welcome-rotating" aria-label="security taglines">
-          <span>nothing escapes the tab</span>
-          <span>zero install</span>
-          <span>designed for security</span>
-          <span>contained AI</span>
-        </div>
-        <!-- Shared inbox / team artifacts. Always in the DOM (even with 0 items —
-             JS only updates the list inside, never creates this container). -->
-        <div id="sharedHome" class="shared-home"></div>
-      </div>
+      <!-- Shared inbox / team artifacts. Always in the DOM (even with 0 items —
+           JS only updates the list inside, never creates this container). -->
+      <div id="sharedHome" class="shared-home"></div>
     </div>
     <div id="sideResizer"></div>
     <div id="messagesSide">
@@ -248,7 +238,7 @@ if("serviceWorker"in navigator){
   </div>
 </div>
   <script type="module" src="modules/context.js?v=13"></script>
-  <script src="modules/sharing.js?v=52"></script>
+  <script src="modules/sharing.js?v=53"></script>
   <script type="module" src="modules/artifacts.js?v=11"></script>
   </body>
 </html>

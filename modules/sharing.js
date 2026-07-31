@@ -1089,7 +1089,8 @@
     return true;
   }
   async function renderHome() {
-    const welcome = document.getElementById('welcome'); if (!welcome || !O()) return;
+    // #welcome was removed — #sharedHome is now a direct child of #messages.
+    if (!document.getElementById('sharedHome') || !O()) return;
     // Synchronous prefill from the localStorage mirror — painted before any await,
     // so the box is already full when the splash lifts. The async pass reconciles.
     const preBox = document.getElementById('sharedHome');
