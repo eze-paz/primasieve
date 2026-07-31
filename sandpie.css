@@ -39,7 +39,7 @@
   }
   aside {
     width: var(--sidebar-width, 300px);
-    padding: 1rem 0rem 0rem 1rem;
+    padding: 1rem 1rem 0rem 1rem;
     background: var(--sp-surface);
     border-right: 1px solid var(--sp-border);
     display: flex;
