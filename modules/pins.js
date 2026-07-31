@@ -242,8 +242,8 @@
   function renderHome() {
     for (const u of liveThumbUrls) { try { URL.revokeObjectURL(u); } catch (_) {} }
     liveThumbUrls = [];
-    // #welcome was removed — the home lists now live directly in #messages.
-    const host = document.getElementById('messages');
+    // Home lists share one centered parent (#homeCenter holds pinnedHome + sharedHome).
+    const host = document.getElementById('homeCenter') || document.getElementById('messages');
     if (!host) return;
     let box = document.getElementById('pinnedHome');
     if (!box) {
@@ -252,10 +252,8 @@
       box.className = 'pinned-home';
       host.appendChild(box);
     }
-    // The pin grid must sit ABOVE the shared/team lists. Both this and #sharedHome
-    // (sharing.js) render into #messages, so whichever painted first won — which
-    // is why the order looked random. Assert it on every render instead of relying
-    // on who got there first.
+    // The pin grid must sit ABOVE the shared/team lists. Both render into
+    // #homeCenter, so whichever painted first won — assert order on every render.
     const shared = document.getElementById('sharedHome');
     if (shared && (box.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_PRECEDING)) {
       host.insertBefore(box, shared);

@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=100">
+<link rel="stylesheet" href="sandpie.css?v=101">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -28,7 +28,7 @@ if("serviceWorker"in navigator){
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="modules/core.js?v=1"></script>
   <script src="modules/config.js?v=2"></script>
-  <script src="modules/pins.js?v=10"></script>
+  <script src="modules/pins.js?v=11"></script>
   <script src="modules/settings.js"></script>
   <script src="modules/account.js?v=3"></script>
   <script src="modules/themes.js"></script>
@@ -183,9 +183,11 @@ if("serviceWorker"in navigator){
 
   <div id="messagesWrap">
     <div id="messages">
-      <!-- Shared inbox / team artifacts. Always in the DOM (even with 0 items —
-           JS only updates the list inside, never creates this container). -->
-      <div id="sharedHome" class="shared-home"></div>
+      <!-- Home lists (pinned grid + shared/team inbox) share one centered parent,
+           so they move together as a group instead of centering independently. -->
+      <div id="homeCenter">
+        <div id="sharedHome" class="shared-home"></div>
+      </div>
     </div>
     <div id="sideResizer"></div>
     <div id="messagesSide">
