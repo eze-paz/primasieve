@@ -143,8 +143,13 @@ if("serviceWorker"in navigator){
     </div>
   </details>
 
-<div style="margin-top:auto; padding:0.5rem 0; display:flex; flex-direction:column; gap:0.45rem; align-items:stretch;">
-    <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="display:flex; align-items:center; justify-content:center; gap:0.4rem; font-size:0.8rem;">⚙ Settings</button>
+<div style="margin-top:auto; padding:0.5rem 0; display:flex; align-items:center; gap:0.55rem;">
+    <button id="settingsGearBtn" class="ghost" onclick="SandpieSettings.open()" title="Settings" style="flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:0.95rem;">⚙</button>
+    <div style="flex:none; aspect-ratio:1; width:38px; height:38px; border-radius:50%; background:var(--sp-accent-dim); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.85rem;">AE</div>
+    <div style="display:flex; flex-direction:column; min-width:0;">
+      <span style="font-size:0.9rem;">Augusto Ezequiel de Paz Parlapiano</span>
+      <span style="font-size:0.72rem; color:var(--sp-text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">aezequiel@gasn2.com</span>
+    </div>
   </div>
 </aside>
 <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
