@@ -636,8 +636,9 @@
       _updateSyncSplash(0, totalFiles);
     } else {
       // Base state is the indeterminate pulse — just drop determinate.
+      // Keep the label BLANK (the static markup's two empty spans) — no
+      // "Syncing…" filler when there's nothing to download.
       if (fill) fill.classList.remove('determinate');
-      if (label) label.innerHTML = '<span>Syncing…</span><span></span>';
     }
   }
 
