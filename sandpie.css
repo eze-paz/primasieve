@@ -2946,6 +2946,7 @@ body.sp-decoding *::after {
 .shared-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin: 0.8rem 0 0.4rem; padding-left: 0.2rem; }
 .shared-tile { flex: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; background: var(--sp-panel); border: 1px solid var(--sp-border); color: var(--sp-text-dim); }
 .shared-tile.skill { background: transparent; border-color: var(--sp-accent); color: var(--sp-accent); }
+  .shared-tile.wide { font-size: 0.56rem; letter-spacing: 0; }
 .shared-file { display: flex; align-items: center; gap: 8px; padding: 0.3rem 0.4rem; border: 1px solid transparent; border-radius: 6px; }
 .shared-file:hover { border-color: var(--sp-border); background: var(--sp-panel); }
 .shared-file-name { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

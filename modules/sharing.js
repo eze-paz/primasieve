@@ -1180,7 +1180,11 @@
       const dot = String(m.title || '').lastIndexOf('.');
       label = dot > 0 ? String(m.title).slice(dot + 1).toUpperCase() : 'FILE';
     }
-    t.textContent = label.slice(0, 4);
+    const shown = label.slice(0, 4);
+    t.textContent = shown;
+    // 4-char labels (HTML, XLSX, FILE…) get a smaller size so they fit the 34px
+    // tile without cramped padding; 2–3 char labels keep the standard size.
+    if (shown.length >= 4) t.classList.add('wide');
     t.title = m.kind === 'skill' ? 'Shared skill — the model can load it by name' : m.kind;
     return t;
   }
