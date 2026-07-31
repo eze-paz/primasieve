@@ -1097,7 +1097,14 @@
       if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
       // Team artifacts: ✕ (unshare) only on ones I published; everyone else gets pin only.
       if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
-    } finally { homeBusy = false; updateBanner(); if (homePending) { homePending = false; renderHome(); } }
+    } finally {
+      homeBusy = false; updateBanner();
+      // Splash coordination: dropbox.js waits for the first home render before
+      // lifting its splash, so the shared/team lists appear assembled, not popping
+      // in after the welcome. Emitted on every render (idempotent for dropbox).
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('sharing:home-rendered'); } catch (_) {}
+      if (homePending) { homePending = false; renderHome(); }
+    }
   }
   // Every row action here is async and can take seconds (accept downloads the
   // package; mount/decline are Dropbox round-trips). Without feedback the button

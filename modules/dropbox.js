@@ -652,6 +652,19 @@
     label.innerHTML = '<span>' + done + ' downloaded</span><span>' + (total - done) + ' remaining</span>';
   }
 
+  // Lifting the splash right after the cursor check reveals the welcome with an
+  // EMPTY sharedHome — sharing.js fills it asynchronously after Dropbox API calls.
+  // Wait for sharing's first render so the home appears fully assembled. Timeout
+  // guards against sharing.js being absent/erroring (never hang the splash).
+  function _hideSyncSplashAfterHome(instant) {
+    let hidden = false;
+    const doHide = () => { if (hidden) return; hidden = true; _hideSyncSplash(instant); };
+    if (!window.Sandpie || !Sandpie.events || !Sandpie.events.on) { doHide(); return; }
+    let off = null;
+    off = Sandpie.events.on('sharing:home-rendered', () => { try { if (off) off(); } catch (_) {} doHide(); });
+    setTimeout(function() { try { if (off) off(); } catch (_) {} doHide(); }, 3000);
+  }
+
   function _hideSyncSplash(instant) {
     _splashActive = false;
     const el = document.getElementById('deviceSyncSplash');
@@ -778,7 +791,7 @@
         if (_deviceSwitch) {
           _showSyncSplash(toDownload.length);
         } else {
-          _hideSyncSplash(true);   // no delta — remove instantly, no fade
+          _hideSyncSplashAfterHome(true);   // no delta — lift once the home has rendered
         }
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
@@ -842,7 +855,7 @@
       console.warn('[dropbox] sync:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
-      if (_splashActive) _hideSyncSplash();
+      if (_splashActive) _hideSyncSplashAfterHome();
     }
   }
 
