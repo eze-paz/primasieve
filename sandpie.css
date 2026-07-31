@@ -620,7 +620,7 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--sp-text-dim);
-    margin-bottom: 0.4rem;
+    margin-bottom: 2rem;
   }
   .ctx-popup-row {
     display: flex;
@@ -2862,7 +2862,7 @@ body.sp-decoding *::after {
 .pin-toggle.pinned:hover { transform: scale(1.08); }
 
 /* Home-screen "Pinned" app grid (rendered into #welcome by pins.js) */
-.pinned-home { width: 100%; user-select: none; margin-bottom: 0.4rem; }
+.pinned-home { width: 100%; user-select: none; margin-bottom: 2rem; }
 /* flex-wrap + center so any number of tiles stays centred (grid auto-fill left
    empty column tracks, pinning a single item to the left edge). */
 .pin-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.1rem 0.7rem; }
