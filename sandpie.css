@@ -1027,7 +1027,7 @@ ul.conv-list li.active {
   /* Sidebar identity row = settings button (card-lift hover + always-visible chevron) */
   .sidebar-id-btn {
     display: flex; align-items: center; gap: 0.55rem;
-    padding: 0.55rem 0.6rem; border-radius: 10px;
+    border-radius: 10px;
     cursor: pointer; user-select: none;
     border: 1px solid transparent;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
