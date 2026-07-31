@@ -960,8 +960,8 @@ ul.conv-list li.active {
   .mobile-header .brand .name,
   .welcome-title .sidebar-brand .name { transition: color 0.15s; }
   .sidebar-collapse-btn {
-    background: var(--sp-panel);
-    border: none;
+    background: var(--sp-bg);
+    border: 1px solid var(--sp-border);
     color: var(--sp-text);
     border-radius: 6px;
     width: 32px;
@@ -973,12 +973,10 @@ ul.conv-list li.active {
     cursor: pointer;
     font-size: 0.85rem;
     padding: 0;
-    box-shadow: 0 0 16px 2px var(--sp-accent-dim), 0 0 32px 4px var(--sp-accent-dim), 0 2px 4px rgba(0,0,0,0.5);
   }
   .sidebar-collapse-btn:hover {
     background: var(--sp-surface);
     color: var(--sp-accent);
-    box-shadow: 0 0 20px 4px var(--sp-accent-dim), 0 0 40px 6px var(--sp-accent-dim), 0 4px 8px rgba(0,0,0,0.6);
   }
   aside.collapsed {
     width: 0;
