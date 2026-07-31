@@ -1029,6 +1029,7 @@ ul.conv-list li.active {
     display: flex; align-items: center; gap: 0.55rem;
     padding: 0.55rem 0.6rem; border-radius: 10px;
     cursor: pointer; user-select: none;
+    background: var(--sp-panel);
     border: 1px solid transparent;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
