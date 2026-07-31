@@ -1050,7 +1050,6 @@ ul.conv-list li.active {
   .sidebar-id-btn .sb-role { font-size: 0.68rem; color: var(--sp-text-dim); }
   .sidebar-id-btn:hover {
     background: var(--sp-panel);
-    border-color: var(--sp-border-bright);
     transform: translateY(-1px);
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
   }
