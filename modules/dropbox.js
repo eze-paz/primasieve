@@ -620,7 +620,15 @@
         '</div>' +
       '</div>';
     document.body.appendChild(splash);
-    _updateSyncSplash(0, totalFiles);
+    if (totalFiles > 0) {
+      _updateSyncSplash(0, totalFiles);
+    } else {
+      // Nothing to download — indeterminate pulse; hides when sync completes.
+      const fill = document.getElementById('spProgFill');
+      const label = document.getElementById('spProgLabel');
+      if (fill) fill.classList.add('indeterminate');
+      if (label) label.innerHTML = '<span>Syncing…</span><span></span>';
+    }
   }
 
   function _updateSyncSplash(done, total) {
@@ -654,6 +662,9 @@
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
       const { index: cloud, delta, deletions } = await cloudListWorking();
+      // Device-switch signal: stale last-sync AND the cursor reported changes.
+      // (delta covers dehydrated files too — they still changed on another device.)
+      const _deviceSwitch = !_isRecent && !!delta && delta.length > 0;
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
@@ -730,10 +741,10 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      // Show splash when a device switch is detected (stale last-sync) AND files
-      // will actually download — total is the real download count, so the bar
-      // always completes. Dehydrated non-exempt files never reach toDownload.
-      if (!_splashActive && !_isRecent && toDownload.length > 0) {
+      // Show the splash whenever a device switch was detected — it hides the
+      // refreshFiles()/refreshConversations() jank at sync end even when the
+      // delta only touched dehydrated files. Determinate bar iff downloads exist.
+      if (!_splashActive && _deviceSwitch) {
         _showSyncSplash(toDownload.length);
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
