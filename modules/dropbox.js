@@ -652,8 +652,9 @@
     if (_syncing) return;
     if (Sandpie.isGenerating()) return;
     // Device-switch detection: if last sync was < 5 min ago, skip the splash
-    const _lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
-    const _isRecent = (Date.now() - _lastSync) < 300000;
+    // DISABLED after testing — splash now fires on any cursor delta.
+    // const _lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    // const _isRecent = (Date.now() - _lastSync) < 300000;
     _syncing = true; setBusy(true); _syncCount++;
     const firstSync = !initialSyncDone;
     const opfs = Sandpie.opfs;
@@ -662,9 +663,10 @@
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
       const { index: cloud, delta, deletions } = await cloudListWorking();
-      // Device-switch signal: stale last-sync AND the cursor reported changes.
+      // Device-switch signal: the cursor reported changes (adds/changes OR
+      // deletions). No stale-time gate — splash fires on ANY delta now.
       // (delta covers dehydrated files too — they still changed on another device.)
-      const _deviceSwitch = !_isRecent && ((delta && delta.length > 0) || (deletions && deletions.length > 0));
+      const _deviceSwitch = !!((delta && delta.length > 0) || (deletions && deletions.length > 0));
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
