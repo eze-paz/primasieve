@@ -1840,7 +1840,6 @@ ul.conv-list li.active {
   content: '';
   position: absolute; top: 0; right: 0; bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, #00f0ff, transparent, #ff00a0);
   opacity: 0.5;
   animation: borderPulse 3s ease-in-out infinite;
 }
