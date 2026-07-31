@@ -599,33 +599,40 @@
 
   function _showSyncSplash(totalFiles) {
     _splashActive = true;
-    const el = document.getElementById('deviceSyncSplash');
-    if (el) el.remove();
-    const splash = document.createElement('div');
-    splash.id = 'deviceSyncSplash';
-    splash.innerHTML =
-      '<div class="splash-grid"></div>' +
-      '<div class="splash-glow"></div>' +
-      '<div class="splash-content">' +
-        '<div class="splash-icon-ring">' +
-          '<div class="ring-outer"></div>' +
-          '<div class="ring-inner"></div>' +
-          '<span class="ring-emoji">\ud83c\udf70</span>' +
-        '</div>' +
-        '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
-        '<div class="splash-tagline">Catching up from another device</div>' +
-        '<div class="splash-progress">' +
-          '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>' +
-          '<div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(splash);
+    let splash = document.getElementById('deviceSyncSplash');
+    if (!splash) {
+      // Fallback only — normally the element is static in sandpie.html (first paint).
+      splash = document.createElement('div');
+      splash.id = 'deviceSyncSplash';
+      splash.innerHTML =
+        '<div class="splash-grid"></div>' +
+        '<div class="splash-glow"></div>' +
+        '<div class="splash-content">' +
+          '<div class="splash-icon-ring">' +
+            '<div class="ring-outer"></div>' +
+            '<div class="ring-inner"></div>' +
+            '<span class="ring-emoji">\ud83c\udf70</span>' +
+          '</div>' +
+          '<div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>' +
+          '<div class="splash-tagline">Catching up from another device</div>' +
+          '<div class="splash-progress">' +
+            '<div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>' +
+            '<div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(splash);
+    } else {
+      // Static element already visible from first paint — reset any fade state.
+      splash.style.opacity = '1';
+      splash.style.transition = '';
+    }
+    const fill = document.getElementById('spProgFill');
+    const label = document.getElementById('spProgLabel');
+    if (fill) fill.classList.remove('indeterminate');
     if (totalFiles > 0) {
       _updateSyncSplash(0, totalFiles);
     } else {
       // Nothing to download — indeterminate pulse; hides when sync completes.
-      const fill = document.getElementById('spProgFill');
-      const label = document.getElementById('spProgLabel');
       if (fill) fill.classList.add('indeterminate');
       if (label) label.innerHTML = '<span>Syncing…</span><span></span>';
     }
@@ -743,11 +750,14 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      // Show the splash whenever a device switch was detected — it hides the
-      // refreshFiles()/refreshConversations() jank at sync end even when the
-      // delta only touched dehydrated files. Determinate bar iff downloads exist.
-      if (!_splashActive && _deviceSwitch) {
-        _showSyncSplash(toDownload.length);
+      // Splash is static in sandpie.html (first paint). First boot sync decides:
+      // device switch → keep it + wire progress; no delta → fade it out fast.
+      if (_splashActive) {
+        if (_deviceSwitch) {
+          _showSyncSplash(toDownload.length);
+        } else {
+          _hideSyncSplash();
+        }
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
 
@@ -1496,6 +1506,9 @@
   //  Boot
   // ===========================================================================
   function boot() {
+    // Splash markup is static in sandpie.html (first paint, removed inline if
+    // no Dropbox). Active only if it survived that — i.e. this user is connected.
+    _splashActive = !!document.getElementById('deviceSyncSplash');
     addSection();
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,

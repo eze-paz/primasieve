@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=78">
+<link rel="stylesheet" href="sandpie.css?v=79">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -38,7 +38,7 @@ if("serviceWorker"in navigator){
   <script src="modules/litertlm.js?v=7"></script>
   <script type="module" src="modules/providers.js?v=40"></script>
   <script src="modules/console.js"></script>
-  <script src="modules/dropbox.js?v=51"></script>
+  <script src="modules/dropbox.js?v=52"></script>
   <script src="modules/images.js?v=6"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=44"></script>
@@ -56,6 +56,35 @@ if("serviceWorker"in navigator){
   <script type="module" src="modules/conversations.js?v=153"></script>
 </head>
 <body>
+<!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
+     Removed instantly by the inline script below when Dropbox isn't connected;
+     dropbox.js keeps it visible + wires progress only when the cursor delta
+     confirms another device made changes. -->
+<div id="deviceSyncSplash">
+  <div class="splash-grid"></div>
+  <div class="splash-glow"></div>
+  <div class="splash-content">
+    <div class="splash-icon-ring">
+      <div class="ring-outer"></div>
+      <div class="ring-inner"></div>
+      <span class="ring-emoji">🍰</span>
+    </div>
+    <div class="splash-brand"><span class="bracket">[</span>sandpie<span class="bracket">]</span></div>
+    <div class="splash-tagline">Catching up from another device</div>
+    <div class="splash-progress">
+      <div class="splash-progress-track"><div id="spProgFill" class="splash-progress-fill" style="width:0%"></div></div>
+      <div id="spProgLabel" class="splash-progress-label"><span></span><span></span></div>
+    </div>
+  </div>
+</div>
+<script>
+  // No Dropbox tokens → the splash would flash on every load for nothing.
+  // Remove it synchronously, before first paint.
+  if (!localStorage.getItem('dbxfull-tokens')) {
+    var sp = document.getElementById('deviceSyncSplash');
+    if (sp) sp.parentNode.removeChild(sp);
+  }
+</script>
 <header class="mobile-header">
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle settings">☰</button>
   <span class="brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>

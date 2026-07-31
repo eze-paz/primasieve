@@ -731,7 +731,8 @@
   #deviceSyncSplash .splash-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, var(--sp-border) 1px, transparent 1px); background-size: 24px 24px; opacity: 0.15; pointer-events: none; }
   #deviceSyncSplash .splash-glow { position: absolute; width: 420px; height: 420px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, var(--sp-accent-dim) 0%, transparent 65%); border-radius: 50%; pointer-events: none; animation: splash-glow-pulse 4s ease-in-out infinite; }
   @keyframes splash-glow-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .6; } 50% { transform: translate(-50%, -50%) scale(1.12); opacity: .9; } }
-  #deviceSyncSplash .splash-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+  #deviceSyncSplash .splash-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; animation: splash-content-in .45s ease-out both; }
+  @keyframes splash-content-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
   #deviceSyncSplash .splash-icon-ring { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 1.8rem; }
   #deviceSyncSplash .splash-icon-ring .ring-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--sp-border); animation: splash-ring-spin 6s linear infinite; }
   #deviceSyncSplash .splash-icon-ring .ring-inner { position: absolute; inset: 14px; border-radius: 50%; border: 1.5px dashed var(--sp-accent-dim); animation: splash-ring-spin 10s linear infinite reverse; }
