@@ -1069,8 +1069,31 @@
 
   /* ── home inbox + installed list ──────────────────────────────────────── */
   let homeBusy = false, homePending = false;
+  // Mirror of the installed list (sandpie/shared-installed/<id> markers), written
+  // by the async path whenever it succeeds. Lets renderHome prefill #sharedHome
+  // SYNCHRONOUSLY from localStorage — before the Dropbox calls resolve — so a
+  // returning user sees their shared/team sections the moment the splash lifts
+  // instead of popping in a beat later. OPFS itself is async-only, so the mirror
+  // is the synchronous proxy for its contents.
+  const INSTALLED_CACHE_KEY = 'sharing-installed-cache';
+  function prefillInstalled(box) {
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem(INSTALLED_CACHE_KEY) || 'null'); } catch (_) {}
+    if (!Array.isArray(cached) || !cached.length) return false;
+    box.textContent = '';
+    const shared = cached.filter(m => m.from !== 'team');
+    const team = cached.filter(m => m.from === 'team');
+    if (shared.length) box.appendChild(group('🔗 Shared with me', COLLAPSE_KEY, shared, m => itemRow(m, () => uninstall(m.id))));
+    if (team.length) box.appendChild(group('👥 Team artifacts', TEAM_COLLAPSE_KEY, team.map(m => ({ ...m, title: m.team ? m.title + ' · ' + m.team : m.title })), m => itemRow(m, m.publisher === me().user ? () => unshareTeam(m.id) : null)));
+    box.style.display = '';
+    return true;
+  }
   async function renderHome() {
     const welcome = document.getElementById('welcome'); if (!welcome || !O()) return;
+    // Synchronous prefill from the localStorage mirror — painted before any await,
+    // so the box is already full when the splash lifts. The async pass reconciles.
+    const preBox = document.getElementById('sharedHome');
+    if (preBox) prefillInstalled(preBox);
     if (homeBusy) { homePending = true; return; } homeBusy = true;
     try {
       // #sharedHome is static in sandpie.html (always in the DOM, even with 0
@@ -1081,6 +1104,9 @@
       // invites first: pendingInvites() runs catalog(), which is what discovers any
       // namespace-read refusal, so pendingMounts() is then a cache hit.
       try { invites = await pendingInvites(); mounts = await pendingMounts(); installed = await acceptedList(); } catch (_) {}
+      // Mirror installed rows for next boot's synchronous prefill (kept fresh on
+      // every render: boot, sync:done, and the 60s poll).
+      try { localStorage.setItem(INSTALLED_CACHE_KEY, JSON.stringify(installed)); } catch (_) {}
       _pendingCount = invites.length + mounts.length;   // banner is updated in finally, once the box is populated/sized
       box.textContent = '';
       const shared = installed.filter(m => m.from !== 'team');   // accepted 1:1
