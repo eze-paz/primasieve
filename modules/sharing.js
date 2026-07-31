@@ -1073,8 +1073,10 @@
     const welcome = document.getElementById('welcome'); if (!welcome || !O()) return;
     if (homeBusy) { homePending = true; return; } homeBusy = true;
     try {
-      let box = document.getElementById('sharedHome');
-      if (!box) { box = document.createElement('div'); box.id = 'sharedHome'; box.className = 'shared-home'; welcome.appendChild(box); observeInbox(); }
+      // #sharedHome is static in sandpie.html (always in the DOM, even with 0
+      // items). JS only fills the list — never creates the container.
+      const box = document.getElementById('sharedHome');
+      if (!box) return;
       let invites = [], installed = [], mounts = [];
       // invites first: pendingInvites() runs catalog(), which is what discovers any
       // namespace-read refusal, so pendingMounts() is then a cache hit.
