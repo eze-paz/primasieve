@@ -760,7 +760,7 @@ async function tool_load_image({ path }, ctx) {
               { type: 'text', text: 'Describe this image in detail for an assistant that cannot see it. Transcribe any visible text verbatim, note layout/figures/tables, and state anything a viewer would need to reason about the image. Be factual and complete.' },
               { type: 'image_url', image_url: { url: dataUrl } },
             ] }],
-            max_tokens: 512,
+            max_tokens: 2048,
           }),
           signal: (ctx && ctx.signal) || undefined,
         });
@@ -769,7 +769,15 @@ async function tool_load_image({ path }, ctx) {
           return { result: 'Error: vision fallback captioning failed (HTTP ' + capRes.status + (txt ? ': ' + txt : '') + ').' };
         }
         const cap = await capRes.json();
-        const caption = cap && cap.choices && cap.choices[0] && cap.choices[0].message && cap.choices[0].message.content;
+        const _msg = cap && cap.choices && cap.choices[0] && cap.choices[0].message;
+        // Reasoning models (e.g. MiMo V2.5) may spend the budget on chain-of-thought
+        // and leave content null — the reasoning fields still hold the full caption.
+        let caption = _msg && _msg.content;
+        if (!caption && _msg && (Array.isArray(_msg.reasoning_details) || _msg.reasoning)) {
+          caption = Array.isArray(_msg.reasoning_details)
+            ? _msg.reasoning_details.map(x => (x && x.text) || '').join('\n')
+            : _msg.reasoning;
+        }
         if (!caption) return { result: 'Error: vision fallback returned no caption.' };
         return { result: 'image:' + clean + ' (captioned via ' + fb.model + ' — this model cannot see images):\n\n' + String(caption).trim() };
       } catch (e2) {
