@@ -52,6 +52,14 @@ const AI_HTML = `
           <option value="yes">If preferred upstreams fail: fall back to others</option>
           <option value="no">If preferred upstreams fail: error (no fallback)</option>
         </select>
+        <select id="spVision">
+          <option value="auto">Vision: auto (detect at runtime)</option>
+          <option value="yes">Vision: yes (this model accepts images)</option>
+          <option value="no">Vision: no (text only)</option>
+        </select>
+        <select id="spVisionFallback" style="display:none;">
+          <option value="">— no vision fallback —</option>
+        </select>
         <div style="display:flex; gap:0.35rem;">
           <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
           <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
@@ -119,10 +127,12 @@ function init() {
 function _wireProviderPanel() {
   loadProviders();
   renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort','spProviderOrder','spAllowFallbacks']) {
+  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort','spProviderOrder','spAllowFallbacks','spVisionFallback']) {
     const el = document.getElementById(id);
     if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
   }
+  const visionSel = document.getElementById('spVision');
+  if (visionSel && !visionSel._spBound) { visionSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); visionSel._spBound = true; }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
   const lrSel = document.getElementById('spLiteRTLMModel');
@@ -577,6 +587,9 @@ function loadFormFor(id) {
   set('spReasoningEffort', p.reasoningEffort);
   set('spProviderOrder', Array.isArray(p.providerOrder) ? p.providerOrder.join(', ') : '');
   set('spAllowFallbacks', p.allowFallbacks === false ? 'no' : 'yes');
+  set('spVision', p.vision || 'auto');
+  renderVisionFallbackOptions(p.id);
+  set('spVisionFallback', p.visionFallbackId || '');
   set('spType', p.type || 'openai');
   const lr = document.getElementById('spLiteRTLMModel');
   if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
@@ -602,6 +615,12 @@ function applyTypeUI() {
   // Fallback choice only matters once a preferred-provider order is set.
   const hasOrder = !!(document.getElementById('spProviderOrder')?.value || '').trim();
   show('spAllowFallbacks', !local && hasOrder);
+  // Vision capability (auto = detect at runtime) + vision-fallback picker. The
+  // fallback only matters when the model may NOT see images (auto or no), so it
+  // hides once the user marks the model vision:yes.
+  show('spVision', true);
+  const vision = (document.getElementById('spVision')?.value) || 'auto';
+  show('spVisionFallback', vision !== 'yes');
   // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
   // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
@@ -629,6 +648,25 @@ function applyTypeUI() {
   if (cw) cw.placeholder = webgpu ? 'Context size (default 4096; ↑ = more GPU memory)' : (litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)');
 }
 
+// Populate the vision-fallback dropdown with every provider EXCEPT the one being
+// edited (a model can't fall back to itself). Includes company-managed providers —
+// a company MiMo model is a valid vision fallback for a personal text-only model.
+// '👁' marks providers manually declared vision:yes so the user can pick a visual
+// model at a glance. Rebuilt on every loadFormFor, so add/delete/duplicate stays in sync.
+function renderVisionFallbackOptions(activeId) {
+  const sel = document.getElementById('spVisionFallback');
+  if (!sel) return;
+  const prev = sel.value;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const opts = [..._managed, ..._providers].filter(p => p.id !== activeId);
+  sel.innerHTML = '<option value="">— no vision fallback —</option>'
+    + opts.map(p => {
+      const name = (p.name && p.name !== p.model) ? p.name + ' (' + p.model + ')' : (p.name || p.model || 'Unnamed');
+      return '<option value="' + esc(p.id) + '">' + esc(name) + (p.vision === 'yes' ? ' · 👁' : '') + '</option>';
+    }).join('');
+  sel.value = prev;
+}
+
 // Commit form edits to the active provider (auto-save on field change/blur).
 function commitForm() {
   const p = getActiveProvider();
@@ -652,6 +690,10 @@ function commitForm() {
   if (po.length) p.providerOrder = po; else delete p.providerOrder;
   const af = (document.getElementById('spAllowFallbacks')?.value) || 'yes';
   if (po.length && af === 'no') p.allowFallbacks = false; else delete p.allowFallbacks;
+  const vs = val('spVision') || 'auto';
+  if (vs !== 'auto') p.vision = vs; else delete p.vision;
+  const vf = val('spVisionFallback');
+  if (vf && vf !== p.id) p.visionFallbackId = vf; else delete p.visionFallbackId;
   applyTypeUI();   // reflect fallback-select visibility as the order field changes
   const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
   saveProviders();
