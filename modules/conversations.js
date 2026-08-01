@@ -350,7 +350,9 @@ function renderHistoricalMessage(m, host = null) {
     const sent = content.replace(/^\[r\d+\]\s*/, '');
     if (tcId) {
       if (sent.startsWith('image:')) {
-        const path = sent.slice('image:'.length);
+        // Path = everything after 'image:' up to the first newline — caption
+        // branches append the caption on following lines after the bare path.
+        const path = sent.slice('image:'.length).split('\n')[0].trim();
         if (path) appendToolResultImage(tcId, path, target);
       } else if (sent.startsWith('todos:')) {
         const nl = sent.indexOf('\n');
@@ -1364,7 +1366,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=84');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=85');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -2632,7 +2634,9 @@ class RoundRenderer {
     }
 
     if (sent.startsWith('image:')) {
-      const path = sent.slice('image:'.length);
+      // Path = everything after 'image:' up to the first newline — caption
+      // branches append the caption on following lines after the bare path.
+      const path = sent.slice('image:'.length).split('\n')[0].trim();
       if (path && el) appendToolResultImage(el, path, this.host);
       return;
     }

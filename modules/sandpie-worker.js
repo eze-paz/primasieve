@@ -779,7 +779,7 @@ async function tool_load_image({ path }, ctx) {
             : _msg.reasoning;
         }
         if (!caption) return { result: 'Error: vision fallback returned no caption.' };
-        return { result: 'image:' + clean + ' (captioned via ' + fb.model + ' — this model cannot see images):\n\n' + String(caption).trim() };
+        return { result: 'image:' + clean + '\n\n(captioned via ' + fb.model + ' — this model cannot see images):\n\n' + String(caption).trim() };
       } catch (e2) {
         return { result: 'Error: vision fallback captioning request failed (' + ((e2 && e2.message) || e2) + ').' };
       }
