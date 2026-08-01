@@ -165,7 +165,43 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
         required: ['src'],
       },
     },
-    write_todos: {
+    share: {
+      description: `Share a file or folder in OPFS with the team or with specific people (1:1).
+The share is performed by the page (Dropbox), so this tool returns once it is published.
+- type "team": recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["R+D+I"]) — the item is copied into that department's shared hub; only that department can read it (Dropbox folder membership is the boundary).
+- type "p2p": recipients are EMAIL addresses — a folder is shared live in place, a single file is wrapped into an outbox folder, and each recipient is invited as a folder member.
+permissions: "viewer" (default, read-only) or "editor" (may write back); "read"/"write" aliases accepted. Permissions apply to p2p invites; team shares are bounded by the department folder membership.
+path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "sandpie/artifacts/x.html").' },
+          type: { type: 'string', enum: ['team', 'p2p'], description: '"team" = publish to department hub(s); "p2p" = share 1:1 with email recipients.' },
+          recipients: { type: 'array', items: { type: 'string' }, description: 'team: department folder names (e.g. ["R+D+I"]); p2p: recipient email addresses.' },
+          permissions: { type: 'string', enum: ['viewer', 'editor'], description: '"viewer" (default) read-only, or "editor" (recipient may write back).' },
+        },
+        required: ['path', 'type', 'recipients'],
+      },
+    },
+    share: {
+      description: `Share a file or folder in OPFS with the team or with specific people (1:1).
+The share is performed by the page (Dropbox), so this tool returns once it is published.
+- type "team": recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["R+D+I"]) — the item is copied into that department's shared hub; only that department can read it (Dropbox folder membership is the boundary).
+- type "p2p": recipients are EMAIL addresses — a folder is shared live in place, a single file is wrapped into an outbox folder, and each recipient is invited as a folder member.
+permissions: "viewer" (default, read-only) or "editor" (may write back); "read"/"write" aliases accepted. Permissions apply to p2p invites; team shares are bounded by the department folder membership.
+path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "sandpie/artifacts/x.html").' },
+        type: { type: 'string', enum: ['team', 'p2p'], description: '"team" = publish to department hub(s); "p2p" = share 1:1 with email recipients.' },
+        recipients: { type: 'array', items: { type: 'string' }, description: 'team: department folder names (e.g. ["R+D+I"]); p2p: recipient email addresses.' },
+        permissions: { type: 'string', enum: ['viewer', 'editor'], description: '"viewer" (default) read-only, or "editor" (recipient may write back).' },
+      },
+      required: ['path', 'type', 'recipients'],
+    },
+  },
+  write_todos: {
       description: `Create and manage a structured task list for the current session. This helps you track progress, organize complex work, and demonstrate to the user that you understand the scope.
 Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).
 Do NOT use it for: a single straightforward task; trivial work; anything doable in under 3 steps; purely conversational requests — it only adds overhead there.

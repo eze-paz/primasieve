@@ -217,6 +217,14 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Page → worker reply to a share() request (see tool_share below). Resolves the
+  // deferred the tool is awaiting with the page's publish result/error.
+  if (data.type === 'share-result') {
+    const d = _shareReqs.get(data.id);
+    if (d) { _shareReqs.delete(data.id); d.resolve({ result: data.result }); }
+    return;
+  }
+
   if (data.type === 'tool') {
     const { id, name, args, conversation_file_name } = data;
     const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
@@ -788,6 +796,49 @@ async function tool_load_image({ path }, ctx) {
   } catch (e) { return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' }; }
 }
 
+// ---- share() — worker → page round-trip --------------------------------
+// Sharing needs the page: Dropbox tokens and the OPFS/cloud machinery live in
+// sharing.js on the main thread, not in this worker. tool_share posts a
+// share-request to the page (forward-to-page relay) and awaits the reply. The
+// page (conversations.js) calls SandpieSharing.publish and replies share-result.
+const SHARE_TIMEOUT = 60000;
+const _shareReqs = new Map();
+
+async function tool_share(args, ctx) {
+  const path = String(args.path || '').trim();
+  const type = String(args.type || '').toLowerCase();
+  const perms = String(args.permissions || 'viewer').toLowerCase();
+  const recips = Array.isArray(args.recipients)
+    ? args.recipients.map(String).filter(Boolean)
+    : (typeof args.recipients === 'string' && args.recipients.trim()
+        ? args.recipients.split(',').map(s => s.trim()).filter(Boolean) : []);
+  if (!path) return { result: 'Error: "path" is required (OPFS path of the file or folder to share).' };
+  if (type !== 'team' && type !== 'p2p') return { result: 'Error: "type" must be "team" or "p2p".' };
+  const level = (perms === 'editor' || perms === 'write') ? 'editor' : 'viewer';
+  if (!recips.length) {
+    return { result: 'Error: "recipients" is required — ' + (type === 'team'
+      ? 'team/department folder names (e.g. ["R+D+I"]).'
+      : 'recipient email addresses.') };
+  }
+  if (type === 'p2p' && !recips.every(r => r.includes('@'))) {
+    return { result: 'Error: p2p recipients must be email addresses.' };
+  }
+  const id = 'share_' + Math.random().toString(36).slice(2);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      _shareReqs.delete(id);
+      resolve({ result: 'Error: share request timed out after ' + (SHARE_TIMEOUT / 1000) + 's (the page did not reply).' });
+    }, SHARE_TIMEOUT);
+    _shareReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
+    try {
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, permissions: level } } });
+    } catch (e) {
+      clearTimeout(timer); _shareReqs.delete(id);
+      resolve({ result: 'Error: could not reach the page to perform the share (' + ((e && e.message) || e) + ').' });
+    }
+  });
+}
+
 async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
@@ -1289,7 +1340,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -1350,6 +1401,7 @@ async function runTool(name, args, ctx) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'shell':         return tool_shell(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
+    case 'share':         return tool_share(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
     case 'read_file':     return tool_read_file(args, ctx);

@@ -1366,7 +1366,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=85');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=86');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1387,6 +1387,27 @@ function getSandpieWorker() {
         const paths = (msg.payload && msg.payload.type === 'sw-opfs-changed' && Array.isArray(msg.payload.paths)) ? msg.payload.paths : [];
         if (paths.some(p => /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(p)) && typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:changed', {});
       } catch (_) {}
+      // share() tool: the worker posts a share-request; perform it here (the page
+      // owns Dropbox + sharing.js) and reply with the publish result.
+      if (msg.payload && msg.payload.type === 'share-request') {
+        const pr = msg.payload;
+        (async () => {
+          const reply = (result) => { try { _sandpieWorker.postMessage({ type: 'share-result', id: pr.id, result }); } catch (_) {} };
+          try {
+            const s = window.SandpieSharing;
+            if (!s || typeof s.publish !== 'function') { reply('Error: sharing is not available on this page (SandpieSharing missing or not yet loaded).'); return; }
+            const audience = (pr.args.type === 'p2p')
+              ? { org: false, users: pr.args.recipients, teams: [] }
+              : { org: false, users: [], teams: pr.args.recipients };
+            const out = await s.publish(pr.args.path, audience, { access: pr.args.permissions, title: String(pr.args.path).split('/').pop() });
+            reply('Shared "' + pr.args.path + '" (' + pr.args.type + ', ' + (out && out.access) + ').'
+              + ((out && out.dests && out.dests.length) ? '\n' + out.dests.join('\n') : ''));
+          } catch (e) {
+            reply('Error sharing "' + pr.args.path + '": ' + ((e && e.message) || e));
+          }
+        })();
+        return;
+      }
       return;
     }
     if (msg.type === 'managed-token-refreshed') {
