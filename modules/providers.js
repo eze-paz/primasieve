@@ -53,7 +53,6 @@ const AI_HTML = `
           <option value="no">If preferred upstreams fail: error (no fallback)</option>
         </select>
         <select id="spVision">
-          <option value="auto">Vision: auto (detect at runtime)</option>
           <option value="yes">Vision: yes (this model accepts images)</option>
           <option value="no">Vision: no (text only)</option>
         </select>
@@ -514,7 +513,7 @@ function renderModelPicker() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
-    b.textContent = p.name || p.model || 'Unnamed';
+    b.textContent = (p.name || p.model || 'Unnamed') + (providerCanSee(p) ? ' 👁' : ' TXT');
     if (p.model) b.title = p.model;
     b.addEventListener('click', () => { host.classList.remove('open'); const mp = document.querySelector('.mp-panel'); if (mp) mp.classList.remove('visible'); selectProvider(p.id); });
     return b;
@@ -587,7 +586,7 @@ function loadFormFor(id) {
   set('spReasoningEffort', p.reasoningEffort);
   set('spProviderOrder', Array.isArray(p.providerOrder) ? p.providerOrder.join(', ') : '');
   set('spAllowFallbacks', p.allowFallbacks === false ? 'no' : 'yes');
-  set('spVision', p.vision || 'auto');
+  set('spVision', p.vision === 'no' ? 'no' : 'yes');
   renderVisionFallbackOptions(p.id);
   set('spVisionFallback', p.visionFallbackId || '');
   set('spType', p.type || 'openai');
@@ -615,12 +614,11 @@ function applyTypeUI() {
   // Fallback choice only matters once a preferred-provider order is set.
   const hasOrder = !!(document.getElementById('spProviderOrder')?.value || '').trim();
   show('spAllowFallbacks', !local && hasOrder);
-  // Vision capability (auto = detect at runtime) + vision-fallback picker. The
-  // fallback only matters when the model may NOT see images (auto or no), so it
-  // hides once the user marks the model vision:yes.
+  // Vision capability (yes/no) + vision-fallback picker. The fallback only matters
+  // when the model is text-only (no), so it hides once the user marks vision:yes.
   show('spVision', true);
-  const vision = (document.getElementById('spVision')?.value) || 'auto';
-  show('spVisionFallback', vision !== 'yes');
+  const vision = (document.getElementById('spVision')?.value) || 'yes';
+  show('spVisionFallback', vision === 'no');
   // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
   // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
@@ -648,23 +646,42 @@ function applyTypeUI() {
   if (cw) cw.placeholder = webgpu ? 'Context size (default 4096; ↑ = more GPU memory)' : (litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)');
 }
 
-// Populate the vision-fallback dropdown with every provider EXCEPT the one being
-// edited (a model can't fall back to itself). Includes company-managed providers —
-// a company MiMo model is a valid vision fallback for a personal text-only model.
-// '👁' marks providers manually declared vision:yes so the user can pick a visual
-// model at a glance. Rebuilt on every loadFormFor, so add/delete/duplicate stays in sync.
+// Populate the vision-fallback dropdown with every vision-CAPABLE provider except
+// the one being edited (a model can't fall back to itself). Includes company-managed
+// providers — a company MiMo model is a valid vision fallback for a personal
+// text-only model. Rebuilt on every loadFormFor, so add/delete/duplicate stays in sync.
 function renderVisionFallbackOptions(activeId) {
   const sel = document.getElementById('spVisionFallback');
   if (!sel) return;
   const prev = sel.value;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const opts = [..._managed, ..._providers].filter(p => p.id !== activeId);
+  // Only vision-capable providers make sense as a fallback (a text-only model
+  // can't see the rerouted images either).
+  const opts = [..._managed, ..._providers].filter(p => p.id !== activeId && providerCanSee(p));
   sel.innerHTML = '<option value="">— no vision fallback —</option>'
     + opts.map(p => {
       const name = (p.name && p.name !== p.model) ? p.name + ' (' + p.model + ')' : (p.name || p.model || 'Unnamed');
-      return '<option value="' + esc(p.id) + '">' + esc(name) + (p.vision === 'yes' ? ' · 👁' : '') + '</option>';
+      return '<option value="' + esc(p.id) + '">' + esc(name) + '</option>';
     }).join('');
   sel.value = prev;
+}
+
+// Does this provider accept images? Local in-browser engines (LiteRT-LM / WebGPU)
+// are always text-only regardless of the setting; cloud providers can see unless
+// explicitly marked vision:no (an unset field keeps legacy behavior = can see).
+function providerCanSee(p) {
+  if (!p) return false;
+  if (p.type === 'webgpu' || p.type === 'litertlm') return false;
+  return p.vision !== 'no';
+}
+
+// Resolve a provider's configured vision fallback — the model that receives image
+// turns when THIS model can't see. Returns null when unset or when the target
+// can't see either.
+function resolveVisionFallback(p) {
+  if (!p || !p.visionFallbackId) return null;
+  const fb = getProviderById(p.visionFallbackId);
+  return (fb && providerCanSee(fb)) ? fb : null;
 }
 
 // Commit form edits to the active provider (auto-save on field change/blur).
@@ -690,8 +707,7 @@ function commitForm() {
   if (po.length) p.providerOrder = po; else delete p.providerOrder;
   const af = (document.getElementById('spAllowFallbacks')?.value) || 'yes';
   if (po.length && af === 'no') p.allowFallbacks = false; else delete p.allowFallbacks;
-  const vs = val('spVision') || 'auto';
-  if (vs !== 'auto') p.vision = vs; else delete p.vision;
+  p.vision = (val('spVision') === 'no') ? 'no' : 'yes';
   const vf = val('spVisionFallback');
   if (vf && vf !== p.id) p.visionFallbackId = vf; else delete p.visionFallbackId;
   applyTypeUI();   // reflect fallback-select visibility as the order field changes
@@ -832,6 +848,8 @@ window.SandpieProviders = {
   refreshDot: refreshAiDot,
   setManaged,
   clearManaged,
+  providerCanSee,
+  resolveVisionFallback,
 };
 
 function bootProviders() {

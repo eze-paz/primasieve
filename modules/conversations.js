@@ -1364,7 +1364,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=83');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=84');
   window._sandpieWorker = _sandpieWorker;
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
@@ -1464,10 +1464,12 @@ async function sendSingle(text, stream, opts = {}) {
   // config turns out to be incomplete, the message stays in the conversation and
   // the error appears after it — never in place of it.
   let wasAborted = false;
+  let userBubbleEl = null;
   if (!opts?.resume) {
     const userMsg = { role: 'user', content: text };
     convMessages.push(userMsg);
-    bindBubble(addMsg('user', text, host), userMsg);
+    userBubbleEl = addMsg('user', text, host);
+    bindBubble(userBubbleEl, userMsg);
     saveConv(convId).catch(() => {});
   }
 
@@ -1509,6 +1511,13 @@ async function sendSingle(text, stream, opts = {}) {
   startTotalTimer(stream);
 
   let config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
+  // Rerouted to the vision fallback — mark the user's bubble so the switch is visible.
+  if (config.routedViaVision && userBubbleEl) {
+    const mk = document.createElement('span');
+    mk.style.cssText = 'display:block;font-size:0.7rem;color:var(--sp-text-dim);margin-top:0.25rem;';
+    mk.textContent = '📷 → ' + ((config.model || 'vision model'));
+    userBubbleEl.appendChild(mk);
+  }
   // Reactive boundary correction. If the BUILT request is still over the gateway's
   // ~1 MB cap, the compaction boundary is behind where it should be — e.g. an older
   // chat whose mid-turn compactions never persisted a boundary, so buildAgentConfig
@@ -1596,7 +1605,7 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
-    if (_isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
+    if (!config.routedViaVision && _isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
       // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
       try { await SandpieQwen3?.unload?.(); } catch (_) {}
       await SandpieLiteRTLM.runConversation(
@@ -1606,7 +1615,7 @@ async function sendSingle(text, stream, opts = {}) {
     } else {
     const _isDense = _isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
       && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
-    if (_isDense && SandpieQwen3.runConversation) {
+    if (!config.routedViaVision && _isDense && SandpieQwen3.runConversation) {
       await SandpieQwen3.runConversation(
         { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal, logprobs: !!window.__SP_LOGPROBS__ },
         dispatch,
@@ -1700,8 +1709,6 @@ async function resolveFilePart(f) {
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
 async function buildAgentConfig(convMessages, compaction, curTodos) {
-  const endpoint = $('endpoint').value.replace(/\/$/, '');
-  const url = new URL(api(endpoint + '/chat/completions'), location.href).href;
   // Non-destructive compaction: send [summary, …in-context tail] in place of the
   // full history so the model's context stays bounded. The full convMessages
   // still drives the system prompt (skill detection) below.
@@ -1712,11 +1719,34 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
       ...convMessages.slice(compaction.boundary),
     ];
   }
+  // ---- Vision routing gate (yes/no only) --------------------------------
+  // A model that can't see (vision:no, or a local in-browser engine) reroutes the
+  // WHOLE turn to its configured vision fallback when the CURRENT message carries
+  // images; text-only turns sent to it strip image_url parts from the history so
+  // old image turns don't 400. An unset vision field keeps legacy behavior (can
+  // see) — see SandpieProviders.providerCanSee.
+  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+  const canSee = (active && typeof SandpieProviders.providerCanSee === 'function')
+    ? SandpieProviders.providerCanSee(active) : true;
+  const lastUser = [...sendMessages].reverse().find(m => m.role === 'user' && Array.isArray(m.content));
+  const currentHasImages = !!(lastUser && lastUser.content.some(p => p.type === 'image_url'));
+  const visionFallback = (!canSee && typeof SandpieProviders.resolveVisionFallback === 'function')
+    ? SandpieProviders.resolveVisionFallback(active) : null;
+  let effective = active;
+  let routedViaVision = false;
+  if (!canSee && currentHasImages && visionFallback) {
+    effective = visionFallback;
+    routedViaVision = true;
+  }
+  const stripImages = !canSee && !currentHasImages;   // never silently drop a fresh attachment
   const resolvedMessages = [];
   for (const msg of sendMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
       const resolvedContent = [];
       for (const part of msg.content) {
+        if (part.type === 'image_url' && stripImages) {
+          continue;                                   // history image → not for a text-only model
+        }
         if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
           const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
           if (dataUrl) {
@@ -1733,32 +1763,45 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
       resolvedMessages.push(msg);
     }
   }
-  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+  const _ep = (effective && effective.endpoint) ? String(effective.endpoint).replace(/\/$/, '') : $('endpoint').value.replace(/\/$/, '');
   return {
-    url,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + $('apiKey').value },
+    url: new URL(api(_ep + '/chat/completions'), location.href).href,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
     // Managed (company sign-in) provider only: let the worker silently re-mint the
     // session token from the SSO cookie via /auth/token on a 401, so an expired JWT
     // never interrupts the user mid-generation. null for personal providers — a 401
     // there is a real bad-key error, not a refreshable session.
-    authRefreshUrl: (active && active.managed) ? new URL('/auth/token', location.href).href : null,
-    _hermesMode: !!(active && active.type === 'hermes'),
-    model: $('model').value,
+    authRefreshUrl: (effective && effective.managed) ? new URL('/auth/token', location.href).href : null,
+    _hermesMode: !!(effective && effective.type === 'hermes'),
+    model: (effective && effective.model) || $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages),
     messages: resolvedMessages,
     tools: toolDefs(),
+    // Rerouted to the vision fallback for this turn (user attached an image to a
+    // text-only model). The composer marks the user bubble; the worker just uses
+    // this config as-is (url/headers/model already point at the fallback).
+    routedViaVision: !!routedViaVision,
+    // Vision facts for the worker's tools: can the active model see, and where can
+    // a caption be requested from when it can't (tool_load_image uses this).
+    vision: {
+      canSee: !!canSee,
+      fallback: visionFallback ? {
+        endpoint: visionFallback.endpoint || '', apiKey: visionFallback.apiKey || '',
+        model: visionFallback.model || '', proxyUrl: visionFallback.proxyUrl || '',
+      } : null,
+    },
     // Only what the provider config explicitly sets — no invented default. Absent
     // means absent on the wire (OpenAI-spec default: the model's own maximum).
-    maxTokens: (active && active.maxTokens != null) ? active.maxTokens : null,
-    temperature: (active && active.temperature != null) ? active.temperature : null,
-    topP: (active && active.topP != null) ? active.topP : null,
-    reasoningEffort: (active && active.reasoningEffort) || null,
+    maxTokens: (effective && effective.maxTokens != null) ? effective.maxTokens : null,
+    temperature: (effective && effective.temperature != null) ? effective.temperature : null,
+    topP: (effective && effective.topP != null) ? effective.topP : null,
+    reasoningEffort: (effective && effective.reasoningEffort) || null,
     // OpenRouter upstream routing, already in wire shape ({ order, allow_fallbacks })
     // so the worker can drop it straight into the request body's `provider` field.
-    providerRouting: (active && Array.isArray(active.providerOrder) && active.providerOrder.length)
-      ? { order: active.providerOrder, allow_fallbacks: active.allowFallbacks !== false }
+    providerRouting: (effective && Array.isArray(effective.providerOrder) && effective.providerOrder.length)
+      ? { order: effective.providerOrder, allow_fallbacks: effective.allowFallbacks !== false }
       : null,
-    reasoning: (active && active.reasoning) || null,
+    reasoning: (effective && effective.reasoning) || null,
     origin: location.origin,
     conversation_file_name: activeConvId,
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).

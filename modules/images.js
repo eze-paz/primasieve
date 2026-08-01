@@ -255,6 +255,23 @@ const SandpieImages = (function() {
   // ATTACH PATHS (push to _attachments; caller calls renderPreviews once)
   // ============================================================
 
+  // If the ACTIVE model is text-only (vision:no) and has no vision fallback, warn
+  // at attach time — the image would otherwise 400 at send. Silent when the model
+  // can see, or a fallback exists (the send will reroute).
+  function _warnVisionFallback(name) {
+    try {
+      if (typeof SandpieProviders === 'undefined' || !SandpieProviders.getActive) return;
+      const act = SandpieProviders.getActive();
+      if (!act) return;
+      const canSee = SandpieProviders.providerCanSee ? SandpieProviders.providerCanSee(act) : true;
+      const hasFb = !!(SandpieProviders.resolveVisionFallback && SandpieProviders.resolveVisionFallback(act));
+      if (!canSee && !hasFb) {
+        const who = act.name || act.model || 'This model';
+        if (typeof opfs !== 'undefined' && opfs._toast) opfs._toast('⚠ ' + who + " can't see images and has no vision fallback — set one in Settings → AI provider, or the send will fail.", 6000);
+      }
+    } catch (_) {}
+  }
+
   async function attachImage(file, { basePath = null, addComposerChip = false } = {}) {
     let blob = file;
     let name = file.name || ("image_" + Date.now() + ".jpg");
@@ -280,6 +297,7 @@ const SandpieImages = (function() {
         mime: blob.type || getMimeType(opfsPath), size: bytes.length,
         file: { name, type: blob.type || getMimeType(opfsPath) },
       });
+      _warnVisionFallback(name);
     }
     return opfsPath;
   }

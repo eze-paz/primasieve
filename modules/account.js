@@ -98,6 +98,9 @@ const SandpieAccount = (() => {
         maxTokens: m.maxOutput,
         temperature: m.temperature,
         reasoningEffort: m.reasoningEffort,
+        // Vision config pre-set by the company admin in models.json (yes/no only).
+        vision: (m.vision === 'yes') ? 'yes' : 'no',
+        visionFallbackId: m.visionFallback ? '__managed:' + m.visionFallback : undefined,
       })), cat.defaultModel);
     } else {
       SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });

@@ -739,6 +739,43 @@ async function tool_load_image({ path }, ctx) {
     let bin = ''; const CHUNK = 0x8000;
     for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
     const dataUrl = 'data:' + mime + ';base64,' + btoa(bin);
+    // Vision gate (yes/no): a text-only model can't use the raw image — asking the
+    // vision fallback for a caption keeps the pixels OUT of the context AND gives
+    // the model text it can actually reason over. No fallback configured → explain
+    // (the page already warned at attach time). Vision-capable models keep the raw
+    // image (embedded in the next request as before).
+    const _vis = ctx && ctx._agentConfig && ctx._agentConfig.vision;
+    if (_vis && !_vis.canSee) {
+      const fb = _vis.fallback;
+      if (!fb || !fb.endpoint || !fb.apiKey || !fb.model) {
+        return { result: 'Error: this model cannot see images and no vision fallback is configured. Attach images to a vision-capable model, or set a vision fallback in Settings \u2192 AI provider.' };
+      }
+      try {
+        const capRes = await fetch(String(fb.endpoint).replace(/\/$/, '') + '/chat/completions', {
+          method: 'POST', credentials: 'omit',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + fb.apiKey },
+          body: JSON.stringify({
+            model: fb.model,
+            messages: [{ role: 'user', content: [
+              { type: 'text', text: 'Describe this image in detail for an assistant that cannot see it. Transcribe any visible text verbatim, note layout/figures/tables, and state anything a viewer would need to reason about the image. Be factual and complete.' },
+              { type: 'image_url', image_url: { url: dataUrl } },
+            ] }],
+            max_tokens: 512,
+          }),
+          signal: (ctx && ctx.signal) || undefined,
+        });
+        if (!capRes.ok) {
+          let txt = ''; try { txt = (await capRes.text()).slice(0, 300); } catch (_) {}
+          return { result: 'Error: vision fallback captioning failed (HTTP ' + capRes.status + (txt ? ': ' + txt : '') + ').' };
+        }
+        const cap = await capRes.json();
+        const caption = cap && cap.choices && cap.choices[0] && cap.choices[0].message && cap.choices[0].message.content;
+        if (!caption) return { result: 'Error: vision fallback returned no caption.' };
+        return { result: 'image:' + clean + ' (captioned via ' + fb.model + ' — this model cannot see images):\n\n' + String(caption).trim() };
+      } catch (e2) {
+        return { result: 'Error: vision fallback captioning request failed (' + ((e2 && e2.message) || e2) + ').' };
+      }
+    }
     return { result: 'image:' + clean, image: { path: clean, dataUrl } };
   } catch (e) { return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' }; }
 }
