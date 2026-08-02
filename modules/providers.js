@@ -513,7 +513,7 @@ function renderModelPicker() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
-    b.textContent = (p.name || p.model || 'Unnamed') + (providerCanSee(p) ? ' 👁' : ' TXT');
+    b.textContent = p.name || p.model || 'Unnamed';
     if (p.model) b.title = p.model;
     b.addEventListener('click', () => { host.classList.remove('open'); const mp = document.querySelector('.mp-panel'); if (mp) mp.classList.remove('visible'); selectProvider(p.id); });
     return b;
