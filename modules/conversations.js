@@ -1399,7 +1399,13 @@ function getSandpieWorker() {
             const audience = (pr.args.type === 'p2p')
               ? { org: false, users: pr.args.recipients, teams: [] }
               : { org: false, users: [], teams: pr.args.recipients };
-            const out = await s.publish(pr.args.path, audience, { access: pr.args.permissions, title: String(pr.args.path).split('/').pop() });
+            // pin:true matches the manual share dialog's default ("Pin to their home
+          // screen") — install() then auto-pins the INSTALLED copy AFTER copying
+          // the files, so the pin never points at a not-yet-installed path. The
+          // follow-up autoSync installs the just-published team package NOW instead
+          // of waiting for the 60s poll, so the pin resolves immediately.
+          const out = await s.publish(pr.args.path, audience, { access: pr.args.permissions, title: String(pr.args.path).split('/').pop(), pin: true });
+          try { await s.autoSync(); } catch (_) {}
             reply('Shared "' + pr.args.path + '" (' + pr.args.type + ', ' + (out && out.access) + ').'
               + ((out && out.dests && out.dests.length) ? '\n' + out.dests.join('\n') : ''));
           } catch (e) {
