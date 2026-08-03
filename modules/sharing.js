@@ -395,34 +395,42 @@
     }));
     return out;
   }
-  // Per-hub manifest cache keyed by each manifest's Dropbox rev. Session-only, and
-  // the rev arrives in the listing we already have to make — so a scan where
-  // nothing changed costs exactly ONE request per department.
-  const _hubRev = new Map();   // hubRoot -> { id: rev }
-  const _hubMan = new Map();   // hubRoot -> { id: manifest }
-  async function listManifests(store) {
-    const key = store.root;
-    const prevRev = _hubRev.get(key) || {}, prevMan = _hubMan.get(key) || {};
-    // ONE recursive listing yields every manifest AND its rev. The previous version
-    // did a listDirs plus two round trips per package, strictly one after another —
-    // so a handful of departments with a few packages each took tens of seconds.
-    let entries = [];
-    try { entries = await store.listEntries('packages'); } catch (_) { return []; }
-    const revs = {}, ids = [], stale = [];
-    for (const e of entries) {
-      const m = /^([^/]+)\/(package\.json|manifest\.json)$/.exec(e.rel);
-      if (!m) continue;
-      const id = m[1];
-      revs[id] = e.rev || '';
-      ids.push(id);
-      if (!(prevRev[id] === revs[id] && prevMan[id])) stale.push(id);
+  // Cursor-delta listing of the team hub's packages. The cursor is a per-device
+  // localStorage variable (same pattern as dropbox.js dbxfull-cursor) — never a
+  // file. On the FIRST scan (or after a stale cursor) we do a full list and store
+  // the cursor; afterwards list_folder/continue returns ONLY what changed, so a
+  // package only comes back with _changed=true when its content actually moved.
+  // No manifest is read: the folder under packages/<id>/ IS the package.
+  const HUB_CURSOR_KEY = 'sandpie-share-cursor';     // localStorage: { [hubRoot]: cursor }
+  function hubCursor(root) { try { return JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}')[root] || null; } catch (_) { return null; } }
+  function setHubCursor(root, c) { try { const m = JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}'); if (!c) delete m[root]; else m[root] = c; localStorage.setItem(HUB_CURSOR_KEY, JSON.stringify(m)); } catch (_) {} }
+  async function listPackages(store) {
+    const p = prov(), root = store.root;
+    const isFull = !hubCursor(root);
+    let result = null;
+    if (!isFull && p.cloudListContinue) {
+      try { result = await p.cloudListContinue(hubCursor(root), { team: true }); }
+      catch (_) { result = null; }   // stale/expired cursor → fall back to a full list
     }
-    const fetched = await mapLimited(stale, 8, (id) => readManifest(store, id));
-    const mans = {};
-    for (const id of ids) if (prevMan[id]) mans[id] = prevMan[id];
-    stale.forEach((id, k) => { const m = fetched[k]; if (m && m.id) mans[id] = m; else delete mans[id]; });
-    _hubRev.set(key, revs); _hubMan.set(key, mans);
-    return ids.map(id => mans[id]).filter(Boolean).map(m => ({ ...m, _store: store }));
+    if (!result) {
+      if (!p.cloudListWithCursor) return [];   // provider lacks cursor listing
+      try { result = await p.cloudListWithCursor(root + '/packages', { team: true }); }
+      catch (e) { if (String((e && e.message) || e).includes('not_found')) { setHubCursor(root, ''); return []; } throw e; }
+    }
+    setHubCursor(root, result.cursor || '');
+    const byId = {};
+    for (const e of result.entries) {
+      const m = /^([^/]+)(?:\/(.*))?$/.exec(e.rel || '');
+      if (!m) continue;
+      const id = m[1], hasFile = !!m[2];
+      const rec = byId[id] || (byId[id] = { id, kind: 'folder', title: id, publisher: '', rev: 0, cursor: '', pin: null, _store: store });
+      if (hasFile) rec._changed = true;                       // content present / changed
+      if (m[2] === 'SKILL.md') rec.kind = 'skill';            // derive kind from SKILL.md presence
+    }
+    const out = Object.keys(byId).map(id => byId[id]);
+    // First full scan: everything is "changed" so autoSync installs what is missing.
+    if (isFull) for (const m of out) m._changed = true;
+    return out;
   }
   // 1:1 layout: the shared folder IS the package — marker at its root, files
   // alongside. Returns {manifest} | {missing:true} | {error}. The caller MUST only
@@ -509,8 +517,9 @@
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); else missed.push(rel); }
       if (missed.length === files.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
       if (missed.length) console.warn('[sharing] published without ' + missed.length + ' unreadable file(s):', missed);
-      await store.writeText('packages/' + id + '/' + PKG_FILE, JSON.stringify(mk(rev), null, 2));
-      try { await store.writeText('packages/' + id + '/' + LEGACY_MANIFEST, ''); } catch (_) {}   // migration: blank the old name
+      // No manifest: the package folder IS the package (content only). Recipients
+      // detect changes via the per-device list_folder cursor in localStorage, so
+      // nothing else is written to the hub.
       invalidateTeams();   // my own publish should appear now, not on the next slow scan
       dests.push(store.kind + ':' + store.root);
     }
@@ -599,7 +608,7 @@
       await Promise.all(list.map(async (t) => {
         if (!hubRoot(t.name)) return;   // not a usable department (e.g. the hub dir itself)
         try {
-          for (const m of await listManifests(teamHub(t.name))) { m._from = 'team'; m._team = t.name; found[m.id] = m; }
+          for (const m of await listPackages(teamHub(t.name))) { m._from = 'team'; m._team = t.name; found[m.id] = m; }
         } catch (e) { allRead = false; console.debug('[sharing] team hub unreadable', t.name, (e && e.message) || e); }
       }));
       _teamCatalog = found;
@@ -883,10 +892,9 @@
         let mk = null; try { mk = await readInstalledState(id); } catch (_) {}
         if (m._from === 'team') {
           teamIds.add(id);
-          // Reinstall on a manifest rev bump OR a cursor change — every publish
-          // AND every write-back push bumps package.json.cursor, so recipients see
-          // the drift without any per-file rev comparison.
-          if (!mk || String(mk.rev) !== String(m.rev) || (m.cursor && (!mk.cursor || String(mk.cursor) !== String(m.cursor)))) { await install(m); changed = true; }   // install() marks from='team'
+          // Reinstall when the cursor delta says this package's content changed
+          // (_changed) or it isn't installed yet. No manifest, no per-file compare.
+          if (!mk || m._changed) { await install(m); changed = true; }   // install() marks from='team'
           continue;
         }
         // 1:1 — refresh only what's installed AND accepted at this rev.
@@ -1495,12 +1503,8 @@
       const newRev = (resp && resp.rev) || hubRev;
       mk.seen = mk.seen || {}; mk.seen[rel] = newRev;         // next edit compares against OUR push
       mk.dirty = mk.dirty || {}; delete mk.dirty[rel];        // local == dropbox again
-      // Bump the hub package.json cursor so every recipient re-syncs — the change
-      // signal that replaced per-file rev comparison for team packages.
-      try {
-        const cur = await readManifest(store, id);
-        if (cur) { cur.cursor = Date.now(); await store.writeText('packages/' + id + '/' + PKG_FILE, JSON.stringify(cur, null, 2)); mk.cursor = cur.cursor; }
-      } catch (_) {}
+      // No hub metadata to bump: recipients see this upload through their own
+      // list_folder cursor delta (localStorage), exactly like the workspace sync.
       await wbWriteMarker(id, mk);
       // success is silent — the file simply appears in the hub; only failures notify
     } catch (err) {

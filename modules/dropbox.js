@@ -1594,6 +1594,18 @@
         try { return (await listFolder(absPath, { recursive, team, ns })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
       },
+      // Cursor-based delta listing for the TEAM hub — mirrors the workspace sync's
+      // dbxfull-cursor: the cursor is a per-device localStorage variable, never a
+      // file. Returns {entries, cursor}; callers store the cursor and pass it to
+      // cloudListContinue() on the next poll to get ONLY what changed.
+      async cloudListWithCursor(absPath, { team = true, ns = '' } = {}) {
+        try { return await listFolder(absPath, { recursive: true, team, ns }); }
+        catch (e) { if (String((e && e.message) || e).includes('not_found')) return { entries: [], cursor: '' }; throw e; }
+      },
+      async cloudListContinue(cursor, { team = true } = {}) {
+        try { return await listContinue(cursor); }
+        catch (e) { throw e; }   // stale/expired cursor → caller falls back to a full list
+      },
       // Workspace-scoped variants (home namespace) — used by sharing.js to clean up
       // its own copies inside the user's workspace, which is NOT in the team root.
       workspaceDelete: (absPath) => del(absPath, { team: false }),
