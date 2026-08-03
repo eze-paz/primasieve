@@ -96,40 +96,59 @@
       if (!m) continue;
       const dept = m[1], id = m[2], hasFile = !!m[3];
       if (id === 'shared-hub' || id === 'shared-incoming') continue;   // legacy containers, not artifacts
+      const rec4 = () => { const d = out[dept] || (out[dept] = {}); return d[id] || (d[id] = { changed: false, kind: 'folder', revs: {}, gone: [] }); };
       if (e.kind === 'deleted') {                         // tombstone from include_deleted
         if (!hasFile) { removed.push({ dept, id }); continue; }   // the artifact folder itself vanished
-        const d0 = out[dept] || (out[dept] = {});
-        const r0 = d0[id] || (d0[id] = { changed: false, kind: 'folder', revs: {}, gone: [] });
-        r0.changed = true; r0.gone.push(m[3]);
+        const r0 = rec4();
+        r0.changed = true;
+        delete r0.revs[m[3]];                             // entries are chronological: a later delete wins…
+        if (!r0.gone.includes(m[3])) r0.gone.push(m[3]);
         continue;
       }
       if (e.kind === 'file' && !hasFile) continue;        // loose file directly under a dept — not an artifact
-      const d = out[dept] || (out[dept] = {});
-      const rec = d[id] || (d[id] = { changed: false, kind: 'folder', revs: {}, gone: [] });
-      if (hasFile) { rec.changed = true; if (e.kind === 'file') rec.revs[m[3]] = e.rev || ''; }   // content present / moved
+      const rec = rec4();
+      if (hasFile) {
+        rec.changed = true;                               // content present / moved
+        if (e.kind === 'file') {
+          rec.revs[m[3]] = e.rev || '';
+          const gi = rec.gone.indexOf(m[3]); if (gi >= 0) rec.gone.splice(gi, 1);   // …and a later re-add undoes a delete
+        }
+      }
       if (m[3] === 'SKILL.md') rec.kind = 'skill';
     }
     if (isFull) for (const dept in out) for (const id in out[dept]) out[dept][id].changed = true;
     return { full: isFull, removed, depts: out };
   }
 
-  /* ── install: copy an artifact folder into the workspace ─────────────── */
-  async function install(dept, id, kind) {
+  /* ── install/reconcile: mirror the scanned hub state into the workspace ── */
+  // Marker files some hub folders still carry from older builds — never
+  // installed, never counted as a change. Must match what the rev comparison
+  // in autoSync skips, or every scan looks like a change forever.
+  const HUB_IGNORE = (rel) => rel === 'package.json' || rel === 'manifest.json' || /(^|\/)\./.test(rel);
+  // Everything comes from the ONE recursive cursor listing of the team root:
+  // file revs (r.revs) + tombstones (r.gone). No per-artifact re-listing —
+  // files are downloaded directly by path. On a delta r.revs only covers what
+  // changed, so the carried-over `seen` map stands in for the rest; a full
+  // listing is the authority on what exists and also prunes local strays.
+  async function install(dept, id, kind, r, full) {
     const store = cloudStore(deptRoot(dept)), dst = INSTALL_ROOT + '/' + id;
-    let prevDirty = {}, prevSeen = {}, prevPin = null;
-    try { const pm = await readInstalledState(id); prevDirty = (pm && pm.dirty) || {}; prevSeen = (pm && pm.seen) || {}; prevPin = (pm && pm.pin) || null; } catch (_) {}
-    const entries = (await store.listEntries(id)).filter(e => e.rel !== 'package.json' && e.rel !== 'manifest.json' && !e.rel.startsWith('.'));
+    let prev = null;
+    try { prev = await readInstalledState(id); } catch (_) {}
+    const prevDirty = (prev && prev.dirty) || {}, prevSeen = (prev && prev.seen) || {}, prevPin = (prev && prev.pin) || null;
+    const sameTeam = !!(prev && prev.team === dept);   // a dept move must not trust revs recorded for another dept's copy
     const local = new Set(await listOpfs(dst, '', []));
     const seen = {};
+    if (!full && sameTeam) for (const k in prevSeen) seen[k] = prevSeen[k];
     let changed = 0;
-    for (const e of entries) {
-      const p = dst + '/' + e.rel;
-      if (prevDirty[e.rel]) { seen[e.rel] = prevSeen[e.rel] || ''; continue; }   // local > dropbox
-      if (prevSeen[e.rel] && prevSeen[e.rel] === (e.rev || '') && local.has(e.rel)) { seen[e.rel] = prevSeen[e.rel]; continue; }   // rev unchanged + copy present — nothing to download
-      const bytes = await store.readBytes(id + '/' + e.rel);
-      if (!bytes) { if (local.has(e.rel)) seen[e.rel] = prevSeen[e.rel] || ''; continue; }   // download failed — keep the copy we have, retry on a later scan
+    for (const rel in r.revs) {
+      if (HUB_IGNORE(rel)) continue;
+      const p = dst + '/' + rel;
+      if (prevDirty[rel]) { if (sameTeam && prevSeen[rel] != null) seen[rel] = prevSeen[rel]; continue; }   // local edit > hub
+      if (sameTeam && prevSeen[rel] && prevSeen[rel] === r.revs[rel] && local.has(rel)) { seen[rel] = prevSeen[rel]; continue; }   // rev already held + copy present
+      const bytes = await store.readBytes(id + '/' + rel);
+      if (!bytes) { seen[rel] = (sameTeam && prevSeen[rel]) || ''; continue; }   // download failed — keep what we have; the rev mismatch retries on the next full scan
       await O().write(p, new Blob([bytes]));
-      seen[e.rel] = e.rev || '';
+      seen[rel] = r.revs[rel];
       changed++;
       // Notify the workspace sync so it mirrors the file — but NOT the write-back
       // listener: this write came FROM the hub, and pushing it back would mint a
@@ -137,17 +156,29 @@
       // is synchronous, so the flag exactly covers our own event.
       _installing = true; try { markDirty(p); } finally { _installing = false; }
     }
-    const keep = new Set(Object.keys(seen));
-    for (const rel of local) {
-      if (keep.has(rel) || prevDirty[rel]) continue;
+    for (const rel of r.gone) {                          // tombstoned on the hub
+      if (prevDirty[rel]) continue;                      // …but edited here — keep the edit
+      delete seen[rel];
+      if (!local.has(rel)) continue;
       try { await O().remove(dst + '/' + rel); } catch (_) {}
       try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', dst + '/' + rel); } catch (_) {}
       changed++;
     }
-    if (entries.some(e => e.rel === 'SKILL.md')) kind = 'skill';   // a delta that missed SKILL.md must not demote a skill to a folder
+    if (full) for (const rel of local) {                 // full listing = authority on what exists
+      if ((rel in seen) || prevDirty[rel]) continue;
+      try { await O().remove(dst + '/' + rel); } catch (_) {}
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', dst + '/' + rel); } catch (_) {}
+      changed++;
+    }
+    if (r.revs['SKILL.md'] != null) kind = 'skill';
+    else if (prev && prev.kind === 'skill' && !r.gone.includes('SKILL.md')) kind = 'skill';   // a delta that missed SKILL.md must not demote a skill
     await writeInstalledState(id, { id, title: id, kind: kind || 'folder', pin: prevPin, rev: 0, from: 'team', team: dept, seen, dirty: prevDirty });
-    if (window.SandpiePins) { try { if (prevPin) SandpiePins.remove(dst + '/' + prevPin); const p = kind === 'skill' ? 'SKILL.md' : (entries[0] && entries[0].rel); if (p) { SandpiePins.add(dst + '/' + p); } } catch (_) {} }
-    if (changed) { try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id } })); } catch (_) {} }
+    // Pin once, on first install; refreshes leave the user's pin choices alone.
+    if (!prev && window.SandpiePins) { try { const p = kind === 'skill' ? 'SKILL.md' : Object.keys(seen)[0]; if (p) SandpiePins.add(dst + '/' + p); } catch (_) {} }
+    if (changed) {
+      console.info('[sharing] ' + id + ' ← ' + dept + ': ' + changed + ' file(s) updated');
+      try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id } })); } catch (_) {}
+    }
   }
 
   /* ── autoSync: scan + install what changed ───────────────────────────── */
@@ -168,13 +199,12 @@
         let need = !mk || mk.team !== dept;
         if (!need) {
           const seenRevs = mk.seen || {}, dirty = mk.dirty || {};
-          if (r.gone.some(rel => (rel in seenRevs) || dirty[rel])) need = true;                       // a file we track was deleted on the hub
-          if (!need) for (const rel in r.revs) { if (!dirty[rel] && seenRevs[rel] !== r.revs[rel]) { need = true; break; } }   // a rev we don't hold yet
+          if (r.gone.some(rel => !HUB_IGNORE(rel) && ((rel in seenRevs) || dirty[rel]))) need = true;   // a file we track was deleted on the hub
+          if (!need) for (const rel in r.revs) { if (!HUB_IGNORE(rel) && !dirty[rel] && seenRevs[rel] !== r.revs[rel]) { need = true; break; } }   // a rev we don't hold yet
           if (!need && scan.full) for (const rel in seenRevs) { if (!(rel in r.revs)) { need = true; break; } }               // full scan: a file we hold is gone from the hub
         }
         if (!need) continue;
-        await install(dept, id, r.kind);
-        if (mk) console.info('[sharing] refreshed', id, 'from', dept);
+        await install(dept, id, r.kind, r, scan.full);
       }
       // prune installed team packages whose hub folder is gone. A cursor delta
       // only lists what CHANGED — absence there means "quiet", not "deleted" —
@@ -185,7 +215,10 @@
         const present = new Set(); for (const dept in scan.depts) for (const id in scan.depts[dept]) present.add(id);
         for (const id of Object.keys(st)) { if (st[id] && st[id].from === 'team' && !present.has(id)) { await removeInstalledLocal(id); } }
       } else {
-        for (const t of scan.removed) { const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); } }
+        for (const t of scan.removed) {
+          if (scan.depts[t.dept] && scan.depts[t.dept][t.id]) continue;   // deleted then re-created within the same delta — the re-create wins
+          const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); }
+        }
       }
       await wbRetryDirty();
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
