@@ -248,10 +248,36 @@
   let homeBusy = false, homePending = false;
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
+  // Home list = a recursive walk of the installed-packages folder. The rule is
+  // dead simple: whatever physically exists under INSTALL_ROOT shows here — no
+  // scan results, no localStorage state, no hub reachability involved.
   async function acceptedList() {
+    const entries = [];
+    const walk = async (rel) => {
+      let es = [];
+      try { es = await O().listDir(rel ? INSTALL_ROOT + '/' + rel : INSTALL_ROOT); } catch (_) { return; }
+      for (const e of es) {
+        const r = rel ? rel + '/' + e.name : e.name;
+        entries.push({ rel: r, name: e.name, kind: e.kind });
+        if (e.kind === 'directory') await walk(r);
+      }
+    };
+    await walk('');
+    const groups = {};
+    for (const e of entries) {
+      const id = e.rel.split('/')[0];
+      if (e.rel === id) { (groups[id] = groups[id] || { id, files: [] }).dir = e; continue; }
+      (groups[id] = groups[id] || { id, files: [] }).files.push(e);
+    }
     const out = [];
-    let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
-    for (const id of dirs) { let mk = null; try { mk = await readInstalledState(id); } catch (_) {} out.push(mk || { id, title: id, kind: 'folder' }); }
+    for (const g of Object.values(groups)) {
+      let mk = null; try { mk = await readInstalledState(g.id); } catch (_) {}
+      g.title = (mk && mk.title) || g.id;
+      g.team = (mk && mk.team) || '';
+      g.pin = (mk && mk.pin) || null;
+      g.kind = (mk && mk.kind) || (g.files.some(f => f.name === 'SKILL.md') ? 'skill' : 'folder');
+      out.push(g);
+    }
     return out;
   }
   async function renderHome() {
@@ -261,14 +287,22 @@
       const box = document.getElementById('sharedHome');
       const list = await acceptedList();
       if (!list.length) { box.innerHTML = ''; return; }
-      box.innerHTML = list.map(m => {
-        const entry = m.pin || (m.kind === 'skill' ? 'SKILL.md' : '');
-        const full = entry ? INSTALL_ROOT + '/' + m.id + '/' + entry : null;
-        return '<div class="shared-file">' +
-          '<button class="shared-file-open" ' + (full ? 'onclick="opfs.openFile(\'' + full + '\',\'' + entry + '\')"' : '') + '>' + (m.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(m.title || m.id) + '</button>' +
-          '<span class="shared-by">from ' + esc(m.team || 'team') + '</span>' +
-          '<button class="shared-dismiss" title="Remove" onclick="SandpieSharing.uninstall(\'' + m.id + '\')">✕</button>' +
+      box.innerHTML = list.map(g => {
+        const entry = g.pin || (g.kind === 'skill' ? 'SKILL.md' : null);
+        let full = entry ? INSTALL_ROOT + '/' + g.id + '/' + entry : null;
+        if (!full && g.dir && g.dir.kind === 'file') full = INSTALL_ROOT + '/' + g.dir.rel;
+        if (!full && g.files[0]) full = INSTALL_ROOT + '/' + g.id + '/' + g.files[0].rel;
+        const openName = entry || (g.dir && g.dir.name) || (g.files[0] && g.files[0].name) || g.id;
+        const head = '<div class="shared-file">' +
+          '<button class="shared-file-open" ' + (full ? 'onclick="opfs.openFile(\'' + full + '\',\'' + openName + '\')"' : '') + '>' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title || g.id) + '</button>' +
+          '<span class="shared-by">from ' + esc(g.team || 'team') + '</span>' +
+          '<button class="shared-dismiss" title="Remove" onclick="SandpieSharing.uninstall(\'' + g.id + '\')">✕</button>' +
           '</div>';
+        const files = g.files.map(f =>
+          '<div class="shared-file shared-file-nested">' +
+            '<button class="shared-file-open" onclick="opfs.openFile(\'' + INSTALL_ROOT + '/' + f.rel + '\',\'' + f.name + '\')">📄 ' + esc(f.rel) + '</button>' +
+          '</div>').join('');
+        return head + files;
       }).join('');
     } catch (e) { console.warn('[sharing] renderHome failed', e); } finally { homeBusy = false; if (homePending) { homePending = false; renderHome(); } }
   }

@@ -3020,6 +3020,7 @@ body.sp-decoding *::after {
 .shared-file-name { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shared-file-open { flex: 1; min-width: 0; font-size: 0.85rem; color: var(--sp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: none; text-align: left; cursor: pointer; padding: 0.1rem 0; }
 .shared-file-open:hover { color: var(--sp-accent); }
+.shared-file-nested { margin-left: 1.6rem; }
 .shared-by { font-size: 0.72rem; color: var(--sp-text-dim); flex: none; }
 .shared-accept { font-size: 0.72rem; font-weight: 600; padding: 3px 12px; flex: none; color: var(--sp-accent); background: transparent; border: 1px solid var(--sp-accent); border-radius: 7px; cursor: pointer; }
 .shared-accept:hover { background: var(--sp-accent-dim); }
