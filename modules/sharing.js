@@ -5,8 +5,11 @@
 //      sandpie/shared-installed/<artifact>/ (same name)
 //   4) keep the list_folder CURSOR in localStorage (per device, like dbxfull-cursor)
 //   5) next poll: list_folder/continue(cursor) → sync only what changed
-// That is all. No manifests, no marker files, no 1:1 deliveries, no accept/dismiss.
-// Per-device installed state (from/team/seen/dirty) also lives in localStorage.
+// That is all. No 1:1 deliveries, no accept/dismiss, and ONE metadata file per
+// artifact: .sandpie.json ({pin,title} — which file is the MAIN one). It rides
+// the same cursor (rev-tracked in `seen`) but never lands on disk — it becomes
+// pin/title in the per-device installed state.
+// Per-device installed state (from/team/seen/dirty,pin,title) also lives in localStorage.
 (function () {
   'use strict';
   const INSTALL_ROOT = 'sandpie/shared-installed';
@@ -121,10 +124,14 @@
   }
 
   /* ── install/reconcile: mirror the scanned hub state into the workspace ── */
+  // The one hub metadata file, written by publish(): {pin: <main file>, title}.
+  // Rev-tracked in `seen` like any content file (so pin changes propagate), but
+  // parsed into installed state instead of being written to disk.
+  const META = '.sandpie.json';
   // Marker files some hub folders still carry from older builds — never
   // installed, never counted as a change. Must match what the rev comparison
   // in autoSync skips, or every scan looks like a change forever.
-  const HUB_IGNORE = (rel) => rel === 'package.json' || rel === 'manifest.json' || /(^|\/)\./.test(rel);
+  const HUB_IGNORE = (rel) => rel !== META && (rel === 'package.json' || rel === 'manifest.json' || /(^|\/)\./.test(rel));
   // Everything comes from the ONE recursive cursor listing of the team root:
   // file revs (r.revs) + tombstones (r.gone). No per-artifact re-listing —
   // files are downloaded directly by path. On a delta r.revs only covers what
@@ -139,8 +146,16 @@
     const local = new Set(await listOpfs(dst, '', []));
     const seen = {};
     if (!full && sameTeam) for (const k in prevSeen) seen[k] = prevSeen[k];
-    let changed = 0;
+    let changed = 0, metaPin = null, metaTitle = null;
     for (const rel in r.revs) {
+      if (rel === META) {   // metadata: parse into state, never onto disk
+        if (sameTeam && prevSeen[rel] && prevSeen[rel] === r.revs[rel]) { seen[rel] = prevSeen[rel]; continue; }
+        const bytes = await store.readBytes(id + '/' + rel);
+        if (!bytes) { if (sameTeam && prevSeen[rel]) seen[rel] = prevSeen[rel]; continue; }
+        seen[rel] = r.revs[rel];
+        try { const j = JSON.parse(new TextDecoder().decode(bytes)); if (j && typeof j.pin === 'string' && j.pin) metaPin = j.pin; if (j && typeof j.title === 'string' && j.title) metaTitle = j.title; changed++; } catch (_) {}
+        continue;
+      }
       if (HUB_IGNORE(rel)) continue;
       const p = dst + '/' + rel;
       if (prevDirty[rel]) { if (sameTeam && prevSeen[rel] != null) seen[rel] = prevSeen[rel]; continue; }   // local edit > hub
@@ -172,9 +187,15 @@
     }
     if (r.revs['SKILL.md'] != null) kind = 'skill';
     else if (prev && prev.kind === 'skill' && !r.gone.includes('SKILL.md')) kind = 'skill';   // a delta that missed SKILL.md must not demote a skill
-    await writeInstalledState(id, { id, title: id, kind: kind || 'folder', pin: prevPin, rev: 0, from: 'team', team: dept, seen, dirty: prevDirty });
-    // Pin once, on first install; refreshes leave the user's pin choices alone.
-    if (!prev && window.SandpiePins) { try { const p = kind === 'skill' ? 'SKILL.md' : Object.keys(seen)[0]; if (p) SandpiePins.add(dst + '/' + p); } catch (_) {} }
+    const pin = metaPin != null ? metaPin : prevPin;
+    await writeInstalledState(id, { id, title: metaTitle || (prev && prev.title) || id, kind: kind || 'folder', pin, rev: 0, from: 'team', team: dept, seen, dirty: prevDirty });
+    if (window.SandpiePins) { try {
+      // First install: pin the publisher's main file (fallbacks for pre-meta artifacts).
+      if (!prev) { const p = pin || (kind === 'skill' ? 'SKILL.md' : Object.keys(seen).filter(k => k !== META)[0]); if (p) SandpiePins.add(dst + '/' + p); }
+      // Publisher moved the main file: follow it — but only if the user still has
+      // the old one pinned; a deliberate unpin stays unpinned.
+      else if (metaPin != null && prevPin && metaPin !== prevPin && SandpiePins.isPinned(dst + '/' + prevPin)) { SandpiePins.remove(dst + '/' + prevPin); SandpiePins.add(dst + '/' + metaPin); }
+    } catch (_) {} }
     if (changed) {
       console.info('[sharing] ' + id + ' ← ' + dept + ': ' + changed + ' file(s) updated');
       try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id } })); } catch (_) {}
@@ -255,14 +276,23 @@
     const dir = await isDir(src), base = src.split('/').pop();
     const id = opts.id || slug(base);
     const store = cloudStore(deptRoot(dept));
-    const files = await srcFileList(src, dir);
+    // Markers/dotfiles never install on the recipient side (HUB_IGNORE) — don't upload them.
+    const files = (await srcFileList(src, dir)).filter(rel => rel !== META && !HUB_IGNORE(rel));
     const readSrc = async (rel) => { try { const b = await O().readBytes(dir ? src + '/' + rel : src); if (b) return b; } catch (_) {} const p = prov(); if (p && p.hydrate) { try { if (await p.hydrate(dir ? src + '/' + rel : src)) return await O().readBytes(dir ? src + '/' + rel : src); } catch (e) { console.warn('[sharing] hydrate failed', rel, (e && e.message) || e); } } return null; };
-    let missed = 0;
-    for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes(id + '/' + rel, bytes); else missed++; }
-    if (missed === files.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
+    let missed = 0; const sent = [];
+    for (const rel of files) { const bytes = await readSrc(rel); if (bytes) { await store.writeBytes(id + '/' + rel, bytes); sent.push(rel); } else missed++; }
+    if (!sent.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
     if (missed) console.warn('[sharing] published without ' + missed + ' unreadable file(s)');
+    // The artifact's metadata: which file is the MAIN one — what every member's
+    // home tile pins/opens. Written LAST so it never points at content that
+    // hasn't landed yet.
+    const pin = (opts.pinFile && sent.includes(opts.pinFile)) ? opts.pinFile
+              : sent.includes('SKILL.md') ? 'SKILL.md'
+              : sent.includes('index.html') ? 'index.html' : sent[0];
+    try { await store.writeBytes(id + '/' + META, new TextEncoder().encode(JSON.stringify({ pin, title: base }))); }
+    catch (e) { console.warn('[sharing] main-file marker failed:', (e && e.message) || e); }
     fire();
-    return { id, dests: [dept] };
+    return { id, dests: [dept], pin };
   }
 
   /* ── write-back: local edits in the installed copy → the hub ─────────── */
@@ -422,14 +452,14 @@
   async function shareDialog(srcPath, presetKind) {
     const src = norm(srcPath || '');
     const dir = await isDir(src);
-    const folderFiles = await srcFileList(src, dir);
+    const folderFiles = (await srcFileList(src, dir)).filter(f => f !== META && !HUB_IGNORE(f));
+    const defPin = folderFiles.includes('SKILL.md') ? 'SKILL.md' : folderFiles.includes('index.html') ? 'index.html' : folderFiles[0];
     const back = document.createElement('div'); back.className = 'share-modal-back';
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
         '<label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label>' +
-        '<label class="share-opt share-pin"><input type="checkbox" data-k="pin" checked> Pin to my home screen</label>' +
-        (dir ? '<div class="share-pin-file"><label class="share-opt">Pin which file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
+        (dir ? '<div class="share-pin-file"><label class="share-opt">Main file (what everyone opens): <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
         '<div class="share-modal-msg"></div>' +
       '</div>';
@@ -445,9 +475,8 @@
       const dept = sel.value; if (!dept) { msg.textContent = 'Pick a department first.'; return; }
       msg.textContent = 'Sharing…';
       try {
-        const pin = back.querySelector('[data-k="pin"]').checked;
         const pinFile = dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
-        const out = await publish(src, dept, { pin, pinFile });
+        const out = await publish(src, dept, { pinFile });
         msg.textContent = '✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.';
         await autoSync();
         setTimeout(close, 900);
