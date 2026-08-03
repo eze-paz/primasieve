@@ -161,10 +161,15 @@
     while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }, { team, ns }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
-  async function listContinue(cursor) {
-    let data = await api('/2/files/list_folder/continue', { cursor });
+  // Dropbox requires list_folder/continue to run under the SAME path-root as the
+  // list_folder that minted the cursor — a team-hub cursor continued without the
+  // header 409s (PathRootError) every time, silently degrading the hub sync to a
+  // full listing on every poll. Default team:false = the home-namespace workspace
+  // cursor, which is correct header-less.
+  async function listContinue(cursor, { team = false, ns = '' } = {}) {
+    let data = await api('/2/files/list_folder/continue', { cursor }, { team, ns });
     let entries = data.entries.slice();
-    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }); entries = entries.concat(data.entries); }
+    while (data.has_more) { data = await api('/2/files/list_folder/continue', { cursor: data.cursor }, { team, ns }); entries = entries.concat(data.entries); }
     return { entries: entries.map(mapEntry), cursor: data.cursor };
   }
   async function download(path, signal, { team = false, ns = '' } = {}) {
@@ -1618,7 +1623,7 @@
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return { entries: [], cursor: '' }; throw e; }
       },
       async cloudListContinue(cursor, { team = true } = {}) {
-        try { return await listContinue(cursor); }
+        try { return await listContinue(cursor, { team }); }
         catch (e) { throw e; }   // stale/expired cursor → caller falls back to a full list
       },
       // Workspace-scoped variants (home namespace) — used by sharing.js to clean up

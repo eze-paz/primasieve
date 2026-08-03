@@ -209,10 +209,35 @@
     try {
       if (!cloudOn()) return;
       const scan = await scanTeamRoot();
+      // Prune FIRST, so an id freed by a tombstone can be adopted from another
+      // department in the same pass. A cursor delta only lists what CHANGED —
+      // absence there means "quiet", not "deleted" — so absence-pruning is only
+      // valid on a FULL scan; deltas prune via the artifact-folder tombstones.
+      const st = pkgState();
+      if (scan.full) {
+        const present = new Set(); for (const dept in scan.depts) for (const id in scan.depts[dept]) present.add(id);
+        for (const id of Object.keys(st)) { if (st[id] && st[id].from === 'team' && !present.has(id)) { await removeInstalledLocal(id); } }
+      } else {
+        for (const t of scan.removed) {
+          if (scan.depts[t.dept] && scan.depts[t.dept][t.id]) continue;   // deleted then re-created within the same delta — the re-create wins
+          const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); }
+        }
+      }
       for (const dept in scan.depts) for (const id in scan.depts[dept]) {
         const r = scan.depts[dept][id];
         if (!r.changed) continue;
         const mk = await readInstalledState(id);
+        // Same id published in MORE THAN ONE department: the installed copy keeps
+        // ownership — never flip-flop between departments (each pass re-downloaded
+        // both copies forever). Adoption only when a full scan proves the owning
+        // department's copy is gone.
+        if (mk && mk.team && mk.team !== dept) {
+          const ownerGone = scan.full && !(scan.depts[mk.team] && scan.depts[mk.team][id]);
+          if (!ownerGone) {
+            if (scan.full) console.warn('[sharing] "' + id + '" exists in both "' + mk.team + '" and "' + dept + '" — keeping the "' + mk.team + '" copy. Delete one hub folder to resolve.');
+            continue;
+          }
+        }
         // Only reconcile when the hub really moved past what we hold. The delta
         // also echoes OUR OWN write-back uploads (wbPush stores the new rev in
         // seen) — those must NOT re-install, or every push loops back as a
@@ -226,20 +251,6 @@
         }
         if (!need) continue;
         await install(dept, id, r.kind, r, scan.full);
-      }
-      // prune installed team packages whose hub folder is gone. A cursor delta
-      // only lists what CHANGED — absence there means "quiet", not "deleted" —
-      // so absence-pruning is only valid on a FULL scan; deltas prune via the
-      // artifact-folder tombstones Dropbox sends.
-      const st = pkgState();
-      if (scan.full) {
-        const present = new Set(); for (const dept in scan.depts) for (const id in scan.depts[dept]) present.add(id);
-        for (const id of Object.keys(st)) { if (st[id] && st[id].from === 'team' && !present.has(id)) { await removeInstalledLocal(id); } }
-      } else {
-        for (const t of scan.removed) {
-          if (scan.depts[t.dept] && scan.depts[t.dept][t.id]) continue;   // deleted then re-created within the same delta — the re-create wins
-          const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); }
-        }
       }
       // No-provenance sweep: anything physically under INSTALL_ROOT without an
       // installed-state record wasn't put there by this device's hub sync (old
@@ -427,18 +438,18 @@
       const box = document.getElementById('sharedHome');
       const list = await acceptedList();
       if (!list.length) { box.innerHTML = ''; return; }
+      // No remove button: the hub is the authority — an artifact leaves this list
+      // by being deleted from its hub folder (tombstones propagate to everyone).
       box.innerHTML = list.map((g, i) =>
         '<div class="shared-file" data-i="' + i + '">' +
           '<button class="shared-file-open">' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title) + '</button>' +
           '<span class="shared-by">from ' + esc(g.team) + '</span>' +
           '<button class="shared-pin"></button>' +
-          '<button class="shared-dismiss" title="Remove">✕</button>' +
         '</div>').join('');
       for (const row of box.querySelectorAll('.shared-file')) {
         const g = list[+row.getAttribute('data-i')];
         const full = INSTALL_ROOT + '/' + g.id + '/' + g.entry;
         row.querySelector('.shared-file-open').onclick = () => { try { opfs.openFile(full, g.entry.split('/').pop()); } catch (_) {} };
-        row.querySelector('.shared-dismiss').onclick = () => removeInstalledLocal(g.id);
         const pb = row.querySelector('.shared-pin');
         if (window.SandpiePins) { try { SandpiePins.bindButton(pb, full); } catch (_) { pb.remove(); } } else pb.remove();
       }
