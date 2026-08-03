@@ -466,7 +466,12 @@ function parkActiveConv() {
   const s = activeStream();
   if (!s) return;
   s.messages = messages;
-  if (s.host && s.host.parentNode) s.host.parentNode.removeChild(s.host);
+  if (s.host && s.host.parentNode) {
+    const pane = s.host.parentNode;
+    s.host.parentNode.removeChild(s.host);
+    // The parked host carried the home lists — return them to the pane.
+    if (pane === $('messages') || pane === $('messagesSide')) _untuckHomeToPane(pane);
+  }
 }
 function mountConv(convId) {
   activeConvId = convId;
@@ -1177,6 +1182,25 @@ function _mountInPane(host, pane) {
   // The conv-host is now the scroll container — its lock/unlock listeners have
   // to live on it, not on the pane. Guard against double-binding on re-mount.
   if (!host.dataset.spTracked) { setupScrollTracking(host); host.dataset.spTracked = '1'; }
+  // Home lists (pinned / shared / team) live INSIDE the left pane's conv-host so
+  // they scroll with the conversation — the host is the scroll container.
+  if (pane === $('messages')) _tuckHomeInto(host);
+}
+// Move #homeCenter into a conv-host (first child, before the messages) so the
+// home lists share the host's scroll + padding. No-op when already there.
+function _tuckHomeInto(host) {
+  const hc = document.getElementById('homeCenter');
+  if (!hc || !host || hc.parentNode === host) return;
+  if (hc.parentNode) hc.parentNode.removeChild(hc);
+  host.insertBefore(hc, host.firstChild);
+}
+// Return #homeCenter to the pane (home screen, no conversation mounted).
+function _untuckHomeToPane(pane) {
+  const hc = document.getElementById('homeCenter');
+  if (!hc || !pane || hc.parentNode === pane) return;
+  if (hc.parentNode) hc.parentNode.removeChild(hc);
+  const composer = pane.querySelector('.composer');
+  if (composer) pane.insertBefore(hc, composer); else pane.appendChild(hc);
 }
 async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
@@ -3668,7 +3692,7 @@ class SidePanel {
 
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
-      prev?.host?.parentNode?.removeChild(prev.host);
+      if (prev?.host?.parentNode) { prev.host.parentNode.removeChild(prev.host); _untuckHomeToPane(prev.host.parentNode); }
     }
     await this._lazyLoad(id);
     this._sideId = id;
@@ -3683,7 +3707,7 @@ class SidePanel {
     if (!this.isOpen) return;
     if (this._activeIsRight) this.flip();
     const s = convStreams.get(this._sideId);
-    s?.host?.parentNode?.removeChild(s.host);
+    if (s?.host?.parentNode) { s.host.parentNode.removeChild(s.host); _untuckHomeToPane(s.host.parentNode); }
     this._sideId = null;
     this._activeIsRight = false;
     this._render();
@@ -3717,8 +3741,8 @@ class SidePanel {
     const s = convStreams.get(sId);
     if (s && s.host) {
 
-      if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
-      _mountInPane(s.host, this.left);
+      if (s.host.parentNode) { s.host.parentNode.removeChild(s.host); _untuckHomeToPane(s.host.parentNode); }
+      _mountInPane(s.host, this.left);   // re-tucks home into it (left pane)
     }
     activeConvId = sId;
     messages = (s && s.messages) || [];

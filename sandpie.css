@@ -3001,11 +3001,15 @@ body.sp-decoding *::after {
     display: flex; flex-direction: column;
     justify-content: safe center;    /* center when short, scroll-align when tall */
     overflow-y: auto; padding: 1.5rem;
-    flex: 1 1 auto; min-height: 0;   /* fill the pane so internal scroll engages */
+    flex: 1 1 auto; min-height: 0;   /* home screen: fill the pane so scroll engages */
   }
-  /* A mounted conversation is the pane's scroll container; the home lists go back
-     to content height at the top instead of splitting the pane 50/50. */
-  #messages:has(.conv-host) #homeCenter { flex: 0 1 auto; }
+  /* Inside a mounted conv-host the host is the scroll container — homeCenter is a
+     content-height plain child that scrolls WITH the conversation. */
+  .conv-host > #homeCenter {
+    flex: 0 0 auto; min-height: 0;
+    overflow: visible; padding: 0 0 1.5rem;
+    justify-content: flex-start;
+  }
 .shared-home { width: 100%; text-align: left; user-select: none; }
 .shared-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin: 0.8rem 0 0.4rem; padding-left: 0.2rem; }
 .shared-tile { flex: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; background: var(--sp-panel); border: 1px solid var(--sp-border); color: var(--sp-text-dim); }
