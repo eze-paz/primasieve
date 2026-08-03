@@ -67,17 +67,25 @@
   function hubCursor(root) { try { return JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}')[root] || null; } catch (_) { return null; } }
   function setHubCursor(root, c) { try { const m = JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}'); if (!c) delete m[root]; else m[root] = c; localStorage.setItem(HUB_CURSOR_KEY, JSON.stringify(m)); } catch (_) {} }
   // One recursive listing of the team root (IA/): first path segment = department,
-  // second = artifact. Returns { [dept]: { [id]: {changed:bool} } }.
+  // second = artifact. Returns { full, removed:[{dept,id}], depts: { [dept]: {
+  // [id]: {changed, kind, revs:{rel:rev}, gone:[rel]} } } }. `revs` carries the
+  // hub rev of every file the listing covered, so the caller can tell a REAL
+  // change from the echo of an upload it made itself; on a delta scan it only
+  // covers the files that changed. `removed` = artifact folders tombstoned in a
+  // delta. Every Nth poll forces a full listing (like dropbox.js FULL_SCAN_EVERY)
+  // to catch deletions whose tombstones we can't attribute (e.g. a whole dept).
+  let _scanN = 0;
+  const FULL_SCAN_EVERY = 10;
   async function scanTeamRoot() {
     const p = prov(), root = teamRoot();
-    if (!cloudOn() || !root || !p.cloudListWithCursor) return {};
-    const cur = hubCursor(root);
+    if (!cloudOn() || !root || !p.cloudListWithCursor) return { full: false, removed: [], depts: {} };
+    const cur = (++_scanN % FULL_SCAN_EVERY === 0) ? null : hubCursor(root);
     let result = null;
     if (cur && p.cloudListContinue) { try { result = await p.cloudListContinue(cur, { team: true }); } catch (_) { result = null; } }
     const isFull = !result;
-    if (!result) { try { result = await p.cloudListWithCursor(root, { team: true }); } catch (e) { if (String((e && e.message) || e).includes('not_found')) return {}; throw e; } }
+    if (!result) { try { result = await p.cloudListWithCursor(root, { team: true }); } catch (e) { if (String((e && e.message) || e).includes('not_found')) return { full: false, removed: [], depts: {} }; throw e; } }
     setHubCursor(root, result.cursor || '');
-    const out = {};
+    const out = {}, removed = [];
     // cloud entries carry ABSOLUTE paths (/IA/IT/<id>/<file>) with no rel field:
     // strip the team-root prefix (lowercase, like pullOldWorkspace) to get dept/id.
     const prefix = root.replace(/^\/+/, '').toLowerCase() + '/';
@@ -86,17 +94,23 @@
       if (rel.toLowerCase().startsWith(prefix)) rel = rel.slice(prefix.length);
       const m = /^([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(rel);
       if (!m) continue;
-      if (e.kind === 'deleted') continue;                 // tombstone from include_deleted — never list/install a removed path
       const dept = m[1], id = m[2], hasFile = !!m[3];
-      if (e.kind === 'file' && !hasFile) continue;        // loose file directly under a dept — not an artifact
       if (id === 'shared-hub' || id === 'shared-incoming') continue;   // legacy containers, not artifacts
+      if (e.kind === 'deleted') {                         // tombstone from include_deleted
+        if (!hasFile) { removed.push({ dept, id }); continue; }   // the artifact folder itself vanished
+        const d0 = out[dept] || (out[dept] = {});
+        const r0 = d0[id] || (d0[id] = { changed: false, kind: 'folder', revs: {}, gone: [] });
+        r0.changed = true; r0.gone.push(m[3]);
+        continue;
+      }
+      if (e.kind === 'file' && !hasFile) continue;        // loose file directly under a dept — not an artifact
       const d = out[dept] || (out[dept] = {});
-      const rec = d[id] || (d[id] = { changed: false, kind: 'folder' });
-      if (hasFile) rec.changed = true;                       // content present / moved
+      const rec = d[id] || (d[id] = { changed: false, kind: 'folder', revs: {}, gone: [] });
+      if (hasFile) { rec.changed = true; if (e.kind === 'file') rec.revs[m[3]] = e.rev || ''; }   // content present / moved
       if (m[3] === 'SKILL.md') rec.kind = 'skill';
     }
     if (isFull) for (const dept in out) for (const id in out[dept]) out[dept][id].changed = true;
-    return out;
+    return { full: isFull, removed, depts: out };
   }
 
   /* ── install: copy an artifact folder into the workspace ─────────────── */
@@ -105,25 +119,35 @@
     let prevDirty = {}, prevSeen = {}, prevPin = null;
     try { const pm = await readInstalledState(id); prevDirty = (pm && pm.dirty) || {}; prevSeen = (pm && pm.seen) || {}; prevPin = (pm && pm.pin) || null; } catch (_) {}
     const entries = (await store.listEntries(id)).filter(e => e.rel !== 'package.json' && e.rel !== 'manifest.json' && !e.rel.startsWith('.'));
+    const local = new Set(await listOpfs(dst, '', []));
     const seen = {};
+    let changed = 0;
     for (const e of entries) {
       const p = dst + '/' + e.rel;
       if (prevDirty[e.rel]) { seen[e.rel] = prevSeen[e.rel] || ''; continue; }   // local > dropbox
+      if (prevSeen[e.rel] && prevSeen[e.rel] === (e.rev || '') && local.has(e.rel)) { seen[e.rel] = prevSeen[e.rel]; continue; }   // rev unchanged + copy present — nothing to download
       const bytes = await store.readBytes(id + '/' + e.rel);
-      if (!bytes) continue;
+      if (!bytes) { if (local.has(e.rel)) seen[e.rel] = prevSeen[e.rel] || ''; continue; }   // download failed — keep the copy we have, retry on a later scan
       await O().write(p, new Blob([bytes]));
       seen[e.rel] = e.rev || '';
-      markDirty(p);
+      changed++;
+      // Notify the workspace sync so it mirrors the file — but NOT the write-back
+      // listener: this write came FROM the hub, and pushing it back would mint a
+      // new hub rev whose cursor echo re-installs it next poll, forever. emit()
+      // is synchronous, so the flag exactly covers our own event.
+      _installing = true; try { markDirty(p); } finally { _installing = false; }
     }
     const keep = new Set(Object.keys(seen));
-    for (const rel of await listOpfs(dst, '', [])) {
+    for (const rel of local) {
       if (keep.has(rel) || prevDirty[rel]) continue;
       try { await O().remove(dst + '/' + rel); } catch (_) {}
       try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', dst + '/' + rel); } catch (_) {}
+      changed++;
     }
+    if (entries.some(e => e.rel === 'SKILL.md')) kind = 'skill';   // a delta that missed SKILL.md must not demote a skill to a folder
     await writeInstalledState(id, { id, title: id, kind: kind || 'folder', pin: prevPin, rev: 0, from: 'team', team: dept, seen, dirty: prevDirty });
     if (window.SandpiePins) { try { if (prevPin) SandpiePins.remove(dst + '/' + prevPin); const p = kind === 'skill' ? 'SKILL.md' : (entries[0] && entries[0].rel); if (p) { SandpiePins.add(dst + '/' + p); } } catch (_) {} }
-    try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id } })); } catch (_) {}
+    if (changed) { try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id } })); } catch (_) {} }
   }
 
   /* ── autoSync: scan + install what changed ───────────────────────────── */
@@ -133,17 +157,36 @@
     try {
       if (!cloudOn()) return;
       const scan = await scanTeamRoot();
-      for (const dept in scan) for (const id in scan[dept]) {
-        const r = scan[dept][id];
+      for (const dept in scan.depts) for (const id in scan.depts[dept]) {
+        const r = scan.depts[dept][id];
         if (!r.changed) continue;
         const mk = await readInstalledState(id);
-        if (!mk || mk.team !== dept) await install(dept, id, r.kind);
-        else if (r.changed) { await install(dept, id, r.kind); console.info('[sharing] refreshed', id, 'from', dept); }
+        // Only reconcile when the hub really moved past what we hold. The delta
+        // also echoes OUR OWN write-back uploads (wbPush stores the new rev in
+        // seen) — those must NOT re-install, or every push loops back as a
+        // download+re-upload forever.
+        let need = !mk || mk.team !== dept;
+        if (!need) {
+          const seenRevs = mk.seen || {}, dirty = mk.dirty || {};
+          if (r.gone.some(rel => (rel in seenRevs) || dirty[rel])) need = true;                       // a file we track was deleted on the hub
+          if (!need) for (const rel in r.revs) { if (!dirty[rel] && seenRevs[rel] !== r.revs[rel]) { need = true; break; } }   // a rev we don't hold yet
+          if (!need && scan.full) for (const rel in seenRevs) { if (!(rel in r.revs)) { need = true; break; } }               // full scan: a file we hold is gone from the hub
+        }
+        if (!need) continue;
+        await install(dept, id, r.kind);
+        if (mk) console.info('[sharing] refreshed', id, 'from', dept);
       }
-      // prune: installed team packages whose folder vanished from the scan
-      const seen = new Set(); for (const dept in scan) for (const id in scan[dept]) seen.add(id);
+      // prune installed team packages whose hub folder is gone. A cursor delta
+      // only lists what CHANGED — absence there means "quiet", not "deleted" —
+      // so absence-pruning is only valid on a FULL scan; deltas prune via the
+      // artifact-folder tombstones Dropbox sends.
       const st = pkgState();
-      for (const id of Object.keys(st)) { if (st[id] && st[id].from === 'team' && !seen.has(id)) { await removeInstalledLocal(id); } }
+      if (scan.full) {
+        const present = new Set(); for (const dept in scan.depts) for (const id in scan.depts[dept]) present.add(id);
+        for (const id of Object.keys(st)) { if (st[id] && st[id].from === 'team' && !present.has(id)) { await removeInstalledLocal(id); } }
+      } else {
+        for (const t of scan.removed) { const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); } }
+      }
       await wbRetryDirty();
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
@@ -214,6 +257,15 @@
   async function wbMarkDirty(id, rel) {
     try { const mk = await readInstalledState(id); if (!mk || mk.from !== 'team' || !mk.team) return; mk.dirty = mk.dirty || {}; mk.dirty[rel] = true; await writeInstalledState(id, mk); } catch (_) {}
   }
+  // Dropbox content_hash: sha256 of the concatenation of each 4 MiB block's sha256.
+  async function dbxContentHash(bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const B = 4 * 1024 * 1024, parts = [];
+    for (let o = 0; o < u8.byteLength; o += B) parts.push(new Uint8Array(await crypto.subtle.digest('SHA-256', u8.subarray(o, Math.min(o + B, u8.byteLength)))));
+    const cat = new Uint8Array(parts.length * 32);
+    for (let i = 0; i < parts.length; i++) cat.set(parts[i], i * 32);
+    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', cat))].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
   async function wbPush(id, rel) {
     try {
       if (!cloudOn()) return;
@@ -223,10 +275,14 @@
       const entries = await store.listEntries(id);
       const e = entries.find(x => x.rel === rel);
       const hubRev = (e && e.rev) || '', knownRev = (mk.seen || {})[rel] || '';
-      if (hubRev && !knownRev) { await wbPreserve(id, rel, mk, hubRev); return; }
-      if (knownRev && hubRev && knownRev !== hubRev) { await wbPreserve(id, rel, mk, hubRev); return; }
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
+      // Identical content already on the hub → just mark clean. Uploading would
+      // mint a new rev that echoes back through every member's cursor delta as a
+      // phantom change (and can ping-pong between devices indefinitely).
+      if (e && e.hash) { try { if (await dbxContentHash(bytes) === e.hash) { mk.seen = mk.seen || {}; mk.seen[rel] = hubRev; mk.dirty = mk.dirty || {}; delete mk.dirty[rel]; await writeInstalledState(id, mk); return; } } catch (_) {} }
+      if (hubRev && !knownRev) { await wbPreserve(id, rel, mk, hubRev); return; }
+      if (knownRev && hubRev && knownRev !== hubRev) { await wbPreserve(id, rel, mk, hubRev); return; }
       const p = prov();
       const resp = await p.cloudUpload(deptRoot(mk.team) + '/' + id + '/' + rel, bytes, { team: true });
       const newRev = (resp && resp.rev) || hubRev;
@@ -372,7 +428,7 @@
     return {
       kind: 'cloud', root,
       _rel(path, base) { const s = String(path); if (!base) return s.replace(/^\/+/, ''); const i = s.toLowerCase().indexOf(base.toLowerCase() + '/'); return i >= 0 ? s.slice(i + base.length + 1) : s.split('/').pop(); },
-      async listEntries(sub) { const base = root + (sub ? '/' + sub : ''); return (await P().cloudList(base, true, { team: true })).filter(e => e.kind === 'file').map(e => ({ rel: this._rel(e.path, base), rev: e.rev || '', size: e.size || 0 })); },
+      async listEntries(sub) { const base = root + (sub ? '/' + sub : ''); return (await P().cloudList(base, true, { team: true })).filter(e => e.kind === 'file').map(e => ({ rel: this._rel(e.path, base), rev: e.rev || '', hash: e.hash || '', size: e.size || 0 })); },
       async readBytes(rel) { try { return await P().cloudDownload(root + '/' + rel, { team: true }); } catch (_) { return null; } },
       async writeBytes(rel, bytes) { await P().cloudUpload(root + '/' + rel, bytes, { team: true }); },
     };
