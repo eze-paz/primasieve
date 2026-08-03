@@ -208,8 +208,8 @@
       const entries = await store.listEntries(id);
       const e = entries.find(x => x.rel === rel);
       const hubRev = (e && e.rev) || '', knownRev = (mk.seen || {})[rel] || '';
-      if (hubRev && !knownRev) { await wbPreserve(id, rel, mk); return; }
-      if (knownRev && hubRev && knownRev !== hubRev) { await wbPreserve(id, rel, mk); return; }
+      if (hubRev && !knownRev) { await wbPreserve(id, rel, mk, hubRev); return; }
+      if (knownRev && hubRev && knownRev !== hubRev) { await wbPreserve(id, rel, mk, hubRev); return; }
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
       const p = prov();
@@ -224,15 +224,17 @@
       else console.warn('[sharing] write-back failed', id, rel, msg);
     }
   }
-  async function wbPreserve(id, rel, mk) {
+  async function wbPreserve(id, rel, mk, hubRev) {
     try {
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       const dst = 'sandpie/artifacts/' + id + '.conflicts/' + rel + '.' + ts;
       await O().write(dst, new Blob([bytes]));
-      if (mk) { mk.dirty = mk.dirty || {}; delete mk.dirty[rel]; await writeInstalledState(id, mk); }
-      wbNotify('err', '⚠ ' + rel + ' ha canviat a l\'hub — la teva edició s\'ha desat a ' + dst + ' i NO s\'ha publicat.');
+      if (mk) { mk.dirty = mk.dirty || {}; delete mk.dirty[rel];
+        if (hubRev) { mk.seen = mk.seen || {}; mk.seen[rel] = hubRev; }   // one-shot conflict: next save of an unchanged hub publishes
+        await writeInstalledState(id, mk); }
+      wbNotify('err', '⚠ ' + rel + ' ha canviat a l\'hub — la teva edició s\'ha desat a ' + dst + ' i NO s\'ha publicat. Torna a guardar per publicar-la.');
     } catch (e) { console.warn('[sharing] conflict preserve failed', e); }
   }
   async function wbRetryDirty() {
