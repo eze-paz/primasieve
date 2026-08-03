@@ -621,8 +621,8 @@
     const store = m._store, dst = INSTALL_ROOT + '/' + m.id, sub = pkgSub(m);
     // Local edits are preserved across hub re-syncs: read the previous marker's
     // dirty map first, and never overwrite (or sweep) a file with a pending edit.
-    let prevDirty = {}, prevRevs = {};
-    try { const pm = JSON.parse(await O().read(dst + '/' + PKG_MARKER)); prevDirty = (pm && pm.dirty) || {}; prevRevs = (pm && pm.revs) || {}; } catch (_) {}
+    let prevDirty = {}, prevRevs = {}, prevPin = null;
+    try { const pm = JSON.parse(await O().read(dst + '/' + PKG_MARKER)); prevDirty = (pm && pm.dirty) || {}; prevRevs = (pm && pm.revs) || {}; prevPin = (pm && pm.pin) || null; } catch (_) {}
     const entries = (await store.listEntries(sub)).filter(e => !isPkgMeta(e.rel));
     const revs = {};
     for (const e of entries) {
@@ -657,8 +657,13 @@
     const mp = dst + '/' + PKG_MARKER;
     await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', revs, dirty: prevDirty })], { type: 'application/json' }));
     markDirty(mp);
-    // apply directives
-    if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
+    // apply directives. One pin per package: if the manifest's pin target changed
+    // between revs (e.g. a re-publish re-pointed it), remove the OLD tile first —
+    // otherwise both the old and new file stay pinned on the home screen.
+    if (window.SandpiePins) {
+      if (prevPin && prevPin !== m.pin) { try { SandpiePins.remove(dst + '/' + prevPin); } catch (_) {} }
+      if (m.pin) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
+    }
     // skill:true → nothing to move; context.js discovers sandpie/shared-installed/<id>/SKILL.md and load_skill resolves it
     try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
     } finally { _installing = false; }
