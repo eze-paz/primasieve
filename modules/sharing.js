@@ -241,6 +241,17 @@
           const mk = st[t.id]; if (mk && mk.from === 'team' && mk.team === t.dept) { await removeInstalledLocal(t.id); }
         }
       }
+      // No-provenance sweep: anything physically under INSTALL_ROOT without an
+      // installed-state record wasn't put there by this device's hub sync (old
+      // builds; the personal-sync mirror used to write here before it was
+      // blacked out in dropbox.js). Remove it — with the mirror gone it stays gone.
+      let stray = []; try { stray = await O().listDir(INSTALL_ROOT); } catch (_) {}
+      for (const e of stray) {
+        let mk2 = null; try { mk2 = await readInstalledState(e.name); } catch (_) {}
+        if (mk2 && mk2.from === 'team' && mk2.team) continue;
+        console.info('[sharing] removing unprovenanced', e.name);
+        await removeInstalledLocal(e.name);
+      }
       await wbRetryDirty();
     } catch (e) { console.warn('[sharing] autoSync failed:', e); } finally { syncing = false; }
   }
@@ -250,6 +261,7 @@
     if (window.SandpiePins) { for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p); }
     for (const rel of await listOpfs(dst, '', [])) { try { await O().remove(dst + '/' + rel); } catch (_) {} }
     try { await O().remove(dst); } catch (_) {}
+    fire();
   }
 
   // Dehydrated (cloud-only) files don't exist in OPFS — merge them into a source
@@ -388,35 +400,23 @@
   let homeBusy = false, homePending = false;
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
-  // Home list = a recursive walk of the installed-packages folder. The rule is
-  // dead simple: whatever physically exists under INSTALL_ROOT shows here — no
-  // scan results, no localStorage state, no hub reachability involved.
+  // Home list = ONE row per installed artifact: its main file (publisher's pick,
+  // sensible fallbacks for pre-meta artifacts). Only artifacts with provenance
+  // (an installed-state record from this device's hub sync) show — anything
+  // else under INSTALL_ROOT is debris that autoSync sweeps away.
   async function acceptedList() {
-    const entries = [];
-    const walk = async (rel) => {
-      let es = [];
-      try { es = await O().listDir(rel ? INSTALL_ROOT + '/' + rel : INSTALL_ROOT); } catch (_) { return; }
-      for (const e of es) {
-        const r = rel ? rel + '/' + e.name : e.name;
-        entries.push({ rel: r, name: e.name, kind: e.kind });
-        if (e.kind === 'directory') await walk(r);
-      }
-    };
-    await walk('');
-    const groups = {};
-    for (const e of entries) {
-      const id = e.rel.split('/')[0];
-      if (e.rel === id) { (groups[id] = groups[id] || { id, files: [] }).dir = e; continue; }
-      (groups[id] = groups[id] || { id, files: [] }).files.push(e);
-    }
+    let top = [];
+    try { top = await O().listDir(INSTALL_ROOT); } catch (_) { return []; }
     const out = [];
-    for (const g of Object.values(groups)) {
-      let mk = null; try { mk = await readInstalledState(g.id); } catch (_) {}
-      g.title = (mk && mk.title) || g.id;
-      g.team = (mk && mk.team) || '';
-      g.pin = (mk && mk.pin) || null;
-      g.kind = (mk && mk.kind) || (g.files.some(f => f.name === 'SKILL.md') ? 'skill' : 'folder');
-      out.push(g);
+    for (const t of top) {
+      let mk = null; try { mk = await readInstalledState(t.name); } catch (_) {}
+      if (!mk || mk.from !== 'team' || !mk.team) continue;
+      const files = t.kind === 'directory' ? await listOpfs(INSTALL_ROOT + '/' + t.name, '', []) : [];
+      const entry = (mk.pin && files.includes(mk.pin)) ? mk.pin
+                  : (mk.kind === 'skill' && files.includes('SKILL.md')) ? 'SKILL.md'
+                  : files.includes('index.html') ? 'index.html' : files[0];
+      if (!entry) continue;                        // nothing to open (mid-install / empty)
+      out.push({ id: t.name, title: mk.title || t.name, team: mk.team, kind: mk.kind || 'folder', entry });
     }
     return out;
   }
@@ -427,23 +427,21 @@
       const box = document.getElementById('sharedHome');
       const list = await acceptedList();
       if (!list.length) { box.innerHTML = ''; return; }
-      box.innerHTML = list.map(g => {
-        const entry = g.pin || (g.kind === 'skill' ? 'SKILL.md' : null);
-        let full = entry ? INSTALL_ROOT + '/' + g.id + '/' + entry : null;
-        if (!full && g.dir && g.dir.kind === 'file') full = INSTALL_ROOT + '/' + g.dir.rel;
-        if (!full && g.files[0]) full = INSTALL_ROOT + '/' + g.id + '/' + g.files[0].rel;
-        const openName = entry || (g.dir && g.dir.name) || (g.files[0] && g.files[0].name) || g.id;
-        const head = '<div class="shared-file">' +
-          '<button class="shared-file-open" ' + (full ? 'onclick="opfs.openFile(\'' + full + '\',\'' + openName + '\')"' : '') + '>' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title || g.id) + '</button>' +
-          '<span class="shared-by">from ' + esc(g.team || 'team') + '</span>' +
-          '<button class="shared-dismiss" title="Remove" onclick="SandpieSharing.uninstall(\'' + g.id + '\')">✕</button>' +
-          '</div>';
-        const files = g.files.map(f =>
-          '<div class="shared-file shared-file-nested">' +
-            '<button class="shared-file-open" onclick="opfs.openFile(\'' + INSTALL_ROOT + '/' + f.rel + '\',\'' + f.name + '\')">📄 ' + esc(f.rel) + '</button>' +
-          '</div>').join('');
-        return head + files;
-      }).join('');
+      box.innerHTML = list.map((g, i) =>
+        '<div class="shared-file" data-i="' + i + '">' +
+          '<button class="shared-file-open">' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title) + '</button>' +
+          '<span class="shared-by">from ' + esc(g.team) + '</span>' +
+          '<button class="shared-pin"></button>' +
+          '<button class="shared-dismiss" title="Remove">✕</button>' +
+        '</div>').join('');
+      for (const row of box.querySelectorAll('.shared-file')) {
+        const g = list[+row.getAttribute('data-i')];
+        const full = INSTALL_ROOT + '/' + g.id + '/' + g.entry;
+        row.querySelector('.shared-file-open').onclick = () => { try { opfs.openFile(full, g.entry.split('/').pop()); } catch (_) {} };
+        row.querySelector('.shared-dismiss').onclick = () => removeInstalledLocal(g.id);
+        const pb = row.querySelector('.shared-pin');
+        if (window.SandpiePins) { try { SandpiePins.bindButton(pb, full); } catch (_) { pb.remove(); } } else pb.remove();
+      }
     } catch (e) { console.warn('[sharing] renderHome failed', e); } finally { homeBusy = false; if (homePending) { homePending = false; renderHome(); } }
   }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }

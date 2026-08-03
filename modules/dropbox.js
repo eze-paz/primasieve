@@ -66,6 +66,14 @@
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
   const LAST_SYNC_KEY = 'dbxfull-last-sync-ts';   // Date.now() after each successful sync (device-switch detection)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
+  // The personal workspace sync must NOT mirror the hub-managed subtree: every
+  // device installs it from the TEAM hub (sharing.js), and a second authority
+  // here — pushing/pulling the user's own mirror of it — resurrected
+  // uninstalled artifacts and ping-ponged copies between devices. Still listed
+  // in EXEMPT_PREFIXES (never dehydrate-purged); just invisible to push, pull,
+  // cleanup passes and the file:changed/file:deleted reactions.
+  const NOSYNC_PREFIX = 'sandpie/shared-installed';
+  const isNoSyncRel = (p) => { const r = String(p).replace(/^\/+/, ''); return r === NOSYNC_PREFIX || r.startsWith(NOSYNC_PREFIX + '/'); };
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -712,6 +720,9 @@
       const _deviceSwitch = !!((delta && delta.length > 0) || (deletions && deletions.length > 0));
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
+      // hub-managed subtree: drop legacy state entries so neither Pass 1 nor the
+      // dirty-push loop ever touches it (see NOSYNC_PREFIX)
+      for (const k of Object.keys(state)) if (isNoSyncRel(k)) delete state[k];
       const fullScan = !!opts.full || !initialSyncDone || delta === null || (_syncCount % FULL_SCAN_EVERY === 0);
 
       // ── Dropbox is the authority: delete everything that no longer exists in cloud ──
@@ -748,6 +759,7 @@
       }
       let removedCount = 0, keptCount = 0;
       for (const path of allLocal) {
+        if (isNoSyncRel(path)) { keptCount++; continue; }   // hub-managed — never delete locally
         if (cloudSet.has(path)) { keptCount++; continue; }
         if (state[path] && state[path].syncedMtime === 0) {
           if (isConv(path)) console.log('[dropbox] PASS2 KEEP (dirty-state):', path);
@@ -773,6 +785,7 @@
       const toDownload = [];
       for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
+        if (isNoSyncRel(path)) continue;                    // hub-managed — never pull the stale mirror
         if (dehydrated() && !isExemptRel(path)) continue;   // on-demand: skip eager download; worker hydrates on touch
         const s = state[path];
         const localExists = await opfs.exists(path);
@@ -871,6 +884,7 @@
   function onFileChanged(path) {
     const rel = String(path).replace(/^\/+/, '');
     if (!rel) return;
+    if (isNoSyncRel(rel)) return;   // hub-managed — sharing.js owns its cloud side
     const st = syncState();
     if (st[rel]) st[rel].syncedMtime = 0; else st[rel] = { rev: '', size: 0, syncedMtime: 0 };
     setSyncState(st);
@@ -890,6 +904,7 @@
   }
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
+    if (isNoSyncRel(rel)) { forgetFromStateAndIndex(rel); return; }   // hub-managed: tidy local bookkeeping, never touch the personal cloud
     forgetFromStateAndIndex(rel);
     if (tokens()) del(relToCloud(rel)).catch(() => {});
   }
