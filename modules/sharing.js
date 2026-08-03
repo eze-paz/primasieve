@@ -78,8 +78,11 @@
     if (!result) { try { result = await p.cloudListWithCursor(root, { team: true }); } catch (e) { if (String((e && e.message) || e).includes('not_found')) return {}; throw e; } }
     setHubCursor(root, result.cursor || '');
     const out = {};
+    const rootPrefix = root.replace(/\/+$/, '') + '/';
     for (const e of result.entries) {
-      const m = /^([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(e.rel || '');
+      const rel0 = (e.rel != null) ? e.rel : String(e.path || '').replace(/^\/+/, '');
+      const rel = rel0.startsWith(rootPrefix) ? rel0.slice(rootPrefix.length) : rel0;
+      const m = /^([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(rel);
       if (!m) continue;
       const dept = m[1], id = m[2], hasFile = !!m[3];
       if (id === 'shared-hub' || id === 'shared-incoming') continue;   // legacy containers, not artifacts
