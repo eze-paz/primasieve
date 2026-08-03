@@ -691,7 +691,7 @@ function registerRewindCommand() {
       clearActiveConvUI();
       renderConversation(messages, s ? s.compaction : null);
 
-      const messagesEl = $('messages');
+      const messagesEl = paneScrollEl($('messages'));
       if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
       saveActiveConv().catch(() => {});
 
@@ -744,8 +744,8 @@ async function loadConv(id) {
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
-  const mEl = $('messages');
-  mEl.scrollTop = mEl.scrollHeight;
+  const mEl = paneScrollEl($('messages'));
+  if (mEl) mEl.scrollTop = mEl.scrollHeight;
 }
 async function newConversation() {
   await saveActiveConv();
@@ -1160,8 +1160,9 @@ async function handleSubmit(which = 'main') {
   if (SandpieImages.hasAttachment()) {
     SandpieImages.clear();
   }
-  lockScroll(pane);
-  pane.scrollTop = pane.scrollHeight;
+  const scEl = paneScrollEl(pane);
+  lockScroll(scEl);
+  scEl.scrollTop = scEl.scrollHeight;
   enqueueFor(convId, content, pane);
 
   if (ta) ta.style.height = 'auto';
@@ -1173,6 +1174,9 @@ function _mountInPane(host, pane) {
   if (host.parentNode) host.parentNode.removeChild(host);
   const composer = pane.querySelector('.composer');
   if (composer) pane.insertBefore(host, composer); else pane.appendChild(host);
+  // The conv-host is now the scroll container — its lock/unlock listeners have
+  // to live on it, not on the pane. Guard against double-binding on re-mount.
+  if (!host.dataset.spTracked) { setupScrollTracking(host); host.dataset.spTracked = '1'; }
 }
 async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
@@ -2163,10 +2167,7 @@ function addMsg(role, text = '', host = null) {
 
   const target = host || (activeStream() && activeStream().host) || $('messages');
 
-  let scrollHost = target;
-  while (scrollHost && scrollHost.id !== 'messages' && scrollHost.id !== 'messagesSide') {
-    scrollHost = scrollHost.parentNode;
-  }
+  let scrollHost = climbScrollEl(target);
   const visible = !!scrollHost;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
@@ -3058,11 +3059,7 @@ class RoundRenderer {
   }
 
   _scrollHost() {
-    let el = this.reply || this.host;
-    while (el && el.id !== 'messages' && el.id !== 'messagesSide') {
-      el = el.parentNode;
-    }
-    return el;
+    return climbScrollEl(this.reply || this.host);
   }
 
   _flushAllPending() {
@@ -3202,6 +3199,23 @@ const renderMd = text => {
 
 /* ---- scroll tracking (auto-stick to bottom unless the user scrolls up) ---- */
 const _scrollLocked = new Set();
+// The scroll container of a pane is its .conv-host when a conversation is
+// mounted; fall back to the pane itself (home screen / nothing mounted).
+function paneScrollEl(pane) {
+  if (!pane) return null;
+  const host = pane.querySelector(':scope > .conv-host');
+  return host || pane;
+}
+// Climb from any element to the scroll container that holds it (.conv-host,
+// else the pane mapped through paneScrollEl).
+function climbScrollEl(el) {
+  while (el && !(el.classList && el.classList.contains('conv-host')) && el.id !== 'messages' && el.id !== 'messagesSide') {
+    el = el.parentNode;
+  }
+  if (!el) return null;
+  if (el.classList && el.classList.contains('conv-host')) return el;
+  return paneScrollEl(el);
+}
 function isAtBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight <= 2; }
 function lockScroll(el) { if (el) _scrollLocked.add(el); }
 function unlockScroll(el) { if (el) _scrollLocked.delete(el); }
@@ -3352,7 +3366,7 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   if (convId === activeConvId) {
     clearActiveConvUI();
     renderConversation(messages, compaction);
-    const el = $('messages');
+    const el = paneScrollEl($('messages'));
     if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
   }
   // The recorded usage still reflects the PRE-compaction (larger) context — drop
@@ -3662,7 +3676,7 @@ class SidePanel {
     if (s?.host) _mountInPane(s.host, this.right);
     this._render();
 
-    requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
+    requestAnimationFrame(() => { const se = paneScrollEl(this.right); if (se) se.scrollTop = se.scrollHeight; });
     refreshConversationList();
   }
   close() {
@@ -3789,7 +3803,7 @@ let sidePanel = null;
       const newH = Math.min(ta.scrollHeight, maxH);
       ta.style.height = newH + 'px';
       ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
-      if (shouldAutoScroll(pane)) pane.scrollTop = pane.scrollHeight;
+      if (shouldAutoScroll(pane)) { const se = paneScrollEl(pane); if (se) se.scrollTop = se.scrollHeight; }
     }
     ta.addEventListener('input', () => {
       autosize();
@@ -3854,18 +3868,29 @@ let sidePanel = null;
   if (searchInput) {
     searchInput.addEventListener('input', () => refreshConversationList());
   }
-  function setupScrollTracking(el) {
-    if (!el) return;
-    lockScroll(el);
-    el.addEventListener('scroll', () => { if (isAtBottom(el)) lockScroll(el); }, { passive: true });
-    el.addEventListener('wheel', e => { if (e.deltaY < 0) unlockScroll(el); }, { passive: true });
-    let _ty = 0;
-    el.addEventListener('touchstart', e => { _ty = e.touches[0].clientY; }, { passive: true });
-    el.addEventListener('touchmove', e => { if (e.touches[0].clientY > _ty) unlockScroll(el); }, { passive: true });
-  }
-  setupScrollTracking($('messages'));
-  setupScrollTracking($('messagesSide'));
 })();
+
+// Scroll lock/unlock tracking follows the SCROLL CONTAINER — now the pane's
+// .conv-host (or the pane itself when nothing is mounted, e.g. the home screen).
+function setupScrollTracking(el) {
+  if (!el) return;
+  lockScroll(el);
+  el.addEventListener('scroll', () => { if (isAtBottom(el)) lockScroll(el); }, { passive: true });
+  el.addEventListener('wheel', e => { if (e.deltaY < 0) unlockScroll(el); }, { passive: true });
+  let _ty = 0;
+  el.addEventListener('touchstart', e => { _ty = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener('touchmove', e => { if (e.touches[0].clientY > _ty) unlockScroll(el); }, { passive: true });
+}
+// Attach tracking to a pane's scroll element AND to its homeCenter (home lists
+// scroll themselves now that the pane doesn't).
+function trackPaneScroll(pane) {
+  const sc = paneScrollEl(pane);
+  if (sc) setupScrollTracking(sc);
+  const home = pane && pane.querySelector('#homeCenter');
+  if (home && home !== sc) setupScrollTracking(home);
+}
+trackPaneScroll($('messages'));
+trackPaneScroll($('messagesSide'));
 
 
 
@@ -4346,7 +4371,7 @@ function bootConversations() {
       mountConv(restoreId);
       renderConversation(s.messages, s.compaction);
     }
-    const scrollEnd = () => { const m = $('messages'); m.scrollTop = m.scrollHeight; };
+    const scrollEnd = () => { const m = paneScrollEl($('messages')); if (m) m.scrollTop = m.scrollHeight; };
     requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
     document.querySelectorAll('#messages img').forEach(img => {
       if (!img.complete) img.addEventListener('load', scrollEnd, { once: true });
