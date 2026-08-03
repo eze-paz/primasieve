@@ -3843,7 +3843,15 @@ window.sidePanel = sidePanel;
   const resizer = $('sideResizer');
   const panel   = $('messagesSide');
   if (!resizer || !panel) return;
-  resizer.addEventListener('mousedown', e => {
+  // Pointer events + setPointerCapture: a plain mousedown/mousemove/mouseup
+  // drag BREAKS when an artifact is open in the sidepanel — the artifact iframe
+  // (file-viewer's .fv-panel > iframe, not the legacy #artifactPanelFrame)
+  // swallows mouse events, so the parent's mouseup never fires and the resize
+  // stays stuck in the 'dragging' state. setPointerCapture retargets EVERY
+  // pointer event (move/up/cancel) to the resizer for the whole gesture, even
+  // over an iframe or outside the window — the drag always ends cleanly.
+  resizer.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;   // left button only
     e.preventDefault();
     const startX = e.clientX;
     const startW = panel.offsetWidth;
@@ -3853,13 +3861,16 @@ window.sidePanel = sidePanel;
     document.body.style.cursor     = 'col-resize';
     document.body.style.userSelect = 'none';
 
-    const frame = $('artifactPanelFrame');
-    if (frame) frame.style.pointerEvents = 'none';
+    // Belt & suspenders: knock pointer events off every sidepanel iframe while
+    // dragging (capture is the real fix; this covers older engines).
+    const sideIframes = document.querySelectorAll('#messagesSide iframe');
+    sideIframes.forEach(f => f.style.pointerEvents = 'none');
+    try { resizer.setPointerCapture(e.pointerId); } catch (_) {}
+
     function onMove(ev) {
       const wrap = $('messagesWrap');
       const minW = 200;
       const maxW = (wrap ? wrap.offsetWidth : window.innerWidth) - 300;
-
       const newW = Math.max(minW, Math.min(startW + (startX - ev.clientX), maxW));
       panel.style.width = newW + 'px';
     }
@@ -3867,13 +3878,15 @@ window.sidePanel = sidePanel;
       resizer.classList.remove('dragging');
       document.body.style.cursor     = '';
       document.body.style.userSelect = '';
-      const frame = $('artifactPanelFrame');
-      if (frame) frame.style.pointerEvents = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup',   onUp);
+      document.querySelectorAll('#messagesSide iframe').forEach(f => f.style.pointerEvents = '');
+      try { resizer.releasePointerCapture(e.pointerId); } catch (_) {}
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup',   onUp);
+      resizer.removeEventListener('pointercancel', onUp);
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup',   onUp);
+    resizer.addEventListener('pointercancel', onUp);
   });
 })();
 
