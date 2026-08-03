@@ -1442,7 +1442,7 @@
       mk.revs = mk.revs || {}; mk.revs[rel] = newRev;         // next edit compares against OUR push
       mk.dirty = mk.dirty || {}; delete mk.dirty[rel];        // local == dropbox again
       await wbWriteMarker(id, mk);
-      wbNotify('ok', '📤 Publicat ' + rel + ' a l\'hub de ' + mk.team);
+      // success is silent — the file simply appears in the hub; only failures notify
     } catch (err) {
       const msg = String((err && err.message) || err);
       if (/403|no_permission|insufficient_permissions|path_root|access_denied/i.test(msg)) {
