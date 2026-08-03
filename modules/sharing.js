@@ -613,6 +613,8 @@
   const pkgSub = (m) => (m._from === 'team' ? 'packages/' + m.id : '');
   const isPkgMeta = (rel) => rel === 'manifest.json' || rel === SHARE_MARKER;
   async function install(m) {
+    _installing = true;
+    try {
     const store = m._store, dst = INSTALL_ROOT + '/' + m.id, sub = pkgSub(m);
     const entries = (await store.listEntries(sub)).filter(e => !isPkgMeta(e.rel));
     const revs = {};
@@ -644,6 +646,7 @@
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
     // skill:true → nothing to move; context.js discovers sandpie/shared-installed/<id>/SKILL.md and load_skill resolves it
     try { window.dispatchEvent(new CustomEvent('sandpie-shares-installed', { detail: { id: m.id, rev: m.rev } })); } catch (_) {}
+    } finally { _installing = false; }
   }
   // Has a LIVE shared folder changed since we installed it? Compares the per-file
   // Dropbox revs, because the sender editing files in place never touches the
@@ -803,7 +806,10 @@
         let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
         if (m._from === 'team') {
           teamIds.add(id);
-          if (!mk || String(mk.rev) !== String(m.rev)) { await install(m); changed = true; }   // install() marks from='team'
+          // Reinstall on a manifest rev bump OR per-file rev drift (an editor with
+          // write access pushed bytes straight to the hub) — liveChanged() compares
+          // marker.revs against the hub listing.
+          if (!mk || String(mk.rev) !== String(m.rev) || await liveChanged(m, mk)) { await install(m); changed = true; }   // install() marks from='team'
           continue;
         }
         // 1:1 — refresh only what's installed AND accepted at this rev.
@@ -1331,6 +1337,108 @@
     _banner.textContent = '📥 ' + _pendingCount + ' item' + (_pendingCount === 1 ? '' : 's') + ' shared with you — tap to view';
     _banner.style.display = '';
   }
+
+  /* ── editor write-back: installed-package edits → team hub ─────────────── */
+  // A user with EDITOR access on the hub folder edits files in the installed copy
+  // (sandpie/shared-installed/<id>/). Those edits are pushed back to the hub
+  // package so the whole team gets them — rev-gated so a stale edit never
+  // clobbers a newer hub revision, and permission-fenced so a viewer's edits stay
+  // local with a notice. Writes made BY install() are guarded by _installing.
+  const WB_DEBOUNCE = 1500;
+  const WB_SKIP = /(^|\/)\.[^/]+$|\.bak(?:-|$)|(^|\/)(cache|items_cache|extraction_log)\.json$/;
+  let _installing = false;          // install() copies hub→local; those writes must not echo back
+  let _wbTimers = {};               // id/rel → timeout
+  let _wbDenied = {};               // pkgId → true (learned we can't write; don't retry each keystroke)
+
+  function wbNotify(kind, msg) { try { if (window.Sandpie && Sandpie.addMsg) Sandpie.addMsg(kind, msg); } catch (_) {} }
+
+  async function wbReadMarker(id) {
+    try { return JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) { return null; }
+  }
+
+  // 'sandpie/shared-installed/<id>/<rel>' → {id, rel}, else null.
+  function wbMatch(p) {
+    const pre = INSTALL_ROOT + '/';
+    if (typeof p !== 'string' || !p.startsWith(pre)) return null;
+    const rest = p.slice(pre.length);
+    const slash = rest.indexOf('/');
+    if (slash < 0) return null;
+    return { id: rest.slice(0, slash), rel: rest.slice(slash + 1) };
+  }
+
+  function wbOnChanged(p) {
+    const m = wbMatch(p);
+    if (!m) return;
+    if (m.rel === PKG_MARKER || WB_SKIP.test(m.rel)) return;
+    if (_installing || _wbDenied[m.id]) return;
+    const key = m.id + '/' + m.rel;
+    clearTimeout(_wbTimers[key]);
+    _wbTimers[key] = setTimeout(() => { delete _wbTimers[key]; wbPush(m.id, m.rel); }, WB_DEBOUNCE);
+  }
+
+  async function wbPush(id, rel) {
+    try {
+      if (!cloudOn()) return;
+      const mk = await wbReadMarker(id);
+      if (!mk || mk.from !== 'team' || !mk.team) return;      // team packages only
+      const store = teamHub(mk.team);
+      const hubRel = 'packages/' + id + '/' + rel;
+      const entries = await store.listEntries('packages/' + id);
+      const e = entries.find(x => x.rel === rel);
+      if (!e) return;                                        // not a package file (local-only) → leave alone
+      const hubRev = e.rev || '';
+      const knownRev = (mk.revs || {})[rel] || '';
+      if (knownRev && hubRev && knownRev !== hubRev) {       // hub moved since we installed/pushed
+        await wbPreserve(id, rel);
+        return;
+      }
+      const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
+      if (!bytes) return;
+      // Upload directly through the provider so we capture the NEW rev (the store
+      // wrapper discards the response).
+      const p = prov();
+      const resp = await p.cloudUpload(store.root + '/' + hubRel, bytes, { team: true });
+      const newRev = (resp && resp.rev) || hubRev;
+      mk.revs = mk.revs || {}; mk.revs[rel] = newRev;         // next edit compares against OUR push
+      await O().write(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER, new Blob([JSON.stringify(mk)], { type: 'application/json' }));
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', INSTALL_ROOT + '/' + id + '/' + PKG_MARKER); } catch (_) {}
+      wbNotify('ok', '📤 Publicat ' + rel + ' a l\'hub de ' + mk.team);
+    } catch (err) {
+      const msg = String((err && err.message) || err);
+      if (/403|no_permission|insufficient_permissions|path_root|access_denied/i.test(msg)) {
+        _wbDenied[id] = true;
+        wbNotify('err', '⚠ Sense permís d\'escriptura a l\'hub — el canvi a ' + rel + ' no s\'ha publicat.');
+      } else {
+        console.warn('[sharing] write-back failed', id, rel, msg);
+      }
+    }
+  }
+
+  // Keep the edit safe, never destroy it: copy to the user's workspace under
+  // sandpie/artifacts/<id>.conflicts/ with a timestamp. Hub stays untouched.
+  async function wbPreserve(id, rel) {
+    try {
+      const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
+      if (!bytes) return;
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const dst = 'sandpie/artifacts/' + id + '.conflicts/' + rel + '.' + ts;
+      await O().write(dst, new Blob([bytes]));
+      wbNotify('err', '⚠ ' + rel + ' ha canviat a l\'hub — la teva edició s\'ha desat a ' + dst + ' i NO s\'ha publicat.');
+    } catch (e) { console.warn('[sharing] conflict preserve failed', e); }
+  }
+
+  // Wire-up: page-side file:changed + the worker's sw-opfs-changed relay (covers
+  // python writes and editor saves that go through the worker).
+  try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('file:changed', wbOnChanged); } catch (_) {}
+  try {
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', (ev) => {
+      const d = ev.data;
+      if (!d) return;
+      const paths = (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) ? d.paths
+                  : (d.type === 'forward-to-page' && d.payload && d.payload.type === 'sw-opfs-changed' && Array.isArray(d.payload.paths)) ? d.payload.paths : null;
+      if (paths) for (const p of paths) wbOnChanged(p);
+    });
+  } catch (_) {}
 
   /* ── boot ─────────────────────────────────────────────────────────────── */
   // An earlier build persisted an "is this shared folder ours" index; a stale entry
