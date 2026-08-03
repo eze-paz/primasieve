@@ -619,31 +619,43 @@
     _installing = true;
     try {
     const store = m._store, dst = INSTALL_ROOT + '/' + m.id, sub = pkgSub(m);
+    // Local edits are preserved across hub re-syncs: read the previous marker's
+    // dirty map first, and never overwrite (or sweep) a file with a pending edit.
+    let prevDirty = {}, prevRevs = {};
+    try { const pm = JSON.parse(await O().read(dst + '/' + PKG_MARKER)); prevDirty = (pm && pm.dirty) || {}; prevRevs = (pm && pm.revs) || {}; } catch (_) {}
     const entries = (await store.listEntries(sub)).filter(e => !isPkgMeta(e.rel));
     const revs = {};
     for (const e of entries) {
+      const p = dst + '/' + e.rel;
+      if (prevDirty[e.rel]) {
+        // local > dropbox — keep the edited bytes and the OLD rev so the write-back
+        // rev-gate still sees the drift; the hub stays authority for clean files.
+        revs[e.rel] = prevRevs[e.rel] || '';
+        continue;
+      }
       const bytes = await store.readBytes(sub ? sub + '/' + e.rel : e.rel);
       if (!bytes) continue;
-      const p = dst + '/' + e.rel;
       await O().write(p, new Blob([bytes]));
       revs[e.rel] = e.rev || '';
       markDirty(p);   // emit file:changed so Dropbox marks it dirty + uploads it — without this the
                       // reconciliation pass deletes it as a local-only orphan under the eager prefix
     }
     // Files the sender has since DELETED from a live shared folder must go too,
-    // otherwise an update leaves orphans behind in the installed copy.
+    // otherwise an update leaves orphans behind in the installed copy. A file
+    // with a pending local edit is never swept — it is local > dropbox.
     const keep = new Set(Object.keys(revs));
     for (const rel of await listOpfs(dst, '', [])) {
-      if (rel === PKG_MARKER || keep.has(rel)) continue;
+      if (rel === PKG_MARKER || keep.has(rel) || prevDirty[rel]) continue;
       const p = dst + '/' + rel;
       try { await O().remove(p); } catch (_) {}
       try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
     }
     // marker so "Shared with me" + rollback-free identification work without shares.json.
     // `revs` is the per-file Dropbox rev map — how autoSync notices that a LIVE
-    // shared folder changed without the manifest rev moving.
+    // shared folder changed without the manifest rev moving. `dirty` records local
+    // edits pending upload (local > dropbox), mirroring the workspace sync model.
     const mp = dst + '/' + PKG_MARKER;
-    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', revs })], { type: 'application/json' }));
+    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', revs, dirty: prevDirty })], { type: 'application/json' }));
     markDirty(mp);
     // apply directives
     if (m.pin && window.SandpiePins) { try { SandpiePins.add(dst + '/' + m.pin); } catch (_) {} }
@@ -658,8 +670,12 @@
     if (!m._store || m._store.kind !== 'cloud') return false;
     const was = (marker && marker.revs) || null;
     if (!was) return false;   // installed before rev tracking → leave it alone
-    let entries; try { entries = (await m._store.listEntries(pkgSub(m))).filter(e => !isPkgMeta(e.rel)); } catch (_) { return false; }
-    if (entries.length !== Object.keys(was).length) return true;
+    const dirty = (marker && marker.dirty) || {};
+    // A dirty file is local > dropbox by design — exclude it from BOTH sides so
+    // its own pending edit never looks like a hub change (no reinstall loop).
+    let entries; try { entries = (await m._store.listEntries(pkgSub(m))).filter(e => !isPkgMeta(e.rel) && !dirty[e.rel]); } catch (_) { return false; }
+    const wasClean = Object.keys(was).filter(r => !dirty[r]).length;
+    if (entries.length !== wasClean) return true;
     return entries.some(e => was[e.rel] !== (e.rev || ''));
   }
   // Delete a 1:1 package from shared-incoming (local + Dropbox) — used by accept (move)
@@ -824,6 +840,10 @@
           changed = true;
         }
       }
+      // Bidirectional: retry pending local edits (dirty marker entries) on every
+      // tick, like the workspace sync retries dirty uploads — covers edits made
+      // while offline or when an upload previously failed.
+      if (cloudOn()) { try { await wbRetryDirty(); } catch (e) { console.warn('[sharing] write-back retry failed', e); } }
       // Prune ONLY after a scan we can trust. removeInstalledLocal() deletes the
       // package and unpins it, so acting on an empty-because-it-failed team list
       // wipes the user's pinned team artifacts — which is exactly what made them
@@ -1358,6 +1378,21 @@
   async function wbReadMarker(id) {
     try { return JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) { return null; }
   }
+  async function wbWriteMarker(id, mk) {
+    try {
+      const mp = INSTALL_ROOT + '/' + id + '/' + PKG_MARKER;
+      await O().write(mp, new Blob([JSON.stringify(mk)], { type: 'application/json' }));
+      if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', mp);
+    } catch (_) {}
+  }
+  async function wbMarkDirty(id, rel) {
+    try {
+      const mk = await wbReadMarker(id);
+      if (!mk || mk.from !== 'team' || !mk.team) return;
+      mk.dirty = mk.dirty || {}; mk.dirty[rel] = true;
+      await wbWriteMarker(id, mk);
+    } catch (_) {}
+  }
 
   // 'sandpie/shared-installed/<id>/<rel>' → {id, rel}, else null.
   function wbMatch(p) {
@@ -1374,6 +1409,7 @@
     if (!m) return;
     if (m.rel === PKG_MARKER || WB_SKIP.test(m.rel)) return;
     if (_installing || _wbDenied[m.id]) return;
+    wbMarkDirty(m.id, m.rel);          // record local > dropbox NOW (survives reload)
     const key = m.id + '/' + m.rel;
     clearTimeout(_wbTimers[key]);
     _wbTimers[key] = setTimeout(() => { delete _wbTimers[key]; wbPush(m.id, m.rel); }, WB_DEBOUNCE);
@@ -1381,51 +1417,70 @@
 
   async function wbPush(id, rel) {
     try {
-      if (!cloudOn()) return;
+      if (!cloudOn()) return;                                // stays dirty; retried on the next edit/poll
       const mk = await wbReadMarker(id);
       if (!mk || mk.from !== 'team' || !mk.team) return;      // team packages only
       const store = teamHub(mk.team);
       const hubRel = 'packages/' + id + '/' + rel;
       const entries = await store.listEntries('packages/' + id);
       const e = entries.find(x => x.rel === rel);
-      if (!e) return;                                        // not a package file (local-only) → leave alone
-      const hubRev = e.rev || '';
+      const hubRev = (e && e.rev) || '';
       const knownRev = (mk.revs || {})[rel] || '';
-      if (knownRev && hubRev && knownRev !== hubRev) {       // hub moved since we installed/pushed
-        await wbPreserve(id, rel);
-        return;
-      }
+      // Safety: if the hub HAS the file but we have no recorded rev (ancient
+      // install), never clobber — preserve instead.
+      if (hubRev && !knownRev) { await wbPreserve(id, rel, mk); return; }
+      // Conflict: hub moved since we installed/pushed → newer hub revision wins,
+      // the local edit is preserved (never destroyed).
+      if (knownRev && hubRev && knownRev !== hubRev) { await wbPreserve(id, rel, mk); return; }
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
       // Upload directly through the provider so we capture the NEW rev (the store
-      // wrapper discards the response).
+      // wrapper discards the response). New files (hubRev '') are created here.
       const p = prov();
       const resp = await p.cloudUpload(store.root + '/' + hubRel, bytes, { team: true });
       const newRev = (resp && resp.rev) || hubRev;
       mk.revs = mk.revs || {}; mk.revs[rel] = newRev;         // next edit compares against OUR push
-      await O().write(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER, new Blob([JSON.stringify(mk)], { type: 'application/json' }));
-      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', INSTALL_ROOT + '/' + id + '/' + PKG_MARKER); } catch (_) {}
+      mk.dirty = mk.dirty || {}; delete mk.dirty[rel];        // local == dropbox again
+      await wbWriteMarker(id, mk);
       wbNotify('ok', '📤 Publicat ' + rel + ' a l\'hub de ' + mk.team);
     } catch (err) {
       const msg = String((err && err.message) || err);
       if (/403|no_permission|insufficient_permissions|path_root|access_denied/i.test(msg)) {
         _wbDenied[id] = true;
-        wbNotify('err', '⚠ Sense permís d\'escriptura a l\'hub — el canvi a ' + rel + ' no s\'ha publicat.');
+        wbNotify('err', '⚠ Sense permís d\'escriptura a l\'hub — el canvi a ' + rel + ' no s\'ha publicat (queda marcat com a pendent).');
       } else {
         console.warn('[sharing] write-back failed', id, rel, msg);
       }
     }
   }
 
+  // Push every file marked dirty in an installed team package's marker (local >
+  // dropbox). Runs on each autoSync tick so edits made offline eventually reach
+  // the hub without needing a fresh edit event.
+  async function wbRetryDirty() {
+    let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) { return; }
+    for (const id of dirs) {
+      const mk = await wbReadMarker(id);
+      if (!mk || mk.from !== 'team' || !mk.team) continue;
+      const dirtyRels = Object.keys((mk.dirty) || {}).filter(r => !WB_SKIP.test(r) && r !== PKG_MARKER);
+      for (const rel of dirtyRels) {
+        if (_wbDenied[id]) break;
+        try { await wbPush(id, rel); } catch (e) { console.warn('[sharing] wbRetryDirty', id, rel, e); }
+      }
+    }
+  }
+
   // Keep the edit safe, never destroy it: copy to the user's workspace under
-  // sandpie/artifacts/<id>.conflicts/ with a timestamp. Hub stays untouched.
-  async function wbPreserve(id, rel) {
+  // sandpie/artifacts/<id>.conflicts/ with a timestamp. Hub stays untouched and
+  // the local edit's dirty flag is cleared (the preserved copy is the edit now).
+  async function wbPreserve(id, rel, mk) {
     try {
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       const dst = 'sandpie/artifacts/' + id + '.conflicts/' + rel + '.' + ts;
       await O().write(dst, new Blob([bytes]));
+      if (mk) { mk.dirty = mk.dirty || {}; delete mk.dirty[rel]; await wbWriteMarker(id, mk); }
       wbNotify('err', '⚠ ' + rel + ' ha canviat a l\'hub — la teva edició s\'ha desat a ' + dst + ' i NO s\'ha publicat.');
     } catch (e) { console.warn('[sharing] conflict preserve failed', e); }
   }
