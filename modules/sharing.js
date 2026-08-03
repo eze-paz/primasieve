@@ -49,8 +49,15 @@
   const INSTALL_ROOT = 'sandpie/shared-installed';   // read-only accepted packages (worker guard keys on this)
   const LOCAL_HUB = 'sandpie/shared-incoming';       // per-user 1:1 inbox (1:1 deliveries sync in here) + offline sim hub
   const SUBS_PATH = 'sandpie/config/shares.json';   // accept/dismiss state (1:1) + team subscriptions
-  const PKG_MARKER = '.sandpie-pkg.json';           // per-installed-package marker: {id,title,kind,publisher,pin,rev,revs}
-  const SHARE_MARKER = '.sandpie-share.json';       // manifest at the root of a 1:1 shared folder
+  // ONE visible package record per package, used everywhere: the team hub manifest
+  // (packages/<id>/package.json), the 1:1 marker (folder-root package.json) and —
+  // in the installed copy — NO file at all: per-device state lives in localStorage.
+  const PKG_FILE = 'package.json';
+  // Legacy marker names, read-only fallbacks for already-published packages/shares.
+  const LEGACY_MANIFEST = 'manifest.json';
+  const LEGACY_SHARE = '.sandpie-share.json';
+  const LEGACY_PKG = '.sandpie-pkg.json';
+  const SHARE_MARKER = LEGACY_SHARE;   // kept as an alias: 1:1 discovery still probes legacy name
   const LEGACY_PROBE_KEY = 'sandpie-share-probe';   // removed: a persisted "is this ours" index that went stale and hid deliveries
   const COLLAPSE_KEY = 'sandpie-shared-collapsed';      // "Shared with me" collapsed state (per device)
   const TEAM_COLLAPSE_KEY = 'sandpie-team-collapsed';   // "Team artifacts" collapsed state (per device)
@@ -76,6 +83,35 @@
     return { user: 'me@local', teams };
   }
   function setIdentity(id) { if (id) localStorage.setItem(ID_OVERRIDE_KEY, JSON.stringify(id)); else localStorage.removeItem(ID_OVERRIDE_KEY); fire(); }
+
+  /* ── per-device installed state (localStorage, like dropbox.js syncState) ─
+     Installed packages have NO marker file — from/team/cursor/seen/dirty live in
+     localStorage keyed by package id. That is why the installed folder shows no
+     index file, exactly like the rest of sandpie's sync. */
+  const PKG_STATE_KEY = 'sandpie-pkg-state';
+  function pkgState() { try { return JSON.parse(localStorage.getItem(PKG_STATE_KEY) || '{}'); } catch (_) { return {}; } }
+  function setPkgState(s) { try { localStorage.setItem(PKG_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
+  async function readInstalledState(id) {
+    const st = pkgState();
+    if (st[id]) return st[id];
+    // one-time migration from legacy marker files (pre-cursor installs)
+    for (const name of [LEGACY_PKG, PKG_FILE]) {
+      let mk = null;
+      try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + name)); } catch (_) {}
+      if (mk && (mk.id || mk.revs || mk.from)) {
+        const seen = (mk.revs || {}), dirty = (mk.dirty || {});
+        st[id] = { id, title: mk.title || id, kind: mk.kind || 'folder', publisher: mk.publisher || '', pin: mk.pin || null, rev: mk.rev || 0, from: mk.from || 'incoming', team: mk.team || '', cursor: mk.cursor || '', seen, dirty };
+        setPkgState(st);
+        try { await O().remove(INSTALL_ROOT + '/' + id + '/' + name); } catch (_) {}
+        return st[id];
+      }
+    }
+    return null;
+  }
+  async function writeInstalledState(id, mk) {
+    const st = pkgState(); st[id] = mk; setPkgState(st);
+    for (const name of [PKG_FILE, LEGACY_PKG]) { try { await O().remove(INSTALL_ROOT + '/' + id + '/' + name); } catch (_) {} }
+  }
 
   /* ── stores (uniform read/write over a hub root) ──────────────────────── */
   function markDirty(p) { try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', p); } catch (_) {} }
@@ -341,8 +377,14 @@
   }
 
   /* ── package IO over a store ──────────────────────────────────────────── */
-  // TEAM hub layout: packages/<id>/manifest.json + files (many packages per store).
-  async function readManifest(store, id) { const t = await store.readText('packages/' + id + '/manifest.json'); if (!t) return null; try { return JSON.parse(t); } catch (_) { return null; } }
+  // TEAM hub layout: packages/<id>/package.json + files (many packages per store).
+  async function readManifest(store, id) {
+    for (const name of [PKG_FILE, LEGACY_MANIFEST]) {
+      const t = await store.readText('packages/' + id + '/' + name);
+      if (t) { try { return JSON.parse(t); } catch (_) { return null; } }
+    }
+    return null;
+  }
   // Run fn over items with at most n in flight. Round-trip latency dominates here,
   // so serial vs 8-wide is the difference between half a minute and a second.
   async function mapLimited(items, n, fn) {
@@ -368,7 +410,7 @@
     try { entries = await store.listEntries('packages'); } catch (_) { return []; }
     const revs = {}, ids = [], stale = [];
     for (const e of entries) {
-      const m = /^([^/]+)\/manifest\.json$/.exec(e.rel);
+      const m = /^([^/]+)\/(package\.json|manifest\.json)$/.exec(e.rel);
       if (!m) continue;
       const id = m[1];
       revs[id] = e.rev || '';
@@ -387,11 +429,14 @@
   // remember a verdict for the first two: an `error` means we could not tell, and
   // recording that as "not a package" is what hides a real delivery.
   async function readShareManifest(store) {
-    const r = await store.probeText(SHARE_MARKER);
-    if (r.error) return { error: r.error };
-    if (r.missing || !r.text) return { missing: true };
-    try { const m = JSON.parse(r.text); return (m && m.id) ? { manifest: m } : { missing: true }; }
-    catch (_) { return { missing: true }; }   // present but unparseable → not one of ours
+    for (const name of [PKG_FILE, LEGACY_SHARE]) {
+      const r = await store.probeText(name);
+      if (r.error) return { error: r.error };
+      if (r.missing || !r.text) continue;
+      try { const m = JSON.parse(r.text); return (m && m.id) ? { manifest: m } : { missing: true }; }
+      catch (_) { return { missing: true }; }
+    }
+    return { missing: true };
   }
 
   /* ── publish ──────────────────────────────────────────────────────────── */
@@ -449,7 +494,7 @@
     // 'viewer' (default) or 'editor'. Recorded in the manifest so the recipient can
     // tell whether they are looking at something they may write back to.
     const level = opts.access === 'editor' ? 'editor' : 'viewer';
-    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', access: level, ts: 0 });
+    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', access: level, cursor: Date.now(), ts: 0 });
     const dests = [], users = (audience.users || []).map(String);
     let rev = 1;
 
@@ -464,7 +509,8 @@
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); else missed.push(rel); }
       if (missed.length === files.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
       if (missed.length) console.warn('[sharing] published without ' + missed.length + ' unreadable file(s):', missed);
-      await store.writeText('packages/' + id + '/manifest.json', JSON.stringify(mk(rev), null, 2));
+      await store.writeText('packages/' + id + '/' + PKG_FILE, JSON.stringify(mk(rev), null, 2));
+      try { await store.writeText('packages/' + id + '/' + LEGACY_MANIFEST, ''); } catch (_) {}   // migration: blank the old name
       invalidateTeams();   // my own publish should appear now, not on the next slow scan
       dests.push(store.kind + ':' + store.root);
     }
@@ -489,7 +535,8 @@
       }
       // Marker BEFORE members: the first thing a recipient does with a new share is
       // look for it, and a miss is remembered.
-      await store.writeText(SHARE_MARKER, JSON.stringify(mk(rev), null, 2));
+      await store.writeText(PKG_FILE, JSON.stringify(mk(rev), null, 2));
+      try { await store.writeText(LEGACY_SHARE, ''); } catch (_) {}   // migration: blank the old name
       try { await store.invite(users); }
       catch (e) { throw new Error('Could not invite ' + users.join(', ') + ': ' + ((e && e.message) || e)); }
       _lastShareId = store.shareId || '';   // selfTest needs it to point self-mode at this one folder
@@ -603,7 +650,7 @@
     const out = [];
     let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
     for (const id of dirs) {
-      let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+      let mk = null; try { mk = await readInstalledState(id); } catch (_) {}
       out.push(mk || { id, title: id, kind: 'folder' });
     }
     return out;
@@ -614,49 +661,53 @@
   // packages/<id>/ in the shared hub; a 1:1 shared folder IS the package, so its
   // files are at the root (minus the marker).
   const pkgSub = (m) => (m._from === 'team' ? 'packages/' + m.id : '');
-  const isPkgMeta = (rel) => rel === 'manifest.json' || rel === SHARE_MARKER;
+  const isPkgMeta = (rel) => rel === PKG_FILE || rel === LEGACY_MANIFEST || rel === LEGACY_SHARE || rel === LEGACY_PKG;
   async function install(m) {
     _installing = true;
     try {
     const store = m._store, dst = INSTALL_ROOT + '/' + m.id, sub = pkgSub(m);
-    // Local edits are preserved across hub re-syncs: read the previous marker's
-    // dirty map first, and never overwrite (or sweep) a file with a pending edit.
-    let prevDirty = {}, prevRevs = {}, prevPin = null;
-    try { const pm = JSON.parse(await O().read(dst + '/' + PKG_MARKER)); prevDirty = (pm && pm.dirty) || {}; prevRevs = (pm && pm.revs) || {}; prevPin = (pm && pm.pin) || null; } catch (_) {}
+    // Local edits are preserved across hub re-syncs: read the previous per-device
+    // state first, and never overwrite (or sweep) a file with a pending edit.
+    let prevDirty = {}, prevSeen = {}, prevPin = null;
+    try { const pm = await readInstalledState(m.id); prevDirty = (pm && pm.dirty) || {}; prevSeen = (pm && pm.seen) || {}; prevPin = (pm && pm.pin) || null; } catch (_) {}
     const entries = (await store.listEntries(sub)).filter(e => !isPkgMeta(e.rel));
-    const revs = {};
+    const seen = {};
     for (const e of entries) {
       const p = dst + '/' + e.rel;
       if (prevDirty[e.rel]) {
         // local > dropbox — keep the edited bytes and the OLD rev so the write-back
-        // rev-gate still sees the drift; the hub stays authority for clean files.
-        revs[e.rel] = prevRevs[e.rel] || '';
+        // conflict gate still sees the drift; the hub stays authority for clean files.
+        seen[e.rel] = prevSeen[e.rel] || '';
         continue;
       }
       const bytes = await store.readBytes(sub ? sub + '/' + e.rel : e.rel);
       if (!bytes) continue;
       await O().write(p, new Blob([bytes]));
-      revs[e.rel] = e.rev || '';
+      seen[e.rel] = e.rev || '';
       markDirty(p);   // emit file:changed so Dropbox marks it dirty + uploads it — without this the
                       // reconciliation pass deletes it as a local-only orphan under the eager prefix
     }
     // Files the sender has since DELETED from a live shared folder must go too,
     // otherwise an update leaves orphans behind in the installed copy. A file
     // with a pending local edit is never swept — it is local > dropbox.
-    const keep = new Set(Object.keys(revs));
+    const keep = new Set(Object.keys(seen));
     for (const rel of await listOpfs(dst, '', [])) {
-      if (rel === PKG_MARKER || keep.has(rel) || prevDirty[rel]) continue;
+      if (rel === PKG_FILE || rel === LEGACY_PKG) { try { await O().remove(dst + '/' + rel); } catch (_) {} continue; }   // drop leftover marker files
+      if (keep.has(rel) || prevDirty[rel]) continue;
       const p = dst + '/' + rel;
       try { await O().remove(p); } catch (_) {}
       try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', p); } catch (_) {}
     }
     // marker so "Shared with me" + rollback-free identification work without shares.json.
-    // `revs` is the per-file Dropbox rev map — how autoSync notices that a LIVE
-    // shared folder changed without the manifest rev moving. `dirty` records local
-    // edits pending upload (local > dropbox), mirroring the workspace sync model.
-    const mp = dst + '/' + PKG_MARKER;
-    await O().write(mp, new Blob([JSON.stringify({ id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', revs, dirty: prevDirty })], { type: 'application/json' }));
-    markDirty(mp);
+    // `seen` is the minimal per-file rev reference for the write-back conflict
+    // gate; `dirty` records local edits pending upload (local > dropbox), mirroring
+    // the workspace sync model. Change detection for team packages uses the hub
+    // package.json cursor, not per-file revs.
+    // per-device state → localStorage (no marker file in OPFS). `seen` is the
+    // minimal per-file rev reference for the write-back conflict gate; `dirty`
+    // records local edits pending upload (local > dropbox); `cursor` is the hub
+    // package cursor we synced to.
+    await writeInstalledState(m.id, { id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', cursor: m.cursor || '', seen, dirty: prevDirty });
     // apply directives. One pin per package: if the manifest's pin target changed
     // between revs (e.g. a re-publish re-pointed it), remove the OLD tile first —
     // otherwise both the old and new file stay pinned on the home screen.
@@ -673,7 +724,7 @@
   // manifest rev. Cheap: one list_folder, no downloads.
   async function liveChanged(m, marker) {
     if (!m._store || m._store.kind !== 'cloud') return false;
-    const was = (marker && marker.revs) || null;
+    const was = (marker && marker.seen) || null;
     if (!was) return false;   // installed before rev tracking → leave it alone
     const dirty = (marker && marker.dirty) || {};
     // A dirty file is local > dropbox by design — exclude it from BOTH sides so
@@ -752,6 +803,7 @@
   // "Shared with me" ✕ (uninstall) and the team ✕ (unshare, after hub delete).
   async function removeInstalledLocal(id) {
     const dst = INSTALL_ROOT + '/' + id;
+    try { const st = pkgState(); delete st[id]; setPkgState(st); } catch (_) {}
     if (window.SandpiePins) { for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p); }
     try {
       const p = prov();
@@ -778,7 +830,8 @@
   // session, the installed marker knows across reloads.
   async function teamOf(id) {
     try { const cat = await catalog(); if (cat[id] && cat[id]._team) return cat[id]._team; } catch (_) {}
-    try { return (JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)) || {}).team || ''; } catch (_) { return ''; }
+    try { const mk = await readInstalledState(id); if (mk && mk.team) return mk.team; } catch (_) {}
+    return '';
   }
   async function unshareTeam(id) {
     try {
@@ -827,13 +880,13 @@
       const accepted = (await subs()).accepted || {};
       for (const id in cat) {
         const m = cat[id];
-        let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+        let mk = null; try { mk = await readInstalledState(id); } catch (_) {}
         if (m._from === 'team') {
           teamIds.add(id);
-          // Reinstall on a manifest rev bump OR per-file rev drift (an editor with
-          // write access pushed bytes straight to the hub) — liveChanged() compares
-          // marker.revs against the hub listing.
-          if (!mk || String(mk.rev) !== String(m.rev) || await liveChanged(m, mk)) { await install(m); changed = true; }   // install() marks from='team'
+          // Reinstall on a manifest rev bump OR a cursor change — every publish
+          // AND every write-back push bumps package.json.cursor, so recipients see
+          // the drift without any per-file rev comparison.
+          if (!mk || String(mk.rev) !== String(m.rev) || (m.cursor && (!mk.cursor || String(mk.cursor) !== String(m.cursor)))) { await install(m); changed = true; }   // install() marks from='team'
           continue;
         }
         // 1:1 — refresh only what's installed AND accepted at this rev.
@@ -857,7 +910,7 @@
         let dirs = []; try { dirs = (await O().listDir(INSTALL_ROOT)).filter(e => e.kind === 'directory').map(e => e.name); } catch (_) {}
         for (const id of dirs) {
           if (teamIds.has(id)) continue;
-          let mk = null; try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) {}
+          let mk = null; try { mk = await readInstalledState(id); } catch (_) {}
           if (mk && mk.from === 'team') { await removeInstalledLocal(id); changed = true; }   // unshared from the hub → drop local
         }
       }
@@ -1381,14 +1434,10 @@
   function wbNotify(kind, msg) { try { if (window.Sandpie && Sandpie.addMsg) Sandpie.addMsg(kind, msg); } catch (_) {} }
 
   async function wbReadMarker(id) {
-    try { return JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + PKG_MARKER)); } catch (_) { return null; }
+    try { return await readInstalledState(id); } catch (_) { return null; }
   }
   async function wbWriteMarker(id, mk) {
-    try {
-      const mp = INSTALL_ROOT + '/' + id + '/' + PKG_MARKER;
-      await O().write(mp, new Blob([JSON.stringify(mk)], { type: 'application/json' }));
-      if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', mp);
-    } catch (_) {}
+    try { await writeInstalledState(id, mk); } catch (_) {}
   }
   async function wbMarkDirty(id, rel) {
     try {
@@ -1412,7 +1461,7 @@
   function wbOnChanged(p) {
     const m = wbMatch(p);
     if (!m) return;
-    if (m.rel === PKG_MARKER || WB_SKIP.test(m.rel)) return;
+    if (m.rel === PKG_FILE || WB_SKIP.test(m.rel)) return;
     if (_installing || _wbDenied[m.id]) return;
     wbMarkDirty(m.id, m.rel);          // record local > dropbox NOW (survives reload)
     const key = m.id + '/' + m.rel;
@@ -1444,8 +1493,14 @@
       const p = prov();
       const resp = await p.cloudUpload(store.root + '/' + hubRel, bytes, { team: true });
       const newRev = (resp && resp.rev) || hubRev;
-      mk.revs = mk.revs || {}; mk.revs[rel] = newRev;         // next edit compares against OUR push
+      mk.seen = mk.seen || {}; mk.seen[rel] = newRev;         // next edit compares against OUR push
       mk.dirty = mk.dirty || {}; delete mk.dirty[rel];        // local == dropbox again
+      // Bump the hub package.json cursor so every recipient re-syncs — the change
+      // signal that replaced per-file rev comparison for team packages.
+      try {
+        const cur = await readManifest(store, id);
+        if (cur) { cur.cursor = Date.now(); await store.writeText('packages/' + id + '/' + PKG_FILE, JSON.stringify(cur, null, 2)); mk.cursor = cur.cursor; }
+      } catch (_) {}
       await wbWriteMarker(id, mk);
       // success is silent — the file simply appears in the hub; only failures notify
     } catch (err) {
@@ -1467,7 +1522,7 @@
     for (const id of dirs) {
       const mk = await wbReadMarker(id);
       if (!mk || mk.from !== 'team' || !mk.team) continue;
-      const dirtyRels = Object.keys((mk.dirty) || {}).filter(r => !WB_SKIP.test(r) && r !== PKG_MARKER);
+      const dirtyRels = Object.keys((mk.dirty) || {}).filter(r => !WB_SKIP.test(r) && r !== PKG_FILE);
       for (const rel of dirtyRels) {
         if (_wbDenied[id]) break;
         try { await wbPush(id, rel); } catch (e) { console.warn('[sharing] wbRetryDirty', id, rel, e); }

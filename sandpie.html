@@ -188,6 +188,18 @@ if("serviceWorker"in navigator){
       <div id="homeCenter">
         <div id="sharedHome" class="shared-home"></div>
       </div>
+      <form class="composer" onsubmit="event.preventDefault(); handleSubmit('main')">
+        <input type="file" id="imageInput" multiple style="display:none" >
+        <div id="imagePreview" class="image-preview" style="display:none"></div>
+        <div class="input-wrap">
+          <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
+          <div class="input-bar">
+            <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach file">+</button>
+            <div id="modelPicker" class="model-picker"></div>
+            <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick('main')" title="Send">▶</button>
+          </div>
+        </div>
+      </form>
     </div>
     <div id="sideResizer"></div>
     <div id="messagesSide">
@@ -199,6 +211,17 @@ if("serviceWorker"in navigator){
         </span>
       </div>
       <iframe id="artifactPanelFrame" src="about:blank"></iframe>
+      <form class="composer composer-side" onsubmit="event.preventDefault(); handleSubmit('side')">
+        <input type="file" id="imageInputSide" multiple style="display:none" >
+        <div id="imagePreviewSide" class="image-preview" style="display:none"></div>
+        <div class="input-wrap">
+          <textarea id="inputSide" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
+          <div class="input-bar">
+            <button type="button" id="attachBtnSide" class="attach-btn" onclick="$('imageInputSide').click()" title="Attach file">+</button>
+            <button type="button" id="sendBtnSide" class="send-btn" onclick="handleButtonClick('side')" title="Send">▶</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
   <div id="commandOutput" class="cmd-output" style="display:none;">
@@ -208,18 +231,7 @@ if("serviceWorker"in navigator){
     </div>
     <pre class="cmd-body"></pre>
   </div>
-  <form onsubmit="event.preventDefault(); handleSubmit();">
-    <input type="file" id="imageInput" multiple style="display:none" >
-    <div id="imagePreview" class="image-preview" style="display:none"></div>
-    <div class="input-wrap">
-      <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
-      <div class="input-bar">
-        <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach file">+</button>
-        <div id="modelPicker" class="model-picker"></div>
-        <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick()" title="Send">▶</button>
-      </div>
-    </div>
-  </form>
+
 </main>
 
 <!-- Settings modal — a top-level overlay (direct child of <body>). MUST stay
@@ -240,7 +252,7 @@ if("serviceWorker"in navigator){
   </div>
 </div>
   <script type="module" src="modules/context.js?v=13"></script>
-  <script src="modules/sharing.js?v=62"></script>
+  <script src="modules/sharing.js?v=63"></script>
   <script type="module" src="modules/artifacts.js?v=14"></script>
   </body>
 </html>
