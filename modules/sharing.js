@@ -100,7 +100,7 @@
       try { mk = JSON.parse(await O().read(INSTALL_ROOT + '/' + id + '/' + name)); } catch (_) {}
       if (mk && (mk.id || mk.revs || mk.from)) {
         const seen = (mk.revs || {}), dirty = (mk.dirty || {});
-        st[id] = { id, title: mk.title || id, kind: mk.kind || 'folder', publisher: mk.publisher || '', pin: mk.pin || null, rev: mk.rev || 0, from: mk.from || 'incoming', team: mk.team || '', cursor: mk.cursor || '', seen, dirty };
+        st[id] = { id, title: mk.title || id, kind: mk.kind || 'folder', publisher: mk.publisher || '', pin: mk.pin || null, rev: mk.rev || 0, from: mk.from || 'incoming', team: mk.team || '', seen, dirty };
         setPkgState(st);
         try { await O().remove(INSTALL_ROOT + '/' + id + '/' + name); } catch (_) {}
         return st[id];
@@ -423,13 +423,23 @@
       const m = /^([^/]+)(?:\/(.*))?$/.exec(e.rel || '');
       if (!m) continue;
       const id = m[1], hasFile = !!m[2];
-      const rec = byId[id] || (byId[id] = { id, kind: 'folder', title: id, publisher: '', rev: 0, cursor: '', pin: null, _store: store });
+      const rec = byId[id] || (byId[id] = { id, kind: 'folder', title: id, publisher: '', rev: 0, pin: null, _store: store });
       if (hasFile) rec._changed = true;                       // content present / changed
-      if (m[2] === 'SKILL.md') rec.kind = 'skill';            // derive kind from SKILL.md presence
+      if (m[2] === 'SKILL.md') rec.kind = 'skill';            // fallback kind from SKILL.md presence
     }
     const out = Object.keys(byId).map(id => byId[id]);
     // First full scan: everything is "changed" so autoSync installs what is missing.
     if (isFull) for (const m of out) m._changed = true;
+    // Enrich from the ONE visible record file (package.json) when present — pin,
+    // kind, title, publisher, rev, acl. The cursor delta stays the change signal.
+    await mapLimited(out, 8, async (rec) => {
+      try {
+        const r = await store.readText('packages/' + rec.id + '/' + PKG_FILE);
+        if (!r) return;
+        const j = JSON.parse(r);
+        if (j && j.id) { rec.kind = j.kind || rec.kind; rec.title = j.title || rec.title; rec.publisher = j.publisher || ''; rec.rev = j.rev || 0; rec.pin = j.pin || null; rec.acl = j.acl || null; }
+      } catch (_) {}
+    });
     return out;
   }
   // 1:1 layout: the shared folder IS the package — marker at its root, files
@@ -502,7 +512,7 @@
     // 'viewer' (default) or 'editor'. Recorded in the manifest so the recipient can
     // tell whether they are looking at something they may write back to.
     const level = opts.access === 'editor' ? 'editor' : 'viewer';
-    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', access: level, cursor: Date.now(), ts: 0 });
+    const mk = (rev) => ({ id, kind, title: opts.title || base, publisher: me().user, rev, acl, pin: pinFile, skill: kind === 'skill', access: level, ts: 0 });
     const dests = [], users = (audience.users || []).map(String);
     let rev = 1;
 
@@ -517,9 +527,12 @@
       for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes('packages/' + id + '/' + rel, bytes); else missed.push(rel); }
       if (missed.length === files.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
       if (missed.length) console.warn('[sharing] published without ' + missed.length + ' unreadable file(s):', missed);
-      // No manifest: the package folder IS the package (content only). Recipients
-      // detect changes via the per-device list_folder cursor in localStorage, so
-      // nothing else is written to the hub.
+      // ONE visible package record per package: package.json carries id/kind/
+      // title/publisher/rev/acl/pin (the pin directive feeds the home screen).
+      // Change detection is the per-device list_folder cursor in localStorage —
+      // the file is the record, NOT the change signal.
+      await store.writeText('packages/' + id + '/' + PKG_FILE, JSON.stringify(mk(rev), null, 2));
+      try { await store.writeText('packages/' + id + '/' + LEGACY_MANIFEST, ''); } catch (_) {}   // migration: blank the old name
       invalidateTeams();   // my own publish should appear now, not on the next slow scan
       dests.push(store.kind + ':' + store.root);
     }
@@ -716,7 +729,7 @@
     // minimal per-file rev reference for the write-back conflict gate; `dirty`
     // records local edits pending upload (local > dropbox); `cursor` is the hub
     // package cursor we synced to.
-    await writeInstalledState(m.id, { id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', cursor: m.cursor || '', seen, dirty: prevDirty });
+    await writeInstalledState(m.id, { id: m.id, title: m.title, kind: m.kind, publisher: m.publisher, pin: m.pin || null, rev: m.rev, from: m._from || 'incoming', team: m._team || '', seen, dirty: prevDirty });
     // apply directives. One pin per package: if the manifest's pin target changed
     // between revs (e.g. a re-publish re-pointed it), remove the OLD tile first —
     // otherwise both the old and new file stay pinned on the home screen.
