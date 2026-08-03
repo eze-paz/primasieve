@@ -2827,7 +2827,24 @@ opfs.toUrl = async function(path) {
   if (ext === 'html' || ext === 'htm') {
 
 
-    let text = new TextDecoder().decode(bytes);
+    let text = new TextDecoder().decode(bytes);
+
+
+    // Console capture bootstrap — must run BEFORE the artifact's own scripts so
+    // load-time console calls / errors are caught too. Buffers into
+    // window.__sandpieConsole (read by the html_console tool via the page).
+    const cap = `<script>(function(){` +
+      `if(window.__sandpieConsole)return;` +
+      `var __b=[],__cap=200;` +
+      `function __p(lvl,args){var parts=[];for(var i=0;i<args.length;i++){var a=args[i],s;` +
+      `try{if(typeof a==='string')s=a;else if(a&&a.message&&a.stack)s=a.message;else s=JSON.stringify(a);}catch(_){s=String(a);}parts.push(s);}` +
+      `var line=lvl+': '+parts.join(' ');if(__b.length>=__cap)__b.shift();__b.push(line);}` +
+      `['log','info','warn','error','debug'].forEach(function(m){var o=console[m]&&console[m].bind(console);` +
+      `console[m]=function(){__p(m.toUpperCase(),arguments);if(o)o.apply(null,arguments);};});` +
+      `window.addEventListener('error',function(e){__p('ERROR',[(e.message||'')+(e.filename?(' @ '+e.filename.split('/').pop()+(e.lineno?(':'+e.lineno):'')):'')]);},true);` +
+      `window.addEventListener('unhandledrejection',function(e){var r=e.reason;__p('UNHANDLED',[(r&&r.message)||String(r)]);});` +
+      `window.__sandpieConsole=__b;` +
+      `})();<\/script>`;
 
 
     const script = `<script>(function(){` +
@@ -2860,12 +2877,11 @@ opfs.toUrl = async function(path) {
       `})();<\/script>`;
 
 
+    // console capture FIRST (before any artifact script), resize LAST (needs layout)
+    if (/<head[^>]*>/i.test(text)) text = text.replace(/<head([^>]*)>/i, '<head$1>' + cap);
+    else text = cap + text;
     if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, script + '</body>');
-
-
     else text += script;
-
-
     return URL.createObjectURL(new Blob([text], { type: 'text/html' }));
 
 

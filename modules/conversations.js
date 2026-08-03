@@ -1366,7 +1366,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=86');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=87');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1446,6 +1446,27 @@ function getSandpieWorker() {
               + ((out && out.dests && out.dests.length) ? '\n' + out.dests.join('\n') : ''));
           } catch (e) {
             reply('Error sharing "' + pr.args.path + '": ' + ((e && e.message) || e));
+          }
+        })();
+        return;
+      }
+      // html_console tool: the worker posts a console-request; the page reads the
+      // artifact frame's captured console (readArtifactConsole in artifacts.js)
+      // and replies with the entries.
+      if (msg.payload && msg.payload.type === 'console-request') {
+        const pr = msg.payload;
+        (async () => {
+          const reply = (result) => { try { _sandpieWorker.postMessage({ type: 'console-result', id: pr.id, result }); } catch (_) {} };
+          try {
+            const fn = window.readArtifactConsole;
+            if (typeof fn !== 'function') { reply('Error: readArtifactConsole is not available on this page (artifacts.js not loaded or outdated).'); return; }
+            const out = await fn(pr.args && pr.args.path);
+            if (out && out.error) { reply('Error: ' + out.error); return; }
+            const entries = (out && out.entries) || [];
+            if (!entries.length) reply('(no console output captured — the artifact logged nothing, or its console buffer is empty)');
+            else reply('Console for "' + (pr.args && pr.args.path || 'artifact') + '" (' + entries.length + ' entries):\n' + entries.join('\n'));
+          } catch (e) {
+            reply('Error reading console: ' + ((e && e.message) || e));
           }
         })();
         return;

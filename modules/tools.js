@@ -201,6 +201,19 @@ path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
       required: ['path', 'type', 'recipients'],
     },
   },
+  html_console: {
+    description: `Read the browser console output of an HTML artifact that is shown in the conversation (rendered via show_artifact), so you can see console.log/warn/error output, uncaught errors, and unhandled promise rejections from the artifact's own JavaScript.
+WHEN TO USE: after showing an HTML artifact, when the user reports something looks broken (blank areas, missing elements, wrong layout) or you want to verify the page's JS ran without errors. The console is captured from load time (the capture script is injected before the artifact's own scripts), so load-time errors are included.
+WHEN NOT TO USE: for non-HTML artifacts (images, PDFs, office docs have no console). If the artifact is not currently open in the conversation, call show_artifact first — the console is read from the live preview frame.
+path: optional — omit to read the most recently shown artifact, or pass the exact path (e.g. "sandpie/artifacts/report.html").`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Optional OPFS path of the artifact (e.g. "sandpie/artifacts/report.html"). Omit to target the most recently shown artifact.' },
+      },
+      required: [],
+    },
+  },
   write_todos: {
       description: `Create and manage a structured task list for the current session. This helps you track progress, organize complex work, and demonstrate to the user that you understand the scope.
 Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).

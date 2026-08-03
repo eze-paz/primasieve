@@ -225,6 +225,13 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Page → worker reply to an html_console request (see tool_html_console below).
+  if (data.type === 'console-result') {
+    const d = _consoleReqs.get(data.id);
+    if (d) { _consoleReqs.delete(data.id); d.resolve({ result: data.result }); }
+    return;
+  }
+
   if (data.type === 'tool') {
     const { id, name, args, conversation_file_name } = data;
     const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
@@ -839,6 +846,31 @@ async function tool_share(args, ctx) {
   });
 }
 
+// ---- html_console() — worker → page round-trip -------------------------
+// The artifact's console buffer lives on the PAGE (the blob-URL iframe in the
+// conversation; the bootstrap injected by opfs.toUrl captures into
+// window.__sandpieConsole). tool_html_console posts a console-request to the
+// page (forward-to-page relay) and awaits the console-result reply.
+const CONSOLE_TIMEOUT = 30000;
+const _consoleReqs = new Map();
+
+async function tool_html_console({ path }, ctx) {
+  const id = 'console_' + Math.random().toString(36).slice(2);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      _consoleReqs.delete(id);
+      resolve({ result: 'Error: html_console request timed out after ' + (CONSOLE_TIMEOUT / 1000) + 's (the page did not reply).' });
+    }, CONSOLE_TIMEOUT);
+    _consoleReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
+    try {
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'console-request', id, args: { path: String(path || '') } } });
+    } catch (e) {
+      clearTimeout(timer); _consoleReqs.delete(id);
+      resolve({ result: 'Error: could not reach the page to read the console (' + ((e && e.message) || e) + ').' });
+    }
+  });
+}
+
 async function tool_load_skill({ name }, ctx) {
   const n = String(name || '').trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
@@ -1340,7 +1372,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -1402,6 +1434,7 @@ async function runTool(name, args, ctx) {
     case 'shell':         return tool_shell(args, ctx);
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
+    case 'html_console':  return tool_html_console(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
     case 'read_file':     return tool_read_file(args, ctx);

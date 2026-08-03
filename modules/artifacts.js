@@ -423,6 +423,32 @@ function closeArtifactPanel() {
 
 window.renderArtifact = renderArtifact;
 
+// html_console tool (worker -> page): read the console buffer of an HTML
+// artifact shown in the conversation. The buffer is captured by the bootstrap
+// injected in opfs.toUrl (window.__sandpieConsole on the frame's contentWindow).
+// Returns { entries: [...] } or { error: '...' }.
+async function readArtifactConsole(path) {
+  const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+  const want = norm(path);
+  let found = null;
+  for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+    const cur = wrap.dataset.artifactPath;
+    if (!cur) continue;
+    if (want && norm(cur) !== want) continue;
+    const frame = wrap.querySelector('.artifact-frame');
+    if (frame) { found = { wrap, frame }; break; }
+  }
+  if (!found) return { error: want ? 'No artifact frame open for "' + path + '". Show it with show_artifact first, or pass its exact path.' : 'No artifact frame open in the conversation.' };
+  try {
+    const w = found.frame.contentWindow;
+    if (!w || !w.__sandpieConsole) return { error: 'This artifact has no console capture (loaded before instrumentation, or it is not an HTML file). Re-show it with show_artifact to instrument it.' };
+    return { entries: w.__sandpieConsole.slice() };
+  } catch (e) {
+    return { error: 'Could not read artifact console: ' + ((e && e.message) || e) };
+  }
+}
+window.readArtifactConsole = readArtifactConsole;
+
 // Auto-reload: when a tool call (edit_file / write_file / run_python / …) rewrites
 // an open artifact, swap in a fresh blob URL so every .artifact-frame iframe shows
 // the new bytes. Paths arrive already debounced (conversations.js — max 1 reload
