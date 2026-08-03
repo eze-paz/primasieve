@@ -155,7 +155,7 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     copy_to_workspace: {
-      description: `Copy a file INTO the user's editable workspace so you can modify it. Two uses: (1) FORK a read-only workspace file — e.g. a shared, managed package under "sandpie/shared-installed/" — into an editable copy: pass its workspace path as src (no leading slash). (2) IMPORT a file from ELSEWHERE in the user's Dropbox that read_file/run_python/load_image can't reach: pass an absolute Dropbox path like "/R+D+I/reports/q1.pdf" (as returned by search). The source is never modified in either case. Returns the new editable workspace-relative path; then use read_file / edit_file / run_python on it.`,
+      description: `Copy a file INTO the user's editable workspace so you can modify it. Two uses: (1) FORK a workspace file — e.g. a shared package under "sandpie/shared-installed/" — into a standalone copy (shared-installed files are now editable in place via editor write-back, but forking is still handy for a detached copy): pass its workspace path as src (no leading slash). (2) IMPORT a file from ELSEWHERE in the user's Dropbox that read_file/run_python/load_image can't reach: pass an absolute Dropbox path like "/R+D+I/reports/q1.pdf" (as returned by search). The source is never modified in either case. Returns the new editable workspace-relative path; then use read_file / edit_file / run_python on it.`,
       parameters: {
         type: 'object',
         properties: {

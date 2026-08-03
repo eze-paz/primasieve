@@ -291,6 +291,10 @@ function renderArtifact(host, path) {
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
   wrap.appendChild(frame);
   target.appendChild(wrap);
+  // METACOG: if the NEWEST HTML artifact logs to the console, tell the worker
+  // so it can inject a metacog note for the model (newest artifact only — a
+  // superseded check is skipped by the seq guard).
+  armConsoleNoteCheck(wrap, frame, clean);
   loadArtifactFrame(wrap, frame, resolvedP, clean);
 }
 
@@ -427,6 +431,35 @@ window.renderArtifact = renderArtifact;
 // artifact shown in the conversation. The buffer is captured by the bootstrap
 // injected in opfs.toUrl (window.__sandpieConsole on the frame's contentWindow).
 // Returns { entries: [...] } or { error: '...' }.
+// ---- metacog: newest-artifact console note -------------------------------
+// After the newest HTML artifact renders, wait for its load + a short settle
+// window (async console output like setTimeout / load handlers), read the
+// captured buffer, and if non-empty post an artifact-console-note to the
+// worker. Only the newest artifact triggers: a seq guard skips superseded
+// checks when several artifacts render in a row.
+let _consoleNoteSeq = 0;
+function armConsoleNoteCheck(wrap, frame, clean) {
+  const ext = (String(clean || '').split('.').pop() || '').toLowerCase();
+  if (ext !== 'html' && ext !== 'htm') return;              // only HTML has the bootstrap
+  const seq = ++_consoleNoteSeq;
+  wrap.dataset.consoleNoteSeq = String(seq);
+  let done = false;
+  const check = () => {
+    if (done) return; done = true;
+    if (String(wrap.dataset.consoleNoteSeq) !== String(seq)) return;   // superseded
+    try {
+      const w = frame.contentWindow;
+      if (!w || !w.__sandpieConsole || !w.__sandpieConsole.length) return;
+      let conv = ''; try { conv = localStorage.getItem('sandpie-active-conv') || ''; } catch (_) {}
+      if (window._sandpieWorker && window._sandpieWorker.postMessage) {
+        window._sandpieWorker.postMessage({ type: 'artifact-console-note', conversation_file_name: conv, path: clean, entries: w.__sandpieConsole.slice(0, 25) });
+      }
+    } catch (_) {}
+  };
+  frame.addEventListener('load', () => setTimeout(check, 800), { once: true });
+  setTimeout(check, 5000);   // fallback if the frame never fires load
+}
+
 async function readArtifactConsole(path) {
   const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
   const want = norm(path);

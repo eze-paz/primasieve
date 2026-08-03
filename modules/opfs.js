@@ -3535,7 +3535,9 @@ opfs.refreshFileList = async function() {
       menuItems.push({ label: 'Copy path', action: () => { navigator.clipboard.writeText(it.fullKey).catch(() => {}); } });
 
 
-      if (window.SandpieSharing && !it.fullKey.startsWith('sandpie/shared')) {
+      // Share is offered on installed packages too (an editor can re-publish them);
+      // only the 1:1 delivery inbox stays unpublishable.
+      if (window.SandpieSharing && !it.fullKey.startsWith('sandpie/shared-incoming')) {
         menuItems.push({ label: '🔗 Share…', action: () => SandpieSharing.shareDialog(it.fullKey, it.kind === 'folder' ? undefined : 'artifact') });
       }
 

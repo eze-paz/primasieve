@@ -15,7 +15,7 @@
 //     Recipients read the folder by namespace and never mount it, so nothing
 //     appears in their Dropbox. See dropbox.js "Dropbox sharing API".
 //   • per-user INSTALLED          sandpie/shared-installed/  (in the recipient's own
-//     workspace; read-only accepted packages, the worker's guard keys on this prefix)
+//     workspace; editable via editor write-back — edits propagate to the hub)
 //
 // Because the shared folder is the sender's own workspace folder, its NAME carries
 // no signal — a recipient identifies Sandpie packages by probing each shared folder
@@ -402,7 +402,10 @@
     opts = opts || {};
     const src = String(srcPath || '').replace(/^\/+/, '').replace(/\/+$/, '');
     if (!src) throw new Error('publish: srcPath required');
-    if (src.startsWith(INSTALL_ROOT + '/') || src.startsWith(LOCAL_HUB + '/')) throw new Error('publish: share your own file, not a managed/hub path');
+    // INSTALL_ROOT (shared-installed) sources are allowed: an editor with write
+    // access on the hub folder can re-publish the installed copy. Only the 1:1
+    // inbox (LOCAL_HUB) stays unpublishable — it is a delivery area, not a source.
+    if (src.startsWith(LOCAL_HUB + '/')) throw new Error('publish: share your own file, not a delivery/inbox path');
     const dir = await isDir(src), base = src.split('/').pop();
     const kind = opts.kind || (dir ? (await fileExists(src + '/SKILL.md') ? 'skill' : 'folder') : 'artifact');
     const id = opts.id || slug(base);

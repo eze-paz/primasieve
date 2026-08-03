@@ -69,6 +69,10 @@ const _agentSteers = new Map();   // id -> [content, ...]
 // drift/stop guards (>>> drift toggles the note's visibility). Session state is
 // keyed by conversation and lives for the worker's lifetime.
 const _convStats = new Map();   // convId -> stats
+// One-shot metacog note per conversation: the page posts it when the NEWEST
+// artifact in the convo logged console messages; consumed at the next round
+// boundary (see runAgent, before the METACOG (c) nudges).
+const _consoleNotes = new Map();   // convId -> {path, entries}
 function _statsFor(id) {
   let s = _convStats.get(id);
   if (!s) { s = { calls: 0, since: 0, gaps: [], done: 0, shapes: new Map(),
@@ -229,6 +233,17 @@ self.addEventListener('message', async (event) => {
   if (data.type === 'console-result') {
     const d = _consoleReqs.get(data.id);
     if (d) { _consoleReqs.delete(data.id); d.resolve({ result: data.result }); }
+    return;
+  }
+
+  // Page → worker: the newest artifact in this conversation logged console
+  // messages. Queue a one-shot metacog note for that conversation; runAgent
+  // injects it as a system-reminder at the next round boundary.
+  if (data.type === 'artifact-console-note') {
+    const conv = String(data.conversation_file_name || '');
+    if (conv && Array.isArray(data.entries) && data.entries.length) {
+      _consoleNotes.set(conv, { path: String(data.path || ''), entries: data.entries.slice(0, 25) });
+    }
     return;
   }
 
@@ -1253,14 +1268,10 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
   return { result: head + local.buf.replace(/\n$/, '') + cloudExtra };
 }
 
-// ── Shared, read-only packages (sandpie/shared-installed/) ────────────────
-// Installed shared packages live under this root. They auto-update from the team
-// registry, so local writes/edits are refused; the caller is pointed at a fork.
+// Installed shared packages live under this root. Edits there are allowed and
+// write back to the hub via sharing.js (editor write-back, rev-gated); the
+// constant is still used by the fork helper to lift copies out of this area.
 const SHARED_ROOT = 'sandpie/shared-installed/';
-function _sharedReadOnly(norm) {
-  if (!norm || !norm.startsWith(SHARED_ROOT)) return null;
-  return { result: `"${norm}" is a shared, read-only package — it's managed centrally and auto-updates, so any local change would be overwritten on the next sync. To modify it, fork your own editable copy first:\n    copy_to_workspace(src="${norm}")\nthen edit the copy it returns (it lands outside sandpie/shared-installed/).` };
-}
 
 // If a destination already exists in OPFS, append _2/_3/… before the extension.
 async function _opfsAutorename(rel) {
@@ -1286,7 +1297,7 @@ async function _forkLocal(src, dest) {
     destRel = srcRel.startsWith(SHARED_ROOT) ? 'sandpie/' + base : base;   // lift out of the managed area
   }
   if (!destRel || destRel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
-  if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared-installed/ — that area is read-only. Pick an editable location.' };
+  if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared-installed/ — that area is managed by the hub sync. Pick an editable location outside it.' };
   let bytes;
   try { bytes = await opfsReadBytes(srcRel); }
   catch (_) { return { result: `Error: "${srcRel}" not found in your workspace. (If it's a folder, fork individual files — folder forking isn't supported yet.)` }; }
@@ -2381,6 +2392,22 @@ async function runAgent(config, ctx) {
       }
       ctx._lastNagAt = ctx._roundsSinceTodo;
     }
+    // METACOG (c'): newest-artifact console note — the page queued it after the
+    // newest artifact rendered and logged console output. Higher priority than the
+    // grind/reuse nudges below; one-shot (consumed here).
+    if (!maxRounds && !pendingReminder) {
+      const cn = _consoleNotes.get(convFileName);
+      if (cn) {
+        _consoleNotes.delete(convFileName);
+        const n = cn.entries.length;
+        const errs = cn.entries.filter(e => /^ERROR|^UNHANDLED/.test(e)).length;
+        setReminder('artifact-console',
+          '<system-reminder>The newest artifact in this conversation — ' + (cn.path || '?') + ' — emitted ' + n
+          + ' console message' + (n === 1 ? '' : 's') + (errs ? (', ' + errs + ' error/unhandled-rejection line' + (errs === 1 ? '' : 's')) : '') + ' after rendering.'
+          + ' If the user\'s task involves this artifact, consider using html_console to read its console output — it may reveal a layout/JS defect worth fixing before you declare the task done.'
+          + '</system-reminder>', cn);
+      }
+    }
     // METACOG (c): grind / reuse-a-tool / remember nudges, if nothing more urgent queued.
     if (!maxRounds && !pendingReminder) {
       try { const mc = _metacogReminder(_statsFor(convFileName), config.metacog); if (mc) setReminder(mc.kind, mc.text, mc.meta); }
@@ -2559,7 +2586,6 @@ async function runAgent(config, ctx) {
 async function tool_write_file({ path, content, _conv }) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-  const _ro = _sharedReadOnly(norm); if (_ro) return _ro;   // shared packages are read-only → fork instead
   try {
     const root = await opfsRoot();
     const parts = norm.split('/').filter(Boolean); const name = parts.pop();
@@ -2696,7 +2722,6 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (!path) return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-  const _ro = _sharedReadOnly(norm); if (_ro) return _ro;   // shared packages are read-only → fork instead
   let current;
   try { current = new TextDecoder().decode(await opfsReadBytes(norm)); }
   catch {
