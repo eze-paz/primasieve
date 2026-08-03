@@ -3865,6 +3865,8 @@ let sidePanel = null;
   }
   setupScrollTracking($('messages'));
   setupScrollTracking($('messagesSide'));
+})();
+
 
 
 sidePanel = new SidePanel();
