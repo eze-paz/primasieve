@@ -74,6 +74,10 @@
   // cleanup passes and the file:changed/file:deleted reactions.
   const NOSYNC_PREFIX = 'sandpie/shared-installed';
   const isNoSyncRel = (p) => { const r = String(p).replace(/^\/+/, ''); return r === NOSYNC_PREFIX || r.startsWith(NOSYNC_PREFIX + '/'); };
+  // Paths this module is writing right now (downloads/hydration). opfs.write emits
+  // file:changed for EVERY write, which is what finally makes user edits upload —
+  // but our own downloads must not be mistaken for edits and pushed straight back.
+  const _pulling = new Set();
   const DBX_REDIRECT = location.origin + location.pathname;
 
   // ===========================================================================
@@ -595,7 +599,8 @@
         const it = items[i++];
         try {
           const bytes = await download(it.cloudPath);
-          await opfs.write(it.rel, bytes);
+          _pulling.add(it.rel);                    // our own write — not a user edit
+          try { await opfs.write(it.rel, bytes); } finally { _pulling.delete(it.rel); }
           const mtime = await Sandpie.opfsMtime(it.rel);
           state[it.rel] = { rev: it.e.rev, size: it.e.size, syncedMtime: mtime };
         } catch (err) { console.warn('[dropbox] download failed:', it.rel, err); }
@@ -820,9 +825,12 @@
       // because it causes mega-uploads when localStorage state is lost or reset and
       // Dropbox already holds the correct copies. Dropbox is the authority; we only
       // upload files the conversation itself created or edited.
+      // NOTE: the open file is skipped when PULLING (never clobber what someone is
+      // editing) but must NOT be skipped here — a Save in the viewer marks the open
+      // file dirty, and skipping it meant the user's own edit sat unuploaded until
+      // they closed the file.
       const dirty = [];
       for (const rel of Object.keys(state)) {
-        if (rel === openFilePath) continue;
         if (state[rel].syncedMtime !== 0) continue;
         if (!(await opfs.exists(rel))) continue;
         dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
@@ -890,6 +898,7 @@
     const rel = String(path).replace(/^\/+/, '');
     if (!rel) return;
     if (isNoSyncRel(rel)) return;   // hub-managed — sharing.js owns its cloud side
+    if (_pulling.has(rel)) return;  // a file WE just downloaded, not a user edit
     const st = syncState();
     if (st[rel]) st[rel].syncedMtime = 0; else st[rel] = { rev: '', size: 0, syncedMtime: 0 };
     setSyncState(st);
@@ -923,7 +932,8 @@
     if (!e || e.kind !== 'file') return false;      // unknown to the cloud index ⇒ genuinely absent, no request
     if (await Sandpie.opfs.exists(r)) return true;
     const bytes = await download(e.path || relToCloud(r));
-    await Sandpie.opfs.write(r, bytes);
+    _pulling.add(r);                                // our own write — not a user edit
+    try { await Sandpie.opfs.write(r, bytes); } finally { _pulling.delete(r); }
     // Record as a clean synced copy (same as worker-hydrated) so it's flushed
     // on next boot and writes back if edited.
     try { const st = syncState(); st[r] = { rev: e.rev || '', size: e.size || 0, syncedMtime: await Sandpie.opfsMtime(r) }; setSyncState(st); } catch (_) {}

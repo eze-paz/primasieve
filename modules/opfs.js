@@ -102,6 +102,13 @@ const opfs = {
   },
 
 
+  // EVERY save in the app funnels through here, so this is where "a file changed"
+  // is announced. Without it a write is invisible: the file viewer's Save, an
+  // editor, a module writing a file — all left the sync state saying "clean", so
+  // Dropbox never uploaded them (the mechanism was fine; nothing was telling it).
+  // Listeners: dropbox.js (marks dirty → uploads on the next sync) and sharing.js
+  // (pushes an installed team file back to the hub). Both filter what they own,
+  // and both suppress their OWN writes, so downloads can't bounce back as uploads.
   async write(path, content) {
 
 
@@ -121,6 +128,9 @@ const opfs = {
 
 
     await w.close();
+
+
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', path); } catch (_) {}
 
 
   },
@@ -2827,9 +2837,9 @@ opfs.toUrl = async function(path) {
   if (ext === 'html' || ext === 'htm') {
 
 
-    let text = new TextDecoder().decode(bytes);
-
-
+    let text = new TextDecoder().decode(bytes);
+
+
     // Console capture bootstrap — must run BEFORE the artifact's own scripts so
     // load-time console calls / errors are caught too. Buffers into
     // window.__sandpieConsole (read by the html_console tool via the page).
