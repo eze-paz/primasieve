@@ -166,19 +166,16 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       },
     },
     share: {
-      description: `Share a file or folder in OPFS with the team or with specific people (1:1).
+      description: `Share a file or folder in OPFS with a team department.
 The share is performed by the page (Dropbox), so this tool returns once it is published.
-- type "team": recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["R+D+I"]) — the item is copied into that department's shared hub; only that department can read it (Dropbox folder membership is the boundary).
-- type "p2p": recipients are EMAIL addresses — a folder is shared live in place, a single file is wrapped into an outbox folder, and each recipient is invited as a folder member.
-permissions: "viewer" (default, read-only) or "editor" (may write back); "read"/"write" aliases accepted. Permissions apply to p2p invites; team shares are bounded by the department folder membership.
+- type "team" (the only type): recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["IT"]) — the item is copied into IA/<department>/<name>/; only that department can read it (Dropbox folder membership is the boundary). A SKILL.md in the folder makes it a shared skill.
 path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
       parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "sandpie/artifacts/x.html").' },
-          type: { type: 'string', enum: ['team', 'p2p'], description: '"team" = publish to department hub(s); "p2p" = share 1:1 with email recipients.' },
-          recipients: { type: 'array', items: { type: 'string' }, description: 'team: department folder names (e.g. ["R+D+I"]); p2p: recipient email addresses.' },
-          permissions: { type: 'string', enum: ['viewer', 'editor'], description: '"viewer" (default) read-only, or "editor" (recipient may write back).' },
+          type: { type: 'string', enum: ['team'], description: '"team" = publish to a department folder.' },
+          recipients: { type: 'array', items: { type: 'string' }, description: 'Department folder name(s), e.g. ["IT"].' },
         },
         required: ['path', 'type', 'recipients'],
       },
