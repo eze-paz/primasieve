@@ -22,6 +22,13 @@
   const SPREADSHEET_EXTS = new Set(['xlsx', 'xls', 'csv']);
   const TEXT_EDIT_CAP = 4 * 1024 * 1024;   // above this a text file offers download, not an editor
 
+  // Auto-reload state (Rendered mode only): which file is open, whether the HTML
+  // viewer is currently in Rendered mode, and its iframe. Editor/Text modes hold
+  // unsaved edits and must never be clobbered by a reload.
+  let _openKey = null;
+  let _renderedMode = false;
+  let _renderedFrame = null;
+
   const loading = (msg) => `<div style="color:var(--sp-text-dim);padding:2rem;text-align:center;">${msg}</div>`;
 
   /* ════════════════════ pane host (the ONLY chrome) ═════════════════════ */
@@ -192,7 +199,7 @@
     };
 
     function showPage() {
-      teardown(); modeSel.value = 'page'; body.style.padding = '0';
+      teardown(); _renderedMode = false; _renderedFrame = null; modeSel.value = 'page'; body.style.padding = '0';
       if (window.SandpieHtmlEditor) {
         active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; savedHtml = out; return opfs.write(fullKey, out); } });
       } else {
@@ -201,7 +208,7 @@
     }
 
     function showText() {
-      teardown(); modeSel.value = 'text';
+      teardown(); _renderedMode = false; _renderedFrame = null; modeSel.value = 'text';
       const ta = document.createElement('textarea');
       ta.value = html; ta.spellcheck = false;
       ta.style.cssText = 'width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;padding:12px 14px;'
@@ -219,7 +226,7 @@
     }
 
     function showRendered() {
-      teardown(); modeSel.value = 'rendered';
+      teardown(); _renderedFrame = null; _renderedMode = true; modeSel.value = 'rendered';
       const iframe = document.createElement('iframe');
       // Load the file through the service worker at its real /files/ URL — NOT
       // srcdoc. This gives the doc a REAL same-origin, so it reliably shares the
@@ -233,6 +240,7 @@
       iframe.src = filesUrl(fullKey);
       iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:#fff;';
       body.appendChild(iframe);
+      _renderedFrame = iframe;   // auto-reload target
     }
 
     // single view-mode dropdown (Page / Text / Rendered) in the header
@@ -274,6 +282,7 @@
 
     opfs.closeFile();                       // single viewer instance
     window._openFilePath = fullKey;
+    _openKey = fullKey; _renderedMode = false; _renderedFrame = null;
     const ext = (name.split('.').pop() || '').toLowerCase();
     const { pane, header, body } = buildPane(fullKey);
     // 📌 pin toggle — reflects/sets SandpiePins state for the open file.
@@ -414,6 +423,23 @@
     a.download = name;
     row.appendChild(a);
     fill(body, row);
+  }
+
+  // Auto-reload (Rendered mode only): a tool call rewrote the open file — refresh
+  // its iframe so the pane shows the new bytes. The iframe is same-origin at its
+  // real /files/ URL (sw.js reads OPFS fresh on every GET), so a plain reload()
+  // picks up the change; no cache busting needed.
+  if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+    Sandpie.events.on('artifact:changed', (path) => {
+      if (!path || !_openKey || !_renderedMode || !_renderedFrame) return;
+      const np = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+      const strip = (p) => p.startsWith('sandpie/') ? p.slice('sandpie/'.length) : p;
+      const a = np(path), b = np(_openKey);
+      if (a !== b && strip(a) !== strip(b)) return;
+      if (!_renderedFrame.isConnected) return;   // pane was closed since
+      try { _renderedFrame.contentWindow.location.reload(); }
+      catch (_) { _renderedFrame.src = filesUrl(_openKey); }
+    });
   }
 
   window.SandpieFileViewer = { open };

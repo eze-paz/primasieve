@@ -291,19 +291,24 @@ function renderArtifact(host, path) {
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
   wrap.appendChild(frame);
   target.appendChild(wrap);
-  // Load async: read from OPFS, create blob URL, revoke old one on refresh.
-  (async () => {
-    try {
-      const p = await resolvedP;
-      wrap.dataset.artifactPath = p;
-      const url = await opfs.toUrl(p);
-      if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
-      frame._blobUrl = url;
-      frame.src = url;
-    } catch (e) {
-      showArtifactError(wrap, frame, 'failed to load: ' + clean + ' — ' + (e && e.message || e));
-    }
-  })();
+  loadArtifactFrame(wrap, frame, resolvedP, clean);
+}
+
+// (Re)load an artifact's iframe from a fresh OPFS blob URL. Used both for the
+// initial render and for auto-reload when a tool call rewrites the file (a blob
+// URL is a snapshot of the bytes at creation — a new one is required for refresh).
+async function loadArtifactFrame(wrap, frame, resolvedP, clean) {
+  let p = null;
+  try {
+    p = await resolvedP;
+    wrap.dataset.artifactPath = p;
+    const url = await opfs.toUrl(p);
+    if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
+    frame._blobUrl = url;
+    frame.src = url;
+  } catch (e) {
+    showArtifactError(wrap, frame, 'failed to load: ' + (clean || p || '') + ' — ' + (e && e.message || e));
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -417,6 +422,30 @@ function closeArtifactPanel() {
 /* -------------------------------------------------------------------------- */
 
 window.renderArtifact = renderArtifact;
+
+// Auto-reload: when a tool call (edit_file / write_file / run_python / …) rewrites
+// an open artifact, swap in a fresh blob URL so every .artifact-frame iframe shows
+// the new bytes. Paths arrive already debounced (conversations.js — max 1 reload
+// per 5s per path, trailing edge). Only frames; V2 cards (panel-only / non-
+// renderable) are static thumbnails and skip.
+if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+  Sandpie.events.on('artifact:changed', (path) => {
+    if (!path) return;
+    const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+    const strip = (p) => p.startsWith('sandpie/') ? p.slice('sandpie/'.length) : p;
+    resolveArtifactPath(norm(path)).then((resolved) => {
+      const b = norm(resolved);
+      for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+        const cur = wrap.dataset.artifactPath;
+        if (!cur) continue;
+        const a = norm(cur);
+        if (a !== b && strip(a) !== strip(b)) continue;
+        const frame = wrap.querySelector('.artifact-frame');
+        if (frame) loadArtifactFrame(wrap, frame, Promise.resolve(resolved), resolved);
+      }
+    }).catch(() => {});
+  });
+}
 window.formatArtifactBytes = formatArtifactBytes;
 window.formatArtifactAge = formatArtifactAge;
 window.collapseArtifact = collapseArtifact;

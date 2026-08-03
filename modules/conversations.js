@@ -1368,6 +1368,39 @@ function getSandpieWorker() {
   // the document base (root) → /modules/sandpie-worker.js.
   _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=86');
   window._sandpieWorker = _sandpieWorker;
+
+  /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
+     Worker writes (edit_file / write_file / run_python / copy_to_workspace /
+     remember) that touch an OPEN artifact fire at most one reload per path per
+     ARTIFACT_RELOAD_MS, but a change arriving INSIDE the window still schedules a
+     trailing reload once the window closes — so the final state of an LLM turn is
+     always shown, never cancelled by an earlier reload. ---- */
+  const ARTIFACT_RELOAD_MS = 5000;
+  const _artifactReload = new Map();   // path -> { last, pending, timer }
+  function artifactChanged(path) {
+    if (!path) return;
+    const now = Date.now();
+    let st = _artifactReload.get(path);
+    if (!st) { st = { last: 0, pending: false, timer: null }; _artifactReload.set(path, st); }
+    if (now - st.last >= ARTIFACT_RELOAD_MS) {
+      if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+      st.last = now; st.pending = false;
+      emitArtifactChanged(path);
+      return;
+    }
+    st.pending = true;
+    if (!st.timer) {
+      st.timer = setTimeout(() => {
+        st.timer = null;
+        if (st.pending) { st.pending = false; st.last = Date.now(); emitArtifactChanged(path); }
+      }, st.last + ARTIFACT_RELOAD_MS - now);
+    }
+    // Bounded map: drop the oldest entry once a session has touched many paths.
+    if (_artifactReload.size > 500) { const k = _artifactReload.keys().next().value; if (k !== undefined) _artifactReload.delete(k); }
+  }
+  function emitArtifactChanged(path) {
+    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('artifact:changed', path); } catch (_) {}
+  }
   _sandpieWorker.addEventListener('message', (event) => {
     const msg = event.data;
     if (!msg) return;
@@ -1386,6 +1419,9 @@ function getSandpieWorker() {
       try {
         const paths = (msg.payload && msg.payload.type === 'sw-opfs-changed' && Array.isArray(msg.payload.paths)) ? msg.payload.paths : [];
         if (paths.some(p => /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(p)) && typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:changed', {});
+        // Artifact auto-reload: forward worker writes to the open viewers,
+        // debounced per path (leading edge now, trailing edge after the window).
+        for (const p of paths) artifactChanged(p);
       } catch (_) {}
       // share() tool: the worker posts a share-request; perform it here (the page
       // owns Dropbox + sharing.js) and reply with the publish result.
