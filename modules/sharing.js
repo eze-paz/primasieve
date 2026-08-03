@@ -86,7 +86,9 @@
       if (rel.toLowerCase().startsWith(prefix)) rel = rel.slice(prefix.length);
       const m = /^([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(rel);
       if (!m) continue;
+      if (e.kind === 'deleted') continue;                 // tombstone from include_deleted — never list/install a removed path
       const dept = m[1], id = m[2], hasFile = !!m[3];
+      if (e.kind === 'file' && !hasFile) continue;        // loose file directly under a dept — not an artifact
       if (id === 'shared-hub' || id === 'shared-incoming') continue;   // legacy containers, not artifacts
       const d = out[dept] || (out[dept] = {});
       const rec = d[id] || (d[id] = { changed: false, kind: 'folder' });
