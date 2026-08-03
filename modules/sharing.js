@@ -78,10 +78,12 @@
     if (!result) { try { result = await p.cloudListWithCursor(root, { team: true }); } catch (e) { if (String((e && e.message) || e).includes('not_found')) return {}; throw e; } }
     setHubCursor(root, result.cursor || '');
     const out = {};
-    const rootPrefix = root.replace(/\/+$/, '') + '/';
+    // cloud entries carry ABSOLUTE paths (/IA/IT/<id>/<file>) with no rel field:
+    // strip the team-root prefix (lowercase, like pullOldWorkspace) to get dept/id.
+    const prefix = root.replace(/^\/+/, '').toLowerCase() + '/';
     for (const e of result.entries) {
-      const rel0 = (e.rel != null) ? e.rel : String(e.path || '').replace(/^\/+/, '');
-      const rel = rel0.startsWith(rootPrefix) ? rel0.slice(rootPrefix.length) : rel0;
+      let rel = (e.rel != null) ? e.rel : String(e.path || '').replace(/^\/+/, '');
+      if (rel.toLowerCase().startsWith(prefix)) rel = rel.slice(prefix.length);
       const m = /^([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(rel);
       if (!m) continue;
       const dept = m[1], id = m[2], hasFile = !!m[3];
