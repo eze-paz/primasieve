@@ -155,6 +155,21 @@
     try { await O().remove(dst); } catch (_) {}
   }
 
+  // Dehydrated (cloud-only) files don't exist in OPFS — merge them into a source
+  // listing from the cloud index so publish/dialogs don't silently drop them.
+  async function srcFileList(src, dir) {
+    let files = dir ? await listOpfs(src, '', []) : [src.split('/').pop()];
+    const p = prov();
+    const idx = (p && p.cloudIndex) ? p.cloudIndex() : null;
+    if (dir && idx) {
+      const pre = norm(src) + '/';
+      const set = new Set(files);
+      for (const rel of Object.keys(idx)) if (rel.startsWith(pre)) set.add(rel.slice(pre.length));
+      files = [...set];
+    }
+    return files;
+  }
+
   /* ── publish: copy your files into a department's artifact folder ────── */
   async function publish(srcPath, dept, opts) {
     opts = opts || {};
@@ -164,7 +179,7 @@
     const dir = await isDir(src), base = src.split('/').pop();
     const id = opts.id || slug(base);
     const store = cloudStore(deptRoot(dept));
-    const files = dir ? await listOpfs(src, '', []) : [base];
+    const files = await srcFileList(src, dir);
     const readSrc = async (rel) => { try { const b = await O().readBytes(dir ? src + '/' + rel : src); if (b) return b; } catch (_) {} const p = prov(); if (p && p.hydrate) { try { if (await p.hydrate(dir ? src + '/' + rel : src)) return await O().readBytes(dir ? src + '/' + rel : src); } catch (e) { console.warn('[sharing] hydrate failed', rel, (e && e.message) || e); } } return null; };
     let missed = 0;
     for (const rel of files) { const bytes = await readSrc(rel); if (bytes) await store.writeBytes(id + '/' + rel, bytes); else missed++; }
@@ -318,7 +333,7 @@
   async function shareDialog(srcPath, presetKind) {
     const src = norm(srcPath || '');
     const dir = await isDir(src);
-    const folderFiles = dir ? await listOpfs(src, '', []) : [];
+    const folderFiles = await srcFileList(src, dir);
     const back = document.createElement('div'); back.className = 'share-modal-back';
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
