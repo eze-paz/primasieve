@@ -39,7 +39,7 @@ if("serviceWorker"in navigator){
   <script type="module" src="modules/providers.js?v=43"></script>
   <script src="modules/console.js"></script>
   <script src="modules/dropbox.js?v=58"></script>
-  <script src="modules/images.js?v=7"></script>
+  <script src="modules/images.js?v=8"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=47"></script>
   <script src="modules/opfs.js?v=41"></script>
@@ -53,7 +53,7 @@ if("serviceWorker"in navigator){
   <script src="modules/loop-lab.js?v=56"></script>
   <script type="module" src="modules/mobile.js?v=1"></script>
   <script src="modules/augmentations.js?v=14"></script>
-  <script type="module" src="modules/conversations.js?v=161"></script>
+  <script type="module" src="modules/conversations.js?v=162"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -189,7 +189,7 @@ if("serviceWorker"in navigator){
         <div id="sharedHome" class="shared-home"></div>
       </div>
       <form class="composer" onsubmit="event.preventDefault(); handleSubmit('main')">
-        <input type="file" id="imageInput" multiple style="display:none" >
+        <input type="file" id="imageInput" class="attach-input" multiple style="display:none" >
         <div id="imagePreview" class="image-preview" style="display:none"></div>
         <div class="input-wrap">
           <textarea id="input" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
@@ -212,7 +212,7 @@ if("serviceWorker"in navigator){
       </div>
       <iframe id="artifactPanelFrame" src="about:blank"></iframe>
       <form class="composer composer-side" onsubmit="event.preventDefault(); handleSubmit('side')">
-        <input type="file" id="imageInputSide" multiple style="display:none" >
+        <input type="file" id="imageInputSide" class="attach-input" multiple style="display:none" >
         <div id="imagePreviewSide" class="image-preview" style="display:none"></div>
         <div class="input-wrap">
           <textarea id="inputSide" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>

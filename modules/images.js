@@ -205,10 +205,10 @@ const SandpieImages = (function() {
   // ============================================================
 
   function renderPreviews() {
-    const preview = $('imagePreview');
-    if (!preview) return;
-    preview.innerHTML = '';
-    if (!_attachments.length) { preview.style.display = 'none'; return; }
+    const previews = document.querySelectorAll('.image-preview');
+    if (!previews.length) return;
+    previews.forEach(pv => { pv.innerHTML = ''; pv.style.display = _attachments.length ? '' : 'none'; });
+    if (!_attachments.length) return;
     _attachments.forEach((att, i) => {
       const item = document.createElement('span');
       item.className = 'attach-item';
@@ -240,9 +240,15 @@ const SandpieImages = (function() {
       rm.textContent = '✕';
       rm.onclick = () => removeAt(i);
       item.appendChild(rm);
-      preview.appendChild(item);
+      // cloneNode does NOT copy the remove button's bound onclick — rebind it on
+      // each clone so every pane's preview has a working ✕.
+      previews.forEach(pv => {
+        const el = item.cloneNode(true);
+        const rb = el.querySelector('.remove-btn');
+        if (rb) rb.onclick = () => removeAt(i);
+        pv.appendChild(el);
+      });
     });
-    preview.style.display = '';
   }
 
   function removeAt(i) {
@@ -493,10 +499,8 @@ const SandpieImages = (function() {
 
   function clear() {
     _attachments = [];
-    const preview = $('imagePreview');
-    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
-    const input = $('imageInput');
-    if (input) input.value = '';
+    document.querySelectorAll('.image-preview').forEach(pv => { pv.style.display = 'none'; pv.innerHTML = ''; });
+    document.querySelectorAll('input[type=file].attach-input').forEach(inp => { inp.value = ''; });
   }
 
   /**
@@ -602,18 +606,16 @@ const SandpieImages = (function() {
   }
 
   function init() {
-    const imageInput = $('imageInput');
-    const attachBtn = $('attachBtn');
-
-    if (imageInput) {
+    document.querySelectorAll('input[type=file].attach-input').forEach(imageInput => {
       imageInput.onchange = handleSelect;
-    }
-
-    if (attachBtn) {
+    });
+    document.querySelectorAll('.attach-btn').forEach(attachBtn => {
       attachBtn.onclick = () => {
-        if (imageInput) imageInput.click();
+        const form = attachBtn.closest('form');
+        const input = form ? form.querySelector('input[type=file].attach-input') : null;
+        if (input) input.click();
       };
-    }
+    });
 
     initWindowDrop();
     initPaste();

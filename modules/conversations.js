@@ -476,7 +476,7 @@ function mountConv(convId) {
     messages = s.messages;
 
     const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
-    if (s.host.parentNode !== target) target.appendChild(s.host);
+    if (s.host.parentNode !== target) _mountInPane(s.host, target);
   } else {
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
@@ -1053,9 +1053,14 @@ async function refreshConversationList() {
   ul.replaceChildren(frag);
 }
 function refreshSendButtonForActive() {
-  const btn = $('sendBtn');
+  refreshSendButtonFor('main');
+  refreshSendButtonFor('side');
+}
+function refreshSendButtonFor(which) {
+  const btn = which === 'side' ? $('sendBtnSide') : $('sendBtn');
   if (!btn) return;
-  const s = activeStream();
+  const convId = _composerConv(which);
+  const s = convId ? convStreams.get(convId) : activeStream();
   if (s && s.generating) {
     btn.textContent = '■';
     btn.title = 'Stop';
@@ -1102,15 +1107,29 @@ function isResumableActive() {
   return !!(s && s.messages && s.messages.length && isResumable(s.messages));
 }
 
-async function handleSubmit() {
-  const text = $('input').value.trim();
+// Which pane a composer belongs to: 'main' (#messages) or 'side' (#messagesSide).
+// The SIDE composer is only meaningful while the side panel is open; fall back to
+// the main pane's conv whenever no side conv is mounted.
+function _composerConv(which) {
+  if (which === 'side' && sidePanel && sidePanel.isOpen) {
+    const s = convStreams.get(sidePanel.sideId);
+    if (s && s.host && s.host.parentNode === $('messagesSide')) return sidePanel.sideId;
+  }
+  return activeConvId;
+}
+async function handleSubmit(which = 'main') {
+  const ta = which === 'side' ? $('inputSide') : $('input');
+  const pane = which === 'side' ? $('messagesSide') : $('messages');
+  if (!ta || !pane) return;
+  const text = ta.value.trim();
+  const convId = _composerConv(which) || activeConvId;
   if (!text && !SandpieImages.hasAttachment()) {
     // Empty submit resumes an interrupted turn instead of doing nothing — but only
     // when the conversation is resumable (last message didn't finish with 'stop').
     // No auto-resume on load; the user opts in by pressing Enter / send.
-    if (isResumableActive()) {
-      const s = ensureStream(activeConvId);
-      if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+    if (convId && isResumableActive()) {
+      const s = ensureStream(convId);
+      if (s.host.parentNode !== pane) _mountInPane(s.host, pane);
       await sendSingle('', s, { resume: true });
     }
     return;
@@ -1118,7 +1137,7 @@ async function handleSubmit() {
   if (typeof SandpieCommands !== 'undefined' && text.startsWith('>>>')) {
     const handled = await SandpieCommands.dispatch(text);
     if (handled) {
-      $('input').value = '';
+      ta.value = '';
       return;
     }
     // >>> is reserved. If it's not a real command, reject and show help.
@@ -1128,34 +1147,37 @@ async function handleSubmit() {
       SandpieCommandView.show('"' + cmdName + '" is not a command.', 'help');
       SandpieCommands.dispatch('>>> help');
     }
-    $('input').value = '';
+    ta.value = '';
     return;
   }
-  if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, activeConvId).catch(() => {});
+  if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.showRelevance) SandpieAugmentations.showRelevance(text, convId).catch(() => {});
   // Clear command output on normal chat submit
   if (SandpieCommandView) SandpieCommandView.hide();
-  $('input').value = '';
+  ta.value = '';
 
   const content = await SandpieImages.buildContent(text);
 
   if (SandpieImages.hasAttachment()) {
     SandpieImages.clear();
   }
-  const m = $('messages');
-  lockScroll(m);
-  m.scrollTop = m.scrollHeight;
-  enqueueForActive(content);
+  lockScroll(pane);
+  pane.scrollTop = pane.scrollHeight;
+  enqueueFor(convId, content, pane);
 
-  const ta = $('input');
-  if (ta) {
-    ta.style.height = 'auto';
-  }
+  if (ta) ta.style.height = 'auto';
 }
-async function enqueueForActive(content) {
-  await ensureActiveConv();
-  const s = ensureStream(activeConvId);
-
-  if (s.host.parentNode !== $('messages')) mountConv(activeConvId);
+// Mount a conv host into a pane, keeping the pane's composer pinned at the bottom.
+function _mountInPane(host, pane) {
+  if (!host || !pane) return;
+  if (host.parentNode === pane) return;
+  if (host.parentNode) host.parentNode.removeChild(host);
+  const composer = pane.querySelector('.composer');
+  if (composer) pane.insertBefore(host, composer); else pane.appendChild(host);
+}
+async function enqueueFor(convId, content, pane) {
+  if (!convId) { await ensureActiveConv(); convId = activeConvId; }
+  const s = ensureStream(convId);
+  if (pane) _mountInPane(s.host, pane);
   // Steer instead of queue: if a turn is already streaming via the worker, inject
   // this message into the running agent loop rather than waiting for the turn to
   // finish. The worker splices it in at the next round boundary — a safe point
@@ -1170,6 +1192,10 @@ async function enqueueForActive(content) {
   s.queue.push(content);
   updateQueueCount(s);
   processQueueFor(s);
+}
+async function enqueueForActive(content) {
+  await ensureActiveConv();
+  await enqueueFor(activeConvId, content, $('messages'));
 }
 // Local in-page engines (LiteRT-LM / WebGPU) run their own loop with no steer
 // channel, so a mid-turn send there falls back to the queue.
@@ -1187,9 +1213,11 @@ function steerActive(s, content) {
   (s._pendingSteer = s._pendingSteer || []).push({ el, content, msg: null });
   try { getSandpieWorker().postMessage({ type: 'steer', id: s.agentId, content }); } catch (_) {}
 }
-function handleButtonClick() {
-  const btn = $('sendBtn');
-  const s = activeStream();
+function handleButtonClick(which = 'main') {
+  const btn = which === 'side' ? $('sendBtnSide') : $('sendBtn');
+  if (!btn) return;
+  const convId = _composerConv(which);
+  const s = convId ? convStreams.get(convId) : activeStream();
   if (btn.classList.contains('sending') && s) {
     // Stop only the message generating right now; queued messages stay and the
     // next one is sent immediately. To halt everything, press stop once per
@@ -1197,7 +1225,7 @@ function handleButtonClick() {
     if (s.abort) s.abort.abort();
     updateQueueCount(s);
   } else {
-    window.handleSubmit();
+    window.handleSubmit(which);
   }
 }
 function updateQueueCount(stream) {
@@ -3631,7 +3659,7 @@ class SidePanel {
     await this._lazyLoad(id);
     this._sideId = id;
     const s = convStreams.get(id);
-    if (s?.host) this.right.appendChild(s.host);
+    if (s?.host) _mountInPane(s.host, this.right);
     this._render();
 
     requestAnimationFrame(() => { this.right.scrollTop = this.right.scrollHeight; });
@@ -3676,7 +3704,7 @@ class SidePanel {
     if (s && s.host) {
 
       if (s.host.parentNode) s.host.parentNode.removeChild(s.host);
-      this.left.appendChild(s.host);
+      _mountInPane(s.host, this.left);
     }
     activeConvId = sId;
     messages = (s && s.messages) || [];
@@ -3750,24 +3778,77 @@ let sidePanel = null;
    ============================================================================= */
 
 (function setupInput() {
-  const ta = $('input');
-  if (!ta) return;
-  function autosize() {
-    const m = $('messages');
-    ta.style.height = 'auto';
-    const maxH = 12 * parseFloat(getComputedStyle(ta).lineHeight || '1.4');
-    const newH = Math.min(ta.scrollHeight, maxH);
-    ta.style.height = newH + 'px';
-    ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
-    if (shouldAutoScroll(m)) m.scrollTop = m.scrollHeight;
-  }
-  ta.addEventListener('input', () => {
-    autosize();
-    if (lastTabMatches && !ta.value.startsWith('>>>')) {
-      lastTabMatches = null;
-      if (SandpieCommandView) SandpieCommandView.hide();
+  function wireComposer(which) {
+    const ta = which === 'side' ? $('inputSide') : $('input');
+    const pane = which === 'side' ? $('messagesSide') : $('messages');
+    if (!ta || !pane) return;
+    let lastTabMatches = null;
+    function autosize() {
+      ta.style.height = 'auto';
+      const maxH = 12 * parseFloat(getComputedStyle(ta).lineHeight || '1.4');
+      const newH = Math.min(ta.scrollHeight, maxH);
+      ta.style.height = newH + 'px';
+      ta.style.overflowY = ta.scrollHeight > maxH ? 'auto' : 'hidden';
+      if (shouldAutoScroll(pane)) pane.scrollTop = pane.scrollHeight;
     }
-  });
+    ta.addEventListener('input', () => {
+      autosize();
+      if (lastTabMatches && !ta.value.startsWith('>>>')) {
+        lastTabMatches = null;
+        if (SandpieCommandView) SandpieCommandView.hide();
+      }
+    });
+    // ---- Tab completion for >>> commands ----
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Tab' && ta.value.startsWith('>>>')) {
+        e.preventDefault();
+        if (typeof SandpieCommands === 'undefined' || !SandpieCommands.complete) return;
+        const result = SandpieCommands.complete(ta.value);
+        if (!result) {
+          lastTabMatches = null;
+          if (SandpieCommandView) SandpieCommandView.hide();
+          return;
+        }
+        const typed = ta.value.slice(3).trim();
+        if (result.prefix !== typed) {
+          ta.value = '>>> ' + result.prefix;
+          ta.selectionStart = ta.selectionEnd = ta.value.length;
+        }
+        if (result.single) {
+          ta.value = '>>> ' + result.matches[0] + ' ';
+          ta.selectionStart = ta.selectionEnd = ta.value.length;
+          if (SandpieCommandView) SandpieCommandView.hide();
+          lastTabMatches = null;
+        } else {
+          const list = result.matches.map(m => '  >>> ' + m).join('\n');
+          if (SandpieCommandView) SandpieCommandView.show(list, 'commands');
+          lastTabMatches = result.matches;
+        }
+        return;
+      }
+      if (e.key !== 'Enter' || e.isComposing) return;
+      // Alt+Enter → newline, same as Shift+Enter. Browsers insert a newline for
+      // Shift+Enter natively but NOT for Alt+Enter, so do it explicitly here.
+      if (e.altKey) {
+        e.preventDefault();
+        ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));   // fire autosize
+        return;
+      }
+      // Plain Enter submits; Shift+Enter falls through to the native newline.
+      if (!e.shiftKey) {
+        e.preventDefault();
+        window.handleSubmit(which);
+      }
+    });
+
+    const observer = new MutationObserver(autosize);
+    observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
+    ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
+    autosize();
+  }
+  wireComposer('main');
+  wireComposer('side');
 
   const searchInput = $('convSearch');
   if (searchInput) {
@@ -3784,57 +3865,7 @@ let sidePanel = null;
   }
   setupScrollTracking($('messages'));
   setupScrollTracking($('messagesSide'));
-  // ---- Tab completion for >>> commands ----
-  let lastTabMatches = null;
-  ta.addEventListener('keydown', e => {
-    if (e.key === 'Tab' && ta.value.startsWith('>>>')) {
-      e.preventDefault();
-      if (typeof SandpieCommands === 'undefined' || !SandpieCommands.complete) return;
-      const result = SandpieCommands.complete(ta.value);
-      if (!result) {
-        lastTabMatches = null;
-        if (SandpieCommandView) SandpieCommandView.hide();
-        return;
-      }
-      const typed = ta.value.slice(3).trim();
-      if (result.prefix !== typed) {
-        ta.value = '>>> ' + result.prefix;
-        ta.selectionStart = ta.selectionEnd = ta.value.length;
-      }
-      if (result.single) {
-        ta.value = '>>> ' + result.matches[0] + ' ';
-        ta.selectionStart = ta.selectionEnd = ta.value.length;
-        if (SandpieCommandView) SandpieCommandView.hide();
-        lastTabMatches = null;
-      } else {
-        const list = result.matches.map(m => '  >>> ' + m).join('\n');
-        if (SandpieCommandView) SandpieCommandView.show(list, 'commands');
-        lastTabMatches = result.matches;
-      }
-      return;
-    }
-    if (e.key !== 'Enter' || e.isComposing) return;
-    // Alt+Enter → newline, same as Shift+Enter. Browsers insert a newline for
-    // Shift+Enter natively but NOT for Alt+Enter, so do it explicitly here.
-    if (e.altKey) {
-      e.preventDefault();
-      ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end');
-      ta.dispatchEvent(new Event('input', { bubbles: true }));   // fire autosize
-      return;
-    }
-    // Plain Enter submits; Shift+Enter falls through to the native newline.
-    if (!e.shiftKey) {
-      e.preventDefault();
-      window.handleSubmit();
-    }
-  });
 
-  const observer = new MutationObserver(autosize);
-  observer.observe(ta, { attributes: true, attributeFilter: ['value'] });
-
-  ta.form?.addEventListener('submit', () => setTimeout(autosize, 0));
-  autosize();
-})();
 
 sidePanel = new SidePanel();
 window.sidePanel = sidePanel;

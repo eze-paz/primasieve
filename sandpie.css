@@ -408,6 +408,12 @@
   .assistant table { border-collapse: collapse; margin: 0.5em 0; }
   .assistant th, .assistant td { border: 1px solid var(--sp-border); padding: 0.25em 0.5em; }
   form { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--sp-border); }
+
+  /* Composer pinned to the bottom of its pane (main + side). Sticky so it stays
+     visible while messages scroll; the artifact-mode rule hides the side one so
+     an open artifact gets the full pane height. */
+  form.composer { position: sticky; bottom: 0; z-index: 5; background: var(--sp-bg); }
+  #messagesSide form.composer { border-top: 1px solid var(--sp-border); }
   .input-wrap {
     display: flex;
     flex-direction: column;
