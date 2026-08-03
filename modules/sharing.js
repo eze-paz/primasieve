@@ -1,19 +1,25 @@
-// sharing.js — team artifact sync. Deliberately dumb, because clever was wrong:
+// sharing.js — team artifact sync.
 //
-//   Every poll: ONE recursive listing of the team root (e.g. IA/).
-//   First path level = DEPARTMENT, second = ARTIFACT, rest = the artifact's files.
-//   That listing is the WHOLE truth. Mirror it into sandpie/shared-installed/<id>/:
+//   THE LISTING IS THE TRUTH. One recursive listing of the team root (e.g. IA/):
+//   first path level = DEPARTMENT, second = ARTIFACT, rest = the artifact's files.
+//   Mirror it into sandpie/shared-installed/<id>/:
 //     • file missing locally, or its rev differs  → download it
 //     • local file the listing doesn't have       → delete it
 //     • local artifact the listing doesn't have   → delete the folder
+//   Deletion is ABSENCE from the live listing. Nothing else.
 //
-// No cursor, no deltas, no tombstones, no include_deleted, no manifests, no
-// accept/dismiss. Every one of those produced a bug: cursor deltas replayed
-// history (an artifact MOVED between departments kept reinstalling from the old
-// one), continue() 409'd on the team path-root and silently degraded to a full
-// listing anyway, and tombstone/echo bookkeeping fought the write-back. A full
-// recursive list of one hub folder is a couple of API calls — the simplicity is
-// worth far more than the saved bytes.
+//   THE CURSOR IS ONLY A DOORBELL. list_folder/continue is used for exactly one
+//   thing: "did anything change since last poll — yes or no?" Its entries are
+//   counted, never interpreted. So a quiet hub costs one tiny call and no
+//   listing, while any change (including a delete, which arrives as a tombstone)
+//   just sends us to the real listing.
+//
+// That split matters, because interpreting delta CONTENT is what broke this
+// module repeatedly. list_folder is called with include_deleted:true, so even a
+// FULL listing carries tombstones for paths that used to exist — an artifact
+// MOVED between departments leaves a folder of pure tombstones behind, and code
+// that reads meaning into them sees a live artifact in the old department and
+// fights the new one. Counting entries can't make that mistake.
 //
 // Per-device state (localStorage, never a file): for each installed artifact the
 // department it came from, the rev of each file we hold, and any local edit still
@@ -23,6 +29,7 @@
   'use strict';
   const INSTALL_ROOT = 'sandpie/shared-installed';
   const PKG_STATE_KEY = 'sandpie-pkg-state';     // localStorage: { [id]: {team,title,pin,kind,revs,dirty} }
+  const HUB_CURSOR_KEY = 'sandpie-share-cursor'; // localStorage: { [teamRoot]: cursor } — per device, like dbxfull-cursor
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const META = '.sandpie.json';                  // hub metadata: {pin,title}
   // Files that live on the hub but are never installed: the metadata marker and
@@ -65,6 +72,24 @@
   const hubDownload = (abs) => prov().cloudDownload(abs, { team: true });
   const hubUpload = (abs, bytes) => prov().cloudUpload(abs, bytes, { team: true });
 
+  /* ── the doorbell: has anything changed since the last listing? ────────── */
+  function cursor(root) { try { return JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}')[root] || ''; } catch (_) { return ''; } }
+  function setCursor(root, c) { try { const m = JSON.parse(localStorage.getItem(HUB_CURSOR_KEY) || '{}'); if (c) m[root] = c; else delete m[root]; localStorage.setItem(HUB_CURSOR_KEY, JSON.stringify(m)); } catch (_) {} }
+  // Counts the delta and throws the result away. A tombstone, a new file and a
+  // rename all mean the same thing here: "go read the real listing". Never returns
+  // false unless the hub genuinely reported nothing, so a broken or expired cursor
+  // costs one wasted listing, never a missed change.
+  async function hubQuiet() {
+    const p = prov(), root = teamRoot();
+    const cur = cursor(root);
+    if (!cur || !p.cloudListContinue) return false;
+    try {
+      const r = await p.cloudListContinue(cur, { team: true });
+      setCursor(root, (r && r.cursor) || '');
+      return !(r && r.entries && r.entries.length);
+    } catch (e) { setCursor(root, ''); return false; }   // expired/409 → fall through to a full listing
+  }
+
   /* ── the one listing: what the hub holds right now ─────────────────────── */
   // → { ok, arts: { [id]: { id, dept, files: {rel: rev} } } }
   // ok=false means the listing failed or came back empty; callers must NOT delete
@@ -72,10 +97,16 @@
   // installed artifacts — a stale copy is recoverable, a deleted one isn't).
   async function hubScan() {
     const p = prov(), root = teamRoot();
-    if (!cloudOn() || !root || !p.cloudList) return { ok: false, arts: {} };
+    if (!cloudOn() || !root) return { ok: false, arts: {} };
     let entries;
-    try { entries = await p.cloudList(root, true, { team: true }); }
-    catch (e) { console.warn('[sharing] hub listing failed:', (e && e.message) || e); return { ok: false, arts: {} }; }
+    try {
+      // Take the fresh cursor that comes with the listing: from here on, the
+      // doorbell reports changes made AFTER this exact snapshot.
+      if (p.cloudListWithCursor) { const r = await p.cloudListWithCursor(root, { team: true }); entries = r.entries; setCursor(root, (r && r.cursor) || ''); }
+      else if (p.cloudList) entries = await p.cloudList(root, true, { team: true });
+      else return { ok: false, arts: {} };
+    }
+    catch (e) { console.warn('[sharing] hub listing failed:', (e && e.message) || e); setCursor(root, ''); return { ok: false, arts: {} }; }
     if (!entries || !entries.length) return { ok: false, arts: {} };
     // Entries carry ABSOLUTE paths (/IA/IT/<id>/<file>); strip the team-root prefix.
     const prefix = root.replace(/^\/+/, '').toLowerCase() + '/';
@@ -135,7 +166,7 @@
       if (dirty[rel]) { revs[rel] = prevRevs[rel] || ''; continue; }              // local edit pending push — don't clobber it
       if (local.has(rel) && prevRevs[rel] === a.files[rel]) { revs[rel] = a.files[rel]; continue; }   // already current
       const bytes = await hubRead(a, rel);
-      if (!bytes) { if (local.has(rel)) revs[rel] = prevRevs[rel] || ''; continue; }   // transient failure — keep what we have, retry next poll
+      if (!bytes) { _forceNext = true; if (local.has(rel)) revs[rel] = prevRevs[rel] || ''; continue; }   // transient failure — keep what we have; _forceNext forces a retry pass
       await write(dst + '/' + rel, bytes);
       revs[rel] = a.files[rel];
       changed++;
@@ -176,11 +207,18 @@
   }
 
   /* ── the poll: push pending edits, mirror the hub, drop what's gone ───── */
-  let syncing = false;
-  async function autoSync() {
+  let syncing = false, _pollN = 0, _forceNext = false;
+  const FULL_EVERY = 10;                       // safety net: ignore the doorbell every Nth poll
+  async function autoSync(opts) {
     if (syncing || !O() || !cloudOn()) return; syncing = true;
     try {
       await pushDirty();                       // local edits first, so the mirror sees their revs
+      // The doorbell can only skip work, never cause it. Overridden by an explicit
+      // full request, by a periodic safety net, and by an unfinished previous pass
+      // (a failed download must be retried even though the hub didn't change).
+      const force = !!(opts && opts.full) || _forceNext || (++_pollN % FULL_EVERY === 0);
+      if (!force && await hubQuiet()) return;
+      _forceNext = false;
       const scan = await hubScan();
       if (!scan.ok) return;                    // couldn't see the hub — change nothing
       let touched = 0;
@@ -331,6 +369,7 @@
               : sent.includes('index.html') ? 'index.html' : sent.slice().sort()[0];
     try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: base }))); }
     catch (e) { console.warn('[sharing] main-file marker failed:', (e && e.message) || e); }
+    _forceNext = true;      // we just changed the hub — next pass reads the listing, doorbell or not
     fire();
     return { id, dests: [dept], pin };
   }
@@ -410,7 +449,7 @@
         const pinFile = dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
         const out = await publish(src, dept, { pinFile });
         msg.textContent = '✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.';
-        await autoSync();
+        await autoSync({ full: true });
         setTimeout(close, 900);
       } catch (e) { msg.textContent = 'Error: ' + ((e && e.message) || e); }
     };
@@ -425,8 +464,7 @@
   }
 
   /* ── boot ────────────────────────────────────────────────────────────── */
-  try { localStorage.removeItem('sandpie-share-cursor'); } catch (_) {}   // the cursor era is over
-  function boot() { renderHome(); autoSync(); }
+  function boot() { renderHome(); autoSync({ full: true }); }   // first pass always reads the real listing
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   const SHARE_POLL_MS = 60000;
   const pollShares = () => { autoSync(); renderHome(); };
