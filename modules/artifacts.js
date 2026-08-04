@@ -155,7 +155,7 @@ function renderArtifact(host, path) {
 
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
-  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:60px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;max-width:100%;';
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:250px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;max-width:100%;';
 
   const header = document.createElement('div');
   header.className = 'artifact-header';
@@ -304,7 +304,7 @@ function renderArtifact(host, path) {
 
   const frame = document.createElement('iframe');
   frame.className = 'artifact-frame';
-  frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
+  frame.style.cssText = 'width:100%;min-height:250px;border:0;background:transparent;display:block;';
   wrap.appendChild(frame);
   _append(target, wrap);
   // METACOG: if the NEWEST HTML artifact logs to the console, tell the worker
