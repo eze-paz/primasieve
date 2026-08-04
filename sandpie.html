@@ -38,7 +38,7 @@ if("serviceWorker"in navigator){
   <script src="modules/litertlm.js?v=7"></script>
   <script type="module" src="modules/providers.js?v=43"></script>
   <script src="modules/console.js"></script>
-  <script src="modules/dropbox.js?v=66"></script>
+  <script src="modules/dropbox.js?v=67"></script>
   <script src="modules/images.js?v=8"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=48"></script>
@@ -97,17 +97,26 @@ if("serviceWorker"in navigator){
   // sync's cursor check then decides: delta → stay + progress, none → removed
   // instantly (see _hideSyncSplash(/*instant*/true)).
   var RECENT_SYNC_MS = 60000;
+  // A pre-reload flush (Sandpie.reload) pushes our work and reads the cursor right
+  // before this load. It is not a full sync, so it does NOT touch the last-sync
+  // timestamp — it records its own, and a very short window is enough because the
+  // reload follows it immediately.
+  var RECENT_FLUSH_MS = 30000;
   var lastSync = parseInt(localStorage.getItem('dbxfull-last-sync-ts') || '0', 10);
+  var lastFlush = parseInt(localStorage.getItem('dbxfull-flush-ts') || '0', 10);
   var hasTokens = !!localStorage.getItem('dbxfull-tokens');
   var age = lastSync ? (Date.now() - lastSync) : Infinity;
+  var flushAge = lastFlush ? (Date.now() - lastFlush) : Infinity;
   // Report this gate's inputs: dropbox.js logs the cursor gate separately, and when
-  // the splash appears "even though it just synced" it is one of these two.
+  // the splash appears "even though it just synced" it is one of these.
   console.log('[splash] pre-paint gate — dropbox connected: ' + hasTokens
     + ' | last successful sync: ' + (lastSync ? (Math.round(age / 1000) + 's ago ('
         + new Date(lastSync).toLocaleTimeString() + ')') : 'never (no timestamp stored)')
-    + ' | threshold: ' + (RECENT_SYNC_MS / 1000) + 's');
-  if (!hasTokens || age < RECENT_SYNC_MS) {
-    console.log('[splash] pre-paint: REMOVED (' + (!hasTokens ? 'no dropbox tokens' : 'synced recently') + ')');
+    + ' | pre-reload flush: ' + (lastFlush ? (Math.round(flushAge / 1000) + 's ago') : 'never')
+    + ' | thresholds: ' + (RECENT_SYNC_MS / 1000) + 's sync / ' + (RECENT_FLUSH_MS / 1000) + 's flush');
+  if (!hasTokens || age < RECENT_SYNC_MS || flushAge < RECENT_FLUSH_MS) {
+    console.log('[splash] pre-paint: REMOVED ('
+      + (!hasTokens ? 'no dropbox tokens' : (age < RECENT_SYNC_MS ? 'synced recently' : 'flushed just before this reload')) + ')');
     var sp = document.getElementById('deviceSyncSplash');
     if (sp) sp.parentNode.removeChild(sp);
   } else {

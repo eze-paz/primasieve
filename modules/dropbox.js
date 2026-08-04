@@ -65,6 +65,7 @@
   const DEHYDRATED_KEY = 'dbxfull-dehydrated';  // DEPRECATED: on-demand is now the default when connected
   const PENDING_KEY    = 'dbxfull-pending';       // uploaded-but-not-yet-cursor-confirmed paths (protect from cleanup)
   const LAST_SYNC_KEY = 'dbxfull-last-sync-ts';   // Date.now() after each successful sync (device-switch detection)
+  const FLUSH_KEY     = 'dbxfull-flush-ts';       // Date.now() when a pre-reload flush pushed our work (pre-paint gate)
   const EXEMPT_PREFIXES = ['sandpie/conversations', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared-installed', 'sandpie/shared-incoming'];   // app metadata: always eagerly synced + never dehydrate-purged. memory MUST be exempt: it's injected into every system prompt page-side (memory.js list()/systemBlock read local OPFS directly, NOT via the worker's lazy hydration), so purging it locally silently breaks recall. sandpie/config holds pins.json (read page-side at boot by pins.js — same reason). (sandpie/scripts, sandpie/artifacts stay dehydratable.)
   // The personal workspace sync must NOT mirror the hub-managed subtree: every
   // device installs it from the TEAM hub (sharing.js), and a second authority
@@ -750,6 +751,42 @@
     console.log('[splash] last-sync timestamp refreshed (' + why + ')');
   }
 
+  // Upload every file marked dirty (syncedMtime === 0). Extracted from sync() so the
+  // pre-reload flush can push WITHOUT sync()'s pull/cleanup pass — that pass walks
+  // every local file and does an opfs.exists() per cloud entry, which is far too
+  // slow to hold a refresh on.
+  async function pushDirty(state) {
+    const opfs = Sandpie.opfs;
+    const dirty = [];
+    for (const rel of Object.keys(state)) {
+      if (state[rel].syncedMtime !== 0) continue;
+      if (!(await opfs.exists(rel))) continue;
+      dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
+    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+      const chunk = dirty.slice(i, i + BATCH_SIZE);
+      const files = await Promise.all(chunk.map(async ({ rel, lm, s }) => ({ rel, lm, s, content: await opfs.readBytes(rel) })));
+      try {
+        const results = await uploadBatch(files);
+        for (const r of results) {
+          if (r.meta && r.meta['.tag'] === 'success') {
+            state[r.rel] = {
+              rev: r.meta.rev || (r.s && r.s.rev) || '',
+              size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
+              syncedMtime: r.lm,
+            };
+            addPending(r.rel);   // protect from deletion until cursor confirms
+          } else {
+            console.warn('[dropbox] batch item failed:', r.rel, r.meta);
+          }
+        }
+      } catch (err) { console.warn('[dropbox] batch upload failed:', err); }
+    }
+    setSyncState(state);
+    return dirty.length;
+  }
+
   // ---- pre-reload flush -------------------------------------------------------
   // Work a reload would otherwise lose or misreport: files marked dirty and files
   // uploaded but not yet confirmed by the cursor.
@@ -759,54 +796,52 @@
     for (const k of Object.keys(st)) if (st[k] && st[k].syncedMtime === 0) dirty++;
     return { dirty, pending: Object.keys(pending()).length };
   }
-  // Called from Sandpie.reload() before a user-initiated refresh. Three steps,
-  // in this order, because each fixes a different reload symptom:
-  //   1. wait out any sync already in flight (sync() no-ops while _syncing, so
-  //      calling it here would otherwise reload mid-upload)
-  //   2. sync() — push everything marked dirty, pull remote changes
-  //   3. read the cursor ONCE more — step 2's own uploads are echoed back by
-  //      Dropbox, and cloudListWorking() runs at the START of a sync, so they are
-  //      still unconsumed. Left unconsumed they look like a remote change on the
-  //      next boot: splash kept, nothing to download. Consuming them here also
-  //      re-stamps the last-sync timestamp, so the pre-paint gate stays quiet.
-  // Never rejects and never outlives timeoutMs — a refresh must not hang on the
-  // network.
-  async function flushBeforeReload({ timeoutMs = 10000 } = {}) {
+  // Called from Sandpie.reload() before a user-initiated refresh.
+  //
+  // It does NOT run a full sync. sync() pulls too: it walks every local file for the
+  // deletion passes and does an opfs.exists() per cloud entry, which took long enough
+  // that the refresh visibly hung and then blew the timeout. Pulling is the next
+  // boot's job anyway. So the flush only does what a reload would otherwise lose:
+  //   1. push files marked dirty (the actual data-loss risk)
+  //   2. read the cursor once, which confirms those uploads and consumes their echo
+  //      — unconsumed, our own uploads look like a remote change on the next boot
+  // and it exits immediately when there is nothing of ours outstanding, so a normal
+  // refresh is not delayed at all.
+  //
+  // It does not stamp the last-sync timestamp: no pull happened, so "a sync
+  // completed" would be false. It records FLUSH_KEY instead, which the pre-paint gate
+  // in sandpie.html accepts as "our own work was flushed moments ago".
+  // Never rejects and never outlives timeoutMs.
+  async function flushBeforeReload({ timeoutMs = 5000 } = {}) {
     if (!tokens()) return { ran: false, reason: 'dropbox not connected' };
     const before = unsyncedCount();
-    console.log('[reload] flushing before reload — ' + before.dirty + ' dirty, ' + before.pending + ' pending upload(s)');
+    if (!before.dirty && !before.pending) {
+      console.log('[reload] nothing of ours outstanding (0 dirty, 0 pending) — reloading immediately');
+      localStorage.setItem(FLUSH_KEY, String(Date.now()));
+      return { ran: false, reason: 'nothing to flush', before };
+    }
+    console.log('[reload] flushing — ' + before.dirty + ' dirty, ' + before.pending + ' pending upload(s)');
     const work = (async () => {
+      // Brief wait only: a periodic sync mid-flight will finish its own push.
       const t0 = Date.now();
-      while (_syncing && Date.now() - t0 < timeoutMs) await new Promise(r => setTimeout(r, 100));
-      const res = await sync();
-      if (!res || !res.ok) {
-        // sync() bailed (still syncing, a turn is generating, or it threw). Nothing
-        // was flushed, so the timestamp must NOT be refreshed — otherwise the next
-        // boot's pre-paint gate would suppress a splash we genuinely need.
-        console.warn('[reload] sync did not run (' + ((res && res.reason) || 'unknown')
-          + ') — leaving the last-sync timestamp alone; the next boot will sync properly');
-        return { ran: false, reason: (res && res.reason) || 'unknown', before, after: unsyncedCount() };
-      }
+      while (_syncing && Date.now() - t0 < 1500) await new Promise(r => setTimeout(r, 100));
+      const state = syncState();
+      const pushed = await pushDirty(state);
       try {
-        await cloudListWorking();   // consume the echo of the uploads we just made
-        stampSynced('pre-reload flush, cursor advanced past our own uploads');
+        await cloudListWorking();   // confirms the uploads + consumes their echo
       } catch (e) {
-        // sync() already stamped on its own success path, so the timestamp is fresh;
-        // only the echo is unconsumed, which the next boot's cursor read will absorb.
-        console.warn('[reload] cursor advance failed (next boot may splash):', e && e.message);
+        console.warn('[reload] cursor advance failed (next boot absorbs the echo):', e && e.message);
       }
       const after = unsyncedCount();
-      console.log('[reload] flush done — ' + after.dirty + ' dirty, ' + after.pending + ' pending left');
-      return { ran: true, before, after };
+      console.log('[reload] flush done — pushed ' + pushed + '; ' + after.dirty + ' dirty, ' + after.pending + ' pending left');
+      localStorage.setItem(FLUSH_KEY, String(Date.now()));
+      return { ran: true, pushed, before, after };
     })();
     let timer = null;
     const timeout = new Promise(res => {
       timer = setTimeout(() => {
-        // Reload wins over waiting, but say so: the flush is incomplete and the
-        // timestamp is whatever the last real sync left, so a splash next boot is
-        // correct rather than a bug.
-        console.warn('[reload] flush exceeded ' + timeoutMs + 'ms — reloading with work outstanding;'
-          + ' last-sync timestamp not refreshed by this flush');
+        console.warn('[reload] flush exceeded ' + timeoutMs + 'ms — reloading with uploads outstanding;'
+          + ' they stay marked dirty and go up on the next sync');
         res({ ran: true, timedOut: true, before });
       }, timeoutMs);
     });
@@ -931,20 +966,20 @@
         if (cloudChanged || !localExists) { toDownload.push({ rel: path, cloudPath: e.path, e }); continue; }
         state[path].size = e.size;
       }
-      // Splash is static in sandpie.html (first paint). First boot sync decides:
-      // device switch → keep it + wire progress; no delta → fade it out fast.
+      // Splash is static in sandpie.html (first paint). Keep it ONLY when there are
+      // files to download, because that is the only thing it displays — a progress
+      // bar. Deciding on the cursor delta instead (the old _deviceSwitch test) kept
+      // it up at 0/0 for syncs with no work: our own uploads come back through the
+      // cursor as "changes", and in dehydrated mode remote changes are not downloaded
+      // eagerly at all. Both cases are a delta with an empty toDownload.
       if (_splashActive) {
-        if (_deviceSwitch) {
-          console.log('[splash] KEEPING splash — delta non-empty; ' + toDownload.length + ' file(s) to download');
-          if (!toDownload.length) {
-            console.warn('[splash] …but there is NOTHING to download: every delta entry already matches locally.'
-              + ' The splash is showing 0/0 for a sync that has no work. Usual cause: our own uploads'
-              + ' echoed back through the cursor (see the "own upload" lines above).');
-          }
+        if (toDownload.length) {
+          console.log('[splash] KEEPING splash — ' + toDownload.length + ' file(s) to download');
           _showSyncSplash(toDownload.length);
         } else {
-          console.log('[splash] lifting splash — no cursor delta');
-          _hideSyncSplashAfterHome(true);   // no delta — lift once the home has rendered
+          console.log('[splash] lifting splash — nothing to download'
+            + (_deviceSwitch ? ' (the cursor delta needs no local writes)' : ' (no cursor delta)'));
+          _hideSyncSplashAfterHome(true);
         }
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
@@ -958,35 +993,7 @@
       // editing) but must NOT be skipped here — a Save in the viewer marks the open
       // file dirty, and skipping it meant the user's own edit sat unuploaded until
       // they closed the file.
-      const dirty = [];
-      for (const rel of Object.keys(state)) {
-        if (state[rel].syncedMtime !== 0) continue;
-        if (!(await opfs.exists(rel))) continue;
-        dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
-      }
-      const BATCH_SIZE = 50;
-      let upDone = 0;
-      for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
-        const chunk = dirty.slice(i, i + BATCH_SIZE);
-        const files = await Promise.all(chunk.map(async ({ rel, lm, s }) => ({ rel, lm, s, content: await opfs.readBytes(rel) })));
-        try {
-          const results = await uploadBatch(files);
-          for (const r of results) {
-            if (r.meta && r.meta['.tag'] === 'success') {
-              state[r.rel] = {
-                rev: r.meta.rev || (r.s && r.s.rev) || '',
-                size: r.meta.size != null ? r.meta.size : (r.s && r.s.size != null ? r.s.size : r.content.byteLength),
-                syncedMtime: r.lm,
-              };
-              addPending(r.rel);   // protect from deletion until cursor confirms
-            } else {
-              console.warn('[dropbox] batch item failed:', r.rel, r.meta);
-            }
-          }
-        } catch (err) { console.warn('[dropbox] batch upload failed:', err); }
-        upDone += chunk.length;
-      }
-      setSyncState(state);
+      const dirtyCount = await pushDirty(state);
 
       // Dehydrate files not modified in the last 24h
       if (dehydrated()) await dehydratePurge();
@@ -997,7 +1004,7 @@
       // (removedAny false), so without delta/deletions here the viewer would only
       // update on a manual page refresh.
       const cursorChanged = (delta && delta.length) || (deletions && deletions.length);
-      if (firstSync || toDownload.length || dirty.length || removedAny || cursorChanged) {
+      if (firstSync || toDownload.length || dirtyCount || removedAny || cursorChanged) {
         await Sandpie.refreshFiles();
         await Sandpie.refreshConversations();
         // Let sharing.js react to pulled changes (e.g. a new file in shared-incoming
@@ -1710,6 +1717,9 @@
     // Splash markup is static in sandpie.html (first paint, removed inline if
     // no Dropbox). Active only if it survived that — i.e. this user is connected.
     _splashActive = !!document.getElementById('deviceSyncSplash');
+    // The flush marker is one-shot: it belongs to the reload that just happened, and
+    // must not suppress the splash on some later unrelated load inside its window.
+    localStorage.removeItem(FLUSH_KEY);
     addSection();
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
