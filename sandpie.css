@@ -1655,6 +1655,16 @@ ul.conv-list li.active {
   @media (prefers-reduced-motion: reduce) {
   }
 
+  /* A message must never be squashed by the scroll container.
+     .conv-host is a COLUMN flex container, and a flex item whose overflow is not
+     `visible` gets an automatic minimum size of 0 instead of its content size — so
+     flex-shrink compresses it once the conversation is taller than the host. The
+     thinking box is the only message with overflow:hidden, so it was the only one
+     that collapsed (59px of content clipped to a 24px strip, its summary and body
+     laid out below the clip and painting under the next message). Scoped to .msg so
+     #homeCenter keeps its flex:1 1 auto. */
+  .conv-host > .msg, #messages > .msg, #messagesSide > .msg { flex-shrink: 0; }
+
   /* Streamed reasoning ("thinking") box */
   .msg.think {
     margin: 0.25rem 0 0.5rem;
