@@ -492,11 +492,7 @@
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
         '<label class="share-opt">Share with: <select class="share-in" data-k="mode"><option value="dept">A department</option><option value="person">Specific people</option></select></label>' +
         '<div data-r="dept"><label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label></div>' +
-        '<div data-r="person" style="display:none">' +
-          '<label class="share-opt">Emails: <input class="share-in" data-k="email" type="text" placeholder="ana@company.com, joan@company.com" autocomplete="off"></label>' +
-          // styled inline to match .share-modal-msg — avoids a stylesheet bump for one line
-          '<div style="font-size:0.72rem;color:var(--sp-text-dim);line-height:1.4;padding:0 0 0.2rem 0;">Separate with commas. They all get the same copy and can edit it; nobody else in the team can see it.</div>' +
-        '</div>' +
+        '<div data-r="person" style="display:none"><label class="share-opt">Emails: <input class="share-in" data-k="email" type="text" placeholder="ana@company.com, joan@company.com" autocomplete="off"></label></div>' +
         (dir ? '<div class="share-pin-file"><label class="share-opt">Main file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
         '<div class="share-modal-msg"></div>' +
