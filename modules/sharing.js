@@ -396,18 +396,30 @@
     return { id, dests: [where], pin };
   }
 
-  /* ── deliver: the same artifact, but to ONE person ────────────────────── */
-  // Creates <teamRoot>/mailbox/<key>/, restricts it to that person (no_inherit, so
+  /* ── deliver: the same artifact, but only to named people ─────────────── */
+  // Creates <teamRoot>/mailbox/<key>/, restricts it to those people (no_inherit, so
   // it does NOT inherit the team folder's membership), grants EDITOR so their edits
-  // write back exactly like a department artifact, then publishes into it. The
-  // recipient needs no new code path: the folder simply appears in the recursive
-  // listing they already do, because they're the only member who can see it.
-  async function deliver(srcPath, email, opts) {
+  // write back exactly like a department artifact, then publishes into it. They need
+  // no new code path: the folder simply appears in the recursive listing they already
+  // do, because they are the only members who can see it.
+  //   ONE folder for all the recipients, not one per person: fewer calls, and they
+  // get a small shared workspace — everyone named sees the same copy and each
+  // other's edits, exactly like a department artifact with a short guest list.
+  const RECIPIENT_MAX = 25;
+  function parseEmails(input) {
+    const raw = Array.isArray(input) ? input : String(input == null ? '' : input).split(/[,;\s]+/);
+    const list = [...new Set(raw.map(s => String(s).trim().toLowerCase()).filter(Boolean))];
+    if (!list.length) throw new Error('Enter at least one email address.');
+    const bad = list.filter(e => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+    if (bad.length) throw new Error('Not a valid email address: ' + bad.join(', '));
+    if (list.length > RECIPIENT_MAX) throw new Error('Too many recipients (max ' + RECIPIENT_MAX + ').');
+    return list;
+  }
+  async function deliver(srcPath, emails, opts) {
     const p = prov();
-    const to = String(email || '').trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new Error('Enter a valid email address.');
+    const to = parseEmails(emails);                    // throws with a readable message
     if (!cloudOn()) throw new Error('Connect Dropbox first.');
-    if (!teamRoot()) throw new Error('No team space on this account — 1:1 sending needs one.');
+    if (!teamRoot()) throw new Error('No team space on this account — sending to people needs one.');
     if (!(p.cloudMkdir && p.shareRestricted && p.shareInvite)) throw new Error('This page is running an older cloud-sync module — reload the app and try again.');
     const key = randKey();
     const folder = teamRoot() + '/' + MAILBOX + '/' + key;
@@ -415,9 +427,9 @@
     await p.cloudMkdir(teamRoot() + '/' + MAILBOX);     // parent, in case this is the first ever delivery
     await p.cloudMkdir(folder);
     const sfid = await p.shareRestricted(folder);      // only its members can even list it
-    await p.shareInvite(sfid, [to], 'editor');         // editor → their write-backs are accepted
+    await p.shareInvite(sfid, to, 'editor');           // editor → their write-backs are accepted
     const out = await publish(srcPath, MAILBOX + '/' + key, Object.assign({}, opts || {}, { meta: { from: me().user, to } }));
-    console.info('[sharing] delivered "' + out.id + '" to ' + to + ' (' + MAILBOX + '/' + key + ')');
+    console.info('[sharing] delivered "' + out.id + '" to ' + to.join(', ') + ' (' + MAILBOX + '/' + key + ')');
     return Object.assign(out, { to, key, sharedFolderId: sfid });
   }
 
@@ -478,9 +490,13 @@
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
-        '<label class="share-opt">Share with: <select class="share-in" data-k="mode"><option value="dept">A department</option><option value="person">One person</option></select></label>' +
+        '<label class="share-opt">Share with: <select class="share-in" data-k="mode"><option value="dept">A department</option><option value="person">Specific people</option></select></label>' +
         '<div data-r="dept"><label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label></div>' +
-        '<div data-r="person" style="display:none"><label class="share-opt">Email: <input class="share-in" data-k="email" type="email" placeholder="name@company.com" autocomplete="off"></label></div>' +
+        '<div data-r="person" style="display:none">' +
+          '<label class="share-opt">Emails: <input class="share-in" data-k="email" type="text" placeholder="ana@company.com, joan@company.com" autocomplete="off"></label>' +
+          // styled inline to match .share-modal-msg — avoids a stylesheet bump for one line
+          '<div style="font-size:0.72rem;color:var(--sp-text-dim);line-height:1.4;padding:0 0 0.2rem 0;">Separate with commas. They all get the same copy and can edit it; nobody else in the team can see it.</div>' +
+        '</div>' +
         (dir ? '<div class="share-pin-file"><label class="share-opt">Main file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
         '<div class="share-modal-msg"></div>' +
@@ -505,12 +521,14 @@
       const person = mode.value === 'person';
       const dept = sel.value, email = (back.querySelector('[data-k="email"]').value || '').trim();
       if (!person && !dept) { msg.textContent = 'Pick a department first.'; return; }
-      if (person && !email) { msg.textContent = 'Enter an email address.'; return; }
+      if (person && !email) { msg.textContent = 'Enter at least one email address.'; return; }
       msg.textContent = person ? 'Sending…' : 'Sharing…';
       try {
         const pinFile = dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
         const out = person ? await deliver(src, email, { pinFile }) : await publish(src, dept, { pinFile });
-        msg.textContent = person ? ('✓ Sent to ' + email + ' — they can edit it.') : ('✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.');
+        msg.textContent = person
+          ? ('✓ Sent to ' + (out.to.length === 1 ? out.to[0] : out.to.length + ' people') + ' — they can edit it.')
+          : ('✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.');
         await autoSync({ full: true });
         setTimeout(close, person ? 1600 : 900);
       } catch (e) { msg.textContent = 'Error: ' + ((e && e.message) || e); }
