@@ -2319,7 +2319,6 @@ async function runAgent(config, ctx) {
   ctx._roundsSinceTodo = 0;   // CUMULATIVE rounds since the last real write_todos; only reset by touchedTodo
   ctx._lastNagAt = 0;         // value of _roundsSinceTodo at the last nag (cadence gate, does NOT reset the count)
   ctx._stopBlocks = 0;
-  ctx._summaryAsked = false;   // rule 3: the run-summary block fires at most once per turn
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
   // Escalating preamble keyed to how long the plan has actually gone stale — a
@@ -2506,22 +2505,6 @@ async function runAgent(config, ctx) {
         ctx.emit({ type: 'reminder', kind: 'stop-anyway',
           text: 'Ended with ' + openTodos().length + ' open todo(s) after ' + MAX_STOP_BLOCKS
             + ' auto-continues without progress.' });
-      } else if (!ctx.signal?.aborted && ctx._todos.length && !ctx._summaryAsked
-                 && !(round.content && round.content.trim())) {
-        // Mirror of the guard above: every item is CLOSED, but the model ended the
-        // turn without a word. The checklist collapses to one line at rest, so this
-        // summary is the only thing the user actually reads — a silent finish means
-        // a turn that did a lot and reported nothing.
-        // One-shot: if the model declines again the turn ends, same escape valve
-        // MAX_STOP_BLOCKS gives the open-todo case. It can't loop.
-        ctx._summaryAsked = true;
-        setReminder('run-summary',
-          '<system-reminder>Every checklist item is complete, but you ended the turn with no text. '
-          + 'Write the summary now: what you did, what actually changed, and anything the user should '
-          + 'know (a caveat, a thing you could not verify). This is the only part of the turn most '
-          + 'users read — the tool calls are collapsed behind the checklist.</system-reminder>',
-          { items: ctx._todos.length });
-        continue;
       }
       break;
     }
