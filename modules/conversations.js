@@ -1483,7 +1483,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=88');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=89');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2312,6 +2312,10 @@ function addMsg(role, text = '', host = null) {
   if (role === 'tool-call') {
     _appendToolCall(target, div);
   } else {
+    // A user message is a turn boundary: drop the run card reference so the next
+    // turn opens its own. This is the ONE rule that keeps a card from collecting
+    // calls that don't belong to it, and it covers replay as well as live.
+    if (role === 'user') _runCardReset(target);
     appendContent(target, div);
   }
 
@@ -2345,7 +2349,232 @@ function _lastMsgChild(target) {
   return el;
 }
 
+/* ---- Run card: every tool call lives inside a todo ----------------------
+   A turn's tool calls are not top-level objects. Each is filed under the
+   checklist item that was in_progress when it started, so a twenty-call turn
+   rests as ONE line and the plan is what the user reads.
+
+   The card is held BY THE HOST OBJECT (host._runCard) and never located by DOM
+   position. An earlier attempt looked it up as "the last .tool-run in the host"
+   and filed calls into a checklist from twenty turns earlier; identity by object
+   reference makes that unreachable rather than merely guarded. A new turn drops
+   the reference (addMsg on a 'user' message, and the RoundRenderer constructor),
+   so a card cannot outlive its turn.
+
+   Rule: EVERY tool call gets a todo. If the model hasn't planned yet, the card
+   opens one implicit item titled from the user's message — the container is
+   guaranteed page-side, so no tool call can ever render naked, and the model is
+   never blocked waiting to plan. show_artifact is the one exception and is moved
+   back out (see renderTcDone). */
+
+function _runCardOf(target) {
+  const c = target && target._runCard;
+  return (c && c.isConnected && target.contains(c)) ? c : null;
+}
+function _runCardReset(target) { if (target) target._runCard = null; }
+
+// Title for the implicit item: the user's last request in this host, clipped.
+function _runImplicitTitle(target) {
+  let txt = '';
+  try {
+    const bubbles = target.querySelectorAll(':scope > .msg.user .bubble');
+    const last = bubbles[bubbles.length - 1];
+    txt = (last && last.textContent || '').trim().replace(/\s+/g, ' ');
+  } catch (_) {}
+  if (!txt) return 'Working on your request';
+  return 'Answering: ' + (txt.length > 70 ? txt.slice(0, 70) + '…' : txt);
+}
+
+function _runCardCreate(target) {
+  const card = document.createElement('div');
+  card.className = 'tool-run';               // collapsed by default
+  const head = document.createElement('div');
+  head.className = 'tool-run-head';
+  head.innerHTML = '<span class="tc-prompt">&gt;&gt;&gt;</span>'
+    + '<span class="tool-run-title"></span>'
+    + '<span class="tool-run-n"></span>'
+    + '<span class="tool-run-chevron">▸</span>';
+  head.addEventListener('click', (ev) => { ev.stopPropagation(); card.classList.toggle('expanded'); });
+  const body = document.createElement('div');
+  body.className = 'tool-run-body';
+  card.append(head, body);
+  appendContent(target, card);
+  target._runCard = card;
+  return card;
+}
+
+// The .tt-steps of the item a call belongs to: the in_progress item, else the
+// last completed one (a model often ticks an item off before its closing call).
+function _runCardSteps(card) {
+  if (!card) return null;
+  const items = card.querySelectorAll(':scope > .tool-run-body > .tt-item');
+  if (!items.length) return null;
+  let pick = null;
+  for (const it of items) {
+    if (it.querySelector(':scope > .tool-todo-in_progress')) { pick = it; break; }
+    if (it.querySelector(':scope > .tool-todo-completed')) pick = it;
+  }
+  return (pick || items[0]).querySelector(':scope > .tt-steps');
+}
+
+// Sync a card to a todos array IN PLACE. Rows are rebuilt through buildTodosView
+// so every badge (claim, audit, evidence, blocked) keeps working, but each item's
+// .tt-steps is preserved — the calls already filed under it are never discarded.
+function _runCardSync(card, todos) {
+  const body = card.querySelector(':scope > .tool-run-body');
+  if (!body) return;
+  const fresh = buildTodosView(todos).querySelectorAll(':scope > .tool-todo');
+  const items = body.querySelectorAll(':scope > .tt-item');
+  fresh.forEach((row, i) => {
+    let item = items[i];
+    if (!item) {
+      item = document.createElement('div');
+      item.className = 'tt-item';
+      const think = document.createElement('div');
+      think.className = 'tt-think';         // mid-item prose lands here (one per item)
+      const steps = document.createElement('div');
+      steps.className = 'tt-steps';
+      item.append(think, steps);
+      body.appendChild(item);
+    }
+    const steps = item.querySelector(':scope > .tt-steps');
+    const old = item.querySelector(':scope > .tool-todo');
+    if (old) item.replaceChild(row, old);
+    else item.insertBefore(row, item.firstChild);
+    _runItemDecorate(item);
+  });
+  // A shrunken checklist drops its tail — but never an item holding calls.
+  for (let i = fresh.length; i < items.length; i++) {
+    const st = items[i].querySelector(':scope > .tt-steps');
+    if (!st || !st.querySelector(':scope > .msg.tool-call')) items[i].remove();
+  }
+  const done = todos.filter(t => t && t.status === 'completed').length;
+  const ip = todos.findIndex(t => t && t.status === 'in_progress');
+  const t = card.querySelector('.tool-run-title');
+  const n = card.querySelector('.tool-run-n');
+  // The header is the work itself: the active task, else a closing state.
+  if (t) t.textContent = (ip >= 0 && todos[ip] && (todos[ip].activeForm || todos[ip].content))
+    || (done === todos.length ? 'Done' : 'Checklist');
+  if (n) n.textContent = done + '/' + todos.length;
+  card.classList.toggle('all-done', done === todos.length);
+}
+
+// Per-item count + chevron, derived from the DOM so it can't drift.
+function _runItemDecorate(item) {
+  const row = item.querySelector(':scope > .tool-todo');
+  const steps = item.querySelector(':scope > .tt-steps');
+  const think = item.querySelector(':scope > .tt-think');
+  if (!row) return;
+  const n = steps ? steps.querySelectorAll(':scope > .msg.tool-call').length : 0;
+  const notes = think ? think.querySelectorAll('.tt-note').length : 0;
+  row.querySelectorAll('.tt-n, .tt-chevron').forEach(e => e.remove());
+  if (n || notes) {
+    const cnt = document.createElement('span');
+    cnt.className = 'tt-n';
+    cnt.textContent = n ? String(n) : '·';
+    row.appendChild(cnt);
+    const chev = document.createElement('span');
+    chev.className = 'tt-chevron';
+    chev.textContent = '▸';
+    row.appendChild(chev);
+    item.classList.add('has-steps');
+    if (!row.dataset.ttBound) {
+      row.dataset.ttBound = '1';
+      row.addEventListener('click', (ev) => {
+        if (ev.target.closest('.tool-todo-audit-badge')) return;   // badges own their click
+        ev.stopPropagation();
+        item.classList.toggle('open');
+      });
+    }
+  } else {
+    item.classList.remove('has-steps', 'open');
+  }
+}
+
+// Ensure this host has a card for the live turn, synced to `todos` (or to a
+// single implicit item when the model hasn't planned).
+function _runCardEnsure(target, todos) {
+  if (!target) return null;
+  let card = _runCardOf(target);
+  const list = (Array.isArray(todos) && todos.length) ? todos : null;
+  if (!card) {
+    card = _runCardCreate(target);
+    card.dataset.implicit = list ? '' : '1';
+  }
+  if (list && card.dataset.implicit === '1') {
+    // The model planned after starting work: fold the implicit item's calls into
+    // the first real item rather than leaving an orphan row above them.
+    const imp = card.querySelector(':scope > .tool-run-body > .tt-item');
+    const carried = imp ? [...imp.querySelectorAll(':scope > .tt-steps > .msg.tool-call')] : [];
+    const notes = imp ? [...imp.querySelectorAll(':scope > .tt-think > .tt-note')] : [];
+    if (imp) imp.remove();
+    delete card.dataset.implicit;
+    _runCardSync(card, list);
+    const first = card.querySelector(':scope > .tool-run-body > .tt-item');
+    if (first) {
+      const st = first.querySelector(':scope > .tt-steps');
+      const th = first.querySelector(':scope > .tt-think');
+      carried.forEach(c => st && st.appendChild(c));
+      notes.forEach(nn => th && th.appendChild(nn));
+      _runThinkRelabel(first);
+      _runItemDecorate(first);
+    }
+    return card;
+  }
+  // Never downgrade: once a card holds a real checklist, a later call that can't
+  // see todos yet must leave it alone. Implicit is an INITIAL state only —
+  // re-syncing here would wipe the real plan back to "Answering: …".
+  if (!list && card.dataset.implicit !== '1') return card;
+  _runCardSync(card, list || [{ content: _runImplicitTitle(target), status: 'in_progress' }]);
+  return card;
+}
+
+// Mid-item prose (rule 2): one fold per item, however many times the model
+// writes. Successive notes append into the same box, in order.
+function _runNoteAdd(item, html) {
+  const think = item && item.querySelector(':scope > .tt-think');
+  if (!think) return null;
+  let det = think.querySelector(':scope > details.tt-thinking');
+  if (!det) {
+    det = document.createElement('details');
+    det.className = 'tt-thinking';
+    const sum = document.createElement('summary');
+    sum.innerHTML = 'Thinking <span class="n"></span>';
+    const body = document.createElement('div');
+    body.className = 'tt-think-body';
+    det.append(sum, body);
+    think.appendChild(det);
+  }
+  const body = det.querySelector('.tt-think-body');
+  if (body.querySelector('.tt-note')) body.appendChild(document.createElement('hr'));
+  const note = document.createElement('div');
+  note.className = 'tt-note';
+  note.innerHTML = html;
+  body.appendChild(note);
+  _runThinkRelabel(item);
+  _runItemDecorate(item);
+  return note;
+}
+function _runThinkRelabel(item) {
+  const det = item && item.querySelector(':scope > .tt-think > details.tt-thinking');
+  if (!det) return;
+  const n = det.querySelectorAll('.tt-note').length;
+  const lab = det.querySelector('summary .n');
+  if (lab) lab.textContent = n > 1 ? '· ' + n + ' notes' : '';
+  if (!n) det.remove();
+}
+
 function _appendToolCall(target, div) {
+  // Rule 1: a tool call has nowhere to render except inside a todo. The card is
+  // opened here if the model hasn't planned yet, so this is unconditional.
+  const s = convStreams.get(target && target.dataset && target.dataset.convId);
+  const card = _runCardEnsure(target, s && s.todos);
+  const steps = _runCardSteps(card);
+  if (steps) {
+    steps.appendChild(div);
+    _runItemDecorate(steps.parentNode);
+    return;
+  }
   const last = _lastMsgChild(target);
   if (last && last.classList.contains('tool-bundle')) {
     // Join the run that's already bundled.
@@ -2479,6 +2708,29 @@ function appendToolResult(tcId, result, scopeEl) {
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
+  // The run card owns the checklist. Sync it and do NOT draw the list a second
+  // time inside this call's box — that duplication is what made a run look busy.
+  const host = climbScrollEl(toolCallDiv);
+  if (host && Array.isArray(todos) && todos.length) {
+    const card = _runCardEnsure(host, todos);
+    if (card) {
+      // write_todos is a step of the run like any other, and its result IS the
+      // card, so its box carries no body.
+      toolCallDiv.classList.remove('expanded');
+      toolCallDiv.classList.add('tc-plan');
+      const steps = _runCardSteps(card);
+      if (steps && !card.contains(toolCallDiv)) {
+        const oldBundle = toolCallDiv.closest ? toolCallDiv.closest('.tool-bundle') : null;
+        steps.appendChild(toolCallDiv);
+        if (oldBundle) {
+          const left = oldBundle.querySelectorAll('.tool-bundle-body > .msg.tool-call').length;
+          if (!left) oldBundle.remove(); else _refreshToolBundle(oldBundle);
+        }
+      }
+      if (steps) _runItemDecorate(steps.parentNode);
+      return;
+    }
+  }
   const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
   let box = expanded.querySelector('.tool-box');
@@ -2700,12 +2952,23 @@ function renderTcDone(div, fname) {
     '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
     `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>` +
     '<span class="tc-chevron">▸</span>';
-  // Tools whose result IS the point of the call render it inside the expanded box,
-  // so show it by default (other tools stay collapsed behind the header toggle).
-  // The user can still collapse it by clicking the header.
-  //   load_image  → the loaded image
-  //   write_todos → the checklist card (otherwise the user never sees the todos)
-  if (fname === 'load_image' || fname === 'write_todos') div.classList.add('expanded');
+  // Rule 4: load_image is an ordinary tool now — it lives inside its todo like
+  // every other call. Its result still shows by default, because the image IS the
+  // result. write_todos no longer auto-expands: the run card is its result, and a
+  // checklist nested inside a checklist was the duplication we removed.
+  if (fname === 'load_image') div.classList.add('expanded');
+  // Rule 5: show_artifact is the ONLY tool that renders outside a todo — it's the
+  // deliverable, not the work. The name isn't known when the box is created, so
+  // lift it back out of the card here.
+  if (fname === 'show_artifact') {
+    const card = div.closest ? div.closest('.tool-run') : null;
+    if (card) {
+      const item = div.closest('.tt-item');
+      const host = climbScrollEl(card);
+      if (host) appendContent(host, div);
+      if (item) _runItemDecorate(item);
+    }
+  }
   _refreshBundleOf(div);
 }
 
@@ -2715,6 +2978,10 @@ class RoundRenderer {
     this.convMessages = convMessages;
     this.isLocal = isLocal;
     this.convId = convId;
+    // One renderer per TURN (see sendSingle) — so constructing one IS the turn
+    // boundary. Drop any previous turn's run card so this turn opens its own and
+    // can never file calls into an older checklist.
+    _runCardReset(host);
 
     this.reply = null;
 
@@ -2729,6 +2996,7 @@ class RoundRenderer {
     this.drainTimer = null;
     this.pendingToolResultDiv = null;
     this.reasoning = '';
+    this._proseNote = null;
     this.thinkEl = null;
     this.thinkBody = null;
     this.thinkSummary = null;
@@ -2755,6 +3023,7 @@ class RoundRenderer {
     this.toolPending.length = 0;
     this.toolsShouldClose = false;
     this.reasoning = '';
+    this._proseNote = null;
     this.thinkEl = null;
     this.thinkBody = null;
     this.thinkSummary = null;
@@ -2847,6 +3116,50 @@ class RoundRenderer {
       this.reply.remove();
       this.reply = null;
     }
+    this._placeProse();
+  }
+  /* Rule 2 — the three states of assistant prose. All three are decided from
+     what this round already knows, with no classifier and no extra model call:
+
+       tool calls followed   → process, not answer: folds into the active todo's
+                               single Thinking box, one fold per item.
+       no tool calls, todos  → the model STOPPED mid-list: a question or a
+         still open              blocker. Stays visible and is marked, because a
+                               question folded away is a turn that silently
+                               stalls behind a collapsed box.
+       no todos open         → the run summary (rule 3). Stays visible; it is the
+                               one paragraph left standing in the whole turn.
+
+     The bias is deliberate: prose with no tool call after it is ALWAYS shown.
+     Over-showing costs a line, over-hiding costs a stuck turn. */
+  _placeProse() {
+    if (!this.reply || !this.content || !this.content.trim()) return;
+    const hadTools = this.toolCalls.length > 0;
+    if (!hadTools) {
+      const s = convStreams.get(this.convId);
+      const todos = (s && s.todos) || [];
+      const open = todos.filter(t => t && t.status !== 'completed'
+        && t.status !== 'deleted' && t.status !== 'withdrawn').length;
+      // Stopped with work outstanding → this needs the user, so say so.
+      if (todos.length && open) this.reply.classList.add('needs-you');
+      return;   // summary, or a plain turn with no checklist: leave it visible
+    }
+    const card = _runCardOf(this.host);
+    const steps = _runCardSteps(card);
+    const item = steps && steps.parentNode;
+    if (!item) return;                       // no card (rule-1 gap) → leave visible
+    const bubble = this.reply.querySelector('.bubble') || this.reply;
+    // Keep the node the message binds to (rewind / copy act on it) — bindMessage
+    // falls back to this when the reply bubble is gone.
+    this._proseNote = _runNoteAdd(item, bubble.innerHTML);
+    this.reply.remove();
+    this.reply = null;
+    // The provider's own reasoning box belongs with the prose, not stranded at
+    // top level where the reply used to be.
+    if (this.thinkEl) {
+      const think = item.querySelector(':scope > .tt-think');
+      if (think) think.insertBefore(this.thinkEl, think.firstChild);
+    }
   }
   bindMessage(msg) {
     this.convMessages.push(msg);
@@ -2866,6 +3179,7 @@ class RoundRenderer {
     if (msg.role === 'assistant') {
       this._boundMessage = msg;   // so tool boxes created later (leaked calls) can bind too
       if (this.reply) bindBubble(this.reply, msg);
+      else if (this._proseNote) bindBubble(this._proseNote, msg);   // prose folded into a todo
       for (const el of this.toolCallEls) if (el) bindBubble(el, msg);
     } else if (msg.role === 'tool' && this.pendingToolResultDiv) {
       bindBubble(this.pendingToolResultDiv, msg);
@@ -4211,6 +4525,7 @@ window.buildToolBox = buildToolBox;
 window.renderTcPreparing = renderTcPreparing;
 window.renderTcRunning = renderTcRunning;
 window.renderTcDone = renderTcDone;
+window.renderTodos = renderTodos;   // same category as the renderTc* helpers above
 
 /* ---- expose to window for inline handlers / legacy code ---- */
 window.newConvId = newConvId;
