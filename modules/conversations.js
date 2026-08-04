@@ -2643,6 +2643,12 @@ class RoundRenderer {
   startRound() {
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this._flushAllPending();
+    // The PREVIOUS round's bubble is created empty and only removed by endRound.
+    // Any path that skips endRound (abort, a provider error that isn't retried)
+    // leaves an empty assistant strip on screen, and startRound is where we lose
+    // the last reference to it — so clear it here before taking a new one.
+    // Checked after _flushAllPending, so genuinely-streamed text is never dropped.
+    if (this.reply && !(this.content && this.content.trim())) this.reply.remove();
     this.reply = addMsg('assistant', '', this.host);
     this.content = '';
     this.displayed = '';
@@ -2906,6 +2912,19 @@ class RoundRenderer {
   _finishThinking() {
     if (!this.thinkEl || this._thinkDone) return;
     this._thinkDone = true;
+    // A box with no thinking in it is just an empty strip on screen. Providers do
+    // emit reasoning deltas that are only whitespace (or a lone newline), and
+    // _appendReasoning creates the box on the first one — so the box can outlive
+    // having anything to show. Drop it instead of finishing it.
+    if (!this.reasoning || !this.reasoning.trim()) {
+      this.thinkEl.remove();
+      this.thinkEl = null;
+      this.thinkBody = null;
+      this.thinkSummary = null;
+      const nn0 = document.querySelector('.msg-timer:not(.done) .mt-nn');
+      if (nn0) nn0.classList.remove('thinking');
+      return;
+    }
     const secs = Math.round((performance.now() - this.thinkStart) / 1000);
     this.thinkSummary.textContent = secs > 0 ? ('Thought for ' + secs + 's') : 'Thought';
     this.thinkEl.classList.add('done');
