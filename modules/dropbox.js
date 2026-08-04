@@ -1351,14 +1351,56 @@
   // minted before those were granted fails with missing_scope; that's surfaced as
   // a reconnect prompt rather than a raw API error.
   const OUTBOX_PARENT = '/Sandpie Outbox';   // wrappers for single-file shares (sender's Dropbox)
-  async function shareApi(path, body) {
-    try { return await api(path, body); }
+  // opts is passed straight to api(): PATH-based sharing calls against the team
+  // space need {team:true} (the path-root header), or the path resolves against the
+  // member's home namespace and 404s. ID-based calls (add/remove/update member,
+  // unshare, list members) take a shared_folder_id and need no header, which is why
+  // the original helpers worked without one.
+  async function shareApi(path, body, opts) {
+    try { return await api(path, body, opts); }
     catch (e) {
       if (/missing_scope|insufficient_scope/i.test(String((e && e.message) || e))) {
         throw new Error('Dropbox sharing permission is missing for this login — reconnect Dropbox (Settings → Cloud sync → Disconnect, then Connect) to grant it.');
       }
       throw e;
     }
+  }
+  // create_folder_v2 inside the TEAM space (1:1 mailbox containers live there).
+  async function teamMkdir(path) {
+    try { await api('/2/files/create_folder_v2', { path, autorename: false }, { team: true }); return true; }
+    catch (e) { if (/conflict/.test(String((e && e.message) || e))) return false; throw e; }   // already there / lost a race
+  }
+  // Share a folder in the team space with SPECIFIC people. access_inheritance
+  // 'no_inherit' is the whole point: without it a folder inside a team folder
+  // inherits that folder's membership, so every teammate still sees it. Returns the
+  // shared_folder_id; idempotent if the folder is already shared.
+  async function shareFolderRestricted(path) {
+    const T = { team: true };
+    let md = null;
+    try { md = await api('/2/files/get_metadata', { path }, T); } catch (_) {}
+    const existing = md && md.sharing_info && md.sharing_info.shared_folder_id;
+    if (existing) return existing;
+    const arg = { path, acl_update_policy: 'owner', force_async: false };
+    let res;
+    try { res = await shareApi('/2/sharing/share_folder', Object.assign({ access_inheritance: { '.tag': 'no_inherit' } }, arg), T); }
+    catch (e) { res = await shareApi('/2/sharing/share_folder', arg, T); }   // parameter refused → set it separately below
+    if (res['.tag'] === 'async_job_id') {
+      const job = res.async_job_id; res = null;
+      for (let i = 0; i < 30 && !res; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const st = await shareApi('/2/sharing/check_share_job_status', { async_job_id: job });
+        if (st['.tag'] === 'in_progress') continue;
+        if (st['.tag'] === 'failed') throw new Error('share_folder failed: ' + JSON.stringify(st).slice(0, 200));
+        res = st;
+      }
+      if (!res) throw new Error('Dropbox is still creating the shared folder — try again in a moment.');
+    }
+    const id = res.shared_folder_id;
+    if (!id) throw new Error('share_folder did not return a shared_folder_id');
+    if (((res.access_inheritance || {})['.tag']) !== 'no_inherit') {
+      await shareApi('/2/sharing/set_access_inheritance', { shared_folder_id: id, access_inheritance: { '.tag': 'no_inherit' } });
+    }
+    return id;
   }
   // Idempotent: the shared_folder_id for `path`, sharing the folder if it isn't
   // already shared. share_folder can go async on a big folder, so poll for it.
@@ -1644,6 +1686,12 @@
       // share, independent of whatever account.js reports.
       accountEmail: () => localStorage.getItem(EMAIL_KEY) || '',
       shareFolderWith: (path, emails, level) => shareFolderWith(path, emails, level),   // level 'viewer'|'editor'; → {id, level}
+      // --- 1:1 mailbox inside the TEAM space (sharing.js deliver()) -----------
+      // A folder only its members can see, so access control IS the addressing —
+      // the recipient finds it in the recursive listing they already do, with no
+      // list_shared_folders / list_received_files call anywhere.
+      cloudMkdir: (absPath) => teamMkdir(absPath),
+      shareRestricted: (absPath) => shareFolderRestricted(absPath),   // → shared_folder_id, no_inherit
       // Split so a caller can write the package marker BEFORE anyone is invited —
       // a recipient who polls between the invite and the marker would otherwise see
       // a share that looks like it isn't ours.

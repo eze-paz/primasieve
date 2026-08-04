@@ -31,6 +31,16 @@
   const PKG_STATE_KEY = 'sandpie-pkg-state';     // localStorage: { [id]: {team,title,pin,kind,revs,dirty} }
   const HUB_CURSOR_KEY = 'sandpie-share-cursor'; // localStorage: { [teamRoot]: cursor } — per device, like dbxfull-cursor
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
+  // 1:1 delivery: <teamRoot>/mailbox/<key>/<artifact>/<files…>. <key> is an opaque
+  // folder shared (no_inherit) with ONE person, so only they can list it — access
+  // control is the addressing, and discovery is the listing we already do. The key
+  // is part of the artifact's SOURCE path, so download/mirror/write-back treat a
+  // delivery exactly like a department artifact.
+  const MAILBOX = 'mailbox';
+  const SENT_KEYS = 'sandpie-sent-keys';         // localStorage: keys I created — never install my own outgoing delivery
+  const sentKeys = () => { try { const a = JSON.parse(localStorage.getItem(SENT_KEYS) || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+  const addSentKey = (k) => { try { localStorage.setItem(SENT_KEYS, JSON.stringify(sentKeys().concat(k).slice(-300))); } catch (_) {} };
+  const randKey = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => (b % 36).toString(36)).join('');
   const META = '.sandpie.json';                  // hub metadata: {pin,title}
   // Files that live on the hub but are never installed: the metadata marker and
   // leftovers from older builds. Excluded from install, from publish uploads and
@@ -67,7 +77,8 @@
   async function teams() {
     const p = prov();
     if (!(cloudOn() && p && p.listTeamFolders)) return [];
-    try { return (await p.listTeamFolders()) || []; } catch (_) { return []; }
+    // `mailbox` holds 1:1 deliveries, not a department — never offer it as one.
+    try { return ((await p.listTeamFolders()) || []).filter(t => String(t.name || '').toLowerCase() !== MAILBOX); } catch (_) { return []; }
   }
   const hubDownload = (abs) => prov().cloudDownload(abs, { team: true });
   const hubUpload = (abs, bytes) => prov().cloudUpload(abs, bytes, { team: true });
@@ -117,7 +128,13 @@
       if (rel.toLowerCase().startsWith(prefix)) rel = rel.slice(prefix.length);
       const m = /^([^/]+)\/([^/]+)\/(.+)$/.exec(rel);      // dept / artifact / file…
       if (!m) continue;                                     // loose file under the root or a dept — not an artifact
-      const dept = m[1], id = m[2], file = m[3];
+      let dept = m[1], id = m[2], file = m[3];
+      if (dept.toLowerCase() === MAILBOX) {                 // mailbox / key / artifact / file…
+        const mm = /^([^/]+)\/([^/]+)\/(.+)$/.exec(rel.slice(dept.length + 1));
+        if (!mm) continue;                                  // a bare key folder, nothing delivered yet
+        if (sentKeys().indexOf(mm[1]) >= 0) continue;       // my own outgoing delivery — don't install it back
+        dept = dept + '/' + mm[1]; id = mm[2]; file = mm[3];
+      }
       if (id === 'shared-hub' || id === 'shared-incoming') continue;   // legacy containers
       const k = dept + '/' + id;
       (byKey[k] || (byKey[k] = { dept, id, files: {} })).files[file] = e.rev || '';
@@ -152,14 +169,14 @@
     const dirty = (prev && prev.dirty) || {};
     const local = new Set(await listOpfs(dst, '', []));
     const revs = {};
-    let changed = 0, pin = null, title = null, metaRev = null;
+    let changed = 0, pin = null, title = null, metaRev = null, sender = null;
 
     for (const rel of Object.keys(a.files)) {
       if (rel === META) {                            // metadata → state, never to disk
         // Its rev is cached like any file's, or every poll would re-fetch it.
-        if (!fresh && prev.metaRev && prev.metaRev === a.files[rel]) { metaRev = prev.metaRev; pin = prev.pin || null; title = prev.title || null; continue; }
+        if (!fresh && prev.metaRev && prev.metaRev === a.files[rel]) { metaRev = prev.metaRev; pin = prev.pin || null; title = prev.title || null; sender = prev.sender || null; continue; }
         const bytes = await hubRead(a, rel);
-        if (bytes) { try { const j = JSON.parse(new TextDecoder().decode(bytes)); if (j && typeof j.pin === 'string') pin = j.pin; if (j && typeof j.title === 'string') title = j.title; metaRev = a.files[rel]; } catch (_) {} }
+        if (bytes) { try { const j = JSON.parse(new TextDecoder().decode(bytes)); if (j && typeof j.pin === 'string') pin = j.pin; if (j && typeof j.title === 'string') title = j.title; if (j && typeof j.from === 'string') sender = j.from; metaRev = a.files[rel]; } catch (_) {} }
         continue;
       }
       if (SKIP(rel)) continue;
@@ -182,6 +199,7 @@
       id: a.id, team: a.dept, from: 'team', kind, revs, dirty, metaRev,
       title: title || (prev && prev.title) || a.id,
       pin: pin || (!fresh && prev && prev.pin) || null,
+      sender: sender || (!fresh && prev && prev.sender) || null,   // 1:1 delivery: who sent it
     };
     saveState(a.id, mk);
     // Pin the main file on first install; afterwards follow the publisher only if
@@ -344,10 +362,13 @@
     }
     return files;
   }
-  async function publish(srcPath, dept, opts) {
+  // `where` is a path under the team root: a department ('IT') for everyone, or a
+  // mailbox container ('mailbox/<key>') for one person. Identical from here on.
+  async function publish(srcPath, where, opts) {
     opts = opts || {};
     const src = norm(srcPath || '');
     if (!src) throw new Error('publish: srcPath required');
+    if (!where) throw new Error('publish: a destination is required');
     const dir = await isDir(src), base = src.split('/').pop();
     const id = opts.id || slug(base);
     const files = (await srcFileList(src, dir)).filter(rel => !SKIP(rel));
@@ -359,7 +380,7 @@
       return null;
     };
     let missed = 0; const sent = [];
-    for (const rel of files) { const bytes = await readSrc(rel); if (bytes) { await hubUpload(hubPath(dept, id, rel), bytes); sent.push(rel); } else missed++; }
+    for (const rel of files) { const bytes = await readSrc(rel); if (bytes) { await hubUpload(hubPath(where, id, rel), bytes); sent.push(rel); } else missed++; }
     if (!sent.length) throw new Error('None of the files in "' + base + '" could be read — nothing was shared.');
     if (missed) console.warn('[sharing] published without ' + missed + ' unreadable file(s)');
     // Which file everyone opens. Written LAST so it never points at content that
@@ -367,11 +388,37 @@
     const pin = (opts.pinFile && sent.includes(opts.pinFile)) ? opts.pinFile
               : sent.includes('SKILL.md') ? 'SKILL.md'
               : sent.includes('index.html') ? 'index.html' : sent.slice().sort()[0];
-    try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: base }))); }
+    const meta = Object.assign({ pin, title: base }, opts.meta || {});
+    try { await hubUpload(hubPath(where, id, META), new TextEncoder().encode(JSON.stringify(meta))); }
     catch (e) { console.warn('[sharing] main-file marker failed:', (e && e.message) || e); }
     _forceNext = true;      // we just changed the hub — next pass reads the listing, doorbell or not
     fire();
-    return { id, dests: [dept], pin };
+    return { id, dests: [where], pin };
+  }
+
+  /* ── deliver: the same artifact, but to ONE person ────────────────────── */
+  // Creates <teamRoot>/mailbox/<key>/, restricts it to that person (no_inherit, so
+  // it does NOT inherit the team folder's membership), grants EDITOR so their edits
+  // write back exactly like a department artifact, then publishes into it. The
+  // recipient needs no new code path: the folder simply appears in the recursive
+  // listing they already do, because they're the only member who can see it.
+  async function deliver(srcPath, email, opts) {
+    const p = prov();
+    const to = String(email || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new Error('Enter a valid email address.');
+    if (!cloudOn()) throw new Error('Connect Dropbox first.');
+    if (!teamRoot()) throw new Error('No team space on this account — 1:1 sending needs one.');
+    if (!(p.cloudMkdir && p.shareRestricted && p.shareInvite)) throw new Error('This page is running an older cloud-sync module — reload the app and try again.');
+    const key = randKey();
+    const folder = teamRoot() + '/' + MAILBOX + '/' + key;
+    addSentKey(key);                                   // BEFORE creating: a crash mid-way must not make us install our own delivery
+    await p.cloudMkdir(teamRoot() + '/' + MAILBOX);     // parent, in case this is the first ever delivery
+    await p.cloudMkdir(folder);
+    const sfid = await p.shareRestricted(folder);      // only its members can even list it
+    await p.shareInvite(sfid, [to], 'editor');         // editor → their write-backs are accepted
+    const out = await publish(srcPath, MAILBOX + '/' + key, Object.assign({}, opts || {}, { meta: { from: me().user, to } }));
+    console.info('[sharing] delivered "' + out.id + '" to ' + to + ' (' + MAILBOX + '/' + key + ')');
+    return Object.assign(out, { to, key, sharedFolderId: sfid });
   }
 
   /* ── home rendering ──────────────────────────────────────────────────── */
@@ -390,7 +437,9 @@
       const files = t.kind === 'directory' ? await listOpfs(INSTALL_ROOT + '/' + t.name, '', []) : [];
       const entry = mainFile(mk, files);
       if (!entry) continue;
-      out.push({ id: t.name, title: mk.title || t.name, team: mk.team, kind: mk.kind || 'folder', entry });
+      // A 1:1 delivery's source path is an opaque key — show who sent it instead.
+      const label = mk.sender || (String(mk.team).toLowerCase().startsWith(MAILBOX + '/') ? 'shared with you' : mk.team);
+      out.push({ id: t.name, title: mk.title || t.name, team: label, kind: mk.kind || 'folder', entry });
     }
     return out.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -429,7 +478,9 @@
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
         '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
-        '<label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label>' +
+        '<label class="share-opt">Share with: <select class="share-in" data-k="mode"><option value="dept">A department</option><option value="person">One person</option></select></label>' +
+        '<div data-r="dept"><label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label></div>' +
+        '<div data-r="person" style="display:none"><label class="share-opt">Email: <input class="share-in" data-k="email" type="email" placeholder="name@company.com" autocomplete="off"></label></div>' +
         (dir ? '<div class="share-pin-file"><label class="share-opt">Main file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
         '<div class="share-modal-msg"></div>' +
@@ -440,17 +491,28 @@
     back.querySelector('[data-act="cancel"]').onclick = close;
     const sel = back.querySelector('[data-k="team"]');
     const msg = back.querySelector('.share-modal-msg');
+    const mode = back.querySelector('[data-k="mode"]');
+    const rowDept = back.querySelector('[data-r="dept"]'), rowPerson = back.querySelector('[data-r="person"]');
+    mode.onchange = () => {
+      const person = mode.value === 'person';
+      rowDept.style.display = person ? 'none' : '';
+      rowPerson.style.display = person ? '' : 'none';
+      if (person) { const i = rowPerson.querySelector('[data-k="email"]'); if (i) i.focus(); }
+    };
     const depts = await teams();
     sel.innerHTML = depts.length ? depts.map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>').join('') : '<option value="">no team folders available</option>';
     back.querySelector('[data-act="share"]').onclick = async () => {
-      const dept = sel.value; if (!dept) { msg.textContent = 'Pick a department first.'; return; }
-      msg.textContent = 'Sharing…';
+      const person = mode.value === 'person';
+      const dept = sel.value, email = (back.querySelector('[data-k="email"]').value || '').trim();
+      if (!person && !dept) { msg.textContent = 'Pick a department first.'; return; }
+      if (person && !email) { msg.textContent = 'Enter an email address.'; return; }
+      msg.textContent = person ? 'Sending…' : 'Sharing…';
       try {
         const pinFile = dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
-        const out = await publish(src, dept, { pinFile });
-        msg.textContent = '✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.';
+        const out = person ? await deliver(src, email, { pinFile }) : await publish(src, dept, { pinFile });
+        msg.textContent = person ? ('✓ Sent to ' + email + ' — they can edit it.') : ('✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.');
         await autoSync({ full: true });
-        setTimeout(close, 900);
+        setTimeout(close, person ? 1600 : 900);
       } catch (e) { msg.textContent = 'Error: ' + ((e && e.message) || e); }
     };
   }
@@ -481,5 +543,5 @@
     });
   } catch (_) {}
 
-  window.SandpieSharing = { me, setIdentity, publish, autoSync, uninstall, subscribe, shareDialog, teams, teamRoot, acceptedList, fire, INSTALL_ROOT };
+  window.SandpieSharing = { me, setIdentity, publish, deliver, autoSync, uninstall, subscribe, shareDialog, teams, teamRoot, acceptedList, fire, INSTALL_ROOT };
 })();
