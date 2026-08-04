@@ -347,11 +347,17 @@
   }
   .fv-hbtn-text:hover { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-text); }
   .artifact-panel-btn {  }
-  body.side-open.active-left  #messagesSide,
+  /* The unfocused pane is dimmed to show which conversation is active. It must
+     only ever dim a MESSAGE section: when the side pane is showing a document
+     (file viewer / artifact) the pane holds no conversation at all, and greying
+     out the artifact you are reading is both wrong and a trap — the viewer
+     renders in an iframe, so clicking it cannot bubble out to restore the
+     focus. Excluded via :not(), so the document always renders at full opacity. */
+  body.side-open.active-left  #messagesSide:not(.viewer-mode):not(.artifact-mode),
   body.side-open.active-right #messages {
     opacity: 0.55; filter: grayscale(0.25); cursor: pointer;
   }
-  body.side-open.active-left  #messagesSide:hover,
+  body.side-open.active-left  #messagesSide:not(.viewer-mode):not(.artifact-mode):hover,
   body.side-open.active-right #messages:hover { opacity: 0.75; }
   #messagesWrap.drop-target { outline: 2px dashed var(--sp-accent); outline-offset: -8px; }
   .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
