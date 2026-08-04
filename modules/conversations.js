@@ -467,10 +467,10 @@ function parkActiveConv() {
   if (!s) return;
   s.messages = messages;
   if (s.host && s.host.parentNode) {
-    const pane = s.host.parentNode;
+    // The parked host may carry the home lists — get them out BEFORE detaching it.
+    _evacuateHome(s.host);
     s.host.parentNode.removeChild(s.host);
-    // The parked host carried the home lists — return them to the pane.
-    if (pane === $('messages') || pane === $('messagesSide')) _untuckHomeToPane(pane);
+    _placeHome();
   }
 }
 function mountConv(convId) {
@@ -894,7 +894,11 @@ async function deleteConv(id, title) {
   if (stream) {
     if (stream.abort) stream.abort.abort();
     if (stream.timerInterval) clearInterval(stream.timerInterval);
-    if (stream.host && stream.host.parentNode) stream.host.parentNode.removeChild(stream.host);
+    if (stream.host && stream.host.parentNode) {
+      _evacuateHome(stream.host);   // deleting a conv must not delete the home lists
+      stream.host.parentNode.removeChild(stream.host);
+      _placeHome();
+    }
     convStreams.delete(id);
   }
 
@@ -1176,30 +1180,46 @@ async function handleSubmit(which = 'main') {
 // + sticky composer) pinned below it.
 function _mountInPane(host, pane) {
   if (!host || !pane) return;
-  if (host.parentNode === pane) return;
-  if (host.parentNode) host.parentNode.removeChild(host);
-  appendContent(pane, host);
+  if (host.parentNode !== pane) {
+    if (host.parentNode) host.parentNode.removeChild(host);
+    appendContent(pane, host);
+  }
   // The conv-host is now the scroll container — its lock/unlock listeners have
   // to live on it, not on the pane. Guard against double-binding on re-mount.
   if (!host.dataset.spTracked) { setupScrollTracking(host); host.dataset.spTracked = '1'; }
-  // Home lists (pinned / shared / team) live INSIDE the left pane's conv-host so
-  // they scroll with the conversation — the host is the scroll container.
-  if (pane === $('messages')) _tuckHomeInto(host);
+  _placeHome();
 }
-// Move #homeCenter into a conv-host (first child, before the messages) so the
-// home lists share the host's scroll + padding. No-op when already there.
-function _tuckHomeInto(host) {
-  const hc = document.getElementById('homeCenter');
-  if (!hc || !host || hc.parentNode === host) return;
-  if (hc.parentNode) hc.parentNode.removeChild(hc);
-  host.insertBefore(hc, host.firstChild);
+// #homeCenter (pinned grid + shared/team inbox) is CACHED by reference, never
+// re-looked-up by id: once it rides a conv-host out of the document,
+// getElementById can't see it any more and the home lists vanish for good.
+let _homeCenterEl = null;
+function _homeEl() {
+  if (!_homeCenterEl || !_homeCenterEl.isConnected) {
+    _homeCenterEl = _homeCenterEl || document.getElementById('homeCenter');
+  }
+  return _homeCenterEl;
 }
-// Return #homeCenter to the pane (home screen, no conversation mounted).
-function _untuckHomeToPane(pane) {
-  const hc = document.getElementById('homeCenter');
-  if (!hc || !pane || hc.parentNode === pane) return;
-  if (hc.parentNode) hc.parentNode.removeChild(hc);
-  appendContent(pane, hc);
+// Put the home lists where they belong: first child of the LEFT pane's conv-host
+// when one is mounted (so they scroll with the conversation), else the left pane
+// itself above its bottom cluster. Always the left pane — the home screen only
+// ever lives there, so a host removed from the SIDE pane must not drag the lists
+// into #messagesSide (that left the main pane empty and the lists stranded).
+function _placeHome() {
+  const hc = _homeEl();
+  const pane = $('messages');
+  if (!hc || !pane) return;
+  const host = pane.querySelector(':scope > .conv-host');
+  if (host) {
+    if (hc.parentNode !== host || host.firstChild !== hc) host.insertBefore(hc, host.firstChild);
+  } else if (hc.parentNode !== pane) {
+    appendContent(pane, hc);
+  }
+}
+// Move the home lists out of a host that is about to be detached, so they stay
+// in the document. Call BEFORE removeChild, never after.
+function _evacuateHome(host) {
+  const hc = _homeEl();
+  if (hc && host && host !== hc && host.contains(hc)) appendContent($('messages'), hc);
 }
 async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
@@ -3708,7 +3728,7 @@ class SidePanel {
 
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
-      if (prev?.host?.parentNode) { prev.host.parentNode.removeChild(prev.host); _untuckHomeToPane(prev.host.parentNode); }
+      if (prev?.host?.parentNode) { _evacuateHome(prev.host); prev.host.parentNode.removeChild(prev.host); }
     }
     await this._lazyLoad(id);
     this._sideId = id;
@@ -3723,7 +3743,8 @@ class SidePanel {
     if (!this.isOpen) return;
     if (this._activeIsRight) this.flip();
     const s = convStreams.get(this._sideId);
-    if (s?.host?.parentNode) { s.host.parentNode.removeChild(s.host); _untuckHomeToPane(s.host.parentNode); }
+    if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
+    _placeHome();
     this._sideId = null;
     this._activeIsRight = false;
     this._render();
@@ -3757,8 +3778,8 @@ class SidePanel {
     const s = convStreams.get(sId);
     if (s && s.host) {
 
-      if (s.host.parentNode) { s.host.parentNode.removeChild(s.host); _untuckHomeToPane(s.host.parentNode); }
-      _mountInPane(s.host, this.left);   // re-tucks home into it (left pane)
+      if (s.host.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
+      _mountInPane(s.host, this.left);   // _placeHome() re-tucks the lists into it
     }
     activeConvId = sId;
     messages = (s && s.messages) || [];
