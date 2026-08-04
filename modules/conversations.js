@@ -1151,10 +1151,20 @@ function paneConvId(pane) {
 function _composerConv(which) {
   return paneConvId(which === 'side' ? $('messagesSide') : $('messages'));
 }
+// There is a single #commandOutput panel, so it has to FOLLOW the pane that ran
+// the command — otherwise a `>>>` command typed in the side panel printed its
+// output into the main pane. Always lands directly above that pane's composer.
+function _commandPanelTo(pane) {
+  const panel = $('commandOutput');
+  if (!panel || !pane || panel.parentNode === pane) return;
+  const composer = pane.querySelector(':scope > .composer');
+  if (composer) pane.insertBefore(panel, composer); else pane.appendChild(panel);
+}
 async function handleSubmit(which = 'main') {
   const ta = which === 'side' ? $('inputSide') : $('input');
   const pane = which === 'side' ? $('messagesSide') : $('messages');
   if (!ta || !pane) return;
+  _commandPanelTo(pane);   // `>>>` output belongs in the pane it was typed in
   const text = ta.value.trim();
   // No fallback to activeConvId: when this pane shows nothing, submitting must
   // start a fresh conversation here, not append to whatever the other pane shows.
@@ -3899,19 +3909,28 @@ class SidePanel {
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
 
-    const onPanelClick = (targetIsRight) => (ev) => {
+    // Interacting with a pane focuses it. Clicking its composer — or tabbing into
+    // its textarea — is the STRONGEST "I want to work here" signal there is, so
+    // those must not be excluded: doing that left the pane you were typing in
+    // still dimmed. Only a floating context menu (which overlays a pane it does
+    // not belong to) and an in-progress text selection are exempt.
+    const focusFromEvent = (targetIsRight) => (ev) => {
       if (!this.isOpen) return;
       if (targetIsRight === this._activeIsRight) return;
-      const sel = window.getSelection?.().toString();
-      if (sel && sel.length > 0) return;
-      // A click in a pane's composer (or its command panel) means "type here",
-      // never "switch panes" — the buttons/textarea were already excluded, but
-      // the form's own padding was not.
-      if (ev.target.closest('.context-menu, .composer, .cmd-output, button, a, input, textarea, label, select')) return;
-      this.flip();
+      if (ev.target.closest && ev.target.closest('.context-menu')) return;
+      if (ev.type === 'click') {
+        const sel = window.getSelection?.().toString();
+        if (sel && sel.length > 0) return;   // dragging a selection, not switching panes
+      }
+      this.focusPane(targetIsRight);
     };
-    this.left.addEventListener('click',  onPanelClick(false));
-    this.right.addEventListener('click', onPanelClick(true));
+    for (const [pane, isRight] of [[this.left, false], [this.right, true]]) {
+      pane.addEventListener('click', focusFromEvent(isRight));
+      // focusin covers keyboard Tab and programmatic focus, and fires before the
+      // click on a mousedown-focus, so the pane is never left dimmed while its
+      // textarea holds the caret.
+      pane.addEventListener('focusin', focusFromEvent(isRight));
+    }
 
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
@@ -3983,6 +4002,8 @@ let sidePanel = null;
           lastTabMatches = null;
         } else {
           const list = result.matches.map(m => '  >>> ' + m).join('\n');
+          // Completions belong to the pane being typed in, same as command output.
+          _commandPanelTo(pane);
           if (SandpieCommandView) SandpieCommandView.show(list, 'commands');
           lastTabMatches = result.matches;
         }
