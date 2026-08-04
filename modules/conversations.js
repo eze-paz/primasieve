@@ -3752,6 +3752,17 @@ class SidePanel {
   }
   flip() {
     if (!this.isOpen) return;
+    // Nothing in the left pane to swap in (home screen — no active conversation).
+    // The swap below would put null into _sideId, which reads as isOpen === false:
+    // the panel silently "closed" on a single click and left its conv-host inside
+    // the now display:none pane, so the conversation vanished. With an empty left
+    // pane, "make this the active one" means move it there.
+    if (!activeConvId) {
+      this.promoteSideToActive();
+      refreshConversationList();
+      if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+      return;
+    }
 
     [activeConvId, this._sideId] = [this._sideId, activeConvId];
     this._activeIsRight = !this._activeIsRight;
@@ -3820,7 +3831,10 @@ class SidePanel {
       if (targetIsRight === this._activeIsRight) return;
       const sel = window.getSelection?.().toString();
       if (sel && sel.length > 0) return;
-      if (ev.target.closest('.context-menu, button, a, input, textarea')) return;
+      // A click in a pane's composer (or its command panel) means "type here",
+      // never "switch panes" — the buttons/textarea were already excluded, but
+      // the form's own padding was not.
+      if (ev.target.closest('.context-menu, .composer, .cmd-output, button, a, input, textarea, label, select')) return;
       this.flip();
     };
     this.left.addEventListener('click',  onPanelClick(false));
