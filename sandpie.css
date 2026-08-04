@@ -1463,6 +1463,103 @@ ul.conv-list li.active {
   .tool-bundle-body { display: none; }
   .tool-bundle.expanded .tool-bundle-body { display: flex; flex-direction: column; }
 
+  /* ---- Run card: a checklist that owns its tool calls -------------------
+     Same grammar as a tool call — >>> prompt, rotating chevron, mono — so a run
+     reads as one more line in the transcript rather than a new kind of panel.
+     Collapsed by default: the title is the active task and N/M is the progress,
+     which is all a run needs at rest. The turn timer's own n/m badge stays the
+     live heartbeat, so nothing here animates. */
+  .tool-run {
+    display: flex;
+    flex-direction: column;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 88%;
+    font: 12px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+  }
+  .tool-run-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .tool-run-head:hover { background: var(--sp-panel); border-color: var(--sp-border); }
+  .tool-run.expanded .tool-run-head {
+    background: var(--sp-panel);
+    border: 1px solid var(--sp-border);
+    border-radius: 6px 6px 0 0;
+  }
+  .tool-run-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sp-text-dim);
+  }
+  .tool-run.expanded .tool-run-title { color: var(--sp-text); }
+  .tool-run-n {
+    flex: none;
+    font-size: 10px;
+    color: var(--sp-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .tool-run.all-done .tool-run-n { color: #3fb950; }
+  .tool-run-chevron {
+    flex-shrink: 0;
+    color: var(--sp-text-dim);
+    opacity: 0.35;
+    font-size: 10px;
+    transition: transform 0.2s ease, opacity 0.15s ease;
+  }
+  .tool-run.expanded .tool-run-chevron { transform: rotate(90deg); opacity: 0.7; }
+  .tool-run-body { display: none; }
+  .tool-run.expanded .tool-run-body {
+    display: flex;
+    flex-direction: column;
+    background: var(--sp-bg);
+    border: 1px solid var(--sp-border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 0.35rem 0.1rem 0.4rem;
+  }
+  /* one line per checklist item; the item's own tool calls hide behind it */
+  .tt-item { display: flex; flex-direction: column; }
+  .tool-run-body .tool-todo {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+  }
+  .tt-item.has-steps > .tool-todo { cursor: pointer; }
+  .tt-item.has-steps > .tool-todo:hover { background: var(--sp-panel); }
+  .tool-run-body .tool-todo-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .tool-run-body .tool-todo-mark { flex: none; width: 1ch; text-align: center; }
+  .tool-run-body .tool-todo-completed { color: var(--sp-text-dim); }
+  .tool-run-body .tool-todo-completed .tool-todo-mark { color: #3fb950; }
+  .tool-run-body .tool-todo-in_progress { color: var(--sp-accent); }
+  .tool-run-body .tool-todo-in_progress .tool-todo-mark { color: var(--sp-accent); }
+  .tool-run-body .tool-todo-pending { color: var(--sp-text-dim); opacity: 0.75; }
+  .tt-n { flex: none; font-size: 10px; color: var(--sp-text-dim); font-variant-numeric: tabular-nums; }
+  .tt-chevron {
+    flex: none;
+    color: var(--sp-text-dim);
+    opacity: 0.35;
+    font-size: 10px;
+    transition: transform 0.2s ease, opacity 0.15s ease;
+  }
+  .tt-item.open > .tool-todo .tt-chevron { transform: rotate(90deg); opacity: 0.7; }
+  .tt-steps { display: none; }
+  .tt-item.open > .tt-steps { display: flex; flex-direction: column; padding: 0 0 0.25rem 1.6ch; }
+  /* the write_todos call itself: a step like any other, with no body to show */
+  .tool-run-body .tool-call.tc-plan .tc-expanded { display: none; }
+
   .tool-box {
     background: var(--sp-bg);
     border: 1px solid var(--sp-border);
