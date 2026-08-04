@@ -336,6 +336,60 @@ const Sandpie = (() => {
     return () => { if (_sync === impl) { _sync = null; events.emit('sync:provider-changed', null); } };
   }
 
+  // --- refresh interception --------------------------------------------------
+  // A refresh reloads BEFORE the sync provider has pushed anything still marked
+  // dirty, and before Dropbox's cursor has been read past our own uploads — the
+  // second one is why the boot splash used to appear with nothing to download.
+  // So: flush first, then reload for real.
+  //
+  // HARD LIMIT, worth knowing: only key-driven refreshes can be intercepted.
+  // The browser's reload button, the address bar and closing the tab cannot be
+  // delayed by a page — `beforeunload` may only raise a native dialog, it cannot
+  // await async work, and requests started during unload are cut off. There is no
+  // API that makes those paths wait for a sync.
+  let _reloading = false;
+  function _reloadNotice(text) {
+    let el = document.getElementById('reloadNotice');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'reloadNotice';
+      el.style.cssText = 'position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);z-index:99999;'
+        + 'background:var(--sp-panel,#161b22);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);'
+        + 'border-radius:999px;padding:0.45rem 0.95rem;font:0.78rem/1.2 system-ui,sans-serif;'
+        + 'box-shadow:0 4px 16px rgba(0,0,0,0.35);pointer-events:none;';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    return el;
+  }
+  async function reloadWithSync() {
+    if (_reloading) return;               // second F5 while flushing: ignore, one reload is coming
+    _reloading = true;
+    // Only show the notice if the flush is slow enough to be worth explaining.
+    const notice = setTimeout(() => _reloadNotice('Finishing sync before reload…'), 250);
+    try {
+      if (_sync?.flushBeforeReload) await _sync.flushBeforeReload();
+      else if (_sync?.sync) await _sync.sync();
+    } catch (e) {
+      console.warn('[reload] pre-reload flush failed, reloading anyway:', e);
+    } finally {
+      clearTimeout(notice);
+      location.reload();
+    }
+  }
+  // Capture phase so this wins over any per-element handler.
+  window.addEventListener('keydown', (e) => {
+    const isF5 = e.key === 'F5';
+    const isCmdR = (e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R');
+    if (!isF5 && !isCmdR) return;
+    // Shift = hard reload (cache bypass). Never intercept it: that is the escape
+    // hatch for a wedged page, and it must stay instant.
+    if (e.shiftKey || e.altKey) return;
+    if (!_sync?.isConnected?.()) return;  // nothing to flush → let the browser reload
+    e.preventDefault();
+    reloadWithSync();
+  }, true);
+
   return {
     events,
 
@@ -361,6 +415,7 @@ const Sandpie = (() => {
     registerSyncProvider,
     syncProvider() { return _sync; },
     sync()         { return _sync?.sync?.(); },
+    reload()       { return reloadWithSync(); },
     fileSyncStatus(path, opfsMtime) { return _sync?.fileStatus?.(path, opfsMtime) ?? null; },
     initialSyncDone()               { return _sync ? !!_sync.initialSyncDone : window._sandpieBootDone; },
   };

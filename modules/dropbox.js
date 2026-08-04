@@ -741,6 +741,53 @@
     for (const rel of deletions) console.log('   deleted     ' + rel);
   }
 
+  // ---- pre-reload flush -------------------------------------------------------
+  // Work a reload would otherwise lose or misreport: files marked dirty and files
+  // uploaded but not yet confirmed by the cursor.
+  function unsyncedCount() {
+    const st = syncState();
+    let dirty = 0;
+    for (const k of Object.keys(st)) if (st[k] && st[k].syncedMtime === 0) dirty++;
+    return { dirty, pending: Object.keys(pending()).length };
+  }
+  // Called from Sandpie.reload() before a user-initiated refresh. Three steps,
+  // in this order, because each fixes a different reload symptom:
+  //   1. wait out any sync already in flight (sync() no-ops while _syncing, so
+  //      calling it here would otherwise reload mid-upload)
+  //   2. sync() — push everything marked dirty, pull remote changes
+  //   3. read the cursor ONCE more — step 2's own uploads are echoed back by
+  //      Dropbox, and cloudListWorking() runs at the START of a sync, so they are
+  //      still unconsumed. Left unconsumed they look like a remote change on the
+  //      next boot: splash kept, nothing to download. Consuming them here also
+  //      re-stamps the last-sync timestamp, so the pre-paint gate stays quiet.
+  // Never rejects and never outlives timeoutMs — a refresh must not hang on the
+  // network.
+  async function flushBeforeReload({ timeoutMs = 10000 } = {}) {
+    if (!tokens()) return { ran: false, reason: 'dropbox not connected' };
+    const before = unsyncedCount();
+    console.log('[reload] flushing before reload — ' + before.dirty + ' dirty, ' + before.pending + ' pending upload(s)');
+    const work = (async () => {
+      const t0 = Date.now();
+      while (_syncing && Date.now() - t0 < timeoutMs) await new Promise(r => setTimeout(r, 100));
+      await sync();
+      try {
+        await cloudListWorking();   // consume the echo of the uploads we just made
+        localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+      } catch (e) {
+        console.warn('[reload] cursor advance failed (next boot may splash):', e && e.message);
+      }
+      const after = unsyncedCount();
+      console.log('[reload] flush done — ' + after.dirty + ' dirty, ' + after.pending + ' pending left');
+      return { ran: true, before, after };
+    })();
+    const timeout = new Promise(res => setTimeout(() => res({ ran: true, timedOut: true, before }), timeoutMs));
+    try { return await Promise.race([work, timeout]); }
+    catch (e) {
+      console.warn('[reload] flush failed, reloading anyway:', e && e.message);
+      return { ran: false, reason: (e && e.message) || 'error' };
+    }
+  }
+
   // ---- the sync engine (working dir only) ------------------------------------
   async function sync(opts = {}) {
     if (!tokens()) return;
@@ -1630,6 +1677,10 @@
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),
+      // Pre-reload flush: push dirty files and consume our own cursor echo before
+      // the page goes away (see flushBeforeReload). Called by Sandpie.reload().
+      flushBeforeReload: (opts) => flushBeforeReload(opts),
+      unsyncedCount: () => unsyncedCount(),
       // Absolute Dropbox path of the synced workspace (/sandpie, home namespace).
       // Lets the search tool tell the model where it is, so it can scope a cloud
       // search to the team shared folder instead of guessing.
