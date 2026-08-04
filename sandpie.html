@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=109">
+<link rel="stylesheet" href="sandpie.css?v=110">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -26,9 +26,9 @@ if("serviceWorker"in navigator){
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="modules/core.js?v=1"></script>
+  <script src="modules/core.js?v=2"></script>
   <script src="modules/config.js?v=2"></script>
-  <script src="modules/pins.js?v=12"></script>
+  <script src="modules/pins.js?v=14"></script>
   <script src="modules/settings.js"></script>
   <script src="modules/account.js?v=4"></script>
   <script src="modules/themes.js"></script>
@@ -53,7 +53,7 @@ if("serviceWorker"in navigator){
   <script src="modules/loop-lab.js?v=56"></script>
   <script type="module" src="modules/mobile.js?v=1"></script>
   <script src="modules/augmentations.js?v=14"></script>
-  <script type="module" src="modules/conversations.js?v=166"></script>
+  <script type="module" src="modules/conversations.js?v=168"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -188,6 +188,17 @@ if("serviceWorker"in navigator){
       <div id="homeCenter">
         <div id="sharedHome" class="shared-home"></div>
       </div>
+      <!-- Command output panel — MUST stay inside #messages, immediately above the
+           composer. It used to be a <main> child (back when the composer was one
+           too); now that the composer lives in the pane, a <main> child renders
+           BELOW it. Different flex container, so no CSS order can fix it. -->
+      <div id="commandOutput" class="cmd-output" style="display:none;">
+        <div class="cmd-header">
+          <span class="cmd-prompt">>>></span>
+          <button class="cmd-close" type="button" onclick="SandpieCommandView.hide()">x</button>
+        </div>
+        <pre class="cmd-body"></pre>
+      </div>
       <form class="composer" onsubmit="event.preventDefault(); handleSubmit('main')">
         <input type="file" id="imageInput" class="attach-input" multiple style="display:none" >
         <div id="imagePreview" class="image-preview" style="display:none"></div>
@@ -224,13 +235,6 @@ if("serviceWorker"in navigator){
       </form>
     </div>
   </div>
-  <div id="commandOutput" class="cmd-output" style="display:none;">
-    <div class="cmd-header">
-      <span class="cmd-prompt">>>></span>
-      <button class="cmd-close" type="button" onclick="SandpieCommandView.hide()">x</button>
-    </div>
-    <pre class="cmd-body"></pre>
-  </div>
 
 </main>
 
@@ -252,7 +256,7 @@ if("serviceWorker"in navigator){
   </div>
 </div>
   <script type="module" src="modules/context.js?v=13"></script>
-  <script src="modules/sharing.js?v=81"></script>
-  <script type="module" src="modules/artifacts.js?v=14"></script>
+  <script src="modules/sharing.js?v=82"></script>
+  <script type="module" src="modules/artifacts.js?v=16"></script>
   </body>
 </html>

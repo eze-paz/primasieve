@@ -308,7 +308,7 @@ function renderHistoricalMessage(m, host = null) {
           try {
             const { path } = JSON.parse(tc.function.arguments || '{}');
             if (path) {
-              const target = host || $('messages');
+              const target = host || paneScrollEl($('messages'));
               const existing = target.querySelector('.artifact-wrap[data-artifact-path="' + path + '"]');
               if (!existing) renderArtifact(host, path);
             }
@@ -330,7 +330,7 @@ function renderHistoricalMessage(m, host = null) {
     }
   } else if (m.role === 'tool') {
     const content = String(m.content || '');
-    const target = host || $('messages');
+    const target = host || paneScrollEl($('messages'));
     const toolCalls = target.querySelectorAll('.msg.tool-call');
     // Attach this result to ITS OWN tool call, matched by tool_call_id. The old
     // code matched positionally to the LAST rendered box, so in a turn with
@@ -384,16 +384,16 @@ function renderConversation(msgs, compaction, host = null) {
   // Resolve the stream from the conversation being RENDERED (its host carries
   // dataset.convId), not activeStream() — otherwise rendering a non-active conv
   // (side panel, or mid-switch) staples the active conv's checklist onto it.
-  const target = host || (activeStream() && activeStream().host) || $('messages');
+  const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   const s = convStreams.get(target && target.dataset && target.dataset.convId) || activeStream();
   if (s && s.todos && s.todos.length) {
     const hasTodos = !!(target && target.querySelector('.tool-todos'));
-    if (!hasTodos) target.appendChild(buildTodosView(s.todos));
+    if (!hasTodos) appendContent(target, buildTodosView(s.todos));
   }
 }
 
 function renderCompactionBlock(comp, msgs, host) {
-  const target = host || (activeStream() && activeStream().host) || $('messages');
+  const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   const n = comp.boundary;
   const label = (open) => `${open ? '▾' : '▸'} ${n} earlier message${n === 1 ? '' : 's'} — compacted out of the model's context`;
   const wrap = document.createElement('div');
@@ -419,7 +419,7 @@ function renderCompactionBlock(comp, msgs, host) {
   wrap.appendChild(toggle);
   wrap.appendChild(archived);
   wrap.appendChild(sum);
-  target.appendChild(wrap);
+  appendContent(target, wrap);
 }
 
 // Migrate the OLD compaction format (a data.compactions[] stack of removed heads,
@@ -1172,13 +1172,13 @@ async function handleSubmit(which = 'main') {
 
   if (ta) ta.style.height = 'auto';
 }
-// Mount a conv host into a pane, keeping the pane's composer pinned at the bottom.
+// Mount a conv host into a pane, keeping the pane's bottom cluster (command panel
+// + sticky composer) pinned below it.
 function _mountInPane(host, pane) {
   if (!host || !pane) return;
   if (host.parentNode === pane) return;
   if (host.parentNode) host.parentNode.removeChild(host);
-  const composer = pane.querySelector('.composer');
-  if (composer) pane.insertBefore(host, composer); else pane.appendChild(host);
+  appendContent(pane, host);
   // The conv-host is now the scroll container — its lock/unlock listeners have
   // to live on it, not on the pane. Guard against double-binding on re-mount.
   if (!host.dataset.spTracked) { setupScrollTracking(host); host.dataset.spTracked = '1'; }
@@ -1199,8 +1199,7 @@ function _untuckHomeToPane(pane) {
   const hc = document.getElementById('homeCenter');
   if (!hc || !pane || hc.parentNode === pane) return;
   if (hc.parentNode) hc.parentNode.removeChild(hc);
-  const composer = pane.querySelector('.composer');
-  if (composer) pane.insertBefore(hc, composer); else pane.appendChild(hc);
+  appendContent(pane, hc);
 }
 async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
@@ -2183,7 +2182,9 @@ function buildFileChip(f) {
 
 function addMsg(role, text = '', host = null) {
 
-  const target = host || (activeStream() && activeStream().host) || $('messages');
+  // Prefer the mounted .conv-host even when the caller didn't thread `host`
+  // through (most addMsg('err', …) calls don't) — paneScrollEl resolves it.
+  const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
 
   let scrollHost = climbScrollEl(target);
   const visible = !!scrollHost;
@@ -2249,11 +2250,11 @@ function addMsg(role, text = '', host = null) {
   if (role === 'tool-call') {
     _appendToolCall(target, div);
   } else {
-    target.appendChild(div);
+    appendContent(target, div);
   }
 
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
-  if (timer) target.appendChild(timer);
+  if (timer) appendContent(target, timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
 }
@@ -2272,8 +2273,11 @@ function _lastMsgChild(target) {
   // the end of #messages while a turn streams — skip it so consecutive tool
   // calls within the same turn still bundle. A settled (.done) timer is a turn
   // boundary and DOES break the run.
+  // When the target is a pane rather than a .conv-host, its last children are the
+  // bottom cluster (command panel + composer) — skip them, same as the live timer.
   let el = target.lastElementChild;
-  while (el && el.classList.contains('msg-timer') && !el.classList.contains('done')) {
+  while (el && (el.classList.contains('composer') || el.classList.contains('cmd-output')
+             || (el.classList.contains('msg-timer') && !el.classList.contains('done')))) {
     el = el.previousElementSibling;
   }
   return el;
@@ -2313,7 +2317,7 @@ function _appendToolCall(target, div) {
     _refreshToolBundle(bundle);
     return;
   }
-  target.appendChild(div);
+  appendContent(target, div);
 }
 
 function _refreshBundleOf(div) {
@@ -2933,7 +2937,7 @@ class RoundRenderer {
     if (this.reply && this.reply.parentNode) {
       this.reply.parentNode.insertBefore(det, this.reply);
     } else {
-      (this.host || $('messages')).appendChild(det);
+      appendContent(this.host || paneScrollEl($('messages')), det);
     }
     this.thinkEl = det;
     this.thinkBody = body;
@@ -3223,6 +3227,24 @@ function paneScrollEl(pane) {
   if (!pane) return null;
   const host = pane.querySelector(':scope > .conv-host');
   return host || pane;
+}
+// The pinned bottom cluster of a pane: the command-output panel (when shown) and
+// the sticky composer. Everything else — the conv-host, home lists, stray error
+// bubbles — must go ABOVE it, so this returns the first node of the cluster to
+// insert before. Returns null for a .conv-host (no cluster; plain append).
+function paneBottomAnchor(pane) {
+  if (!pane || !pane.querySelector) return null;
+  return pane.querySelector(':scope > .cmd-output') || pane.querySelector(':scope > .composer');
+}
+// Append content into a target that may be a PANE (#messages / #messagesSide)
+// rather than a .conv-host. A pane's last children are the command panel and the
+// sticky composer, so a bare appendChild there renders the node BELOW the composer
+// — which is how errors and banners used to escape the message column.
+function appendContent(target, el) {
+  if (!target || !el) return el;
+  const anchor = paneBottomAnchor(target);
+  if (anchor) target.insertBefore(el, anchor); else target.appendChild(el);
+  return el;
 }
 // Climb from any element to the scroll container that holds it (.conv-host,
 // else the pane mapped through paneScrollEl).
@@ -4045,6 +4067,10 @@ function injectUploadMessage(text) {
 }
 window.injectUploadMessage = injectUploadMessage;
 window.addMsg = addMsg;
+// Pane-render helpers other modules need (artifacts, pins): a bare appendChild on
+// a pane lands BELOW its sticky composer, so they must resolve/insert through these.
+window.paneScrollEl = paneScrollEl;
+window.appendContent = appendContent;
 window.bindBubble = bindBubble;
 window.tcEscape = tcEscape;
 window.appendToolResult = appendToolResult;
@@ -4300,19 +4326,19 @@ window.endTotalTimer = endTotalTimer;
 function showCompactionProgress(convId) {
   try {
     const s = convStreams.get(convId);
-    const host = (s && s.host) || $('messages');
+    const host = (s && s.host) || paneScrollEl($('messages'));
     if (!host || host.querySelector('.compaction-progress')) return;
     const el = document.createElement('div');
     el.className = 'compaction-progress';
     el.innerHTML = '<span class="cp-spin" aria-hidden="true"></span><span>Summarizing earlier messages to free up context…</span>';
-    host.appendChild(el);
+    appendContent(host, el);
     if (shouldAutoScroll(host) || isAtBottom(host)) host.scrollTop = host.scrollHeight;
   } catch (_) {}
 }
 function hideCompactionProgress(convId) {
   try {
     const s = convStreams.get(convId);
-    const host = (s && s.host) || $('messages');
+    const host = (s && s.host) || paneScrollEl($('messages'));
     if (host) host.querySelectorAll('.compaction-progress').forEach(e => e.remove());
   } catch (_) {}
 }
@@ -4342,20 +4368,20 @@ function showBgProgress(convId, key, text) {
     // #messages ONLY when it IS the active conversation — otherwise a background op
     // (e.g. lessons for a conv you just switched away from) would leak its banner
     // into the unrelated conversation you're now viewing (e.g. a fresh + New chat).
-    const host = (s && s.host) || (convId === activeConvId ? $('messages') : null);
+    const host = (s && s.host) || (convId === activeConvId ? paneScrollEl($('messages')) : null);
     if (!host || host.querySelector('.bg-progress[data-key="' + key + '"]')) return;
     const el = document.createElement('div');
     el.className = 'compaction-progress bg-progress';
     el.dataset.key = key;
     el.innerHTML = '<span class="cp-spin" aria-hidden="true"></span><span>' + text + '</span>';
-    host.appendChild(el);
+    appendContent(host, el);
     if (shouldAutoScroll(host) || isAtBottom(host)) host.scrollTop = host.scrollHeight;
   } catch (_) {}
 }
 function hideBgProgress(convId, key) {
   try {
     const s = convStreams.get(convId || activeConvId);
-    const host = (s && s.host) || $('messages');
+    const host = (s && s.host) || paneScrollEl($('messages'));
     if (host) host.querySelectorAll('.bg-progress[data-key="' + key + '"]').forEach(e => e.remove());
   } catch (_) {}
 }

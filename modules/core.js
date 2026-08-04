@@ -343,6 +343,11 @@ const Sandpie = (() => {
     $,
     api,
     get addMsg() { return window.addMsg; },   // defined in modules/conversations.js
+    // Pane → content container (.conv-host when mounted), and a composer-safe
+    // append. Both from modules/conversations.js. Modules that render into a pane
+    // MUST use them: a bare appendChild on a pane lands below the sticky composer.
+    get paneScrollEl()  { return window.paneScrollEl; },
+    get appendContent() { return window.appendContent; },
     get opfs()   { return opfs; },
     get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },

@@ -2525,10 +2525,11 @@ body.sp-decoding *::after {
 }
 
 /* ---- Command output panel (text-only CLI style) ------------------------ */
+/* Sits inside the pane directly above the composer (which has its own border-top),
+   so no border-bottom here — that would read as a double rule. */
 .cmd-output {
   background: var(--sp-bg);
   border-top: 1px solid var(--sp-border);
-  border-bottom: 1px solid var(--sp-border);
   font: 0.82rem 'JetBrains Mono', Consolas, monospace;
   line-height: 1.5;
 }

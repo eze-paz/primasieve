@@ -250,7 +250,10 @@
       box = document.createElement('div');
       box.id = 'pinnedHome';
       box.className = 'pinned-home';
-      host.appendChild(box);
+      // #messages fallback: its last children are the command panel + sticky
+      // composer, so a bare appendChild would put the grid BELOW them.
+      if (typeof window.appendContent === 'function') window.appendContent(host, box);
+      else host.appendChild(box);
     }
     // The pin grid must sit ABOVE the shared/team lists. Both render into
     // #homeCenter, so whichever painted first won — assert order on every render.

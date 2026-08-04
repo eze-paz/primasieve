@@ -35,6 +35,22 @@ window.addEventListener('message', e => {
 
 function _$(id) { return document.getElementById(id); }
 
+// Pane → the element content goes into (.conv-host when a conv is mounted), and a
+// composer-safe append. Both come from conversations.js; a bare appendChild on a
+// pane lands BELOW its sticky composer. Local fallbacks keep this module standalone.
+function _paneScrollEl(pane) {
+  if (typeof window.paneScrollEl === 'function') return window.paneScrollEl(pane);
+  if (!pane) return null;
+  return pane.querySelector(':scope > .conv-host') || pane;
+}
+function _append(target, el) {
+  if (typeof window.appendContent === 'function') return window.appendContent(target, el);
+  if (!target || !el) return el;
+  const anchor = target.querySelector(':scope > .cmd-output') || target.querySelector(':scope > .composer');
+  if (anchor) target.insertBefore(el, anchor); else target.appendChild(el);
+  return el;
+}
+
 function _activeStream() {
   // Try to get from global scope (host page defines these)
   if (typeof activeStream === 'function') return activeStream();
@@ -132,7 +148,7 @@ function buildArtifactCard(clean, ext, onOpen) {
 }
 
 function renderArtifact(host, path) {
-  const target = host || (_activeStream() && _activeStream().host) || _$('messages');
+  const target = host || (_activeStream() && _activeStream().host) || _paneScrollEl(_$('messages'));
   const clean = path ? String(path).replace(/^\/+/, '') : '';
   // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
   const resolvedP = clean ? resolveArtifactPath(clean) : Promise.resolve(clean);
@@ -160,7 +176,7 @@ function renderArtifact(host, path) {
     errEl.textContent = '⚠ Artifact error: no file path provided.';
     wrap.appendChild(header);
     wrap.appendChild(errEl);
-    target.appendChild(wrap);
+    _append(target, wrap);
     return;
   }
 
@@ -264,7 +280,7 @@ function renderArtifact(host, path) {
       try { await opfs.openInNewTab(await resolvedP); }
       catch (e) { console.error('[artifact] open failed:', e); }
     }));
-    target.appendChild(wrap);
+    _append(target, wrap);
     return;
   }
 
@@ -275,7 +291,7 @@ function renderArtifact(host, path) {
     const cb = wrap.querySelector('.artifact-collapse-btn');
     if (cb) cb.remove();
     wrap.appendChild(buildArtifactCard(clean, ext, async () => openArtifactPanel(await resolvedP)));
-    target.appendChild(wrap);
+    _append(target, wrap);
     return;
   }
 
@@ -290,7 +306,7 @@ function renderArtifact(host, path) {
   frame.className = 'artifact-frame';
   frame.style.cssText = 'width:100%;min-height:60px;border:0;background:transparent;display:block;';
   wrap.appendChild(frame);
-  target.appendChild(wrap);
+  _append(target, wrap);
   // METACOG: if the NEWEST HTML artifact logs to the console, tell the worker
   // so it can inject a metacog note for the model (newest artifact only — a
   // superseded check is skipped by the seq guard).
