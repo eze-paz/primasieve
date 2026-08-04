@@ -1589,6 +1589,34 @@ ul.conv-list li.active {
   .tt-think-body hr { border: 0; border-top: 1px solid var(--sp-border); margin: 0.55rem 0; }
   .tt-think-body p:first-child { margin-top: 0; }
   .tt-think-body pre { overflow-x: auto; }
+  /* provider reasoning, folded in as a note (its own .msg.think element is dropped) */
+  .tt-note-label {
+    font: 10px/1 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sp-text-dim);
+    opacity: 0.7;
+    margin-bottom: 0.3rem;
+  }
+  .tt-reasoning {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 11.5px/1.5 'Space Mono', 'JetBrains Mono', monospace;
+    color: var(--sp-text-dim);
+  }
+  /* Chat-column elements have no business setting their own geometry in here:
+     .msg carries max-width / margins / align-self for the transcript, which is
+     what made a folded reasoning box overlap the step lines. */
+  .tool-run-body .msg {
+    max-width: 100%;
+    margin: 0;
+    align-self: stretch;
+  }
+  /* A single implicit item repeats the card header verbatim ("Answering: …"), so
+     hide its row and let the card's own chevron reveal the steps directly. */
+  .tool-run[data-implicit="1"] .tt-item > .tool-todo { display: none; }
+  .tool-run[data-implicit="1"].expanded .tt-item > .tt-think,
+  .tool-run[data-implicit="1"].expanded .tt-item > .tt-steps { display: flex; flex-direction: column; }
 
   /* rule 2, state 2: the model stopped mid-list. NOT thinking — it needs an
      answer, so it is never folded and it is marked. */

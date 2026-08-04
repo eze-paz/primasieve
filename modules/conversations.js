@@ -3133,9 +3133,10 @@ class RoundRenderer {
      The bias is deliberate: prose with no tool call after it is ALWAYS shown.
      Over-showing costs a line, over-hiding costs a stuck turn. */
   _placeProse() {
-    if (!this.reply || !this.content || !this.content.trim()) return;
     const hadTools = this.toolCalls.length > 0;
+    const hasText = !!(this.reply && this.content && this.content.trim());
     if (!hadTools) {
+      if (!hasText) return;
       const s = convStreams.get(this.convId);
       const todos = (s && s.todos) || [];
       const open = todos.filter(t => t && t.status !== 'completed'
@@ -3148,18 +3149,30 @@ class RoundRenderer {
     const steps = _runCardSteps(card);
     const item = steps && steps.parentNode;
     if (!item) return;                       // no card (rule-1 gap) → leave visible
+    // The provider's reasoning box is a CHAT-COLUMN element (.msg.think carries
+    // max-width, margins, its own border and an overflow:hidden body). Moving that
+    // element into the card imported all of it and the box overlapped the step
+    // lines. Take its TEXT into the same single fold instead and drop the element,
+    // so the item has exactly one Thinking disclosure and no foreign styling.
+    if (this.thinkEl) {
+      const rb = this.thinkEl.querySelector('.think-body');
+      const label = (this.thinkSummary && this.thinkSummary.textContent) || 'Thought';
+      if (rb && rb.textContent.trim()) {
+        _runNoteAdd(item, '<div class="tt-note-label">' + tcEscape(label) + '</div>'
+          + '<div class="tt-reasoning">' + rb.innerHTML + '</div>');
+      }
+      this.thinkEl.remove();
+      this.thinkEl = null;
+      this.thinkBody = null;
+      this.thinkSummary = null;
+    }
+    if (!hasText) return;
     const bubble = this.reply.querySelector('.bubble') || this.reply;
     // Keep the node the message binds to (rewind / copy act on it) — bindMessage
     // falls back to this when the reply bubble is gone.
     this._proseNote = _runNoteAdd(item, bubble.innerHTML);
     this.reply.remove();
     this.reply = null;
-    // The provider's own reasoning box belongs with the prose, not stranded at
-    // top level where the reply used to be.
-    if (this.thinkEl) {
-      const think = item.querySelector(':scope > .tt-think');
-      if (think) think.insertBefore(this.thinkEl, think.firstChild);
-    }
   }
   bindMessage(msg) {
     this.convMessages.push(msg);
@@ -4526,6 +4539,7 @@ window.renderTcPreparing = renderTcPreparing;
 window.renderTcRunning = renderTcRunning;
 window.renderTcDone = renderTcDone;
 window.renderTodos = renderTodos;   // same category as the renderTc* helpers above
+window.RoundRenderer = RoundRenderer;   // exposed so the prose/thinking placement is testable
 
 /* ---- expose to window for inline handlers / legacy code ---- */
 window.newConvId = newConvId;
