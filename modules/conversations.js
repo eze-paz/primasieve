@@ -2309,111 +2309,12 @@ function addMsg(role, text = '', host = null) {
     }
     div.appendChild(bubble);
   }
-  if (role === 'tool-call') {
-    _appendToolCall(target, div);
-  } else {
-    appendContent(target, div);
-  }
+  appendContent(target, div);
 
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) appendContent(target, timer);
   if (visible && shouldAutoScroll(scrollHost)) scrollHost.scrollTop = scrollHost.scrollHeight;
   return div;
-}
-
-/* ---- Tool-call bundling ------------------------------------------------
-   Consecutive tool calls (no text/user/artifact message between them) are
-   grouped into ONE collapsible .tool-bundle: a summary header + the individual
-   .msg.tool-call boxes (each keeps its own toggle, so a single call can still
-   be drilled into without a wall of output). The bundle auto-collapses to the
-   summary once the run finishes, but stays open while any call is in flight
-   (live progress stays visible) or when a call auto-expanded inside
-   (load_image / write_todos — their result IS the point). */
-
-function _lastMsgChild(target) {
-  // Last *message* child of the host. The live per-turn timer always sits at
-  // the end of #messages while a turn streams — skip it so consecutive tool
-  // calls within the same turn still bundle. A settled (.done) timer is a turn
-  // boundary and DOES break the run.
-  // When the target is a pane rather than a .conv-host, its last children are the
-  // bottom cluster (command panel + composer) — skip them, same as the live timer.
-  let el = target.lastElementChild;
-  while (el && (el.classList.contains('composer') || el.classList.contains('cmd-output')
-             || (el.classList.contains('msg-timer') && !el.classList.contains('done')))) {
-    el = el.previousElementSibling;
-  }
-  return el;
-}
-
-function _appendToolCall(target, div) {
-  const last = _lastMsgChild(target);
-  if (last && last.classList.contains('tool-bundle')) {
-    // Join the run that's already bundled.
-    const body = last.querySelector('.tool-bundle-body');
-    if (body) { body.appendChild(div); _refreshToolBundle(last); return; }
-  } else if (last && last.classList.contains('msg') && last.classList.contains('tool-call')) {
-    // Second consecutive call: upgrade the previous standalone box + this one
-    // into a bundle. (A bundle only ever contains tool-call boxes.)
-    const bundle = document.createElement('div');
-    bundle.className = 'tool-bundle';
-    const head = document.createElement('div');
-    head.className = 'tool-bundle-head';
-    const chev = document.createElement('span');
-    chev.className = 'tool-bundle-chevron';
-    chev.textContent = '\u25b8';
-    const sum = document.createElement('span');
-    sum.className = 'tool-bundle-summary';
-    head.appendChild(chev);
-    head.appendChild(sum);
-    head.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      bundle.classList.toggle('expanded');
-    });
-    const body = document.createElement('div');
-    body.className = 'tool-bundle-body';
-    bundle.appendChild(head);
-    bundle.appendChild(body);
-    target.insertBefore(bundle, last);
-    body.appendChild(last);   // move the previous box in
-    body.appendChild(div);
-    _refreshToolBundle(bundle);
-    return;
-  }
-  appendContent(target, div);
-}
-
-function _refreshBundleOf(div) {
-  const b = div && div.closest ? div.closest('.tool-bundle') : null;
-  if (b) _refreshToolBundle(b);
-}
-
-function _refreshToolBundle(bundle) {
-  const calls = bundle.querySelectorAll('.tool-bundle-body > .msg.tool-call');
-  const names = [];
-  for (const c of calls) {
-    const f = c.dataset.fname || 'tool';
-    const prev = names[names.length - 1];
-    if (prev && prev.name === f) prev.count++;
-    else names.push({ name: f, count: 1 });
-  }
-  const sum = bundle.querySelector('.tool-bundle-summary');
-  if (sum) {
-    const shown = names.slice(0, 4).map(x => x.count > 1 ? x.name + ' \u00d7' + x.count : x.name);
-    const extra = names.length - shown.length;
-    const total = calls.length;
-    sum.textContent =
-      (total === 1 ? '1 tool call' : total + ' tool calls') +
-      ' \u00b7 ' + shown.join(' \u2192 ') +
-      (extra > 0 ? ' +' + extra + ' more' : '');
-  }
-  // Keep the bundle open while anything inside is running or auto-expanded;
-  // otherwise settle to the one-line summary.
-  const anyActive = bundle.querySelector(
-    '.tool-bundle-body > .msg.tool-call.in-flight,' +
-    '.tool-bundle-body > .msg.tool-call .repl-loader,' +
-    '.tool-bundle-body > .msg.tool-call.expanded');
-  if (anyActive) bundle.classList.add('expanded');
-  else bundle.classList.remove('expanded');
 }
 
 function bindBubble(div, msgRef) {
@@ -2678,7 +2579,6 @@ function renderTcPreparing(div, fname, args) {
   }
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
-  _refreshBundleOf(div);
 }
 
 function renderTcRunning(div, fname) {
@@ -2690,7 +2590,6 @@ function renderTcRunning(div, fname) {
       `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
       '<span class="tc-chevron">▸</span>';
   }
-  _refreshBundleOf(div);
 }
 
 function renderTcDone(div, fname) {
@@ -2706,7 +2605,6 @@ function renderTcDone(div, fname) {
   //   load_image  → the loaded image
   //   write_todos → the checklist card (otherwise the user never sees the todos)
   if (fname === 'load_image' || fname === 'write_todos') div.classList.add('expanded');
-  _refreshBundleOf(div);
 }
 
 class RoundRenderer {
