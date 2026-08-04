@@ -4200,6 +4200,9 @@ window.addMsg = addMsg;
 // a pane lands BELOW its sticky composer, so they must resolve/insert through these.
 window.paneScrollEl = paneScrollEl;
 window.appendContent = appendContent;
+// The one progress pill in the app (compaction spinner), for host-level ops.
+window.showAppProgress = showAppProgress;
+window.hideAppProgress = hideAppProgress;
 window.bindBubble = bindBubble;
 window.tcEscape = tcEscape;
 window.appendToolResult = appendToolResult;
@@ -4490,6 +4493,13 @@ function _shortConvTitle(convId) {
     return clipped && (t.trim().length > 40) ? clipped + '…' : clipped;
   } catch (_) { return ''; }
 }
+// App-level background-op pill, for work that belongs to no particular
+// conversation (the pre-reload flush). Same spinner as compaction / lessons /
+// memory-consolidation — there is only one progress affordance in the app.
+// activeConvId may be null on the home screen; showBgProgress handles that (the
+// convId === activeConvId test passes null === null and falls back to the pane).
+function showAppProgress(key, text) { return showBgProgress(activeConvId, key, text); }
+function hideAppProgress(key)       { return hideBgProgress(activeConvId, key); }
 function showBgProgress(convId, key, text) {
   try {
     const s = convStreams.get(convId);

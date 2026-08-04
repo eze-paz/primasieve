@@ -348,25 +348,16 @@ const Sandpie = (() => {
   // await async work, and requests started during unload are cut off. There is no
   // API that makes those paths wait for a sync.
   let _reloading = false;
-  function _reloadNotice(text) {
-    let el = document.getElementById('reloadNotice');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'reloadNotice';
-      el.style.cssText = 'position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);z-index:99999;'
-        + 'background:var(--sp-panel,#161b22);color:var(--sp-text,#e6edf3);border:1px solid var(--sp-border,#30363d);'
-        + 'border-radius:999px;padding:0.45rem 0.95rem;font:0.78rem/1.2 system-ui,sans-serif;'
-        + 'box-shadow:0 4px 16px rgba(0,0,0,0.35);pointer-events:none;';
-      document.body.appendChild(el);
-    }
-    el.textContent = text;
-    return el;
-  }
+  const RELOAD_PROGRESS_KEY = 'reload-flush';
   async function reloadWithSync() {
     if (_reloading) return;               // second F5 while flushing: ignore, one reload is coming
     _reloading = true;
-    // Only show the notice if the flush is slow enough to be worth explaining.
-    const notice = setTimeout(() => _reloadNotice('Finishing sync before reload…'), 250);
+    // Reuse the app's one progress affordance (the compaction spinner pill), and only
+    // if the flush is slow enough to be worth explaining — a clean refresh is
+    // instant, so normally nothing appears at all.
+    const notice = setTimeout(() => {
+      try { window.showAppProgress?.(RELOAD_PROGRESS_KEY, 'Finishing sync before reload…'); } catch (_) {}
+    }, 250);
     try {
       if (_sync?.flushBeforeReload) await _sync.flushBeforeReload();
       else if (_sync?.sync) await _sync.sync();
@@ -374,6 +365,8 @@ const Sandpie = (() => {
       console.warn('[reload] pre-reload flush failed, reloading anyway:', e);
     } finally {
       clearTimeout(notice);
+      // The reload wipes the DOM anyway; this only matters if something blocks it.
+      try { window.hideAppProgress?.(RELOAD_PROGRESS_KEY); } catch (_) {}
       location.reload();
     }
   }
