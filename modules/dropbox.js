@@ -741,6 +741,15 @@
     for (const rel of deletions) console.log('   deleted     ' + rel);
   }
 
+  // The ONLY place the last-sync timestamp is written. It means "a sync actually
+  // completed just now" — the pre-paint gate in sandpie.html suppresses the splash
+  // on the strength of it, so stamping it when no sync ran would hide a real
+  // device switch.
+  function stampSynced(why) {
+    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+    console.log('[splash] last-sync timestamp refreshed (' + why + ')');
+  }
+
   // ---- pre-reload flush -------------------------------------------------------
   // Work a reload would otherwise lose or misreport: files marked dirty and files
   // uploaded but not yet confirmed by the cursor.
@@ -769,40 +778,66 @@
     const work = (async () => {
       const t0 = Date.now();
       while (_syncing && Date.now() - t0 < timeoutMs) await new Promise(r => setTimeout(r, 100));
-      await sync();
+      const res = await sync();
+      if (!res || !res.ok) {
+        // sync() bailed (still syncing, a turn is generating, or it threw). Nothing
+        // was flushed, so the timestamp must NOT be refreshed — otherwise the next
+        // boot's pre-paint gate would suppress a splash we genuinely need.
+        console.warn('[reload] sync did not run (' + ((res && res.reason) || 'unknown')
+          + ') — leaving the last-sync timestamp alone; the next boot will sync properly');
+        return { ran: false, reason: (res && res.reason) || 'unknown', before, after: unsyncedCount() };
+      }
       try {
         await cloudListWorking();   // consume the echo of the uploads we just made
-        localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+        stampSynced('pre-reload flush, cursor advanced past our own uploads');
       } catch (e) {
+        // sync() already stamped on its own success path, so the timestamp is fresh;
+        // only the echo is unconsumed, which the next boot's cursor read will absorb.
         console.warn('[reload] cursor advance failed (next boot may splash):', e && e.message);
       }
       const after = unsyncedCount();
       console.log('[reload] flush done — ' + after.dirty + ' dirty, ' + after.pending + ' pending left');
       return { ran: true, before, after };
     })();
-    const timeout = new Promise(res => setTimeout(() => res({ ran: true, timedOut: true, before }), timeoutMs));
+    let timer = null;
+    const timeout = new Promise(res => {
+      timer = setTimeout(() => {
+        // Reload wins over waiting, but say so: the flush is incomplete and the
+        // timestamp is whatever the last real sync left, so a splash next boot is
+        // correct rather than a bug.
+        console.warn('[reload] flush exceeded ' + timeoutMs + 'ms — reloading with work outstanding;'
+          + ' last-sync timestamp not refreshed by this flush');
+        res({ ran: true, timedOut: true, before });
+      }, timeoutMs);
+    });
     try { return await Promise.race([work, timeout]); }
     catch (e) {
       console.warn('[reload] flush failed, reloading anyway:', e && e.message);
       return { ran: false, reason: (e && e.message) || 'error' };
+    } finally {
+      clearTimeout(timer);   // work won: don't let the loser warn afterwards
     }
   }
 
   // ---- the sync engine (working dir only) ------------------------------------
+  // Returns { ok, reason }. Callers that need to know whether a sync REALLY happened
+  // (flushBeforeReload, which must not refresh the last-sync timestamp otherwise)
+  // check `ok`; the periodic caller ignores it.
   async function sync(opts = {}) {
-    if (!tokens()) return;
-    if (_syncing) return;
+    if (!tokens()) return { ok: false, reason: 'dropbox not connected' };
+    if (_syncing) return { ok: false, reason: 'a sync is already running' };
     if (Sandpie.isGenerating()) {
-      // Worth logging: this skip leaves LAST_SYNC_KEY stale, so a reload soon after
-      // a long turn can still trip the pre-paint time gate and show the splash.
+      // Deliberately not overridden for a pre-reload flush: this guard exists to keep
+      // a sync from PULLING (and deleting/overwriting) while a turn is writing files.
       console.log('[splash] sync SKIPPED — a model turn is generating; last-sync timestamp stays stale');
-      return;
+      return { ok: false, reason: 'a model turn is generating' };
     }
     // Device-switch detection: if last sync was < 5 min ago, skip the splash
     // DISABLED after testing — splash now fires on any cursor delta.
     // const _lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
     // const _isRecent = (Date.now() - _lastSync) < 300000;
     _syncing = true; setBusy(true); _syncCount++;
+    let outcome = { ok: false, reason: 'did not finish' };
     const firstSync = !initialSyncDone;
     const opfs = Sandpie.opfs;
     const openFilePath = Sandpie.openFilePath();
@@ -970,18 +1005,20 @@
         try { Sandpie.events.emit('sync:done', { downloaded: toDownload.map(d => d.rel), deletions: deletions || [] }); } catch (_) {}
       }
       // Remember when sync last completed — used to detect device switches on next load
-      localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-      console.log('[splash] sync #' + _syncCount + ' completed — last-sync timestamp refreshed');
+      stampSynced('sync #' + _syncCount + ' completed');
+      outcome = { ok: true };
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
       // The timestamp is only stamped on the success path above, so a throw here
       // leaves it stale — that alone can make the next reload splash.
       console.warn('[splash] sync #' + _syncCount + ' THREW before stamping the last-sync timestamp'
         + ' — it stays stale, so the next reload may splash:', e);
+      outcome = { ok: false, reason: (e && e.message) || 'sync threw' };
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
       if (_splashActive) _hideSyncSplashAfterHome();
     }
+    return outcome;
   }
 
 
