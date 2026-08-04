@@ -809,18 +809,29 @@
   // refresh is not delayed at all.
   //
   // It does not stamp the last-sync timestamp: no pull happened, so "a sync
-  // completed" would be false. It records FLUSH_KEY instead, which the pre-paint gate
-  // in sandpie.html accepts as "our own work was flushed moments ago".
+  // completed" would be false. It records FLUSH_KEY instead, and does so UP FRONT
+  // rather than on success. FLUSH_KEY means "the next load is a deliberate,
+  // user-initiated reload of this device" — and the splash exists to announce that
+  // ANOTHER device changed things while you were away. A refresh you just asked for
+  // is not that, however the uploads happen to go. Writing it only on success was
+  // the bug behind "it waits, then splashes anyway": a flush that hit the timeout
+  // cost the full wait AND left the marker unwritten.
   // Never rejects and never outlives timeoutMs.
-  async function flushBeforeReload({ timeoutMs = 5000 } = {}) {
+  async function flushBeforeReload({ timeoutMs = 2500 } = {}) {
     if (!tokens()) return { ran: false, reason: 'dropbox not connected' };
+    localStorage.setItem(FLUSH_KEY, String(Date.now()));
     const before = unsyncedCount();
-    if (!before.dirty && !before.pending) {
-      console.log('[reload] nothing of ours outstanding (0 dirty, 0 pending) — reloading immediately');
-      localStorage.setItem(FLUSH_KEY, String(Date.now()));
+    // Only UNSENT edits are worth waiting for. `pending` means "uploaded, waiting for
+    // the cursor to confirm" — the bytes are already in Dropbox, nothing can be lost,
+    // and the echo it produces no longer matters now that the splash is decided by
+    // toDownload rather than the delta. Waiting on pending was making ordinary
+    // refreshes slow for no benefit.
+    if (!before.dirty) {
+      console.log('[reload] no unsent edits — reloading immediately ('
+        + before.pending + ' upload(s) awaiting cursor confirmation, which needs no work here)');
       return { ran: false, reason: 'nothing to flush', before };
     }
-    console.log('[reload] flushing — ' + before.dirty + ' dirty, ' + before.pending + ' pending upload(s)');
+    console.log('[reload] flushing ' + before.dirty + ' unsent edit(s) — ' + before.pending + ' already-uploaded pending');
     const work = (async () => {
       // Brief wait only: a periodic sync mid-flight will finish its own push.
       const t0 = Date.now();
@@ -834,7 +845,6 @@
       }
       const after = unsyncedCount();
       console.log('[reload] flush done — pushed ' + pushed + '; ' + after.dirty + ' dirty, ' + after.pending + ' pending left');
-      localStorage.setItem(FLUSH_KEY, String(Date.now()));
       return { ran: true, pushed, before, after };
     })();
     let timer = null;
