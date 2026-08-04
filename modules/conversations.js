@@ -2345,158 +2345,7 @@ function _lastMsgChild(target) {
   return el;
 }
 
-/* ---- Run card: the checklist IS the container ---------------------------
-   When a turn has a checklist, individual tool calls stop being top-level
-   objects: each one is filed under the checklist item that was in_progress
-   when it started. A twenty-call run reads as five checklist lines with a
-   count on each, collapsed to one line by default. No bundle header, no
-   per-call summary line, no ledger — the checklist already says where we are,
-   and the turn timer's existing n/m badge is the live heartbeat.
-   Falls back to the bundle below whenever there is no checklist (short turns
-   shouldn't have to invent one). */
-
-// The live run card of a host: the last one, and only while its turn is still
-// open. Narration between tool calls does NOT close a run (the checklist carries
-// on across it) — but a user message or a settled turn timer does, otherwise the
-// next turn's calls would be filed under the previous turn's checklist.
-function _runCardIn(target) {
-  if (!target || !target.querySelectorAll) return null;
-  const cards = target.querySelectorAll(':scope > .tool-run');
-  if (!cards.length) return null;
-  const card = cards[cards.length - 1];
-  for (let el = card.nextElementSibling; el; el = el.nextElementSibling) {
-    if (!el.classList) continue;
-    if (el.classList.contains('user')) return null;
-    if (el.classList.contains('msg-timer') && el.classList.contains('done')) return null;
-  }
-  return card;
-}
-// The .tt-steps container of the item a tool call belongs to: the in_progress
-// item, else the last completed one (the model often ticks an item off before
-// its closing call). Null when the card has no items at all.
-function _runActiveSteps(card) {
-  if (!card) return null;
-  const items = card.querySelectorAll(':scope > .tool-run-body > .tt-item');
-  if (!items.length) return null;
-  let pick = null;
-  for (const it of items) {
-    if (it.querySelector(':scope > .tool-todo-in_progress')) { pick = it; break; }
-    if (it.querySelector(':scope > .tool-todo-completed')) pick = it;
-  }
-  if (!pick) pick = items[0];
-  return pick.querySelector(':scope > .tt-steps');
-}
-// Create the card if this host has no live one, then sync it to `todos`.
-function _ensureRunCard(target, todos) {
-  if (!target || !Array.isArray(todos) || !todos.length) return null;
-  let card = _runCardIn(target);
-  if (!card) {
-    card = document.createElement('div');
-    card.className = 'tool-run';            // collapsed by default — no .expanded
-    const head = document.createElement('div');
-    head.className = 'tool-run-head';
-    head.innerHTML = '<span class="tc-prompt">&gt;&gt;&gt;</span>'
-      + '<span class="tool-run-title"></span>'
-      + '<span class="tool-run-n"></span>'
-      + '<span class="tool-run-chevron">▸</span>';
-    head.addEventListener('click', (ev) => { ev.stopPropagation(); card.classList.toggle('expanded'); });
-    const body = document.createElement('div');
-    body.className = 'tool-run-body';
-    card.append(head, body);
-    appendContent(target, card);
-  }
-  _updateRunCard(card, todos);
-  return card;
-}
-// Sync an existing card to a todos array IN PLACE: rows are rebuilt (so every
-// badge — claim, audit, evidence, blocked — keeps working via buildTodosView),
-// but each item's .tt-steps is preserved so the tool calls already filed under
-// it are never thrown away.
-function _updateRunCard(card, todos) {
-  const body = card.querySelector(':scope > .tool-run-body');
-  if (!body) return;
-  const fresh = buildTodosView(todos).querySelectorAll(':scope > .tool-todo');
-  const items = body.querySelectorAll(':scope > .tt-item');
-  fresh.forEach((row, i) => {
-    let item = items[i];
-    if (!item) {
-      item = document.createElement('div');
-      item.className = 'tt-item';
-      const steps = document.createElement('div');
-      steps.className = 'tt-steps';
-      item.appendChild(steps);
-      body.appendChild(item);
-    }
-    const steps = item.querySelector(':scope > .tt-steps');
-    const n = steps ? steps.querySelectorAll(':scope > .msg.tool-call').length : 0;
-    if (n) {
-      const cnt = document.createElement('span');
-      cnt.className = 'tt-n';
-      cnt.textContent = String(n);
-      row.appendChild(cnt);
-      const chev = document.createElement('span');
-      chev.className = 'tt-chevron';
-      chev.textContent = '▸';
-      row.appendChild(chev);
-      item.classList.add('has-steps');
-      row.addEventListener('click', (ev) => {
-        if (ev.target.closest('.tool-todo-audit-badge')) return;   // badges own their click
-        ev.stopPropagation();
-        item.classList.toggle('open');
-      });
-    } else {
-      item.classList.remove('has-steps', 'open');
-    }
-    const old = item.querySelector(':scope > .tool-todo');
-    if (old) item.replaceChild(row, old); else item.insertBefore(row, steps);
-  });
-  // Trailing items (a checklist that shrank) go, but never one holding calls.
-  for (let i = fresh.length; i < items.length; i++) {
-    const st = items[i].querySelector(':scope > .tt-steps');
-    if (!st || !st.querySelector(':scope > .msg.tool-call')) items[i].remove();
-  }
-  const done = todos.filter(t => t && t.status === 'completed').length;
-  const ip = todos.findIndex(t => t && t.status === 'in_progress');
-  const t = card.querySelector('.tool-run-title');
-  const n = card.querySelector('.tool-run-n');
-  // The title is the work, not a wrapper: the active task, else the checklist head.
-  if (t) t.textContent = (ip >= 0 && todos[ip] && (todos[ip].activeForm || todos[ip].content))
-    || (done === todos.length ? 'Checklist complete' : 'Checklist');
-  if (n) n.textContent = done + '/' + todos.length;
-  card.classList.toggle('all-done', done === todos.length);
-}
-
 function _appendToolCall(target, div) {
-  // A checklist owns the run: file this call under its active item instead of
-  // adding another top-level box.
-  const steps = _runActiveSteps(_runCardIn(target));
-  if (steps) {
-    steps.appendChild(div);
-    const item = steps.parentNode;
-    const row = item && item.querySelector(':scope > .tool-todo');
-    if (row) {
-      let cnt = row.querySelector('.tt-n');
-      if (!cnt) {
-        cnt = document.createElement('span');
-        cnt.className = 'tt-n';
-        row.insertBefore(cnt, row.querySelector('.tt-chevron'));
-      }
-      cnt.textContent = String(steps.querySelectorAll(':scope > .msg.tool-call').length);
-      if (!row.querySelector('.tt-chevron')) {
-        const chev = document.createElement('span');
-        chev.className = 'tt-chevron';
-        chev.textContent = '▸';
-        row.appendChild(chev);
-        row.addEventListener('click', (ev) => {
-          if (ev.target.closest('.tool-todo-audit-badge')) return;
-          ev.stopPropagation();
-          item.classList.toggle('open');
-        });
-      }
-      item.classList.add('has-steps');
-    }
-    return;
-  }
   const last = _lastMsgChild(target);
   if (last && last.classList.contains('tool-bundle')) {
     // Join the run that's already bundled.
@@ -2630,32 +2479,6 @@ function appendToolResult(tcId, result, scopeEl) {
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
-  // The run card owns the checklist now. Sync it, and DON'T also draw the list
-  // inside this call's box — that duplication is exactly what made a run look
-  // busy. The card is the host's, so resolve the host from this call's position:
-  // it is either already inside the card, or a sibling of where the card goes.
-  const host = climbScrollEl(toolCallDiv);
-  if (host && Array.isArray(todos) && todos.length) {
-    const card = _ensureRunCard(host, todos);
-    if (card) {
-      // This write_todos call is itself a step of the run — file it under the
-      // active item instead of leaving a stray ">>> write_todos" line above the
-      // card. Its box needs no body: the card IS its result.
-      toolCallDiv.classList.remove('expanded');
-      toolCallDiv.classList.add('tc-plan');
-      const steps = _runActiveSteps(card);
-      if (steps && !card.contains(toolCallDiv)) {
-        const oldBundle = toolCallDiv.closest ? toolCallDiv.closest('.tool-bundle') : null;
-        steps.appendChild(toolCallDiv);
-        _updateRunCard(card, todos);   // re-derive the item's count + chevron
-        if (oldBundle) {
-          const left = oldBundle.querySelectorAll('.tool-bundle-body > .msg.tool-call').length;
-          if (!left) oldBundle.remove(); else _refreshToolBundle(oldBundle);
-        }
-      }
-      return;
-    }
-  }
   const expanded = toolCallDiv.querySelector('.tc-expanded');
   if (!expanded) return;
   let box = expanded.querySelector('.tool-box');
@@ -4385,7 +4208,6 @@ window.buildToolBox = buildToolBox;
 window.renderTcPreparing = renderTcPreparing;
 window.renderTcRunning = renderTcRunning;
 window.renderTcDone = renderTcDone;
-window.renderTodos = renderTodos;   // same category as the renderTc* helpers above
 
 /* ---- expose to window for inline handlers / legacy code ---- */
 window.newConvId = newConvId;
