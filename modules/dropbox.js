@@ -539,6 +539,10 @@
         const delta = [];
         const deletions = [];
         const confirmed = [];
+        // Snapshot pending BEFORE clearPending wipes it: a rel that was pending is
+        // a file WE uploaded, now echoed back by the cursor. Those inflate `delta`
+        // without being real remote changes — see _logSyncCause.
+        const pendingBefore = pending();
         for (const e of result.entries) {
           const rel = cloudToRel(e.path);
           if (rel == null || rel === '') continue;
@@ -561,7 +565,7 @@
         }
         if (confirmed.length) clearPending(confirmed);
         setCursor(result.cursor); setCloudIndex(idx);
-        return { index: idx, delta, deletions };
+        return { index: idx, delta, deletions, deltaOwn: delta.filter(([rel]) => pendingBefore[rel]).map(([rel]) => rel) };
       } catch (err) {
         console.warn('[dropbox] cursor sync failed, full re-list:', err.message);
         setCursor(null);
@@ -573,7 +577,7 @@
     } catch (e) {
       if (String(e.message).includes('not_found')) {   // working folder doesn't exist yet (or was deleted)
         setCursor(null); setCloudIndex({}); setPending({});
-        return { index: {}, delta: null };
+        return { index: {}, delta: null, deltaOwn: [] };
       }
       throw e;
     }
@@ -586,7 +590,7 @@
     }
     if (confirmed.length) clearPending(confirmed);
     setCursor(result.cursor); setCloudIndex(out);
-    return { index: out, delta: null };
+    return { index: out, delta: null, deltaOwn: [] };
   }
   // ---- bounded-parallel per-file download ------------------------------------
   const DL_CONCURRENCY = 16;
@@ -707,11 +711,46 @@
     setTimeout(function() { el.remove(); }, 350);
   }
 
+  // ---- "why did the splash appear?" diagnostics -------------------------------
+  // Two independent gates decide the splash, and they can disagree:
+  //   1. pre-paint TIME gate in sandpie.html — removes the splash if the last
+  //      successful sync was < 60s ago (logs '[splash] pre-paint …').
+  //   2. this CURSOR gate — keeps it whenever Dropbox reports any delta.
+  // Gate 2 counts our OWN uploads echoed back through the cursor as a "change",
+  // which is how you get a splash that then has nothing to download.
+  function _logSyncCause(delta, deletions, deltaOwn) {
+    const lastTs = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
+    const age = lastTs ? Math.round((Date.now() - lastTs) / 1000) + 's ago' : 'never';
+    console.log('[splash] sync #' + _syncCount + ' | splash on screen: ' + _splashActive
+      + ' | last successful sync: ' + age
+      + ' | cursor: ' + (cursor() ? 'stored' : 'none → full re-list'));
+    if (delta === null) {
+      console.log('[splash] cause: FULL RE-LIST (no cursor or empty cloud index) — every cloud file is reconsidered');
+      return;
+    }
+    if (!delta.length && !deletions.length) {
+      console.log('[splash] cause: no cursor delta — nothing changed remotely');
+      return;
+    }
+    const own = new Set(deltaOwn || []);
+    console.log('[splash] cause: cursor delta — ' + delta.length + ' changed, ' + deletions.length
+      + ' deleted; ' + own.size + '/' + delta.length + ' of the changes are OUR OWN uploads echoed back');
+    for (const [rel, e] of delta) {
+      console.log('   ' + (own.has(rel) ? 'own upload  ' : 'REMOTE      ') + rel + '  rev=' + e.rev);
+    }
+    for (const rel of deletions) console.log('   deleted     ' + rel);
+  }
+
   // ---- the sync engine (working dir only) ------------------------------------
   async function sync(opts = {}) {
     if (!tokens()) return;
     if (_syncing) return;
-    if (Sandpie.isGenerating()) return;
+    if (Sandpie.isGenerating()) {
+      // Worth logging: this skip leaves LAST_SYNC_KEY stale, so a reload soon after
+      // a long turn can still trip the pre-paint time gate and show the splash.
+      console.log('[splash] sync SKIPPED — a model turn is generating; last-sync timestamp stays stale');
+      return;
+    }
     // Device-switch detection: if last sync was < 5 min ago, skip the splash
     // DISABLED after testing — splash now fires on any cursor delta.
     // const _lastSync = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
@@ -723,11 +762,12 @@
     try {
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
-      const { index: cloud, delta, deletions } = await cloudListWorking();
+      const { index: cloud, delta, deletions, deltaOwn } = await cloudListWorking();
       // Device-switch signal: the cursor reported changes (adds/changes OR
       // deletions). No stale-time gate — splash fires on ANY delta now.
       // (delta covers dehydrated files too — they still changed on another device.)
       const _deviceSwitch = !!((delta && delta.length > 0) || (deletions && deletions.length > 0));
+      _logSyncCause(delta, deletions, deltaOwn);
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       // hub-managed subtree: drop legacy state entries so neither Pass 1 nor the
@@ -813,8 +853,15 @@
       // device switch → keep it + wire progress; no delta → fade it out fast.
       if (_splashActive) {
         if (_deviceSwitch) {
+          console.log('[splash] KEEPING splash — delta non-empty; ' + toDownload.length + ' file(s) to download');
+          if (!toDownload.length) {
+            console.warn('[splash] …but there is NOTHING to download: every delta entry already matches locally.'
+              + ' The splash is showing 0/0 for a sync that has no work. Usual cause: our own uploads'
+              + ' echoed back through the cursor (see the "own upload" lines above).');
+          }
           _showSyncSplash(toDownload.length);
         } else {
+          console.log('[splash] lifting splash — no cursor delta');
           _hideSyncSplashAfterHome(true);   // no delta — lift once the home has rendered
         }
       }
@@ -877,9 +924,13 @@
       }
       // Remember when sync last completed — used to detect device switches on next load
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+      console.log('[splash] sync #' + _syncCount + ' completed — last-sync timestamp refreshed');
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
-      console.warn('[dropbox] sync:', e);
+      // The timestamp is only stamped on the success path above, so a throw here
+      // leaves it stale — that alone can make the next reload splash.
+      console.warn('[splash] sync #' + _syncCount + ' THREW before stamping the last-sync timestamp'
+        + ' — it stays stale, so the next reload may splash:', e);
     } finally {
       initialSyncDone = true; setBusy(false); _syncing = false;
       if (_splashActive) _hideSyncSplashAfterHome();
