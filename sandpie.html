@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=110">
+<link rel="stylesheet" href="sandpie.css?v=111">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -53,7 +53,7 @@ if("serviceWorker"in navigator){
   <script src="modules/loop-lab.js?v=56"></script>
   <script type="module" src="modules/mobile.js?v=1"></script>
   <script src="modules/augmentations.js?v=14"></script>
-  <script type="module" src="modules/conversations.js?v=170"></script>
+  <script type="module" src="modules/conversations.js?v=173"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -98,9 +98,20 @@ if("serviceWorker"in navigator){
   // instantly (see _hideSyncSplash(/*instant*/true)).
   var RECENT_SYNC_MS = 60000;
   var lastSync = parseInt(localStorage.getItem('dbxfull-last-sync-ts') || '0', 10);
-  if (!localStorage.getItem('dbxfull-tokens') || (Date.now() - lastSync < RECENT_SYNC_MS)) {
+  var hasTokens = !!localStorage.getItem('dbxfull-tokens');
+  var age = lastSync ? (Date.now() - lastSync) : Infinity;
+  // Report this gate's inputs: dropbox.js logs the cursor gate separately, and when
+  // the splash appears "even though it just synced" it is one of these two.
+  console.log('[splash] pre-paint gate — dropbox connected: ' + hasTokens
+    + ' | last successful sync: ' + (lastSync ? (Math.round(age / 1000) + 's ago ('
+        + new Date(lastSync).toLocaleTimeString() + ')') : 'never (no timestamp stored)')
+    + ' | threshold: ' + (RECENT_SYNC_MS / 1000) + 's');
+  if (!hasTokens || age < RECENT_SYNC_MS) {
+    console.log('[splash] pre-paint: REMOVED (' + (!hasTokens ? 'no dropbox tokens' : 'synced recently') + ')');
     var sp = document.getElementById('deviceSyncSplash');
     if (sp) sp.parentNode.removeChild(sp);
+  } else {
+    console.log('[splash] pre-paint: KEPT — the cursor delta will decide (watch for the next [splash] lines)');
   }
 </script>
 <header class="mobile-header">

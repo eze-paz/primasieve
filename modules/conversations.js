@@ -473,14 +473,29 @@ function parkActiveConv() {
     _placeHome();
   }
 }
-function mountConv(convId) {
+// Unmount whatever conversation a pane is showing, saving its messages first.
+// Used by "+ New chat", which must clear the MAIN pane specifically rather than
+// "the focused conversation" — the latter would unmount a docked side panel conv.
+function parkPaneConv(pane) {
+  const id = paneConvId(pane);
+  if (!id) return;
+  const s = convStreams.get(id);
+  if (!s) return;
+  if (id === activeConvId) s.messages = messages;
+  if (s.host && s.host.parentNode) {
+    _evacuateHome(s.host);
+    s.host.parentNode.removeChild(s.host);
+    _placeHome();
+  }
+}
+function mountConv(convId, pane = null) {
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
 
-    const target = sidePanel ? sidePanel.activeMountTarget() : $('messages');
+    const target = pane || (sidePanel ? sidePanel.activeMountTarget() : $('messages'));
     if (s.host.parentNode !== target) _mountInPane(s.host, target);
   } else {
     localStorage.removeItem('sandpie-active-conv');
@@ -754,10 +769,15 @@ async function loadConv(id) {
 }
 async function newConversation() {
   await saveActiveConv();
-  parkActiveConv();
+  // "+ New chat" always opens in the MAIN pane and leaves the side panel alone.
+  // It used to mount into the FOCUSED pane, so with the focus on the right it
+  // silently unmounted the conversation the user had docked there.
+  const main = $('messages');
+  parkPaneConv(main);
   const id = newConvId();
   ensureStream(id);
-  mountConv(id);
+  mountConv(id, main);
+  if (sidePanel?.isOpen && sidePanel.activeIsRight) sidePanel.focusPane(false);
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
 }
@@ -1116,22 +1136,29 @@ function isResumableActive() {
   return !!(s && s.messages && s.messages.length && isResumable(s.messages));
 }
 
-// Which pane a composer belongs to: 'main' (#messages) or 'side' (#messagesSide).
-// The SIDE composer is only meaningful while the side panel is open; fall back to
-// the main pane's conv whenever no side conv is mounted.
+// The conversation a pane is actually showing, read from the DOM: whichever
+// .conv-host is mounted in it. The DOM is the single source of truth — deriving
+// this from activeConvId/sideId instead is how the main composer ended up
+// appending to the conversation displayed in the OTHER pane.
+// Returns null when the pane shows no conversation (home screen); callers then
+// create one, rather than hijacking the other pane's.
+function paneConvId(pane) {
+  const host = pane && pane.querySelector && pane.querySelector(':scope > .conv-host');
+  const id = host && host.dataset ? host.dataset.convId : '';
+  return (id && convStreams.has(id)) ? id : null;
+}
+// Which conversation a composer submits into: 'main' → #messages, 'side' → #messagesSide.
 function _composerConv(which) {
-  if (which === 'side' && sidePanel && sidePanel.isOpen) {
-    const s = convStreams.get(sidePanel.sideId);
-    if (s && s.host && s.host.parentNode === $('messagesSide')) return sidePanel.sideId;
-  }
-  return activeConvId;
+  return paneConvId(which === 'side' ? $('messagesSide') : $('messages'));
 }
 async function handleSubmit(which = 'main') {
   const ta = which === 'side' ? $('inputSide') : $('input');
   const pane = which === 'side' ? $('messagesSide') : $('messages');
   if (!ta || !pane) return;
   const text = ta.value.trim();
-  const convId = _composerConv(which) || activeConvId;
+  // No fallback to activeConvId: when this pane shows nothing, submitting must
+  // start a fresh conversation here, not append to whatever the other pane shows.
+  const convId = _composerConv(which);
   if (!text && !SandpieImages.hasAttachment()) {
     // Empty submit resumes an interrupted turn instead of doing nothing — but only
     // when the conversation is resumable (last message didn't finish with 'stop').
@@ -1172,7 +1199,12 @@ async function handleSubmit(which = 'main') {
   const scEl = paneScrollEl(pane);
   lockScroll(scEl);
   scEl.scrollTop = scEl.scrollHeight;
-  enqueueFor(convId, content, pane);
+  await enqueueFor(convId, content, pane);
+  // Typing into a pane focuses it — otherwise the send/stop button and the
+  // conversation list would keep tracking the other pane.
+  if (sidePanel?.isOpen && sidePanel.activeIsRight !== (which === 'side')) {
+    sidePanel.focusPane(which === 'side');
+  }
 
   if (ta) ta.style.height = 'auto';
 }
@@ -3706,17 +3738,40 @@ class SidePanel {
     this.left = $('messages');
     this.right = $('messagesSide');
     this.wrap = $('messagesWrap');
+    this._open = false;
     this._sideId = null;
     this._activeIsRight = false;
     this._render();
     this._wireEvents();
   }
 
-  get isOpen() { return this._sideId !== null; }
+  // isOpen is its OWN flag, never derived from _sideId. _sideId means "the
+  // conversation in the non-focused pane", and null is a legitimate value for it
+  // (that pane is on the home screen). Deriving isOpen from it made a single
+  // click on the side pane read as "panel closed" whenever the main pane had no
+  // conversation — the panel vanished and its conversation went with it.
+  get isOpen() { return this._open; }
   get sideId() { return this._sideId; }
   get activeIsRight() { return this._activeIsRight; }
 
   activeMountTarget() { return this._activeIsRight ? this.right : this.left; }
+
+  // Point the focus at a pane and resync every id FROM THE DOM. Both panes may
+  // legitimately be empty or occupied in any combination, so the mounted hosts —
+  // not a blind id swap — decide what activeConvId and _sideId become.
+  focusPane(isRight) {
+    const leftId = paneConvId(this.left);
+    const rightId = paneConvId(this.right);
+    this._activeIsRight = !!isRight;
+    activeConvId = isRight ? rightId : leftId;
+    this._sideId   = isRight ? leftId : rightId;
+    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    messages = (activeConvId && convStreams.get(activeConvId)?.messages) || [];
+    this._render();
+    refreshSendButtonForActive();
+    refreshConversationList();
+    if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+  }
 
   async open(id) {
     if (!id) return;
@@ -3731,6 +3786,7 @@ class SidePanel {
       if (prev?.host?.parentNode) { _evacuateHome(prev.host); prev.host.parentNode.removeChild(prev.host); }
     }
     await this._lazyLoad(id);
+    this._open = true;
     this._sideId = id;
     const s = convStreams.get(id);
     if (s?.host) _mountInPane(s.host, this.right);
@@ -3741,60 +3797,77 @@ class SidePanel {
   }
   close() {
     if (!this.isOpen) return;
-    if (this._activeIsRight) this.flip();
-    const s = convStreams.get(this._sideId);
+    // Closing with the ONLY conversation in the right pane would leave nothing on
+    // screen, so move it into the main pane instead of discarding the view. This
+    // is an explicit user action, so the move is expected — unlike a stray click.
+    if (!paneConvId(this.left) && paneConvId(this.right) && this.promoteSideToActive()) return;
+    if (this._activeIsRight) this.focusPane(false);
+    const s = convStreams.get(paneConvId(this.right));
     if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
     _placeHome();
+    this._open = false;
     this._sideId = null;
     this._activeIsRight = false;
     this._render();
     refreshConversationList();
   }
+  // Move the focus to the other pane. Nothing moves in the DOM and nothing is
+  // closed — both panes stay exactly as they are, which is the whole point of a
+  // split view.
   flip() {
     if (!this.isOpen) return;
-    // Nothing in the left pane to swap in (home screen — no active conversation).
-    // The swap below would put null into _sideId, which reads as isOpen === false:
-    // the panel silently "closed" on a single click and left its conv-host inside
-    // the now display:none pane, so the conversation vanished. With an empty left
-    // pane, "make this the active one" means move it there.
-    if (!activeConvId) {
-      this.promoteSideToActive();
-      refreshConversationList();
-      if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
-      return;
-    }
-
-    [activeConvId, this._sideId] = [this._sideId, activeConvId];
-    this._activeIsRight = !this._activeIsRight;
-    if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
-    const s = convStreams.get(activeConvId);
-    messages = s?.messages || [];
-    this._render();
-    refreshSendButtonForActive();
-    refreshConversationList();
-    if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+    this.focusPane(!this._activeIsRight);
   }
 
+  // A conversation was deleted (its host is already detached). If the right pane
+  // is now empty there is no split left to show; otherwise just resync the ids
+  // against what is still mounted.
   notifyDeleted(id) {
-    if (id === this._sideId) {
+    if (!this._open) return;
+    if (id !== this._sideId && id !== activeConvId) return;
+    if (!paneConvId(this.right)) {
+      // Right pane is empty now — there is no split left to show.
+      this._open = false;
       this._sideId = null;
       this._activeIsRight = false;
+      _placeHome();
       this._render();
+      // Whatever the main pane still shows becomes the active conversation:
+      // activeConvId must never be left pointing at a deleted one.
+      const leftId = paneConvId(this.left);
+      if (leftId) {
+        activeConvId = leftId;
+        messages = convStreams.get(leftId)?.messages || [];
+        localStorage.setItem('sandpie-active-conv', leftId);
+        refreshSendButtonForActive();
+      }
+      return;
     }
+    // The right pane survives. If the deleted conversation was the FOCUSED one,
+    // leave activeConvId alone — deleteConv checks it right after this call and
+    // promotes the survivor into the main pane. Clearing it here made that check
+    // fail, which left the split standing with an empty main pane.
+    if (id === this._sideId) this.focusPane(this._activeIsRight);
   }
 
+  // Move the right pane's conversation into the main pane and end the split.
+  // Refuses when the left pane is still occupied — two conv-hosts stacked in one
+  // pane is worse than leaving the split alone.
   promoteSideToActive() {
     if (!this.isOpen) return false;
-    const sId = this._sideId;
+    const sId = paneConvId(this.right);
+    if (!sId) return false;
+    const leftId = paneConvId(this.left);
+    if (leftId && leftId !== sId) return false;
     const s = convStreams.get(sId);
     if (s && s.host) {
-
       if (s.host.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
       _mountInPane(s.host, this.left);   // _placeHome() re-tucks the lists into it
     }
     activeConvId = sId;
     messages = (s && s.messages) || [];
     if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+    this._open = false;
     this._sideId = null;
     this._activeIsRight = false;
     this._render();

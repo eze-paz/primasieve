@@ -3011,6 +3011,12 @@ body.sp-decoding *::after {
     overflow: visible; padding: 0 0 1.5rem;
     justify-content: flex-start;
   }
+  /* A conversation with no messages yet (a fresh "+ New chat") must still LOOK
+     like the home screen: the host centres its only child. `safe` degrades to
+     start alignment once the lists outgrow the pane, so nothing is clipped out
+     of reach at the top. */
+  .conv-host:not(:has(.msg)) { justify-content: safe center; }
+  .conv-host:not(:has(.msg)) > #homeCenter { padding: 0; }
 .shared-home { width: 100%; text-align: left; user-select: none; }
 .shared-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin: 0.8rem 0 0.4rem; padding-left: 0.2rem; }
 .shared-tile { flex: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; background: var(--sp-panel); border: 1px solid var(--sp-border); color: var(--sp-text-dim); }
