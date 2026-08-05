@@ -40,10 +40,26 @@
   const HUB_CURSOR_KEY = 'sandpie-share-cursor'; // localStorage: { [teamRoot]: cursor } — per device, like dbxfull-cursor
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
   const META = '.sandpie.json';                  // hub metadata: {pin,title}
-  // Files that live on the hub but are never installed: the metadata marker and
-  // leftovers from older builds. Excluded from install, from publish uploads and
-  // from the "delete local strays" pass.
-  const SKIP = (rel) => rel === META || rel === 'package.json' || rel === 'manifest.json' || /(^|\/)\./.test(rel);
+  // Files that live on the hub but are never installed: leftovers from older
+  // builds, and dotfiles generally. Excluded from install, from publish uploads
+  // and from the "delete local strays" pass.
+  //
+  // META is deliberately NOT skipped: it installs like any other file, so a wrong
+  // pin or title is fixed by editing that one file and the existing write-back
+  // path publishes it (wbPush refuses to push it unless it still parses as JSON).
+  // Republishing the whole artifact to correct one field would mint a new rev for
+  // every file, which every other member then re-downloads for nothing.
+  const SKIP = (rel) => rel === 'package.json' || rel === 'manifest.json' || (rel !== META && /(^|\/)\./.test(rel));
+  const parseMeta = (bytes) => {
+    const out = { pin: null, title: null };
+    if (!bytes) return out;
+    try {
+      const j = JSON.parse(new TextDecoder().decode(bytes));
+      if (j && typeof j.pin === 'string') out.pin = j.pin;
+      if (j && typeof j.title === 'string') out.title = j.title;
+    } catch (_) {}
+    return out;
+  };
 
   const O = () => window.opfs;
   const prov = () => { try { return window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); } catch (_) { return null; } };
@@ -160,23 +176,24 @@
     const dirty = (prev && prev.dirty) || {};
     const local = new Set(await listOpfs(dst, '', []));
     const revs = {};
-    let changed = 0, pin = null, title = null, metaRev = null;
+    let changed = 0, pin = null, title = null;
 
     for (const rel of Object.keys(a.files)) {
-      if (rel === META) {                            // metadata → state, never to disk
-        // Its rev is cached like any file's, or every poll would re-fetch it.
-        if (!fresh && prev.metaRev && prev.metaRev === a.files[rel]) { metaRev = prev.metaRev; pin = prev.pin || null; title = prev.title || null; continue; }
-        const bytes = await hubRead(a, rel);
-        if (bytes) { try { const j = JSON.parse(new TextDecoder().decode(bytes)); if (j && typeof j.pin === 'string') pin = j.pin; if (j && typeof j.title === 'string') title = j.title; metaRev = a.files[rel]; } catch (_) {} }
+      if (SKIP(rel)) continue;
+      if (dirty[rel]) {                                                           // local edit pending push — don't clobber it
+        revs[rel] = prevRevs[rel] || '';
+        // A pending edit to META is the user's new pin/title: read it from the
+        // local copy so the home row follows the edit now, not one poll after the
+        // hub echoes it back.
+        if (rel === META) { const m = parseMeta(await readLocal(dst + '/' + rel)); if (m.pin) pin = m.pin; if (m.title) title = m.title; }
         continue;
       }
-      if (SKIP(rel)) continue;
-      if (dirty[rel]) { revs[rel] = prevRevs[rel] || ''; continue; }              // local edit pending push — don't clobber it
-      if (local.has(rel) && prevRevs[rel] === a.files[rel]) { revs[rel] = a.files[rel]; continue; }   // already current
+      if (local.has(rel) && prevRevs[rel] === a.files[rel]) { revs[rel] = a.files[rel]; continue; }   // already current (state already holds META's pin/title)
       const bytes = await hubRead(a, rel);
       if (!bytes) { _forceNext = true; if (local.has(rel)) revs[rel] = prevRevs[rel] || ''; continue; }   // transient failure — keep what we have; _forceNext forces a retry pass
       await write(dst + '/' + rel, bytes);
       revs[rel] = a.files[rel];
+      if (rel === META) { const m = parseMeta(bytes); pin = m.pin; title = m.title; }
       changed++;
     }
     // the hub is the authority on what belongs here
@@ -187,7 +204,7 @@
     }
     const kind = ('SKILL.md' in a.files) ? 'skill' : 'folder';
     const mk = {
-      id: a.id, team: a.dept, from: 'team', kind, revs, dirty, metaRev,
+      id: a.id, team: a.dept, from: 'team', kind, revs, dirty,
       title: title || (prev && prev.title) || a.id,
       pin: pin || (!fresh && prev && prev.pin) || null,
     };
@@ -207,11 +224,14 @@
   }
   const hubRead = async (a, rel) => { try { return await hubDownload(hubPath(a.dept, a.id, rel)); } catch (e) { console.warn('[sharing] download failed', a.id + '/' + rel, (e && e.message) || e); return null; } };
   // Which file the home row opens: the publisher's pick, else conventions.
+  // META is installed like any other file, so it has to be excluded here or the
+  // last resort ("first alphabetically") would pick the dotfile every time.
   function mainFile(mk, files) {
-    if (mk && mk.pin && files.includes(mk.pin)) return mk.pin;
-    if (files.includes('SKILL.md')) return 'SKILL.md';
-    if (files.includes('index.html')) return 'index.html';
-    return files.slice().sort()[0] || null;
+    const cand = files.filter(f => f !== META);
+    if (mk && mk.pin && cand.includes(mk.pin)) return mk.pin;
+    if (cand.includes('SKILL.md')) return 'SKILL.md';
+    if (cand.includes('index.html')) return 'index.html';
+    return cand.slice().sort()[0] || null;
   }
 
   /* ── the poll: push pending edits, mirror the hub, drop what's gone ───── */
@@ -256,7 +276,7 @@
 
   /* ── write-back: your edits to an installed file go to the hub ────────── */
   const WB_DEBOUNCE = 1500;
-  let _wbTimers = {}, _wbDenied = {}, _mine = new Set();
+  let _wbTimers = {}, _wbDenied = {}, _mine = new Set(), _metaWarned = {};
   const wbNotify = (kind, msg) => { try { if (window.Sandpie && Sandpie.addMsg) Sandpie.addMsg(kind, msg); } catch (_) {} };
   // Our own mirror writes emit file:changed too; ignore exactly those, or every
   // download would be pushed straight back and re-downloaded on the next poll.
@@ -285,6 +305,20 @@
     try {
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
+      // META is hand-editable, so a typo here would break the pin for everyone on
+      // the team. Refuse to publish anything that isn't a JSON object; it stays
+      // dirty and is retried on each poll, so fixing the file publishes it. Warn
+      // once per file, or every poll would repeat the message.
+      if (rel === META) {
+        const wk = id + '/' + rel;
+        let ok = false;
+        try { const j = JSON.parse(new TextDecoder().decode(bytes)); ok = !!j && typeof j === 'object' && !Array.isArray(j); } catch (_) {}
+        if (!ok) {
+          if (!_metaWarned[wk]) { _metaWarned[wk] = true; wbNotify('err', '⚠ ' + rel + ' de ' + id + ' no és JSON vàlid — no s\'ha publicat. Corregeix-lo i es tornarà a provar.'); }
+          return;
+        }
+        delete _metaWarned[wk];
+      }
       // What's on the hub right now (one listing of this artifact's folder).
       let hub = null;
       try {
@@ -359,7 +393,9 @@
     if (!dept) throw new Error('publish: a department is required');
     const dir = await isDir(src), base = src.split('/').pop();
     const id = opts.id || slug(base);
-    const files = (await srcFileList(src, dir)).filter(rel => !SKIP(rel));
+    // META is excluded from the upload loop even though SKIP now allows it: it is
+    // written once, explicitly, after the content lands (see below).
+    const files = (await srcFileList(src, dir)).filter(rel => !SKIP(rel) && rel !== META);
     const readSrc = async (rel) => {
       const path = dir ? src + '/' + rel : src;
       try { const b = await O().readBytes(path); if (b) return b; } catch (_) {}
@@ -466,6 +502,7 @@
 
   /* ── opfs helpers ────────────────────────────────────────────────────── */
   async function isDir(p) { try { await O().listDir(p); return true; } catch (_) { return false; } }
+  async function readLocal(p) { try { return await O().readBytes(p); } catch (_) { return null; } }
   async function listOpfs(base, rel, out) {
     let entries; try { entries = await O().listDir(base + (rel ? '/' + rel : '')); } catch (_) { return out; }
     for (const e of entries) { const r = rel ? rel + '/' + e.name : e.name; if (e.kind === 'directory') await listOpfs(base, r, out); else out.push(r); }
