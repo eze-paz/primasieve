@@ -370,21 +370,31 @@ self._sandpie_cloud_delete = function (rel, isDir) {
 // recursive fault-ins and resurrection of deleted files.
 function _installFsFaultIn() {
   try {
-    const nops = py.FS.lookupPath('/files').node.node_ops;
-    const orig = nops.lookup;
+    // The REAL path-resolution chokepoint: Emscripten's lookupPath resolves via
+    // a flat FS.nameTable through FS.lookupNode, and only falls back to
+    // node.node_ops.lookup on a miss (pyodide's nativefs stub throws there).
+    // Wrapping FS.lookupNode catches every resolution — Python open()/os.stat
+    // AND C-level opens (sqlite's C open goes FS.open -> lookupPath ->
+    // FS.lookupNode), with zero per-extension rules.
+    const orig = py.FS.lookupNode;
     const _faulting = new Set();
-    function _relOf(parent) {
+    // Nodes under the /files mount carry .mount.mountpoint === '/files'. Their
+    // .parent chains SKIP the mountpoint node (the mount root's name is '/'),
+    // so the path base must come from mount.mountpoint, not from the chain.
+    function _relFor(parent, name) {
+      const mnt = parent.mount;
+      if (!mnt || mnt.mountpoint !== '/files') return null;
       const parts = [];
       let n = parent, seen = 0;
-      while (n && n.name && seen < 64) { parts.push(n.name); n = n.parent; seen++; }
-      return '/' + parts.reverse().join('/');
+      while (n && n.mount === mnt && seen < 64) { parts.push(n.name); n = n.parent; seen++; }
+      return (mnt.mountpoint + '/' + parts.reverse().join('/') + '/' + name).replace(/\/+/g, '/');
     }
     const wrapped = function (parent, name) {
       try { return orig(parent, name); }
       catch (e) {
         if (!e || e.errno !== 44) throw e;                 // ENOENT only
-        const rel = (_relOf(parent) + '/' + name).replace(/\/+/g, '/');
-        if (rel.indexOf('/files/') !== 0) throw e;         // outside /files — real miss
+        const rel = _relFor(parent, name);
+        if (!rel || rel.indexOf('/files/') !== 0) throw e; // outside /files — real miss
         const r = rel.slice('/files/'.length);
         if (!r || _relExempt(r) || _cloudDeleted.has(r) || _faulting.has(rel)) throw e;
         if (!_dehydrated || !_dbxIndex) throw e;
@@ -392,17 +402,17 @@ function _installFsFaultIn() {
         if (!entry) throw e;                               // genuinely absent — clean ENOENT
         _faulting.add(rel);
         try {
-          nops.lookup = orig;                              // unwrap: fault-in writes through this FS
+          py.FS.lookupNode = orig;                         // unwrap: fault-in writes through this FS
           try {
             if (entry.kind === 'folder') { try { py.FS.mkdirTree('/files/' + r); } catch (_) {} }
             else _sandpie_hydrate_sync('/files/' + r);
-          } finally { nops.lookup = wrapped; }
+          } finally { py.FS.lookupNode = wrapped; }
         } finally { _faulting.delete(rel); }
         return orig(parent, name);                         // retry
       }
     };
-    nops.lookup = wrapped;
-    console.log('[pyodide-worker] generic FS fault-in installed at /files');
+    py.FS.lookupNode = wrapped;
+    console.log('[pyodide-worker] generic FS fault-in installed at /files (lookupNode)');
   } catch (e) { console.warn('[pyodide-worker] FS fault-in install failed:', e && e.message || e); }
 }
 // ---- Cloud-index view for Python (stat / listdir / scandir) ------------------
