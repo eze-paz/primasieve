@@ -1537,8 +1537,8 @@ function getSandpieWorker() {
         const pr = msg.payload;
         const convId = activeConvId;
         if (convId) _askingConvs.add(convId);
-        if (pr.tcId) renderQuestions(pr.tcId, pr.args && pr.args.questions);
-        else {
+        const boxRef = pr.tcId ? renderQuestions(pr.tcId, pr.args && pr.args.questions) : null;
+        if (!boxRef) {
           const host = $('messages');
           if (host) host.appendChild(buildQuestionsView(pr.args && pr.args.questions, null));
         }
@@ -1548,7 +1548,7 @@ function getSandpieWorker() {
           refreshConversationList();
           try { _sandpieWorker.postMessage({ type: 'ask-result', id: pr.id, result }); } catch (_) {}
         };
-        setTimeout(() => wireAskCard(pr, reply), 50);
+        setTimeout(() => wireAskCard(pr, reply, boxRef), 50);
         return;
       }
       return;
@@ -2389,10 +2389,22 @@ function renderTodos(tcId, todos, scopeEl) {
 // Build a checklist DOM element from a todos array.
 // Render the ask question card inside a tool-call box, in place of a text result.
 function renderQuestions(tcId, questions) {
-  const toolCallDiv = _toolBoxEl(tcId);
-  if (!toolCallDiv) return;
-  const expanded = toolCallDiv.querySelector('.tc-expanded');
-  if (!expanded) return;
+  // Find the tool-call box by id; fall back to the last .tool-call in the
+  // stream (the in-flight ask call) when the id doesn't match — the live
+  // renderer can normalize tool-call ids, so a strict match isn't reliable.
+  let toolCallDiv = _toolBoxEl(tcId);
+  if (!toolCallDiv) {
+    const all = document.querySelectorAll('.msg.tool-call.in-flight, .msg.tool-call');
+    if (all.length) toolCallDiv = all[all.length - 1];
+  }
+  if (!toolCallDiv) return null;
+  toolCallDiv.classList.add('expanded');
+  let expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) {
+    expanded = document.createElement('div');
+    expanded.className = 'tc-expanded';
+    toolCallDiv.appendChild(expanded);
+  }
   let box = expanded.querySelector('.tool-box');
   if (!box) {
     box = document.createElement('div');
@@ -2411,6 +2423,7 @@ function renderQuestions(tcId, questions) {
   const card = buildQuestionsView(questions || [], null);
   box.appendChild(sep);
   box.appendChild(card);
+  return toolCallDiv;
 }
 
 // Build a multiple-choice question card DOM element from a questions array.
@@ -2489,11 +2502,29 @@ function buildQuestionsView(questions, onAnswer) {
 }
 
 // Wire the ask card's buttons + free-text inputs to the reply callback.
-function wireAskCard(pr, reply) {
-  const box = pr.tcId ? _toolBoxEl(pr.tcId) : null;
-  if (!box) { reply('answers:[]'); return; }
+function wireAskCard(pr, reply, toolCallDiv) {
+  const box = toolCallDiv ? toolCallDiv.querySelector('.tool-box') : (pr.tcId ? _toolBoxEl(pr.tcId) : null);
+  if (!box) {
+    // Last-resort: scan the whole document for a rendered ask card.
+    const fallback = document.querySelector('.ask-card');
+    if (!fallback) { reply('answers:[]'); return; }
+    const card = fallback;
+    wireAskButtons(pr, reply, card);
+    return;
+  }
   const card = box.querySelector('.ask-card');
-  if (!card) { reply('answers:[]'); return; }
+  if (!card) {
+    const fallback = document.querySelector('.ask-card');
+    if (!fallback) { reply('answers:[]'); return; }
+    wireAskButtons(pr, reply, fallback);
+    return;
+  }
+  wireAskButtons(pr, reply, card);
+}
+
+// Attach the click handlers to an ask card (works for both the live stream
+// box and the appended-fallback path).
+function wireAskButtons(pr, reply, card) {
   const questions = (pr.args && pr.args.questions) || [];
   const getAnswers = () => {
     return questions.map((q, i) => {
