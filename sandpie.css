@@ -1512,11 +1512,11 @@ ul.conv-list li.active {
     gap: 0.4rem;
   }
   .ask-chip {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    width: 100%;
-    padding: 0.4rem 0.8rem;
+    width: auto;
+    padding: 0.35rem 0.8rem;
     border: 1px solid var(--sp-border);
     border-radius: 20px;
     font-size: 12px;
@@ -1526,7 +1526,6 @@ ul.conv-list li.active {
     transition: all 0.12s;
     user-select: none;
   }
-  .ask-chip .chip-label { flex: 1; }
   .ask-chip:hover { border-color: var(--sp-accent); background: var(--sp-panel); }
   .ask-chip.selected {
     border-color: var(--sp-accent);
