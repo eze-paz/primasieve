@@ -785,9 +785,7 @@ function registerRewindCommand() {
       }
 
       if (s) {
-        if (s.abort) { s.queueAborted = true; s.abort.abort(); }
-        s.queue.length = 0;
-        updateQueueCount(s);
+        if (s.abort) { s.abort.abort(); }
       }
       messages.length = idx;
       if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
@@ -1189,7 +1187,6 @@ function setStreamSending(stream, sending) {
   if (!stream) return;
   if (sending) {
     stream.abort = new AbortController();
-    stream.queueAborted = false;
     stream.generating = true;
   } else {
     stream.abort = null;
@@ -1359,20 +1356,12 @@ async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
   const s = ensureStream(convId);
   if (pane) _mountInPane(s.host, pane);
-  // Steer instead of queue: if a turn is already streaming via the worker, inject
-  // this message into the running agent loop rather than waiting for the turn to
-  // finish. The worker splices it in at the next round boundary — a safe point
-  // that can't orphan a tool result — and echoes it back as message_added, so
-  // array ordering + persistence stay worker-authoritative (see RoundRenderer).
+  // Steer into the active agent loop when generating, otherwise send directly.
   if (s.generating && s.agentId && _canSteerActive()) {
     steerActive(s, content);
     return;
   }
-  // No active worker turn (idle, or a local-model turn with no steer channel):
-  // fall back to the queue, which sends immediately when idle.
-  s.queue.push(content);
-  updateQueueCount(s);
-  processQueueFor(s);
+  await sendSingle(content, s);
 }
 async function enqueueForActive(content) {
   await ensureActiveConv();
@@ -1398,168 +1387,9 @@ function handleButtonClick(which = 'main') {
     // next one is sent immediately. To halt everything, press stop once per
     // in-flight + queued message.
     if (s.abort) s.abort.abort();
-    updateQueueCount(s);
   } else {
     window.handleSubmit(which);
   }
-}
-function updateQueueCount(stream) {
-  // Refresh just the queue pill inside the live timer. The timer's own tick
-  // (startTotalTimer→paint) also keeps this in sync; this gives an instant
-  // update when the queue changes without rebuilding the timer's other spans.
-  const s = stream || activeStream();
-  if (!s || !s.timerEl) return;
-  const queueEl = s.timerEl.querySelector('.mt-queue, .queue-pill');
-  if (!queueEl) return;
-  const q = s.queue.length;
-  queueEl.dataset.q = String(q);
-  queueEl.className = q > 0 ? 'queue-pill' : 'mt-queue';
-  queueEl.textContent = q > 0 ? `${q} queued` : '';
-}
-
-function openQueueModal(stream) {
-  if (!stream || stream.queue.length === 0) return;
-  const existing = document.getElementById('queueModal');
-  if (existing) existing.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'queueModal';
-  modal.className = 'modal';
-  modal.style.display = 'flex';
-
-  const items = stream.queue.map((item, idx) => {
-    const text = typeof item === 'string' ? item : (item.text || JSON.stringify(item).slice(0, 200));
-    return `
-      <div class="qm-item" data-idx="${idx}">
-        <div class="qm-number">${idx + 1}</div>
-        <div class="qm-text">${escapeHtml(text)}</div>
-        <div class="qm-actions">
-          <button type="button" class="ghost qm-edit" data-idx="${idx}" title="Edit">Edit</button>
-          <button type="button" class="ghost qm-cancel" data-idx="${idx}" title="Cancel">Cancel</button>
-        </div>
-      </div>`;
-  }).join('');
-
-  modal.innerHTML =
-    '<div class="modal-backdrop"></div>' +
-    '<div class="modal-content" style="max-width:560px; width:90%; max-height:70vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">' +
-      '<div style="display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1.05rem; border-bottom:1px solid var(--sp-border);">' +
-        '<h3 style="margin:0; font-size:1rem;">Queued Messages (' + stream.queue.length + ')</h3>' +
-        '<button type="button" class="ghost qm-close" title="Close" style="font-size:1rem; line-height:1; padding:0.15rem 0.5rem;">&#215;</button>' +
-      '</div>' +
-      '<div style="flex:1; overflow-y:auto; padding:0.75rem 1rem;">' + items + '</div>' +
-      '<div style="padding:0.75rem 1rem; border-top:1px solid var(--sp-border); display:flex; justify-content:flex-end; gap:0.5rem;">' +
-        '<button type="button" class="ghost qm-clear">Clear All</button>' +
-      '</div>' +
-    '</div>';
-
-  document.body.appendChild(modal);
-
-  // Wire up click handlers (module-scoped; inline onclick can't reach them)
-  modal.querySelector('.modal-backdrop').addEventListener('click', closeQueueModal);
-  modal.querySelector('.qm-close').addEventListener('click', closeQueueModal);
-  modal.querySelector('.qm-clear').addEventListener('click', () => clearQueue(stream.id));
-
-  const escHandler = (e) => { if (e.key === 'Escape') closeQueueModal(); };
-  document.addEventListener('keydown', escHandler);
-  modal._escHandler = escHandler;
-
-  modal.querySelectorAll('.qm-cancel').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = +e.currentTarget.dataset.idx;
-      stream.queue.splice(idx, 1);
-      updateQueueCount(stream);
-      const item = e.currentTarget.closest('.qm-item');
-      if (item) item.remove();
-      // Re-index remaining items so subsequent cancels target the right array slot
-      modal.querySelectorAll('.qm-item').forEach((el, newIdx) => {
-        el.dataset.idx = String(newIdx);
-        const num = el.querySelector('.qm-number');
-        if (num) num.textContent = String(newIdx + 1);
-        el.querySelectorAll('.qm-edit, .qm-cancel').forEach(b => b.dataset.idx = String(newIdx));
-      });
-      if (stream.queue.length === 0) closeQueueModal();
-    });
-  });
-
-  modal.querySelectorAll('.qm-edit').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = +e.target.dataset.idx;
-      enterQueueEditMode(stream, idx, e.target.closest('.qm-item'));
-    });
-  });
-}
-
-function closeQueueModal() {
-  const m = document.getElementById('queueModal');
-  if (!m) return;
-  if (m._escHandler) document.removeEventListener('keydown', m._escHandler);
-  m.remove();
-}
-
-function clearQueue(streamId) {
-  const s = convStreams.get(streamId);
-  if (!s) return;
-  s.queue.length = 0;
-  updateQueueCount(s);
-  closeQueueModal();
-}
-
-function enterQueueEditMode(stream, idx, itemEl) {
-  const current = stream.queue[idx];
-  const text = typeof current === 'string' ? current : (current.text || '');
-
-  itemEl.innerHTML =
-    '<textarea class="qm-edit-textarea" style="width:100%; min-height:60px; background:var(--sp-bg); border:1px solid var(--sp-border); border-radius:5px; color:var(--sp-text); padding:0.5rem; font:inherit; resize:vertical;">' + escapeHtml(text) + '</textarea>' +
-    '<div style="display:flex; gap:0.4rem; justify-content:flex-end; margin-top:0.4rem;">' +
-      '<button type="button" class="ghost qm-save" data-idx="' + idx + '">Save</button>' +
-      '<button type="button" class="ghost qm-cancel-edit" data-idx="' + idx + '">Cancel</button>' +
-    '</div>';
-
-  const ta = itemEl.querySelector('.qm-edit-textarea');
-  ta.focus();
-
-  itemEl.querySelector('.qm-save').addEventListener('click', () => {
-    const newText = ta.value.trim();
-    if (!newText) return;
-    if (typeof current === 'string') {
-      stream.queue[idx] = newText;
-    } else {
-      stream.queue[idx] = Object.assign({}, current, { text: newText });
-    }
-    openQueueModal(stream);
-  });
-
-  itemEl.querySelector('.qm-cancel-edit').addEventListener('click', () => {
-    openQueueModal(stream);
-  });
-}
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-async function processQueueFor(stream) {
-  if (!stream || stream.isProcessing || stream.queue.length === 0) return;
-  stream.isProcessing = true;
-  stream.queueAborted = false;
-  updateQueueCount(stream);
-  try {
-    while (stream.queue.length > 0) {
-      const text = stream.queue.shift();
-      updateQueueCount(stream);
-      await sendSingle(text, stream);
-      // No break on stop: aborting the current generation advances to the next
-      // queued message. The queue is only emptied by an explicit rewind.
-    }
-  } finally {
-    stream.isProcessing = false;
-    updateQueueCount(stream);
-  }
-
-  if (stream.queue.length > 0) processQueueFor(stream);
 }
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
 // Created once per page load. Other modules reach it via window._sandpieWorker.
@@ -2264,7 +2094,6 @@ function ensureStream(id) {
     s = {
       id, host,
       messages: [],
-      queue: [], isProcessing: false, queueAborted: false,
       abort: null,
       compaction: null,
       timerEl: null, timerStart: 0, timerInterval: null,
@@ -4225,8 +4054,6 @@ window.setStreamSending = setStreamSending;
 window.handleSubmit = handleSubmit;
 window.enqueueForActive = enqueueForActive;
 window.handleButtonClick = handleButtonClick;
-window.updateQueueCount = updateQueueCount;
-window.processQueueFor = processQueueFor;
 window.sendSingle = sendSingle;
 window.buildAgentConfig = buildAgentConfig;
 window.readAgentEvents = readAgentEvents;
@@ -4281,16 +4108,12 @@ function startTotalTimer(stream) {
     '<button class="mt-nn" title="Show thoughts" onclick="toggleThoughts()">' + NN_SVG_INLINE + '</button>' +
     '<span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
-    '<span class="mt-queue"></span>' +
     '<span class="mt-todos"></span>';
   stream.host.appendChild(el);
   stream.timerEl = el;
 
   const timeEl = el.querySelector('.mt-time');
-  const queueEl = el.querySelector('.mt-queue');
-  queueEl.style.cursor = 'pointer';
-  queueEl.title = 'Click to view queued messages';
-  queueEl.addEventListener('click', () => openQueueModal(stream));
+  // queueEl wiring removed (queue system removed)
   _wireCtxCounter(el, stream.id);
   const todosEl = el.querySelector('.mt-todos');
   stream.todosEl = todosEl;
@@ -4310,12 +4133,7 @@ function startTotalTimer(stream) {
     // been orphaned, re-append it to the (rebuilt) host at the next tick.
     if (!stream.timerEl.isConnected && stream.host) stream.host.appendChild(stream.timerEl);
     set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
-    const q = stream.queue.length;
-    if (queueEl.dataset.q !== String(q)) {
-      queueEl.dataset.q = String(q);
-      queueEl.className = q > 0 ? 'queue-pill' : 'mt-queue';
-      queueEl.textContent = q > 0 ? `${q} queued` : '';
-    }
+
   };
 
   paint();
@@ -4580,8 +4398,7 @@ export {
   handleSubmit,
   enqueueForActive,
   handleButtonClick,
-  updateQueueCount,
-  processQueueFor,
+
   sendSingle,
   buildAgentConfig,
   readAgentEvents,
