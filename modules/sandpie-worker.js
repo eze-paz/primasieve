@@ -829,14 +829,12 @@ const _shareReqs = new Map();
 async function tool_share(args, ctx) {
   const path = String(args.path || '').trim();
   const type = String(args.type || '').toLowerCase();
-  const perms = String(args.permissions || 'viewer').toLowerCase();
   const recips = Array.isArray(args.recipients)
     ? args.recipients.map(String).filter(Boolean)
     : (typeof args.recipients === 'string' && args.recipients.trim()
         ? args.recipients.split(',').map(s => s.trim()).filter(Boolean) : []);
   if (!path) return { result: 'Error: "path" is required (OPFS path of the file or folder to share).' };
   if (type !== 'team' && type !== 'p2p') return { result: 'Error: "type" must be "team" or "p2p".' };
-  const level = (perms === 'editor' || perms === 'write') ? 'editor' : 'viewer';
   if (!recips.length) {
     return { result: 'Error: "recipients" is required — ' + (type === 'team'
       ? 'team/department folder names (e.g. ["R+D+I"]).'
@@ -853,7 +851,7 @@ async function tool_share(args, ctx) {
     }, SHARE_TIMEOUT);
     _shareReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
     try {
-      self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, permissions: level, pinFile: args.pinFile || undefined } } });
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, pinFile: args.pinFile || undefined } } });
     } catch (e) {
       clearTimeout(timer); _shareReqs.delete(id);
       resolve({ result: 'Error: could not reach the page to perform the share (' + ((e && e.message) || e) + ').' });
