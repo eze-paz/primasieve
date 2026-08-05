@@ -3974,17 +3974,34 @@ class SidePanel {
   // in which case the split closes).
   async openInLeft(id) {
     if (!id) return;
-    // If it's currently the side-panel convo, undock it first so loadConv doesn't
-    // flip focus — the user explicitly wants it in the LEFT pane now.
+    // Dragging the convo that's currently docked in the RIGHT pane into the
+    // LEFT: swap the two panes instead of closing the split — the dragged convo
+    // becomes the active (left) convo and whatever the left was showing moves
+    // over to the right. The split stays open.
     if (id === this._sideId) {
       const s = convStreams.get(id);
+      const leftId = paneConvId(this.left);
+      const leftS = leftId ? convStreams.get(leftId) : null;
       if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
-      this._sideId = null;
-      this._open = false;
+      if (leftS?.host?.parentNode) { _evacuateHome(leftS.host); leftS.host.parentNode.removeChild(leftS.host); }
+      if (s?.host) _mountInPane(s.host, this.left);
+      if (leftS?.host) _mountInPane(leftS.host, this.right);
       _placeHome();
+      this._activeIsRight = false;
+      activeConvId = id;
+      this._sideId = leftId || null;
+      if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+      messages = (s && s.messages) || [];
+      // Left was empty (home screen) → right is now empty too → no split left.
+      this._open = !!leftId;
       this._render();
+      refreshSendButtonForActive();
+      refreshConversationList();
+      if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+      return;
     }
-    // Focus the left pane so loadConv mounts the convo there.
+    // Normal case: mount the convo into the left (main) pane as the active
+    // conversation; the right pane keeps its own convo.
     this.focusPane(false);
     await loadConv(id);
   }
@@ -3994,8 +4011,34 @@ class SidePanel {
   // updates it regardless of which pane currently has focus.
   async openInRight(id) {
     if (!id) return;
-    if (id === activeConvId) return;   // already the main-pane convo
     if (id === this._sideId) return;   // already docked here
+    // Dragging the ACTIVE (left) convo into the RIGHT pane: swap the two panes
+    // — the active convo becomes the side convo and the old side convo moves to
+    // the left as the active one. The split stays open.
+    if (id === activeConvId) {
+      const s = convStreams.get(id);
+      const sideId = this._sideId;
+      const sideS = sideId ? convStreams.get(sideId) : null;
+      if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
+      if (sideS?.host?.parentNode) { _evacuateHome(sideS.host); sideS.host.parentNode.removeChild(sideS.host); }
+      if (sideS?.host) _mountInPane(sideS.host, this.left);
+      if (s?.host) _mountInPane(s.host, this.right);
+      _placeHome();
+      this._activeIsRight = false;
+      activeConvId = sideId || null;
+      this._sideId = id;
+      if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
+      else localStorage.removeItem('sandpie-active-conv');
+      messages = (activeConvId && convStreams.get(activeConvId)?.messages) || [];
+      // The right pane always ends up holding the dragged convo → the split
+      // stays open.
+      this._open = true;
+      this._render();
+      refreshSendButtonForActive();
+      refreshConversationList();
+      if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+      return;
+    }
     closeArtifactPanel();
     if (this._sideId) {
       const prev = convStreams.get(this._sideId);
