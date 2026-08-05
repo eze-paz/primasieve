@@ -128,7 +128,7 @@
     background: var(--sp-panel);
     color: var(--sp-text);
     padding: 0.45rem 0.625rem;
-    border-radius: 4px;
+    border-radius: 8px;
     clip-path: none;
   }
   aside .navbar .back {
@@ -138,7 +138,7 @@
     background: var(--sp-panel);
     color: var(--sp-text);
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 8px;
     clip-path: none;
     font-size: 1rem;
     line-height: 32px;
@@ -573,7 +573,7 @@
   .msg-timer .mt-todos {
     margin-left: 1rem;
     padding: 0.05rem 0.35rem;
-    border-radius: 4px;
+    border-radius: 8px;
     background: var(--sp-accent);
     color: var(--sp-bg);
     font-size: 0.65rem;
@@ -1379,7 +1379,7 @@ ul.conv-list li.active {
     gap: 0.5rem;
     padding: 0.35rem 0.6rem;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     user-select: none;
     transition: background 0.15s ease, border-color 0.15s ease;
@@ -1517,7 +1517,7 @@ ul.conv-list li.active {
   .tool-box .tool-image {
     max-width: 100%;
     max-height: 320px;
-    border-radius: 4px;
+    border-radius: 8px;
     display: block;
   }
   .repl-loader {
@@ -1553,7 +1553,7 @@ ul.conv-list li.active {
   }
   .artifact-show-btn {
     background: var(--sp-panel); border: 1px solid var(--sp-border);
-    border-radius: 4px; padding: 3px 10px; font: 11px monospace;
+    border-radius: 8px; padding: 3px 10px; font: 11px monospace;
     color: var(--sp-text); cursor: pointer; white-space: nowrap;
     transition: background 0.1s, border-color 0.1s;
   }
