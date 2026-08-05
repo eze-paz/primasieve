@@ -264,6 +264,9 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   if (comp) meta.compaction = comp;
   if (todos) meta.todos = todos;
   if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
+  // Persist the last-turn timer snapshot so it survives refresh and can be
+  // rebuilt by rebuildSettledTimer on cold load.
+  if (s && s.lastTurn) meta.lastTurn = s.lastTurn;
   // Keep the stable cache key across saves; otherwise the first save after
   // ensureSessionId() rewrites meta and would drop session_id.
   if (prevMeta && prevMeta.session_id) meta.session_id = prevMeta.session_id;
@@ -301,6 +304,22 @@ function renderHistoricalMessage(m, host = null) {
       const div = addMsg('assistant', '', host);
       div.innerHTML = renderMd(contentStr);
       bindBubble(div, m);
+    }
+    // Saved reasoning (chain of thought) — cloud tool-call turns persist it as
+    // m.reasoning. Render it as a collapsed thinking block matching the live
+    // <details class="msg think"> shape, so a reloaded conversation reads the
+    // same as it streamed.
+    if (m.reasoning && m.reasoning.trim()) {
+      const det = document.createElement('details');
+      det.className = 'msg think done';
+      det.open = false;
+      const sum = document.createElement('summary');
+      sum.textContent = 'Thought';
+      const body = document.createElement('div');
+      body.className = 'think-body';
+      body.textContent = m.reasoning;
+      det.append(sum, body);
+      appendContent(host || (activeStream() && activeStream().host) || paneScrollEl($('messages')), det);
     }
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
@@ -407,16 +426,26 @@ function renderConversation(msgs, compaction, host = null) {
 // timer is already mounted.
 function rebuildSettledTimer(target, s) {
   if (!target || !s || target.querySelector('.msg-timer')) return;
-  if (!s.timerStart || !s.lastUsage) return;
-  const sec = (Date.now() - s.timerStart) / 1000;
-  const u = s.lastUsage;
-  const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
+  // Live data (timerStart/lastUsage) from a warm stream; persisted data
+  // (lastTurn) from a cold load after refresh. At least one must be set.
+  if (s.timerStart && s.lastUsage) {
+    var sec = (Date.now() - s.timerStart) / 1000;
+    var u = s.lastUsage;
+    var comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
+    var label = 'done';
+  } else if (s.lastTurn) {
+    var sec = s.lastTurn.sec;
+    var comp = s.lastTurn.completionTokens || 0;
+    var label = s.lastTurn.label || 'done';
+  } else {
+    return;
+  }
   const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
   const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
   const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   const parts = [
     `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
-    '<span class="mt-label">done</span>',
+    `<span class="mt-label">${label}</span>`,
     `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
@@ -501,6 +530,7 @@ function hydrateStreamFromData(s, data) {
   s.messages = (data.messages || []).slice();
   s.compaction = data.compaction || null;
   s.todos = data.todos || null;
+  s.lastTurn = data.lastTurn || null;
   // Messages loaded from the new JSONL are already persisted; those from a legacy
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
   s.persistedCount = (data && data._format === 'new') ? s.messages.length : 0;
@@ -4361,6 +4391,9 @@ function endTotalTimer(stream, label) {
         };
       }
     }
+    // Persist the finished turn's data so the timer can be rebuilt on cold
+    // loads (refresh → hydrateStreamFromData → renderConversation).
+    stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp };
   }
   stream.timerEl = null;
 }
