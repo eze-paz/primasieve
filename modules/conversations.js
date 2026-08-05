@@ -288,6 +288,7 @@ async function saveConv(convId, { touchUpdated = true } = {}) {
   }
 
   await refreshConversationList();
+  refreshPaneBars();
   // Distill lessons only on a turn-end save (touchUpdated:true) — never on the
   // ~1.2s mid-turn tick, which would snapshot a half-finished turn. The distiller
   // itself is cursor-gated so it re-runs each turn over only the NEW activity.
@@ -920,6 +921,7 @@ async function updateConvFile(id, patch) {
     // Keep a warm stream's mirrored fields in step so its next save doesn't revert them.
     const s = convStreams.get(id);
     if (s && 'compaction' in patch) s.compaction = patch.compaction || null;
+    _refreshPaneBarsFor(id);
     return;
   }
   if (loc.format === 'old') {
@@ -928,6 +930,7 @@ async function updateConvFile(id, patch) {
     Object.assign(data, patch);
     await opfs.write(p, JSON.stringify(data));
     Sandpie.events.emit('file:changed', p);
+    _refreshPaneBarsFor(id);
   }
 }
 async function renameConv(id, current) {
@@ -1353,6 +1356,7 @@ function _mountInPane(host, pane) {
   // to live on it, not on the pane. Guard against double-binding on re-mount.
   if (!host.dataset.spTracked) { setupScrollTracking(host); host.dataset.spTracked = '1'; }
   _placeHome();
+  refreshPaneBar(pane);
 }
 // #homeCenter (pinned grid + shared/team inbox) is CACHED by reference, never
 // re-looked-up by id: once it rides a conv-host out of the document,
@@ -1385,6 +1389,7 @@ function _placeHome() {
 function _evacuateHome(host) {
   const hc = _homeEl();
   if (hc && host && host !== hc && host.contains(hc)) appendContent($('messages'), hc);
+  if (host && host.parentNode) refreshPaneBar(host.parentNode);
 }
 async function enqueueFor(convId, content, pane) {
   if (!convId) { await ensureActiveConv(); convId = activeConvId; }
@@ -4161,6 +4166,85 @@ class SidePanel {
     });
   }
 }
+/* ---- per-pane titlebar (conversation title + ✕, top-right of each pane) ---- */
+// The bar inherits the fv-header/artifact-header look (sandpie.css .pane-titlebar);
+// it renders only while a conversation is mounted in the pane, is hidden on
+// mobile, and is suppressed in artifact/viewer modes by the same `> *:not(...)`
+// rules that hide everything else in those modes.
+const _paneBars = { messages: null, messagesSide: null };
+function _paneBarEl(pane) {
+  if (!pane) return null;
+  const key = pane.id === 'messagesSide' ? 'messagesSide' : 'messages';
+  if (!_paneBars[key] || !_paneBars[key].isConnected) {
+    _paneBars[key] = pane.querySelector(':scope > .pane-titlebar');
+  }
+  return _paneBars[key];
+}
+// Stored title first; fall back to the derived placeholder while the very first
+// save is still pending (a fresh conversation has no meta file yet).
+async function _paneTitleFor(id) {
+  const stored = await convTitle(id);
+  if (stored) return stored;
+  const s = convStreams.get(id);
+  if (s && s.messages && s.messages.length) return _deriveTitle(s.messages);
+  return '';
+}
+async function refreshPaneBar(pane) {
+  const bar = _paneBarEl(pane);
+  if (!bar) return;
+  const t = bar.querySelector('.pt-title');
+  if (!t) return;
+  const id = paneConvId(pane);
+  bar._req = (bar._req || 0) + 1;
+  const req = bar._req;
+  if (!id) { bar.style.display = 'none'; return; }   // no conversation mounted → no bar
+  bar.style.display = 'flex';
+  const title = (await _paneTitleFor(id)) || '';
+  if (req !== bar._req) return;                       // a newer refresh won the race
+  t.textContent = title || 'new chat';
+  t.classList.toggle('fresh', !title);
+  const x = bar.querySelector('.artifact-icon-btn');
+  if (x) x.title = pane.id === 'messagesSide'
+    ? 'Close side panel'
+    : (sidePanel && sidePanel.isOpen ? 'Close left panel' : 'Start a new chat');
+}
+function _refreshPaneBarsFor(convId) {
+  for (const pane of [$('messages'), $('messagesSide')]) {
+    if (pane && paneConvId(pane) === convId) refreshPaneBar(pane);
+  }
+}
+function refreshPaneBars() {
+  refreshPaneBar($('messages'));
+  refreshPaneBar($('messagesSide'));
+}
+// ✕ behavior: right pane closes the side panel; left pane closes the LEFT pane
+// (its conversation is parked, the right pane's is promoted to the main pane);
+// with a single pane open, ✕ behaves exactly like "+ New chat".
+function paneBarClose(pane) {
+  if (!pane) return;
+  if (pane.id === 'messagesSide') {
+    if (sidePanel && sidePanel.isOpen) sidePanel.close();
+    else if (typeof closeArtifactPanel === 'function') closeArtifactPanel();
+    return;
+  }
+  if (sidePanel && sidePanel.isOpen) {
+    parkPaneConv($('messages'));
+    sidePanel.close();
+  } else {
+    newConversation();
+  }
+}
+// Delegated ✕ clicks on either pane's titlebar.
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.pane-titlebar .artifact-icon-btn') : null;
+  if (!btn) return;
+  const bar = btn.closest('.pane-titlebar');
+  const pane = bar && bar.parentNode;
+  if (!pane) return;
+  e.preventDefault();
+  e.stopPropagation();
+  paneBarClose(pane);
+});
 let sidePanel = null;
 
 /* =============================================================================
@@ -4755,6 +4839,7 @@ function bootConversations() {
       } catch {  }
       mountConv(restoreId);
       renderConversation(s.messages, s.compaction);
+      refreshPaneBars();
     }
     const scrollEnd = () => { const m = paneScrollEl($('messages')); if (m) m.scrollTop = m.scrollHeight; };
     requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
