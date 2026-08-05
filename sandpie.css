@@ -357,7 +357,7 @@
   }
   body.side-open.active-left  #messagesSide:not(.viewer-mode):not(.artifact-mode):hover,
   body.side-open.active-right #messages:hover { opacity: 0.75; }
-  #messagesWrap.drop-target { outline: 2px dashed var(--sp-accent); outline-offset: -8px; }
+  #messagesWrap.drop-target .conv-host { outline: 2px dashed var(--sp-accent); outline-offset: -8px; }
   .msg { max-width: 85%; min-width: 0; padding: 0.75rem 1rem; line-height: 1.5; overflow-wrap: anywhere; position: relative; }
   .user {
     align-self: flex-end;
