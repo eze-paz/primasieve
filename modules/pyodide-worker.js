@@ -470,19 +470,24 @@ def _patched_lstat(path, *args, **kwargs):
         return r
 
 def _patched_access(path, mode, *args, **kwargs):
+    # os.access returns False on ENOENT (it does not raise), so a False result
+    # must also fall back to the cloud index.
     try:
-        return _orig_access(path, mode, *args, **kwargs)
+        r = _orig_access(path, mode, *args, **kwargs)
     except (FileNotFoundError, NotADirectoryError):
-        if kwargs.get('dir_fd') is not None:
-            raise
-        m = _cloud_meta(_cloud_rel(path))
-        if m is None:
-            raise
-        if mode == 0:
-            return True
-        if m.get('kind') == 'folder':
-            return bool(mode & (os.R_OK | os.W_OK | os.X_OK))
-        return bool(mode & (os.R_OK | os.W_OK))
+        r = False
+    if r:
+        return r
+    if kwargs.get('dir_fd') is not None:
+        return r
+    m = _cloud_meta(_cloud_rel(path))
+    if m is None:
+        return r
+    if mode == 0:
+        return True
+    if m.get('kind') == 'folder':
+        return bool(mode & (os.R_OK | os.W_OK | os.X_OK))
+    return bool(mode & (os.R_OK | os.W_OK))
 
 def _cloud_children(rel):
     if rel is None:
