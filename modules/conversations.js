@@ -1837,8 +1837,22 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
   const resolvedMessages = [];
   for (const msg of sendMessages) {
     if (msg.role === 'user' && Array.isArray(msg.content)) {
+      // A load_image result from an EARLIER turn: collapse the pixels back to a
+      // text note. buildAgentConfig runs once per turn, before the worker adds
+      // anything, so any _loadedImage message here already had its turn — the
+      // model read it then, and re-sending the base64 on every later turn costs
+      // context and bandwidth for an image nobody asked about again. It can always
+      // call load_image on the same path to look again (the tool description says
+      // so). Not applied to lastUser: an interrupted turn resumed right after
+      // load_image still needs the real pixels.
+      const collapseLoaded = !!msg._loadedImage && msg !== lastUser;
       const resolvedContent = [];
       for (const part of msg.content) {
+        if (part.type === 'image_url' && collapseLoaded) {
+          const p = String(part.image_url.url || '').replace(/^opfs:\/\//, '');
+          resolvedContent.push({ type: 'text', text: '[image ' + p + ' was loaded earlier in this conversation and is no longer attached — call load_image("' + p + '") again to re-examine it]' });
+          continue;
+        }
         if (part.type === 'image_url' && stripImages) {
           continue;                                   // history image → not for a text-only model
         }
