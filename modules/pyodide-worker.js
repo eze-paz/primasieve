@@ -153,6 +153,7 @@ async function initPyodide() {
         p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
         try { p.runPython(_HYDRATE_AUDIT_PY); } catch (e) { console.warn('[pyodide-worker] hydrate audit hook install failed:', e); }
         try { p.runPython(_CLOUD_FS_PY); } catch (e) { console.warn('[pyodide-worker] cloud fs view patch install failed:', e); }
+        _installFsFaultIn();   // generic cloud-index fault-in at the Emscripten FS layer
         console.log('[pyodide-worker] OPFS mounted at /files (cwd); FS tracking installed');
       } catch (e) {
         _nativefs = null;
@@ -233,6 +234,7 @@ async function _opfsGetFile(rel) {
 // ============================================================
 const _hydratedSet = new Set();
 const _hydrating = new Map();
+const _cloudDeleted = new Set();   // rels Python deleted this session (JS side, so the FS fault-in won't resurrect them)
 function _reportHydrated(rel) {
   try { self.postMessage({ type: 'forward-to-page', payload: { type: 'worker-hydrated', paths: [rel] } }); } catch (_) {}
 }
@@ -351,10 +353,58 @@ self._sandpie_cloud_delete = function (rel, isDir) {
   try {
     const r = String(rel || '').replace(/^\/+/, '');
     if (!r) return;
+    _cloudDeleted.add(r);                       // the FS fault-in must not resurrect it
     try { swOpfsDelete(r, !!isDir); } catch (_) {}
     try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [r] } }); } catch (_) {}
   } catch (_) {}
 };
+// ---- Generic FS-level fault-in (catch-all for C-level / any consumer) --------
+// Wraps the /files node_ops.lookup chokepoint. EVERY operation under /files —
+// Python open()/os.stat via the FS, os.open, sqlite3's C fopen, any compiled
+// wheel — resolves paths through this function. On ENOENT we consult the cloud
+// index and fault the entry in (files hydrate bytes, folders materialize as
+// empty dirs), then retry the original lookup. No per-extension rules: this
+// single wrapper covers every current and future C-level consumer. Reentrancy:
+// the wrapper unwraps itself while faulting in (hydration/mkdir write through
+// this same FS), and a per-rel guard + the JS deletion tombstone prevent
+// recursive fault-ins and resurrection of deleted files.
+function _installFsFaultIn() {
+  try {
+    const nops = py.FS.lookupPath('/files').node.node_ops;
+    const orig = nops.lookup;
+    const _faulting = new Set();
+    function _relOf(parent) {
+      const parts = [];
+      let n = parent, seen = 0;
+      while (n && n.name && seen < 64) { parts.push(n.name); n = n.parent; seen++; }
+      return '/' + parts.reverse().join('/');
+    }
+    const wrapped = function (parent, name) {
+      try { return orig(parent, name); }
+      catch (e) {
+        if (!e || e.errno !== 44) throw e;                 // ENOENT only
+        const rel = (_relOf(parent) + '/' + name).replace(/\/+/g, '/');
+        if (rel.indexOf('/files/') !== 0) throw e;         // outside /files — real miss
+        const r = rel.slice('/files/'.length);
+        if (!r || _relExempt(r) || _cloudDeleted.has(r) || _faulting.has(rel)) throw e;
+        if (!_dehydrated || !_dbxIndex) throw e;
+        const entry = _dbxIndex[r];
+        if (!entry) throw e;                               // genuinely absent — clean ENOENT
+        _faulting.add(rel);
+        try {
+          nops.lookup = orig;                              // unwrap: fault-in writes through this FS
+          try {
+            if (entry.kind === 'folder') { try { py.FS.mkdirTree('/files/' + r); } catch (_) {} }
+            else _sandpie_hydrate_sync('/files/' + r);
+          } finally { nops.lookup = wrapped; }
+        } finally { _faulting.delete(rel); }
+        return orig(parent, name);                         // retry
+      }
+    };
+    nops.lookup = wrapped;
+    console.log('[pyodide-worker] generic FS fault-in installed at /files');
+  } catch (e) { console.warn('[pyodide-worker] FS fault-in install failed:', e && e.message || e); }
+}
 // ---- Cloud-index view for Python (stat / listdir / scandir) ------------------
 // Expose the dehydrated cloud index to Python so its view of /files matches the
 // file viewer: os.path.exists/getsize, os.listdir, glob, pathlib all see cloud
