@@ -1378,14 +1378,8 @@ async function enqueueForActive(content) {
   await ensureActiveConv();
   await enqueueFor(activeConvId, content, $('messages'));
 }
-// Local in-page engines (LiteRT-LM / WebGPU) run their own loop with no steer
-// channel, so a mid-turn send there falls back to the queue.
-function _canSteerActive() {
-  try {
-    const a = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-    return !a || (a.type !== 'litertlm' && a.type !== 'webgpu');
-  } catch (_) { return true; }
-}
+// Every provider is steerable now that local engines are removed.
+function _canSteerActive() { return true; }
 function steerActive(s, content) {
   // Render a provisional bubble now for immediate feedback; the authoritative
   // array insert + persistence happen when the worker echoes it back as a
@@ -1644,7 +1638,7 @@ function getSandpieWorker() {
             // 1:1 was removed — the share tool publishes to a DEPARTMENT only.
             const dept = Array.isArray(pr.args.recipients) ? pr.args.recipients[0] : (pr.args.recipients || '');
             if (!dept) throw new Error('share: a department name is required (e.g. ["IT"]).');
-            const out = await s.publish(pr.args.path, dept, { title: String(pr.args.path).split('/').pop() });
+            const out = await s.publish(pr.args.path, dept, { title: String(pr.args.path).split('/').pop(), pinFile: pr.args.pinFile || undefined });
             try { await s.autoSync(); } catch (_) {}
             reply('Shared "' + pr.args.path + '" to ' + dept + (out && out.id ? ' (' + out.id + ')' : '') + '.');
           } catch (e) {
@@ -1768,15 +1762,8 @@ async function sendSingle(text, stream, opts = {}) {
     try { SandpieProviders.ensureUsable(); } catch (_) {}
   }
   const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  const _isLiteRTLM = !!(_active && _active.type === 'litertlm');
-  const _isWebGPU = !!(_active && _active.type === 'webgpu');
-  const _isLocal = _isLiteRTLM || _isWebGPU;
-  if (_isLocal) _localInferring = true;
-  if (!$('endpoint').value || !$('model').value || (!_isLocal && !$('apiKey').value)) {
-    addMsg('err',
-      _isLiteRTLM ? 'Pick a LiteRT-LM (Gemma) model in Settings before sending.' :
-      _isWebGPU ? 'Pick a WebGPU (Qwen3.5) model in Settings before sending.' :
-      'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
+  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
+    addMsg('err', 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
     return;
   }
   requestWakeLock();
@@ -1846,7 +1833,7 @@ async function sendSingle(text, stream, opts = {}) {
     else stream.abort.signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const renderer = new RoundRenderer(host, convMessages, _isLocal, convId);
+  const renderer = new RoundRenderer(host, convMessages, false, convId);
 
   let agentDoneSeen = false;
   let errorSeen = false;
@@ -1894,22 +1881,7 @@ async function sendSingle(text, stream, opts = {}) {
   };
   try {
 
-    if (!config.routedViaVision && _isLiteRTLM && typeof SandpieLiteRTLM !== 'undefined' && SandpieLiteRTLM.runConversation) {
-      // Local Gemma via Google AI Edge LiteRT-LM (WebGPU). Same page-side loop.
-      try { await SandpieQwen3?.unload?.(); } catch (_) {}
-      await SandpieLiteRTLM.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal },
-        dispatch,
-      );
-    } else {
-    const _isDense = _isWebGPU && typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
-      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === _active.endpoint);
-    if (!config.routedViaVision && _isDense && SandpieQwen3.runConversation) {
-      await SandpieQwen3.runConversation(
-        { provider: _active, messages: config.messages, systemPrompt: config.systemPrompt, tools: config.tools, convId, signal: ctrl.signal, logprobs: !!window.__SP_LOGPROBS__ },
-        dispatch,
-      );
-    } else {
+    { // always cloud worker — local engines removed
     const worker = getSandpieWorker();
     const _agentId = Math.random().toString(36).slice(2);
     stream.agentId = _agentId;   // steer target: enqueueForActive posts {type:'steer', id} here
@@ -1924,8 +1896,7 @@ async function sendSingle(text, stream, opts = {}) {
         host,
       );
     }
-    }   // end inner cloud else
-    }   // end outer else (litertlm not active)
+    }   // end cloud-worker-only block
   } catch (e) {
     if (e && (e.name === 'AbortError' || ctrl.signal.aborted)) {
       wasAborted = true;
@@ -1939,7 +1910,7 @@ async function sendSingle(text, stream, opts = {}) {
     if (stream.abort?.signal) stream.abort.signal.removeEventListener('abort', onAbort);
     stream.requestId = null;
 
-    _localInferring = false;
+    // local-LLM removed
     stream.agentId = null;   // no longer steerable once the loop has ended
     renderer.finalize();
     // Reconcile any steer messages the loop never got to inject (turn aborted or
@@ -4126,7 +4097,7 @@ window.sidePanel = sidePanel;
   });
 })();
 
-let _localInferring = false;
+// let _localInferring = false;  // local-LLM removed
 
 (function() {
   const messages = document.getElementById('messages');
@@ -4172,7 +4143,7 @@ let _localInferring = false;
     }
   }
   function onScroll() {
-    if (_localInferring) return;
+    // if (_localInferring) return;  // local-LLM removed
     updateTargets();
     if (!animating) {
       animating = true;

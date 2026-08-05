@@ -30,12 +30,9 @@ const AI_HTML = `
         <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
         <select id="spType">
           <option value="openai">API (OpenAI-compatible)</option>
-          <option value="litertlm">Local model (LiteRT-LM / Gemma, in-browser)</option>
-          <option value="webgpu">Local model (WebGPU Qwen3.5, in-browser)</option>
           <option value="hermes">API (Hermes local llama.cpp)</option>
         </select>
-        <select id="spLiteRTLMModel" style="display:none;"></select>
-        <select id="spWebGPUModel" style="display:none;"></select>
+
         <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
         <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
         <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
@@ -65,47 +62,10 @@ const AI_HTML = `
         </div>
       </div>
       <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
-      <div id="localCacheSection" style="margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); display:flex; flex-direction:column; gap:0.4rem;">
-        <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Local model storage</div>
-        <div style="font-size:0.72rem; color:var(--sp-text-dim);">In-browser models (LiteRT-LM / WebGPU) are cached on this device. Clearing frees the space; they re-download next time you use them.</div>
-        <button class="ghost" type="button" id="spClearModelCache">Clear cached local models</button>
-        <div id="spClearCacheStatus" style="font-size:0.7rem; color:var(--sp-text-dim);"></div>
-      </div>
+
     `;
 
-// Clear all cached in-browser model files. LiteRT-LM bytes live in Cache Storage
-// ('sandpie-litertlm-models'); WebGPU model files live in OPFS. Unload any resident
-// model first so the freed space isn't immediately re-held by the running engine.
-async function clearLocalModelCaches() {
-  const btn = document.getElementById('spClearModelCache');
-  const status = document.getElementById('spClearCacheStatus');
-  const setStatus = (t) => { if (status) status.textContent = t; };
-  if (!window.confirm('Clear all cached local models from this device? They will re-download the next time you use them.')) return;
-  if (btn) btn.disabled = true;
-  setStatus('Clearing…');
-  try {
-    try { await window.SandpieLiteRTLM?.unload?.(); } catch (_) {}
-    try { await window.SandpieQwen35?.unload?.(); await window.SandpieQwen35?.clearCache?.(); } catch (_) {}
-    let before = 0, after = 0;
-    try { before = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
-    let deleted = 0;
-    // LiteRT-LM uses Cache Storage; WebGPU OPFS cleared above.
-    if (typeof caches !== 'undefined') {
-      const names = await caches.keys();
-      const target = names.filter(n => n === 'sandpie-litertlm-models');
-      for (const n of target) { try { if (await caches.delete(n)) deleted++; } catch (_) {} }
-    }
-    try { after = (await navigator.storage.estimate()).usage || 0; } catch (_) {}
-    const freedMB = Math.max(0, before - after) / (1024 * 1024);
-    setStatus(deleted
-      ? `Cleared ${deleted} model cache${deleted > 1 ? 's' : ''}${freedMB >= 1 ? ` — ~${freedMB.toFixed(0)} MB freed` : ''}.`
-      : 'No cached local models found.');
-  } catch (e) {
-    setStatus('Error clearing cache: ' + ((e && e.message) || e));
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
+// clearLocalModelCaches removed (local LLM engines removed)
 
 // Prefer the gear modal (SandpieSettings); fall back to the sidebar (SandpieMenu).
 function init() {
@@ -134,48 +94,11 @@ function _wireProviderPanel() {
   if (visionSel && !visionSel._spBound) { visionSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); visionSel._spBound = true; }
   const typeSel = document.getElementById('spType');
   if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
-  const lrSel = document.getElementById('spLiteRTLMModel');
-  if (lrSel && !lrSel._spBound) {
-    if (typeof SandpieLiteRTLM !== 'undefined' && !lrSel.options.length) {
-      lrSel.innerHTML = '<option value="">— pick a model —</option>'
-        + SandpieLiteRTLM.DEFAULT_MODELS.map(m => `<option value="${m.modelId}">${m.label}</option>`).join('')
-        + '<option value="__custom">Custom .litertlm URL…</option>';
-    }
-    lrSel.addEventListener('change', () => {
-      const v = lrSel.value;
-      if (!v || v === '__custom') return;
-      const m = (typeof SandpieLiteRTLM !== 'undefined') ? SandpieLiteRTLM.DEFAULT_MODELS.find(x => x.modelId === v) : null;
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
-      commitForm();
-    });
-    lrSel._spBound = true;
-  }
-  // WebGPU model list = dense Qwen3 (fast prefill, no DeltaNet) + hybrid Qwen3.5 (better
-  // long-context). Both engines emit the same protocol; conversations.js routes by model id.
-  const _wgModels = () => [
-    ...((typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS) ? SandpieQwen3.DEFAULT_MODELS : []),
-    ...((typeof SandpieQwen35 !== 'undefined' && SandpieQwen35.DEFAULT_MODELS) ? SandpieQwen35.DEFAULT_MODELS : []),
-  ];
-  const wgSel = document.getElementById('spWebGPUModel');
-  if (wgSel && !wgSel._spBound) {
-    if (!wgSel.options.length) {
-      wgSel.innerHTML = '<option value="">— pick a model —</option>'
-        + _wgModels().map(m => `<option value="${m.modelId}">${m.label}</option>`).join('');
-    }
-    wgSel.addEventListener('change', () => {
-      const v = wgSel.value; if (!v) return;
-      const m = _wgModels().find(x => x.modelId === v);
-      const ep = document.getElementById('spEndpoint'); if (ep) ep.value = v;
-      const mo = document.getElementById('spModel'); if (mo && m) mo.value = m.id;
-      commitForm();
-    });
-    wgSel._spBound = true;
-  }
+  // spLiteRTLMModel wiring removed (local LLM engines removed)
+  // spWebGPUModel wiring removed (local LLM engines removed)
   document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
   document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
-  const _clearBtn = document.getElementById('spClearModelCache');
-  if (_clearBtn && !_clearBtn._spBound) { _clearBtn._spBound = true; _clearBtn.addEventListener('click', clearLocalModelCaches); }
+  // spClearModelCache wiring removed (local LLM engines removed)
   if (_activeProviderId) loadFormFor(_activeProviderId);
   applyTypeUI();
   updateRoutingHint();
@@ -241,41 +164,14 @@ function getActiveProvider() {
 // One-shot, NON-streaming completion — the shared utility path for background
 // summarization (native compactor + memory/note agents). Never touches the
 // conversation stream, so it emits no generation:complete. Routes to whatever
-// provider is active: in-browser LiteRT-LM / WebGPU engines, or a cloud
-// /chat/completions endpoint. Returns the assistant text (may be '').
+// provider is active. Returns the assistant text (may be ''). Returns the assistant text (may be '').
 // maxTokens: null (default) sends NO max_tokens on the wire for cloud providers
 // (OpenAI-spec default — the model's own cap). In-browser engines still need a
 // concrete generation budget, so the local paths below fall back to 1024.
 async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal, noReasoning = false } = {}) {
   const active = getActiveProvider();
   const localMax = maxTokens != null ? maxTokens : 1024;
-  if (active && active.type === 'litertlm') {
-    if (typeof SandpieLiteRTLM === 'undefined' || !SandpieLiteRTLM.runConversation) throw new Error('LiteRT-LM engine not loaded');
-    let out = '';
-    await SandpieLiteRTLM.runConversation({
-      provider: { ...active, maxTokens: localMax },
-      messages: [{ role: 'user', content: user }],
-      systemPrompt: system, tools: [], convId: null, signal,
-      logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
-    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
-    return out;
-  }
-  if (active && active.type === 'webgpu') {
-    // Route to the SAME engine the chat uses (dense Qwen3 vs hybrid Qwen3.5) so a
-    // utility prompt doesn't load the other model.
-    const isDense = typeof SandpieQwen3 !== 'undefined' && SandpieQwen3.DEFAULT_MODELS
-      && SandpieQwen3.DEFAULT_MODELS.some(m => m.modelId === active.endpoint);
-    const eng = isDense ? SandpieQwen3 : (typeof SandpieQwen35 !== 'undefined' ? SandpieQwen35 : null);
-    if (!eng || !eng.runConversation) throw new Error('WebGPU engine not loaded');
-    let out = '';
-    await eng.runConversation({
-      provider: { endpoint: active.endpoint, maxTokens: localMax },
-      messages: [{ role: 'user', content: user }],
-      systemPrompt: system, tools: [], convId: null, signal,
-      logprobs: (typeof window !== 'undefined' && window.__SP_LOGPROBS__) || false,
-    }, (ev) => { if (ev && ev.type === 'delta' && ev.delta && typeof ev.delta.content === 'string') out += ev.delta.content; });
-    return out;
-  }
+  // local-LM inference paths removed
   const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
   const apiKey = document.getElementById('apiKey')?.value || '';
   const mdl = model || document.getElementById('model')?.value || '';
@@ -394,14 +290,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
 // conversations.js reads (endpoint/model/apiKey/proxyUrl).
 function applyActiveProvider() {
   const p = getActiveProvider();
-  // In-browser WebGPU backends: hybrid Qwen3.5 + dense Qwen3. When switching to a cloud
-  // provider, eagerly free both GPU contexts (no-op if not loaded). The active-engine swap
-  // between the two webgpu models is handled in conversations.js (single active local model).
-  try {
-    const _t = p && p.type;
-    if (_t !== 'litertlm') window.SandpieLiteRTLM?.unload?.();
-    if (_t !== 'webgpu') { window.SandpieQwen35?.unload?.(); window.SandpieQwen3?.unload?.(); }
-  } catch (_) {}
+  // local-LLM engine unload removed
   const ep = document.getElementById('endpoint');
   const mo = document.getElementById('model');
   const ak = document.getElementById('apiKey');
@@ -590,60 +479,33 @@ function loadFormFor(id) {
   renderVisionFallbackOptions(p.id);
   set('spVisionFallback', p.visionFallbackId || '');
   set('spType', p.type || 'openai');
-  const lr = document.getElementById('spLiteRTLMModel');
-  if (lr) lr.value = (p.type === 'litertlm' && p.endpoint) ? p.endpoint : '';
-  const wg = document.getElementById('spWebGPUModel');
-  if (wg) wg.value = (p.type === 'webgpu' && p.endpoint) ? p.endpoint : '';
+  // spLiteRTLMModel/spWebGPUModel value setting removed (local LLM engines removed)
   applyTypeUI();
 }
 
 // Show/hide provider fields based on the selected backend type.
 function applyTypeUI() {
   const type = (document.getElementById('spType')?.value) || 'openai';
-  const litertlm = type === 'litertlm';
-  const webgpu = type === 'webgpu';
   const hermes = type === 'hermes';
-  const local = litertlm || webgpu;
   const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  show('spLiteRTLMModel', litertlm);
-  show('spWebGPUModel', webgpu);
-  show('spApiKey', !local);
-  show('spProxyUrl', !local);
-  show('spReasoningEffort', !local);
-  show('spProviderOrder', !local);
+  show('spApiKey', !hermes);
+  show('spProxyUrl', !hermes);
+  show('spReasoningEffort', !hermes);
+  show('spProviderOrder', !hermes);
   // Fallback choice only matters once a preferred-provider order is set.
   const hasOrder = !!(document.getElementById('spProviderOrder')?.value || '').trim();
-  show('spAllowFallbacks', !local && hasOrder);
-  // Vision capability (yes/no) + vision-fallback picker. The fallback only matters
-  // when the model is text-only (no), so it hides once the user marks vision:yes.
+  show('spAllowFallbacks', !hermes && hasOrder);
+  // Vision capability (yes/no) + vision-fallback picker.
   show('spVision', true);
   const vision = (document.getElementById('spVision')?.value) || 'yes';
   show('spVisionFallback', vision === 'no');
-  // litertlm: context window (maxNumTokens) + reasoning toggle. webgpu: context size (sizes the
-  // KV window MAX_SEQ) + max output tokens. Context input shown for every type now.
   show('spContextWindow', true);
-  show('spTemperature', !local);
-  show('spTopP', !local);
-  // Reasoning select: only LiteRT-LM exposes a Gemma thinking toggle.
-  let rsn = document.getElementById('spReasoning');
-  if (!rsn && litertlm) {
-    // Lazily inject the reasoning select after the context window field if not present.
-    const cw = document.getElementById('spContextWindow');
-    if (cw && cw.parentNode) {
-      rsn = document.createElement('select');
-      rsn.id = 'spReasoning';
-      rsn.innerHTML = '<option value="auto">Thinking: auto (model default)</option>'
-        + '<option value="think">Thinking: on</option>'
-        + '<option value="no_think">Thinking: off</option>';
-      rsn.addEventListener('change', commitForm);
-      cw.parentNode.insertBefore(rsn, cw.nextSibling);
-    }
-  }
-  if (rsn) rsn.style.display = litertlm ? '' : 'none';
+  show('spTemperature', !hermes);
+  show('spTopP', !hermes);
   const ep = document.getElementById('spEndpoint');
-  if (ep) ep.placeholder = local ? 'Model ID (picker above)' : 'Base URL (e.g. https://api.openai.com/v1)';
+  if (ep) ep.placeholder = 'Base URL (e.g. https://api.openai.com/v1)';
   const cw = document.getElementById('spContextWindow');
-  if (cw) cw.placeholder = webgpu ? 'Context size (default 4096; ↑ = more GPU memory)' : (litertlm ? 'Max tokens (default 4096)' : 'Context window (e.g. 128000)');
+  if (cw) cw.placeholder = 'Context window (e.g. 128000)';
 }
 
 // Populate the vision-fallback dropdown with every vision-CAPABLE provider except
@@ -666,12 +528,9 @@ function renderVisionFallbackOptions(activeId) {
   sel.value = prev;
 }
 
-// Does this provider accept images? Local in-browser engines (LiteRT-LM / WebGPU)
-// are always text-only regardless of the setting; cloud providers can see unless
-// explicitly marked vision:no (an unset field keeps legacy behavior = can see).
+// Cloud providers can see images unless explicitly marked vision:no.
 function providerCanSee(p) {
   if (!p) return false;
-  if (p.type === 'webgpu' || p.type === 'litertlm') return false;
   return p.vision !== 'no';
 }
 
@@ -808,11 +667,7 @@ function updateRoutingHint() {
   const remote = (document.getElementById('proxyUrl')?.value || '').trim();
   const hint = document.getElementById('routingHint');
   if (!hint) return;
-  if (active?.type === 'litertlm') {
-    hint.textContent = 'In-browser LiteRT-LM · ' + (active.model || 'Gemma');
-  } else if (active?.type === 'webgpu') {
-    hint.textContent = 'In-browser WebGPU · ' + (active.model || 'Qwen3.5');
-  } else if (active?.type === 'hermes') {
+  if (active?.type === 'hermes') {
     hint.textContent = 'Hermes local llama.cpp via ' + (active.endpoint || '(no endpoint set)');
   } else if (remote) {
     hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
@@ -826,7 +681,7 @@ function updateRoutingHint() {
 function refreshAiDot() {
   const ep = document.getElementById('endpoint')?.value.trim();
   const active = getActiveProvider();
-  const local = (active?.type === 'litertlm' || active?.type === 'webgpu' || active?.type === 'hermes');
+  const local = (active?.type === 'hermes');
   const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }

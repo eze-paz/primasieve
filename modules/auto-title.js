@@ -87,7 +87,7 @@ const SandpieAutoTitle = (function () {
     const a = String(assistantText || '').trim().slice(0, CHARS_PER_MSG);
 
     const active = SandpieProviders.getActive ? SandpieProviders.getActive() : null;
-    const isLocal = !!active && (active.type === 'litertlm' || active.type === 'webgpu');
+    const isLocal = false;  // local-LLM engines removed
     let user = 'User: ' + u + (a ? '\n\nAssistant: ' + a : '');
     if (isLocal) user += '\n\n/no_think';
 
