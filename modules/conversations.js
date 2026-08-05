@@ -1818,8 +1818,17 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
   const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
   const canSee = (active && typeof SandpieProviders.providerCanSee === 'function')
     ? SandpieProviders.providerCanSee(active) : true;
-  const lastUser = [...sendMessages].reverse().find(m => m.role === 'user' && Array.isArray(m.content));
-  const currentHasImages = !!(lastUser && lastUser.content.some(p => p.type === 'image_url'));
+  // "Current" means the message being sent NOW: the last user message, whatever
+  // shape its content has. This used to search for the last user message with
+  // ARRAY content, which silently skipped every plain-text follow-up (a typed
+  // message is a string — SandpieImages.buildContent only returns an array when
+  // something is attached). So once a conversation contained one image message it
+  // stayed "current" forever: every later turn was rerouted to the vision
+  // fallback, and stripImages below — the guard written for exactly this case —
+  // never fired, so the image was re-resolved to base64 and resent every turn.
+  const lastUser = [...sendMessages].reverse().find(m => m.role === 'user');
+  const currentHasImages = !!(lastUser && Array.isArray(lastUser.content)
+    && lastUser.content.some(p => p.type === 'image_url'));
   const visionFallback = (!canSee && typeof SandpieProviders.resolveVisionFallback === 'function')
     ? SandpieProviders.resolveVisionFallback(active) : null;
   let effective = active;
