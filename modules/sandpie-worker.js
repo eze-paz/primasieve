@@ -853,7 +853,7 @@ async function tool_share(args, ctx) {
     }, SHARE_TIMEOUT);
     _shareReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
     try {
-      self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, permissions: level } } });
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, permissions: level, pinFile: args.pinFile || undefined } } });
     } catch (e) {
       clearTimeout(timer); _shareReqs.delete(id);
       resolve({ result: 'Error: could not reach the page to perform the share (' + ((e && e.message) || e) + ').' });
