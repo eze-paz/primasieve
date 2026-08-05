@@ -1073,7 +1073,11 @@ function buildConvLi(c, idx) {
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
   if (stream && stream.generating) {
-    meta.classList.add('gen-dot');
+    // Render the pulsing dot INSIDE the fixed-width conv-meta so the dot's
+    // width (0/7px) never collapses the meta to min-width:0.
+    const dot = document.createElement('span');
+    dot.className = 'gen-dot';
+    meta.appendChild(dot);
     meta.title = 'Still generating…';
   } else {
     meta.textContent = fmtRelTime(c.updated);

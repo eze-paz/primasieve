@@ -828,7 +828,6 @@ ul.conv-list li.active {
   }
   ul.conv-list li.archived-toggle:hover { color: var(--sp-text-dim); background: transparent; border: none; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
-  ul.conv-list li .conv-meta.gen-dot,
   ul.conv-list li .gen-dot {
     display: inline-block;
     width: 7px; height: 7px;
@@ -842,11 +841,14 @@ ul.conv-list li.active {
     animation: status-dot-pulse 0.9s ease-in-out infinite;
   }
   ul.conv-list li .conv-meta {
+    width: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
     font-size: 0.6rem;
     color: var(--sp-text-dim);
     opacity: 0.6;
     flex-shrink: 0;
-    min-width: 1.5rem;
     text-align: right;
     user-select: none;
   }
