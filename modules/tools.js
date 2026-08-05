@@ -332,6 +332,50 @@ LINK related memories: reference other facts inside the body as [[their-name]] (
       },
     },
 
+    ask: {
+      description: `Ask the user to choose between concrete options to resolve genuine ambiguity — a multiple-choice clarification the user answers with one click.
+
+USE THIS when the user's prompt has an INTERPRETABLE AMBIGUITY: a fork where guessing wrong would waste significant work or produce a result they did not want, and the conversation context does not already make the intent clear. Ask EARLY, before doing the work, not after.
+
+TRIGGERS (ask when any of these is genuinely ambiguous):
+- Scope: "make a report on the ACS200" when several ACS200 variants/sites exist.
+- Target/format: "send it to the team" when the recipient or channel is unclear.
+- Direction: "reduce the cost" when several diverging cost levers exist.
+- Constraints: a deadline, priority, budget, or language that changes the approach.
+- Conflicting requirements where you must settle on one reading.
+
+DO NOT USE when:
+- The choice is trivial and you can safely assume a sensible default (pick it and state it).
+- Prior context or earlier turns already disambiguate the intent.
+- The user can simply answer in their next message without wasted work.
+- It is a matter of taste you can decide yourself.
+
+ALWAYS BATCH: if several ambiguities exist, ask them ALL in ONE call (multiple questions), never one question at a time. Keep to at most 4 questions per call.
+Each question must be phrased as a clear choice with 2-5 mutually exclusive, non-overlapping options, and you MUST set a default (the option you would pick if the user skips) so a single click resolves it. Prefer short, concrete option labels.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          questions: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 4,
+            description: 'The clarification questions to ask, batched together. All are shown at once.',
+            items: {
+              type: 'object',
+              properties: {
+                question: { type: 'string', description: 'The clarification, phrased as a choice. Concise and specific.' },
+                options: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' }, description: '2-5 mutually exclusive, concrete options. No overlap.' },
+                allow_freeform: { type: 'boolean', description: 'If true, ALSO offer a free-text "Other" input so the user can type a custom answer (default false).' },
+                default: { type: 'string', description: 'The option that is pre-selected if the user skips. Must exactly match one of options.' },
+              },
+              required: ['question', 'options'],
+            },
+          },
+        },
+        required: ['questions'],
+      },
+    },
+
 };
 //// Lets the user (Settings → System prompt) turn tools off and rewrite their
 // descriptions. Stored globally so it applies to every conversation. toolDefs()

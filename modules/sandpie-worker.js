@@ -143,7 +143,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.18.0-write-todos';
+const WORKER_VERSION = '2.19.0-ask';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -233,6 +233,14 @@ self.addEventListener('message', async (event) => {
   if (data.type === 'console-result') {
     const d = _consoleReqs.get(data.id);
     if (d) { _consoleReqs.delete(data.id); d.resolve({ result: data.result }); }
+    return;
+  }
+
+  // Page → worker reply to an ask() request (see tool_ask below). Resolves the
+  // deferred the tool is awaiting with the user's answers.
+  if (data.type === 'ask-result') {
+    const d = _askReqs.get(data.id);
+    if (d) { _askReqs.delete(data.id); d.resolve({ result: data.result }); }
     return;
   }
 
@@ -868,6 +876,7 @@ async function tool_share(args, ctx) {
 // page (forward-to-page relay) and awaits the console-result reply.
 const CONSOLE_TIMEOUT = 30000;
 const _consoleReqs = new Map();
+const _askReqs = new Map();   // ask tool — pending user-clarification promises
 
 async function tool_html_console({ path }, ctx) {
   const id = 'console_' + Math.random().toString(36).slice(2);
@@ -882,6 +891,58 @@ async function tool_html_console({ path }, ctx) {
     } catch (e) {
       clearTimeout(timer); _consoleReqs.delete(id);
       resolve({ result: 'Error: could not reach the page to read the console (' + ((e && e.message) || e) + ').' });
+    }
+  });
+}
+
+// ---- ask() — worker → page round-trip for user clarifications -------
+// The worker posts the questions to the page (forward-to-page relay), the page
+// renders them as a multiple-choice card, and the user clicks an option. The
+// page replies ask-result with the chosen answers, and this promise resolves.
+// The loop is BLOCKED (suspended) while waiting — no new rounds until the user
+// answers. If the user hits stop, ctx.signal aborts and the promise rejects.
+async function tool_ask({ questions }, ctx) {
+  if (!Array.isArray(questions) || !questions.length) {
+    return { result: 'Error: "questions" is required (array of question objects with question + options).' };
+  }
+  if (questions.length > 4) {
+    return { result: 'Error: maximum 4 questions per call — batch them into one ask call.' };
+  }
+  for (const q of questions) {
+    if (!q.question || !Array.isArray(q.options) || q.options.length < 2) {
+      return { result: 'Error: each question needs "question" (string) and "options" (array of 2-5 strings).' };
+    }
+    if (q.default && !q.options.includes(q.default)) {
+      return { result: 'Error: default "' + q.default + '" is not in options for question: ' + q.question };
+    }
+  }
+  // Sanitize: ensure each question has a default set (first option if none given)
+  const sanitized = questions.map(q => ({
+    ...q,
+    default: q.default || q.options[0],
+    allow_freeform: !!q.allow_freeform,
+  }));
+  const id = 'ask_' + Math.random().toString(36).slice(2);
+  return new Promise((resolve) => {
+    // No timeout — the user can take as long as they need. But wire to abort.
+    const onAbort = () => {
+      _askReqs.delete(id);
+      if (!resolved) { resolved = true; resolve({ result: 'Error: ask request aborted (turn stopped).' }); }
+    };
+    let resolved = false;
+    if (ctx && ctx.signal) {
+      if (ctx.signal.aborted) { onAbort(); return; }
+      ctx.signal.addEventListener('abort', onAbort, { once: true });
+    }
+    _askReqs.set(id, { resolve: (out) => { if (!resolved) { resolved = true; resolve(out); } } });
+    try {
+      self.postMessage({ type: 'forward-to-page', payload: {
+        type: 'ask-question', id,
+        tcId: (ctx && ctx._currentToolCallId) || '',
+        args: { questions: sanitized }
+      }});
+    } catch (e) {
+      _askReqs.delete(id); if (!resolved) { resolved = true; resolve({ result: 'Error: could not reach the page to ask (' + ((e && e.message) || e) + ').' }); }
     }
   });
 }
@@ -1383,7 +1444,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','ask'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -1446,6 +1507,7 @@ async function runTool(name, args, ctx) {
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
     case 'html_console':  return tool_html_console(args, ctx);
+    case 'ask':           return tool_ask(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
     case 'read_file':     return tool_read_file(args, ctx);

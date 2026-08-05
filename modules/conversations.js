@@ -383,6 +383,27 @@ function renderHistoricalMessage(m, host = null) {
           if (box) { renderTodos(tcId, todos, target); }
           else { target.appendChild(buildTodosView(todos)); }
         }
+      } else if (sent.startsWith('answers:')) {
+        // Tool result: answered questions — render a read-only summary
+        const nl = sent.indexOf('\n');
+        const json = sent.slice('answers:'.length, nl < 0 ? undefined : nl);
+        let answers = null;
+        try { answers = JSON.parse(json); } catch (_) {}
+        if (Array.isArray(answers) && answers.length) {
+          const box = _toolBoxEl(tcId, target);
+          if (box) {
+            const existing = box.querySelector('.tool-result');
+            if (existing) existing.remove();
+            const sep = box.querySelector('.tool-sep');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'tool-result';
+            resultDiv.textContent = '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 ');
+            if (sep) sep.after(resultDiv);
+            else box.appendChild(resultDiv);
+          }
+        } else {
+          appendToolResult(tcId, content, target);
+        }
       } else if (!sent.startsWith('artifact:')) {
         // Full result, untruncated — the user sees exactly what the model sees.
         appendToolResult(tcId, content, target);
@@ -1073,12 +1094,20 @@ function buildConvLi(c, idx) {
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
   if (stream && stream.generating) {
-    // Render the pulsing dot INSIDE the fixed-width conv-meta so the dot's
-    // width (0/7px) never collapses the meta to min-width:0.
-    const dot = document.createElement('span');
-    dot.className = 'gen-dot';
-    meta.appendChild(dot);
-    meta.title = 'Still generating…';
+    // If there's a pending ask question, show the '?' indicator instead of the dot
+    if (_askingConvs.has(c.id)) {
+      meta.textContent = '?';
+      meta.title = 'Esperando respuesta a una pregunta';
+      meta.style.color = 'var(--sp-accent)';
+      meta.style.fontWeight = '700';
+    } else {
+      // Render the pulsing dot INSIDE the fixed-width conv-meta so the dot's
+      // width (0/7px) never collapses the meta to min-width:0.
+      const dot = document.createElement('span');
+      dot.className = 'gen-dot';
+      meta.appendChild(dot);
+      meta.title = 'Still generating…';
+    }
   } else {
     meta.textContent = fmtRelTime(c.updated);
     const lastViewed = convLastViewed.get(c.id);
@@ -1188,6 +1217,9 @@ function setStreamSending(stream, sending) {
   if (sending) {
     stream.abort = new AbortController();
     stream.generating = true;
+    // A new turn starts fresh — clear any stale pending-ask flag for this conv
+    // (left behind if a previous turn was aborted mid-question).
+    _askingConvs.delete(activeConvId);
   } else {
     stream.abort = null;
     stream.generating = false;
@@ -1393,13 +1425,14 @@ function handleButtonClick(which = 'main') {
 }
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
 // Created once per page load. Other modules reach it via window._sandpieWorker.
+let _askingConvs = new Set();    // conversation ids with a pending ask( ) question
 let _sandpieWorker = null;
 function getSandpieWorker() {
   if (_sandpieWorker) return _sandpieWorker;
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=91');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=92');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1496,6 +1529,26 @@ function getSandpieWorker() {
             reply('Error reading console: ' + ((e && e.message) || e));
           }
         })();
+        return;
+      }
+      // ask tool: the worker posts a ask-question; the page renders the question
+      // card into the conversation and waits for the user to click an option.
+      if (msg.payload && msg.payload.type === 'ask-question') {
+        const pr = msg.payload;
+        const convId = activeConvId;
+        if (convId) _askingConvs.add(convId);
+        if (pr.tcId) renderQuestions(pr.tcId, pr.args && pr.args.questions);
+        else {
+          const host = $('messages');
+          if (host) host.appendChild(buildQuestionsView(pr.args && pr.args.questions, null));
+        }
+        refreshConversationList();
+        const reply = (result) => {
+          if (convId) _askingConvs.delete(convId);
+          refreshConversationList();
+          try { _sandpieWorker.postMessage({ type: 'ask-result', id: pr.id, result }); } catch (_) {}
+        };
+        setTimeout(() => wireAskCard(pr, reply), 50);
         return;
       }
       return;
@@ -2334,6 +2387,141 @@ function renderTodos(tcId, todos, scopeEl) {
 }
 
 // Build a checklist DOM element from a todos array.
+// Render the ask question card inside a tool-call box, in place of a text result.
+function renderQuestions(tcId, questions) {
+  const toolCallDiv = _toolBoxEl(tcId);
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  const existingAsk = box.querySelector('.ask-card');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+  if (existingAsk) existingAsk.remove();
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  const card = buildQuestionsView(questions || [], null);
+  box.appendChild(sep);
+  box.appendChild(card);
+}
+
+// Build a multiple-choice question card DOM element from a questions array.
+function buildQuestionsView(questions, onAnswer) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ask-card';
+  const head = document.createElement('div');
+  head.className = 'ask-card-head';
+  const qIcon = document.createElement('span');
+  qIcon.className = 'ask-q-icon';
+  qIcon.textContent = '?';
+  const headLabel = document.createElement('span');
+  headLabel.textContent = 'Clarificaci\u00f3n' + (questions && questions.length > 1 ? ' \u00b7 ' + questions.length + ' preguntas' : '');
+  head.append(qIcon, headLabel);
+  wrap.appendChild(head);
+  for (let i = 0; i < (questions || []).length; i++) {
+    const q = questions[i];
+    const qBlock = document.createElement('div');
+    qBlock.className = 'ask-q';
+    const qText = document.createElement('div');
+    qText.className = 'ask-q-text';
+    qText.textContent = q.question || '';
+    qBlock.appendChild(qText);
+    const options = q.options || [];
+    for (const opt of options) {
+      const row = document.createElement('div');
+      row.className = 'ask-option' + (opt === q.default ? ' selected' : '');
+      const radio = document.createElement('span');
+      radio.className = 'ask-radio' + (opt === q.default ? ' on' : '');
+      const label = document.createElement('span');
+      label.className = 'opt-label';
+      label.textContent = opt;
+      row.append(radio, label);
+      if (opt === q.default && options.length > 2) {
+        const rec = document.createElement('span');
+        rec.className = 'opt-rec';
+        rec.textContent = 'recomendado';
+        row.appendChild(rec);
+      }
+      row.onclick = () => {
+        qBlock.querySelectorAll('.ask-option').forEach(o => {
+          o.classList.remove('selected');
+          const r = o.querySelector('.ask-radio'); if (r) r.classList.remove('on');
+        });
+        row.classList.add('selected');
+        row.querySelector('.ask-radio').classList.add('on');
+      };
+      qBlock.appendChild(row);
+    }
+    // Free-text "Other" input for every question (enabled only if allow_freeform)
+    const freeRow = document.createElement('div');
+    freeRow.className = 'ask-free-row';
+    const sp = document.createElement('span');
+    sp.className = 'ask-free-tag';
+    sp.textContent = 'Otro:';
+    const freeInput = document.createElement('input');
+    freeInput.type = 'text';
+    freeInput.className = 'ask-free-input';
+    freeInput.placeholder = q.allow_freeform ? 'Escribe tu propia respuesta\u2026' : 'No habilitado';
+    freeInput.disabled = !q.allow_freeform;
+    freeRow.append(sp, freeInput);
+    qBlock.appendChild(freeRow);
+    wrap.appendChild(qBlock);
+  }
+  const actions = document.createElement('div');
+  actions.className = 'ask-actions';
+  const defBtn = document.createElement('button');
+  defBtn.className = 'ask-btn use-defaults';
+  defBtn.textContent = 'Usar recomendados';
+  const contBtn = document.createElement('button');
+  contBtn.className = 'ask-btn primary';
+  contBtn.textContent = 'Responder';
+  actions.append(defBtn, contBtn);
+  wrap.appendChild(actions);
+  return wrap;
+}
+
+// Wire the ask card's buttons + free-text inputs to the reply callback.
+function wireAskCard(pr, reply) {
+  const box = pr.tcId ? _toolBoxEl(pr.tcId) : null;
+  if (!box) { reply('answers:[]'); return; }
+  const card = box.querySelector('.ask-card');
+  if (!card) { reply('answers:[]'); return; }
+  const questions = (pr.args && pr.args.questions) || [];
+  const getAnswers = () => {
+    return questions.map((q, i) => {
+      const qBlock = card.querySelectorAll('.ask-q')[i];
+      if (!qBlock) return { question: q.question, answer: q.default || (q.options && q.options[0]) || '' };
+      const selected = qBlock.querySelector('.ask-option.selected');
+      const freeInput = qBlock.querySelector('.ask-free-input');
+      if (freeInput && !freeInput.disabled && freeInput.value.trim()) {
+        return { question: q.question, answer: freeInput.value.trim() };
+      }
+      if (selected) {
+        const label = selected.querySelector('.opt-label');
+        return { question: q.question, answer: (label ? label.textContent.trim() : (q.default || q.options[0])) };
+      }
+      return { question: q.question, answer: q.default || (q.options && q.options[0]) || '' };
+    });
+  };
+  const contBtn = card.querySelector('.ask-btn.primary');
+  if (contBtn) { contBtn.onclick = () => reply('answers:' + JSON.stringify(getAnswers())); }
+  const defBtn = card.querySelector('.ask-btn.use-defaults');
+  if (defBtn) {
+    defBtn.onclick = () => {
+      const answers = questions.map(q => ({ question: q.question, answer: q.default || (q.options && q.options[0]) || '' }));
+      reply('answers:' + JSON.stringify(answers));
+    };
+  }
+}
+
 function buildTodosView(todos) {
   const wrap = document.createElement('div');
   wrap.className = 'tool-todos';
@@ -2457,7 +2645,7 @@ function buildToolBox(args, toolName) {
   const box = document.createElement('div');
   box.className = 'tool-box';
   // write_todos renders the result as a checklist card; raw JSON is noise.
-  if (name === 'write_todos') return box;
+  if (name === 'write_todos' || name === 'ask') return box;
 
   let code = '';
   try {
@@ -2519,7 +2707,7 @@ function renderTcDone(div, fname) {
   // The user can still collapse it by clicking the header.
   //   load_image  → the loaded image
   //   write_todos → the checklist card (otherwise the user never sees the todos)
-  if (fname === 'load_image' || fname === 'write_todos') div.classList.add('expanded');
+  if (fname === 'load_image' || fname === 'write_todos' || fname === 'ask') div.classList.add('expanded');
 }
 
 class RoundRenderer {

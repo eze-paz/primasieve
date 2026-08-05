@@ -1456,6 +1456,131 @@ ul.conv-list li.active {
   .tool-box .tool-todo-audit-badge.audit-clickable { cursor: pointer; }
   .tool-box .tool-todo-audit-badge.audit-clickable:hover { filter: brightness(1.3); }
   .tool-todo-audit-log { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; margin: 0; padding: 8px 4px; }
+  /* ask-card: multiple-choice clarification inside tool-call boxes */
+  .ask-card {
+    padding: 0.5rem 0.65rem 0.55rem;
+    font: 12px/1.5 'JetBrains Mono','Space Mono',ui-monospace,monospace;
+  }
+  .ask-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.45rem;
+    color: var(--sp-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+  }
+  .ask-card-head .ask-q-icon {
+    background: var(--accent-dim, rgba(88,166,255,0.35));
+    color: var(--sp-accent);
+    border-radius: 50%;
+    width: 16px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .ask-q {
+    padding: 0.35rem 0 0.15rem;
+    border-top: 1px solid var(--sp-border);
+    margin-top: 0.25rem;
+  }
+  .ask-q:first-of-type { border-top: none; margin-top: 0; }
+  .ask-q-text {
+    color: var(--sp-text);
+    font-size: 11.5px;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+  }
+  .ask-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s;
+    font-size: 11px;
+  }
+  .ask-option:hover { background: var(--sp-panel); }
+  .ask-option.selected { background: var(--accent-dim, rgba(88,166,255,0.35)); }
+  .ask-radio {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid var(--sp-border-bright, #484f58);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.12s;
+  }
+  .ask-option:hover .ask-radio { border-color: var(--sp-accent); }
+  .ask-radio.on { border-color: var(--sp-accent); }
+  .ask-radio.on::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--sp-accent); }
+  .opt-label { flex: 1; }
+  .opt-rec {
+    font-size: 9px;
+    color: var(--sp-text-dim);
+    background: var(--sp-panel);
+    padding: 0 5px;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+  }
+  .ask-free-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    padding-left: 0.45rem;
+  }
+  .ask-free-tag {
+    font-size: 10px;
+    color: var(--sp-text-dim);
+    flex-shrink: 0;
+  }
+  .ask-free-input {
+    flex: 1;
+    background: var(--sp-panel);
+    border: 1px solid var(--sp-border);
+    border-radius: 4px;
+    padding: 0.2rem 0.45rem;
+    color: var(--sp-text);
+    font: 11px/1.4 'JetBrains Mono',monospace;
+    outline: none;
+  }
+  .ask-free-input:focus { border-color: var(--sp-accent); }
+  .ask-free-input:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .ask-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--sp-border);
+  }
+  .ask-btn {
+    font: 11px/1.4 'JetBrains Mono',monospace;
+    padding: 0.25rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid var(--sp-border);
+    cursor: pointer;
+    background: var(--sp-panel);
+    color: var(--sp-text);
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .ask-btn:hover { border-color: var(--sp-border-bright, #484f58); background: var(--sp-surface); }
+  .ask-btn.primary {
+    background: var(--sp-accent);
+    color: #fff;
+    border-color: var(--sp-accent);
+    font-weight: 600;
+  }
+  .ask-btn.primary:hover { filter: brightness(1.1); }
+  /* Read-only answers summary after the user answered */
+  .ask-answers-summary { font-size: 11px; color: var(--sp-accent); padding: 0.2rem 0; }
+
   .tool-box .tool-image {
     max-width: 100%;
     max-height: 320px;
