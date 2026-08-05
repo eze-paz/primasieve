@@ -2417,7 +2417,7 @@ function buildAnswersSummary(answers) {
     // One question row, then its answer on its own row — no arrow.
     const q = document.createElement('div');
     q.className = 'ask-answered-q';
-    q.textContent = '\u2713 ' + (a.question || '');
+    q.textContent = a.question || '';
     const ans = document.createElement('div');
     ans.className = 'ask-answered-a';
     ans.textContent = a.answer || '';
