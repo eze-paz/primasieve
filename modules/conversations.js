@@ -1144,6 +1144,9 @@ function buildConvLi(c, idx) {
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
     ev.dataTransfer.effectAllowed = 'copy';
+    // Show the dashed drop zone immediately, before the pointer even reaches the
+    // messages area — so the user can see where they're allowed to drop.
+    const w0 = $('messagesWrap'); if (w0) w0.classList.add('drop-target');
     // dragend always fires when the drag concludes (dropped, cancelled, or
     // released outside the drop zone) — guaranteed cleanup for the drop-target
     // dashed line so it can never get stuck on screen.
@@ -4046,6 +4049,49 @@ class SidePanel {
     }
   }
 
+  // Load a conversation into the LEFT (main) pane as the active conversation.
+  // Used when the user drops a convo on the left pane with the split open — the
+  // right pane keeps its own convo (unless the dropped convo was docked there,
+  // in which case the split closes).
+  async openInLeft(id) {
+    if (!id) return;
+    // If it's currently the side-panel convo, undock it first so loadConv doesn't
+    // flip focus — the user explicitly wants it in the LEFT pane now.
+    if (id === this._sideId) {
+      const s = convStreams.get(id);
+      if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
+      this._sideId = null;
+      this._open = false;
+      _placeHome();
+      this._render();
+    }
+    // Focus the left pane so loadConv mounts the convo there.
+    this.focusPane(false);
+    await loadConv(id);
+  }
+
+  // Load a conversation into the RIGHT (side) pane — the drop counterpart of
+  // open(), minus the _activeIsRight guard, so dropping on the right pane always
+  // updates it regardless of which pane currently has focus.
+  async openInRight(id) {
+    if (!id) return;
+    if (id === activeConvId) return;   // already the main-pane convo
+    if (id === this._sideId) return;   // already docked here
+    closeArtifactPanel();
+    if (this._sideId) {
+      const prev = convStreams.get(this._sideId);
+      if (prev?.host?.parentNode) { _evacuateHome(prev.host); prev.host.parentNode.removeChild(prev.host); }
+    }
+    await this._lazyLoad(id);
+    this._open = true;
+    this._sideId = id;
+    const s = convStreams.get(id);
+    if (s?.host) _mountInPane(s.host, this.right);
+    this._render();
+    requestAnimationFrame(() => { const se = paneScrollEl(this.right); if (se) se.scrollTop = se.scrollHeight; });
+    refreshConversationList();
+  }
+
   _wireEvents() {
     if (!this.wrap || !this.left || !this.right) return;
 
@@ -4090,7 +4136,20 @@ class SidePanel {
       const id = ev.dataTransfer?.getData('text/sandpie-conv-id');
       if (!id) return;
       ev.preventDefault();
-      this.open(id);
+      const t = ev.target;
+      const inSide = !!(t && t.closest && t.closest('#messagesSide'));
+      const inMain = !!(t && t.closest && t.closest('#messages'));
+      if (!this.isOpen) {
+        // Single panel — create the side panel (drop lands in the right pane).
+        this.open(id);
+      } else if (inSide) {
+        // Split open + dropped on the right pane → update the right pane.
+        this.openInRight(id);
+      } else {
+        // Split open + dropped on the left pane (or the wrap itself) → update
+        // the left pane.
+        this.openInLeft(id);
+      }
     });
   }
 }
