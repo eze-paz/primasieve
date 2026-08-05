@@ -384,29 +384,18 @@ function renderHistoricalMessage(m, host = null) {
           else { target.appendChild(buildTodosView(todos)); }
         }
       } else if (sent.startsWith('answers:')) {
-        // Tool result: answered questions — the standalone ask card is replaced
-        // by a read-only summary (`✓ answer · answer`).
+        // Tool result: answered questions. The box already shows the human-readable
+        // summary (markToolDone for live turns); here we REMOVE the standalone
+        // question card and, for historical replays (no markToolDone), render the
+        // summary into the box.
         const nl = sent.indexOf('\n');
         const json = sent.slice('answers:'.length, nl < 0 ? undefined : nl);
         let answers = null;
         try { answers = JSON.parse(json); } catch (_) {}
-        if (Array.isArray(answers) && answers.length) {
-          // Find the standalone card by its tcId data attr; fall back to any
-          // remaining .ask-card (older rendering path).
-          let card = target.querySelector('.ask-card[data-ask-tc-id="' + tcId + '"]');
-          if (!card) card = target.querySelector('.ask-card');
-          if (card) {
-            const sum = document.createElement('div');
-            sum.className = 'tool-result ask-answered';
-            sum.textContent = '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 ');
-            card.replaceWith(sum);
-          } else {
-            // No card found — show the summary as a plain tool result line.
-            appendToolResult(tcId, '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 '), target);
-          }
-        } else {
-          appendToolResult(tcId, content, target);
-        }
+        const card = target.querySelector('.ask-card[data-ask-tc-id="' + tcId + '"]') || target.querySelector('.ask-card');
+        if (card) card.remove();
+        if (Array.isArray(answers) && answers.length) renderAnswers(tcId, answers, target);
+        else appendToolResult(tcId, content, target);
       } else if (!sent.startsWith('artifact:')) {
         // Full result, untruncated — the user sees exactly what the model sees.
         appendToolResult(tcId, content, target);
@@ -2418,6 +2407,54 @@ function renderQuestions(tcId, questions, reply) {
   return card;
 }
 
+// Human-readable summary of answered questions — rendered into the ask
+// tool-call box in place of the raw 'answers:[...]' JSON (the model still
+// receives the JSON, the user sees the Q → A pairs).
+function buildAnswersSummary(answers) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ask-answered';
+  for (const a of (answers || [])) {
+    const row = document.createElement('div');
+    row.className = 'ask-answered-row';
+    const q = document.createElement('span');
+    q.className = 'ask-answered-q';
+    q.textContent = '\u2713 ' + (a.question || '');
+    const arrow = document.createElement('span');
+    arrow.className = 'ask-answered-arrow';
+    arrow.textContent = '\u2192';
+    const ans = document.createElement('span');
+    ans.className = 'ask-answered-a';
+    ans.textContent = a.answer || '';
+    row.append(q, arrow, ans);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function renderAnswers(tcIdOrEl, answers, scopeEl) {
+  const toolCallDiv = (tcIdOrEl && tcIdOrEl.nodeType === 1) ? tcIdOrEl : _toolBoxEl(tcIdOrEl, scopeEl);
+  if (!toolCallDiv) return;
+  const expanded = toolCallDiv.querySelector('.tc-expanded');
+  if (!expanded) return;
+  let box = expanded.querySelector('.tool-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'tool-box';
+    expanded.innerHTML = '';
+    expanded.appendChild(box);
+  }
+  const existingSep = box.querySelector('.tool-sep');
+  const existingResult = box.querySelector('.tool-result');
+  const existingAnswers = box.querySelector('.ask-answered');
+  if (existingSep) existingSep.remove();
+  if (existingResult) existingResult.remove();
+  if (existingAnswers) existingAnswers.remove();
+  const sep = document.createElement('div');
+  sep.className = 'tool-sep';
+  box.appendChild(sep);
+  box.appendChild(buildAnswersSummary(answers));
+}
+
 // Build a multiple-choice question card DOM element from a questions array.
 // Mockup B (revised): conversational bubble, one question at a time (wizard),
 // full-width chips, 'Otro:' free text ALWAYS available (the model cannot gate
@@ -3000,6 +3037,18 @@ class RoundRenderer {
         if (s) s.todos = todos;
       }
       if (todos && el) renderTodos(el, todos, this.host);
+      return;
+    }
+
+    if (sent.startsWith('answers:')) {
+      // Answered ask questions — render a human-readable Q → A summary into the
+      // box (the raw 'answers:[...]' JSON stays model-only).
+      const nl = sent.indexOf('\n');
+      const json = sent.slice('answers:'.length, nl < 0 ? undefined : nl);
+      let answers = null;
+      try { answers = JSON.parse(json); } catch (_) {}
+      if (Array.isArray(answers) && answers.length && el) renderAnswers(el, answers, this.host);
+      else if (el) appendToolResult(el, text, this.host);
       return;
     }
     // Show the full tool result — the user sees exactly what the model sees.

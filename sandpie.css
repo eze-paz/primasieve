@@ -1475,7 +1475,7 @@ ul.conv-list li.active {
     border-radius: 14px 14px 14px 4px;
     padding: 1rem 1.1rem;
     margin: 0.25rem 0;
-    box-shadow: 0 0 30px rgba(88,166,255,0.08);
+    box-shadow: 0 0 30px var(--sp-accent-dim);
     font: 12px/1.5 'JetBrains Mono','Space Mono',ui-monospace,monospace;
   }
   .ask-card-head {
@@ -1486,7 +1486,7 @@ ul.conv-list li.active {
   }
   .ask-card-head .ask-q-icon {
     width: 26px; height: 26px;
-    background: var(--accent-dim, rgba(88,166,255,0.35));
+    background: var(--sp-accent-dim);
     border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 12px; color: var(--sp-accent); font-weight: 700;
@@ -1512,11 +1512,11 @@ ul.conv-list li.active {
     gap: 0.4rem;
   }
   .ask-chip {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.45rem;
-    width: auto;
-    padding: 0.35rem 0.8rem;
+    width: 100%;
+    padding: 0.4rem 0.8rem;
     border: 1px solid var(--sp-border);
     border-radius: 20px;
     font-size: 12px;
@@ -1526,10 +1526,11 @@ ul.conv-list li.active {
     transition: all 0.12s;
     user-select: none;
   }
+  .ask-chip .chip-label { flex: 1; }
   .ask-chip:hover { border-color: var(--sp-accent); background: var(--sp-panel); }
   .ask-chip.selected {
     border-color: var(--sp-accent);
-    background: var(--accent-dim, rgba(88,166,255,0.35));
+    background: var(--sp-accent-dim);
     color: var(--sp-accent);
   }
   .ask-chip[data-rec="1"] { border-color: var(--sp-accent); border-style: dashed; }
@@ -1538,7 +1539,7 @@ ul.conv-list li.active {
   .ask-chip .chip-rec {
     font-size: 9px;
     color: var(--sp-accent);
-    background: rgba(88,166,255,0.12);
+    background: var(--sp-panel);
     padding: 0 5px; border-radius: 8px;
     letter-spacing: 0.3px;
   }
@@ -1592,28 +1593,29 @@ ul.conv-list li.active {
     color: var(--sp-text);
     transition: 0.12s;
   }
-  .ask-btn:hover { border-color: var(--sp-border-bright, #484f58); background: var(--sp-panel); }
+  .ask-btn:hover { border-color: var(--sp-border-bright); background: var(--sp-panel); }
   .ask-btn.primary {
     background: var(--sp-accent);
-    color: #fff;
+    color: var(--sp-text);
     border-color: var(--sp-accent);
     font-weight: 600;
   }
   .ask-btn.primary:hover { filter: brightness(1.1); }
-  /* Read-only answers summary after the user answered. The standalone card is
-     replaced by this line; it reads as a quiet confirmation of what was picked. */
+  /* Read-only answers summary rendered inside the ask tool-box (the raw
+     'answers:[...]' JSON stays model-only). One Q → A pair per row. */
   .ask-answered {
-    padding: 0.4rem 0.65rem;
-    font-size: 11px;
-    color: var(--sp-accent);
-    border-left: 2px solid var(--sp-accent);
-    background: var(--sp-panel);
-    border-radius: 0 4px 4px 0;
-    margin: 0.2rem 0;
-    width: fit-content;
-    max-width: 88%;
-    align-self: flex-start;
+    padding: 0.3rem 0.6rem 0.4rem;
+    font: 11px/1.6 'JetBrains Mono','Space Mono',ui-monospace,monospace;
   }
+  .ask-answered-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+    padding: 1px 0;
+  }
+  .ask-answered-q { color: var(--sp-text-dim); }
+  .ask-answered-arrow { color: var(--sp-accent); flex-shrink: 0; }
+  .ask-answered-a { color: var(--sp-accent); font-weight: 600; }
 
   .tool-box .tool-image {
     max-width: 100%;
