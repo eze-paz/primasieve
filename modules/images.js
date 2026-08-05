@@ -22,10 +22,34 @@ const SandpieImages = (function() {
   // PRIVATE STATE
   // ============================================================
 
-  // The composer's attachments (in order). Each entry:
+  // Attachments (in order) PER COMPOSER — 'main' is the left pane, 'side' the
+  // right. Both can be open on different conversations at once, so an attachment
+  // belongs to the composer whose + button (or textarea) produced it. One shared
+  // list showed every attachment in BOTH previews and made a single ✕ remove it
+  // from both. Each entry:
   //   { kind:'image', opfsPath, name, mime, size, thumb, file:{name,type} }
   //   { kind:'file',  opfsPath, name, mime, size, isText, file:{name,type} }
-  let _attachments = [];
+  const _byPane = { main: [], side: [] };
+  const _pane = w => (w === 'side' ? 'side' : 'main');
+  const _list = w => _byPane[_pane(w)];
+  const _previewEl = w => document.getElementById(_pane(w) === 'side' ? 'imagePreviewSide' : 'imagePreview');
+  const _inputEl = w => document.getElementById(_pane(w) === 'side' ? 'imageInputSide' : 'imageInput');
+  // Which composer a node belongs to, or null when it isn't inside one.
+  const _paneOfEl = (el) => {
+    if (!el || !el.closest) return null;
+    const form = el.closest('.composer');
+    if (form) return form.classList.contains('composer-side') ? 'side' : 'main';
+    const host = el.closest('#messages, #messagesSide');
+    if (host) return host.id === 'messagesSide' ? 'side' : 'main';
+    return null;
+  };
+  // Fallback when there is no element to derive the pane from (a window-level
+  // paste): whichever pane the app is focused on. body.active-right is set only
+  // while the split is open, so this is 'main' in the single-pane case.
+  const _activePane = () => {
+    const b = document.body.classList;
+    return (b.contains('side-open') && b.contains('active-right')) ? 'side' : 'main';
+  };
 
   // Browser-renderable raster/vector image extensions (re-encoded to JPEG before
   // the model sees them) and the iPhone HEIC family (decoded via heic2any).
@@ -204,12 +228,17 @@ const SandpieImages = (function() {
   // COMPOSER PREVIEW (multiple attachments)
   // ============================================================
 
-  function renderPreviews() {
-    const previews = document.querySelectorAll('.image-preview');
-    if (!previews.length) return;
-    previews.forEach(pv => { pv.innerHTML = ''; pv.style.display = _attachments.length ? '' : 'none'; });
-    if (!_attachments.length) return;
-    _attachments.forEach((att, i) => {
+  // Renders ONE pane's preview from that pane's list. Deliberately not a
+  // querySelectorAll over every .image-preview: that is what mirrored a single
+  // attachment into both composers.
+  function renderPreviews(which) {
+    const pv = _previewEl(which);
+    if (!pv) return;
+    const list = _list(which);
+    pv.innerHTML = '';
+    pv.style.display = list.length ? '' : 'none';
+    if (!list.length) return;
+    list.forEach((att, i) => {
       const item = document.createElement('span');
       item.className = 'attach-item';
       if (att.kind === 'image') {
@@ -238,27 +267,24 @@ const SandpieImages = (function() {
       rm.className = 'remove-btn';
       rm.title = 'Remove';
       rm.textContent = '✕';
-      rm.onclick = () => removeAt(i);
+      rm.onclick = () => removeAt(which, i);
       item.appendChild(rm);
-      // cloneNode does NOT copy the remove button's bound onclick — rebind it on
-      // each clone so every pane's preview has a working ✕.
-      previews.forEach(pv => {
-        const el = item.cloneNode(true);
-        const rb = el.querySelector('.remove-btn');
-        if (rb) rb.onclick = () => removeAt(i);
-        pv.appendChild(el);
-      });
+      pv.appendChild(item);
     });
   }
 
-  function removeAt(i) {
-    if (i < 0 || i >= _attachments.length) return;
-    _attachments.splice(i, 1);
-    renderPreviews();
+  // Removes from ONE pane. `which` is required in practice — the ✕ handlers above
+  // always pass their own pane — but an omitted value falls back to the focused
+  // pane rather than mutating both.
+  function removeAt(which, i) {
+    const list = _list(which);
+    if (i < 0 || i >= list.length) return;
+    list.splice(i, 1);
+    renderPreviews(which);
   }
 
   // ============================================================
-  // ATTACH PATHS (push to _attachments; caller calls renderPreviews once)
+  // ATTACH PATHS (push to the pane's list; caller calls renderPreviews(pane) once)
   // ============================================================
 
   // If the ACTIVE model is text-only (vision:no) and has no vision fallback, warn
@@ -278,7 +304,7 @@ const SandpieImages = (function() {
     } catch (_) {}
   }
 
-  async function attachImage(file, { basePath = null, addComposerChip = false } = {}) {
+  async function attachImage(file, { basePath = null, addComposerChip = false, pane = null } = {}) {
     let blob = file;
     let name = file.name || ("image_" + Date.now() + ".jpg");
     if (HEIC_EXTS.has(extOf(name)) || /heic|heif/i.test(file.type || "")) {
@@ -298,7 +324,7 @@ const SandpieImages = (function() {
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
     if (addComposerChip) {
-      _attachments.push({
+      _list(pane).push({
         kind: "image", opfsPath, name, thumb,
         mime: blob.type || getMimeType(opfsPath), size: bytes.length,
         file: { name, type: blob.type || getMimeType(opfsPath) },
@@ -397,15 +423,16 @@ const SandpieImages = (function() {
    * Attach one or more File objects (from the file picker or simple drag).
    * Each is written to OPFS under the current file-viewer folder.
    */
-  async function addFiles(fileList) {
+  async function addFiles(fileList, which) {
     const files = Array.from(fileList || []);
     const basePath = currentBasePath();
+    const pane = _pane(which);
     const paths = [];
     for (const file of files) {
       const looksImage = IMAGE_EXTS.has(extOf(file.name)) || HEIC_EXTS.has(extOf(file.name)) || (file.type || '').startsWith('image/');
       try {
         const opfsPath = looksImage
-          ? await attachImage(file, { basePath, addComposerChip: true })
+          ? await attachImage(file, { basePath, addComposerChip: true, pane })
           : await attachDocument(file, { basePath });
         paths.push(opfsPath);
       } catch (err) {
@@ -413,7 +440,7 @@ const SandpieImages = (function() {
         alert('Could not attach "' + (file.name || 'file') + '": ' + ((err && err.message) || err));
       }
     }
-    renderPreviews();
+    renderPreviews(pane);
 
     if (paths.length && typeof injectUploadMessage === 'function') {
       const folder = basePath || '/';
@@ -428,7 +455,10 @@ const SandpieImages = (function() {
    */
   async function handleSelect(e) {
     const files = e.target.files;
-    if (files && files.length) await addFiles(files);
+    // The <input type=file> lives inside its own composer, so the pane the user
+    // clicked + in is right here on the event target — no guessing.
+    const which = _paneOfEl(e.target) || (e.target.id === 'imageInputSide' ? 'side' : 'main');
+    if (files && files.length) await addFiles(files, which);
     e.target.value = '';   // let the same file be picked again after removal
   }
 
@@ -481,26 +511,32 @@ const SandpieImages = (function() {
   // PUBLIC API
   // ============================================================
 
-  function getState() {
-    return _attachments;
+  // All pane-scoped entry points below default to the focused pane when `which`
+  // is omitted, so a legacy no-arg call touches one composer instead of both.
+  function getState(which) {
+    return _list(which === undefined ? _activePane() : which);
   }
 
   // Add an attachment that already lives in OPFS (e.g. the load_image tool
   // result), or replace/clear the whole set. Tolerates the legacy single-object
   // image shape ({ opfsPath, file, dataUrl }).
-  function setState(att) {
-    if (att == null) { clear(); return; }
-    if (Array.isArray(att)) { _attachments = att; renderPreviews(); return; }
+  function setState(att, which) {
+    const pane = _pane(which === undefined ? _activePane() : which);
+    if (att == null) { clear(pane); return; }
+    if (Array.isArray(att)) { _byPane[pane] = att; renderPreviews(pane); return; }
     if (!att.kind) att.kind = 'image';
     if (att.dataUrl && !att.thumb) att.thumb = att.dataUrl;
-    _attachments.push(att);
-    renderPreviews();
+    _list(pane).push(att);
+    renderPreviews(pane);
   }
 
-  function clear() {
-    _attachments = [];
-    document.querySelectorAll('.image-preview').forEach(pv => { pv.style.display = 'none'; pv.innerHTML = ''; });
-    document.querySelectorAll('input[type=file].attach-input').forEach(inp => { inp.value = ''; });
+  function clear(which) {
+    const pane = _pane(which === undefined ? _activePane() : which);
+    _byPane[pane] = [];
+    const pv = _previewEl(pane);
+    if (pv) { pv.style.display = 'none'; pv.innerHTML = ''; }
+    const inp = _inputEl(pane);
+    if (inp) inp.value = '';
   }
 
   /**
@@ -541,8 +577,8 @@ const SandpieImages = (function() {
    * the send path now resolves opfs:// image refs in buildAgentConfig).
    * @returns {Promise<string|null>}
    */
-  async function compressForLLM() {
-    const a = _attachments.find(x => x.kind === 'image');
+  async function compressForLLM(which) {
+    const a = _list(which === undefined ? _activePane() : which).find(x => x.kind === 'image');
     if (!a) return null;
     try {
       const bytes = await opfs.readBytes(a.opfsPath);
@@ -564,11 +600,12 @@ const SandpieImages = (function() {
    * @param {string} text - User text message
    * @returns {Promise<string|Array>}
    */
-  async function buildContent(text) {
-    if (!_attachments.length) return text;
+  async function buildContent(text, which) {
+    const list = _list(which === undefined ? _activePane() : which);
+    if (!list.length) return text;
     const parts = [];
     if (text) parts.push({ type: 'text', text });
-    for (const a of _attachments) {
+    for (const a of list) {
       if (a.kind === 'image') {
         parts.push({ type: 'image_url', image_url: { url: 'opfs://' + a.opfsPath } });
       } else {
@@ -578,14 +615,14 @@ const SandpieImages = (function() {
     return parts;
   }
 
-  /** @returns {boolean} whether anything is attached */
-  function hasAttachment() {
-    return _attachments.length > 0;
+  /** @returns {boolean} whether anything is attached to this pane's composer */
+  function hasAttachment(which) {
+    return _list(which === undefined ? _activePane() : which).length > 0;
   }
 
-  /** Legacy alias — true when any attachment is present. */
-  function hasImage() {
-    return _attachments.length > 0;
+  /** Legacy alias — true when any attachment is present on that composer. */
+  function hasImage(which) {
+    return hasAttachment(which);
   }
 
   /**
@@ -601,7 +638,10 @@ const SandpieImages = (function() {
 
       e.preventDefault();
       const files = e.clipboardData.files ? Array.from(e.clipboardData.files) : [];
-      if (files.length) await addFiles(files);
+      // Paste is window-level: prefer the composer the caret is in, else the pane
+      // the user is focused on.
+      const which = _paneOfEl(document.activeElement) || _activePane();
+      if (files.length) await addFiles(files, which);
     });
   }
 

@@ -1290,7 +1290,7 @@ async function handleSubmit(which = 'main') {
   // No fallback to activeConvId: when this pane shows nothing, submitting must
   // start a fresh conversation here, not append to whatever the other pane shows.
   const convId = _composerConv(which);
-  if (!text && !SandpieImages.hasAttachment()) {
+  if (!text && !SandpieImages.hasAttachment(which)) {
     // Empty submit resumes an interrupted turn instead of doing nothing — but only
     // when the conversation is resumable (last message didn't finish with 'stop').
     // No auto-resume on load; the user opts in by pressing Enter / send.
@@ -1322,10 +1322,12 @@ async function handleSubmit(which = 'main') {
   if (SandpieCommandView) SandpieCommandView.hide();
   ta.value = '';
 
-  const content = await SandpieImages.buildContent(text);
+  // Attachments are per-composer: build and clear THIS pane's, or submitting in
+  // one pane would consume (and wipe) whatever the other pane had staged.
+  const content = await SandpieImages.buildContent(text, which);
 
-  if (SandpieImages.hasAttachment()) {
-    SandpieImages.clear();
+  if (SandpieImages.hasAttachment(which)) {
+    SandpieImages.clear(which);
   }
   const scEl = paneScrollEl(pane);
   lockScroll(scEl);
