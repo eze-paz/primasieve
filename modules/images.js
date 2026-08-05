@@ -293,7 +293,7 @@ const SandpieImages = (function() {
     const imgEl = await loadImageFromBlob(new Blob([bytes], { type: blob.type || getMimeType(name) }));
     const thumb = compressImage(imgEl, 200, 0.7);
 
-    const dir = (basePath != null ? basePath : currentBasePath()) || "images";
+    const dir = (basePath != null ? basePath : currentBasePath());
     const opfsPath = await uniquePath(dir, name);
     await opfs.write(opfsPath, bytes);
     opfs.notifyUpload(opfsPath);   // sidebar + run_python /files mount
