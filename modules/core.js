@@ -29,7 +29,7 @@ const SandpieMenu = (() => {
       summaryHtml += ` <span class="status-dot" id="${config.dot}"></span>`;
     }
     if (config.badge) {
-      summaryHtml += ` <span style="margin-left:auto; font-size:0.7rem; color:var(--sp-text-dim);">${config.badge}</span>`;
+      summaryHtml += ` <span style="margin-left:auto; font-size:0.7rem;">${config.badge}</span>`;
     }
     summary.innerHTML = summaryHtml;
     details.appendChild(summary);
