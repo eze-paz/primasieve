@@ -152,6 +152,7 @@ async function initPyodide() {
         p.runPython('import os; os.chdir("/files")');
         p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
         try { p.runPython(_HYDRATE_AUDIT_PY); } catch (e) { console.warn('[pyodide-worker] hydrate audit hook install failed:', e); }
+        try { p.runPython(_CLOUD_FS_PY); } catch (e) { console.warn('[pyodide-worker] cloud fs view patch install failed:', e); }
         console.log('[pyodide-worker] OPFS mounted at /files (cwd); FS tracking installed');
       } catch (e) {
         _nativefs = null;
@@ -322,6 +323,47 @@ self._sandpie_hydrate_sync = function (pathStr) {
     _hydratedSet.add(rel);
   } catch (e) { console.warn('[pyodide-worker] sync hydrate failed:', pathStr, (e && e.message) || e); }
 };
+// ---- Cloud-index view for Python (stat / listdir / scandir) ------------------
+// Expose the dehydrated cloud index to Python so its view of /files matches the
+// file viewer: os.path.exists/getsize, os.listdir, glob, pathlib all see cloud
+// entries that have no local bytes yet. Pure metadata (no network, no bytes);
+// byte hydration stays in _sandpie_hydrate_sync (open() audit hook). Returns
+// null when dehydrated mode is off / index absent -> Python falls back to the
+// plain OPFS behaviour. The pool manager keeps _dbxIndex live via dbx-index
+// messages, so these read the freshest snapshot on every call.
+self._sandpie_cloud_stat = function (rel) {
+  try {
+    if (!_dehydrated || !_dbxIndex) return null;
+    const r = String(rel || '').replace(/^\/+/, '').replace(/\/+$/, '');
+    if (!r || _relExempt(r)) return null;
+    const e = _dbxIndex[r];
+    if (!e) return null;
+    return { kind: e.kind === 'file' ? 'file' : 'folder', size: e.kind === 'file' ? (e.size || 0) : 0, mtime: e.cloudMtime ? Math.max(0, Math.floor(new Date(e.cloudMtime).getTime() / 1000)) : 0 };
+  } catch (_) { return null; }
+};
+self._sandpie_cloud_children = function (rel) {
+  try {
+    if (!_dehydrated || !_dbxIndex) return null;
+    const base = String(rel || '').replace(/^\/+/, '').replace(/\/+$/, '');
+    const prefix = base ? base + '/' : '';
+    const out = [], dirs = new Set(), seen = new Set();
+    for (const k0 of Object.keys(_dbxIndex)) {
+      const k = k0.replace(/^\/+/, '');
+      if (!k || _relExempt(k)) continue;
+      if (prefix && !k.startsWith(prefix)) continue;
+      const rest = k.slice(prefix.length);
+      if (!rest) continue;
+      const slash = rest.indexOf('/');
+      if (slash >= 0) { dirs.add(rest.slice(0, slash)); continue; }
+      if (seen.has(rest)) continue;               // folder already aggregated via its children
+      seen.add(rest);
+      const e = _dbxIndex[k0];
+      out.push({ name: rest, kind: (e && e.kind === 'folder') ? 'folder' : 'file' });
+    }
+    for (const d of dirs) if (!seen.has(d)) out.push({ name: d, kind: 'folder' });
+    return out;
+  } catch (_) { return null; }
+};
 const _HYDRATE_AUDIT_PY = `
 import sys
 from js import _sandpie_hydrate_sync as __sp_hydrate
@@ -332,6 +374,242 @@ def __sp_audit(event, args):
             try: __sp_hydrate(p)
             except Exception: pass
 sys.addaudithook(__sp_audit)
+`;
+
+// ---- Cloud-index view for Python: wrap the three introspection choke points ----
+// os.stat / os.listdir / os.scandir (plus lstat/access) consult the cloud index
+// when the local FS reports ENOENT/ENOTDIR, so os.path.*, pathlib, glob, shutil
+// and os.walk all see dehydrated entries with truthful metadata and ZERO
+// downloads. Bytes still come exclusively from open() -> _sandpie_hydrate_sync.
+// Important: listings are VIRTUAL — no placeholder files are ever created, so
+// the open() hydrate guard (analyzePath().exists) can never short-circuit on a
+// hollow file.
+const _CLOUD_FS_PY = `
+import os
+from js import _sandpie_cloud_stat, _sandpie_cloud_children
+
+_orig_stat = os.stat
+_orig_lstat = os.lstat
+_orig_access = os.access
+_orig_listdir = os.listdir
+_orig_scandir = os.scandir
+
+def _cloud_rel(path):
+    try:
+        p = os.fspath(path)
+    except Exception:
+        return None
+    if isinstance(p, bytes):
+        try:
+            p = p.decode('utf-8')
+        except Exception:
+            return None
+    if not isinstance(p, str):
+        return None
+    if p.startswith('/files/'):
+        rel = p[len('/files/'):]
+    elif p == '/files' or p == '/files/':
+        rel = ''
+    elif p.startswith('files/'):
+        rel = p[len('files/'):]
+    elif p.startswith('/'):
+        return None
+    else:
+        rel = p
+    rel = rel.strip('/')
+    if rel == '.' or rel == '..':
+        rel = ''
+    return rel
+
+def _cloud_meta(rel):
+    if rel is None:
+        return None
+    try:
+        m = _sandpie_cloud_stat(rel)
+        if m is None:
+            return None
+        if hasattr(m, 'to_py'):
+            m = m.to_py()
+        if not isinstance(m, dict):
+            return None
+        return m
+    except Exception:
+        return None
+
+def _cloud_result(m):
+    try:
+        mode = 0o100644 if m.get('kind') == 'file' else 0o040755
+        size = int(m.get('size') or 0)
+        mt = int(m.get('mtime') or 0)
+        return os.stat_result((mode, 0, 0, 1, 0, 0, size, mt, mt, mt))
+    except Exception:
+        return None
+
+def _patched_stat(path, *args, **kwargs):
+    try:
+        return _orig_stat(path, *args, **kwargs)
+    except (FileNotFoundError, NotADirectoryError):
+        if kwargs.get('dir_fd') is not None:
+            raise
+        m = _cloud_meta(_cloud_rel(path))
+        r = _cloud_result(m) if m is not None else None
+        if r is None:
+            raise
+        return r
+
+def _patched_lstat(path, *args, **kwargs):
+    try:
+        return _orig_lstat(path, *args, **kwargs)
+    except (FileNotFoundError, NotADirectoryError):
+        if kwargs.get('dir_fd') is not None:
+            raise
+        m = _cloud_meta(_cloud_rel(path))
+        r = _cloud_result(m) if m is not None else None
+        if r is None:
+            raise
+        return r
+
+def _patched_access(path, mode, *args, **kwargs):
+    try:
+        return _orig_access(path, mode, *args, **kwargs)
+    except (FileNotFoundError, NotADirectoryError):
+        if kwargs.get('dir_fd') is not None:
+            raise
+        m = _cloud_meta(_cloud_rel(path))
+        if m is None:
+            raise
+        if mode == 0:
+            return True
+        if m.get('kind') == 'folder':
+            return bool(mode & (os.R_OK | os.W_OK | os.X_OK))
+        return bool(mode & (os.R_OK | os.W_OK))
+
+def _cloud_children(rel):
+    if rel is None:
+        return None
+    try:
+        kids = _sandpie_cloud_children(rel)
+        if kids is None:
+            return None
+        if hasattr(kids, 'to_py'):
+            kids = kids.to_py()
+        out = []
+        for k in kids:
+            out.append(dict(k))
+        return out
+    except Exception:
+        return None
+
+def _patched_listdir(path='.'):
+    err = None
+    names = None
+    try:
+        names = _orig_listdir(path)
+    except (FileNotFoundError, NotADirectoryError) as e:
+        err = e
+    rel = _cloud_rel(path)
+    kids = _cloud_children(rel)
+    if kids is None:
+        if err is not None:
+            raise err
+        return names
+    extra = [k['name'] for k in kids if k.get('name')]
+    if isinstance(path, bytes):
+        extra = [n.encode('utf-8') for n in extra]
+    if err is not None and not extra:
+        m = _cloud_meta(rel)
+        if m is None or m.get('kind') != 'folder':
+            raise err
+    merged = set(names or []) | set(extra)
+    return sorted(merged)
+
+class _CloudDirEntry:
+    __slots__ = ('name', 'path', '_kind')
+    def __init__(self, name, base, kind):
+        if isinstance(base, bytes):
+            name = name.encode('utf-8')
+        self.name = name
+        self.path = os.path.join(base, name)
+        self._kind = kind
+    def is_dir(self, follow_symlinks=True):
+        return self._kind == 'folder'
+    def is_file(self, follow_symlinks=True):
+        return self._kind == 'file'
+    def is_symlink(self):
+        return False
+    def inode(self):
+        return 0
+    def stat(self, follow_symlinks=True):
+        m = _cloud_meta(_cloud_rel(self.path))
+        r = _cloud_result(m) if m is not None else None
+        if r is None:
+            raise FileNotFoundError('No such file or directory: ' + str(self.path))
+        return r
+    def __repr__(self):
+        return '<_CloudDirEntry %r>' % (self.name,)
+
+class _ScandirResult:
+    def __init__(self, entries):
+        self._entries = list(entries)
+        self._i = 0
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self._i >= len(self._entries):
+            raise StopIteration
+        e = self._entries[self._i]
+        self._i += 1
+        return e
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc):
+        self.close()
+        return False
+    def close(self):
+        self._i = len(self._entries)
+
+def _patched_scandir(path='.', *, dir_fd=None):
+    if dir_fd is not None:
+        return _orig_scandir(path, dir_fd=dir_fd)
+    err = None
+    local = None
+    try:
+        local = _orig_scandir(path)
+    except (FileNotFoundError, NotADirectoryError) as e:
+        err = e
+    rel = _cloud_rel(path)
+    kids = _cloud_children(rel)
+    if kids is None:
+        if local is not None:
+            return local
+        raise err
+    local_entries = []
+    names_local = set()
+    if local is not None:
+        try:
+            local_entries = list(local)
+            names_local = {e.name for e in local_entries}
+        except OSError:
+            local_entries = []
+            names_local = set()
+    if err is not None and not kids:
+        m = _cloud_meta(rel)
+        if m is None or m.get('kind') != 'folder':
+            raise err
+    base = os.fspath(path)
+    merged = list(local_entries)
+    for k in kids:
+        name = k.get('name')
+        if not name or name in names_local:
+            continue
+        merged.append(_CloudDirEntry(name, base, k.get('kind') or 'file'))
+    return _ScandirResult(merged)
+
+os.stat = _patched_stat
+os.lstat = _patched_lstat
+os.access = _patched_access
+os.listdir = _patched_listdir
+os.scandir = _patched_scandir
 `;
 
 // ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
