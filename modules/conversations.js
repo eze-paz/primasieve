@@ -412,10 +412,6 @@ function renderConversation(msgs, compaction, host = null) {
   // survives on the stream, so rebuild the ~same .done line here. Skip when a
   // timer already exists (live or settled) — it's only ever needed after a wipe.
   rebuildSettledTimer(target, s);
-  if (s && s.todos && s.todos.length) {
-    const hasTodos = !!(target && target.querySelector('.tool-todos'));
-    if (!hasTodos) appendContent(target, buildTodosView(s.todos));
-  }
 }
 
 // Rebuild a settled (.done) msg-timer line into `target` from the stream's
