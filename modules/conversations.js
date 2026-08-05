@@ -386,9 +386,59 @@ function renderConversation(msgs, compaction, host = null) {
   // (side panel, or mid-switch) staples the active conv's checklist onto it.
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   const s = convStreams.get(target && target.dataset && target.dataset.convId) || activeStream();
+  // A caller that wiped the host (clearActiveConvUI — rewind / compaction
+  // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
+  // endTotalTimer only fixes the DOM while the tick interval is alive, then nulls
+  // stream.timerEl. But the data that built it (timerStart, lastUsage, todos)
+  // survives on the stream, so rebuild the ~same .done line here. Skip when a
+  // timer already exists (live or settled) — it's only ever needed after a wipe.
+  rebuildSettledTimer(target, s);
   if (s && s.todos && s.todos.length) {
     const hasTodos = !!(target && target.querySelector('.tool-todos'));
     if (!hasTodos) appendContent(target, buildTodosView(s.todos));
+  }
+}
+
+// Rebuild a settled (.done) msg-timer line into `target` from the stream's
+// surviving post-turn data. Mirrors the label/elapsed/[tok/s]/ctx/todos layout
+// endTotalTimer builds, minus the "stopped" variant (the label is not persisted
+// on the stream, so a rebuilt line reads "done" — the distinction is cosmetic).
+// No-op when the stream has no completed turn (timerStart/lastUsage unset) or a
+// timer is already mounted.
+function rebuildSettledTimer(target, s) {
+  if (!target || !s || target.querySelector('.msg-timer')) return;
+  if (!s.timerStart || !s.lastUsage) return;
+  const sec = (Date.now() - s.timerStart) / 1000;
+  const u = s.lastUsage;
+  const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
+  const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
+  const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
+  const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
+  const parts = [
+    `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
+    '<span class="mt-label">done</span>',
+    `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
+  ];
+  if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+  parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
+  if (s.todos && s.todos.length) {
+    const ip = s.todos.findIndex(t => t && t.status === 'in_progress');
+    const cur = ip >= 0 ? ip + 1 : s.todos.filter(t => t && t.status === 'completed').length;
+    parts.push(`<span class="mt-todos">${cur}/${s.todos.length}</span>`);
+  }
+  const el = document.createElement('div');
+  el.className = 'msg-timer done';
+  el.innerHTML = parts.join('');
+  appendContent(target, el);
+  _wireCtxCounter(el, s.id);
+  if (s.todos && s.todos.length) {
+    const badge = el.querySelector('.mt-todos');
+    if (badge) {
+      const snapshot = s.todos.slice();
+      badge.onclick = () => {
+        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(snapshot), 'Checklist');
+      };
+    }
   }
 }
 
