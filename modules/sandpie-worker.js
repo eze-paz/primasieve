@@ -533,6 +533,8 @@ function _indexEntriesUnder(norm, recursive) {
 // Tool implementations
 // ============================================================
 const MAX_TOOL_RESULT_BYTES = 30 * 1024;
+// Monotonic counter for fallback tool_call_ids (avoid duplicates across rounds).
+let _toolCallSeq = 0;
 function truncateToolResult(result) {
   if (typeof result !== 'string') { try { result = JSON.stringify(result); } catch { result = String(result); } }
   const bytes = new TextEncoder().encode(result);
@@ -1557,7 +1559,7 @@ function parseLeakedToolCalls(text) {
   let m;
   while ((m = callRe.exec(text)) !== null) {
     const [, name, idx, rawArgs] = m;
-    toolCalls.push({ id: 'call_' + idx, type: 'function', function: { name, arguments: (rawArgs || '').trim() } });
+    toolCalls.push({ id: 'call_' + (++_toolCallSeq), type: 'function', function: { name, arguments: (rawArgs || '').trim() } });
   }
   const stripped = text.replace(/<\|tool_calls_section_begin\|>[\s\S]*?<\|tool_calls_section_end\|>/g, '').replace(/<\|tool_calls_section_begin\|>[\s\S]*$/g, '').trim();
   return { toolCalls, stripped };
@@ -1579,7 +1581,7 @@ function parseBlobToolCalls(text) {
   const blockRe = /<\|(write_file|edit_file):([^\n|]+?)\|>([\s\S]*?)<\|end_\1\|>/g;
   const srRe = /<{5,9} SEARCH\r?\n([\s\S]*?)\r?\n={3,}\r?\n([\s\S]*?)\r?\n>{5,9} REPLACE/;
   const spans = [];   // consumed [start,end) ranges, stripped from content afterward
-  let m, idx = 0;
+  let m;
   while ((m = blockRe.exec(text)) !== null) {
     const [full, kind, rawPath, body] = m;
     const path = rawPath.trim();
@@ -1593,7 +1595,7 @@ function parseBlobToolCalls(text) {
       if (!sr) continue;   // malformed edit body → leave as text so the model can retry
       args = { path, old_str: sr[1], new_str: sr[2] };
     }
-    toolCalls.push({ id: 'call_blob_' + (idx++), type: 'function', function: { name: kind, arguments: JSON.stringify(args) } });
+    toolCalls.push({ id: 'call_blob_' + (++_toolCallSeq), type: 'function', function: { name: kind, arguments: JSON.stringify(args) } });
     spans.push([m.index, m.index + full.length]);
   }
   let stripped = text;
@@ -1622,13 +1624,13 @@ function parseHermesToolCalls(text) {
   if (typeof text !== 'string') return { toolCalls, stripped: text };
   const callRe = /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g;
   let m;
-  let idx = 0;
+  // idx replaced by module-scope _toolCallSeq
   while ((m = callRe.exec(text)) !== null) {
     try {
       const parsed = JSON.parse(m[1]);
       if (parsed && parsed.name) {
         toolCalls.push({
-          id: 'call_hermes_' + (idx++),
+          id: 'call_hermes_' + (++_toolCallSeq),
           type: 'function',
           function: {
             name: String(parsed.name),
@@ -1645,7 +1647,7 @@ function parseHermesToolCalls(text) {
         const parsed = JSON.parse(m[1].trim());
         if (parsed && parsed.name) {
           toolCalls.push({
-            id: 'call_hermes_' + (idx++),
+            id: 'call_hermes_' + (++_toolCallSeq),
             type: 'function',
             function: {
               name: String(parsed.name),
@@ -1745,7 +1747,14 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
           for (const tc of delta.tool_calls) {
             const i = tc.index || 0;
             if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-            if (tc.id) toolCalls[i].id = tc.id;
+            if (tc.id) {
+              // Defensive dedupe: if the same provider id appears twice (some
+              // models reuse call ids across rounds), append a unique suffix so
+              // _toolBoxEl on the page finds the correct box.
+              if (typeof _seenTcIds === 'undefined') var _seenTcIds = new Set();
+              if (_seenTcIds.has(tc.id)) toolCalls[i].id = tc.id + '_' + (++_toolCallSeq);
+              else { toolCalls[i].id = tc.id; _seenTcIds.add(tc.id); }
+            }
             if (tc.function?.name) toolCalls[i].function.name += tc.function.name;
             if (tc.function?.arguments) toolCalls[i].function.arguments += tc.function.arguments;
           }
