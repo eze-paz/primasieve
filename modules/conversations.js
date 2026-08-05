@@ -436,7 +436,7 @@ function rebuildSettledTimer(target, s) {
     if (badge) {
       const snapshot = s.todos.slice();
       badge.onclick = () => {
-        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(snapshot), 'Checklist');
+        showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
       };
     }
   }
@@ -1209,6 +1209,15 @@ function _commandPanelTo(pane) {
   if (!panel || !pane || panel.parentNode === pane) return;
   const composer = pane.querySelector(':scope > .composer');
   if (composer) pane.insertBefore(panel, composer); else pane.appendChild(panel);
+}
+// Route the shared command panel to the pane that an element lives in, then
+// show content there. Used by timer badges (mt-todos) that can sit in either
+// pane — without this the single #commandOutput stays parked in the main pane
+// and the side panel's checklist opens in the wrong conversation.
+function showCmdPanelForEl(el, content, title) {
+  const pane = el && el.closest ? el.closest('#messages, #messagesSide') : null;
+  if (pane) _commandPanelTo(pane);
+  if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(content, title);
 }
 async function handleSubmit(which = 'main') {
   const ta = which === 'side' ? $('inputSide') : $('input');
@@ -2462,7 +2471,7 @@ function renderTodos(tcId, todos, scopeEl) {
       badge.textContent = cur + '/' + todos.length;
       badge.title = (todos[ip] && todos[ip].content) || 'Checklist';
       badge.onclick = () => {
-        if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(todos), 'Checklist');
+        showCmdPanelForEl(badge, buildTodosView(todos), 'Checklist');
       };
     }
   }
@@ -4348,7 +4357,7 @@ function endTotalTimer(stream, label) {
         // stream.todos (startTotalTimer resets it to null next turn).
         const snapshot = stream.todos.slice();
         badge.onclick = () => {
-          if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(snapshot), 'Checklist');
+          showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
         };
       }
     }
