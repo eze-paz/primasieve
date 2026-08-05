@@ -1607,15 +1607,12 @@ ul.conv-list li.active {
     padding: 0.3rem 0.6rem 0.4rem;
     font: 11px/1.6 'JetBrains Mono','Space Mono',ui-monospace,monospace;
   }
-  .ask-answered-row {
-    display: flex;
-    gap: 0.4rem;
-    align-items: baseline;
-    padding: 1px 0;
+  .ask-answered-q { color: var(--sp-text-dim); padding: 1px 0; }
+  .ask-answered-a {
+    color: var(--sp-accent);
+    font-weight: 600;
+    padding: 0 0 3px 1.2em;   /* nests under the question text */
   }
-  .ask-answered-q { color: var(--sp-text-dim); }
-  .ask-answered-arrow { color: var(--sp-accent); flex-shrink: 0; }
-  .ask-answered-a { color: var(--sp-accent); font-weight: 600; }
 
   .tool-box .tool-image {
     max-width: 100%;

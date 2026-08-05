@@ -2414,19 +2414,14 @@ function buildAnswersSummary(answers) {
   const wrap = document.createElement('div');
   wrap.className = 'ask-answered';
   for (const a of (answers || [])) {
-    const row = document.createElement('div');
-    row.className = 'ask-answered-row';
-    const q = document.createElement('span');
+    // One question row, then its answer on its own row — no arrow.
+    const q = document.createElement('div');
     q.className = 'ask-answered-q';
     q.textContent = '\u2713 ' + (a.question || '');
-    const arrow = document.createElement('span');
-    arrow.className = 'ask-answered-arrow';
-    arrow.textContent = '\u2192';
-    const ans = document.createElement('span');
+    const ans = document.createElement('div');
     ans.className = 'ask-answered-a';
     ans.textContent = a.answer || '';
-    row.append(q, arrow, ans);
-    wrap.appendChild(row);
+    wrap.append(q, ans);
   }
   return wrap;
 }
