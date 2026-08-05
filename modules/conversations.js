@@ -1141,6 +1141,11 @@ function buildConvLi(c, idx) {
   li.addEventListener('dragstart', (ev) => {
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
     ev.dataTransfer.effectAllowed = 'copy';
+    // dragend always fires when the drag concludes (dropped, cancelled, or
+    // released outside the drop zone) — guaranteed cleanup for the drop-target
+    // dashed line so it can never get stuck on screen.
+    const clearDrop = () => { const w = $('messagesWrap'); if (w) w.classList.remove('drop-target'); };
+    li.addEventListener('dragend', clearDrop, { once: true });
   });
   return li;
 }
@@ -3990,7 +3995,10 @@ class SidePanel {
       this.wrap.classList.add('drop-target');
     });
     this.wrap.addEventListener('dragleave', (ev) => {
-      if (ev.target === this.wrap) this.wrap.classList.remove('drop-target');
+      // Clear only when the pointer truly leaves the wrap (moving over a child
+      // of the wrap fires dragleave on the wrap too, but relatedTarget is still
+      // inside it — must keep the dashed line up).
+      if (!this.wrap.contains(ev.relatedTarget)) this.wrap.classList.remove('drop-target');
     });
     this.wrap.addEventListener('drop', (ev) => {
       this.wrap.classList.remove('drop-target');
