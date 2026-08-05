@@ -426,19 +426,22 @@ function renderConversation(msgs, compaction, host = null) {
 // timer is already mounted.
 function rebuildSettledTimer(target, s) {
   if (!target || !s || target.querySelector('.msg-timer')) return;
-  // Live data (timerStart/lastUsage) from a warm stream; persisted data
-  // (lastTurn) from a cold load after refresh. At least one must be set.
+  // The ONLY case where a conversation renders no timer line is a brand-new
+  // empty chat (nothing has ever been sent). Any conversation with messages
+  // must show the timer. Missing data points (elapsed, tok/s, label) degrade
+  // gracefully to their defaults rather than suppressing the whole line.
+  if (!s.messages || !s.messages.length) return;
+  let sec = null, comp = null, label = 'done';
+  // Live data (timerStart/lastUsage) from a warm stream takes precedence;
+  // persisted data (lastTurn) covers a cold load after refresh.
   if (s.timerStart && s.lastUsage) {
-    var sec = (Date.now() - s.timerStart) / 1000;
-    var u = s.lastUsage;
-    var comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
-    var label = 'done';
+    sec = (Date.now() - s.timerStart) / 1000;
+    const u = s.lastUsage;
+    comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
   } else if (s.lastTurn) {
-    var sec = s.lastTurn.sec;
-    var comp = s.lastTurn.completionTokens || 0;
-    var label = s.lastTurn.label || 'done';
-  } else {
-    return;
+    sec = s.lastTurn.sec;
+    comp = s.lastTurn.completionTokens || 0;
+    label = s.lastTurn.label || 'done';
   }
   const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
   const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
@@ -446,7 +449,7 @@ function rebuildSettledTimer(target, s) {
   const parts = [
     `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
     `<span class="mt-label">${label}</span>`,
-    `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
+    `<span class="mt-sep">·</span><span class="mt-time">${sec == null ? '–' : fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
   parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
