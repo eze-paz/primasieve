@@ -1469,6 +1469,13 @@ ul.conv-list li.active {
   .ask-card {
     padding: 0.5rem 0.65rem 0.55rem;
     font: 12px/1.5 'JetBrains Mono','Space Mono',ui-monospace,monospace;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 88%;
+    background: var(--sp-bg);
+    border: 1px solid var(--sp-border);
+    border-radius: 8px;
+    margin: 0.25rem 0;
   }
   .ask-card-head {
     display: flex;
@@ -1587,8 +1594,19 @@ ul.conv-list li.active {
     font-weight: 600;
   }
   .ask-btn.primary:hover { filter: brightness(1.1); }
-  /* Read-only answers summary after the user answered */
-  .ask-answers-summary { font-size: 11px; color: var(--sp-accent); padding: 0.2rem 0; }
+  /* Read-only answers summary after the user answered. The standalone card is
+     replaced by this line; it reads as a quiet confirmation of what was picked. */
+  .ask-answered {
+    padding: 0.4rem 0.65rem;
+    font-size: 11px;
+    color: var(--sp-accent);
+    border-left: 2px solid var(--sp-accent);
+    background: var(--sp-panel);
+    border-radius: 0 4px 4px 0;
+    margin: 0.2rem 0;
+    width: fit-content;
+    max-width: 88%;
+  }
 
   .tool-box .tool-image {
     max-width: 100%;

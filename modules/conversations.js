@@ -384,22 +384,25 @@ function renderHistoricalMessage(m, host = null) {
           else { target.appendChild(buildTodosView(todos)); }
         }
       } else if (sent.startsWith('answers:')) {
-        // Tool result: answered questions — render a read-only summary
+        // Tool result: answered questions — the standalone ask card is replaced
+        // by a read-only summary (`✓ answer · answer`).
         const nl = sent.indexOf('\n');
         const json = sent.slice('answers:'.length, nl < 0 ? undefined : nl);
         let answers = null;
         try { answers = JSON.parse(json); } catch (_) {}
         if (Array.isArray(answers) && answers.length) {
-          const box = _toolBoxEl(tcId, target);
-          if (box) {
-            const existing = box.querySelector('.tool-result');
-            if (existing) existing.remove();
-            const sep = box.querySelector('.tool-sep');
-            const resultDiv = document.createElement('div');
-            resultDiv.className = 'tool-result';
-            resultDiv.textContent = '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 ');
-            if (sep) sep.after(resultDiv);
-            else box.appendChild(resultDiv);
+          // Find the standalone card by its tcId data attr; fall back to any
+          // remaining .ask-card (older rendering path).
+          let card = target.querySelector('.ask-card[data-ask-tc-id="' + tcId + '"]');
+          if (!card) card = target.querySelector('.ask-card');
+          if (card) {
+            const sum = document.createElement('div');
+            sum.className = 'tool-result ask-answered';
+            sum.textContent = '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 ');
+            card.replaceWith(sum);
+          } else {
+            // No card found — show the summary as a plain tool result line.
+            appendToolResult(tcId, '\u2713 ' + answers.map(a => (a.answer || '')).filter(Boolean).join(' \u00b7 '), target);
           }
         } else {
           appendToolResult(tcId, content, target);
@@ -1542,18 +1545,15 @@ function getSandpieWorker() {
         const pr = msg.payload;
         const convId = activeConvId;
         if (convId) _askingConvs.add(convId);
-        const boxRef = pr.tcId ? renderQuestions(pr.tcId, pr.args && pr.args.questions) : null;
-        if (!boxRef) {
-          const host = $('messages');
-          if (host) host.appendChild(buildQuestionsView(pr.args && pr.args.questions, null));
-        }
+        // Render the question card (standalone, below the empty ask tool-box).
+        const cardEl = renderQuestions(pr.tcId, pr.args && pr.args.questions);
         refreshConversationList();
         const reply = (result) => {
           if (convId) _askingConvs.delete(convId);
           refreshConversationList();
           try { _sandpieWorker.postMessage({ type: 'ask-result', id: pr.id, result }); } catch (_) {}
         };
-        setTimeout(() => wireAskCard(pr, reply, boxRef), 50);
+        setTimeout(() => wireAskCard(pr, reply, cardEl), 50);
         return;
       }
       return;
@@ -2393,42 +2393,20 @@ function renderTodos(tcId, todos, scopeEl) {
 
 // Build a checklist DOM element from a todos array.
 // Render the ask question card inside a tool-call box, in place of a text result.
+// Render the ask question card as a STANDALONE element in the conversation.
+// It is NOT injected into a tool-call box: the worker events that create the
+// box flow through an async NDJSON stream (workerAgentStream), while the
+// forward-to-page asks-question is processed synchronously — so the box may
+// not exist yet, and a last-box fallback can target the wrong (write_todos)
+// box. A standalone card is deterministic and matches the conversational
+// direction: the empty 'ask' tool-box header stays, and the card sits below it.
 function renderQuestions(tcId, questions) {
-  // Find the tool-call box by id; fall back to the last .tool-call in the
-  // stream (the in-flight ask call) when the id doesn't match — the live
-  // renderer can normalize tool-call ids, so a strict match isn't reliable.
-  let toolCallDiv = _toolBoxEl(tcId);
-  if (!toolCallDiv) {
-    const all = document.querySelectorAll('.msg.tool-call.in-flight, .msg.tool-call');
-    if (all.length) toolCallDiv = all[all.length - 1];
-  }
-  if (!toolCallDiv) return null;
-  toolCallDiv.classList.add('expanded');
-  let expanded = toolCallDiv.querySelector('.tc-expanded');
-  if (!expanded) {
-    expanded = document.createElement('div');
-    expanded.className = 'tc-expanded';
-    toolCallDiv.appendChild(expanded);
-  }
-  let box = expanded.querySelector('.tool-box');
-  if (!box) {
-    box = document.createElement('div');
-    box.className = 'tool-box';
-    expanded.innerHTML = '';
-    expanded.appendChild(box);
-  }
-  const existingSep = box.querySelector('.tool-sep');
-  const existingResult = box.querySelector('.tool-result');
-  const existingAsk = box.querySelector('.ask-card');
-  if (existingSep) existingSep.remove();
-  if (existingResult) existingResult.remove();
-  if (existingAsk) existingAsk.remove();
-  const sep = document.createElement('div');
-  sep.className = 'tool-sep';
+  const host = paneScrollEl($('messages')) || $('messages');
+  if (!host) return null;
   const card = buildQuestionsView(questions || [], null);
-  box.appendChild(sep);
-  box.appendChild(card);
-  return toolCallDiv;
+  if (tcId) card.dataset.askTcId = tcId;
+  host.appendChild(card);
+  return card;
 }
 
 // Build a multiple-choice question card DOM element from a questions array.
@@ -2507,23 +2485,9 @@ function buildQuestionsView(questions, onAnswer) {
 }
 
 // Wire the ask card's buttons + free-text inputs to the reply callback.
-function wireAskCard(pr, reply, toolCallDiv) {
-  const box = toolCallDiv ? toolCallDiv.querySelector('.tool-box') : (pr.tcId ? _toolBoxEl(pr.tcId) : null);
-  if (!box) {
-    // Last-resort: scan the whole document for a rendered ask card.
-    const fallback = document.querySelector('.ask-card');
-    if (!fallback) { reply('answers:[]'); return; }
-    const card = fallback;
-    wireAskButtons(pr, reply, card);
-    return;
-  }
-  const card = box.querySelector('.ask-card');
-  if (!card) {
-    const fallback = document.querySelector('.ask-card');
-    if (!fallback) { reply('answers:[]'); return; }
-    wireAskButtons(pr, reply, fallback);
-    return;
-  }
+function wireAskCard(pr, reply, card) {
+  if (!card) card = document.querySelector('.ask-card');
+  if (!card) { reply('answers:[]'); return; }
   wireAskButtons(pr, reply, card);
 }
 
