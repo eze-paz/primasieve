@@ -1142,6 +1142,9 @@
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
         (async () => { if (!tokens()) return; for (const p of d.paths) { try { await del(relToCloud(p)); } catch {} } })();
         for (const p of d.paths) forgetFromStateAndIndex(p);
+        // Fan the deletion to the worker pool so sibling interpreters drop their
+        // MEMFS copies (the manager broadcasts fs-removed to every pyodide worker).
+        try { const w = window._sandpieWorker; if (w) w.postMessage({ type: 'opfs-removed', paths: d.paths }); } catch (_) {}
         return;
       }
       if (d.type === 'sw-opfs-changed' && Array.isArray(d.paths)) {

@@ -313,6 +313,7 @@ self._sandpie_hydrate_sync = function (pathStr) {
     if (!full.startsWith('/files/')) return;
     const rel = full.slice('/files/'.length).replace(/^\/+/, '');
     if (!rel || _relExempt(rel)) return;
+    _ensureCloudDirs(full);   // materialize cloud-folder ancestors (create-mode opens in cloud dirs)
     try { if (py.FS.analyzePath(full).exists) return; } catch (_) {}
     const entry = _dbxIndex[rel];
     if (!entry || entry.kind !== 'file') return;
@@ -322,6 +323,37 @@ self._sandpie_hydrate_sync = function (pathStr) {
     py.FS.writeFile(full, bytes);
     _hydratedSet.add(rel);
   } catch (e) { console.warn('[pyodide-worker] sync hydrate failed:', pathStr, (e && e.message) || e); }
+};
+// Materialize ancestor DIRECTORIES that exist in the cloud index, so create-mode
+// opens / mkdir / chdir inside a cloud-only folder can proceed. Only folders
+// present in the index (or already local) are created — a typo'd path stays a
+// clean ENOENT. Directories carry no bytes, so this is never a hydration hazard.
+function _ensureCloudDirs(full) {
+  try {
+    const dir = full.slice(0, full.lastIndexOf('/'));
+    if (!dir || dir === '/files' || py.FS.analyzePath(dir).exists) return;
+    const segs = dir.slice('/files/'.length).split('/').filter(Boolean);
+    let cur = '';
+    for (const seg of segs) {
+      cur = cur ? cur + '/' + seg : seg;
+      const fc = '/files/' + cur;
+      if (py.FS.analyzePath(fc).exists) continue;
+      const e = _dbxIndex[cur];
+      if (e && e.kind === 'folder') { try { py.FS.mkdirTree(fc); } catch (_) {} }
+      else return;
+    }
+  } catch (_) {}
+}
+// Report a Python-initiated deletion of a cloud-only path: remove any OPFS copy,
+// then let the page delete it from Dropbox + trim the cloud index (the manager
+// fans fs-removed to sibling interpreters via the page's opfs-removed broadcast).
+self._sandpie_cloud_delete = function (rel, isDir) {
+  try {
+    const r = String(rel || '').replace(/^\/+/, '');
+    if (!r) return;
+    try { swOpfsDelete(r, !!isDir); } catch (_) {}
+    try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [r] } }); } catch (_) {}
+  } catch (_) {}
 };
 // ---- Cloud-index view for Python (stat / listdir / scandir) ------------------
 // Expose the dehydrated cloud index to Python so its view of /files matches the
@@ -388,6 +420,11 @@ const _CLOUD_FS_PY = `
 import os
 from js import _sandpie_cloud_stat, _sandpie_cloud_children
 
+# Python-side tombstones: cloud paths this interpreter has deleted this session.
+# Keeps POSIX semantics instant (re-stat -> ENOENT, listdir -> gone) without
+# waiting for the page's async index trim; the page still deletes from Dropbox.
+_deleted_set = set()
+
 _orig_stat = os.stat
 _orig_lstat = os.lstat
 _orig_access = os.access
@@ -423,6 +460,8 @@ def _cloud_rel(path):
 
 def _cloud_meta(rel):
     if rel is None:
+        return None
+    if rel in _deleted_set:
         return None
     try:
         m = _sandpie_cloud_stat(rel)
@@ -500,7 +539,13 @@ def _cloud_children(rel):
             kids = kids.to_py()
         out = []
         for k in kids:
-            out.append(dict(k))
+            d = dict(k)
+            nm = d.get('name')
+            if nm:
+                cr = (rel + '/' + nm) if rel else nm
+                if cr in _deleted_set:
+                    continue
+            out.append(d)
         return out
     except Exception:
         return None
@@ -610,11 +655,193 @@ def _patched_scandir(path='.', *, dir_fd=None):
         merged.append(_CloudDirEntry(name, base, k.get('kind') or 'file'))
     return _ScandirResult(merged)
 
+# ---------- Layer 3: mutations on cloud-only paths ----------
+_orig_chdir = os.chdir
+_orig_makedirs = os.makedirs
+_orig_mkdir = os.mkdir
+_orig_unlink = os.unlink
+_orig_rmdir = os.rmdir
+_orig_rename = os.rename
+_orig_replace = os.replace
+_orig_chmod = os.chmod
+_orig_utime = os.utime
+from js import _sandpie_hydrate_sync as _sp_hydrate
+from js import _sandpie_cloud_delete as _sp_cloud_delete
+
+def _cloud_folder(rel):
+    m = _cloud_meta(rel)
+    return m is not None and m.get('kind') == 'folder'
+
+def _ensure_ancestors(path):
+    p = os.fspath(path)
+    if isinstance(p, bytes):
+        try: p = p.decode('utf-8')
+        except Exception: return
+    cur = ''
+    for seg in str(p).split('/')[:-1]:
+        if not seg:
+            continue
+        cur = cur + '/' + seg if cur else seg
+        try:
+            _orig_stat(cur)
+        except (FileNotFoundError, NotADirectoryError):
+            if _cloud_folder(_cloud_rel(cur)):
+                try: _orig_makedirs(cur, exist_ok=True)
+                except Exception: pass
+
+def _drop_local(path, rel, is_dir):
+    try:
+        if is_dir:
+            _orig_rmdir(path)
+        else:
+            _orig_unlink(path)
+    except Exception:
+        pass
+    _deleted_set.add(rel)
+    try:
+        _sp_cloud_delete(rel, is_dir)
+    except Exception:
+        pass
+
+def _patched_chdir(path):
+    try:
+        return _orig_chdir(path)
+    except (FileNotFoundError, NotADirectoryError):
+        if _cloud_folder(_cloud_rel(path)):
+            try: _orig_makedirs(path, exist_ok=True)
+            except Exception: pass
+            return _orig_chdir(path)
+        raise
+
+def _patched_mkdir(path, mode=0o777, **kw):
+    try:
+        return _orig_mkdir(path, mode, **kw)
+    except FileNotFoundError:
+        _ensure_ancestors(path)
+        return _orig_mkdir(path, mode, **kw)
+
+def _patched_unlink(path, **kw):
+    rel = _cloud_rel(path)
+    try:
+        _orig_unlink(path, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        m = _cloud_meta(rel)
+        if m is None:
+            raise
+        if m.get('kind') != 'file':
+            raise IsADirectoryError(21, 'Is a directory', os.fspath(path))
+        _drop_local(path, rel, False)
+    else:
+        # physical copy deleted but the cloud snapshot still lists it — hide it
+        # intra-session; the capture path still deletes the Dropbox copy.
+        if rel is not None and _cloud_meta(rel) is not None:
+            _deleted_set.add(rel)
+    return None
+
+def _patched_rmdir(path, **kw):
+    rel = _cloud_rel(path)
+    try:
+        _orig_rmdir(path, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        m = _cloud_meta(rel)
+        if m is None or m.get('kind') != 'folder':
+            raise
+        try:
+            if _patched_listdir(path):
+                raise OSError(39, 'Directory not empty', os.fspath(path))
+        except FileNotFoundError:
+            pass
+        _drop_local(path, rel, True)
+    else:
+        if rel is not None and _cloud_meta(rel) is not None:
+            _deleted_set.add(rel)
+    return None
+
+def _hydrate_src(path):
+    try:
+        _sp_hydrate(os.fspath(path))
+    except Exception:
+        pass
+    try:
+        _orig_stat(path)
+        return True
+    except Exception:
+        return False
+
+def _patched_rename(src, dst, **kw):
+    srel = _cloud_rel(src)
+    sm = _cloud_meta(srel)
+    drel = _cloud_rel(dst)
+    dm = _cloud_meta(drel)
+    if dm is not None and dm.get('kind') == 'file':
+        _drop_local(dst, drel, False)      # POSIX rename overwrites dst
+    try:
+        _orig_rename(src, dst, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        if dm is not None and dm.get('kind') == 'folder':
+            try: _orig_makedirs(dst, exist_ok=True)
+            except Exception: pass
+        if sm is None:
+            raise
+        if not _hydrate_src(src):
+            raise
+        _ensure_ancestors(dst)
+        _orig_rename(src, dst, **kw)
+    # POSIX: the old name no longer exists — drop its cloud fallback too
+    if sm is not None:
+        _deleted_set.add(srel)
+    return None
+
+def _patched_replace(src, dst, **kw):
+    srel = _cloud_rel(src)
+    sm = _cloud_meta(srel)
+    drel = _cloud_rel(dst)
+    dm = _cloud_meta(drel)
+    if dm is not None and dm.get('kind') == 'file':
+        _drop_local(dst, drel, False)
+    try:
+        _orig_replace(src, dst, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        if sm is None:
+            raise
+        if not _hydrate_src(src):
+            raise
+        _ensure_ancestors(dst)
+        _orig_replace(src, dst, **kw)
+    if sm is not None:
+        _deleted_set.add(srel)
+    return None
+
+def _patched_chmod(path, mode, **kw):
+    try:
+        return _orig_chmod(path, mode, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        if _cloud_meta(_cloud_rel(path)) is not None:
+            return None
+        raise
+
+def _patched_utime(path, times=None, **kw):
+    try:
+        return _orig_utime(path, times, **kw)
+    except (FileNotFoundError, NotADirectoryError):
+        if _cloud_meta(_cloud_rel(path)) is not None:
+            return None
+        raise
+
 os.stat = _patched_stat
 os.lstat = _patched_lstat
 os.access = _patched_access
 os.listdir = _patched_listdir
 os.scandir = _patched_scandir
+os.chdir = _patched_chdir
+os.mkdir = _patched_mkdir
+os.unlink = _patched_unlink
+os.remove = _patched_unlink
+os.rmdir = _patched_rmdir
+os.rename = _patched_rename
+os.replace = _patched_replace
+os.chmod = _patched_chmod
+os.utime = _patched_utime
 `;
 
 // ---- Event-driven OPFS write-back (FS.trackingDelegate) --------------------
