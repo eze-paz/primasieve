@@ -2401,7 +2401,10 @@ function renderTodos(tcId, todos, scopeEl) {
 // box. A standalone card is deterministic and matches the conversational
 // direction: the empty 'ask' tool-box header stays, and the card sits below it.
 function renderQuestions(tcId, questions) {
-  const host = paneScrollEl($('messages')) || $('messages');
+  // Render into the active stream's host (the panel where the agent is running),
+  // not the main pane — the user may have the agent open in the side panel.
+  const stream = activeStream();
+  const host = (stream && stream.host) || paneScrollEl($('messages')) || $('messages');
   if (!host) return null;
   const card = buildQuestionsView(questions || [], null);
   if (tcId) card.dataset.askTcId = tcId;
@@ -2410,77 +2413,161 @@ function renderQuestions(tcId, questions) {
 }
 
 // Build a multiple-choice question card DOM element from a questions array.
+// Mockup B: conversational bubble, one question at a time (wizard), chips,
+// recommendation tag, 'Otro:' free-text input per question, Next/Back navigation.
 function buildQuestionsView(questions, onAnswer) {
   const wrap = document.createElement('div');
   wrap.className = 'ask-card';
+  // Store question data for the wizard
+  const qs = questions || [];
+  const state = { questions: qs, current: 0, answers: qs.map(() => null) };
+  wrap._askState = state;
+
+  // --- Header ---
   const head = document.createElement('div');
   head.className = 'ask-card-head';
   const qIcon = document.createElement('span');
   qIcon.className = 'ask-q-icon';
   qIcon.textContent = '?';
   const headLabel = document.createElement('span');
-  headLabel.textContent = 'Clarificaci\u00f3n' + (questions && questions.length > 1 ? ' \u00b7 ' + questions.length + ' preguntas' : '');
-  head.append(qIcon, headLabel);
+  headLabel.textContent = 'Necesito aclarar algunos puntos';
+  const qCount = document.createElement('span');
+  qCount.className = 'ask-qcount';
+  head.append(qIcon, headLabel, qCount);
   wrap.appendChild(head);
-  for (let i = 0; i < (questions || []).length; i++) {
-    const q = questions[i];
-    const qBlock = document.createElement('div');
-    qBlock.className = 'ask-q';
-    const qText = document.createElement('div');
-    qText.className = 'ask-q-text';
-    qText.textContent = q.question || '';
-    qBlock.appendChild(qText);
-    const options = q.options || [];
-    for (const opt of options) {
-      const row = document.createElement('div');
-      row.className = 'ask-option' + (opt === q.default ? ' selected' : '');
-      const radio = document.createElement('span');
-      radio.className = 'ask-radio' + (opt === q.default ? ' on' : '');
-      const label = document.createElement('span');
-      label.className = 'opt-label';
-      label.textContent = opt;
-      row.append(radio, label);
-      if (opt === q.default && options.length > 2) {
-        const rec = document.createElement('span');
-        rec.className = 'opt-rec';
-        rec.textContent = 'recomendado';
-        row.appendChild(rec);
-      }
-      row.onclick = () => {
-        qBlock.querySelectorAll('.ask-option').forEach(o => {
-          o.classList.remove('selected');
-          const r = o.querySelector('.ask-radio'); if (r) r.classList.remove('on');
-        });
-        row.classList.add('selected');
-        row.querySelector('.ask-radio').classList.add('on');
-      };
-      qBlock.appendChild(row);
-    }
-    // Free-text "Other" input for every question (enabled only if allow_freeform)
-    const freeRow = document.createElement('div');
-    freeRow.className = 'ask-free-row';
-    const sp = document.createElement('span');
-    sp.className = 'ask-free-tag';
-    sp.textContent = 'Otro:';
-    const freeInput = document.createElement('input');
-    freeInput.type = 'text';
-    freeInput.className = 'ask-free-input';
-    freeInput.placeholder = q.allow_freeform ? 'Escribe tu propia respuesta\u2026' : 'No habilitado';
-    freeInput.disabled = !q.allow_freeform;
-    freeRow.append(sp, freeInput);
-    qBlock.appendChild(freeRow);
-    wrap.appendChild(qBlock);
-  }
+
+  // --- Question body container (replaced on navigation) ---
+  const body = document.createElement('div');
+  body.className = 'ask-body';
+  wrap.appendChild(body);
+
+  // --- Navigation dots ---
+  const dots = document.createElement('div');
+  dots.className = 'ask-dots';
+  wrap.appendChild(dots);
+
+  // --- Actions ---
   const actions = document.createElement('div');
   actions.className = 'ask-actions';
+  const backBtn = document.createElement('button');
+  backBtn.className = 'ask-btn';
+  backBtn.textContent = '\u2190 Atr\u00e1s';
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'ask-btn primary';
   const defBtn = document.createElement('button');
-  defBtn.className = 'ask-btn use-defaults';
+  defBtn.className = 'ask-btn';
   defBtn.textContent = 'Usar recomendados';
-  const contBtn = document.createElement('button');
-  contBtn.className = 'ask-btn primary';
-  contBtn.textContent = 'Responder';
-  actions.append(defBtn, contBtn);
+  actions.append(backBtn, defBtn, nextBtn);
   wrap.appendChild(actions);
+
+  // --- Render the current question ---
+  function renderQuestion() {
+    const i = state.current;
+    const q = qs[i];
+    if (!q) { body.innerHTML = ''; return; }
+    qCount.textContent = (i + 1) + '/' + qs.length;
+
+    // Dots
+    dots.innerHTML = '';
+    for (let j = 0; j < qs.length; j++) {
+      const dot = document.createElement('span');
+      dot.className = 'ask-dot' + (j === i ? ' active' : '') + (state.answers[j] ? ' done' : '');
+      dots.appendChild(dot);
+    }
+
+    // Question block
+    let html = '<div class="ask-q">';
+    html += '<div class="ask-q-text">' + tcEscape(q.question || '') + '</div>';
+    if (q.default && q.options.length > 2) {
+      html += '<div class="ask-q-rec">\u21b3 Recomiendo: <strong>' + tcEscape(q.default) + '</strong></div>';
+    }
+    // Chips
+    html += '<div class="ask-chips">';
+    for (const opt of (q.options || [])) {
+      // Pre-select the default option on first render (Mockup B shows it filled).
+      const prev = state.answers[i] ? state.answers[i].answer : null;
+      const sel = opt === (prev || q.default) ? ' selected' : '';
+      const rec = opt === q.default && q.options.length > 2 ? ' data-rec="1"' : '';
+      html += '<div class="ask-chip' + sel + '"' + rec + ' data-value="' + tcEscape(opt) + '">';
+      html += '<span class="chip-radio">' + (sel ? '\u25cf' : '\u25cb') + '</span> ';
+      html += '<span class="chip-label">' + tcEscape(opt) + '</span>';
+      if (rec) html += '<span class="chip-rec">rec</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Free-text 'Other' (always shown, enabled only if allow_freeform)
+    const prevFree = state.answers[i] && state.answers[i]._freeText ? state.answers[i]._freeText : '';
+    const disabled = q.allow_freeform ? '' : ' disabled';
+    html += '<div class="ask-free-row">';
+    html += '<span class="ask-free-tag">Otro:</span>';
+    html += '<input type="text" class="ask-free-input" placeholder="' + (q.allow_freeform ? 'Escribe tu respuesta…' : 'No habilitado') + '" value="' + tcEscape(prevFree) + '"' + disabled + '>';
+    html += '</div>';
+    html += '</div>';
+    body.innerHTML = html;
+
+    // Wire chips
+    body.querySelectorAll('.ask-chip').forEach(chip => {
+      chip.onclick = () => {
+        body.querySelectorAll('.ask-chip').forEach(c => { c.classList.remove('selected'); c.querySelector('.chip-radio').textContent = '\u25cb'; });
+        chip.classList.add('selected');
+        chip.querySelector('.chip-radio').textContent = '\u25cf';
+        saveAnswer(i);
+      };
+    });
+    // Wire free-text input
+    const freeInput = body.querySelector('.ask-free-input');
+    if (freeInput) {
+      freeInput.oninput = () => saveAnswer(i);
+    }
+
+    // Buttons
+    const isLast = i === qs.length - 1;
+    nextBtn.textContent = isLast ? 'Responder' : 'Siguiente \u2192';
+    backBtn.style.display = i === 0 ? 'none' : '';
+    if (isLast) {
+      defBtn.style.display = '';
+      nextBtn.onclick = () => { saveAnswer(i); returnAnswers(); };
+    } else {
+      defBtn.style.display = 'none';
+      nextBtn.onclick = () => { saveAnswer(i); state.current++; renderQuestion(); };
+    }
+    backBtn.onclick = () => { saveAnswer(i); state.current--; renderQuestion(); };
+    defBtn.onclick = () => {
+      const answers = qs.map(q => ({ question: q.question, answer: q.default || (q.options && q.options[0]) || '' }));
+      if (onAnswer) onAnswer(answers);
+    };
+    // Scroll into view
+    wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function saveAnswer(i) {
+    const q = qs[i];
+    if (!q) return;
+    const selected = body.querySelector('.ask-chip.selected');
+    const freeInput = body.querySelector('.ask-free-input');
+    let answer = q.default || (q.options && q.options[0]) || '';
+    let _freeText = '';
+    if (freeInput && !freeInput.disabled && freeInput.value.trim()) {
+      answer = freeInput.value.trim();
+      _freeText = freeInput.value.trim();
+    } else if (selected) {
+      answer = selected.dataset.value || selected.querySelector('.chip-label').textContent.trim();
+    }
+    state.answers[i] = { question: q.question, answer, _freeText };
+  }
+
+  function returnAnswers() {
+    const answers = state.answers.map(a => a ? { question: a.question, answer: a.answer } : null).filter(Boolean);
+    if (onAnswer) onAnswer(answers);
+    else {
+      // If no onAnswer callback, the reply function is wired externally via
+      // wireAskButtons — store the answers for retrieval.
+      wrap._answers = answers;
+    }
+  }
+
+  renderQuestion();
   return wrap;
 }
 
@@ -2494,7 +2581,40 @@ function wireAskCard(pr, reply, card) {
 // Attach the click handlers to an ask card (works for both the live stream
 // box and the appended-fallback path).
 function wireAskButtons(pr, reply, card) {
+  // Use the card's stored state (Mockup B wizard) if available
   const questions = (pr.args && pr.args.questions) || [];
+  // The card stores its wizard state (Mockup B) — use it directly.
+  if (card._askState) {
+    const saveCurrent = () => {
+      const i = card._askState.current;
+      const qs = card._askState.questions[i];
+      if (!qs) return;
+      const qBlock = card.querySelector('.ask-q');
+      if (!qBlock) return;
+      const selected = qBlock.querySelector('.ask-chip.selected');
+      const freeInput = qBlock.querySelector('.ask-free-input');
+      let answer = qs.default || (qs.options && qs.options[0]) || '';
+      let _freeText = '';
+      if (freeInput && !freeInput.disabled && freeInput.value.trim()) {
+        answer = freeInput.value.trim();
+        _freeText = freeInput.value.trim();
+      } else if (selected) {
+        answer = selected.dataset.value || (selected.querySelector('.chip-label') && selected.querySelector('.chip-label').textContent.trim()) || answer;
+      }
+      card._askState.answers[i] = { question: qs.question, answer, _freeText };
+    };
+    saveCurrent();
+    contBtn.onclick = () => {
+      const all = card._askState.answers.filter(Boolean).map(a => ({ question: a.question, answer: a.answer }));
+      reply('answers:' + JSON.stringify(all));
+    };
+    defBtn.onclick = () => {
+      const answers = card._askState.questions.map(q => ({ question: q.question, answer: q.default || (q.options && q.options[0]) || '' }));
+      reply('answers:' + JSON.stringify(answers));
+    };
+    return;
+  }
+
   const getAnswers = () => {
     return questions.map((q, i) => {
       const qBlock = card.querySelectorAll('.ask-q')[i];
