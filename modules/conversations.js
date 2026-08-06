@@ -863,10 +863,6 @@ async function loadConv(id) {
 
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
 
-  // TEMP-DIAG (loadConv latency): console.time spans for ONE measurement pass.
-  // Reload between clicks to re-measure cold loads (warm streams skip read+render).
-  // Remove after reading the numbers.
-  console.time('[loadConv] total');
   const prevId = activeConvId;
 
   // ── INSTANT UI SWITCH: all synchronous, no awaits before the panel changes.
@@ -883,10 +879,7 @@ async function loadConv(id) {
     // Warm — content already loaded; just scroll + refresh the sidebar.
     const mEl = paneScrollEl($('messages'));
     if (mEl) mEl.scrollTop = mEl.scrollHeight;
-    console.time('[loadConv] sidebar');
     await refreshConversationList();
-    console.timeEnd('[loadConv] sidebar');
-    console.timeEnd('[loadConv] total');
     return;
   }
 
@@ -898,13 +891,10 @@ async function loadConv(id) {
       // Save the PREVIOUS conversation in the background (its data is still in
       // its stream); no longer blocks the switch.
       if (prevId) { try { await saveConv(prevId, { touchUpdated: false }); } catch (_) {} }
-      console.time('[loadConv] read+parse');
       const data = await readConvData(id);
       if (!data) {
         addMsg('err', 'Failed to load conversation.');
         if (prevId) mountConv(prevId);
-        console.timeEnd('[loadConv] read+parse');
-        console.timeEnd('[loadConv] total');
         return;
       }
       hydrateStreamFromData(s, data);
@@ -914,16 +904,10 @@ async function loadConv(id) {
       // the stream — wiping the history and re-triggering a full cold load on
       // the next visit. Only when this conv is still the active one.
       if (activeConvId === id) messages = s.messages;
-      console.timeEnd('[loadConv] read+parse');
-      console.time('[loadConv] render');
       renderConversation(s.messages, s.compaction, s.host);
-      console.timeEnd('[loadConv] render');
       const mEl = paneScrollEl($('messages'));
       if (mEl) mEl.scrollTop = mEl.scrollHeight;
-      console.time('[loadConv] sidebar');
       await refreshConversationList();
-      console.timeEnd('[loadConv] sidebar');
-      console.timeEnd('[loadConv] total');
     } finally {
       s._loading = false;
     }
@@ -4115,13 +4099,11 @@ class SidePanel {
 
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
-    console.time('[lazyLoad] read+parse+render');
     const data = await readConvData(id);
     if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
-    console.timeEnd('[lazyLoad] read+parse+render');
   }
 
   _render() {
