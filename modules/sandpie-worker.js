@@ -938,6 +938,7 @@ async function tool_ask({ questions }, ctx) {
     try {
       self.postMessage({ type: 'forward-to-page', payload: {
         type: 'ask-question', id,
+        convId: (ctx && ctx._conversation_file_name) || '',
         tcId: (ctx && ctx._currentToolCallId) || '',
         args: { questions: sanitized }
       }});

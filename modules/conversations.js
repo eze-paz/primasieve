@@ -1542,7 +1542,10 @@ function getSandpieWorker() {
       // card into the conversation and waits for the user to click an option.
       if (msg.payload && msg.payload.type === 'ask-question') {
         const pr = msg.payload;
-        const convId = activeConvId;
+        // The generating conversation — NOT the currently-active one. The worker
+        // includes its conv id; without it a background/side-panel ask would
+        // render into whatever conversation is focused now.
+        const convId = pr.convId || activeConvId;
         if (convId) _askingConvs.add(convId);
         // Reply is wired DIRECTLY into the card as its onAnswer callback — no
         // setTimeout/wireAsk* indirection (that path had a TDZ ReferenceError
@@ -1552,7 +1555,7 @@ function getSandpieWorker() {
           refreshConversationList();
           try { _sandpieWorker.postMessage({ type: 'ask-result', id: pr.id, result }); } catch (_) {}
         };
-        renderQuestions(pr.tcId, pr.args && pr.args.questions, reply);
+        renderQuestions(pr.tcId, pr.args && pr.args.questions, reply, pr.convId);
         refreshConversationList();
         return;
       }
@@ -2400,10 +2403,11 @@ function renderTodos(tcId, todos, scopeEl) {
 // not exist yet, and a last-box fallback can target the wrong (write_todos)
 // box. A standalone card is deterministic and matches the conversational
 // direction: the empty 'ask' tool-box header stays, and the card sits below it.
-function renderQuestions(tcId, questions, reply) {
-  // Render into the active stream's host (the panel where the agent is running),
-  // not the main pane — the user may have the agent open in the side panel.
-  const stream = activeStream();
+function renderQuestions(tcId, questions, reply, convId) {
+  // Render into the GENERATING conversation's host — the stream that produced
+  // the ask tool call — not the currently-active conversation. The user may
+  // have switched panels/conversations while the question was pending.
+  const stream = (convId && convStreams.get(convId)) || activeStream();
   const host = (stream && stream.host) || paneScrollEl($('messages')) || $('messages');
   if (!host) return null;
   const card = buildQuestionsView(questions || [], (answers) => {
