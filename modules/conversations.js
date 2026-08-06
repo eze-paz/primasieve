@@ -243,7 +243,20 @@ function flushIncrementalSave(convId) {
   const t = _incSaveTimers.get(convId);
   if (t) { clearTimeout(t); _incSaveTimers.delete(convId); }
 }
-async function saveConv(convId, { touchUpdated = true } = {}) {
+// Serialize saves per conversation. saveConv is async (convLocation + opfs
+// append), and two concurrent calls — the ~1.2s incremental timer racing the
+// turn-end save in sendSingle's finally — could BOTH read the same
+// persistedCount and append the same tail, duplicating a whole round in the
+// JSONL (seen in the wild: identical tool_call ids, same [rN] results twice).
+// Chaining per conv makes each save see the previous one's persistedCount.
+const _saveChains = new Map();
+function saveConv(convId, opts = {}) {
+  const prev = _saveChains.get(convId) || Promise.resolve();
+  const next = prev.then(() => _saveConv(convId, opts)).catch((e) => console.warn('[sandpie] saveConv failed:', e && e.message));
+  _saveChains.set(convId, next);
+  return next;
+}
+async function _saveConv(convId, { touchUpdated = true } = {}) {
   if (!convId) return;
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
@@ -2366,10 +2379,14 @@ function tcEscape(s) {
 function _toolBoxEl(ref, scopeEl) {
   if (ref && ref.nodeType === 1) return ref;
   const root = scopeEl || document;
+  let found = null;
   for (const div of root.querySelectorAll('.msg.tool-call')) {
-    if (div.dataset.tcId === ref) return div;
+    // Last match wins: a round persisted twice (concurrent-append race) yields
+    // duplicate tool_call ids, and each result must attach to ITS OWN box — the
+    // first match left the later duplicate box EMPTY.
+    if (div.dataset.tcId === ref) found = div;
   }
-  return null;
+  return found;
 }
 
 function appendToolResult(tcId, result, scopeEl) {
