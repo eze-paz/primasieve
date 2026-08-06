@@ -744,6 +744,12 @@ function registerRewindCommand() {
       const s = activeStream();
       if (!s || !messages.length) return 'Nothing to rewind.';
 
+      // The rewound conversation lives in whichever pane its stream host is
+      // mounted in (#messages left / #messagesSide right). Capture it BEFORE
+      // the re-render wipes the host, so the restored text lands in THAT
+      // pane's composer instead of always the left one.
+      const rewindPane = s.host ? s.host.parentNode : null;
+
       let userCount = 0;
       let idx = messages.length;
       while (idx > 0 && userCount < n) {
@@ -787,7 +793,7 @@ function registerRewindCommand() {
       saveActiveConv().catch(() => {});
 
       if (rewindTexts.length) {
-        const ta = $('input');
+        const ta = rewindPane === $('messagesSide') ? $('inputSide') : $('input');
         if (ta) {
           const combined = rewindTexts.join('\n\n');
           ta.value = combined;
