@@ -1416,7 +1416,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=93');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=94');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1935,6 +1935,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     _hermesMode: !!(effective && effective.type === 'hermes'),
     model: (effective && effective.model) || $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages),
+    // Reply-language rule shipped separately so sandpie-worker.js can also
+    // inject it into subagent system prompts (subagents never see the parent's
+    // composed system message).
+    languageRule: (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.directive) ? SandpieLanguage.directive() : null,
     messages: resolvedMessages,
     tools: toolDefs(),
     // Rerouted to the vision fallback for this turn (user attached an image to a
@@ -3418,6 +3422,15 @@ async function buildSystemPrompt(convMessages) {
   if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {
     try { content += await SandpieAugmentations.systemBlock(); }
     catch (e) { console.warn('[sandpie] augmentations block failed:', e); }
+  }
+  // Reply-language rule (Settings → Account → Reply language): appended LAST so
+  // it is the final instruction the model reads — the LLM MUST reply in the
+  // chosen language unless the user explicitly asks otherwise, regardless of
+  // the language of tool results/materials. Applies to every provider, and to
+  // the Ralph loop (loop-lab.js shares buildSystemPrompt).
+  if (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.directive) {
+    try { content += '\n\n' + SandpieLanguage.directive(); }
+    catch (e) { console.warn('[sandpie] language rule failed:', e); }
   }
   return { role: 'system', content };
 }

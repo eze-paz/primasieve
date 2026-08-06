@@ -1,12 +1,14 @@
 // sandpie /modules/account.js — optional company sign-in (progressive enhancement).
 //
-// Anonymous-first: sandpie is fully usable signed-out. When a sandpie-server
-// backend is present, this adds an "Account" panel (Sign in / Sign out) to the
-// gear modal and, once signed in, surfaces the company SSO **as a read-only AI
-// provider** — a server-side wrapper that holds the real LLM key. Nothing here
-// is persisted: the managed provider is injected into SandpieProviders in memory
-// and removed on sign-out, so the user's own settings/config file are never
-// touched.
+// Anonymous-first: sandpie is fully usable signed-out. The "Account" panel in
+// the gear modal is ALWAYS present: signed-in users see their company identity
+// (and Sign out), everyone else sees an "Anonymous" placeholder. The panel also
+// hosts the reply-language picker (see SandpieLanguage) — the language sandpie
+// answers in. When a sandpie-server backend is present, signing in surfaces the
+// company SSO **as a read-only AI provider** — a server-side wrapper that holds
+// the real LLM key. Nothing here is persisted: the managed provider is injected
+// into SandpieProviders in memory and removed on sign-out, so the user's own
+// settings/config file are never touched.
 //
 // No backend (static / Dropbox / file:// deploy, or /auth/* missing) → this
 // module is a silent no-op: no panel, no chip, no behaviour change.
@@ -15,6 +17,8 @@
 
 const SandpieAccount = (() => {
   let _user = null;
+  let _backend = false;       // a sandpie-server auth backend was detected
+  let _langFlashT = null;     // "Applied" feedback timer for the language picker
   let _panel = null;
   let _registered = false;
   let _refreshTimer = null;
@@ -37,18 +41,24 @@ const SandpieAccount = (() => {
   // Probe the backend. Only a real auth response (200 signed-in / 401 signed-out)
   // lights up the Account UI; anything else (404, error) means no backend → no-op.
   async function init() {
+    // The Account panel (identity + reply language) is always available — no
+    // backend needed. The /auth/me probe only fills in the real identity and
+    // the Sign in / Sign out UI when a sandpie-server backend is present.
+    registerPanel();
     let me;
     try { me = await getJSON('/auth/me'); }
-    catch (_) { return; }                  // server unreachable → stay anonymous, no UI
+    catch (_) { _backend = false; paint(); return; }   // unreachable → anonymous
     if (me.ok && me.data) {                // signed in
+      _backend = true;
       _user = me.data;
-      registerPanel();
       onSignedIn();
     } else if (me.status === 401) {        // backend present, signed out
-      registerPanel();
+      _backend = true;
+      paint();
+    } else {                               // 404 / other → no auth backend
+      _backend = false;
       paint();
     }
-    // 404 / other → no auth backend → no-op
   }
 
   async function onSignedIn() {
@@ -137,9 +147,11 @@ const SandpieAccount = (() => {
 
   function paint() {
     if (!_panel) return;
+    let html = '';
+    // Identity row: the real account, or an "Anonymous" placeholder.
     if (_user) {
       const name = _user.name || _user.email || 'Signed in';
-      _panel.innerHTML =
+      html +=
         '<div style="display:flex; align-items:center; gap:0.6rem;">' +
           '<div style="flex:none;aspect-ratio:1;width:38px;height:38px;border-radius:50%;background:var(--sp-accent-dim);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.85rem;">' + esc(initials(name)) + '</div>' +
           '<div style="display:flex;flex-direction:column;min-width:0;">' +
@@ -148,13 +160,67 @@ const SandpieAccount = (() => {
           '</div>' +
         '</div>' +
         '<button class="ghost" id="spLogoutBtn" style="margin-top:0.9rem;">Sign out</button>';
-      _panel.querySelector('#spLogoutBtn')?.addEventListener('click', logout);
     } else {
-      _panel.innerHTML =
-        '<p style="font-size:0.8rem;color:var(--sp-text-dim);margin:0 0 0.7rem;">Sign in with your company account to use the managed AI provider. Signing in is optional — sandpie works anonymously with your own providers.</p>' +
-        '<button class="ghost" id="spLoginBtn">Sign in</button>';
-      _panel.querySelector('#spLoginBtn')?.addEventListener('click', login);
+      html +=
+        '<div style="display:flex; align-items:center; gap:0.6rem;">' +
+          '<div style="flex:none;aspect-ratio:1;width:38px;height:38px;border-radius:50%;background:var(--sp-panel);border:1px solid var(--sp-border);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:0.85rem;color:var(--sp-text-dim);">?</div>' +
+          '<div style="display:flex;flex-direction:column;min-width:0;">' +
+            '<span style="font-size:0.9rem;">Anonymous</span>' +
+            '<span style="font-size:0.72rem;color:var(--sp-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">not signed in</span>' +
+          '</div>' +
+        '</div>';
+      if (_backend) html += '<button class="ghost" id="spLoginBtn" style="margin-top:0.9rem;">Sign in</button>';
     }
+    // Reply-language picker — always present, backend or not.
+    html += languageBlockHtml();
+    _panel.innerHTML = html;
+    _panel.querySelector('#spLogoutBtn')?.addEventListener('click', logout);
+    _panel.querySelector('#spLoginBtn')?.addEventListener('click', login);
+    wireLanguage();
+  }
+
+  // ---- Reply-language picker (drives the LLM reply language; see SandpieLanguage) ----
+  function languageBlockHtml() {
+    let select;
+    try {
+      const L = (typeof SandpieLanguage !== 'undefined') ? SandpieLanguage : null;
+      if (!L || !L.options || !L.stored) throw new Error('SandpieLanguage missing');
+      const o = L.options();
+      const stored = L.stored();
+      const current = (stored && stored !== 'auto') ? stored : 'auto';
+      select = '<select id="spLanguage" style="width:100%;margin-top:0.35rem;padding:0.4rem 0.5rem;background:var(--sp-panel);border:1px solid var(--sp-border);border-radius:6px;color:var(--sp-text);font-size:0.82rem;">' +
+        '<option value="auto">' + esc(o.auto.label) + '</option>' +
+        o.items.map(l => '<option value="' + esc(l.code) + '" title="' + esc(l.name) + '"' + (l.code === current ? ' selected' : '') + '>' + esc(l.native || l.name) + '</option>').join('') +
+        '</select>';
+    } catch (_) {
+      select = '<p style="font-size:0.75rem;color:var(--sp-text-dim);margin:0.35rem 0 0;">Language picker unavailable.</p>';
+    }
+    return '<div style="margin-top:1rem;border-top:1px solid var(--sp-border);padding-top:0.8rem;">' +
+      '<label for="spLanguage" style="font-size:0.8rem;font-weight:600;display:block;">Reply language</label>' +
+      select +
+      '<p id="spLangHint" style="font-size:0.72rem;color:var(--sp-text-dim);margin:0.35rem 0 0;">Sandpie answers in this language unless you explicitly ask otherwise (e.g. a translation task).</p>' +
+      '</div>';
+  }
+
+  function wireLanguage() {
+    if (!_panel) return;
+    const sel = _panel.querySelector('#spLanguage');
+    const hint = _panel.querySelector('#spLangHint');
+    if (!sel || !hint) return;
+    sel.addEventListener('change', () => {
+      try { if (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.set) SandpieLanguage.set(sel.value); } catch (_) {}
+      let shown = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : sel.value;
+      try {
+        if (sel.value === 'auto' && typeof SandpieLanguage !== 'undefined' && SandpieLanguage.nativeName) {
+          shown = SandpieLanguage.nativeName(SandpieLanguage.effective());
+        }
+      } catch (_) {}
+      hint.textContent = 'Applied — sandpie will now reply in ' + shown + '.';
+      clearTimeout(_langFlashT);
+      _langFlashT = setTimeout(() => {
+        hint.textContent = 'Sandpie answers in this language unless you explicitly ask otherwise (e.g. a translation task).';
+      }, 2000);
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

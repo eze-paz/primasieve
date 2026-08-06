@@ -2065,13 +2065,17 @@ async function tool_spawn_subagent({ agent, prompt }, ctx) {
   });
 
   const sysBody = def.body || ('You are a focused subagent named ' + agent + '. Do the task and report the result.');
+  // Propagate the parent's reply-language rule (set by the page via
+  // config.languageRule) so subagents answer in the same language as the main
+  // agent — subagents don't see the parent's composed system message.
+  const langRule = (cfg && cfg.languageRule) ? '\n\n' + cfg.languageRule : '';
   const outNote = (def.meta.output === 'structured')
     ? '\n\nReturn ONLY your final result in the exact structure your instructions specify — no preamble, no commentary.'
     : '\n\nYour FINAL message is returned verbatim to the caller as your result — the caller cannot see your intermediate steps, and you cannot ask follow-up questions. Make it a self-contained summary.';
   const subConfig = {
     ...cfg,
     model: def.meta.model || cfg.model,
-    systemPrompt: { role: 'system', content: sysBody + outNote },
+    systemPrompt: { role: 'system', content: sysBody + langRule + outNote },
     messages: [{ role: 'user', content: brief }],
     tools: subTools,
     todos: [],

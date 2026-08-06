@@ -52,6 +52,7 @@ const SandpieSystemPrompt = (function () {
 
   const HTML = `
         <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Sets the assistant's behavior for every conversation. Stored locally in this browser only — not synced and not saved as a file.</p>
+        <p id="sysPromptLangNote" style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;"></p>
         <textarea id="sysPromptText" rows="8" spellcheck="false" placeholder="You are a helpful assistant…" style="width:100%; resize:vertical; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font:0.82rem 'JetBrains Mono', Consolas, monospace; line-height:1.45;"></textarea>
         <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.4rem;">
           <span id="sysPromptStatus" style="font-size:0.7rem; color:var(--sp-text-dim); flex:1; min-width:0;"></span>
@@ -173,6 +174,14 @@ const SandpieSystemPrompt = (function () {
   function wire(panel) {
     const ta = panel.querySelector('#sysPromptText');
     const resetBtn = panel.querySelector('#sysPromptReset');
+    const langNote = panel.querySelector('#sysPromptLangNote');
+    if (langNote) {
+      try {
+        if (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.nativeName && SandpieLanguage.effective) {
+          langNote.textContent = 'Reply language: ' + SandpieLanguage.nativeName(SandpieLanguage.effective()) + ' — set in Settings → Account.';
+        }
+      } catch (_) {}
+    }
     if (ta) {
       ta.value = get();
       ta.addEventListener('input', () => { set(ta.value); flashMsg('Saved'); });
