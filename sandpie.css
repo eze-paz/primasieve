@@ -1647,6 +1647,25 @@ ul.conv-list li.active {
     font-weight: 600;
     padding: 0 0 3px 1.2em;   /* nests under the question text */
   }
+  /* Stale/unanswered ask: the turn died (reload or abort) before the user could
+     answer. The box shows a notice; a surviving card is dimmed + disabled. */
+  .ask-stale {
+    padding: 0.35rem 0.6rem;
+    font: 11px/1.5 'JetBrains Mono','Space Mono',ui-monospace,monospace;
+    color: var(--sp-warn);
+    border-top: 1px dashed var(--sp-border);
+  }
+  .ask-stale-card {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .ask-stale-note {
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--sp-border);
+    font-size: 10.5px;
+    color: var(--sp-warn);
+  }
 
   .tool-box .tool-image {
     max-width: 100%;

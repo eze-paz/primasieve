@@ -408,6 +408,40 @@ function renderHistoricalMessage(m, host = null) {
 // honouring compaction: messages before the boundary are NOT sent to the model —
 // they render collapsed behind a toggle, with the summary that's sent in their
 // place — and messages from the boundary on render normally (in context).
+// After a reload or an aborted turn, an ask() that was never answered leaves a
+// dangling empty tool-box (the worker died, the card is gone). Mark those boxes
+// with a stale notice so the conversation doesn't look broken, and disable any
+// live question card that survived an abort (its worker round-trip is dead).
+function markStaleAsks(host) {
+  const root = host || document;
+  // Live cards orphaned by an abort: disable + label, keep the question visible.
+  for (const card of root.querySelectorAll('.ask-card')) {
+    if (card._askState && card._askState.settled) continue;
+    if (card._askState) card._askState.settled = true;
+    card.classList.add('ask-stale-card');
+    for (const b of card.querySelectorAll('button, textarea, .ask-chip')) b.disabled = true;
+    if (!card.querySelector('.ask-stale-note')) {
+      const note = document.createElement('div');
+      note.className = 'ask-stale-note';
+      note.textContent = '\u2717 Generaci\u00f3n interrumpida: esta pregunta ya no puede responderse.';
+      card.appendChild(note);
+    }
+  }
+  // Empty ask tool-boxes with no result AND no live card (reload case).
+  for (const box of root.querySelectorAll('.msg.tool-call')) {
+    if ((box.dataset.fname || '') !== 'ask') continue;
+    const inner = box.querySelector('.tool-box');
+    if (!inner) continue;
+    if (inner.querySelector('.ask-answered, .tool-result')) continue;   // has a result
+    if (root.querySelector('.ask-card')) continue;                       // card still live
+    if (inner.querySelector('.ask-stale')) continue;
+    const stale = document.createElement('div');
+    stale.className = 'ask-stale';
+    stale.textContent = '\u2753 Pregunta no respondida \u2014 la generaci\u00f3n se interrumpi\u00f3.';
+    inner.appendChild(stale);
+  }
+}
+
 function renderConversation(msgs, compaction, host = null) {
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
   if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
@@ -418,6 +452,7 @@ function renderConversation(msgs, compaction, host = null) {
   // dataset.convId), not activeStream() — otherwise rendering a non-active conv
   // (side panel, or mid-switch) staples the active conv's checklist onto it.
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
+  markStaleAsks(target);   // reload: stale/unanswered ask boxes get a notice
   const s = convStreams.get(target && target.dataset && target.dataset.convId) || activeStream();
   // A caller that wiped the host (clearActiveConvUI — rewind / compaction
   // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
@@ -1439,7 +1474,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=92');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=93');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1804,6 +1839,7 @@ async function sendSingle(text, stream, opts = {}) {
     // local-LLM removed
     stream.agentId = null;   // no longer steerable once the loop has ended
     renderer.finalize();
+    markStaleAsks(stream.host);   // aborted ask: disable any surviving card, label empty boxes
     // Reconcile any steer messages the loop never got to inject (turn aborted or
     // the worker died before the next round boundary): keep them in the history
     // so the user's input isn't lost — the next send will include them. Their
