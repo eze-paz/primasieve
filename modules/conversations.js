@@ -1318,12 +1318,15 @@ async function handleSubmit(which = 'main') {
   const scEl = paneScrollEl(pane);
   lockScroll(scEl);
   scEl.scrollTop = scEl.scrollHeight;
-  await enqueueFor(convId, content, pane);
   // Typing into a pane focuses it — otherwise the send/stop button and the
-  // conversation list would keep tracking the other pane.
+  // conversation list would keep tracking the other pane. Must run BEFORE the
+  // round is awaited: after `await enqueueFor(...)` it only executed when the
+  // round FINISHED, and stole focus back from whatever pane the user had moved
+  // to in the meantime (the round-end focus-shift bug).
   if (sidePanel?.isOpen && sidePanel.activeIsRight !== (which === 'side')) {
     sidePanel.focusPane(which === 'side');
   }
+  await enqueueFor(convId, content, pane);
 
   if (ta) ta.style.height = 'auto';
 }
@@ -4062,10 +4065,6 @@ class SidePanel {
         const sel = window.getSelection?.().toString();
         if (sel && sel.length > 0) return;   // dragging a selection, not switching panes
       }
-      console.log('[focusTrace] focusFromEvent(' + targetIsRight + ') via ' + ev.type
-        + ' target=' + (ev.target && (ev.target.id || ev.target.className || ev.target.tagName))
-        + ' rightActive=' + this._activeIsRight);
-      console.trace('[focusTrace] focusFromEvent stack');
       this.focusPane(targetIsRight);
     };
     for (const [pane, isRight] of [[this.left, false], [this.right, true]]) {
@@ -4075,48 +4074,6 @@ class SidePanel {
       // textarea holds the caret.
       pane.addEventListener('focusin', focusFromEvent(isRight));
     }
-    // TEMP-DIAG (focus-shift hunt) v2: closes the iframe/window gaps.
-    // v1 saw NOTHING while focus still shifted — focus events do not cross
-    // documents, so a move into an IFRAME (artifact frames, #artifactPanelFrame,
-    // file viewer) is invisible to document listeners (the parent only sees the
-    // focusout, no focusin), and a window/OS-level blur hides the caret without
-    // any document event at all. v2 adds: a WIRED marker (proves the instrument
-    // loaded), a document.activeElement poll (the only way to see focus land
-    // inside an iframe — parent activeElement becomes the <iframe> element), and
-    // window blur/focus. Remove after the round-end focus-shift bug is identified.
-    if (!window.__focusTraceWired) {
-      window.__focusTraceWired = true;
-      console.log('[focusTrace] WIRED v198');
-      const _ft = (t) => t && (t.id || (t.className && String(t.className).split(' ')[0]) || t.tagName);
-      const _pane = (t) => {
-        try {
-          const p = t && t.closest && t.closest('#messages, #messagesSide');
-          return p ? (p.id === 'messagesSide' ? 'RIGHT' : 'LEFT') : (t === document.body ? 'body' : 'none');
-        } catch (_) { return 'none'; }
-      };
-      document.addEventListener('focusin', (e) => {
-        console.log('[focusTrace] focusin -> ' + _ft(e.target) + ' pane=' + _pane(e.target) + ' time=' + Date.now());
-      });
-      document.addEventListener('focusout', (e) => {
-        console.log('[focusTrace] focusout <- ' + _ft(e.target) + ' now=' + _ft(document.activeElement) + ' pane=' + _pane(document.activeElement) + ' time=' + Date.now());
-      });
-      // Poll: sees focus land inside an IFRAME's document (parent activeElement
-      // becomes the <iframe>) and focus dropping to <body>.
-      let _last = null;
-      setInterval(() => {
-        const ae = document.activeElement;
-        const key = ae ? (ae.id || ae.tagName) : 'null';
-        if (key === _last) return;
-        _last = key;
-        console.log('[focusTrace] active => ' + _ft(ae) + ' pane=' + _pane(ae)
-          + ' hasFocus=' + document.hasFocus() + ' time=' + Date.now());
-      }, 250);
-      // Window-level focus: OS/notification/iframe takeover blur hides the caret
-      // without touching document.activeElement.
-      window.addEventListener('blur', () => console.log('[focusTrace] WINDOW blur time=' + Date.now()));
-      window.addEventListener('focus', () => console.log('[focusTrace] WINDOW focus time=' + Date.now()));
-    }
-
     this.wrap.addEventListener('dragover', (ev) => {
       if (!ev.dataTransfer?.types.includes('text/sandpie-conv-id')) return;
       ev.preventDefault();
