@@ -1416,7 +1416,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=94');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=95');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1939,6 +1939,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // inject it into subagent system prompts (subagents never see the parent's
     // composed system message).
     languageRule: (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.directive) ? SandpieLanguage.directive() : null,
+    // Ephemeral per-round reminder (user role) appended to every request right
+    // before generation; not persisted, not shown in the UI.
+    languageReminder: (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.reminder) ? SandpieLanguage.reminder() : null,
     messages: resolvedMessages,
     tools: toolDefs(),
     // Rerouted to the vision fallback for this turn (user attached an image to a
@@ -3379,7 +3382,13 @@ async function buildSystemPrompt(convMessages) {
     const now = new Date();
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
     const stamp = now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    content = 'The current local date and time is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as "now".\n\n' + content;
+    // Reply-language rule, ALSO stated at the very top of the system message
+    // (primacy): a model skimming a long prompt still reads it first.
+    let langTop = '';
+    if (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.directiveShort) {
+      try { langTop = SandpieLanguage.directiveShort() + '\n\n'; } catch (_) {}
+    }
+    content = langTop + 'The current local date and time is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as "now".\n\n' + content;
   } catch (_) {}
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill

@@ -2499,9 +2499,13 @@ async function runAgent(config, ctx) {
       ctx.emit({ type: 'reminder', kind: pendingReminder.kind, text: pendingReminder.text, meta: pendingReminder.meta });
       pendingReminder = null;
     }
+    // Reply-language reminder: an ephemeral user-role message appended LAST so
+    // the model reads it immediately before generating (recency beats a rule
+    // buried in a long system prompt). Never persisted, never rendered.
+    const langMsg = (config.languageReminder) ? { role: 'user', content: config.languageReminder } : null;
     const reqBody = {
       model: config.model,
-      messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
+      messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg, langMsg].filter(Boolean)),
       stream: true,
       stream_options: { include_usage: true },
       tools: config.tools,
@@ -2525,7 +2529,7 @@ async function runAgent(config, ctx) {
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
             model: config.model,
-            messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
+            messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg, langMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
             tools: config.tools,
