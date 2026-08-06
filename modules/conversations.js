@@ -863,11 +863,18 @@ async function loadConv(id) {
 
   if (sidePanel?.isOpen && id === sidePanel.sideId) { sidePanel.flip(); return; }
 
+  // TEMP-DIAG (loadConv latency): console.time spans for ONE measurement pass.
+  // Reload between clicks to re-measure cold loads (warm streams skip read+render).
+  // Remove after reading the numbers.
+  console.time('[loadConv] total');
+  console.time('[loadConv] save-old-conv');
   await saveActiveConv();
+  console.timeEnd('[loadConv] save-old-conv');
   parkActiveConv();
   if (convStreams.has(id)) {
     mountConv(id);
   } else {
+    console.time('[loadConv] read+parse');
     const data = await readConvData(id);
     if (!data) {
       if (activeConvId) mountConv(activeConvId);
@@ -876,13 +883,18 @@ async function loadConv(id) {
     }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
+    console.timeEnd('[loadConv] read+parse');
     mountConv(id);
+    console.time('[loadConv] render');
     renderConversation(s.messages, s.compaction);
+    console.timeEnd('[loadConv] render');
   }
   activeConvId = id;
   localStorage.setItem('sandpie-active-conv', id);
   convLastViewed.set(id, new Date().toISOString());
+  console.time('[loadConv] sidebar');
   await refreshConversationList();
+  console.timeEnd('[loadConv] sidebar');
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
@@ -4021,11 +4033,13 @@ class SidePanel {
 
   async _lazyLoad(id) {
     if (convStreams.has(id)) return;
+    console.time('[lazyLoad] read+parse+render');
     const data = await readConvData(id);
     if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
+    console.timeEnd('[lazyLoad] read+parse+render');
   }
 
   _render() {
