@@ -1374,6 +1374,17 @@ function _mountInPane(host, pane) {
   if (!host || !pane) return;
   if (host.parentNode !== pane) {
     if (host.parentNode) host.parentNode.removeChild(host);
+    // A pane may hold at most one conversation host. Evict ANY other host
+    // already mounted here, so a misrouted mount can never stack two
+    // conversations in the same pane (this is the structural guarantee the
+    // callers rely on — the double-conv-host drag bug was a caller failing it).
+    if (pane.querySelectorAll) {
+      for (const el of Array.from(pane.querySelectorAll(':scope > .conv-host'))) {
+        if (el === host) continue;
+        _evacuateHome(el);
+        el.parentNode.removeChild(el);
+      }
+    }
     appendContent(pane, host);
   }
   // The conv-host is now the scroll container — its lock/unlock listeners have
@@ -4017,8 +4028,11 @@ class SidePanel {
     // Dragging the convo that's currently docked in the RIGHT pane into the
     // LEFT: swap the two panes instead of closing the split — the dragged convo
     // becomes the active (left) convo and whatever the left was showing moves
-    // over to the right. The split stays open.
-    if (id === this._sideId) {
+    // over to the right. The split stays open. Which pane holds which conv is
+    // read from the DOM: _sideId is only the right pane's conv while the focus
+    // is on the left — with the focus on the right it names the LEFT pane's
+    // conv, and swapping on that stacked two conv-hosts in one pane.
+    if (id === paneConvId(this.right)) {
       const s = convStreams.get(id);
       const leftId = paneConvId(this.left);
       const leftS = leftId ? convStreams.get(leftId) : null;
@@ -4048,24 +4062,30 @@ class SidePanel {
 
   // Load a conversation into the RIGHT (side) pane — the drop counterpart of
   // open(), minus the _activeIsRight guard, so dropping on the right pane always
-  // updates it regardless of which pane currently has focus.
+  // updates it regardless of which pane currently has focus. Which pane holds
+  // which conv is read from the DOM (paneConvId), never from _sideId: _sideId is
+  // the NON-focused pane's conv, which is only the right pane's while the focus
+  // sits on the left. With the focus on the right, evicting _sideId's host
+  // removed the LEFT pane's conv and then stacked a second host on top of the
+  // right pane's real one — the two-conv-host-in-one-pane bug.
   async openInRight(id) {
     if (!id) return;
-    if (id === this._sideId) return;   // already docked here
-    // Dragging the ACTIVE (left) convo into the RIGHT pane: swap the two panes
-    // — the active convo becomes the side convo and the old side convo moves to
-    // the left as the active one. The split stays open.
-    if (id === activeConvId) {
+    const rightId = paneConvId(this.right);
+    const leftId  = paneConvId(this.left);
+    if (id === rightId) return;   // already docked here
+    // Dragging the convo currently in the LEFT pane into the RIGHT: swap the
+    // two panes — the dragged convo becomes the side convo and the old side
+    // convo moves to the left as the active one. The split stays open.
+    if (id === leftId) {
       const s = convStreams.get(id);
-      const sideId = this._sideId;
-      const sideS = sideId ? convStreams.get(sideId) : null;
+      const rightS = rightId ? convStreams.get(rightId) : null;
       if (s?.host?.parentNode) { _evacuateHome(s.host); s.host.parentNode.removeChild(s.host); }
-      if (sideS?.host?.parentNode) { _evacuateHome(sideS.host); sideS.host.parentNode.removeChild(sideS.host); }
-      if (sideS?.host) _mountInPane(sideS.host, this.left);
+      if (rightS?.host?.parentNode) { _evacuateHome(rightS.host); rightS.host.parentNode.removeChild(rightS.host); }
+      if (rightS?.host) _mountInPane(rightS.host, this.left);
       if (s?.host) _mountInPane(s.host, this.right);
       _placeHome();
       this._activeIsRight = false;
-      activeConvId = sideId || null;
+      activeConvId = rightId || null;
       this._sideId = id;
       if (activeConvId) localStorage.setItem('sandpie-active-conv', activeConvId);
       else localStorage.removeItem('sandpie-active-conv');
@@ -4080,13 +4100,14 @@ class SidePanel {
       return;
     }
     closeArtifactPanel();
-    if (this._sideId) {
-      const prev = convStreams.get(this._sideId);
+    // Normal case: evict whatever is ACTUALLY mounted in the right pane (the
+    // DOM is the source of truth), then mount the dropped convo there.
+    if (rightId) {
+      const prev = convStreams.get(rightId);
       if (prev?.host?.parentNode) { _evacuateHome(prev.host); prev.host.parentNode.removeChild(prev.host); }
     }
     await this._lazyLoad(id);
     this._open = true;
-    this._sideId = id;
     const s = convStreams.get(id);
     if (s?.host) _mountInPane(s.host, this.right);
     this._render();
