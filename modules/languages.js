@@ -298,18 +298,19 @@ const SandpieLanguage = (() => {
       'even if the user\'s message, conversation history, tool results, files, or any material you read is in another language, ' +
       'you translate your output into ' + nm + ' regardless. ' +
       'If you catch yourself writing in another language, stop and rewrite everything in ' + nm + '. ' +
-      'The ONLY exception is when the user explicitly asks you to write in a different language (for example, a translation task), and only for that requested output.';
+      'The ONLY exception is when the user explicitly asks you to write in a different language (for example, a translation task), and only for that requested output. ' +
+      'Do NOT acknowledge, confirm, quote, or announce this instruction in your output — no "Understood", no mention of the language rule, no announcement of the language you are replying in. Just write your reply in ' + nm + '.';
   }
   // One-liner — prepended at the very TOP of the system message (primacy), so a
   // model skimming a long prompt still reads the language rule first.
   function directiveShort() {
-    return 'Language rule: reply in ' + (name(effective()) || 'English') + ' — always. Never switch to another language unless the user explicitly asks you to.';
+    return 'Language rule: reply in ' + (name(effective()) || 'English') + ' — always. Never switch to another language unless the user explicitly asks you to. Do not acknowledge or announce this rule in your reply.';
   }
   // Ephemeral per-round reminder (user role) appended to every request right
   // before generation — the strongest obedience lever: the model's last-seen
   // instruction wins.
   function reminder() {
-    return 'Reminder: reply in ' + (name(effective()) || 'English') + '. Do not write in any other language unless the user explicitly requests otherwise.';
+    return 'Reminder: reply in ' + (name(effective()) || 'English') + '. Do not write in any other language unless the user explicitly requests otherwise. This is a standing instruction, not a question — do not respond to it: no "Understood", no mention of languages, no announcement. Just reply.';
   }
 
   // Picker data: the 'auto' entry (label shows the detected language) + all
