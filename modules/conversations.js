@@ -867,39 +867,63 @@ async function loadConv(id) {
   // Reload between clicks to re-measure cold loads (warm streams skip read+render).
   // Remove after reading the numbers.
   console.time('[loadConv] total');
-  console.time('[loadConv] save-old-conv');
-  await saveActiveConv();
-  console.timeEnd('[loadConv] save-old-conv');
+  const prevId = activeConvId;
+
+  // ── INSTANT UI SWITCH: all synchronous, no awaits before the panel changes.
   parkActiveConv();
-  if (convStreams.has(id)) {
-    mountConv(id);
-  } else {
-    console.time('[loadConv] read+parse');
-    const data = await readConvData(id);
-    if (!data) {
-      if (activeConvId) mountConv(activeConvId);
-      addMsg('err', 'Failed to load conversation.');
-      return;
-    }
-    const s = ensureStream(id);
-    hydrateStreamFromData(s, data);
-    console.timeEnd('[loadConv] read+parse');
-    mountConv(id);
-    console.time('[loadConv] render');
-    renderConversation(s.messages, s.compaction);
-    console.timeEnd('[loadConv] render');
-  }
-  activeConvId = id;
+  mountConv(id);                       // sets activeConvId, mounts the (possibly empty) host
   localStorage.setItem('sandpie-active-conv', id);
   convLastViewed.set(id, new Date().toISOString());
-  console.time('[loadConv] sidebar');
-  await refreshConversationList();
-  console.timeEnd('[loadConv] sidebar');
   document.body.classList.remove('sidebar-open');
   const btn = document.querySelector('.hamburger');
   if (btn) btn.textContent = '☰';
-  const mEl = paneScrollEl($('messages'));
-  if (mEl) mEl.scrollTop = mEl.scrollHeight;
+
+  const s = ensureStream(id);
+  if (convStreams.has(id) && s.messages.length) {
+    // Warm — content already loaded; just scroll + refresh the sidebar.
+    const mEl = paneScrollEl($('messages'));
+    if (mEl) mEl.scrollTop = mEl.scrollHeight;
+    console.time('[loadConv] sidebar');
+    await refreshConversationList();
+    console.timeEnd('[loadConv] sidebar');
+    console.timeEnd('[loadConv] total');
+    return;
+  }
+
+  // ── COLD: load in the background — the panel has already switched. ──
+  const host = s.host;
+  const ph = document.createElement('div');
+  ph.className = 'conv-loading';
+  ph.textContent = 'Loading history…';
+  host.appendChild(ph);
+
+  (async () => {
+    // Save the PREVIOUS conversation in the background (its data is still in
+    // its stream); no longer blocks the switch.
+    if (prevId) { try { await saveConv(prevId, { touchUpdated: false }); } catch (_) {} }
+    console.time('[loadConv] read+parse');
+    const data = await readConvData(id);
+    if (!data) {
+      ph.remove();
+      addMsg('err', 'Failed to load conversation.');
+      if (prevId) mountConv(prevId);
+      console.timeEnd('[loadConv] read+parse');
+      console.timeEnd('[loadConv] total');
+      return;
+    }
+    hydrateStreamFromData(s, data);
+    console.timeEnd('[loadConv] read+parse');
+    ph.remove();
+    console.time('[loadConv] render');
+    renderConversation(s.messages, s.compaction, s.host);
+    console.timeEnd('[loadConv] render');
+    const mEl = paneScrollEl($('messages'));
+    if (mEl) mEl.scrollTop = mEl.scrollHeight;
+    console.time('[loadConv] sidebar');
+    await refreshConversationList();
+    console.timeEnd('[loadConv] sidebar');
+    console.timeEnd('[loadConv] total');
+  })();
 }
 async function newConversation() {
   await saveActiveConv();
@@ -915,6 +939,12 @@ async function newConversation() {
   convLastViewed.set(id, new Date().toISOString());
   await refreshConversationList();
 }
+// Conversation-list row cache (see listConversations). Rows are keyed by
+// archived-state + id and invalidated by file:changed/file:deleted on
+// conversation meta paths (registered in bootConversations). JSONL appends are
+// filtered out — they fire constantly during a turn but never change a row.
+const _convRowCache = new Map();
+
 async function listConversations() {
   const searchActive = !!($('convSearch')?.value.trim());
 
@@ -938,9 +968,21 @@ async function listConversations() {
     }
   }
 
+  // Steady-state refreshes reuse cached rows instead of re-reading every meta
+  // (that was ~3.4s of the conversation-switch cost with many convs). Search
+  // bypasses the cache (it needs the jsonl content).
   const rows = await Promise.all(
-    [...found.entries()].map(([id, loc]) => readConvMetaRow(id, loc.archived, loc.format, searchActive)),
+    [...found.entries()].map(async ([id, loc]) => {
+      const key = (loc.archived ? 'a:' : 'n:') + id;
+      if (!searchActive && _convRowCache.has(key)) return _convRowCache.get(key);
+      const row = await readConvMetaRow(id, loc.archived, loc.format, searchActive);
+      if (row && !searchActive) _convRowCache.set(key, row);
+      return row;
+    }),
   );
+  // Prune rows for conversations that no longer exist (deleted / moved archive).
+  const alive = new Set([...found.entries()].map(([id, loc]) => (loc.archived ? 'a:' : 'n:') + id));
+  for (const key of _convRowCache.keys()) if (!alive.has(key)) _convRowCache.delete(key);
   const out = rows.filter(Boolean);
 
   for (const c of out) {
@@ -4907,6 +4949,19 @@ function bootConversations() {
     // Memory consolidation (memory.js) — events existed but had no indicator.
     Sandpie.events.on('memory:consolidate-start', () => showBgProgress(activeConvId, 'consolidate', 'Consolidating memory…'));
     Sandpie.events.on('memory:consolidate-end', () => hideBgProgress(activeConvId, 'consolidate'));
+    // Invalidate the sidebar row cache when a conversation's meta changes
+    // (title/updated/pinned) or is deleted. Only meta paths: `.jsonl` appends
+    // fire constantly during a turn but never change a row.
+    const invalidateConvRow = (path) => {
+      const p = String(path || '');
+      if (!p.includes('/conversations/') || !p.endsWith('.json')) return;
+      const id = (p.split('/').pop() || '').replace(/\.(?:meta\.)?json$/, '');
+      if (!id) return;
+      _convRowCache.delete('a:' + id);
+      _convRowCache.delete('n:' + id);
+    };
+    Sandpie.events.on('file:changed', invalidateConvRow);
+    Sandpie.events.on('file:deleted', invalidateConvRow);
   }
   (async () => {
     await refreshConversationList();
