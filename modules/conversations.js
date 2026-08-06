@@ -412,22 +412,55 @@ function renderHistoricalMessage(m, host = null) {
 // dangling empty tool-box (the worker died, the card is gone). Mark those boxes
 // with a stale notice so the conversation doesn't look broken, and disable any
 // live question card that survived an abort (its worker round-trip is dead).
+// Detect an unanswered ask() at the END of a conversation: the newest assistant
+// message's last tool call is 'ask' and no tool result followed it. Walks back
+// past trailing user messages (a steer typed while the question was pending),
+// stops at the first tool result (already answered) or a final assistant text
+// (turn completed). The questions come from the tool call's own arguments.
+function findPendingAsk(msgs) {
+  if (!Array.isArray(msgs) || !msgs.length) return null;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!m || typeof m !== 'object') continue;
+    if (m.role === 'tool') return null;                        // answered already
+    if (m.role === 'user') continue;                           // steer typed while pending
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      const last = m.tool_calls[m.tool_calls.length - 1];
+      if (last && last.function && last.function.name === 'ask') {
+        let questions = null;
+        try { questions = JSON.parse(last.function.arguments || '{}').questions; } catch (_) {}
+        if (Array.isArray(questions) && questions.length) return { tcId: last.id || '', questions };
+      }
+      return null;                                             // last tool call wasn't ask
+    }
+    if (m.role === 'assistant') return null;                   // final text → turn done
+  }
+  return null;
+}
+
+// Answer a question whose original turn died (reload / abort): append the tool
+// result to the conversation, persist + render it into the ask box, then RESUME
+// the agent loop — the model sees a complete exchange and continues the work.
+async function resolveStoredAsk(convId, tcId, answers) {
+  if (!convId || !tcId) return;
+  const s = ensureStream(convId);
+  const toolMsg = { role: 'tool', tool_call_id: tcId, content: 'answers:' + JSON.stringify(answers) };
+  s.messages.push(toolMsg);
+  await saveConv(convId);
+  // Render the result into the DOM (the worker won't re-emit this synthetic
+  // message): renderHistoricalMessage's 'answers:' branch removes the card and
+  // draws the Q → A summary into the ask box.
+  renderHistoricalMessage(toolMsg, s.host);
+  _askingConvs.delete(convId);
+  refreshConversationList();
+  await sendSingle('', s, { resume: true });
+}
+
+// Fallback ONLY for genuinely unrecoverable asks (no detectable pending tool_call
+// and no card): label the empty box. Surviving cards are re-wired to
+// resolveStoredAsk instead of being disabled.
 function markStaleAsks(host) {
   const root = host || document;
-  // Live cards orphaned by an abort: disable + label, keep the question visible.
-  for (const card of root.querySelectorAll('.ask-card')) {
-    if (card._askState && card._askState.settled) continue;
-    if (card._askState) card._askState.settled = true;
-    card.classList.add('ask-stale-card');
-    for (const b of card.querySelectorAll('button, textarea, .ask-chip')) b.disabled = true;
-    if (!card.querySelector('.ask-stale-note')) {
-      const note = document.createElement('div');
-      note.className = 'ask-stale-note';
-      note.textContent = '\u2717 Generaci\u00f3n interrumpida: esta pregunta ya no puede responderse.';
-      card.appendChild(note);
-    }
-  }
-  // Empty ask tool-boxes with no result AND no live card (reload case).
   for (const box of root.querySelectorAll('.msg.tool-call')) {
     if ((box.dataset.fname || '') !== 'ask') continue;
     const inner = box.querySelector('.tool-box');
@@ -1123,21 +1156,20 @@ function buildConvLi(c, idx) {
   const meta = document.createElement('span');
   meta.className = 'conv-meta';
   const stream = convStreams.get(c.id);
-  if (stream && stream.generating) {
-    // If there's a pending ask question, show the '?' indicator instead of the dot
-    if (_askingConvs.has(c.id)) {
-      meta.textContent = '?';
-      meta.title = 'Esperando respuesta a una pregunta';
-      meta.style.color = 'var(--sp-accent)';
-      meta.style.fontWeight = '700';
-    } else {
-      // Render the pulsing dot INSIDE the fixed-width conv-meta so the dot's
-      // width (0/7px) never collapses the meta to min-width:0.
-      const dot = document.createElement('span');
-      dot.className = 'gen-dot';
-      meta.appendChild(dot);
-      meta.title = 'Still generating…';
-    }
+  // Pending ask() question: show the accent '?' whether or not generation is
+  // running — the question survives a reload, so the badge must too.
+  if (_askingConvs.has(c.id)) {
+    meta.textContent = '?';
+    meta.title = 'Pregunta pendiente de respuesta';
+    meta.style.color = 'var(--sp-accent)';
+    meta.style.fontWeight = '700';
+  } else if (stream && stream.generating) {
+    // Render the pulsing dot INSIDE the fixed-width conv-meta so the dot's
+    // width (0/7px) never collapses the meta to min-width:0.
+    const dot = document.createElement('span');
+    dot.className = 'gen-dot';
+    meta.appendChild(dot);
+    meta.title = 'Still generating…';
   } else {
     meta.textContent = fmtRelTime(c.updated);
     const lastViewed = convLastViewed.get(c.id);
