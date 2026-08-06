@@ -4069,19 +4069,46 @@ class SidePanel {
       // textarea holds the caret.
       pane.addEventListener('focusin', focusFromEvent(isRight));
     }
-    // TEMP-DIAG (focus-shift hunt): full focus timeline for one reproduction.
-    // Logs every focusin/focusout in the document + the stack when a pane flip
-    // happens. Remove after the round-end focus-shift bug is identified.
+    // TEMP-DIAG (focus-shift hunt) v2: closes the iframe/window gaps.
+    // v1 saw NOTHING while focus still shifted — focus events do not cross
+    // documents, so a move into an IFRAME (artifact frames, #artifactPanelFrame,
+    // file viewer) is invisible to document listeners (the parent only sees the
+    // focusout, no focusin), and a window/OS-level blur hides the caret without
+    // any document event at all. v2 adds: a WIRED marker (proves the instrument
+    // loaded), a document.activeElement poll (the only way to see focus land
+    // inside an iframe — parent activeElement becomes the <iframe> element), and
+    // window blur/focus. Remove after the round-end focus-shift bug is identified.
     if (!window.__focusTraceWired) {
       window.__focusTraceWired = true;
+      console.log('[focusTrace] WIRED v198');
       const _ft = (t) => t && (t.id || (t.className && String(t.className).split(' ')[0]) || t.tagName);
+      const _pane = (t) => {
+        try {
+          const p = t && t.closest && t.closest('#messages, #messagesSide');
+          return p ? (p.id === 'messagesSide' ? 'RIGHT' : 'LEFT') : (t === document.body ? 'body' : 'none');
+        } catch (_) { return 'none'; }
+      };
       document.addEventListener('focusin', (e) => {
-        console.log('[focusTrace] focusin -> ' + _ft(e.target) + ' time=' + Date.now());
+        console.log('[focusTrace] focusin -> ' + _ft(e.target) + ' pane=' + _pane(e.target) + ' time=' + Date.now());
       });
       document.addEventListener('focusout', (e) => {
-        const ae = document.activeElement;
-        console.log('[focusTrace] focusout <- ' + _ft(e.target) + ' now=' + _ft(ae) + ' time=' + Date.now());
+        console.log('[focusTrace] focusout <- ' + _ft(e.target) + ' now=' + _ft(document.activeElement) + ' pane=' + _pane(document.activeElement) + ' time=' + Date.now());
       });
+      // Poll: sees focus land inside an IFRAME's document (parent activeElement
+      // becomes the <iframe>) and focus dropping to <body>.
+      let _last = null;
+      setInterval(() => {
+        const ae = document.activeElement;
+        const key = ae ? (ae.id || ae.tagName) : 'null';
+        if (key === _last) return;
+        _last = key;
+        console.log('[focusTrace] active => ' + _ft(ae) + ' pane=' + _pane(ae)
+          + ' hasFocus=' + document.hasFocus() + ' time=' + Date.now());
+      }, 250);
+      // Window-level focus: OS/notification/iframe takeover blur hides the caret
+      // without touching document.activeElement.
+      window.addEventListener('blur', () => console.log('[focusTrace] WINDOW blur time=' + Date.now()));
+      window.addEventListener('focus', () => console.log('[focusTrace] WINDOW focus time=' + Date.now()));
     }
 
     this.wrap.addEventListener('dragover', (ev) => {
