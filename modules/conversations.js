@@ -1487,7 +1487,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=96');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=97');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2211,7 +2211,11 @@ function dispatchAgentEvent(ev, renderer, host) {
       // touches the DOM). Prefixed so it's unmistakably a harness event.
       const _rl = { 'stop-block': 'stop guard', 'stop-anyway': 'stop guard (gave up)', 'drift': 'drift reminder', 'no-plan': 'no-plan reminder', 'grind': 'grind nudge', 'reuse': 'reuse-a-tool nudge', 'remember': 'remember nudge' };
       const label = _rl[ev.kind] || 'reminder';
-      try { console.debug('[sandpie reminder]', ev.kind, ev.meta || '', ev.text); } catch (_) {}
+      // Console copy follows the same visibility flag as the transcript
+      // (`>>> drift`); silent by default, re-enabled with `>>> drift on`.
+      if (_reminderNotesVisible()) {
+        try { console.debug('[sandpie reminder]', ev.kind, ev.meta || '', ev.text); } catch (_) {}
+      }
       // Hidden by default — toggle with the `>>> drift` command. When off, the
       // guard still fires and is logged to the console; it just isn't rendered.
       if (_reminderNotesVisible()) {

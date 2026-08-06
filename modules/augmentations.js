@@ -7,6 +7,11 @@
   const MEMORY_DIR = 'sandpie/memory';
   const META_NS = '_sp_augment';
 
+  // Per-tool-call [Aug] logging is chatty (two lines per tool call); off by
+  // default. Re-enable with localStorage 'sandpie-aug-log' = '1'. Errors
+  // (console.warn) always show.
+  function _augLog(...args) { try { if (localStorage.getItem('sandpie-aug-log') === '1') console.log(...args); } catch (_) {} }
+
   /* ── per-conversation scratchpad (ephemeral, lives in RAM) ────────── */
   const convMeta = new Map(); // convId -> { scripts:Set, files:Set, toolCalls:[], folder }
 
@@ -147,7 +152,7 @@
         if (!f || !f.body) continue;
         try { const r = await SandpieMemory.save(f); if (r && r.ok) saved++; } catch (_) {}
       }
-      if (saved) console.log('[Aug] Harvested', saved, 'memory fact(s) for', project, '(tools', cursor, '→', total + ')');
+      if (saved) _augLog('[Aug] Harvested', saved, 'memory fact(s) for', project, '(tools', cursor, '→', total + ')');
     } catch (e) {
       console.warn('[Aug] Memory harvest failed:', e);
     } finally {
@@ -202,7 +207,7 @@
     }
     // Track script references from run_python
     if (name === 'run_python' && args.path) meta.scripts.add(args.path);
-    console.log(`[Aug] start ${name}`, args.path || args.src || args.cwd || '');
+    _augLog(`[Aug] start ${name}`, args.path || args.src || args.cwd || '');
   }
 
   function logToolResult(convId, result) {
@@ -224,7 +229,7 @@
     if (written) meta.files.add(written[1]);
     const artifact = text.match(/artifact["']?\s*[:=]\s*["']?([^\s"']+)/i);
     if (artifact) meta.files.add(artifact[1]);
-    console.log(`[Aug] done  ${last ? last.name : '?'}`, `files=${meta.files.size}`);
+    _augLog(`[Aug] done  ${last ? last.name : '?'}`, `files=${meta.files.size}`);
   }
 
   /* ── (removed) file co-occurrence fingerprint + preload advisor.
@@ -276,7 +281,7 @@
         m.files.forEach(f => out.files.add(f));
       }
       out.fileCount = out.files.size;
-      console.log('[Aug] stats:', out);
+      _augLog('[Aug] stats:', out);
       return out;
     },
     _rawMeta: convMeta,

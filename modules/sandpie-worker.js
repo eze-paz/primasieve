@@ -31,11 +31,14 @@ function _relayLog(level, args) {
   if (_logBuffer.length > _MAX_BUFFER) _logBuffer.shift();
   try { self.postMessage(msg); } catch (_) {}
 }
-const _origConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info };
-console.log   = (...args) => { try { _relayLog('log',   args); } catch (_) {} _origConsole.log.apply(console, args); };
-console.warn  = (...args) => { try { _relayLog('warn',  args); } catch (_) {} _origConsole.warn.apply(console, args); };
-console.error = (...args) => { try { _relayLog('error', args); } catch (_) {} _origConsole.error.apply(console, args); };
-console.info  = (...args) => { try { _relayLog('info',  args); } catch (_) {} _origConsole.info.apply(console, args); };
+// Relay-only: worker console output reaches the page once, via postMessage
+// (the page logs it as '[worker] …'). Previously every call ALSO wrote to the
+// worker's native console, which Chrome surfaces in the page console too —
+// so each worker log appeared twice.
+console.log   = (...args) => { try { _relayLog('log',   args); } catch (_) {} };
+console.warn  = (...args) => { try { _relayLog('warn',  args); } catch (_) {} };
+console.error = (...args) => { try { _relayLog('error', args); } catch (_) {} };
+console.info  = (...args) => { try { _relayLog('info',  args); } catch (_) {} };
 
 self.addEventListener('error', (ev) => {
   console.error('uncaught error:', ev.message, 'at', (ev.filename || '?') + ':' + (ev.lineno || '?'), ev.error && ev.error.stack ? '\n' + ev.error.stack : '');

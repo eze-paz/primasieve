@@ -719,27 +719,32 @@
   //   2. this CURSOR gate — keeps it whenever Dropbox reports any delta.
   // Gate 2 counts our OWN uploads echoed back through the cursor as a "change",
   // which is how you get a splash that then has nothing to download.
+  // Routine per-sync diagnostics are chatty (fire on every 60s + on-demand
+  // sync, several lines each); off by default. Re-enable with localStorage
+  // 'sandpie-splash-log' = '1'. console.warn/error always show.
+  function _splashLog(...args) { try { if (localStorage.getItem('sandpie-splash-log') === '1') console.log(...args); } catch (_) {} }
+
   function _logSyncCause(delta, deletions, deltaOwn) {
     const lastTs = parseInt(localStorage.getItem(LAST_SYNC_KEY) || '0', 10);
     const age = lastTs ? Math.round((Date.now() - lastTs) / 1000) + 's ago' : 'never';
-    console.log('[splash] sync #' + _syncCount + ' | splash on screen: ' + _splashActive
+    _splashLog('[splash] sync #' + _syncCount + ' | splash on screen: ' + _splashActive
       + ' | last successful sync: ' + age
       + ' | cursor: ' + (cursor() ? 'stored' : 'none → full re-list'));
     if (delta === null) {
-      console.log('[splash] cause: FULL RE-LIST (no cursor or empty cloud index) — every cloud file is reconsidered');
+      _splashLog('[splash] cause: FULL RE-LIST (no cursor or empty cloud index) — every cloud file is reconsidered');
       return;
     }
     if (!delta.length && !deletions.length) {
-      console.log('[splash] cause: no cursor delta — nothing changed remotely');
+      _splashLog('[splash] cause: no cursor delta — nothing changed remotely');
       return;
     }
     const own = new Set(deltaOwn || []);
-    console.log('[splash] cause: cursor delta — ' + delta.length + ' changed, ' + deletions.length
+    _splashLog('[splash] cause: cursor delta — ' + delta.length + ' changed, ' + deletions.length
       + ' deleted; ' + own.size + '/' + delta.length + ' of the changes are OUR OWN uploads echoed back');
     for (const [rel, e] of delta) {
-      console.log('   ' + (own.has(rel) ? 'own upload  ' : 'REMOTE      ') + rel + '  rev=' + e.rev);
+      _splashLog('   ' + (own.has(rel) ? 'own upload  ' : 'REMOTE      ') + rel + '  rev=' + e.rev);
     }
-    for (const rel of deletions) console.log('   deleted     ' + rel);
+    for (const rel of deletions) _splashLog('   deleted     ' + rel);
   }
 
   // The ONLY place the last-sync timestamp is written. It means "a sync actually
@@ -748,7 +753,7 @@
   // device switch.
   function stampSynced(why) {
     localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-    console.log('[splash] last-sync timestamp refreshed (' + why + ')');
+    _splashLog('[splash] last-sync timestamp refreshed (' + why + ')');
   }
 
   // Upload every file marked dirty (syncedMtime === 0). Extracted from sync() so the
@@ -874,7 +879,7 @@
     if (Sandpie.isGenerating()) {
       // Deliberately not overridden for a pre-reload flush: this guard exists to keep
       // a sync from PULLING (and deleting/overwriting) while a turn is writing files.
-      console.log('[splash] sync SKIPPED — a model turn is generating; last-sync timestamp stays stale');
+      _splashLog('[splash] sync SKIPPED — a model turn is generating; last-sync timestamp stays stale');
       return { ok: false, reason: 'a model turn is generating' };
     }
     // Device-switch detection: if last sync was < 5 min ago, skip the splash
@@ -955,7 +960,7 @@
           console.warn('[dropbox] PASS2 remove FAILED:', path, e && e.message);
         }
       }
-      console.log('[dropbox] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
+      _splashLog('[dropbox] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
 
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
@@ -984,10 +989,10 @@
       // eagerly at all. Both cases are a delta with an empty toDownload.
       if (_splashActive) {
         if (toDownload.length) {
-          console.log('[splash] KEEPING splash — ' + toDownload.length + ' file(s) to download');
+          _splashLog('[splash] KEEPING splash — ' + toDownload.length + ' file(s) to download');
           _showSyncSplash(toDownload.length);
         } else {
-          console.log('[splash] lifting splash — nothing to download'
+          _splashLog('[splash] lifting splash — nothing to download'
             + (_deviceSwitch ? ' (the cursor delta needs no local writes)' : ' (no cursor delta)'));
           _hideSyncSplashAfterHome(true);
         }

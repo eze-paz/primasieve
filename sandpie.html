@@ -35,7 +35,7 @@ if("serviceWorker"in navigator){
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js?v=44"></script>
   <script src="modules/console.js"></script>
-  <script src="modules/dropbox.js?v=68"></script>
+  <script src="modules/dropbox.js?v=69"></script>
   <script src="modules/images.js?v=10"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=52"></script>
@@ -49,8 +49,8 @@ if("serviceWorker"in navigator){
   <script src="modules/memory.js?v=24"></script>
   <script src="modules/loop-lab.js?v=56"></script>
   <script type="module" src="modules/mobile.js?v=1"></script>
-  <script src="modules/augmentations.js?v=14"></script>
-  <script type="module" src="modules/conversations.js?v=201"></script>
+  <script src="modules/augmentations.js?v=15"></script>
+  <script type="module" src="modules/conversations.js?v=202"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -106,18 +106,18 @@ if("serviceWorker"in navigator){
   var flushAge = lastFlush ? (Date.now() - lastFlush) : Infinity;
   // Report this gate's inputs: dropbox.js logs the cursor gate separately, and when
   // the splash appears "even though it just synced" it is one of these.
-  console.log('[splash] pre-paint gate — dropbox connected: ' + hasTokens
+  if (localStorage.getItem('sandpie-splash-log') === '1') console.log('[splash] pre-paint gate — dropbox connected: ' + hasTokens
     + ' | last successful sync: ' + (lastSync ? (Math.round(age / 1000) + 's ago ('
         + new Date(lastSync).toLocaleTimeString() + ')') : 'never (no timestamp stored)')
     + ' | pre-reload flush: ' + (lastFlush ? (Math.round(flushAge / 1000) + 's ago') : 'never')
     + ' | thresholds: ' + (RECENT_SYNC_MS / 1000) + 's sync / ' + (RECENT_FLUSH_MS / 1000) + 's flush');
   if (!hasTokens || age < RECENT_SYNC_MS || flushAge < RECENT_FLUSH_MS) {
-    console.log('[splash] pre-paint: REMOVED ('
+    if (localStorage.getItem('sandpie-splash-log') === '1') console.log('[splash] pre-paint: REMOVED ('
       + (!hasTokens ? 'no dropbox tokens' : (age < RECENT_SYNC_MS ? 'synced recently' : 'flushed just before this reload')) + ')');
     var sp = document.getElementById('deviceSyncSplash');
     if (sp) sp.parentNode.removeChild(sp);
   } else {
-    console.log('[splash] pre-paint: KEPT — the cursor delta will decide (watch for the next [splash] lines)');
+    if (localStorage.getItem('sandpie-splash-log') === '1') console.log('[splash] pre-paint: KEPT — the cursor delta will decide (watch for the next [splash] lines)');
   }
 </script>
 <header class="mobile-header">
