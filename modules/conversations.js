@@ -1712,7 +1712,7 @@ async function sendSingle(text, stream, opts = {}) {
 
   startTotalTimer(stream);
 
-  let config = await buildAgentConfig(convMessages, stream.compaction, stream.todos);
+  let config = await buildAgentConfig(convMessages, stream.compaction, stream.todos, convId);
   // Rerouted to the vision fallback — mark the user's bubble so the switch is visible.
   if (config.routedViaVision && userBubbleEl) {
     const mk = document.createElement('span');
@@ -1745,7 +1745,7 @@ async function sendSingle(text, stream, opts = {}) {
       if (_sentRequestBytes(config) <= budget) break;
       const r = await _performCompaction(convId, { ...base, keepTail: keep });
       if (r && !r.ok && !/nothing/.test(r.reason || '')) break;   // real failure (e.g. summarizer down)
-      config = await buildAgentConfig(stream.messages, stream.compaction, stream.todos);
+      config = await buildAgentConfig(stream.messages, stream.compaction, stream.todos, convId);
       if (keep <= 2) break;                                        // already at the floor
       keep = Math.max(2, Math.floor(keep / 2));
     }
@@ -1895,7 +1895,7 @@ async function resolveFilePart(f) {
   }
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
-async function buildAgentConfig(convMessages, compaction, curTodos) {
+async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   // Non-destructive compaction: send [summary, …in-context tail] in place of the
   // full history so the model's context stays bounded. The full convMessages
   // still drives the system prompt (skill detection) below.
@@ -2013,10 +2013,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos) {
       : null,
     reasoning: (effective && effective.reasoning) || null,
     origin: location.origin,
-    conversation_file_name: activeConvId,
+    conversation_file_name: convId || activeConvId,
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
-    session_id: await ensureSessionId(activeConvId),
+    session_id: await ensureSessionId(convId || activeConvId),
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],
