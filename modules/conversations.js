@@ -1050,7 +1050,7 @@ async function duplicateConv(id, title) {
   await rewriteConvJsonl(newId, false, data.messages || []);
   const meta = {
     id: newId,
-    title: (data.title || title || '(no title)') + ' (copy)',
+    title: '(copy) ' + (data.title || title || '(no title)'),
     created: now, updated: now, pinned: false,
     msgCount: (data.messages || []).length,
   };
