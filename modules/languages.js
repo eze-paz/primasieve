@@ -10,7 +10,7 @@
 //
 // The directive is consumed by:
 //  - conversations.js buildSystemPrompt() → appended to the per-turn system
-//    message (covers every provider and the Ralph loop, which shares it),
+//    message (covers every provider),
 //  - conversations.js buildAgentConfig() → shipped as config.languageRule so
 //    sandpie-worker.js can also append it to subagent system prompts.
 //

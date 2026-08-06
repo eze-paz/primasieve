@@ -315,7 +315,7 @@ const SandpieMemory = (function () {
   }
 
   // ---- deterministic consolidation (supersede near-duplicates) --------------
-  // NO LLM rewrite (the model can't be trusted to prune — [[ralph-loop-no-auto-memory]]).
+  // NO LLM rewrite (the model can't be trusted to prune memory automatically).
   // Reduction is by SUPERSESSION: within one project, if two memories are near-identical
   // (Jaccard token overlap), the older is archived to .pruned/ (recoverable). The AUTO
   // threshold is deliberately HIGH — a dry-run over the real store showed lower thresholds

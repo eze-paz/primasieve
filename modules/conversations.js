@@ -3583,8 +3583,8 @@ async function buildSystemPrompt(convMessages) {
   }
   // Optional capability: memory.js injects all durable facts (sandpie/memory/*.md).
   // maybeConsolidate runs FIRE-AND-FORGET: it is an LLM housekeeping pass that can
-  // take minutes (and 504), and awaiting it here blocked every completion — and
-  // every ralph turn, which builds this prompt — behind it. The pruned store simply
+  // take minutes (and 504), and awaiting it here blocked every completion —
+  // behind it. The pruned store simply
   // lands on the NEXT prompt build; this one injects the current store as-is.
   if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
     // (consolidation is event-driven off memory writes now — no per-turn / clock trigger)
@@ -3612,8 +3612,7 @@ async function buildSystemPrompt(convMessages) {
   // Reply-language rule (Settings → Account → Reply language): appended LAST so
   // it is the final instruction the model reads — the LLM MUST reply in the
   // chosen language unless the user explicitly asks otherwise, regardless of
-  // the language of tool results/materials. Applies to every provider, and to
-  // the Ralph loop (loop-lab.js shares buildSystemPrompt).
+  // the language of tool results/materials. Applies to every provider.
   if (typeof SandpieLanguage !== 'undefined' && SandpieLanguage.directive) {
     try { content += '\n\n' + SandpieLanguage.directive(); }
     catch (e) { console.warn('[sandpie] language rule failed:', e); }
@@ -4635,11 +4634,9 @@ window.convPath = convPath;
 window.ensureActiveConv = ensureActiveConv;
 window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
-// buildSystemPrompt exposed so Loop Lab can inject the app's full system prompt
-// (memories, lessons, skills index) into its harness-loop agents — read-only.
 // getTitle/autoTitle are read/write access to a conversation's name for modules
 // that only need that (notifications.js reads it for the toast body).
-window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, buildSystemPrompt, getTitle: convTitle, autoTitle: maybeAutoTitle };
+window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, getTitle: convTitle, autoTitle: maybeAutoTitle };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
 window.parkActiveConv = parkActiveConv;
