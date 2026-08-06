@@ -485,8 +485,25 @@ function renderConversation(msgs, compaction, host = null) {
   // dataset.convId), not activeStream() — otherwise rendering a non-active conv
   // (side panel, or mid-switch) staples the active conv's checklist onto it.
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
-  markStaleAsks(target);   // reload: stale/unanswered ask boxes get a notice
   const s = convStreams.get(target && target.dataset && target.dataset.convId) || activeStream();
+  // Persistent pending question: if the newest exchange is an unanswered ask()
+  // tool call (survived a reload/abort), re-render the LIVE card so the user can
+  // answer hours later. Only when it's unrecoverable does markStaleAsks label
+  // the empty box.
+  const targetConvId = (target && target.dataset && target.dataset.convId) || (s && s.id) || '';
+  const pending = findPendingAsk(s ? s.messages : msgs);
+  if (pending && pending.tcId && targetConvId) {
+    _askingConvs.add(targetConvId);   // open-then-badge: '?' in the sidebar for this conv
+    if (!target.querySelector('.ask-card[data-ask-tc-id="' + pending.tcId + '"]')) {
+      renderQuestions(pending.tcId, pending.questions, (result) => {
+        let answers = [];
+        try { answers = JSON.parse(String(result || '').replace(/^answers:/, '')); } catch (_) {}
+        resolveStoredAsk(targetConvId, pending.tcId, answers);
+      }, targetConvId);
+    }
+  } else {
+    markStaleAsks(target);
+  }
   // A caller that wiped the host (clearActiveConvUI — rewind / compaction
   // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
   // endTotalTimer only fixes the DOM while the tick interval is alive, then nulls
@@ -1871,7 +1888,15 @@ async function sendSingle(text, stream, opts = {}) {
     // local-LLM removed
     stream.agentId = null;   // no longer steerable once the loop has ended
     renderer.finalize();
-    markStaleAsks(stream.host);   // aborted ask: disable any surviving card, label empty boxes
+    // A surviving ask card (turn aborted mid-question): keep it ANSWERABLE.
+    // Answering appends the tool result and resumes the turn via resolveStoredAsk.
+    for (const card of (stream.host ? stream.host.querySelectorAll('.ask-card') : [])) {
+      if (!card._askState || card._askState.settled) continue;
+      const tcId = card.dataset.askTcId;
+      if (!tcId) continue;
+      card._askState.settled = true;   // guard: wire once
+      card._askState.onAnswer = (answers) => { resolveStoredAsk(convId, tcId, answers); };
+    }
     // Reconcile any steer messages the loop never got to inject (turn aborted or
     // the worker died before the next round boundary): keep them in the history
     // so the user's input isn't lost — the next send will include them. Their
