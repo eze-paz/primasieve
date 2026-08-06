@@ -891,38 +891,42 @@ async function loadConv(id) {
   }
 
   // ── COLD: load in the background — the panel has already switched. ──
-  const host = s.host;
-  const ph = document.createElement('div');
-  ph.className = 'conv-loading';
-  ph.textContent = 'Loading history…';
-  host.appendChild(ph);
-
+  if (s._loading) return;   // a load for this conv is already in flight — it will render when done
+  s._loading = true;
   (async () => {
-    // Save the PREVIOUS conversation in the background (its data is still in
-    // its stream); no longer blocks the switch.
-    if (prevId) { try { await saveConv(prevId, { touchUpdated: false }); } catch (_) {} }
-    console.time('[loadConv] read+parse');
-    const data = await readConvData(id);
-    if (!data) {
-      ph.remove();
-      addMsg('err', 'Failed to load conversation.');
-      if (prevId) mountConv(prevId);
+    try {
+      // Save the PREVIOUS conversation in the background (its data is still in
+      // its stream); no longer blocks the switch.
+      if (prevId) { try { await saveConv(prevId, { touchUpdated: false }); } catch (_) {} }
+      console.time('[loadConv] read+parse');
+      const data = await readConvData(id);
+      if (!data) {
+        addMsg('err', 'Failed to load conversation.');
+        if (prevId) mountConv(prevId);
+        console.timeEnd('[loadConv] read+parse');
+        console.timeEnd('[loadConv] total');
+        return;
+      }
+      hydrateStreamFromData(s, data);
+      // mountConv() captured the EMPTY array reference when it mounted the host
+      // (it runs before the read). Re-sync the module `messages` to the loaded
+      // array, or parkActiveConv() later writes the stale empty array back onto
+      // the stream — wiping the history and re-triggering a full cold load on
+      // the next visit. Only when this conv is still the active one.
+      if (activeConvId === id) messages = s.messages;
       console.timeEnd('[loadConv] read+parse');
+      console.time('[loadConv] render');
+      renderConversation(s.messages, s.compaction, s.host);
+      console.timeEnd('[loadConv] render');
+      const mEl = paneScrollEl($('messages'));
+      if (mEl) mEl.scrollTop = mEl.scrollHeight;
+      console.time('[loadConv] sidebar');
+      await refreshConversationList();
+      console.timeEnd('[loadConv] sidebar');
       console.timeEnd('[loadConv] total');
-      return;
+    } finally {
+      s._loading = false;
     }
-    hydrateStreamFromData(s, data);
-    console.timeEnd('[loadConv] read+parse');
-    ph.remove();
-    console.time('[loadConv] render');
-    renderConversation(s.messages, s.compaction, s.host);
-    console.timeEnd('[loadConv] render');
-    const mEl = paneScrollEl($('messages'));
-    if (mEl) mEl.scrollTop = mEl.scrollHeight;
-    console.time('[loadConv] sidebar');
-    await refreshConversationList();
-    console.timeEnd('[loadConv] sidebar');
-    console.timeEnd('[loadConv] total');
   })();
 }
 async function newConversation() {
