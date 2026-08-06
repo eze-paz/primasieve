@@ -433,6 +433,46 @@ async function opfsWriteBytes(path, bytes) {
   await w.close();
 }
 async function opfsWriteText(path, text) { await opfsWriteBytes(path, new TextEncoder().encode(text)); }
+// ---- O(1) in-place JSONL append (moved from opfs-append-worker.js) ----
+// Main-thread createWritable({keepExistingData:true}) is O(new bytes) at the API
+// level but several Chromium versions swap-copy the WHOLE file on close() — a
+// per-message append to a long conversation would cost O(whole file) on disk.
+// FileSystemSyncAccessHandle writes in place at end-of-file (true O(1)) and is
+// worker-only, so the completions worker can own conversation persistence with
+// no main-thread involvement: it appends each committed message as it is
+// emitted, so the on-disk transcript never lags the stream — no throttled
+// 1.2s page timer to starve while hidden, no giant backlog to serialize when
+// the user hits stop. A SyncAccessHandle takes an EXCLUSIVE lock, so appends to
+// a given path are serialized through a per-path promise chain (the page's
+// turn-end saveConv is the only other writer, and it runs after the loop ends).
+const _appendEncoder = new TextEncoder();
+const _appendChains = new Map();
+async function opfsAppendText(path, text) {
+  const { parts, name } = splitPath(path);
+  const dir = await opfsResolveDir(parts, true);
+  const handle = await dir.getFileHandle(name, { create: true });
+  const access = await handle.createSyncAccessHandle();
+  try {
+    const bytes = _appendEncoder.encode(text);
+    const at = access.getSize();
+    let written = 0;
+    while (written < bytes.length) {
+      const n = access.write(bytes.subarray(written), { at: at + written });
+      if (!n) throw new Error('SyncAccessHandle.write wrote 0 bytes');
+      written += n;
+    }
+    access.flush();
+  } finally {
+    access.close();
+  }
+}
+function enqueueAppend(path, text) {
+  const prev = _appendChains.get(path) || Promise.resolve();
+  const next = prev.catch(() => {}).then(() => opfsAppendText(path, text));
+  const cleanup = next.catch(() => {}).finally(() => { if (_appendChains.get(path) === cleanup) _appendChains.delete(path); });
+  _appendChains.set(path, cleanup);
+  return next;
+}
 async function opfsReadText(path) { return new TextDecoder().decode(await opfsReadBytes(path)); }
 
 // ============================================================
@@ -2334,6 +2374,39 @@ async function runAgent(config, ctx) {
   // (e.g. spawn_subagent builds the child's config from it).
   ctx._agentConfig = config;
   ctx._messages = messages;
+  // ---- Worker-side JSONL persistence -------------------------------------
+  // The page passes where to append (config.jsonl_path) and how many messages
+  // are already on disk (config.persisted_count). Every committed message is
+  // appended here at EOF (O(1) SyncAccessHandle) as it is emitted, so the
+  // transcript on disk tracks the stream live: no throttled 1.2s page timer to
+  // starve while hidden, no giant backlog to serialize when the user stops.
+  // Subagents (config.maxRounds set) never persist — their messages aren't part
+  // of the parent transcript.
+  ctx._persistPath = (!config.maxRounds && config.jsonl_path) ? config.jsonl_path : '';
+  ctx._persistCount = Number(config.persisted_count) || 0;
+  const persistMessage = async (m) => {
+    if (!ctx._persistPath || (ctx.signal && ctx.signal.aborted)) return false;
+    try {
+      await enqueueAppend(ctx._persistPath, JSON.stringify(m) + '\n');
+      ctx._persistCount++;
+      // Mark the file dirty for the Dropbox cursor-delta sync (same relay the
+      // write_file tool uses) so the turn-end sync pushes the new lines.
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [ctx._persistPath] } }); } catch (_) {}
+      return true;
+    } catch (e) {
+      // Append failed (e.g. exclusive lock) — do NOT advance the counter, and do
+      // NOT report a count: the page then falls back to its own incremental save
+      // for this message, so nothing is silently lost.
+      try { console.warn('[sandpie] worker JSONL append failed:', e && e.message); } catch (_) {}
+      return false;
+    }
+  };
+  // message_added carries the running JSONL line count ONLY when the worker
+  // actually wrote the line (persist succeeded). Absent count → page fallback.
+  const emitAdded = async (m) => {
+    const ok = await persistMessage(m);
+    ctx.emit({ type: 'message_added', message: m, ...(ok ? { persistedCount: ctx._persistCount } : {}) });
+  };
   // Stable per-conversation cache key, generated ONCE and persisted in the
   // conversation meta (see ensureSessionId in conversations.js). Reuse it so
   // OpenRouter prompt-cache grouping survives across turns, refreshes, and
@@ -2361,14 +2434,15 @@ async function runAgent(config, ctx) {
   // round's tool results are already appended — so a steer can never land between
   // an assistant tool_calls message and its tool results. Each is echoed back as
   // message_added (flagged _steer) so the page renders + persists it in order.
-  const drainSteers = () => {
+  const drainSteers = async () => {
     const arr = _agentSteers.get(ctx.agentId);
     if (!arr || !arr.length) return false;
     _agentSteers.set(ctx.agentId, []);
     for (const content of arr) {
       const m = { role: 'user', content };
       messages.push(m);
-      ctx.emit({ type: 'message_added', message: { ...m, _steer: true } });
+      const steerMsg = { ...m, _steer: true };
+      await emitAdded(steerMsg);
     }
     return true;
   };
@@ -2431,7 +2505,7 @@ async function runAgent(config, ctx) {
       break;
     }
     _roundNo++;
-    if (drainSteers()) ctx._stopBlocks = 0;   // fresh user input → reset the stop guard
+    if (await drainSteers()) ctx._stopBlocks = 0;   // fresh user input → reset the stop guard
     // Reminder assembly (only if nothing more urgent is already queued this round).
     // Two variants keyed off whether a plan exists yet:
     //   • open todos  → drift nudge (re-read/update the list).
@@ -2560,12 +2634,13 @@ async function runAgent(config, ctx) {
     if (!round.tool_calls.length) {
       if (round.content) {
         const m = { role: 'assistant', content: round.content, finish_reason: round.finish_reason };
-        messages.push(m); ctx.emit({ type: 'message_added', message: m });
+        messages.push(m);
+        await emitAdded(m);
       }
       // The model is done, but if the user steered a message in during this round
       // (or while it was finishing) keep the loop alive so that message gets
       // answered instead of stranded until a fresh turn. Otherwise the turn ends.
-      if (!ctx.signal?.aborted && ((_agentSteers.get(ctx.agentId) || []).length)) { drainSteers(); continue; }
+      if (!ctx.signal?.aborted && ((_agentSteers.get(ctx.agentId) || []).length)) { await drainSteers(); continue; }
       // Don't let the model end the turn with todos still open — a finished task
       // is often just left unmarked, or the provider dropped the closing round.
       // Re-prompt and continue, unless the user stopped it (abort) or we've hit
@@ -2598,7 +2673,8 @@ async function runAgent(config, ctx) {
     // fronts, not just OpenAI o-series. Attached only when non-empty, so models
     // that don't emit reasoning never see the field.
     if (round.reasoning_content) asstMsg.reasoning = round.reasoning_content;
-    messages.push(asstMsg); ctx.emit({ type: 'message_added', message: asstMsg });
+    messages.push(asstMsg);
+    await emitAdded(asstMsg);
     const loadedImages = [];
     let touchedTodo = false;
     for (const tc of round.tool_calls) {
@@ -2631,7 +2707,8 @@ async function runAgent(config, ctx) {
       }
       ctx.emit({ type: 'tool_result', id: tc.id, result: safeResult });
       const toolMsg = { role: 'tool', tool_call_id: tc.id, content: safeResult };
-      messages.push(toolMsg); ctx.emit({ type: 'message_added', message: toolMsg });
+      messages.push(toolMsg);
+      await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
@@ -2649,7 +2726,8 @@ async function runAgent(config, ctx) {
     }
     if (loadedImages.length) {
       messages.push({ role: 'user', content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: im.dataUrl } })) });
-      ctx.emit({ type: 'message_added', message: { role: 'user', _loadedImage: true, content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: 'opfs://' + im.path } })) } });
+      const imgMsg = { role: 'user', _loadedImage: true, content: loadedImages.map(im => ({ type: 'image_url', image_url: { url: 'opfs://' + im.path } })) };
+      await emitAdded(imgMsg);
     }
     // End of round, and another round WILL follow (this round called tools). If the
     // request we just sent was already over the threshold, pause and compact before
@@ -2665,7 +2743,7 @@ async function runAgent(config, ctx) {
       console.warn('[sandpie] mid-turn compaction error:', e);
     }
   }
-  ctx.emit({ type: 'agent_done' });
+  ctx.emit({ type: 'agent_done', persistedCount: ctx._persistCount });
 }
 
 // ============================================================

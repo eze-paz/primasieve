@@ -1499,7 +1499,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=97');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=98');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1704,7 +1704,11 @@ async function sendSingle(text, stream, opts = {}) {
     convMessages.push(userMsg);
     userBubbleEl = addMsg('user', text, host);
     bindBubble(userBubbleEl, userMsg);
-    saveConv(convId).catch(() => {});
+    // Awaited: the worker now appends committed messages to the JSONL itself,
+    // starting from persisted_count. If this user-message save were still in
+    // flight when the worker's first assistant reply lands, the reply would be
+    // written at EOF BEFORE the user message — wrong order in the file.
+    await saveConv(convId).catch(() => {});
   }
 
   // If no model is selected but a configured provider has one, use it rather than
@@ -2054,6 +2058,21 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     reasoning: (effective && effective.reasoning) || null,
     origin: location.origin,
     conversation_file_name: convId || activeConvId,
+    // Worker-side JSONL persistence: the completions worker appends each
+    // committed message to the conversation file itself (O(1) SyncAccessHandle
+    // at EOF) as it streams — no throttled page timer to starve while hidden,
+    // no giant backlog to serialize when the user stops. jsonl_path = where to
+    // append; persisted_count = messages already on disk so the worker's
+    // counter stays in sync with the page (subagents inherit the fields but the
+    // worker refuses to persist when maxRounds is set).
+    jsonl_path: await (async () => {
+      try {
+        const cid = convId || activeConvId;
+        const loc = await convLocation(cid);
+        return (loc && loc.format) ? jsonlPath(cid, loc.archived) : '';
+      } catch { return ''; }
+    })(),
+    persisted_count: (convStreams.get(convId || activeConvId) || {}).persistedCount || 0,
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
     session_id: await ensureSessionId(convId || activeConvId),
@@ -2200,11 +2219,25 @@ function dispatchAgentEvent(ev, renderer, host) {
     case 'round_retry':   return renderer.retryRound();
     case 'delta':         return renderer.applyDelta(ev.delta);
     case 'round_end':     return renderer.endRound(ev.content);
-    case 'message_added': return renderer.bindMessage(ev.message);
+    case 'message_added': {
+      // Worker-side persistence: the event carries the worker's running JSONL
+      // line count — keep the page's persistedCount in lockstep so the turn-end
+      // saveConv finds nothing left to append. bindMessage falls back to the
+      // 1.2s incremental save only when the worker couldn't persist (no count).
+      const _st = convStreams.get(renderer.convId);
+      if (_st && typeof ev.persistedCount === 'number') _st.persistedCount = ev.persistedCount;
+      return renderer.bindMessage(ev.message, typeof ev.persistedCount === 'number');
+    }
     case 'tool_started':  return renderer.markToolStarted(ev.tc);
     case 'tool_result':   return renderer.markToolDone(ev.id, ev.result, ev.artifacts);
     case 'subagent':      return renderSubagentEvent(host, ev);
-    case 'agent_done':    return;
+    case 'agent_done': {
+      // Final sync: the worker reports where it stopped appending, so the
+      // turn-end saveConv never re-appends what the worker already wrote.
+      const _st = convStreams.get(renderer.convId);
+      if (_st && typeof ev.persistedCount === 'number') _st.persistedCount = ev.persistedCount;
+      return;
+    }
     case 'error':         return addMsg('err', 'Error: ' + (ev.message || 'unknown'), host);
     case 'info': {
       if (ev.message) {
@@ -2977,10 +3010,14 @@ class RoundRenderer {
       this.reply = null;
     }
   }
-  bindMessage(msg) {
+  bindMessage(msg, workerPersisted) {
     this.convMessages.push(msg);
-    // Persist the just-committed round so a mid-turn crash can't lose it.
-    scheduleIncrementalSave(this.convId);
+    // Persist the just-committed round so a mid-turn crash can't lose it. When
+    // the completions worker owns persistence (workerPersisted=true) the JSONL
+    // is already written by it — no page timer needed. Fall back to the 1.2s
+    // incremental save only when the worker couldn't append (no jsonl_path or
+    // a write error), so nothing is ever lost.
+    if (!workerPersisted) scheduleIncrementalSave(this.convId);
     // A steered mid-turn user message the worker just spliced into its loop and
     // echoed back. Bind it to the provisional bubble steerActive() already put on
     // screen (FIFO), or render one if none is pending; mark it reconciled so the
