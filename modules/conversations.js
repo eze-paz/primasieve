@@ -4047,6 +4047,10 @@ class SidePanel {
         const sel = window.getSelection?.().toString();
         if (sel && sel.length > 0) return;   // dragging a selection, not switching panes
       }
+      console.log('[focusTrace] focusFromEvent(' + targetIsRight + ') via ' + ev.type
+        + ' target=' + (ev.target && (ev.target.id || ev.target.className || ev.target.tagName))
+        + ' rightActive=' + this._activeIsRight);
+      console.trace('[focusTrace] focusFromEvent stack');
       this.focusPane(targetIsRight);
     };
     for (const [pane, isRight] of [[this.left, false], [this.right, true]]) {
@@ -4055,6 +4059,20 @@ class SidePanel {
       // click on a mousedown-focus, so the pane is never left dimmed while its
       // textarea holds the caret.
       pane.addEventListener('focusin', focusFromEvent(isRight));
+    }
+    // TEMP-DIAG (focus-shift hunt): full focus timeline for one reproduction.
+    // Logs every focusin/focusout in the document + the stack when a pane flip
+    // happens. Remove after the round-end focus-shift bug is identified.
+    if (!window.__focusTraceWired) {
+      window.__focusTraceWired = true;
+      const _ft = (t) => t && (t.id || (t.className && String(t.className).split(' ')[0]) || t.tagName);
+      document.addEventListener('focusin', (e) => {
+        console.log('[focusTrace] focusin -> ' + _ft(e.target) + ' time=' + Date.now());
+      });
+      document.addEventListener('focusout', (e) => {
+        const ae = document.activeElement;
+        console.log('[focusTrace] focusout <- ' + _ft(e.target) + ' now=' + _ft(ae) + ' time=' + Date.now());
+      });
     }
 
     this.wrap.addEventListener('dragover', (ev) => {
