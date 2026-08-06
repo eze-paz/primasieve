@@ -1290,7 +1290,11 @@ async function handleSubmit(which = 'main') {
   if (typeof SandpieCommands !== 'undefined' && text.startsWith('>>>')) {
     const handled = await SandpieCommands.dispatch(text);
     if (handled) {
-      ta.value = '';
+      // A command may itself populate the composer (>>> rewind restores the
+      // rewound text into the pane's input box). Only clear the typed command
+      // when the command didn't replace it — otherwise the restored text is
+      // written and then wiped in the same task and never visibly lands.
+      if (ta.value.trim() === text) ta.value = '';
       return;
     }
     // >>> is reserved. If it's not a real command, reject and show help.
