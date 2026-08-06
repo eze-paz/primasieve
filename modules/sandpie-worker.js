@@ -2609,7 +2609,14 @@ async function runAgent(config, ctx) {
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
       if (tc.function.name === 'write_todos') touchedTodo = true;
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
-      let safeResult = truncateToolResult(toolOut.result);
+      // write_todos results must round-trip intact: the page renders + persists
+      // the checklist from the 'todos:' JSON line, and history rendering parses
+      // it back on reload — a 30kB cut mid-JSON made the persisted result
+      // unparseable, so the checklist rendered EMPTY from history. Like the
+      // citable-id tag below, checklist bookkeeping is exempt from truncation.
+      let safeResult = tc.function.name === 'write_todos'
+        ? toolOut.result
+        : truncateToolResult(toolOut.result);
       // Citable result id (F1): tag the result so the model can cite it as
       // evidence ("r7") when closing a claim-todo. write_todos output is
       // checklist bookkeeping, not observations of the world — never tagged,

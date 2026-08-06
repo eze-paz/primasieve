@@ -92,6 +92,31 @@ function _parseJsonl(text) {
   }
   return out;
 }
+// Read + parse a conversation JSONL, retrying once when a line fails to parse.
+// Incremental saves append every ~1.2s DURING a turn, so a load that races an
+// in-flight append can read a torn trailing line. _parseJsonl silently DROPS
+// such a line — and the last message of a round is often the write_todos tool
+// result carrying the checklist JSON — so the box rendered empty "sometimes"
+// (same file, different timing). Retry after the append settles, then degrade
+// gracefully exactly as before.
+async function readConvJsonl(path) {
+  let text = '', torn = true;
+  for (let attempt = 0; attempt < 2 && torn; attempt++) {
+    try { text = await opfs.read(path); } catch (_) { return []; }
+    torn = false;
+    for (const line of String(text).split('\n')) {
+      const t = line.trim(); if (!t) continue;
+      try { JSON.parse(t); } catch (_) { torn = true; }
+    }
+    if (torn && attempt === 0) await new Promise(r => setTimeout(r, 300));
+  }
+  const msgs = [];
+  for (const line of String(text).split('\n')) {
+    const t = line.trim(); if (!t) continue;
+    try { msgs.push(JSON.parse(t)); } catch (_) { /* tolerate a torn trailing line */ }
+  }
+  return msgs;
+}
 function _serializeJsonl(msgs) { return msgs.length ? msgs.map(m => JSON.stringify(m)).join('\n') + '\n' : ''; }
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
@@ -128,7 +153,7 @@ async function readConvData(id) {
   const loc = await convLocation(id);
   if (loc.format === 'new') {
     let meta = {}; try { meta = JSON.parse(await opfs.read(metaPath(id, loc.archived))); } catch {}
-    let messages = []; try { messages = _parseJsonl(await opfs.read(jsonlPath(id, loc.archived))); } catch {}
+    let messages = []; try { messages = await readConvJsonl(jsonlPath(id, loc.archived)); } catch {}
     return { ...meta, id, archived: loc.archived, messages, _format: 'new' };
   }
   if (loc.format === 'old') {
@@ -379,6 +404,15 @@ function renderHistoricalMessage(m, host = null) {
         const json = sent.slice('todos:'.length, nl < 0 ? undefined : nl);
         let todos = null;
         try { todos = JSON.parse(json); } catch (_) {}
+        // Fallback: the persisted 'todos:' JSON may be missing/truncated (a torn
+        // JSONL read mid-append, or a pre-fix result cut past 30kB). Render the
+        // conversation's restored checklist (meta.todos -> stream.todos) instead
+        // of an empty box; resolve from the host's own convId so a side-panel /
+        // background load never staples the ACTIVE conv's checklist on.
+        if (!(todos && todos.length)) {
+          const s = convStreams.get(target && target.dataset ? target.dataset.convId : '');
+          if (s && Array.isArray(s.todos) && s.todos.length) todos = s.todos;
+        }
         const box = _toolBoxEl(tcId, target);
         if (todos) {
           if (box) { renderTodos(tcId, todos, target); }
@@ -1429,7 +1463,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=95');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=96');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2993,6 +3027,13 @@ class RoundRenderer {
       const json = sent.slice('todos:'.length, nl < 0 ? undefined : nl);
       let todos = null;
       try { todos = JSON.parse(json); } catch (_) {}
+      // Fallback: missing/truncated 'todos:' JSON (torn JSONL read mid-append,
+      // or a result cut past 30kB) renders the stream's restored checklist
+      // instead of an empty box.
+      if (!(todos && todos.length)) {
+        const s = convStreams.get(this.convId);
+        if (s && Array.isArray(s.todos) && s.todos.length) todos = s.todos;
+      }
       if (todos) {
         // Attribute todos to the conversation that PRODUCED them (this renderer's
         // own conv), not whatever is active now — otherwise switching away as a
