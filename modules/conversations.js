@@ -1667,6 +1667,21 @@ function getSandpieWorker() {
         refreshConversationList();
         return;
       }
+      // Unhandled payload type. This happens when the worker is newer than the
+      // page (a tool exists in sandpie-worker.js but its page-side handler is not
+      // in this cached build) — previously the tool just hung until its timeout
+      // with no clue why. Any worker that names its reply channel gets a fast,
+      // explanatory failure instead of silence.
+      if (msg.payload && msg.payload.replyType && msg.payload.id) {
+        try {
+          _sandpieWorker.postMessage({
+            type: msg.payload.replyType,
+            id: msg.payload.id,
+            result: 'Error: this page build has no handler for "' + msg.payload.type + '". sandpie.html is running cached assets older than the worker — hard-reload the page (or unregister the service worker) to pick up the current build.',
+            payload: { ok: false, error: 'page build has no handler for "' + msg.payload.type + '" (stale cached assets — hard-reload the page)' },
+          });
+        } catch (_) {}
+      }
       return;
     }
     if (msg.type === 'managed-token-refreshed') {

@@ -1022,11 +1022,16 @@ async function tool_screenshot(args, ctx) {
   const out = await new Promise((resolve) => {
     const timer = setTimeout(() => {
       _shotReqs.delete(id);
-      resolve({ ok: false, error: 'the page did not answer within ' + (SHOT_TIMEOUT / 1000) + 's' });
+      resolve({ ok: false, error: 'the page did not answer within ' + (SHOT_TIMEOUT / 1000) + 's. '
+        + 'Total silence (rather than an error) almost always means sandpie.html is running cached assets older than this worker, '
+        + 'so the page-side screenshot handler is missing — ask the user to hard-reload the page. '
+        + 'It is NOT caused by the tab being unfocused: capture runs in an offscreen frame and works with the tab hidden.' });
     }, SHOT_TIMEOUT);
     _shotReqs.set(id, { resolve: (d) => { clearTimeout(timer); resolve(d); } });
     try {
-      self.postMessage({ type: 'forward-to-page', payload: { type: 'screenshot-request', id, args: { path, opts } } });
+      // replyType lets a page that lacks this handler fail fast and explain itself
+      // instead of leaving the tool to time out in silence.
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'screenshot-request', replyType: 'screenshot-result', id, args: { path, opts } } });
     } catch (e) {
       clearTimeout(timer); _shotReqs.delete(id);
       resolve({ ok: false, error: 'could not reach the page (' + ((e && e.message) || e) + ')' });
