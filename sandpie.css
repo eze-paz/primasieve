@@ -193,7 +193,6 @@
   .sp-item-head input[type="checkbox"] { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; border: none !important; background: none !important; border-radius: 0 !important; cursor: pointer; }
   .modal-content input[type="checkbox"] { width: auto !important; padding: 0 !important; background: none !important; border: none !important; }
   .sp-item-name { font: 0.8rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); white-space: nowrap; flex: 0 0 auto; }
-  .sp-item-desc { font-size: 0.72rem; color: var(--sp-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
   .sp-item-meta { font-size: 0.62rem; color: var(--sp-text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto; white-space: nowrap; }
   .sp-caret { font-size: 0.7rem; color: var(--sp-text-dim); }
   .sp-item-body { padding: 0.5rem 0.55rem; border-top: 1px solid var(--sp-border); }

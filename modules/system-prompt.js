@@ -88,8 +88,10 @@ const SandpieSystemPrompt = (function () {
     const name = document.createElement('span'); name.className = 'sp-item-name'; name.textContent = nameText;
     if (checkbox && !checkbox.checked) name.style.opacity = '0.5';
     head.appendChild(name);
-    const desc = document.createElement('span'); desc.className = 'sp-item-desc'; desc.textContent = descPreview || '';
-    head.appendChild(desc);
+    if (descPreview) {
+      const desc = document.createElement('span'); desc.className = 'sp-item-desc'; desc.textContent = descPreview;
+      head.appendChild(desc);
+    }
     const meta = document.createElement('span'); meta.className = 'sp-item-meta'; meta.textContent = metaText || '';
     head.appendChild(meta);
     const caret = document.createElement('span'); caret.className = 'sp-caret'; caret.textContent = '▸';
@@ -145,8 +147,7 @@ const SandpieSystemPrompt = (function () {
     for (const s of idx.skills) {
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = s.enabled;
       cb.addEventListener('change', () => { SandpieContext.setSkillEnabled(s.name, cb.checked); flashMsg('Saved'); renderSkills(panel); });
-      const preview = s.desc.length > 56 ? s.desc.slice(0, 56) + '…' : s.desc;
-      const { row, body } = makeRow(cb, s.name, '', preview);
+      const { row, body } = makeRow(cb, s.name, '', null);   // skill name only — no description preview in the modal
       const ta = document.createElement('textarea'); ta.className = 'sp-edit'; ta.rows = 12; ta.spellcheck = false; ta.value = 'Loading…'; ta.disabled = true;
       const btns = document.createElement('div'); btns.className = 'sp-item-btns';
       const save = document.createElement('button'); save.type = 'button'; save.className = 'ghost'; save.textContent = 'Save'; save.disabled = true;

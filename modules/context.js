@@ -192,6 +192,12 @@ const SandpieContext = (() => {
     return first >= 0 ? flat.slice(first).trim() : '';
   }
 
+  // Minimum usable description length: fewer alphanumeric characters than this is
+  // junk ('>', '--', 'Short.'), not guidance the model can decide on — such skills
+  // are flagged (never advertised) exactly like missing descriptions.
+  const MIN_DESC_ALNUM = 10;
+  function descAlnum(s) { const m = String(s || '').match(/[\p{L}\p{N}]/gu); return m ? m.length : 0; }
+
   // Walk skills/*/ and derive the index from each folder's SKILL.md frontmatter.
   // Every problem is reported in `errors`; only fully-valid skills reach `skills`.
   async function scanSkills() {
@@ -222,6 +228,11 @@ const SandpieContext = (() => {
         errors.push(`${file} — missing "description"${hint}; the model needs it to decide when to load this skill`);
         continue;
       }
+      const dn = descAlnum(desc);
+      if (dn < MIN_DESC_ALNUM) {
+        errors.push(`${file} — description is only ${dn} characters of real text (need ≥ ${MIN_DESC_ALNUM}); the model can't decide when to load this skill`);
+        continue;
+      }
       skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
     // Shared skills: installed, read-only packages under sandpie/shared-installed/<id>/ that
@@ -234,7 +245,7 @@ const SandpieContext = (() => {
         let text; try { text = await opfs.read(file); } catch { continue; }   // not a skill package
         const fm = parseFrontmatter(text);
         const desc = cleanDescription(fm && fm.description);
-        if (!desc || skills.some(s => s.name === e.name)) continue;
+        if (!desc || descAlnum(desc) < MIN_DESC_ALNUM || skills.some(s => s.name === e.name)) continue;
         skills.push({ name: e.name, desc, path, file, enabled: isSkillEnabled(e.name), shared: true });
       }
     } catch (_) {}
@@ -324,7 +335,7 @@ returned to the model when it calls load_skill on this skill.
   return {
     SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
     isSkillEnabled, setSkillEnabled, saveSkill,
-    parseFrontmatter, cleanDescription,
+    parseFrontmatter, cleanDescription, descAlnum,
     lastState: () => last,
   };
 })();
