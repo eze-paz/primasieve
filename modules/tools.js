@@ -403,9 +403,10 @@ Each question must be phrased as a clear choice with 2-5 mutually exclusive, non
     },
 
 };
-//// Lets the user (Settings → System prompt) turn tools off and rewrite their
-// descriptions. Stored globally so it applies to every conversation. toolDefs()
-// — what's actually sent to the model — is the single choke point that honors it.
+//// Tool enable/disable + description editing were REMOVED 2026-08-07 (product
+// decision): every tool is always ON with its shipped description — isEnabled()
+// returns true and description() returns the default. The storage below is inert
+// legacy (kept for API compatibility); toolDefs() no longer reads it.
 const TOOLS_DISABLED_KEY = 'sandpie-tools-disabled';   // JSON array of disabled names
 const TOOLS_DESC_KEY     = 'sandpie-tools-desc';       // JSON map { name: customDescription }
 const TOOLS_ENABLED_KEY  = 'sandpie-tools-enabled';    // JSON array of explicitly-ON names (for default-off tools)
@@ -442,11 +443,13 @@ function _toolAvailable(name) {
 const SandpieTools = {
   names() { return Object.keys(tools); },
   defaultDescription(name) { return tools[name] ? tools[name].description : ''; },
-  description(name) { const o = _toolsDescMap(); return (o[name] != null) ? o[name] : SandpieTools.defaultDescription(name); },
-  isCustom(name) { const o = _toolsDescMap(); return o[name] != null && o[name] !== SandpieTools.defaultDescription(name); },
+  description(name) { return SandpieTools.defaultDescription(name); },   // always the shipped description (editing removed 2026-08-07)
+  isCustom(name) { return false; },                                          // custom-description storage is inert
   isEnabled(name) {
-    if (TOOLS_DEFAULT_OFF.has(name)) return _toolsEnabledSet().has(name);   // off until explicitly enabled
-    return !_toolsDisabledSet().has(name);
+    // Hardcoded 2026-08-07: every tool is always ON. The disabled/enabled
+    // localStorage sets are ignored — a browser that previously toggled tools
+    // is re-enrolled onto all-on.
+    return true;
   },
   isAvailable(name) { return _toolAvailable(name); },
   setEnabled(name, on) {

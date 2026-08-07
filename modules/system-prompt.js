@@ -84,9 +84,9 @@ const SandpieSystemPrompt = (function () {
   function makeRow(checkbox, nameText, metaText, descPreview) {
     const row = document.createElement('div'); row.className = 'sp-item';
     const head = document.createElement('div'); head.className = 'sp-item-head';
-    head.appendChild(checkbox);
+    if (checkbox) head.appendChild(checkbox);
     const name = document.createElement('span'); name.className = 'sp-item-name'; name.textContent = nameText;
-    if (!checkbox.checked) name.style.opacity = '0.5';
+    if (checkbox && !checkbox.checked) name.style.opacity = '0.5';
     head.appendChild(name);
     const desc = document.createElement('span'); desc.className = 'sp-item-desc'; desc.textContent = descPreview || '';
     head.appendChild(desc);
@@ -110,21 +110,18 @@ const SandpieSystemPrompt = (function () {
     const countEl = panel.querySelector('#spToolsCount');
     if (!listEl || typeof SandpieTools === 'undefined') return;
     const items = SandpieTools.list();
-    if (countEl) countEl.textContent = items.filter(t => t.enabled).length + ' / ' + items.length + ' active';
+    if (countEl) countEl.textContent = String(items.length);
     listEl.innerHTML = '';
     for (const t of items) {
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = t.enabled;
-      cb.addEventListener('change', () => { SandpieTools.setEnabled(t.name, cb.checked); flashMsg('Saved'); renderTools(panel); });
-      const meta = [t.custom ? 'edited' : '', t.available ? '' : 'needs Dropbox'].filter(Boolean).join(' · ');
-      const { row, body } = makeRow(cb, t.name, meta, null);
-      const ta = document.createElement('textarea'); ta.className = 'sp-edit'; ta.rows = 7; ta.spellcheck = false; ta.value = t.description;
-      const btns = document.createElement('div'); btns.className = 'sp-item-btns';
-      const save = document.createElement('button'); save.type = 'button'; save.className = 'ghost'; save.textContent = 'Save';
-      save.addEventListener('click', () => { SandpieTools.setDescription(t.name, ta.value); flashMsg('Saved'); renderTools(panel); });
-      const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'ghost'; reset.textContent = 'Reset to default'; reset.disabled = !t.custom;
-      reset.addEventListener('click', () => { SandpieTools.resetDescription(t.name); flashMsg('Reset to default'); renderTools(panel); });
-      btns.append(save, reset);
-      body.append(ta, btns);
+      // All tools are always ON (toggle removed 2026-08-07); the description is
+      // read-only — expand a row to inspect the exact text sent to the model.
+      const meta = t.available ? '' : 'needs Dropbox';
+      const { row, body } = makeRow(null, t.name, meta, null);
+      const pre = document.createElement('pre');
+      pre.className = 'sp-edit';
+      pre.style.cssText = 'margin:0; white-space:pre-wrap; word-break:break-word;';
+      pre.textContent = t.description;
+      body.appendChild(pre);
       listEl.appendChild(row);
     }
   }
