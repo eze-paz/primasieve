@@ -168,6 +168,30 @@
       return { canvasFixes, imgFixes };
     }
 
+    // A screenshot is ONE state of a page that may have many. Enumerating them is
+    // hopeless (a page driven by an API has unbounded states), so this only
+    // DISCLOSES that other views exist — enough that the model doesn't declare a
+    // tabbed dashboard fine having seen a third of it. It is a disclosure, not an
+    // invitation to go exploring.
+    function disclose(warnings) {
+      const q = (sel) => { try { return document.querySelectorAll(sel).length; } catch (_) { return 0; } };
+      const bits = [];
+      const tabs = q('[role="tab"]');
+      if (tabs > 1) bits.push(tabs + ' tabs (one shown)');
+      const collapsed = q('details:not([open])');
+      if (collapsed) bits.push(collapsed + ' collapsed <details>');
+      const expandable = q('[aria-expanded="false"]');
+      if (expandable) bits.push(expandable + ' collapsed section(s)');
+      const dialogs = q('dialog:not([open])');
+      if (dialogs) bits.push(dialogs + ' unopened dialog(s)');
+      const hidden = q('[hidden]');
+      if (hidden) bits.push(hidden + ' [hidden] element(s)');
+      if (bits.length) {
+        warnings.push('OTHER VIEWS EXIST — this is one state of an interactive page: '
+          + bits.join(', ') + '. What is not shown is not verified.');
+      }
+    }
+
     async function build(opts, warnings) {
       const doc = document;
       const root = doc.documentElement;
@@ -186,6 +210,8 @@
           + 'px, so the right ' + overflow + 'px is CUT OFF (text near the right edge may be missing characters). '
           + 'Re-run with width: ' + root.scrollWidth + ' to see the whole thing.');
       }
+
+      disclose(warnings);
 
       const clone = root.cloneNode(true);
       const pairs = pairUp(root, clone, []);
@@ -329,8 +355,9 @@
     });
   }
 
+  const ENGINE_SRC = __sandpieShotEngine.toString();
   const HEAD_BOOTSTRAP = '<script>(' + __sandpieShotPatch.toString() + ')();<\/script>';
-  const BODY_BOOTSTRAP = '<script>(' + __sandpieShotEngine.toString() + ')();<\/script>';
+  const BODY_BOOTSTRAP = '<script>(' + ENGINE_SRC + ')();<\/script>';
 
   /* ---------------------------------------------------------------------- */
   /*  Page side                                                             */
@@ -385,11 +412,48 @@
     }
   }
 
+  const _norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+
+  // The side-panel viewer loads files through the service worker at their real
+  // /files/ URL (file-viewer.js showRendered), NOT through opfs.toUrl — so the
+  // capture bootstrap was never injected. The frame is same-origin, so install the
+  // engine on demand. NOTE: the getContext patch cannot be retrofitted (the
+  // artifact's scripts already ran), so a WebGL canvas may capture blank here —
+  // collect() reports that when it happens.
+  function ensureEngine(win) {
+    try {
+      if (win.__sandpieShotReady) return true;
+      const s = win.document.createElement('script');
+      s.textContent = '(' + ENGINE_SRC + ')();';
+      (win.document.body || win.document.documentElement).appendChild(s);
+      s.remove();
+      return !!win.__sandpieShotReady;
+    } catch (_) { return false; }
+  }
+
+  // Capture what the user is CURRENTLY LOOKING AT in the side panel. This is the
+  // privileged state: it holds fetched data, the open tab, scroll position and
+  // typed input — none of which a fresh render could reproduce, and all of which
+  // is what "it looks broken" actually refers to.
+  async function captureSidePanel(path, opts) {
+    const want = _norm(path);
+    if (want && _norm(window._openFilePath) !== want) return null;   // panel shows a different file
+    for (const frame of document.querySelectorAll('.file-viewer iframe')) {
+      const src = frame.getAttribute('src') || '';
+      if (!src.startsWith('/files/')) continue;                      // pdf/latex frames aren't captureable
+      if (!frame.contentWindow || !ensureEngine(frame.contentWindow)) continue;
+      const out = await askFrame(frame.contentWindow, opts);
+      out.mode = 'side-panel';
+      return out;
+    }
+    return null;
+  }
+
   // Capture the artifact frame already visible in the conversation. Preserves
   // whatever state the page is in (post-interaction), at the cost of depending on
   // that frame being mounted and expanded.
   async function captureLiveFrame(path, opts) {
-    const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+    const norm = _norm;
     const want = norm(path);
     for (const wrap of document.querySelectorAll('.artifact-wrap')) {
       if (want && norm(wrap.dataset.artifactPath) !== want) continue;
@@ -403,7 +467,9 @@
         await sleep(120);
       }
       try {
-        return await askFrame(frame.contentWindow, opts);
+        const out = await askFrame(frame.contentWindow, opts);
+        out.mode = 'conversation-frame';
+        return out;
       } finally {
         if (wasCollapsed && typeof window.collapseArtifact === 'function') window.collapseArtifact(wrap);
       }
@@ -439,7 +505,9 @@
       // Settle window: async rendering (fetches, chart libraries, load handlers)
       // has not necessarily finished when load fires.
       await sleep(Math.min(Math.max(opts.wait_ms | 0 || 400, 0), 10000));
-      return await askFrame(host.contentWindow, Object.assign({}, opts, { width: W, height: opts.full_page ? 0 : H }));
+      const out = await askFrame(host.contentWindow, Object.assign({}, opts, { width: W, height: opts.full_page ? 0 : H }));
+      out.mode = 'fresh-render';
+      return out;
     } finally {
       host.remove();
       if (url) setTimeout(() => URL.revokeObjectURL(url), 5000);
@@ -468,10 +536,14 @@
       throw new Error('cannot screenshot a .' + ext + ' file — only HTML artifacts and image files can be rasterized. Open it with show_artifact instead.');
     }
 
+    // live: the user's ACTUAL view, in preference order — side panel (where files
+    // are really viewed and interacted with), then the inline conversation card.
+    // Falls back to a fresh render when the file is on screen nowhere.
     if (opts.live) {
-      const out = await captureLiveFrame(clean, opts);
-      if (out) return out;
-      // Fall through: nothing on screen for that path, so render it fresh.
+      const panel = await captureSidePanel(clean, opts);
+      if (panel) return panel;
+      const inline = await captureLiveFrame(clean, opts);
+      if (inline) return inline;
     }
     return await captureOffscreen(clean, opts);
   }

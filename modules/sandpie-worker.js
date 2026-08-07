@@ -1046,8 +1046,16 @@ async function tool_screenshot(args, ctx) {
   }
 
   const warns = Array.isArray(out.warnings) ? out.warnings : [];
+  // Say WHICH surface produced the image. "The user's current view" and "a clean
+  // render" support very different conclusions, and the model can't tell them apart
+  // from pixels alone.
+  const MODE_NOTE = {
+    'side-panel': 'THE USER\'S CURRENT VIEW, captured live from the side panel — it reflects their actual state (loaded data, selected tab, scroll position, typed input). This is what they are looking at.',
+    'conversation-frame': 'the live artifact card in the conversation, in whatever state it currently holds.',
+    'fresh-render': 'a clean render from the file on disk, in its initial state — NOT the user\'s current view.',
+  };
   let text = 'screenshot:' + path + ' (' + out.width + '×' + out.height + 'px'
-    + (opts.live ? ', live frame' : '') + (opts.full_page ? ', full page' : '') + ')';
+    + (opts.full_page ? ', full page' : '') + ')\n\nSOURCE: ' + (MODE_NOTE[out.mode] || MODE_NOTE['fresh-render']);
   text += warns.length
     ? '\n\nFIDELITY CAVEATS — the render is faithful EXCEPT:\n- ' + warns.join('\n- ')
       + '\nTreat those areas as unverified; everything else is what the browser actually draws.'
