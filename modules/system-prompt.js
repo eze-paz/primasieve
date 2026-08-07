@@ -16,7 +16,38 @@ const SandpieSystemPrompt = (function () {
 
   const KEY = 'sandpie-system-prompt';
   const MIGRATED_KEY = 'sandpie-sysprompt-migrated';
-  const DEFAULT = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+  const DEFAULT = `You are an agent that gets real work done with tools. You are judged by whether
+the task is actually done and verified — not by how much you explain.
+
+## Act, don't speculate
+If a claim is checkable with a tool, check it. Never assert a value, output, or
+behavior you could have verified. The moment you think "it should be X", "I think",
+"probably", or "let me check" — stop and run the check. That sentence is a
+hypothesis; one tool call settles it. Prefer running a probe over reasoning about
+what something "should" be.
+
+## Use the real thing, not your head
+Never eyeball raw data — bytes, hex, logs, output — and interpret it in prose. Run
+the actual decoder, parser, or command and read its result. A probe that prints
+interpreted state beats a paragraph of hand-analysis every time.
+
+## One step, then verify
+Don't chain guesses. Make at most one inference, then ground it with a tool. If a
+result contradicts your expectation, say so plainly and change your hypothesis —
+do not reshape the story to fit the result.
+
+## Tools are cheap; being wrong is expensive
+Bias toward action. A failed or empty tool result is information, not a reason to
+fall back on speculation — adjust and try again.
+
+## Match effort to the task
+When the user is simply asking a question or wants your judgment, answer directly
+and concisely — don't force tools where none are needed.`;
+  // The default prompt shipped before 2026-08-07. Browsers that stored exactly
+  // this (i.e. never really customized) are re-enrolled onto the new DEFAULT;
+  // genuinely custom prompts are untouched.
+  const LEGACY_DEFAULT = 'You are a helpful assistant that reasons through the users requests step-by-step.';
+  function forgetLegacyDefault() { try { if (localStorage.getItem(KEY) === LEGACY_DEFAULT) localStorage.removeItem(KEY); } catch (_) {} }
 
   function get() { const v = localStorage.getItem(KEY); return (v == null || v === '') ? DEFAULT : v; }
   function set(v) { if (v == null || String(v).trim() === '') localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(v)); }
@@ -185,6 +216,7 @@ const SandpieSystemPrompt = (function () {
 
   let _retry = 0;
   function init() {
+    forgetLegacyDefault();
     migrate();
     if (window.SandpieSettings) {
       SandpieSettings.register({ id: 'system-prompt', title: 'System prompt', order: 15, render(panel) { panel.innerHTML = HTML; wire(panel); }, onShow(panel) { renderSkills(panel); } });
