@@ -140,23 +140,23 @@
      Was write-only: the fingerprint was rebuilt each conversation but its only
      reader (getPreloadFiles) was never wired in. Co-occurrence is a weak signal
      and mispredicted preloads pollute context, so the feature was dropped.
-     Recent-paths + lessons below remain the live augmentations. ── */
+     Recent-paths below remains the live augmentation. ── */
 
 
   
   /* ── system prompt injection block ─────────────────────────────────── */
   async function systemBlock() {
     let block = '';
-    // Recent paths: single global list (was per-project)
-    // Recent paths
-    if (localStorage.getItem('sandpie-recent-paths-enabled') !== 'false') {
-      // Path-shape filter: cleans any pre-existing junk entries (21, len, panic!,
-      // {, {:#x}) written before the _shellFileTargets fix, so they never reach the
-      // prompt. The stored file self-heals via its 20-cap as real paths push them out.
-      const paths = (await getRecentPaths()).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
-      if (paths.length) {
-        block += '\n\n## Recent paths\n\nFiles touched recently:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
-      }
+    // Recent paths: always on when memory is enabled — the separate enable lever
+    // was removed 2026-08-07; the single "Enable automatic memory" checkbox gates
+    // both the memory facts (memory.js systemBlock) and this recent-paths block.
+    if (typeof SandpieMemory === 'undefined' || !SandpieMemory.isEnabled()) return block;
+    // Path-shape filter: cleans any pre-existing junk entries (21, len, panic!,
+    // {, {:#x}) written before the _shellFileTargets fix, so they never reach the
+    // prompt. The stored file self-heals via its 50-cap as real paths push them out.
+    const paths = (await getRecentPaths()).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
+    if (paths.length) {
+      block += '\n\n## Recent paths\n\nFiles touched recently:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
     }
     // (Lessons/harvest injection removed: the auto-harvester (distillLessons) was
     // eliminated 2026-08-07 — the remember tool is the only capture channel. Old

@@ -501,11 +501,8 @@ const SandpieMemory = (function () {
     </label>
     <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); display:block; margin-bottom:0.6rem;"></span>
     <hr style="border:none; border-top:1px solid var(--sp-border); margin:0.8rem 0;">
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt (always the most recent 50).</p>
-    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
-      <input type="checkbox" id="rpEnabled" style="width:auto;"> Enable recent-paths memory
-    </label>
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidation</strong> &mdash; always on, deterministic: archives near-identical memories within a project (recoverable via <code>&gt;&gt;&gt; memory restore</code>). No LLM.</p>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt while memory is on (always the most recent 50).</p>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidation</strong> &mdash; always on, deterministic: archives near-identical memories within a project.</p>
     `;
 
   let _flashT = null;
@@ -514,12 +511,7 @@ const SandpieMemory = (function () {
   function wire(panel) {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
-    const rpEn = panel.querySelector('#rpEnabled');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
-    if (rpEn) {
-      rpEn.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
-      rpEn.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', rpEn.checked ? 'true' : 'false'));
-    }
   }
 
   let _retry = 0;
