@@ -899,7 +899,7 @@ ul.conv-list li.active {
   .arch-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--sp-border); }
   .arch-list li {
     display: flex; align-items: center; gap: 0.6rem; padding: 0.42rem 0.55rem;
-    border-bottom: 1px solid var(--sp-border); border-radius: 6px; cursor: pointer;
+    border-radius: 6px; cursor: pointer;
   }
   .arch-list li:hover { background: var(--sp-panel); }
   .arch-list li .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
