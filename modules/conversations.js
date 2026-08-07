@@ -4318,11 +4318,11 @@ async function refreshPaneBar(pane) {
   const id = paneConvId(pane);
   bar._req = (bar._req || 0) + 1;
   const req = bar._req;
-  if (!id) { bar.style.display = 'none'; return; }   // no conversation mounted → no bar
+  if (!id) { bar.style.display = 'flex'; t.textContent = 'New chat'; t.classList.add('fresh'); return; }   // bar always shows on desktop; empty pane = new chat
   bar.style.display = 'flex';
   const title = (await _paneTitleFor(id)) || '';
   if (req !== bar._req) return;                       // a newer refresh won the race
-  t.textContent = title || 'new chat';
+  t.textContent = title || 'New chat';
   t.classList.toggle('fresh', !title);
   const x = bar.querySelector('.artifact-icon-btn');
   if (x) x.title = pane.id === 'messagesSide'

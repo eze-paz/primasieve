@@ -312,8 +312,9 @@
   #artifactPanelClose:hover { color: var(--sp-text); }
   /* Per-pane conversation titlebar — inherits the fv-header/artifact-header
      recipe (file-viewer.js buildPane): panel bar, 11px mono, hairline bottom,
-     round icon-button close (the ✕ IS .artifact-icon-btn). Hidden until a
-     conversation mounts (JS sets display:flex), hidden on mobile, and covered
+     round icon-button close (the ✕ IS .artifact-icon-btn). Always visible on
+     desktop — JS sets display:flex even for a fresh 'New chat' pane; hidden on
+     mobile, and covered
      by the artifact/viewer-mode `> *:not(...)` rules when those are active.
      The bottom edge dissolves into the chat with a fading shadow (no hairline). */
   .pane-titlebar {
