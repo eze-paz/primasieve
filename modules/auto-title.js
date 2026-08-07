@@ -44,8 +44,14 @@ const SandpieAutoTitle = (function () {
     '- Write it in the same language the user wrote in.',
   ].join('\n');
 
-  function isEnabled() { const v = localStorage.getItem(K_ENABLED); return v == null ? DEFAULTS.enabled : v === '1'; }
-  function getPrompt() { const v = localStorage.getItem(K_PROMPT); return (v == null || v === '') ? BUILT_IN_PROMPT : v; }
+  // Hardcoded 2026-08-07 (product decision): the Titles settings tab is removed
+  // from the UI and the config is fixed for every user — auto-titling is always
+  // ON with the built-in prompt. The old localStorage keys (K_ENABLED/K_PROMPT)
+  // are deliberately IGNORED: a browser that previously disabled it or saved a
+  // custom prompt is re-enrolled onto the default too. Uncommenting the
+  // register() call in init() restores the levers.
+  function isEnabled() { return DEFAULTS.enabled; }    // always true
+  function getPrompt() { return BUILT_IN_PROMPT; }     // always the built-in default
   function config() { return { enabled: isEnabled(), prompt: getPrompt() }; }
 
   // ---- output sanitizing ----------------------------------------------------
@@ -195,9 +201,13 @@ const SandpieAutoTitle = (function () {
 
   let _retry = 0;
   function init() {
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'titles', title: 'Titles', order: 18, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('autoTitleSection', { title: 'Titles', badge: null, open: false, html: HTML, onRender: wire }); return; }
-    if (_retry++ < 40) setTimeout(init, 500);
+    // Titles settings tab commented out 2026-08-07 (product decision): the
+    // enabled/prompt levers are removed from the UI and the config is hardcoded
+    // (see isEnabled/getPrompt above). HTML/wire are kept intact below so this
+    // tab can be restored by uncommenting the register() line.
+    // if (window.SandpieSettings) { SandpieSettings.register({ id: 'titles', title: 'Titles', order: 18, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
+    // if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('autoTitleSection', { title: 'Titles', badge: null, open: false, html: HTML, onRender: wire }); return; }
+    // if (_retry++ < 40) setTimeout(init, 500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
