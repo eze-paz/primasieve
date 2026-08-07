@@ -327,10 +327,6 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
 
   await refreshConversationList();
   refreshPaneBars();
-  // Distill lessons only on a turn-end save (touchUpdated:true) — never on the
-  // ~1.2s mid-turn tick, which would snapshot a half-finished turn. The distiller
-  // itself is cursor-gated so it re-runs each turn over only the NEW activity.
-  if (touchUpdated && typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.distillLessons(convId).catch(() => {});
 }
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
@@ -5082,14 +5078,6 @@ function bootConversations() {
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     Sandpie.events.on('compaction:start', ({ convId }) => showCompactionProgress(convId));
     Sandpie.events.on('compaction:end', ({ convId }) => hideCompactionProgress(convId));
-    // Lessons distillation (augmentations.js) — silent post-turn LLM call. Name
-    // the conversation so it's clear WHICH one is being distilled (it may not be
-    // the one currently on screen).
-    Sandpie.events.on('lessons:start', ({ convId }) => {
-      const t = _shortConvTitle(convId);
-      showBgProgress(convId, 'lessons', 'Distilling lessons' + (t ? ` from “${t}”` : ' from this session') + '…');
-    });
-    Sandpie.events.on('lessons:end', ({ convId }) => hideBgProgress(convId, 'lessons'));
     // Memory consolidation (memory.js) — events existed but had no indicator.
     Sandpie.events.on('memory:consolidate-start', () => showBgProgress(activeConvId, 'consolidate', 'Consolidating memory…'));
     Sandpie.events.on('memory:consolidate-end', () => hideBgProgress(activeConvId, 'consolidate'));

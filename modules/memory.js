@@ -458,8 +458,8 @@ const SandpieMemory = (function () {
         // Also surface the augmentations content that lives in this folder and is
         // injected via a SEPARATE path (augmentations.systemBlock): recent-paths
         // (*.recent-paths.json). Old *.lessons.md files may still exist but are
-        // INERT — the lessons injection was replaced by the memory harvester,
-        // which writes normal facts (listed above); flag leftovers as removable.
+        // INERT — the auto-harvester that replaced them was eliminated 2026-08-07
+        // (the remember tool is the only capture channel); flag leftovers as removable.
         let aux = '';
         if (Array.isArray(entries)) {
           for (const e of entries) {
@@ -505,10 +505,6 @@ const SandpieMemory = (function () {
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
       <input type="checkbox" id="rpEnabled" style="width:auto;"> Enable recent-paths memory
     </label>
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Auto-harvest</strong> &mdash; automatically saves durable, evidence-backed facts from sessions into memory (shares the memory budget above; refined by consolidation).</p>
-    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
-      <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable automatic memory harvest
-    </label>
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidation</strong> &mdash; always on, deterministic: archives near-identical memories within a project (recoverable via <code>&gt;&gt;&gt; memory restore</code>). No LLM.</p>
     `;
 
@@ -519,18 +515,10 @@ const SandpieMemory = (function () {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
     const rpEn = panel.querySelector('#rpEnabled');
-    const lsEn = panel.querySelector('#lessonsEnabled');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
     if (rpEn) {
       rpEn.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
       rpEn.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', rpEn.checked ? 'true' : 'false'));
-    }
-    if (lsEn) {
-      // Same localStorage key as the old lessons toggle, so an existing OFF choice
-      // carries over — but it now gates the memory HARVESTER (augmentations
-      // distillLessons), whose output lives in the normal memory store/budget.
-      lsEn.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
-      lsEn.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', lsEn.checked ? 'true' : 'false'));
     }
   }
 
