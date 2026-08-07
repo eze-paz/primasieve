@@ -503,7 +503,16 @@ async function readArtifactConsole(path) {
     const frame = wrap.querySelector('.artifact-frame');
     if (frame) { found = { wrap, frame }; break; }
   }
-  if (!found) return { error: want ? 'No artifact frame open for "' + path + '". Show it with show_artifact first, or pass its exact path.' : 'No artifact frame open in the conversation.' };
+  if (!found) {
+    const known = wraps.map(w => w.dataset.artifactPath).filter(Boolean).slice(0, 5);
+    let detail;
+    if (want) {
+      detail = 'Artifacts currently in the DOM (max 5): ' + (known.length ? known.map(p => '"' + p + '"').join(', ') : 'none') + '. Show the requested artifact with show_artifact first (it must render as an inline .artifact-frame, not a V2 placeholder card), or pass its exact path.';
+    } else {
+      detail = 'No path was given. Artifacts currently in the DOM (max 5): ' + (known.length ? known.map(p => '"' + p + '"').join(', ') : 'none') + '.';
+    }
+    return { error: want ? 'No artifact frame open for "' + path + '". ' + detail : detail };
+  }
   try {
     let w = found.frame.contentWindow;
     if (!w || !w.__sandpieConsole) {
