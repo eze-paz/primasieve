@@ -16,27 +16,22 @@
  *     tombstoning removed facts to sandpie/memory/.pruned/ (recoverable).
  *   - Commands: >>> memory [show <name> | consolidate], >>> forget <name>.
  *
- * Config (enabled, budget threshold) lives in localStorage; a "Memory" section
+ * Config (enabled) lives in localStorage; a "Memory" section
  * in the Settings modal edits it.
  */
 const SandpieMemory = (function () {
   'use strict';
 
   const K_ENABLED   = 'sandpie-memory-enabled';     // '0' | '1' (unset = default ON)
-  const K_THRESHOLD = 'sandpie-memory-threshold';    // integer tokens
 
-  const DEFAULTS = { enabled: true, threshold: 5000 };
-  const MIN_THRESHOLD = 500;
+  const DEFAULTS = { enabled: true };
 
   const DIR = 'sandpie/memory';
   const PRUNED = DIR + '/.pruned';
   const VALID_TYPES = ['user', 'feedback', 'project', 'reference'];
 
-  const _int = (key, fallback) => { const v = parseInt(localStorage.getItem(key) || '', 10); return Number.isFinite(v) ? v : fallback; };
-
   function isEnabled() { const v = localStorage.getItem(K_ENABLED); return v == null ? DEFAULTS.enabled : v === '1'; }
-  function threshold() { return Math.max(MIN_THRESHOLD, _int(K_THRESHOLD, DEFAULTS.threshold)); }
-  function config() { return { enabled: isEnabled(), threshold: threshold() }; }
+  function config() { return { enabled: isEnabled() }; }
 
   // ---- store ----------------------------------------------------------------
   const estTokens = (s) => Math.ceil((s || '').length / 4);
@@ -453,7 +448,7 @@ const SandpieMemory = (function () {
         const header =
           `Memory: ${enabled ? 'ENABLED' : 'DISABLED'}  ·  dir "${DIR}": ` +
           (entries === null ? 'not present locally' : `${mdFiles.length} fact file(s)`) +
-          `  ·  ${facts.length} parsed  ·  ~${used}/${threshold()} tokens`;
+          `  ·  ${facts.length} parsed  ·  ~${used} tokens`;
         const block = await systemBlock();        // the ACTUAL injected text (respects enabled + facts)
         let injected;
         if (!enabled) injected = '\n\n(memory is DISABLED → nothing is injected, even if files exist)';
@@ -501,16 +496,11 @@ const SandpieMemory = (function () {
 
   // ---- Settings section -----------------------------------------------------
   const HTML = `
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.6rem;">Durable facts are remembered across conversations and injected into the model's context automatically. When the remembered facts grow past the budget below, they're auto-consolidated (merged, pruned, de-duplicated) to stay small. Stored locally in this browser only.</p>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.6rem;">Durable facts are remembered across conversations and injected into the model's context automatically. Auto-consolidation keeps the store small by merging, pruning and de-duplicating near-identical facts. Stored locally in this browser only.</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.6rem;">
       <input type="checkbox" id="memEnabled" style="width:auto;"> Enable automatic memory
     </label>
-    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:0.2rem;">
-      <label style="font-size:0.78rem; color:var(--sp-text-dim);">Memory budget
-        <input type="number" id="memThreshold" min="500" step="500" style="width:6rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;"> tokens
-      </label>
-      <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); align-self:center;"></span>
-    </div>
+    <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); display:block; margin-bottom:0.6rem;"></span>
     <hr style="border:none; border-top:1px solid var(--sp-border); margin:0.8rem 0;">
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt.</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
@@ -535,15 +525,13 @@ const SandpieMemory = (function () {
   function wire(panel) {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
-    const th = panel.querySelector('#memThreshold');
     const rpEn = panel.querySelector('#rpEnabled');
     const rpCnt = panel.querySelector('#rpCount');
     const lsEn = panel.querySelector('#lessonsEnabled');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
-    if (th) { th.value = cfg.threshold; th.addEventListener('change', () => { const v = Math.max(MIN_THRESHOLD, parseInt(th.value || '', 10) || DEFAULTS.threshold); th.value = v; localStorage.setItem(K_THRESHOLD, String(v)); flash('Saved'); }); }
     if (rpEn) {
       rpEn.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
-      rpCnt.value = localStorage.getItem('sandpie-recent-paths-count') || '20';
+      rpCnt.value = localStorage.getItem('sandpie-recent-paths-count') || '50';
       rpEn.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', rpEn.checked ? 'true' : 'false'));
       rpCnt.addEventListener('change', () => { let v = parseInt(rpCnt.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 100) v = 100; rpCnt.value = v; localStorage.setItem('sandpie-recent-paths-count', String(v)); });
     }
@@ -766,7 +754,7 @@ const SandpieMemory = (function () {
     return { ok: true, name: slug };
   }
 
-  return { config, isEnabled, threshold, list, systemBlock, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
+  return { config, isEnabled, list, systemBlock, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
 })();
 window.SandpieMemory = SandpieMemory;
 

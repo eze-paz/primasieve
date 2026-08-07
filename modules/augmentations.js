@@ -52,7 +52,7 @@
     try { const raw = await opfs.read(storePath); if (raw) list = JSON.parse(raw); } catch (_) {}
     list = list.filter(p => p !== path);
     list.unshift(path);
-    const max = Number(localStorage.getItem('sandpie-recent-paths-count') || '20');
+    const max = Number(localStorage.getItem('sandpie-recent-paths-count') || '50');
     if (list.length > max) list = list.slice(0, max);
     await opfs.write(storePath, JSON.stringify(list, null, 2));
     // Mark dirty so it uploads and survives the Dropbox sync orphan-cleanup.
