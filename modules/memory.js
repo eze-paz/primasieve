@@ -318,7 +318,6 @@ const SandpieMemory = (function () {
   // REPORTED as candidates, never auto-archived. user/feedback are never superseded.
   const AUTO_TH = 0.65;   // >= this → auto-archive the older (zero false positives measured)
   const CAND_TH = 0.4;    // [CAND_TH, AUTO_TH) → surface as a review candidate only
-  const AUTO_KEY = 'sandpie-memory-autoconsolidate';   // '0' disables the auto pass
   const LAST_KEY = 'sandpie-memory-consolidate-ts';
   const _MEM_STOP = new Set('the a an of to in on for and or is are was be it this that with at by from as into not no you your can will has have not are'.split(' '));
   function _memTokens(f) { return new Set((`${f.name} ${f.description} ${f.body}`.toLowerCase().match(/[a-z0-9][a-z0-9_-]{2,}/g) || []).filter(w => !_MEM_STOP.has(w))); }
@@ -394,12 +393,12 @@ const SandpieMemory = (function () {
   // which schedules one more pass that finds nothing new and stops (self-terminating).
   let _consTimer = null, _consolidating = false;
   function scheduleConsolidate() {
-    if (!isEnabled() || localStorage.getItem(AUTO_KEY) === '0') return;
+    if (!isEnabled()) return;
     clearTimeout(_consTimer);
     _consTimer = setTimeout(runAutoConsolidate, 4000);
   }
   async function runAutoConsolidate() {
-    if (_consolidating || !isEnabled() || localStorage.getItem(AUTO_KEY) === '0') return;
+    if (_consolidating || !isEnabled()) return;
     _consolidating = true;
     try { const r = await consolidate(); if (r.archived && r.archived.length) console.log('[sandpie memory] auto-superseded:', r.archived); }
     catch (e) { console.warn('[sandpie] consolidate failed', e); }
@@ -513,10 +512,7 @@ const SandpieMemory = (function () {
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
       <input type="checkbox" id="lessonsEnabled" style="width:auto;"> Enable automatic memory harvest
     </label>
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidate</strong> &mdash; hourly, deterministic: archives near-identical memories within a project (recoverable via <code>&gt;&gt;&gt; memory restore</code>). No LLM.</p>
-    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
-      <input type="checkbox" id="autoConsolidate" style="width:auto;"> Enable auto-consolidation
-    </label>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidation</strong> &mdash; always on, deterministic: archives near-identical memories within a project (recoverable via <code>&gt;&gt;&gt; memory restore</code>). No LLM.</p>
     `;
 
   let _flashT = null;
@@ -541,11 +537,6 @@ const SandpieMemory = (function () {
       // distillLessons), whose output lives in the normal memory store/budget.
       lsEn.checked = localStorage.getItem('sandpie-lessons-enabled') !== 'false';
       lsEn.addEventListener('change', () => localStorage.setItem('sandpie-lessons-enabled', lsEn.checked ? 'true' : 'false'));
-    }
-    const acEn = panel.querySelector('#autoConsolidate');
-    if (acEn) {
-      acEn.checked = localStorage.getItem('sandpie-memory-autoconsolidate') !== '0';
-      acEn.addEventListener('change', () => { localStorage.setItem('sandpie-memory-autoconsolidate', acEn.checked ? '1' : '0'); flash('Saved'); });
     }
   }
 
