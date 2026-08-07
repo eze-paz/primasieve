@@ -477,19 +477,49 @@ function armConsoleNoteCheck(wrap, frame, clean) {
 }
 
 async function readArtifactConsole(path) {
-  const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+  // Normalize both the query AND the stored wrap path the same way: strip leading
+  // slashes, a files/ prefix, a sandpie/ prefix, and trailing slashes. The stored
+  // data-artifact-path is the RESOLVED path (loadArtifactFrame overwrites it), which
+  // can carry a sandpie/ prefix the caller doesn't know about, or vice versa.
+  const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '').replace(/^sandpie\//, '').replace(/\/+$/, '');
+  const strip = (p) => String(p || '').replace(/^sandpie\//, '');
   const want = norm(path);
   let found = null;
+  // Accepted forms of the requested path: normalized, stripped-of-sandpie, and (if
+  // resolvable) the resolved form — covers the legacy artifacts/ → sandpie/artifacts/
+  // remap and any alias the caller might use.
+  const wantForms = new Set([want, strip(want)]);
+  if (want) {
+    try {
+      const r = await resolveArtifactPath(want);
+      if (r) { wantForms.add(norm(r)); wantForms.add(strip(norm(r))); }
+    } catch (_) {}
+  }
   for (const wrap of document.querySelectorAll('.artifact-wrap')) {
     const cur = wrap.dataset.artifactPath;
     if (!cur) continue;
-    if (want && norm(cur) !== want) continue;
+    const c = norm(cur);
+    if (want && !wantForms.has(c) && !wantForms.has(strip(c))) continue;
     const frame = wrap.querySelector('.artifact-frame');
     if (frame) { found = { wrap, frame }; break; }
   }
   if (!found) return { error: want ? 'No artifact frame open for "' + path + '". Show it with show_artifact first, or pass its exact path.' : 'No artifact frame open in the conversation.' };
   try {
-    const w = found.frame.contentWindow;
+    let w = found.frame.contentWindow;
+    if (!w || !w.__sandpieConsole) {
+      // Self-heal: the frame may predate instrumentation (or the bootstrap failed to
+      // inject). Reload it through opfs.toUrl — which ALWAYS injects the console
+      // capture — and re-read. This makes the tool reliable regardless of when the
+      // artifact was shown.
+      const p = found.wrap.dataset.artifactPath || want;
+      await new Promise((resolve) => {
+        const onLoad = () => resolve();
+        found.frame.addEventListener('load', onLoad, { once: true });
+        loadArtifactFrame(found.wrap, found.frame, resolveArtifactPath(p), p).catch(() => {});
+        setTimeout(resolve, 5000);   // safety net if the load event never fires
+      });
+      w = found.frame.contentWindow;
+    }
     if (!w || !w.__sandpieConsole) return { error: 'This artifact has no console capture (loaded before instrumentation, or it is not an HTML file). Re-show it with show_artifact to instrument it.' };
     return { entries: w.__sandpieConsole.slice() };
   } catch (e) {
