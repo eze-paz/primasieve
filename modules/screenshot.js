@@ -176,6 +176,17 @@
         ? Math.max(root.scrollHeight, doc.body ? doc.body.scrollHeight : 0)
         : root.clientHeight) || 800);
 
+      // Horizontal overflow is the failure mode most likely to be mistaken for a
+      // faithful capture: the page renders fine, it is just wider than the frame,
+      // so the right edge is cut with nothing to indicate it. Report the width
+      // that would actually fit rather than leaving the model to guess.
+      const overflow = root.scrollWidth - root.clientWidth;
+      if (overflow > 1) {
+        warnings.push('Content is ' + root.scrollWidth + 'px wide but was captured at ' + root.clientWidth
+          + 'px, so the right ' + overflow + 'px is CUT OFF (text near the right edge may be missing characters). '
+          + 'Re-run with width: ' + root.scrollWidth + ' to see the whole thing.');
+      }
+
       const clone = root.cloneNode(true);
       const pairs = pairUp(root, clone, []);
       const { canvasFixes, imgFixes } = collect(pairs, warnings);
@@ -260,11 +271,29 @@
       return canvas;
     }
 
+    // A vertical scrollbar steals ~15 CSS px of the width the caller asked for,
+    // which silently clips fixed-width documents (an A4 page is 793.7px — at a
+    // 794px request it lost its right edge). Suppress it for the capture only.
+    function suppressScrollbars() {
+      const st = document.createElement('style');
+      st.textContent = 'html{overflow:hidden !important;scrollbar-width:none !important}'
+        + 'html::-webkit-scrollbar{display:none !important}';
+      document.head.appendChild(st);
+      return () => st.remove();
+    }
+
     async function shoot(opts) {
       const warnings = [];
-      const { url, W, H } = await build(opts || {}, warnings);
+      const restore = suppressScrollbars();
+      let built;
+      try { built = await build(opts || {}, warnings); }
+      finally { restore(); }
+      const { url, W, H } = built;
 
-      let scale = Math.min(window.devicePixelRatio || 1, 2);
+      // Never rasterize below 1:1 — devicePixelRatio is < 1 at browser zoom under
+      // 100%, which would silently soften every capture (a 794px request came back
+      // 715px at 90% zoom, blurring small text enough to be misread).
+      let scale = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
       if (W * scale > 16384 || H * scale > 16384) scale = 1;
       let h = H;
       if (h > 16384) {
