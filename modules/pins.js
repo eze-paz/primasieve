@@ -284,12 +284,7 @@
     box.textContent = '';
     box.style.display = '';
     const addTile = buildAddTile();
-    if (!list.length) {   // composed empty state instead of a blank home
-      const empty = document.createElement('div');
-      empty.className = 'pin-empty';
-      empty.innerHTML = '<div class="pin-empty-ghosts"><i></i><i></i><i></i></div>'
-        + '<div class="pin-empty-hint">No pinned apps yet.<br>Right-click any file → <b>Pin</b> to keep it one tap away.</div>';
-      box.appendChild(empty);
+    if (!list.length) {   // the always-present +Add tile IS the empty state now
       box.appendChild(addTile);
       refreshAddCount();
       return;
