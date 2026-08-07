@@ -232,47 +232,23 @@
   }
   */
 
-  let _overlay = null;
   let _retry = 0;
 
-  function ensureOverlay() {
-    if (_overlay && document.body.contains(_overlay)) return _overlay;
-    const ov = document.createElement('div');
-    ov.id = 'sandpieConsoleOverlay';
-    ov.style.cssText = [
-      'position:fixed; right:0.75rem; bottom:0.75rem; z-index:9999;',
-      'width:min(560px, calc(100vw - 1.5rem)); max-height:42vh;',
-      'display:flex; flex-direction:column;',
-      'background:var(--sp-panel); border:1px solid var(--sp-border-bright); border-radius:8px;',
-      'box-shadow:0 0 30px var(--sp-accent-dim);',
-      'font:0.8rem inherit; color:var(--sp-text);',
-    ].join(' ');
-    ov.innerHTML =
-      '<div style="display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.6rem; border-bottom:1px solid var(--sp-border); flex:0 0 auto;">' +
-        '<span style="font-weight:600; font-size:0.72rem; letter-spacing:0.08em; color:var(--sp-text-dim); flex:1;">CONSOLE</span>' +
-        '<button type="button" class="ghost" id="consoleClear" style="font-size:0.7rem; padding:0.15rem 0.5rem;">Clear</button>' +
-        '<button type="button" class="ghost" id="consoleCopy" style="font-size:0.7rem; padding:0.15rem 0.5rem;">Copy</button>' +
-        '<button type="button" class="ghost" id="consoleClose" title="Close (or >>> console)" style="font-size:0.7rem; padding:0.15rem 0.45rem;">✕</button>' +
-      '</div>' +
-      '<div id="consoleLines" style="overflow-y:auto; min-height:4rem; padding:0.25rem 0; background:var(--sp-bg);"></div>';
-    document.body.appendChild(ov);
-    _overlay = ov;
-    wireConsolePanel(ov);                       // scroll tracking + Clear/Copy
-    const closeBtn = ov.querySelector('#consoleClose');
-    if (closeBtn) closeBtn.addEventListener('click', closeConsole);
-    return ov;
-  }
-
-  function openConsole() {
-    const ov = ensureOverlay();
-    ov.style.display = 'flex';
-    flushLines();                               // paint lines logged while closed
-  }
-  function closeConsole() { if (_overlay) _overlay.style.display = 'none'; }
-  function toggleConsole() {
-    const visible = !!(_overlay && _overlay.style.display !== 'none');
-    if (visible) closeConsole(); else openConsole();
-    return !visible;
+  /* Render the console (Clear/Copy + live lines) directly into the command
+     output panel's .cmd-body. SandpieCommandView.show() appends an HTMLElement
+     into that pre, so the panel is mounted FIRST (flushLines resolves
+     #consoleLines via getElementById), then wireConsolePanel wires
+     scroll/Clear/Copy and paints the buffered history. Returning the element
+     keeps dispatch's follow-up show() from wiping it with a text result. */
+  function openConsoleInCommandView() {
+    if (typeof SandpieCommandView === 'undefined' || !SandpieCommandView.show) return null;
+    const el = document.createElement('div');
+    el.innerHTML = panelHtml;
+    const linesEl = el.querySelector('#consoleLines');
+    if (linesEl) linesEl.style.maxHeight = '150px';   // fit inside .cmd-body's 220px
+    SandpieCommandView.show(el, 'console');           // mount into cmd-body
+    wireConsolePanel(el);                             // scroll + Clear/Copy + paint
+    return el;
   }
 
   function registerConsoleCommand() {
@@ -280,16 +256,16 @@
     SandpieCommands.register({
       name: 'console',
       module: 'core',
-      help: 'Open/close the live console panel (toggle)',
+      help: 'Show the live console panel (Clear/Copy) in the command output',
       usage: '>>> console',
-      run() { return toggleConsole() ? 'Console panel opened.' : 'Console panel closed.'; },
+      run() { return openConsoleInCommandView() || 'Console is not available.'; },
     });
     return true;
   }
 
-  /* Boot: the console is command-driven now — `>>> console` toggles the panel.
-     (core.js loads before console.js, so SandpieCommands exists on first try;
-     retry is just belt-and-braces.) */
+  /* Boot: the console is command-driven now — `>>> console` renders it into the
+     command output panel. (core.js loads before console.js, so SandpieCommands
+     exists on first try; retry is just belt-and-braces.) */
   function init() {
     if (!registerConsoleCommand() && _retry++ < 50) setTimeout(init, 100);
   }
