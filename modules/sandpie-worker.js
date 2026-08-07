@@ -239,6 +239,14 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Page → worker reply to a screenshot request (see tool_screenshot below).
+  // Carries the whole payload — data URL, dimensions and fidelity caveats.
+  if (data.type === 'screenshot-result') {
+    const d = _shotReqs.get(data.id);
+    if (d) { _shotReqs.delete(data.id); d.resolve(data.payload || { ok: false, error: 'empty reply' }); }
+    return;
+  }
+
   // Page → worker reply to an ask() request (see tool_ask below). Resolves the
   // deferred the tool is awaiting with the user's answers.
   if (data.type === 'ask-result') {
@@ -938,6 +946,124 @@ async function tool_html_console({ path }, ctx) {
   });
 }
 
+// ---- screenshot() — worker → page round-trip ---------------------------
+// Rasterizing needs a DOM, which this worker does not have. tool_screenshot posts
+// a screenshot-request to the page (forward-to-page relay); screenshot.js renders
+// the artifact — offscreen at exact dimensions by default — and replies with a
+// JPEG data URL plus a list of fidelity caveats. The image rides back to the model
+// on the same rail load_image uses (ctx collects toolOut.image into the next
+// request), so the model literally sees what it built.
+const SHOT_TIMEOUT = 45000;
+const _shotReqs = new Map();
+
+// Ask the configured vision fallback to describe an image, for models that cannot
+// see. Mirrors the captioning path in tool_load_image.
+async function _captionImage(dataUrl, ctx, what) {
+  const _vis = ctx && ctx._agentConfig && ctx._agentConfig.vision;
+  const fb = _vis && _vis.fallback;
+  if (!fb || !fb.endpoint || !fb.apiKey || !fb.model) {
+    return 'Error: this model cannot see images and no vision fallback is configured, so the screenshot is unusable. Switch to a vision-capable model, or set a vision fallback in Settings → AI provider.';
+  }
+  try {
+    const res = await fetch(String(fb.endpoint).replace(/\/$/, '') + '/chat/completions', {
+      method: 'POST', credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + fb.apiKey },
+      body: JSON.stringify({
+        model: fb.model,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: 'This is a screenshot of ' + what + '. Describe the rendered layout precisely for a developer who cannot see it: overall structure and position of each region, alignment and spacing problems, overlapping or clipped elements, colours and contrast, and any text that is cut off. Transcribe visible text verbatim. Be factual; call out anything that looks broken.' },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ] }],
+        max_tokens: 2048,
+      }),
+      signal: (ctx && ctx.signal) || undefined,
+    });
+    if (!res.ok) {
+      let txt = ''; try { txt = (await res.text()).slice(0, 300); } catch (_) {}
+      return 'Error: vision fallback captioning failed (HTTP ' + res.status + (txt ? ': ' + txt : '') + ').';
+    }
+    const j = await res.json();
+    const m = j && j.choices && j.choices[0] && j.choices[0].message;
+    let caption = m && m.content;
+    if (!caption && m && (Array.isArray(m.reasoning_details) || m.reasoning)) {
+      caption = Array.isArray(m.reasoning_details)
+        ? m.reasoning_details.map(x => (x && x.text) || '').join('\n')
+        : m.reasoning;
+    }
+    return caption ? String(caption).trim() : 'Error: vision fallback returned no caption.';
+  } catch (e) {
+    return 'Error: vision fallback captioning request failed (' + ((e && e.message) || e) + ').';
+  }
+}
+
+async function tool_screenshot(args, ctx) {
+  const path = String((args && args.path) || '').trim().replace(/^\/+/, '');
+  if (!path) return { result: 'Error: "path" is required (OPFS path of the artifact to capture, e.g. "sandpie/artifacts/report.html").' };
+
+  const opts = {
+    width:     Math.max(0, Math.min(4096, (args && args.width) | 0)),
+    height:    Math.max(0, Math.min(16384, (args && args.height) | 0)),
+    full_page: !!(args && args.full_page),
+    wait_ms:   Math.max(0, Math.min(10000, (args && args.wait_ms) | 0)),
+    live:      !!(args && args.live),
+  };
+
+  const id = 'shot_' + Math.random().toString(36).slice(2);
+  const out = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      _shotReqs.delete(id);
+      resolve({ ok: false, error: 'the page did not answer within ' + (SHOT_TIMEOUT / 1000) + 's' });
+    }, SHOT_TIMEOUT);
+    _shotReqs.set(id, { resolve: (d) => { clearTimeout(timer); resolve(d); } });
+    try {
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'screenshot-request', id, args: { path, opts } } });
+    } catch (e) {
+      clearTimeout(timer); _shotReqs.delete(id);
+      resolve({ ok: false, error: 'could not reach the page (' + ((e && e.message) || e) + ')' });
+    }
+  });
+
+  if (!out || !out.ok || !out.dataUrl) {
+    return { result: 'Error: screenshot of "' + path + '" failed — ' + ((out && out.error) || 'unknown error') + '.' };
+  }
+
+  // Shrink to the per-image budget if the capture came out large (a full-page shot
+  // of a long document easily exceeds it).
+  let dataUrl = out.dataUrl;
+  const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  if (b64.length > IMAGE_MAX_B64_BYTES) {
+    try {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const c = await _compressImageToFit(bytes, 'image/jpeg', IMAGE_MAX_B64_BYTES);
+      if (c) {
+        let s = ''; const CHUNK = 0x8000;
+        for (let i = 0; i < c.bytes.length; i += CHUNK) s += String.fromCharCode.apply(null, c.bytes.subarray(i, i + CHUNK));
+        dataUrl = 'data:' + c.mime + ';base64,' + btoa(s);
+      }
+    } catch (_) {}
+  }
+
+  const warns = Array.isArray(out.warnings) ? out.warnings : [];
+  let text = 'screenshot:' + path + ' (' + out.width + '×' + out.height + 'px'
+    + (opts.live ? ', live frame' : '') + (opts.full_page ? ', full page' : '') + ')';
+  text += warns.length
+    ? '\n\nFIDELITY CAVEATS — the render is faithful EXCEPT:\n- ' + warns.join('\n- ')
+      + '\nTreat those areas as unverified; everything else is what the browser actually draws.'
+    : '\n\nNo fidelity caveats: this is what the browser actually draws.';
+
+  // A text-only model cannot use the pixels — caption instead, so it still gets
+  // something it can reason over rather than a wasted turn.
+  const _vis = ctx && ctx._agentConfig && ctx._agentConfig.vision;
+  if (_vis && !_vis.canSee) {
+    const caption = await _captionImage(dataUrl, ctx, 'a web page rendered from ' + path);
+    return { result: text + '\n\n(described by a vision model — this model cannot see images):\n\n' + caption };
+  }
+
+  return { result: text, image: { path, dataUrl } };
+}
+
 // ---- ask() — worker → page round-trip for user clarifications -------
 // The worker posts the questions to the page (forward-to-page relay), the page
 // renders them as a multiple-choice card, and the user clicks an option. The
@@ -1488,7 +1614,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','ask'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','screenshot','ask'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -1551,6 +1677,7 @@ async function runTool(name, args, ctx) {
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
     case 'html_console':  return tool_html_console(args, ctx);
+    case 'screenshot':    return tool_screenshot(args, ctx);
     case 'ask':           return tool_ask(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);

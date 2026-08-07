@@ -1530,7 +1530,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=99');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=100');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -1625,6 +1625,27 @@ function getSandpieWorker() {
             else reply('Console for "' + (pr.args && pr.args.path || 'artifact') + '" (' + entries.length + ' entries):\n' + entries.join('\n'));
           } catch (e) {
             reply('Error reading console: ' + ((e && e.message) || e));
+          }
+        })();
+        return;
+      }
+      // screenshot tool: the worker posts a screenshot-request; the page rasterizes
+      // the artifact (screenshot.js) and replies with a JPEG data URL, its
+      // dimensions, and any fidelity caveats worth telling the model about.
+      if (msg.payload && msg.payload.type === 'screenshot-request') {
+        const pr = msg.payload;
+        (async () => {
+          const reply = (payload) => { try { _sandpieWorker.postMessage({ type: 'screenshot-result', id: pr.id, payload }); } catch (_) {} };
+          try {
+            const s = window.SandpieScreenshot;
+            if (!s || typeof s.capture !== 'function') {
+              reply({ ok: false, error: 'screenshot.js is not loaded on this page' });
+              return;
+            }
+            const out = await s.capture(pr.args && pr.args.path, (pr.args && pr.args.opts) || {});
+            reply({ ok: true, dataUrl: out.dataUrl, width: out.width, height: out.height, warnings: out.warnings || [] });
+          } catch (e) {
+            reply({ ok: false, error: (e && e.message) || String(e) });
           }
         })();
         return;

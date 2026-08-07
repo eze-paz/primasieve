@@ -212,6 +212,30 @@ path: optional — omit to read the most recently shown artifact, or pass the ex
       required: [],
     },
   },
+  screenshot: {
+    description: `Render an artifact and SEE it as an image — the screenshot comes back as part of this tool call, visible to you on the next step, no further action needed.
+WHEN TO USE: after writing or editing an HTML artifact, to check what it actually looks like before telling the user it's done. Layout bugs — overlapping elements, clipped text, broken alignment, a chart that rendered empty, invisible low-contrast text — do NOT throw errors, so html_console cannot find them and reading your own source cannot either. Looking is the only way.
+Also use it to check responsive behaviour (pass width), and to verify a fix really landed rather than assuming it did.
+WHEN NOT TO USE: on files that are not HTML or images (a .docx/.pdf/.csv cannot be rasterized — use show_artifact). Don't screenshot the same unchanged file twice.
+The artifact does NOT need to be shown in the conversation first: by default it is rendered offscreen at exact dimensions, which neither disturbs the user's view nor depends on what is currently on screen.
+The result lists FIDELITY CAVEATS when parts of the page could not be captured faithfully (e.g. cross-origin images, backdrop-filter, shadow DOM). Trust the rest of the image; treat flagged areas as unverified.
+Typical flow:
+  run_python: write sandpie/artifacts/report.html
+  screenshot: { "path": "sandpie/artifacts/report.html" }
+  -> see a clipped header -> edit_file to fix -> screenshot again to confirm`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:      { type: 'string', description: 'OPFS path of the artifact to capture (e.g. "sandpie/artifacts/report.html"). HTML or an image file. No leading slash.' },
+        width:     { type: 'integer', description: 'Viewport width in CSS pixels (default 1280). Use e.g. 375 to check the mobile layout.' },
+        height:    { type: 'integer', description: 'Viewport height in CSS pixels (default 800). Ignored when full_page is true.' },
+        full_page: { type: 'boolean', description: 'Capture the entire scrollable height instead of just the viewport (default false).' },
+        wait_ms:   { type: 'integer', description: 'Extra settle time in ms before capturing, for pages that render asynchronously (default 400, max 10000).' },
+        live:      { type: 'boolean', description: 'Capture the artifact frame already shown in the conversation, preserving its current interacted state, instead of rendering a fresh copy. Falls back to a fresh render if it is not on screen.' },
+      },
+      required: ['path'],
+    },
+  },
   write_todos: {
       description: `Create and manage a structured task list for the current session. This helps you track progress, organize complex work, and demonstrate to the user that you understand the scope.
 Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).

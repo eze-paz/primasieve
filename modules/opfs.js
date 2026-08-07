@@ -2887,11 +2887,21 @@ opfs.toUrl = async function(path) {
       `})();<\/script>`;
 
 
-    // console capture FIRST (before any artifact script), resize LAST (needs layout)
-    if (/<head[^>]*>/i.test(text)) text = text.replace(/<head([^>]*)>/i, '<head$1>' + cap);
-    else text = cap + text;
-    if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, script + '</body>');
-    else text += script;
+    // Screenshot bootstrap (screenshot.js). The HEAD half patches getContext to
+    // force preserveDrawingBuffer and MUST land before the artifact's own scripts,
+    // or WebGL artifacts rasterize blank. The BODY half answers capture requests.
+    const shotHead = (window.SandpieScreenshot && window.SandpieScreenshot.HEAD_BOOTSTRAP) || '';
+    const shotBody = (window.SandpieScreenshot && window.SandpieScreenshot.BODY_BOOTSTRAP) || '';
+
+    // console capture FIRST (before any artifact script), resize LAST (needs layout).
+    // Function replacers, not string ones — a literal $& / $1 anywhere in an
+    // injected script would otherwise be eaten as a replacement pattern.
+    const head = cap + shotHead;
+    const tail = script + shotBody;
+    if (/<head[^>]*>/i.test(text)) text = text.replace(/<head([^>]*)>/i, (m, attrs) => '<head' + attrs + '>' + head);
+    else text = head + text;
+    if (/<\/body>/i.test(text)) text = text.replace(/<\/body>/i, () => tail + '</body>');
+    else text += tail;
     return URL.createObjectURL(new Blob([text], { type: 'text/html' }));
 
 

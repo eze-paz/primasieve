@@ -1,0 +1,455 @@
+/**
+ * Screenshot Module for Sandpie
+ *
+ * Client-side capture of artifacts as raster images, so the model can SEE what it
+ * built instead of inferring layout from source. No server, no headless browser.
+ *
+ * HOW IT WORKS (and why this shape)
+ * ---------------------------------
+ * HTML artifacts are rasterized through SVG <foreignObject>: the document is
+ * serialized into an <svg><foreignObject>, loaded as an <img>, and drawn to a
+ * canvas. The BROWSER'S OWN layout+paint engine renders the foreignObject, so
+ * typography, flexbox/grid, borders, shadows, gradients and inline SVG come out
+ * pixel-identical. This is not a JS reimplementation of CSS (that's html2canvas,
+ * which is both slower and less faithful).
+ *
+ * The capture runs INSIDE the artifact frame, via a bootstrap injected by
+ * opfs.toUrl (the same injection point as the console capture). That placement is
+ * what makes this accurate:
+ *   - live <canvas> bitmaps are readable (a serialized <canvas> carries no pixels)
+ *   - getContext is patched to force preserveDrawingBuffer, so WebGL artifacts
+ *     capture instead of coming out blank — this MUST run before the artifact's
+ *     own scripts, hence the head injection
+ *   - form state (value/checked/selected) is a property, not an attribute, so it
+ *     only survives if read live
+ *   - the artifact IS the captured document, so there is no nested-iframe blind
+ *     spot (the usual blocker when rasterizing from a parent page)
+ * Because the whole document is serialized — <style> blocks included — CSS rules,
+ * pseudo-elements and @font-face all apply natively. No style inlining, no
+ * computed-style flattening, no library.
+ *
+ * Known unfixable gaps are REPORTED rather than hidden (see collectWarnings):
+ * backdrop-filter, cross-origin images without CORS, scrolled containers, shadow
+ * DOM. A model told its screenshot is suspect reasons correctly; one silently
+ * handed a wrong image does not.
+ *
+ * iOS/WebKit workarounds are baked in, not bolted on later:
+ *   - foreignObject is given explicit width/height (Safari renders nothing without)
+ *   - img.decode() instead of onload (onload fires before pixels exist)
+ *   - the rasterize pass runs TWICE (Safari's first attempt silently no-ops)
+ *
+ * Usage:
+ *   await SandpieScreenshot.capture('sandpie/artifacts/x.html', { width: 1280 })
+ *     -> { dataUrl, width, height, warnings: [] }
+ */
+
+(function () {
+  'use strict';
+
+  const SHOT_TIMEOUT = 25000;
+  const DEFAULT_W = 1280;
+  const DEFAULT_H = 800;
+  const MAX_PX = 16384;          // Chrome's canvas dimension ceiling
+
+  /* ---------------------------------------------------------------------- */
+  /*  In-frame engine (stringified into the artifact via opfs.toUrl)         */
+  /* ---------------------------------------------------------------------- */
+
+  // Runs FIRST, before the artifact's own scripts. Forcing preserveDrawingBuffer
+  // is the single highest-value line in this file: three.js and friends default it
+  // to false, which leaves the framebuffer cleared by the time toDataURL runs, so
+  // every WebGL artifact would otherwise capture as an empty rectangle.
+  function __sandpieShotPatch() {
+    if (window.__sandpieShotPatched) return;
+    window.__sandpieShotPatched = 1;
+    try {
+      const orig = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+        if (/webgl/i.test(String(type))) {
+          attrs = attrs || {};
+          if (attrs.preserveDrawingBuffer === undefined) attrs.preserveDrawingBuffer = true;
+        }
+        return orig.call(this, type, attrs);
+      };
+    } catch (_) {}
+  }
+
+  // Runs at end of body. Answers 'sandpie-shot-request' from the parent.
+  function __sandpieShotEngine() {
+    if (window.__sandpieShotReady) return;
+    window.__sandpieShotReady = 1;
+
+    const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+
+    const isInlineUrl = (u) => /^(data:|blob:)/i.test(String(u || ''));
+
+    function isSameOrigin(u) {
+      try { return new URL(u, location.href).origin === location.origin; }
+      catch (_) { return false; }
+    }
+
+    // The SVG-in-<img> rasterization context cannot fetch ANY subresource, so
+    // every external image must be turned into a data: URI up front or it renders
+    // blank. Cross-origin fetches need CORS; failures are reported, not silent.
+    function toDataUri(src) {
+      return fetch(src, { mode: 'cors', credentials: 'omit' })
+        .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .then((b) => new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(fr.result);
+          fr.onerror = () => rej(new Error('read failed'));
+          fr.readAsDataURL(b);
+        }));
+    }
+
+    // Walk the live tree and its clone in lockstep, recording what needs fixing.
+    // Nothing is mutated during the walk — a structural edit mid-walk would
+    // desynchronise the two trees.
+    function pairUp(live, clone, out) {
+      out.push([live, clone]);
+      const a = live.children, b = clone.children;
+      const n = Math.min(a.length, b.length);
+      for (let i = 0; i < n; i++) pairUp(a[i], b[i], out);
+      return out;
+    }
+
+    function collect(pairs, warnings) {
+      const canvasFixes = [];
+      const imgFixes = [];
+      let scrolled = 0, shadow = 0, backdrop = 0;
+
+      for (const [live, clone] of pairs) {
+        const tag = live.tagName ? live.tagName.toLowerCase() : '';
+
+        if (tag === 'canvas') {
+          let url = null;
+          try { url = live.toDataURL('image/png'); } catch (_) { /* tainted */ }
+          // A cleared WebGL buffer serialises to a ~120-byte blank PNG; treat a
+          // suspiciously tiny payload as a failed capture rather than pretend.
+          if (url && url.length > 200) canvasFixes.push([clone, url, live.width, live.height]);
+          else warnings.push('A <canvas> could not be captured (tainted by cross-origin content, or its WebGL buffer was already cleared) — it appears blank in the image.');
+        }
+
+        if (tag === 'img') {
+          const src = live.currentSrc || live.getAttribute('src') || '';
+          if (src && !isInlineUrl(src)) imgFixes.push([clone, src]);
+        }
+
+        // Live form state lives in properties, not attributes — without this the
+        // capture shows the pristine markup, not what was typed or clicked.
+        if (tag === 'input') {
+          if (live.type === 'checkbox' || live.type === 'radio') {
+            if (live.checked) clone.setAttribute('checked', 'checked');
+            else clone.removeAttribute('checked');
+          } else if (live.value != null) {
+            clone.setAttribute('value', live.value);
+          }
+        } else if (tag === 'textarea') {
+          clone.textContent = live.value || '';
+        } else if (tag === 'option') {
+          if (live.selected) clone.setAttribute('selected', 'selected');
+          else clone.removeAttribute('selected');
+        }
+
+        if (live.shadowRoot) shadow++;
+        if (live.scrollTop > 2 || live.scrollLeft > 2) scrolled++;
+
+        try {
+          const cs = getComputedStyle(live);
+          const bf = cs.backdropFilter || cs.webkitBackdropFilter;
+          if (bf && bf !== 'none') backdrop++;
+        } catch (_) {}
+      }
+
+      if (scrolled) warnings.push(scrolled + ' scrolled container(s) capture from the top — their scroll position is not reproduced.');
+      if (shadow) warnings.push(shadow + ' element(s) use shadow DOM; shadow content is not serialisable and is missing from the image.');
+      if (backdrop) warnings.push(backdrop + ' element(s) use backdrop-filter, which has nothing to sample in an isolated render — those areas appear flat rather than frosted.');
+
+      return { canvasFixes, imgFixes };
+    }
+
+    async function build(opts, warnings) {
+      const doc = document;
+      const root = doc.documentElement;
+      const W = Math.max(1, opts.width | 0 || root.clientWidth || 1280);
+      const H = Math.max(1, opts.height | 0 || (opts.full_page
+        ? Math.max(root.scrollHeight, doc.body ? doc.body.scrollHeight : 0)
+        : root.clientHeight) || 800);
+
+      const clone = root.cloneNode(true);
+      const pairs = pairUp(root, clone, []);
+      const { canvasFixes, imgFixes } = collect(pairs, warnings);
+
+      // Scripts never execute inside an <img>-loaded SVG; dropping them keeps the
+      // payload small and the XML clean.
+      clone.querySelectorAll('script').forEach((s) => s.remove());
+
+      for (const [node, url, w, h] of canvasFixes) {
+        const img = doc.createElementNS(XHTML_NS, 'img');
+        img.setAttribute('src', url);
+        img.setAttribute('width', String(w));
+        img.setAttribute('height', String(h));
+        img.setAttribute('style', (node.getAttribute('style') || '') + ';display:block;');
+        if (node.parentNode) node.parentNode.replaceChild(img, node);
+      }
+
+      let failedImgs = 0;
+      await Promise.all(imgFixes.map(([node, src]) =>
+        toDataUri(src)
+          .then((d) => node.setAttribute('src', d))
+          .catch(() => {
+            failedImgs++;
+            node.removeAttribute('src');
+          })
+      ));
+      if (failedImgs) {
+        warnings.push(failedImgs + ' image(s) could not be inlined (cross-origin without CORS headers) and are blank in the capture.');
+      }
+
+      // Any remaining url() reference in CSS has the same problem as an <img>, but
+      // rewriting stylesheet text is a different order of complexity — flag it.
+      try {
+        const cssUrls = Array.from(doc.styleSheets).some((sh) => {
+          try {
+            return Array.from(sh.cssRules || []).some((r) =>
+              r.cssText && /url\((?!['"]?(data:|#))/i.test(r.cssText));
+          } catch (_) { return false; }
+        });
+        if (cssUrls) warnings.push('Stylesheet url() references (background images, external fonts) are not inlined — they may be missing, and a substituted font changes text metrics.');
+      } catch (_) {}
+
+      clone.setAttribute('xmlns', XHTML_NS);
+      const html = new XMLSerializer().serializeToString(clone);
+
+      const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
+        // Explicit width/height on foreignObject is REQUIRED by Safari — without
+        // it, iOS renders nothing at all.
+        '<foreignObject x="0" y="0" width="' + W + '" height="' + H + '">' + html + '</foreignObject></svg>';
+
+      return { url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), W, H };
+    }
+
+    function backdropColor() {
+      try {
+        for (const el of [document.body, document.documentElement]) {
+          if (!el) continue;
+          const c = getComputedStyle(el).backgroundColor;
+          if (c && !/transparent|rgba\(0,\s*0,\s*0,\s*0\)/i.test(c)) return c;
+        }
+      } catch (_) {}
+      return '#ffffff';
+    }
+
+    async function draw(url, W, H, scale, bg) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(W * scale);
+      canvas.height = Math.round(H * scale);
+      const cx = canvas.getContext('2d');
+      cx.fillStyle = bg;
+      cx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const img = new Image();
+      img.src = url;
+      // decode() rather than onload: on WebKit, onload fires before the SVG has
+      // actually produced pixels, and drawImage then paints nothing.
+      if (img.decode) { try { await img.decode(); } catch (_) { await new Promise((r) => { img.onload = r; img.onerror = r; }); } }
+      else await new Promise((r) => { img.onload = r; img.onerror = r; });
+
+      cx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+
+    async function shoot(opts) {
+      const warnings = [];
+      const { url, W, H } = await build(opts || {}, warnings);
+
+      let scale = Math.min(window.devicePixelRatio || 1, 2);
+      if (W * scale > 16384 || H * scale > 16384) scale = 1;
+      let h = H;
+      if (h > 16384) {
+        warnings.push('Content is ' + H + 'px tall; truncated to 16384px (canvas limit).');
+        h = 16384;
+      }
+
+      const bg = backdropColor();
+      // Safari's first rasterization of a foreignObject SVG silently produces
+      // nothing. Drawing twice is the standard workaround; the second pass hits
+      // the image cache, so it costs almost nothing on browsers that don't need it.
+      await draw(url, W, h, scale, bg);
+      const canvas = await draw(url, W, h, scale, bg);
+
+      return {
+        dataUrl: canvas.toDataURL('image/jpeg', 0.92),
+        width: canvas.width,
+        height: canvas.height,
+        warnings,
+      };
+    }
+
+    window.addEventListener('message', (e) => {
+      const d = e.data;
+      if (!d || d.type !== 'sandpie-shot-request') return;
+      const reply = (payload) => {
+        try { (e.source || parent).postMessage(Object.assign({ type: 'sandpie-shot-result', id: d.id }, payload), '*'); }
+        catch (_) {}
+      };
+      shoot(d.opts || {})
+        .then((out) => reply(Object.assign({ ok: true }, out)))
+        .catch((err) => reply({ ok: false, error: (err && err.message) || String(err) }));
+    });
+  }
+
+  const HEAD_BOOTSTRAP = '<script>(' + __sandpieShotPatch.toString() + ')();<\/script>';
+  const BODY_BOOTSTRAP = '<script>(' + __sandpieShotEngine.toString() + ')();<\/script>';
+
+  /* ---------------------------------------------------------------------- */
+  /*  Page side                                                             */
+  /* ---------------------------------------------------------------------- */
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function askFrame(win, opts) {
+    return new Promise((resolve, reject) => {
+      const id = 'shot_' + Math.random().toString(36).slice(2);
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onMsg);
+        reject(new Error('the artifact did not answer the capture request in time (it may predate the screenshot bootstrap — re-show it to reinstrument)'));
+      }, SHOT_TIMEOUT);
+      function onMsg(e) {
+        const d = e.data;
+        if (!d || d.type !== 'sandpie-shot-result' || d.id !== id) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMsg);
+        if (d.ok) resolve(d); else reject(new Error(d.error || 'capture failed inside the artifact'));
+      }
+      window.addEventListener('message', onMsg);
+      try { win.postMessage({ type: 'sandpie-shot-request', id, opts }, '*'); }
+      catch (e) { clearTimeout(timer); window.removeEventListener('message', onMsg); reject(e); }
+    });
+  }
+
+  // Non-HTML artifacts (png/jpg/svg/…) need no DOM work — decode and re-encode.
+  async function captureImageFile(path, opts) {
+    const url = await opfs.toUrl(path);
+    try {
+      const img = new Image();
+      img.src = url;
+      if (img.decode) { try { await img.decode(); } catch (_) { await new Promise((r) => { img.onload = r; img.onerror = r; }); } }
+      else await new Promise((r) => { img.onload = r; img.onerror = r; });
+
+      let w = img.naturalWidth || opts.width || DEFAULT_W;
+      let h = img.naturalHeight || opts.height || DEFAULT_H;
+      if (w > MAX_PX || h > MAX_PX) {
+        const k = MAX_PX / Math.max(w, h);
+        w = Math.round(w * k); h = Math.round(h * k);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const cx = canvas.getContext('2d');
+      cx.fillStyle = '#ffffff';
+      cx.fillRect(0, 0, w, h);
+      cx.drawImage(img, 0, 0, w, h);
+      return { dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: w, height: h, warnings: [] };
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+  }
+
+  // Capture the artifact frame already visible in the conversation. Preserves
+  // whatever state the page is in (post-interaction), at the cost of depending on
+  // that frame being mounted and expanded.
+  async function captureLiveFrame(path, opts) {
+    const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+    const want = norm(path);
+    for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+      if (want && norm(wrap.dataset.artifactPath) !== want) continue;
+      const frame = wrap.querySelector('.artifact-frame');
+      if (!frame || !frame.contentWindow) continue;
+      // A collapsed frame is display:none — no layout, nothing to serialise. Expand
+      // for the duration, then put it back exactly as the user left it.
+      const wasCollapsed = wrap.dataset.artifactCollapsed === '1';
+      if (wasCollapsed && typeof window.expandArtifact === 'function') {
+        window.expandArtifact(wrap);
+        await sleep(120);
+      }
+      try {
+        return await askFrame(frame.contentWindow, opts);
+      } finally {
+        if (wasCollapsed && typeof window.collapseArtifact === 'function') window.collapseArtifact(wrap);
+      }
+    }
+    return null;
+  }
+
+  // Default path: render the artifact into an offscreen iframe at exact
+  // dimensions. Deterministic size (so responsive checks mean something), works
+  // regardless of which conversation is mounted, and never disturbs the user's view.
+  async function captureOffscreen(path, opts) {
+    const W = Math.max(120, opts.width | 0 || DEFAULT_W);
+    const H = Math.max(120, opts.height | 0 || DEFAULT_H);
+    const host = document.createElement('iframe');
+    host.setAttribute('aria-hidden', 'true');
+    host.setAttribute('tabindex', '-1');
+    // Positioned offscreen rather than display:none — the document still needs
+    // layout, and display:none gives it none.
+    host.style.cssText =
+      'position:fixed;left:-30000px;top:0;width:' + W + 'px;height:' + H + 'px;' +
+      'border:0;background:#fff;z-index:-1;pointer-events:none;opacity:0;';
+    document.body.appendChild(host);
+
+    let url = null;
+    try {
+      url = await opfs.toUrl(path);
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('artifact did not load in time')), SHOT_TIMEOUT);
+        host.onload = () => { clearTimeout(t); resolve(); };
+        host.onerror = () => { clearTimeout(t); reject(new Error('artifact failed to load')); };
+        host.src = url;
+      });
+      // Settle window: async rendering (fetches, chart libraries, load handlers)
+      // has not necessarily finished when load fires.
+      await sleep(Math.min(Math.max(opts.wait_ms | 0 || 400, 0), 10000));
+      return await askFrame(host.contentWindow, Object.assign({}, opts, { width: W, height: opts.full_page ? 0 : H }));
+    } finally {
+      host.remove();
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+  }
+
+  /**
+   * Capture an OPFS artifact as a JPEG data URL.
+   * @param {string} path  OPFS path (e.g. "sandpie/artifacts/report.html")
+   * @param {object} opts  { width, height, full_page, wait_ms, live }
+   * @returns {Promise<{dataUrl:string,width:number,height:number,warnings:string[]}>}
+   */
+  async function capture(path, opts) {
+    opts = opts || {};
+    let clean = String(path || '').replace(/^\/+/, '');
+    if (!clean) throw new Error('a path is required');
+    if (typeof window.resolveArtifactPath === 'function') {
+      try { clean = await window.resolveArtifactPath(clean); } catch (_) {}
+    }
+
+    const ext = (clean.split('.').pop() || '').toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+      return await captureImageFile(clean, opts);
+    }
+    if (ext !== 'html' && ext !== 'htm') {
+      throw new Error('cannot screenshot a .' + ext + ' file — only HTML artifacts and image files can be rasterized. Open it with show_artifact instead.');
+    }
+
+    if (opts.live) {
+      const out = await captureLiveFrame(clean, opts);
+      if (out) return out;
+      // Fall through: nothing on screen for that path, so render it fresh.
+    }
+    return await captureOffscreen(clean, opts);
+  }
+
+  window.SandpieScreenshot = {
+    capture,
+    HEAD_BOOTSTRAP,
+    BODY_BOOTSTRAP,
+  };
+})();
