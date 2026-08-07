@@ -869,6 +869,52 @@ ul.conv-list li.active {
     letter-spacing: 0.04em; text-transform: uppercase;
   }
   ul.conv-list li.archived-toggle:hover { color: var(--sp-text-dim); background: transparent; border: none; }
+  /* Settings → Archive tab (sidebar Archived row opens this modal tab) */
+  .arch-head { display: flex; align-items: baseline; gap: 0.55rem; margin-bottom: 0.8rem; }
+  .arch-head h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .arch-total { font-size: 0.72rem; color: var(--sp-text-dim); }
+  .arch-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+  .arch-chip {
+    background: transparent; border: 1px solid var(--sp-border); border-radius: 999px;
+    color: var(--sp-text-dim); font: 0.72rem inherit; padding: 0.22rem 0.65rem; cursor: pointer;
+    transition: border-color .12s, color .12s, background .12s;
+  }
+  .arch-chip:hover { color: var(--sp-text); border-color: var(--sp-border-bright); }
+  .arch-chip.active { border-color: var(--sp-accent); color: var(--sp-text); background: var(--sp-accent-dim); }
+  .arch-chip .n { opacity: 0.65; font-variant-numeric: tabular-nums; }
+  .arch-tools { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.7rem; }
+  .arch-seg { display: flex; border: 1px solid var(--sp-border); border-radius: 6px; overflow: hidden; }
+  .arch-seg button {
+    background: transparent; border: none; color: var(--sp-text-dim);
+    font: 0.7rem inherit; padding: 0.32rem 0.6rem; cursor: pointer; border-right: 1px solid var(--sp-border);
+  }
+  .arch-seg button:last-child { border-right: none; }
+  .arch-seg button:hover { color: var(--sp-text); }
+  .arch-seg button.active { background: var(--sp-panel); color: var(--sp-text); }
+  .arch-tools input[type="text"] {
+    flex: 1; padding: 0.4rem 0.55rem; background: var(--sp-bg); border: 1px solid var(--sp-border);
+    border-radius: 6px; color: var(--sp-text); font-size: 0.85rem; font-family: inherit;
+  }
+  .arch-tools input[type="text"]:focus { outline: none; border-color: var(--sp-accent); }
+  .arch-list { list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--sp-border); }
+  .arch-list li {
+    display: flex; align-items: center; gap: 0.6rem; padding: 0.42rem 0.55rem;
+    border-bottom: 1px solid var(--sp-border); border-radius: 6px; cursor: pointer;
+  }
+  .arch-list li:hover { background: var(--sp-panel); }
+  .arch-list li .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+  .arch-list li .conv-meta { flex-shrink: 0; font-size: 0.62rem; color: var(--sp-text-dim); opacity: 0.75; font-variant-numeric: tabular-nums; }
+  .arch-list li.arch-empty { cursor: default; justify-content: center; color: var(--sp-text-dim); font-size: 0.75rem; padding: 1rem 0.5rem; opacity: 0.75; }
+  .arch-list li.arch-empty:hover { background: transparent; }
+  .arch-list li.arch-pager {
+    justify-content: center; gap: 0.5rem; padding: 0.55rem 0.2rem 0.4rem; cursor: default;
+    border-bottom: none; font-size: 0.68rem; color: var(--sp-text-dim); letter-spacing: 0.02em;
+  }
+  .arch-list li.arch-pager:hover { background: transparent; }
+  .arch-pager .more-link { color: var(--sp-text-dim); cursor: pointer; text-decoration: none; transition: color .12s; }
+  .arch-pager .more-link:hover { color: var(--sp-text); text-decoration: underline; text-underline-offset: 2px; }
+  .arch-pager .more-sep { opacity: 0.45; }
+  .arch-pager .more-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
   ul.conv-list .name { font-family: inherit; font-size: 0.78rem; }
   ul.conv-list li .gen-dot {
     display: inline-block;

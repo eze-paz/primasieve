@@ -978,7 +978,6 @@ async function listConversations() {
   }
   return out.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
-let archivedExpanded = false;
 // Patch conversation metadata (title / pinned / archived / compaction / …). New
 // format → rewrite ONLY the tiny meta file (O(1), regardless of chat size — this
 // is what makes rename/pin instant). Legacy → patch the .json in place (still O(N)
@@ -1257,12 +1256,14 @@ async function refreshConversationList() {
   }
   regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
   if (archived.length) {
+    // Opens the Settings → Archive tab (modal), which owns archive management
+    // (filter/sort/search/unarchive). No inline expansion here anymore.
     const header = document.createElement('li');
     header.className = 'archived-toggle';
-    header.textContent = `Archived (${archived.length}) ${archivedExpanded ? '▾' : '▸'}`;
-    header.onclick = () => { archivedExpanded = !archivedExpanded; refreshConversationList(); };
+    header.textContent = `Archived (${archived.length}) ›`;
+    header.title = 'Manage archived conversations';
+    header.onclick = () => { if (window.SandpieSettings) SandpieSettings.open('archive'); };
     frag.appendChild(header);
-    if (archivedExpanded) archived.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + regular.length + i)));
   }
   ul.replaceChildren(frag);
 }
@@ -4917,7 +4918,166 @@ function hideBgProgress(convId, key) {
   } catch (_) {}
 }
 
+
+// ---------------------------------------------------------------------------
+// Settings → Archive tab. The sidebar "Archived (N)" row opens this modal tab
+// (SandpieSettings.open('archive')) — archive management moved out of the
+// sidebar. Lists archived convs via a dedicated scan of ARCHIVED_DIR (reuses
+// the shared row cache), with filter chips, sort, archive-scoped search, a
+// quiet pager and per-row actions (Unarchive / Open / Delete).
+// ---------------------------------------------------------------------------
+async function listArchived() {
+  const found = new Map();   // id -> { archived, format }
+  let entries = [];
+  try { entries = await opfs.listDir(ARCHIVED_DIR); } catch { /* empty */ }
+  for (const e of entries) {
+    if (e.kind !== 'file') continue;
+    let id = null, format = null;
+    if (e.name.endsWith(META_SUFFIX)) { id = e.name.slice(0, -META_SUFFIX.length); format = 'new'; }
+    else if (e.name.endsWith('.json')) { id = e.name.slice(0, -5); format = 'old'; }
+    else continue;
+    const prev = found.get(id);
+    if (!prev || (prev.format === 'old' && format === 'new')) found.set(id, { archived: true, format });
+  }
+  const rows = await Promise.all([...found.entries()].map(async ([id, loc]) => {
+    const key = 'a:' + id;
+    if (_convRowCache.has(key)) return _convRowCache.get(key);
+    const row = await readConvMetaRow(id, true, loc.format, false);
+    if (row) _convRowCache.set(key, row);
+    return row;
+  }));
+  return rows.filter(Boolean).sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+}
+
+function registerArchiveSettingsTab() {
+  if (typeof SandpieSettings === 'undefined' || !SandpieSettings.register) return;
+  const CHUNK = 50;
+  const state = { filter: 'all', sort: 'date-desc', query: '', shown: CHUNK };
+  const FILTERS = [
+    { id: 'all',   label: 'All',        test: () => true },
+    { id: 'week',  label: 'Last week',  test: c => Date.now() - new Date(c.updated).getTime() < 7 * 86400000 },
+    { id: 'month', label: 'Last month', test: c => Date.now() - new Date(c.updated).getTime() < 30 * 86400000 },
+    { id: '3mo',   label: '3 months',   test: c => Date.now() - new Date(c.updated).getTime() < 90 * 86400000 },
+    { id: 'older', label: 'Older',      test: c => Date.now() - new Date(c.updated).getTime() >= 90 * 86400000 },
+  ];
+  const SORTERS = {
+    'date-desc': (a, b) => (b.updated || '').localeCompare(a.updated || ''),
+    'date-asc':  (a, b) => (a.updated || '').localeCompare(b.updated || ''),
+    'alpha':     (a, b) => (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase()),
+  };
+  let chipsEl = null, segEl = null, searchEl = null, listEl = null, countEl = null;
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function highlight(title) {
+    if (!state.query) return esc(title);
+    const idx = title.toLowerCase().indexOf(state.query);
+    if (idx < 0) return esc(title);
+    return esc(title.slice(0, idx)) + '<span style="background:var(--sp-accent-dim);border-radius:2px;padding:0 1px;">'
+      + esc(title.slice(idx, idx + state.query.length)) + '</span>' + esc(title.slice(idx + state.query.length));
+  }
+  function filtered(list) {
+    const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
+    let pool = list.filter(c => f.test(c));
+    if (state.query) pool = pool.filter(c => (c.title || '').toLowerCase().includes(state.query));
+    return pool.slice().sort(SORTERS[state.sort] || SORTERS['date-desc']);
+  }
+
+  async function refresh() {
+    const list = await listArchived();
+    countEl.textContent = list.length + ' conversation' + (list.length === 1 ? '' : 's');
+    // filter chips with live counts
+    chipsEl.replaceChildren();
+    for (const f of FILTERS) {
+      const n = list.filter(c => f.test(c)).length;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'arch-chip' + (f.id === state.filter ? ' active' : '');
+      b.innerHTML = esc(f.label) + ' <span class="n">' + n + '</span>';
+      b.onclick = () => { state.filter = f.id; state.shown = CHUNK; refresh(); };
+      chipsEl.appendChild(b);
+    }
+    const pool = filtered(list);
+    const shownNow = Math.min(state.shown, pool.length);
+    const frag = document.createDocumentFragment();
+    if (!pool.length) {
+      const li = document.createElement('li');
+      li.className = 'arch-empty';
+      li.textContent = state.query ? 'No archived conversations match "' + state.query + '"' : 'No conversations in this range';
+      frag.appendChild(li);
+    } else {
+      for (let i = 0; i < shownNow; i++) {
+        const c = pool[i];
+        const li = document.createElement('li');
+        const name = document.createElement('span');
+        name.className = 'name'; name.innerHTML = highlight(c.title || '(no title)'); name.title = c.title || '';
+        const meta = document.createElement('span');
+        meta.className = 'conv-meta'; meta.textContent = fmtRelTime(c.updated);
+        li.append(name, meta);
+        li.onclick = (ev) => {
+          ev.stopPropagation();
+          const items = [
+            { label: 'Unarchive', action: async () => { await toggleArchiveConv(c.id, true); refresh(); } },
+            { label: 'Open conversation', action: () => { if (window.SandpieSettings) SandpieSettings.close(); loadConv(c.id); } },
+            { label: 'Delete', danger: true, action: () => deleteConv(c.id, c.title) },
+          ];
+          showContextMenu(ev.clientX, ev.clientY, items);
+        };
+        frag.appendChild(li);
+      }
+      if (pool.length > shownNow) {
+        const p = document.createElement('li');
+        p.className = 'arch-pager';
+        const more = document.createElement('span');
+        more.className = 'more-link'; more.textContent = 'show more';
+        more.onclick = (e) => { e.stopPropagation(); state.shown = Math.min(pool.length, state.shown + CHUNK); refresh(); };
+        const sep1 = document.createElement('span'); sep1.className = 'more-sep'; sep1.textContent = '·';
+        const all = document.createElement('span');
+        all.className = 'more-link'; all.textContent = 'show all';
+        all.onclick = (e) => { e.stopPropagation(); state.shown = pool.length; refresh(); };
+        const sep2 = document.createElement('span'); sep2.className = 'more-sep'; sep2.textContent = '·';
+        const cnt = document.createElement('span'); cnt.className = 'more-count'; cnt.textContent = shownNow + '/' + pool.length;
+        p.append(more, sep1, all, sep2, cnt);
+        frag.appendChild(p);
+      }
+    }
+    listEl.replaceChildren(frag);
+  }
+
+  SandpieSettings.register({
+    id: 'archive', title: 'Archive', order: 19,
+    render(panel) {
+      panel.innerHTML = '';
+      const head = document.createElement('div');
+      head.className = 'arch-head';
+      const h = document.createElement('h3'); h.textContent = 'Archive';
+      countEl = document.createElement('span'); countEl.className = 'arch-total';
+      head.append(h, countEl);
+      chipsEl = document.createElement('div'); chipsEl.className = 'arch-chips';
+      const tools = document.createElement('div'); tools.className = 'arch-tools';
+      segEl = document.createElement('div'); segEl.className = 'arch-seg';
+      for (const [id, label] of [['date-desc', 'Date ↓'], ['date-asc', 'Date ↑'], ['alpha', 'A–Z']]) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.dataset.sort = id; b.textContent = label;
+        b.className = id === state.sort ? 'active' : '';
+        b.onclick = () => { state.sort = id; refresh(); };
+        segEl.appendChild(b);
+      }
+      searchEl = document.createElement('input');
+      searchEl.type = 'text'; searchEl.placeholder = 'Search archive…'; searchEl.autocomplete = 'off';
+      searchEl.oninput = () => { state.query = searchEl.value.trim().toLowerCase(); state.shown = CHUNK; refresh(); };
+      tools.append(segEl, searchEl);
+      listEl = document.createElement('ul'); listEl.className = 'arch-list';
+      panel.append(head, chipsEl, tools, listEl);
+      refresh();
+    },
+    // onShow re-runs on EVERY activation so the list is current after
+    // archive/unarchive happened elsewhere while the modal was open.
+    onShow() { if (listEl) refresh(); },
+  });
+}
+
 function bootConversations() {
+  registerArchiveSettingsTab();
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     Sandpie.events.on('compaction:start', ({ convId }) => showCompactionProgress(convId));
     Sandpie.events.on('compaction:end', ({ convId }) => hideCompactionProgress(convId));
