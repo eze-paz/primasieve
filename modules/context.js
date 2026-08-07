@@ -146,20 +146,50 @@ const SandpieContext = (() => {
   let last = { exists: false, skills: [], errors: [], loaded: [] };
 
   // Parse leading YAML-ish frontmatter (--- … ---). Deterministic and
-  // dependency-free: only scalar `key: value` lines (name, description). Returns
-  // null when there's no frontmatter block at all.
+  // dependency-free: single-line `key: value` scalars plus YAML BLOCK scalars —
+  // `key: >` (folded), `key: |` (literal) and bare `key:` followed by indented
+  // lines — because skill descriptions commonly span several lines that way.
+  // Returns null when there's no frontmatter block at all.
   function parseFrontmatter(text) {
     const m = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
     if (!m) return null;
     const fm = {};
-    for (const line of m[1].split(/\r?\n/)) {
-      const kv = /^([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*)$/.exec(line);
+    const lines = m[1].split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const kv = /^([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*)$/.exec(lines[i]);
       if (!kv) continue;
       let v = kv[2].trim();
+      // Block scalar ('>' folded, '|' literal, bare 'key:' with indented body):
+      // the value is the run of indented lines that follows. Folded joins with
+      // spaces, literal with newlines (the -/+ chomping hints are ignored — the
+      // result is trimmed anyway).
+      if (v === '' || /^[>|][-+]?$/.test(v)) {
+        const parts = [];
+        while (i + 1 < lines.length) {
+          const next = lines[i + 1];
+          if (!/^[ \t]/.test(next) || next.trim() === '') break;
+          parts.push(next.trim());
+          i++;
+        }
+        v = v[0] === '|' ? parts.join('\n') : parts.join(' ');
+      }
       if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
       fm[kv[1].toLowerCase()] = v;
     }
     return fm;
+  }
+
+  // Clean a frontmatter description into model-ready text: drop everything up to
+  // and including the leading run of whitespace/symbols before the first
+  // alphanumeric character (a leftover block-scalar indicator like '>', a stray
+  // quote, a '---' fragment), then collapse internal whitespace. A value with no
+  // alphanumeric content at all ('>', '---') becomes '' and trips the
+  // missing-description guard — junk can never be advertised as a description.
+  // Unicode-aware ([\p{L}\p{N}]) so accented first letters survive.
+  function cleanDescription(s) {
+    const flat = String(s || '').replace(/\s+/g, ' ');
+    const first = flat.search(/[\p{L}\p{N}]/u);
+    return first >= 0 ? flat.slice(first).trim() : '';
   }
 
   // Walk skills/*/ and derive the index from each folder's SKILL.md frontmatter.
@@ -184,8 +214,14 @@ const SandpieContext = (() => {
       if (fm.name && fm.name.toLowerCase() !== folder) {
         errors.push(`${file} — frontmatter name "${fm.name}" ≠ folder "${folder}"; load_skill uses the folder name "${folder}"`);
       }
-      const desc = (fm.description || '').replace(/\s+/g, ' ').trim();
-      if (!desc) { errors.push(`${file} — missing "description"; the model needs it to decide when to load this skill`); continue; }
+      const desc = cleanDescription(fm.description);
+      if (!desc) {
+        const hint = fm.description
+          ? ' — description resolves to empty text; if it uses a YAML `>`/`|` block scalar, the text must sit on indented lines under the indicator'
+          : '';
+        errors.push(`${file} — missing "description"${hint}; the model needs it to decide when to load this skill`);
+        continue;
+      }
       skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
     // Shared skills: installed, read-only packages under sandpie/shared-installed/<id>/ that
@@ -197,7 +233,7 @@ const SandpieContext = (() => {
         const path = 'sandpie/shared-installed/' + e.name, file = path + '/' + SKILL_FILE;
         let text; try { text = await opfs.read(file); } catch { continue; }   // not a skill package
         const fm = parseFrontmatter(text);
-        const desc = ((fm && fm.description) || '').replace(/\s+/g, ' ').trim();
+        const desc = cleanDescription(fm && fm.description);
         if (!desc || skills.some(s => s.name === e.name)) continue;
         skills.push({ name: e.name, desc, path, file, enabled: isSkillEnabled(e.name), shared: true });
       }
@@ -288,6 +324,7 @@ returned to the model when it calls load_skill on this skill.
   return {
     SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
     isSkillEnabled, setSkillEnabled, saveSkill,
+    parseFrontmatter, cleanDescription,
     lastState: () => last,
   };
 })();
