@@ -47,9 +47,21 @@ a[href]{cursor:pointer;}
 .sp-stylepop .sp-sr{display:flex;align-items:center;gap:6px;justify-content:space-between;}
 .sp-stylepop .sp-sr>span:first-child{color:#8b949e;min-width:76px;}
 .sp-stylepop input,.sp-stylepop select,.sp-stylepop button{background:#2b313a;color:#d8dee5;border:1px solid #30363d;border-radius:4px;font:12px system-ui;padding:2px 4px;}
-.sp-stylepop button{cursor:pointer;}`;
+.sp-stylepop button{cursor:pointer;}
+.sp-overflow{outline:2px solid #f85149 !important;outline-offset:1px;}
+.sp-overflow-badge{position:absolute;top:2mm;right:2mm;z-index:2147482999;background:#f85149;color:#fff;font:11px system-ui;padding:2px 7px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none;}`;
 
-  const NEW_DOC = `<!DOCTYPE html><html><head><meta charset="utf-8"><style id="sp-doc-css">${DOC_CSS}</style></head><body><div class="sp-page"><p>Start typing…</p></div></body></html>`;
+  
+
+  const REFLOW_JS = `
+(function(r,f){typeof define==='function'&&define.amd?define(f):typeof module==='object'&&module.exports?module.exports=f():r.SPReflow=f()})(typeof self!=='undefined'?self:this,function(){'use strict';
+function pages(d){return Array.from(d.querySelectorAll('.sp-page, section.page, .page'))}
+function contentBounds(p){var h=p.querySelector('.hdr'),f=p.querySelector('.ftr');if(!h||!f)return{top:0,bottom:0,available:0};var pr=p.getBoundingClientRect(),hr=h.getBoundingClientRect(),fr=f.getBoundingClientRect();return{top:hr.bottom-pr.top,bottom:fr.top-pr.top,available:fr.top-hr.bottom}}
+function isStructural(e){if(!e||!e.matches)return false;if(e.matches('.hdr, .ftr, .pnum, .sp-textbox, .sp-overflow-badge'))return true;if(e.classList.contains('sp-grip')||e.classList.contains('sp-handle'))return true;var cs=getComputedStyle(e);return cs.position==='absolute'||cs.position==='fixed'}
+function clearBadges(d){d.querySelectorAll('.sp-overflow-badge').forEach(function(b){b.remove()});d.querySelectorAll('.sp-overflow').forEach(function(e){e.classList.remove('sp-overflow')})}
+function checkOverflow(d){if(!d||!d.body)return[];clearBadges(d);var pgs=pages(d),issues=[];pgs.forEach(function(p,idx){var b=contentBounds(p);if(b.available<=0)return;var kids=Array.from(p.children),hi=-1,fi=-1;kids.forEach(function(k,i){if(k.matches&&k.matches('.hdr'))hi=i;if(k.matches&&k.matches('.ftr'))fi=i});if(hi<0||fi<0)return;for(var i=hi+1;i<fi;i++){var e=kids[i];if(isStructural(e))continue;var er=e.getBoundingClientRect(),pr=p.getBoundingClientRect(),eb=er.bottom-pr.top;if(eb>b.bottom){var px=Math.round(eb-b.bottom);e.classList.add('sp-overflow');var badge=d.createElement('div');badge.className='sp-overflow-badge';badge.textContent='⚠ overflow '+px+'px';p.appendChild(badge);var tag=e.tagName.toLowerCase(),cls=(e.className&&e.className.baseVal!==undefined?e.className.baseVal:e.className)||'';console.warn('[reflow] page '+(idx+1)+' overflows into footer by '+px+'px — <'+tag+'>'+(cls?' .'+String(cls).split(/\s+/).join('.'):''));issues.push({page:idx+1,px:px});break;}}});return issues}
+return{checkOverflow:checkOverflow,pages:pages,contentBounds:contentBounds}});`;
+const NEW_DOC = `<!DOCTYPE html><html><head><meta charset="utf-8"><style id="sp-doc-css">${DOC_CSS}</style></head><body><div class="sp-page"><p>Start typing…</p></div></body></html>`;
 
   function mount(container, opts = {}) {
     opts = opts || {};
@@ -515,7 +527,7 @@ a[href]{cursor:pointer;}
       });
       mo.observe(editRoot(), MO_OPTS);
     }
-    function onEdit() { markDirty(); scheduleSnapshot(); }   // explicit nudge; the observer also covers it
+    function onEdit() { markDirty(); scheduleSnapshot(); try { if (typeof SPReflow !== 'undefined') SPReflow.checkOverflow(doc); } catch (_) {} }   // explicit nudge; the observer also covers it
 
     /* ── global/master objects: shown on every page, edit one → all sync ──── */
     // Any object can be toggled "global": it's copied onto every page (same class
@@ -575,7 +587,8 @@ a[href]{cursor:pointer;}
     /* ── serialize (strip editor-only chrome) ───────────────────────────── */
     function getHTML() {
       const clone = doc.documentElement.cloneNode(true);
-      clone.querySelectorAll('#sp-editor-css,.sp-handle,.sp-grip,.sp-imgbar,.sp-stylepop').forEach(n => n.remove());
+      clone.querySelectorAll('#sp-editor-css,.sp-handle,.sp-grip,.sp-imgbar,.sp-stylepop,.sp-overflow-badge').forEach(n => n.remove());
+      clone.querySelectorAll('.sp-overflow').forEach(n => n.classList.remove('sp-overflow'));
       clone.querySelectorAll('.sp-obj-sel').forEach(n => n.classList.remove('sp-obj-sel'));
       clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
       return '<!DOCTYPE html>\n' + clone.outerHTML;
@@ -729,6 +742,9 @@ a[href]{cursor:pointer;}
       // inject doc-css (saved) if absent, and editor-css (transient, stripped on save)
       if (!doc.getElementById('sp-doc-css')) { const s = doc.createElement('style'); s.id = 'sp-doc-css'; s.textContent = DOC_CSS; (doc.head || doc.documentElement).appendChild(s); }
       const es = doc.createElement('style'); es.id = 'sp-editor-css'; es.textContent = EDITOR_CSS; (doc.head || doc.documentElement).appendChild(es);
+      // Inject overflow detector (Mode C: console.warn + badge, no auto-move)
+      const refScript = doc.createElement('script'); refScript.textContent = REFLOW_JS; (doc.head || doc.documentElement).appendChild(refScript);
+      requestAnimationFrame(function() { try { if (typeof SPReflow !== 'undefined') { var r = SPReflow.checkOverflow(doc); if (r.length) console.warn('[reflow] ' + r.length + ' page(s) with overflow'); } } catch (_) {} });
       // Wrap loose content into a page ONLY for documents with no structure of
       // their own — never wrap a doc that already lays itself out (its own .page
       // sections, divs, tables…), or we'd nest A4 pages inside A4 pages and it
