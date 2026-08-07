@@ -2763,6 +2763,7 @@ body.sp-decoding *::after {
   .sidebar-brand::after { clip-path: none; }
   .mobile-header .brand::before { clip-path: none; }
   .mobile-header .brand::after { clip-path: none; }
+  .sp-item-name { color: var(--sp-text-dim); }
 
   --sp-bg: #FFFFFF;
 
