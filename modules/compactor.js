@@ -50,13 +50,21 @@ const SandpieCompactor = (function () {
 
   const _int = (key, fallback) => { const v = parseInt(localStorage.getItem(key) || '', 10); return Number.isFinite(v) ? v : fallback; };
 
-  function isEnabled() { const v = localStorage.getItem(K_ENABLED); return v == null ? DEFAULTS.enabled : v === '1'; }
-  function getPrompt() { const v = localStorage.getItem(K_PROMPT); return (v == null || v === '') ? BUILT_IN_PROMPT : v; }
+  // Hardcoded 2026-08-07 (product decision): the Compaction settings tab is
+  // removed from the UI and the config is fixed for every user — compaction is
+  // always ON at 70% / keep-last 10 with the built-in prompt. The old
+  // localStorage keys (K_ENABLED/K_PCT/K_KEEPTAIL/K_PROMPT) are deliberately
+  // IGNORED: a browser that previously disabled it or customized any value is
+  // re-enrolled onto the defaults too. Uncommenting the register() call in
+  // init() restores the levers. (_int above is the levers' storage helper —
+  // dead code kept for that re-enable path.)
+  function isEnabled() { return DEFAULTS.enabled; }    // always true
+  function getPrompt() { return BUILT_IN_PROMPT; }     // always the built-in default
   function config() {
     return {
       enabled: isEnabled(),
-      pct: Math.min(99, Math.max(1, _int(K_PCT, DEFAULTS.pct))),
-      keepTail: Math.max(2, _int(K_KEEPTAIL, DEFAULTS.keepTail)),
+      pct: DEFAULTS.pct,                               // always 70
+      keepTail: DEFAULTS.keepTail,                     // always 10
       model: '',
       prompt: getPrompt(),
     };
@@ -145,10 +153,14 @@ const SandpieCompactor = (function () {
 
   let _retry = 0;
   function init() {
-    migrate();
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'compaction', title: 'Compaction', order: 16, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('compactionSection', { title: 'Compaction', badge: null, open: false, html: HTML, onRender: wire }); return; }
-    if (_retry++ < 40) setTimeout(init, 500);
+    migrate();   // legacy agents/compactor.md cleanup still runs — housekeeping, not a lever
+    // Compaction settings tab commented out 2026-08-07 (product decision): the
+    // enabled/pct/keepTail/prompt levers are removed from the UI and the config
+    // is hardcoded (see isEnabled/getPrompt/config above). HTML/wire are kept
+    // intact below so this tab can be restored by uncommenting register().
+    // if (window.SandpieSettings) { SandpieSettings.register({ id: 'compaction', title: 'Compaction', order: 16, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
+    // if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('compactionSection', { title: 'Compaction', badge: null, open: false, html: HTML, onRender: wire }); return; }
+    // if (_retry++ < 40) setTimeout(init, 500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
