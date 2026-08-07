@@ -1530,7 +1530,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=101');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=102');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2780,19 +2780,20 @@ function buildTodosView(todos) {
     const st = (t && t.status) || 'pending';
     if (st === 'deleted' || st === 'withdrawn') continue;   // dropped from the flat view
     const row = document.createElement('div');
-    row.className = 'tool-todo tool-todo-' + st;
+    row.className = 'tool-todo tool-todo-' + (st === 'blocked' ? 'wait' : st);
     const mark = document.createElement('span');
     mark.className = 'tool-todo-mark';
-    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : '\u25cb';
+    mark.textContent = st === 'completed' ? '\u2713' : st === 'in_progress' ? '\u25b8' : st === 'blocked' ? '\u23f8' : '\u25cb';
     const txt = document.createElement('span');
     txt.className = 'tool-todo-text';
-    txt.textContent = (t && (st === 'in_progress' && t.activeForm ? t.activeForm : t.content)) || '';
+    const label = (t && (st === 'in_progress' && t.activeForm ? t.activeForm : t.content)) || '';
+    txt.textContent = label + (st === 'blocked' && t && t.reason ? ' \u2014 ' + t.reason : '');
     row.append(mark, txt);
     // Dependency indicator: tasks still waiting on an open blocker.
     if (t && Array.isArray(t.blockedBy) && t.blockedBy.length) {
       const openBlk = t.blockedBy.filter(id => {
         const b = (todos || []).find(x => x && String(x.id) === String(id));
-        return b && (b.status === 'pending' || b.status === 'in_progress');
+        return b && (b.status === 'pending' || b.status === 'in_progress' || b.status === 'blocked');
       });
       if (openBlk.length) {
         const bb = document.createElement('span');

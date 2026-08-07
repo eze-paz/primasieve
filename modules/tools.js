@@ -247,6 +247,7 @@ THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add/remove blockers (tasks that must complete before this one can start) after creation.
   {"op":"start","id":"3"}   mark in_progress before you begin it. Refused while the task still has an open blocker; several tasks may be in progress at once if nothing blocks them.
   {"op":"complete","id":"3"}   mark done — ONLY when you have FULLY accomplished it. Never complete a task if tests fail, the implementation is partial, or errors are unresolved: keep it in_progress. If you hit a blocker you can't clear, keep the task in_progress and add a new task describing what must be resolved.
+  {"op":"blocked","id":"3","reason":"waiting on …"}   mark a task BLOCKED — it needs user input, an external dependency, or something unobtainable this turn. Blocked tasks are NOT open: once everything is blocked/completed the turn may end. {"op":"start","id":"3"} resumes it later.
   {"op":"delete","id":"3"}   remove a task you're no longer doing (also removed from any other task's blockedBy).
 IDs are shown in the returned checklist. You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or delete them first.`,
       parameters: {
@@ -258,12 +259,13 @@ IDs are shown in the returned checklist. You can batch several ops in one call. 
             items: {
               type: 'object',
               properties: {
-                op:        { type: 'string', enum: ['add', 'start', 'complete', 'delete', 'block', 'unblock'], description: 'The operation.' },
+                op:        { type: 'string', enum: ['add', 'start', 'complete', 'delete', 'block', 'unblock', 'blocked'], description: 'The operation.' },
                 text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests").' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
                 activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
-                id:        { type: 'string', description: 'For start/complete/delete/block/unblock: the target task id.' },
+                id:        { type: 'string', description: 'For start/complete/delete/block/unblock/blocked: the target task id.' },
                 by:        { type: 'array', items: { type: 'string' }, description: 'For block: mark tasks that must complete before this one can start. For unblock: the blocker ids to remove.' },
+                reason:    { type: 'string', description: 'For "blocked": why the task is stalled (shown in the checklist).' },
               },
               required: ['op'],
             },

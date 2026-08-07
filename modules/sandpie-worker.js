@@ -625,17 +625,19 @@ async function tool_run_python({ path, args, timeout }, ctx) {
 // NOT by nesting: a task with an open blocker cannot start. The list lives on
 // ctx._todoTree (seeded from config.todos each turn) and is echoed as a 'todos:'
 // payload the page renders + persists.
-const _TODO_OPEN = new Set(['pending', 'in_progress']);
-const _TODO_ALL = ['pending', 'in_progress', 'completed', 'deleted'];
+const _TODO_OPEN = new Set(['pending', 'in_progress']);   // stop-guard: only these keep the turn alive
+const _TODO_UNSAT = new Set(['pending', 'in_progress', 'blocked']);   // dependency gate: a blocked task is not done
+const _TODO_ALL = ['pending', 'in_progress', 'completed', 'blocked', 'deleted'];
 function _todoNextId(tree) { let mx = 0; for (const t of tree) { const n = parseInt(t.id, 10); if (n > mx) mx = n; } return String(mx + 1); }
-function _todoBlockers(t, byId) { return (Array.isArray(t.blockedBy) ? t.blockedBy : []).filter(id => { const b = byId.get(id); return b && _TODO_OPEN.has(b.status); }); }
-function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed, blockedBy: t.blockedBy, activeForm: t.activeForm })); }
+function _todoBlockers(t, byId) { return (Array.isArray(t.blockedBy) ? t.blockedBy : []).filter(id => { const b = byId.get(id); return b && _TODO_UNSAT.has(b.status); }); }
+function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed, blockedBy: t.blockedBy, activeForm: t.activeForm, reason: t.reason })); }
 function _todoSummary(tree) {
   const byId = new Map(tree.map(t => [t.id, t]));
-  const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'deleted' ? '[-]' : '[ ]';
+  const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'blocked' ? '[!]' : s === 'deleted' ? '[-]' : '[ ]';
   return tree.filter(t => t.status !== 'deleted').map(t => {
     const open = _todoBlockers(t, byId);
     return mark(t.status) + ' ' + t.id + ' ' + t.content
+      + (t.status === 'blocked' && t.reason ? ' — ' + t.reason : '')
       + (open.length ? ' (blocked by ' + open.join(', ') + ')' : '');
   }).join('\n');
 }
@@ -663,6 +665,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       const task = { id: ids[i], content, status, created: now };
       if (Array.isArray(t.blockedBy) && t.blockedBy.length) task.blockedBy = t.blockedBy.map(String).filter(x => ids.includes(x) && x !== ids[i]);
       if (typeof t.activeForm === 'string' && t.activeForm.trim()) task.activeForm = t.activeForm.trim();
+      if (status === 'blocked' && t && typeof t.reason === 'string' && t.reason.trim()) task.reason = t.reason.trim();
       if (status === 'completed') task.completed = now;
       tree.push(task);
     });
@@ -679,6 +682,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       + '  {"op":"add","text":"…","blockedBy":["2"]?}  add a task (blockedBy = ids that must finish first)\n'
       + '  {"op":"start","id":"…"}                      pending → in_progress (refused while blocked)\n'
       + '  {"op":"complete","id":"…"}                   → completed\n'
+      + '  {"op":"blocked","id":"…","reason":"…"}  mark BLOCKED — needs user input or an external dependency; NOT open, so the turn may end once everything is blocked/completed (start resumes)\n'
       + '  {"op":"delete","id":"…"}                     remove a task from the list\n'
       + '  {"op":"block","id":"…","by":["1"]} / {"op":"unblock","id":"…","by":["1"]}   adjust dependencies\n'
       + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/deleted.' };
@@ -699,20 +703,26 @@ async function tool_write_todos({ ops, todos }, ctx) {
       }
       if (typeof op.activeForm === 'string' && op.activeForm.trim()) task.activeForm = op.activeForm.trim();
       tree.push(task); byId.set(task.id, task); added.push(task.id);
-    } else if (k === 'start' || k === 'complete' || k === 'delete' || k === 'block' || k === 'unblock') {
+    } else if (k === 'start' || k === 'complete' || k === 'delete' || k === 'block' || k === 'unblock' || k === 'blocked') {
       const t = byId.get(op.id);
       if (!t) { errs.push(k + ': unknown id "' + op.id + '"'); continue; }
       if (k === 'start') {
-        if (t.status !== 'pending') { errs.push('start "' + op.id + '": only a pending task can start (is ' + t.status + ')'); continue; }
+        if (t.status !== 'pending' && t.status !== 'blocked') { errs.push('start "' + op.id + '": only a pending or blocked task can start (is ' + t.status + ')'); continue; }
         // Ordering is enforced by blockers, not by a one-at-a-time lock: a task
         // cannot start while any task in its blockedBy is still open.
         const open = _todoBlockers(t, byId);
         if (open.length) { errs.push('start "' + op.id + '": blocked by open task(s) ' + open.join(', ') + ' — finish or delete them first, or {"op":"unblock","id":"' + op.id + '","by":["' + open[0] + '"]} if that dependency no longer applies'); continue; }
-        t.status = 'in_progress';
+        t.status = 'in_progress'; delete t.reason;
       } else if (k === 'complete') {
         if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
         if (t.status === 'deleted') { errs.push('complete "' + op.id + '": deleted tasks cannot be completed'); continue; }
         t.status = 'completed'; t.completed = now;
+      } else if (k === 'blocked') {
+        if (t.status === 'completed') { errs.push('blocked "' + op.id + '": completed tasks stay on the record'); continue; }
+        if (t.status === 'deleted') { errs.push('blocked "' + op.id + '": deleted tasks cannot be blocked'); continue; }
+        t.status = 'blocked'; delete t.completed;
+        const reason = (op.reason !== undefined ? String(op.reason) : '').trim();
+        if (reason) t.reason = reason; else delete t.reason;
       } else if (k === 'block' || k === 'unblock') {
         const by = (Array.isArray(op.by) ? op.by : []).map(String);
         if (!by.length) { errs.push(k + ' "' + op.id + '": pass "by":["<id>", …]'); continue; }
@@ -726,7 +736,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
         t.status = 'deleted'; t.deleted = now;
         for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
       }
-    } else { errs.push('unknown op "' + k + '" (use add/start/complete/delete/block/unblock)'); }
+    } else { errs.push('unknown op "' + k + '" (use add/start/complete/delete/block/unblock/blocked)'); }
   }
   if (ctx) ctx._todos = _todoFlat(tree);
   const done = tree.filter(t => t.status === 'completed').length;
@@ -2560,6 +2570,7 @@ async function runAgent(config, ctx) {
     created: t.created, completed: t.completed,
     blockedBy: Array.isArray(t.blockedBy) ? t.blockedBy.map(String) : undefined,
     activeForm: t.activeForm,
+    reason: t.reason,
   }));
   // Drain any user messages steered in since the last round and splice them into
   // the loop as user turns. Called at the round boundary — after the previous
@@ -2616,7 +2627,8 @@ async function runAgent(config, ctx) {
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
   const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
   const renderTodos = () => ctx._todos.filter(t => t.status !== 'deleted').map(t =>
-    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]') + ' ' + t.content
+    (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]') + ' ' + t.content
+      + (t.status === 'blocked' && t.reason ? ' — ' + t.reason : '')
   ).join('\n');
   // Ephemeral, request-only reminder for the NEXT round. Never pushed into
   // `messages`, so it is neither persisted nor resent on later rounds; it is
@@ -2781,7 +2793,10 @@ async function runAgent(config, ctx) {
             '<system-reminder>You tried to end the turn, but these todo items are still open:\n'
             + renderTodos() + '\n\nUnless the user stopped you, keep going and finish the remaining work. '
             + 'When an item is genuinely done, mark it completed with write_todos. Only stop once every item '
-            + 'is completed. (auto-continue ' + ctx._stopBlocks + '/' + MAX_STOP_BLOCKS + ')</system-reminder>',
+            + 'is completed. If an item is genuinely blocked — it needs user input, an external credential or '
+            + 'file, or something you cannot obtain this turn — mark it blocked with write_todos '
+            + '({"op":"blocked","id":"…","reason":"…"}) and the turn may end with only blocked/completed items. '
+            + '(auto-continue ' + ctx._stopBlocks + '/' + MAX_STOP_BLOCKS + ')</system-reminder>',
             { open: openTodos().length, attempt: ctx._stopBlocks });
           continue;
         }

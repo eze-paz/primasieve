@@ -1511,6 +1511,8 @@ ul.conv-list li.active {
   .tool-box .tool-todo-in_progress { color: var(--sp-accent); }
   .tool-box .tool-todo-in_progress .tool-todo-mark { color: var(--sp-accent); }
   .tool-box .tool-todo-pending .tool-todo-mark { color: var(--sp-text-dim); }
+  .tool-box .tool-todo-wait { color: var(--sp-warn); }
+  .tool-box .tool-todo-wait .tool-todo-mark { color: var(--sp-warn); }
   /* Claim badges: hypothesis items + their evidence-backed verdicts. */
   .tool-box .tool-todo-claim-badge {
     flex: none; font-size: 10px; font-weight: 600; letter-spacing: 0.4px;
