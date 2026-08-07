@@ -676,10 +676,10 @@
     label.innerHTML = '<span>' + done + ' downloaded</span><span>' + (total - done) + ' remaining</span>';
   }
 
-  // Lifting the splash right after the cursor check reveals the welcome with an
-  // EMPTY sharedHome — sharing.js fills it asynchronously after Dropbox API calls.
-  // Wait for sharing's first render so the home appears fully assembled. Timeout
-  // guards against sharing.js being absent/erroring (never hang the splash).
+  // Lifting the splash right after the cursor check reveals the welcome before
+  // sharing.js has read the team hub. Wait for sharing's first sync/render so
+  // the Sharing tab (Settings) has data when opened. Timeout guards against
+  // sharing.js being absent/erroring (never hang the splash).
   function _hideSyncSplashAfterHome(instant) {
     let hidden = false;
     const doHide = () => { if (hidden) return; hidden = true; _hideSyncSplash(instant); };

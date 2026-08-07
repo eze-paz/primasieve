@@ -421,6 +421,10 @@
 
   /* ── home rendering ──────────────────────────────────────────────────── */
   let homeBusy = false, homePending = false;
+  // Settings → Sharing tab element refs (created lazily by registerSharingTab).
+  // renderHome() paints into the modal panel now — the home screen no longer
+  // hosts the shared/team lists.
+  let _shareListEl = null, _shareTotalEl = null, _shareEmptyEl = null;
   function fire() { try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {} renderHome(); }
   function subscribe(cb) { const h = () => cb(); window.addEventListener('sandpie-shares-changed', h); return () => window.removeEventListener('sandpie-shares-changed', h); }
   // One row per installed artifact: its main file. Only artifacts this device
@@ -440,11 +444,13 @@
     return out.sort((a, b) => a.title.localeCompare(b.title));
   }
   async function renderHome() {
-    if (!document.getElementById('sharedHome') || !O()) return;
+    if (!_shareListEl || !O()) return;
     if (homeBusy) { homePending = true; return; } homeBusy = true;
     try {
-      const box = document.getElementById('sharedHome');
+      const box = _shareListEl;
       const list = await acceptedList();
+      if (_shareTotalEl) _shareTotalEl.textContent = list.length + ' app' + (list.length === 1 ? '' : 's') + ' from the team hub';
+      if (_shareEmptyEl) _shareEmptyEl.style.display = list.length ? 'none' : '';
       if (!list.length) { box.innerHTML = ''; return; }
       // No remove button: an artifact leaves this list by leaving the hub.
       box.innerHTML = list.map((g, i) =>
@@ -509,8 +515,41 @@
     return out;
   }
 
+  /* ── Settings → Sharing tab ──────────────────────────────────────────── */
+  // The shared/team lists moved off the home screen into this modal tab. The
+  // tab renders once (lazy); renderHome() paints into it on every refresh.
+  function registerSharingTab() {
+    if (typeof SandpieSettings === 'undefined' || !SandpieSettings.register) return;
+    SandpieSettings.register({
+      id: 'sharing', title: 'Sharing', order: 42,
+      render(panel) {
+        panel.innerHTML = '';
+        const head = document.createElement('div');
+        head.className = 'share-head';
+        const h = document.createElement('h3'); h.textContent = 'Sharing';
+        _shareTotalEl = document.createElement('span');
+        _shareTotalEl.className = 'share-total';
+        head.append(h, _shareTotalEl);
+        const sec = document.createElement('div');
+        sec.className = 'share-sec-title'; sec.textContent = 'From the team hub (auto-synced)';
+        _shareListEl = document.createElement('ul'); _shareListEl.className = 'share-list';
+        _shareEmptyEl = document.createElement('div');
+        _shareEmptyEl.className = 'share-empty-hint';
+        _shareEmptyEl.textContent = 'Nothing shared with you yet — apps appear here automatically when a teammate publishes to the hub.';
+        panel.append(head, sec, _shareListEl, _shareEmptyEl);
+      },
+      onShow() { renderHome(); },   // refresh on every activation, not just first render
+    });
+  }
+
   /* ── boot ────────────────────────────────────────────────────────────── */
-  function boot() { renderHome(); autoSync({ full: true }); }   // first pass always reads the real listing
+  function boot() {
+    registerSharingTab();
+    renderHome(); autoSync({ full: true });
+    // First paint of the home-screen +Add badge: pins.js loads BEFORE this
+    // module, so it can't read the count at its own init — push it a change.
+    try { window.dispatchEvent(new CustomEvent('sandpie-shares-changed')); } catch (_) {}
+  }   // first pass always reads the real listing
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   const SHARE_POLL_MS = 60000;
   const pollShares = () => { autoSync(); renderHome(); };

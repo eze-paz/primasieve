@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=132">
+<link rel="stylesheet" href="sandpie.css?v=133">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -29,7 +29,7 @@ if("serviceWorker"in navigator){
   <script src="modules/core.js?v=6"></script>
   <script src="modules/config.js?v=2"></script>
   <script src="modules/languages.js?v=3"></script>
-  <script src="modules/pins.js?v=14"></script>
+  <script src="modules/pins.js?v=15"></script>
   <script src="modules/settings.js"></script>
   <script src="modules/account.js?v=5"></script>
   <script src="modules/themes.js"></script>
@@ -205,7 +205,6 @@ if("serviceWorker"in navigator){
       <!-- Home lists (pinned grid + shared/team inbox) share one centered parent,
            so they move together as a group instead of centering independently. -->
       <div id="homeCenter">
-        <div id="sharedHome" class="shared-home"></div>
       </div>
       <!-- Command output panel — MUST stay inside #messages, immediately above the
            composer. It used to be a <main> child (back when the composer was one
@@ -279,7 +278,7 @@ if("serviceWorker"in navigator){
   </div>
 </div>
   <script type="module" src="modules/context.js?v=13"></script>
-  <script src="modules/sharing.js?v=83"></script>
+  <script src="modules/sharing.js?v=84"></script>
   <script type="module" src="modules/artifacts.js?v=18"></script>
   </body>
 </html>

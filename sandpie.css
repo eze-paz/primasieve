@@ -3186,6 +3186,19 @@ body.sp-decoding *::after {
 .shared-count { margin-left: auto; font-size: 0.64rem; font-weight: 600; font-family: ui-monospace, monospace; color: var(--sp-text-dim); background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 12px; padding: 0.14rem 0.46rem; }
 .shared-list { display: flex; flex-direction: column; padding-bottom: 0.3rem; }
 .shared-pin { flex: none; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px 4px; }
+  /* Settings → Sharing tab (shared/team lists moved off the home screen) */
+  .share-head { display: flex; align-items: baseline; gap: 0.55rem; margin-bottom: 0.9rem; }
+  .share-head h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .share-total { font-size: 0.72rem; color: var(--sp-text-dim); }
+  .share-sec-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sp-text-dim); margin: 0.9rem 0 0.35rem; padding-left: 0.1rem; }
+  .share-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .share-empty-hint { font-size: 0.72rem; color: var(--sp-text-dim); opacity: 0.8; padding: 0.2rem 0.1rem; }
+  /* pinnedHome "+Add" tile — plain, like every pin tile; count rides inside the icon */
+  .pin-tile.add-tile { justify-content: center; gap: 0.25rem; background: transparent; }
+  .pin-tile.add-tile:hover { background: var(--sp-panel); }
+  .add-icon { position: relative; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; line-height: 1; color: var(--sp-accent); background: var(--sp-panel); border: 1px solid var(--sp-border); }
+  .add-icon .add-count { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--sp-accent); color: var(--sp-bg); font-size: 0.58rem; font-weight: 700; line-height: 16px; text-align: center; }
+  .add-label { font-size: 0.62rem; color: var(--sp-text); }
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
 .share-banner {

@@ -238,11 +238,36 @@
     img.src = src;
   }
 
+  /* ── always-present "+Add" tile (opens Settings → Sharing) ───────────── */
+  function buildAddTile() {
+    const tile = document.createElement('div');
+    tile.className = 'pin-tile add-tile';
+    tile.title = 'Apps from the team hub';
+    const icon = document.createElement('div');
+    icon.className = 'add-icon';
+    icon.innerHTML = '+<span class="add-count" id="addCount">0</span>';
+    const label = document.createElement('div');
+    label.className = 'add-label'; label.textContent = 'Add';
+    tile.append(icon, label);
+    tile.onclick = () => { try { if (window.SandpieSettings) SandpieSettings.open('sharing'); } catch (_) {} };
+    return tile;
+  }
+  async function refreshAddCount() {
+    const el = document.getElementById('addCount');
+    if (!el) return;
+    try {
+      if (window.SandpieSharing && SandpieSharing.acceptedList) {
+        const n = (await SandpieSharing.acceptedList()).length;
+        el.textContent = n;
+      }
+    } catch (_) {}
+  }
+
   /* ─────────────── home-screen "Pinned" list (rendered into #welcome) ─────────────── */
   function renderHome() {
     for (const u of liveThumbUrls) { try { URL.revokeObjectURL(u); } catch (_) {} }
     liveThumbUrls = [];
-    // Home lists share one centered parent (#homeCenter holds pinnedHome + sharedHome).
+    // Home lists share one centered parent (#homeCenter holds pinnedHome; the shared/team list now lives in Settings → Sharing).
     const host = document.getElementById('homeCenter') || document.getElementById('messages');
     if (!host) return;
     let box = document.getElementById('pinnedHome');
@@ -255,21 +280,18 @@
       if (typeof window.appendContent === 'function') window.appendContent(host, box);
       else host.appendChild(box);
     }
-    // The pin grid must sit ABOVE the shared/team lists. Both render into
-    // #homeCenter, so whichever painted first won — assert order on every render.
-    const shared = document.getElementById('sharedHome');
-    if (shared && (box.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_PRECEDING)) {
-      host.insertBefore(box, shared);
-    }
     const list = Pins.list();
     box.textContent = '';
     box.style.display = '';
+    const addTile = buildAddTile();
     if (!list.length) {   // composed empty state instead of a blank home
       const empty = document.createElement('div');
       empty.className = 'pin-empty';
       empty.innerHTML = '<div class="pin-empty-ghosts"><i></i><i></i><i></i></div>'
         + '<div class="pin-empty-hint">No pinned apps yet.<br>Right-click any file → <b>Pin</b> to keep it one tap away.</div>';
       box.appendChild(empty);
+      box.appendChild(addTile);
+      refreshAddCount();
       return;
     }
 
@@ -330,8 +352,10 @@
       tile.dataset.path = path;
       grid.appendChild(tile);
     }
+    grid.appendChild(buildAddTile());
     box.appendChild(grid);
     wireReorder(grid);
+    refreshAddCount();
   }
 
   /* ─────────────── drag to reorder ───────────────
@@ -420,6 +444,9 @@
     Pins.subscribe(renderHome);
     refreshFromDisk();                                  // reconcile with the synced OPFS file at boot
     window.addEventListener('focus', refreshFromDisk);  // pick up pins.json pulled from another device
+    // The +Add badge follows the team hub (sharing.js dispatches on change).
+    window.addEventListener('sandpie-shares-changed', refreshAddCount);
+    try { if (window.Sandpie && Sandpie.events && Sandpie.events.on) Sandpie.events.on('sync:done', refreshAddCount); } catch (_) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
