@@ -501,12 +501,9 @@ const SandpieMemory = (function () {
     </label>
     <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); display:block; margin-bottom:0.6rem;"></span>
     <hr style="border:none; border-top:1px solid var(--sp-border); margin:0.8rem 0;">
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt.</p>
+    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt (always the most recent 50).</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
       <input type="checkbox" id="rpEnabled" style="width:auto;"> Enable recent-paths memory
-    </label>
-    <label style="font-size:0.78rem; color:var(--sp-text-dim); margin-bottom:0.6rem;">Max paths (5–100):
-      <input type="number" id="rpCount" min="5" max="100" step="5" style="width:4rem; margin-left:0.3rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:4px; color:var(--sp-text); padding:0.15rem 0.3rem;">
     </label>
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Auto-harvest</strong> &mdash; automatically saves durable, evidence-backed facts from sessions into memory (shares the memory budget above; refined by consolidation).</p>
     <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; margin-bottom:0.4rem;">
@@ -522,14 +519,11 @@ const SandpieMemory = (function () {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
     const rpEn = panel.querySelector('#rpEnabled');
-    const rpCnt = panel.querySelector('#rpCount');
     const lsEn = panel.querySelector('#lessonsEnabled');
     if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
     if (rpEn) {
       rpEn.checked = localStorage.getItem('sandpie-recent-paths-enabled') !== 'false';
-      rpCnt.value = localStorage.getItem('sandpie-recent-paths-count') || '50';
       rpEn.addEventListener('change', () => localStorage.setItem('sandpie-recent-paths-enabled', rpEn.checked ? 'true' : 'false'));
-      rpCnt.addEventListener('change', () => { let v = parseInt(rpCnt.value, 10); if (!Number.isFinite(v) || v < 5) v = 5; if (v > 100) v = 100; rpCnt.value = v; localStorage.setItem('sandpie-recent-paths-count', String(v)); });
     }
     if (lsEn) {
       // Same localStorage key as the old lessons toggle, so an existing OFF choice
