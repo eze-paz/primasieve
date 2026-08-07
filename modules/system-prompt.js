@@ -229,7 +229,7 @@ and concisely — don't force tools where none are needed.`;
     if (_retry++ < 40) setTimeout(init, 500);   // neither host ready yet — retry
   }
 
-  return { get, set, isCustom, init };
+  return { get, set, isCustom, DEFAULT, init };
 })();
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', SandpieSystemPrompt.init);
