@@ -132,9 +132,8 @@ if("serviceWorker"in navigator){
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
     <div class="service-body">
-      <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
+      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-bottom:0.5rem;">+ New chat</button>
       <ul class="fs-list conv-list" id="convList"></ul>
-      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-top:0.5rem;">+ New chat</button>
     </div>
   </details>
 
@@ -206,6 +205,7 @@ if("serviceWorker"in navigator){
       <!-- Home lists (pinned grid + shared/team inbox) share one centered parent,
            so they move together as a group instead of centering independently. -->
       <div id="homeCenter">
+        <input type="text" id="convSearch" autocomplete="off" placeholder="Search conversations..." style="width:100%; padding:0.4rem; margin-bottom:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.85rem;">
         <div id="sharedHome" class="shared-home"></div>
       </div>
       <!-- Command output panel — MUST stay inside #messages, immediately above the
