@@ -5112,6 +5112,7 @@ function bootConversations() {
   }
   (async () => {
     await refreshConversationList();
+    refreshPaneBars();   // bar always shows on desktop from first paint — 'New chat' when no conversation is mounted
     if (activeConvId) {
       const restoreId = activeConvId;
       activeConvId = null;
