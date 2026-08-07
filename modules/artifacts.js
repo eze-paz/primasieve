@@ -484,6 +484,7 @@ async function readArtifactConsole(path) {
   const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '').replace(/^sandpie\//, '').replace(/\/+$/, '');
   const strip = (p) => String(p || '').replace(/^sandpie\//, '');
   const want = norm(path);
+  const wraps = Array.from(document.querySelectorAll('.artifact-wrap'));
   let found = null;
   // Accepted forms of the requested path: normalized, stripped-of-sandpie, and (if
   // resolvable) the resolved form — covers the legacy artifacts/ → sandpie/artifacts/
@@ -495,7 +496,7 @@ async function readArtifactConsole(path) {
       if (r) { wantForms.add(norm(r)); wantForms.add(strip(norm(r))); }
     } catch (_) {}
   }
-  for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+  for (const wrap of wraps) {
     const cur = wrap.dataset.artifactPath;
     if (!cur) continue;
     const c = norm(cur);
