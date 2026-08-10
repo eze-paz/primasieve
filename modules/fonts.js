@@ -149,6 +149,47 @@
     if (note) { note.textContent = msg; note.style.display = ''; }
   }
 
+  // ── SSO server-fonts install ────────────────────────────────────────────
+  // Users who signed in via SSO (Microsoft OIDC) get the company font package
+  // from the server once: fetch the manifest, and if the version changed,
+  // download the missing .ttf/.otf/.ttc into this user's own OPFS fonts folder
+  // (the path the converter reads at boot). Same-origin fetch carries the SSO
+  // cookie, so unauthenticated/non-SSO users simply get a 401 and skip.
+  const FONTS_VER_KEY = 'sandpie-server-fonts-ver';
+  async function ensureServerFonts() {
+    try {
+      const m = await fetch('/fonts/manifest', { headers: { Accept: 'application/json' } });
+      if (!m.ok) return;                     // 401 (no SSO) or 404 — nothing to install
+      const manifest = await m.json();
+      if (!manifest || !manifest.version) return;
+      if (manifest.version === localStorage.getItem(FONTS_VER_KEY)) return;   // already installed
+      let installed = 0;
+      for (const f of (manifest.files || [])) {
+        try {
+          const r = await fetch('/fonts/file/' + encodeURIComponent(f.name));
+          if (!r.ok) continue;
+          const bytes = new Uint8Array(await r.arrayBuffer());
+          await opfs.write(FONTS_DIR + '/' + f.name, bytes);
+          try { Sandpie.events.emit('file:changed', FONTS_DIR + '/' + f.name); } catch (_) {}
+          installed++;
+        } catch (_) {}
+      }
+      localStorage.setItem(FONTS_VER_KEY, manifest.version);
+      console.log('[fonts] installed ' + installed + ' server fonts (v' + manifest.version + ')');
+      if (listEl && listEl.isConnected) refresh();
+    } catch (_) {}
+  }
+
+  // Run after any SSO sign-in (fresh or re-auth). Also try once at boot in case
+  // the sign-in event fired before this script loaded.
+  try {
+    if (window.Sandpie && Sandpie.events && Sandpie.events.on) {
+      Sandpie.events.on('account:signedin', () => ensureServerFonts());
+    }
+  } catch (_) {}
+  if (document.readyState !== 'loading') setTimeout(ensureServerFonts, 800);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(ensureServerFonts, 800), { once: true });
+
   SandpieSettings.register({
     id: 'fonts', title: 'Fonts', order: 44,
     render(panel) {
