@@ -114,25 +114,43 @@
         groups.get(key).items.push(f);
       }
       for (const g of [...groups.values()].sort((a, b) => a.family.localeCompare(b.family))) {
-        const hli = document.createElement('li');
-        hli.className = 'font-group';
-        hli.textContent = g.family + ' · ' + g.items.length;
-        listEl.appendChild(hli);
+        // Collapsed sp-item per family (same pattern as system-prompt.js):
+        // head = family + count + caret, body = font rows, hidden until clicked.
+        const item = document.createElement('div');
+        item.className = 'sp-item';
+        const head = document.createElement('div');
+        head.className = 'sp-item-head';
+        const name = document.createElement('span');
+        name.className = 'sp-item-name'; name.textContent = g.family;
+        const meta = document.createElement('span');
+        meta.className = 'sp-item-meta'; meta.textContent = String(g.items.length);
+        const caret = document.createElement('span');
+        caret.className = 'sp-caret'; caret.textContent = '\u25b8';   // ▸ collapsed
+        head.append(name, meta, caret);
+        const body = document.createElement('div');
+        body.className = 'sp-item-body'; body.style.display = 'none';
+        item.append(head, body);
+        head.addEventListener('click', () => {
+          const open = body.style.display === 'none';
+          body.style.display = open ? '' : 'none';
+          caret.textContent = open ? '\u25be' : '\u25b8';   // ▾ / ▸
+        });
         for (const f of g.items) {
-          const li = document.createElement('li');
-          li.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
-          const name = document.createElement('span');
-          name.className = 'font-name'; name.textContent = f.name;
-          name.title = f.name + (f.family ? ' (' + f.family + ')' : '');
+          const row = document.createElement('div');
+          row.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
+          const rn = document.createElement('span');
+          rn.className = 'font-name'; rn.textContent = f.name;
+          rn.title = f.name + (f.family ? ' (' + f.family + ')' : '');
           const size = document.createElement('span');
           size.className = 'font-size'; size.textContent = fmtSize(f.size);
           const del = document.createElement('button');
           del.className = 'font-del';
-          del.textContent = '✕'; del.title = 'Delete font';
+          del.textContent = '\u2715'; del.title = 'Delete font';
           del.onclick = () => deleteFont(f.name);
-          li.append(name, size, del);
-          listEl.appendChild(li);
+          row.append(rn, size, del);
+          body.appendChild(row);
         }
+        listEl.appendChild(item);
       }
       // Non-blocking: hydrate cloud-only fonts in the background; when done it
       // re-renders with real families/sizes.
@@ -179,17 +197,13 @@
       head.className = 'share-head';
       const h = document.createElement('h3'); h.textContent = 'Fonts';
       countEl = document.createElement('span'); countEl.className = 'share-total';
-      head.append(h, countEl);
-
-      // Add-fonts action at the TOP, above the list
-      const actions = document.createElement('div');
-      actions.className = 'font-actions';
+      // Add-fonts action lives in the header row, right of the count
       const add = document.createElement('button');
-      add.className = 'act'; add.textContent = '+ Add fonts';
+      add.className = 'act font-add-btn'; add.textContent = '+ Add fonts';
       add.onclick = () => fileInput.click();
-      actions.append(add);
+      head.append(h, countEl, add);
 
-      listEl = document.createElement('ul'); listEl.className = 'font-list';
+      listEl = document.createElement('div'); listEl.className = 'font-list';
 
       const note = document.createElement('div');
       note.className = 'font-note'; note.id = 'fontNote'; note.style.display = 'none';
@@ -200,7 +214,7 @@
       fileInput.style.display = 'none';
       fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ''; };
 
-      panel.append(head, actions, listEl, note, fileInput);
+      panel.append(head, listEl, note, fileInput);
     },
     onShow() { refresh(); },
   });

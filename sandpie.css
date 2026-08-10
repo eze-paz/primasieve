@@ -3208,20 +3208,20 @@ body.sp-decoding *::after {
   .add-label { max-width: 78px; font-size: 0.72rem; line-height: 1.15; color: var(--sp-text); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Settings → Fonts tab */
   .font-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
-  .font-list li.font-group {
-    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--sp-text-dim); margin: 0.7rem 0 0.3rem; padding-left: 0.1rem;
-    background: transparent; cursor: default; border-radius: 0;
+  .font-add-btn {
+    margin-left: auto; background: var(--sp-panel); border: 1px solid var(--sp-border);
+    border-radius: 6px; color: var(--sp-text); font: 0.72rem inherit;
+    padding: 0.28rem 0.6rem; cursor: pointer; flex-shrink: 0;
   }
-  .font-list li.font-group:hover { background: transparent; }
-  .font-list li.font-group:first-child { margin-top: 0; }
+  .font-add-btn:hover { border-color: var(--sp-accent); }
+  .font-list .sp-item-body { padding: 0.3rem 0.4rem 0.45rem; }
   .font-row {
     display: flex; align-items: center; gap: 0.6rem;
-    padding: 0.42rem 0.55rem; border-radius: 6px; background: var(--sp-panel);
+    padding: 0.32rem 0.45rem; border-radius: 6px;
   }
+  .font-row:hover { background: var(--sp-border); }
   .font-row.legacy { opacity: 0.55; }
   .font-row .font-name { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .font-row .font-fam { flex-shrink: 0; font-size: 0.62rem; color: var(--sp-text-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .font-row .font-size { flex-shrink: 0; font-size: 0.62rem; color: var(--sp-text-dim); font-variant-numeric: tabular-nums; }
   .font-row .font-del {
     flex-shrink: 0; background: transparent; border: none; color: var(--sp-text-dim);
@@ -3231,12 +3231,6 @@ body.sp-decoding *::after {
   .font-row.font-empty { cursor: default; justify-content: center; color: var(--sp-text-dim); font-size: 0.75rem; padding: 1rem 0.5rem; opacity: 0.75; }
   .font-row.font-empty:hover { background: var(--sp-panel); }
   .font-note { font-size: 0.72rem; color: var(--sp-text-dim); opacity: 0.9; padding: 0.2rem 0.1rem; }
-  .font-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
-  .font-actions .act {
-    background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 6px;
-    color: var(--sp-text); font: 0.78rem inherit; padding: 0.4rem 0.7rem; cursor: pointer;
-  }
-  .font-actions .act:hover { border-color: var(--sp-accent); }
 
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
