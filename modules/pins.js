@@ -284,8 +284,14 @@
     box.textContent = '';
     box.style.display = '';
     const addTile = buildAddTile();
-    if (!list.length) {   // the always-present +Add tile IS the empty state now
-      box.appendChild(addTile);
+    // ALWAYS render a .pin-grid — the +Add tile must have a grid parent even
+    // when it is the only item (zero pins), so it lays out like a real tile.
+    const grid = document.createElement('div');
+    grid.className = 'pin-grid';
+    if (!list.length) {
+      grid.appendChild(addTile);
+      box.appendChild(grid);
+      wireReorder(grid);
       refreshAddCount();
       return;
     }
@@ -306,8 +312,6 @@
       }
       return null;
     };
-    const grid = document.createElement('div');
-    grid.className = 'pin-grid';
     for (const path of list) {
       const fname = path.split('/').pop();
       const dot = fname.lastIndexOf('.');
