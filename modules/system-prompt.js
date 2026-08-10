@@ -1,8 +1,9 @@
 /**
  * System Prompt module for Sandpie
  *
- * The chat system prompt is an editable value cached in localStorage — NOT a
- * synced or browsable OPFS file. This replaces the old OPFS `sandpie_memory.md`
+ * The chat system prompt is a FIXED base prompt (the DEFAULT literal below)
+ * plus an optional user suffix APPENDED after it, cached in localStorage — NOT
+ * a synced or browsable OPFS file. This replaces the old OPFS `sandpie_memory.md`
  * (which showed in the file browser and synced to Dropbox).
  *
  * - SandpieSystemPrompt.get() is read by conversations.js buildSystemPrompt().
@@ -49,9 +50,27 @@ and concisely — don't force tools where none are needed.`;
   const LEGACY_DEFAULT = 'You are a helpful assistant that reasons through the users requests step-by-step.';
   function forgetLegacyDefault() { try { if (localStorage.getItem(KEY) === LEGACY_DEFAULT) localStorage.removeItem(KEY); } catch (_) {} }
 
-  function get() { const v = localStorage.getItem(KEY); return (v == null || v === '') ? DEFAULT : v; }
+  // The user-editable part is an APPEND-ONLY suffix: the base prompt is a hard
+  // default and can never be replaced from the Settings modal. get() composes
+  // DEFAULT + suffix. A stored value equal to DEFAULT (an old explicit copy)
+  // counts as no suffix so the default is never duplicated.
+  function suffix() {
+    const v = localStorage.getItem(KEY);
+    if (v == null) return '';
+    const s = String(v).trim();
+    return (s && s !== DEFAULT) ? s : '';
+  }
+  function get() { const s = suffix(); return s ? DEFAULT + '\n\n' + s : DEFAULT; }
+  // Raw stored text exactly as the user typed it ('' when unset or a duplicate
+  // of DEFAULT) — what the Settings textarea shows and edits.
+  function getAppend() {
+    const v = localStorage.getItem(KEY);
+    if (v == null) return '';
+    const s = String(v).trim();
+    return (s && s !== DEFAULT) ? String(v) : '';
+  }
   function set(v) { if (v == null || String(v).trim() === '') localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(v)); }
-  function isCustom() { const v = localStorage.getItem(KEY); return v != null && v !== '' && v !== DEFAULT; }
+  function isCustom() { return suffix() !== ''; }
 
   // One-time migration off the old OPFS sandpie_memory.md. Seed the local prompt
   // from it (hydrating first if it's a dehydrated placeholder), then remove the
@@ -82,8 +101,9 @@ and concisely — don't force tools where none are needed.`;
   }
 
   const HTML = `
-        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Sets the assistant's behavior for every conversation. Stored locally in this browser only — not synced and not saved as a file.</p>
-        <textarea id="sysPromptText" rows="8" spellcheck="false" placeholder="You are a helpful assistant…" style="width:100%; resize:vertical; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font:0.82rem 'JetBrains Mono', Consolas, monospace; line-height:1.45;"></textarea>
+        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">The base system prompt is <b>fixed and cannot be edited</b> (read-only below). Anything you type in the box is <b>appended</b> to it for every conversation. Stored locally in this browser only — not synced and not saved as a file.</p>
+        <pre id="sysPromptBase" style="width:100%; max-height:10rem; overflow:auto; margin:0 0 0.5rem; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text-dim); font:0.72rem 'JetBrains Mono', Consolas, monospace; line-height:1.4; white-space:pre-wrap; word-break:break-word;"></pre>
+        <textarea id="sysPromptText" rows="6" spellcheck="false" placeholder="Append to the base prompt (optional)…" style="width:100%; resize:vertical; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font:0.82rem 'JetBrains Mono', Consolas, monospace; line-height:1.45;"></textarea>
         <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.4rem;">
           <span id="sysPromptStatus" style="font-size:0.7rem; color:var(--sp-text-dim); flex:1; min-width:0;"></span>
           <button type="button" class="ghost" id="sysPromptReset" style="font-size:0.72rem; padding:0.2rem 0.55rem;">Reset to default</button>
@@ -198,13 +218,15 @@ and concisely — don't force tools where none are needed.`;
   }
 
   function wire(panel) {
+    const base = panel.querySelector('#sysPromptBase');
+    if (base) base.textContent = DEFAULT;
     const ta = panel.querySelector('#sysPromptText');
     const resetBtn = panel.querySelector('#sysPromptReset');
     if (ta) {
-      ta.value = get();
+      ta.value = getAppend();
       ta.addEventListener('input', () => { set(ta.value); flashMsg('Saved'); });
     }
-    if (resetBtn) resetBtn.addEventListener('click', () => { set(''); if (ta) ta.value = get(); flashMsg('Reset to default'); });
+    if (resetBtn) resetBtn.addEventListener('click', () => { set(''); if (ta) ta.value = getAppend(); flashMsg('Reset to default'); });
     renderTools(panel);
     renderSkills(panel);
     const createBtn = panel.querySelector('#spSkillCreate');
@@ -229,7 +251,7 @@ and concisely — don't force tools where none are needed.`;
     if (_retry++ < 40) setTimeout(init, 500);   // neither host ready yet — retry
   }
 
-  return { get, set, isCustom, DEFAULT, init };
+  return { get, getAppend, set, isCustom, DEFAULT, init };
 })();
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', SandpieSystemPrompt.init);
