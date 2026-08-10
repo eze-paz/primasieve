@@ -111,7 +111,7 @@
           del.className = 'font-del';
           del.textContent = '\u2715'; del.title = 'Delete font';
           del.onclick = () => deleteFont(f.name);
-          row.append(rn, size, del);
+          row.append(rn, del);
           body.appendChild(row);
         }
         listEl.appendChild(item);
