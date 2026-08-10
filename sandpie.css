@@ -863,12 +863,6 @@ ul.conv-list li.active {
   }
 .shared-toggle:hover { color: var(--sp-text); background: transparent; border: none; }
 .shared { opacity: 0.55; }
-  ul.conv-list li.archived-toggle {
-    background: transparent; border: none; color: var(--sp-text-dim);
-    font: 0.7rem inherit; padding: 0.6rem 0.2rem 0.15rem; justify-content: flex-start;
-    letter-spacing: 0.04em; text-transform: uppercase;
-  }
-  ul.conv-list li.archived-toggle:hover { color: var(--sp-text-dim); background: transparent; border: none; }
   /* Settings → Archive tab (sidebar Archived row opens this modal tab) */
   .arch-head { display: flex; align-items: baseline; gap: 0.55rem; margin-bottom: 0.8rem; }
   .arch-head h3 { margin: 0; font-size: 1rem; font-weight: 600; }

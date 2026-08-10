@@ -1251,16 +1251,8 @@ async function refreshConversationList() {
     frag.appendChild(sep);
   }
   regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
-  if (archived.length) {
-    // Opens the Settings → Archive tab (modal), which owns archive management
-    // (filter/sort/search/unarchive). No inline expansion here anymore.
-    const header = document.createElement('li');
-    header.className = 'archived-toggle';
-    header.textContent = `Archived (${archived.length}) ›`;
-    header.title = 'Manage archived conversations';
-    header.onclick = () => { if (window.SandpieSettings) SandpieSettings.open('archive'); };
-    frag.appendChild(header);
-  }
+  // Archive management lives ONLY in the Settings → Archive tab (modal); the
+  // sidebar deliberately shows no archived row.
   ul.replaceChildren(frag);
 }
 function refreshSendButtonForActive() {
