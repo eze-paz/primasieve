@@ -6,7 +6,7 @@
  * (which showed in the file browser and synced to Dropbox).
  *
  * - SandpieSystemPrompt.get() is read by conversations.js buildSystemPrompt().
- * - Registers a "System prompt" section in the Settings modal (gear), with a
+ * - Registers a "System" section in the Settings modal (gear), with a
  *   sidebar (SandpieMenu) fallback.
  * - One-time migration: pull any existing sandpie_memory.md into the local
  *   prompt, then delete that file locally AND from Dropbox.
@@ -219,11 +219,11 @@ and concisely — don't force tools where none are needed.`;
     forgetLegacyDefault();
     migrate();
     if (window.SandpieSettings) {
-      SandpieSettings.register({ id: 'system-prompt', title: 'System prompt', order: 15, render(panel) { panel.innerHTML = HTML; wire(panel); }, onShow(panel) { renderSkills(panel); } });
+      SandpieSettings.register({ id: 'system-prompt', title: 'System', order: 15, render(panel) { panel.innerHTML = HTML; wire(panel); }, onShow(panel) { renderSkills(panel); } });
       return;
     }
     if (typeof SandpieMenu !== 'undefined') {
-      SandpieMenu.add('systemPromptSection', { title: 'System prompt', badge: null, open: false, html: HTML, onRender: wire });
+      SandpieMenu.add('systemPromptSection', { title: 'System', badge: null, open: false, html: HTML, onRender: wire });
       return;
     }
     if (_retry++ < 40) setTimeout(init, 500);   // neither host ready yet — retry
