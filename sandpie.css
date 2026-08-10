@@ -3206,6 +3206,32 @@ body.sp-decoding *::after {
   .pin-tile.add-tile:active .add-icon { transform: translateY(0) scale(0.96); }
   .add-icon .add-count { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--sp-accent); color: var(--sp-bg); font-size: 0.6rem; font-weight: 700; line-height: 18px; text-align: center; }
   .add-label { max-width: 78px; font-size: 0.72rem; line-height: 1.15; color: var(--sp-text); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Settings → Fonts tab */
+  .font-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .font-row {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.42rem 0.55rem; border-radius: 6px; background: var(--sp-panel);
+  }
+  .font-row.legacy { opacity: 0.55; }
+  .font-row .font-name { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .font-row .font-fam { flex-shrink: 0; font-size: 0.62rem; color: var(--sp-text-dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .font-row .font-size { flex-shrink: 0; font-size: 0.62rem; color: var(--sp-text-dim); font-variant-numeric: tabular-nums; }
+  .font-row .font-del {
+    flex-shrink: 0; background: transparent; border: none; color: var(--sp-text-dim);
+    font-size: 0.7rem; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .font-row .font-del:hover { color: var(--sp-danger); background: var(--sp-bg); }
+  .font-row.font-empty { cursor: default; justify-content: center; color: var(--sp-text-dim); font-size: 0.75rem; padding: 1rem 0.5rem; opacity: 0.75; }
+  .font-row.font-empty:hover { background: var(--sp-panel); }
+  .font-note { font-size: 0.72rem; color: var(--sp-text-dim); opacity: 0.9; padding: 0.2rem 0.1rem; }
+  .font-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+  .font-actions .act {
+    background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 6px;
+    color: var(--sp-text); font: 0.78rem inherit; padding: 0.4rem 0.7rem; cursor: pointer;
+  }
+  .font-actions .act:hover { border-color: var(--sp-accent); }
+  .font-actions .font-clean { color: var(--sp-warn); }
+  .font-actions .font-clean:hover { border-color: var(--sp-warn); }
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
 .share-banner {
