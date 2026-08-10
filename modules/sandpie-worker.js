@@ -1016,6 +1016,7 @@ async function tool_screenshot(args, ctx) {
     full_page: !!(args && args.full_page),
     wait_ms:   Math.max(0, Math.min(10000, (args && args.wait_ms) | 0)),
     live:      !!(args && args.live),
+    exact_width: !!(args && args.exact_width),
   };
 
   const id = 'shot_' + Math.random().toString(36).slice(2);

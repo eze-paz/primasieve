@@ -227,7 +227,8 @@ Typical flow:
       type: 'object',
       properties: {
         path:      { type: 'string', description: 'OPFS path of the artifact to capture (e.g. "sandpie/artifacts/report.html"). HTML or an image file. No leading slash.' },
-        width:     { type: 'integer', description: 'Viewport width in CSS pixels (default 1280). Use e.g. 375 to check the mobile layout.' },
+        width:     { type: 'integer', description: 'Viewport width in CSS pixels (default 1280). Use e.g. 375 to check the mobile layout. If the content turns out to be wider than this, the capture is automatically re-rendered wide enough to fit rather than handing you a clipped image — the result says so when that happens.' },
+        exact_width: { type: 'boolean', description: 'Disable the auto-fit above and capture at exactly "width", clipped, as a real viewport of that size would show it. Use when the width itself is what you are testing (e.g. proving a page overflows at 375px).' },
         height:    { type: 'integer', description: 'Viewport height in CSS pixels (default 800). Ignored when full_page is true.' },
         full_page: { type: 'boolean', description: 'Capture the entire scrollable height instead of just the viewport (default false).' },
         wait_ms:   { type: 'integer', description: 'Extra settle time in ms before capturing, for pages that render asynchronously (default 400, max 10000).' },

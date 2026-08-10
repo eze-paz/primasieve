@@ -50,6 +50,7 @@
   const DEFAULT_W = 1280;
   const DEFAULT_H = 800;
   const MAX_PX = 16384;          // Chrome's canvas dimension ceiling
+  const MAX_FIT_W = 4096;        // ceiling for auto-widening to fit overflowing content
 
   /* ---------------------------------------------------------------------- */
   /*  In-frame engine (stringified into the artifact via opfs.toUrl)         */
@@ -204,11 +205,18 @@
       // faithful capture: the page renders fine, it is just wider than the frame,
       // so the right edge is cut with nothing to indicate it. Report the width
       // that would actually fit rather than leaving the model to guess.
+      // Measured here, acted on by the caller: only the parent can widen the frame
+      // (layout follows the iframe's width, not the SVG's), so captureOffscreen
+      // re-renders at contentWidth rather than shipping a knowingly clipped image.
+      // The warning is the FALLBACK for surfaces that can't be resized — the side
+      // panel is the user's real window and must not be reflowed underneath them.
       const overflow = root.scrollWidth - root.clientWidth;
       if (overflow > 1) {
-        warnings.push('Content is ' + root.scrollWidth + 'px wide but was captured at ' + root.clientWidth
-          + 'px, so the right ' + overflow + 'px is CUT OFF (text near the right edge may be missing characters). '
-          + 'Re-run with width: ' + root.scrollWidth + ' to see the whole thing.');
+        warnings.push('Content is ' + root.scrollWidth + 'px wide but this capture is ' + root.clientWidth
+          + 'px, so the right ' + overflow + 'px is CUT OFF (text near the right edge may be missing characters).'
+          + (opts.liveSurface
+              ? ' This is the user\'s actual window, so it is a real horizontal-overflow problem in the page, not a capture artifact.'
+              : ' exact_width was set, so it was captured clipped as requested — drop exact_width to get a complete image.'));
       }
 
       disclose(warnings);
@@ -339,6 +347,10 @@
         width: canvas.width,
         height: canvas.height,
         warnings,
+        // What the document actually needs vs what it got. captureOffscreen uses
+        // this to re-render at a width that fits.
+        contentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
       };
     }
 
@@ -442,7 +454,9 @@
       const src = frame.getAttribute('src') || '';
       if (!src.startsWith('/files/')) continue;                      // pdf/latex frames aren't captureable
       if (!frame.contentWindow || !ensureEngine(frame.contentWindow)) continue;
-      const out = await askFrame(frame.contentWindow, opts);
+      // This is the user's real window — never reflow it to make a tidier picture.
+      // Overflow here is a genuine layout problem they are looking at, so report it.
+      const out = await askFrame(frame.contentWindow, Object.assign({}, opts, { liveSurface: true }));
       out.mode = 'side-panel';
       return out;
     }
@@ -467,7 +481,7 @@
         await sleep(120);
       }
       try {
-        const out = await askFrame(frame.contentWindow, opts);
+        const out = await askFrame(frame.contentWindow, Object.assign({}, opts, { liveSurface: true }));
         out.mode = 'conversation-frame';
         return out;
       } finally {
@@ -505,7 +519,28 @@
       // Settle window: async rendering (fetches, chart libraries, load handlers)
       // has not necessarily finished when load fires.
       await sleep(Math.min(Math.max(opts.wait_ms | 0 || 400, 0), 10000));
-      const out = await askFrame(host.contentWindow, Object.assign({}, opts, { width: W, height: opts.full_page ? 0 : H }));
+      let out = await askFrame(host.contentWindow, Object.assign({}, opts, { width: W, height: opts.full_page ? 0 : H }));
+
+      // The capture knows exactly how wide the content needed to be, so shipping a
+      // clipped image and a note telling someone else to fix it is indefensible —
+      // one more render costs ~400ms and produces a correct picture. Opt out with
+      // exact_width when the requested width IS the thing being tested.
+      const need = out.contentWidth | 0;
+      if (!opts.exact_width && need > W + 1 && need <= MAX_FIT_W) {
+        host.style.width = need + 'px';
+        await sleep(250);                     // let the reflow settle before re-asking
+        const wide = await askFrame(host.contentWindow, Object.assign({}, opts, { width: need, height: opts.full_page ? 0 : H }));
+        wide.warnings = wide.warnings || [];
+        // Don't hide what happened: a page that overflows the width it was asked
+        // for may still have a real layout bug, and only the caller knows whether
+        // that width mattered.
+        wide.warnings.unshift('AUTO-FITTED: the requested ' + W + 'px was too narrow (content needs '
+          + need + 'px), so this was re-rendered at ' + need + 'px and nothing is cut off. '
+          + 'If you were specifically testing the ' + W + 'px layout, note that at that width the right '
+          + (need - W) + 'px overflows — pass exact_width: true to capture it clipped as-is.');
+        wide.autoFitted = true;
+        out = wide;
+      }
       out.mode = 'fresh-render';
       return out;
     } finally {
