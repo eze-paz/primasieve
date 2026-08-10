@@ -109,15 +109,15 @@ and concisely — don't force tools where none are needed.`;
         </div>
 
         <div class="sp-block">
-          <div class="sp-block-head">Tools <span class="sp-count" id="spToolsCount"></span></div>
-          <div id="spToolsList"></div>
-        </div>
-
-        <div class="sp-block">
           <div class="sp-block-head">Skills <span class="sp-count" id="spSkillsCount"></span></div>
           <div id="spSkillsErrors"></div>
           <div id="spSkillsList"></div>
           <button type="button" class="ghost" id="spSkillCreate" style="font-size:0.72rem; padding:0.2rem 0.55rem; margin-top:0.4rem;">Create example skill</button>
+        </div>
+
+        <div class="sp-block">
+          <div class="sp-block-head">Tools <span class="sp-count" id="spToolsCount"></span></div>
+          <div id="spToolsList"></div>
         </div>
       `;
 
