@@ -19,7 +19,6 @@
 
 const SandpieSettings = (() => {
   const items = new Map();   // id -> { id, title, order, render, panel, navBtn, rendered }
-  let _active = null;
 
   const modalEl  = () => document.getElementById('settingsModal');
   const navEl    = () => document.getElementById('settingsNav');
@@ -63,13 +62,11 @@ const SandpieSettings = (() => {
       it.panel = panel;
       it.rendered = false;
     }
-    if (!items.has(_active)) _active = firstId();
   }
 
   function activate(id) {
     const it = items.get(id);
     if (!it) return;
-    _active = id;
     for (const other of items.values()) {
       const on = (other === it);
       if (other.panel)  other.panel.style.display = on ? '' : 'none';
@@ -90,7 +87,7 @@ const SandpieSettings = (() => {
     const m = modalEl(); if (!m) return;
     const nav = navEl();
     if (nav && !nav.childElementCount) buildNav();
-    const target = id || _active || firstId();
+    const target = id || firstId();   // no last-tab memory: bare open() always lands on the lowest-order tab
     if (target) activate(target);
     m.style.display = 'flex';
   }
