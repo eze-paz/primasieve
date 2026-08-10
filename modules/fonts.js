@@ -112,14 +112,7 @@
       countEl = document.createElement('span'); countEl.className = 'share-total';
       head.append(h, countEl);
 
-      const sec = document.createElement('div');
-      sec.className = 'share-sec-title'; sec.textContent = 'Installed (sandpie/fonts — used by the document converter)';
-
-      listEl = document.createElement('ul'); listEl.className = 'font-list';
-
-      const note = document.createElement('div');
-      note.className = 'font-note'; note.id = 'fontNote'; note.style.display = 'none';
-
+      // Add-fonts action at the TOP, above the list
       const actions = document.createElement('div');
       actions.className = 'font-actions';
       const add = document.createElement('button');
@@ -127,12 +120,18 @@
       add.onclick = () => fileInput.click();
       actions.append(add);
 
+      listEl = document.createElement('ul'); listEl.className = 'font-list';
+
+      const note = document.createElement('div');
+      note.className = 'font-note'; note.id = 'fontNote'; note.style.display = 'none';
+
+
       const fileInput = document.createElement('input');
       fileInput.type = 'file'; fileInput.accept = '.ttf,.otf,.ttc'; fileInput.multiple = true;
       fileInput.style.display = 'none';
       fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ''; };
 
-      panel.append(head, sec, listEl, note, actions, fileInput);
+      panel.append(head, actions, listEl, note, fileInput);
     },
     onShow() { refresh(); },
   });
