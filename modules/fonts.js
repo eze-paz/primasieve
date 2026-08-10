@@ -18,21 +18,56 @@
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function fmtSize(b) { if (!b && b !== 0) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
 
+  // Reliable family identifier: the font's internal 'name' table, NOT the
+  // filename. Prefer NameID 16 (typographic family), fall back to NameID 1
+  // (family). NameID 4 is the full name (e.g. "Graphik Regular") and must not
+  // be used as the group key.
+  function fontFamily(bytes) {
+    try {
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      let base = 0;
+      if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);   // 'ttcf' → first font
+      const numTables = dv.getUint16(base + 4);
+      let nameOff = 0;
+      for (let i = 0; i < numTables; i++) {
+        const rec = base + 12 + i * 16;
+        if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }   // 'name'
+      }
+      if (!nameOff) return '';
+      const count = dv.getUint16(nameOff + 2);
+      const strBase = nameOff + dv.getUint16(nameOff + 4);
+      for (const want of [16, 1]) {
+        for (let i = 0; i < count; i++) {
+          const r = nameOff + 6 + i * 12;
+          const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
+          if (nameId !== want) continue;
+          const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
+          let s = '';
+          if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
+          else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
+          s = s.replace(/\0/g, '').trim();
+          if (s) return s;
+        }
+      }
+      return '';
+    } catch (_) { return ''; }
+  }
+
   async function listFonts() {
     const names = [];
     try { names.push(...(await opfs._listFontFiles())); } catch (_) {}
     const out = [];
     for (const name of names.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
-      let size = null, fams = [];
+      let size = null, family = '';
       try {
-        // Local bytes (no forced hydration — a cloud-only font just shows as such).
-        const bytes = await opfs.readBytes(FONTS_DIR + '/' + name);
+        // Hydrate so the family is readable even for cloud-only fonts.
+        const bytes = await opfs.readBytesHydrating(FONTS_DIR + '/' + name);
         if (bytes && bytes.byteLength) {
           size = bytes.byteLength;
-          try { fams = opfs._fontFamilyNames(bytes) || []; } catch (_) {}
+          family = fontFamily(bytes);
         }
       } catch (_) {}
-      out.push({ name, size, fams, cloudOnly: size == null });
+      out.push({ name, size, family });
     }
     return out;
   }
@@ -50,23 +85,34 @@
         listEl.appendChild(li);
         return;
       }
+      // Group by internal family name; unknown-family fonts go under 'Other'.
+      const groups = new Map();
       for (const f of fonts) {
-        const li = document.createElement('li');
-        li.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
-        const name = document.createElement('span');
-        name.className = 'font-name'; name.textContent = f.name;
-        name.title = f.name;
-        const fam = document.createElement('span');
-        fam.className = 'font-fam';
-        fam.textContent = f.fams.length ? f.fams.slice(0, 2).join(' · ') : '';
-        const size = document.createElement('span');
-        size.className = 'font-size'; size.textContent = f.cloudOnly ? '' : fmtSize(f.size);
-        const del = document.createElement('button');
-        del.className = 'font-del';
-        del.textContent = '✕'; del.title = 'Delete font';
-        del.onclick = () => deleteFont(f.name);
-        li.append(name, fam, size, del);
-        listEl.appendChild(li);
+        const fam = f.family || 'Other';
+        const key = fam.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        if (!groups.has(key)) groups.set(key, { family: fam, items: [] });
+        groups.get(key).items.push(f);
+      }
+      for (const g of [...groups.values()].sort((a, b) => a.family.localeCompare(b.family))) {
+        const hli = document.createElement('li');
+        hli.className = 'font-group';
+        hli.textContent = g.family + ' · ' + g.items.length;
+        listEl.appendChild(hli);
+        for (const f of g.items) {
+          const li = document.createElement('li');
+          li.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
+          const name = document.createElement('span');
+          name.className = 'font-name'; name.textContent = f.name;
+          name.title = f.name + (f.family ? ' (' + f.family + ')' : '');
+          const size = document.createElement('span');
+          size.className = 'font-size'; size.textContent = fmtSize(f.size);
+          const del = document.createElement('button');
+          del.className = 'font-del';
+          del.textContent = '✕'; del.title = 'Delete font';
+          del.onclick = () => deleteFont(f.name);
+          li.append(name, size, del);
+          listEl.appendChild(li);
+        }
       }
     } catch (e) { console.warn('[fonts] refresh failed:', e); }
     finally { busy = false; }

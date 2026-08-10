@@ -3208,6 +3208,13 @@ body.sp-decoding *::after {
   .add-label { max-width: 78px; font-size: 0.72rem; line-height: 1.15; color: var(--sp-text); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Settings → Fonts tab */
   .font-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .font-list li.font-group {
+    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--sp-text-dim); margin: 0.7rem 0 0.3rem; padding-left: 0.1rem;
+    background: transparent; cursor: default; border-radius: 0;
+  }
+  .font-list li.font-group:hover { background: transparent; }
+  .font-list li.font-group:first-child { margin-top: 0; }
   .font-row {
     display: flex; align-items: center; gap: 0.6rem;
     padding: 0.42rem 0.55rem; border-radius: 6px; background: var(--sp-panel);
