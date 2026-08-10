@@ -17,7 +17,7 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=142">
+<link rel="stylesheet" href="sandpie.css?v=143">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -133,7 +133,7 @@ if("serviceWorker"in navigator){
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
     <div class="service-body">
-      <button class="ghost" id="newChatBtn" onclick="newConversation()" style="margin-bottom:0.5rem;">+ New chat</button>
+      <button class="ghost" id="newChatBtn" onclick="newConversation()">+ New chat</button>
       <ul class="fs-list conv-list" id="convList"></ul>
     </div>
   </details>
