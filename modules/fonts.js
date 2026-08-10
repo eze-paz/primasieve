@@ -15,88 +15,44 @@
 
   let listEl = null, countEl = null, busy = false, panelEl = null;
   // Family groups the user has EXPANDED (normalized family key → true). refresh()
-  // rebuilds the list from scratch, so without this the background hydration
-  // re-render would collapse every family the moment after you open it.
+  // rebuilds the list from scratch on every modal re-open (onShow), so without
+  // this the families would collapse every time the tab is activated.
   const _openFams = new Set();
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function fmtSize(b) { if (!b && b !== 0) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
 
-  // Reliable family identifier: the font's internal 'name' table, NOT the
-  // filename. Prefer NameID 16 (typographic family), fall back to NameID 1
-  // (family). NameID 4 is the full name (e.g. "Graphik Regular") and must not
-  // be used as the group key.
-  function fontFamily(bytes) {
-    try {
-      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      let base = 0;
-      if (dv.getUint32(0) === 0x74746366) base = dv.getUint32(12);   // 'ttcf' → first font
-      const numTables = dv.getUint16(base + 4);
-      let nameOff = 0;
-      for (let i = 0; i < numTables; i++) {
-        const rec = base + 12 + i * 16;
-        if (dv.getUint32(rec) === 0x6e616d65) { nameOff = dv.getUint32(rec + 8); break; }   // 'name'
+  // Family from the FILENAME — no byte reads, no hydration, no downloads.
+  //   GRAPHIK-BLACKITALIC.ttf      → GRAPHIK   (before the first '-')
+  //   GRAPHIKBOLD.ttf              → GRAPHIK   (strip trailing style words)
+  //   CALIBRIB / CALIBRII / …      → CALIBRI   (single-letter style suffix)
+  // Good enough to cluster a font folder into its families; not a substitute
+  // for the real name table when the naming is exotic.
+  function familyFromFilename(name) {
+    const stem = name.replace(/\.(ttf|otf|ttc)$/i, '').toUpperCase();
+    const dash = stem.indexOf('-');
+    if (dash > 0) return stem.slice(0, dash);
+    const WORDS = ['SEMIBOLD', 'BLACK', 'BOLD', 'MEDIUM', 'LIGHT', 'ITALIC', 'REGULAR'];
+    let fam = stem, changed = true;
+    while (changed && fam.length > 4) {
+      changed = false;
+      for (const w of WORDS) {
+        if (fam.length > w.length && fam.endsWith(w)) { fam = fam.slice(0, -w.length); changed = true; break; }
       }
-      if (!nameOff) return '';
-      const count = dv.getUint16(nameOff + 2);
-      const strBase = nameOff + dv.getUint16(nameOff + 4);
-      for (const want of [16, 1]) {
-        for (let i = 0; i < count; i++) {
-          const r = nameOff + 6 + i * 12;
-          const platform = dv.getUint16(r), nameId = dv.getUint16(r + 6);
-          if (nameId !== want) continue;
-          const len = dv.getUint16(r + 8), o = strBase + dv.getUint16(r + 10);
-          let s = '';
-          if (platform === 3 || platform === 0) { for (let j = 0; j + 1 < len; j += 2) s += String.fromCharCode(dv.getUint16(o + j)); }
-          else { for (let j = 0; j < len; j++) s += String.fromCharCode(dv.getUint8(o + j)); }
-          s = s.replace(/\0/g, '').trim();
-          if (s) return s;
-        }
-      }
-      return '';
-    } catch (_) { return ''; }
+    }
+    // Calibri single-letter suffixes (B/I/L/Z) — only when the base stays long
+    // enough that the bare family name survives (CALIBRI=7 must not become CALIBR).
+    if (fam.length >= 8) {
+      if (fam.endsWith('LI')) fam = fam.slice(0, -2);
+      else if (/[BILZ]$/.test(fam)) fam = fam.slice(0, -1);
+    }
+    return fam || stem;
   }
-
-  // Phase 1: read LOCAL bytes only — instant, never blocks on downloads.
-  // Phase 2 (background, parallel, time-limited): hydrate cloud-only fonts so
-  // their family/size fill in. A stuck hydration times out and the row stays
-  // under 'Other' rather than hanging the whole list.
-  const HYDRATE_TIMEOUT_MS = 8000;
 
   async function listFonts() {
     const names = [];
     try { names.push(...(await opfs._listFontFiles())); } catch (_) {}
-    const out = [];
-    for (const name of names.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
-      let size = null, family = '';
-      try {
-        const bytes = await opfs.readBytes(FONTS_DIR + '/' + name);
-        if (bytes && bytes.byteLength) { size = bytes.byteLength; family = fontFamily(bytes); }
-      } catch (_) {}
-      out.push({ name, size, family, local: size != null });
-    }
-    return out;
-  }
-
-  async function hydrateOne(f) {
-    if (f.local) return f;
-    try {
-      const bytes = await Promise.race([
-        opfs.readBytesHydrating(FONTS_DIR + '/' + f.name),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), HYDRATE_TIMEOUT_MS)),
-      ]);
-      if (bytes && bytes.byteLength) { f.size = bytes.byteLength; f.family = fontFamily(bytes); f.local = true; }
-    } catch (_) {}
-    return f;
-  }
-
-  // Fill in families/sizes for cloud-only fonts in parallel, then re-render ONCE
-  // — and only if something changed (avoids collapsing families that are open).
-  async function hydrateInBackground(fonts) {
-    const pending = fonts.filter(f => !f.local);
-    if (!pending.length) return;
-    await Promise.allSettled(pending.map(hydrateOne));
-    if (pending.some(f => f.local) && listEl && listEl.isConnected) refresh();
+    return names.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+      .map(name => ({ name, family: familyFromFilename(name) }));
   }
 
   async function refresh() {
@@ -150,9 +106,7 @@
           row.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
           const rn = document.createElement('span');
           rn.className = 'font-name'; rn.textContent = f.name;
-          rn.title = f.name + (f.family ? ' (' + f.family + ')' : '');
-          const size = document.createElement('span');
-          size.className = 'font-size'; size.textContent = fmtSize(f.size);
+          rn.title = f.name;
           const del = document.createElement('button');
           del.className = 'font-del';
           del.textContent = '\u2715'; del.title = 'Delete font';
@@ -162,9 +116,6 @@
         }
         listEl.appendChild(item);
       }
-      // Non-blocking: hydrate cloud-only fonts in the background; when done it
-      // re-renders with real families/sizes.
-      hydrateInBackground(fonts);
     } catch (e) { console.warn('[fonts] refresh failed:', e); }
     finally { busy = false; }
   }
