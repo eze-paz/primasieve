@@ -14,6 +14,10 @@
   const LEGACY_RE = /\.(OTF\.orig|OTF\.cffdisabled)$/i;   // conversion leftovers, never loaded
 
   let listEl = null, countEl = null, busy = false, panelEl = null;
+  // Family groups the user has EXPANDED (normalized family key → true). refresh()
+  // rebuilds the list from scratch, so without this the background hydration
+  // re-render would collapse every family the moment after you open it.
+  const _openFams = new Set();
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function fmtSize(b) { if (!b && b !== 0) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
@@ -86,10 +90,13 @@
     return f;
   }
 
-  // Fill in families/sizes for cloud-only fonts in parallel, then re-render once.
+  // Fill in families/sizes for cloud-only fonts in parallel, then re-render ONCE
+  // — and only if something changed (avoids collapsing families that are open).
   async function hydrateInBackground(fonts) {
-    await Promise.allSettled(fonts.filter(f => !f.local).map(hydrateOne));
-    if (listEl && listEl.isConnected) refresh();
+    const pending = fonts.filter(f => !f.local);
+    if (!pending.length) return;
+    await Promise.allSettled(pending.map(hydrateOne));
+    if (pending.some(f => f.local) && listEl && listEl.isConnected) refresh();
   }
 
   async function refresh() {
@@ -116,6 +123,8 @@
       for (const g of [...groups.values()].sort((a, b) => a.family.localeCompare(b.family))) {
         // Collapsed sp-item per family (same pattern as system-prompt.js):
         // head = family + count + caret, body = font rows, hidden until clicked.
+        const famKey = g.family.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const wasOpen = _openFams.has(famKey);
         const item = document.createElement('div');
         item.className = 'sp-item';
         const head = document.createElement('div');
@@ -125,15 +134,16 @@
         const meta = document.createElement('span');
         meta.className = 'sp-item-meta'; meta.textContent = String(g.items.length);
         const caret = document.createElement('span');
-        caret.className = 'sp-caret'; caret.textContent = '\u25b8';   // ▸ collapsed
+        caret.className = 'sp-caret'; caret.textContent = wasOpen ? '\u25be' : '\u25b8';   // ▾ / ▸
         head.append(name, meta, caret);
         const body = document.createElement('div');
-        body.className = 'sp-item-body'; body.style.display = 'none';
+        body.className = 'sp-item-body'; body.style.display = wasOpen ? '' : 'none';
         item.append(head, body);
         head.addEventListener('click', () => {
           const open = body.style.display === 'none';
           body.style.display = open ? '' : 'none';
           caret.textContent = open ? '\u25be' : '\u25b8';   // ▾ / ▸
+          if (open) _openFams.add(famKey); else _openFams.delete(famKey);
         });
         for (const f of g.items) {
           const row = document.createElement('div');
