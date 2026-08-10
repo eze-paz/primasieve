@@ -3573,7 +3573,7 @@ async function buildSystemPrompt(convMessages) {
   // literal lives in system-prompt.js (SandpieSystemPrompt.DEFAULT); the
   // fallback below only honors a stored prompt if that module somehow missed.
   let content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
-    ? SandpieSystemPrompt.get()
+    ? await SandpieSystemPrompt.get()
     : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
   // Current local time, prepended and rebuilt every turn, so the model can reason
   // about "now" (dates, staleness of recalled state, scheduling).

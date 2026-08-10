@@ -2,21 +2,24 @@
  * System Prompt module for Sandpie
  *
  * The chat system prompt is a FIXED base prompt (the DEFAULT literal below)
- * plus an optional user suffix APPENDED after it, cached in localStorage — NOT
- * a synced or browsable OPFS file. This replaces the old OPFS `sandpie_memory.md`
- * (which showed in the file browser and synced to Dropbox).
+ * plus an optional user suffix APPENDED after it. The suffix is stored in the
+ * synced OPFS file sandpie/config/system-prompt.json — visible in the file
+ * browser and synced via Dropbox — mirrored in a synchronous in-memory cache.
  *
  * - SandpieSystemPrompt.get() is read by conversations.js buildSystemPrompt().
  * - Registers a "System" section in the Settings modal (gear), with a
  *   sidebar (SandpieMenu) fallback.
- * - One-time migration: pull any existing sandpie_memory.md into the local
- *   prompt, then delete that file locally AND from Dropbox.
+ * - One-time migrations: pull any existing sandpie_memory.md into the suffix
+ *   then delete that file locally AND from Dropbox; move any localStorage
+ *   suffix into sandpie/config/system-prompt.json (the synced source of truth).
  */
 const SandpieSystemPrompt = (function () {
   'use strict';
 
-  const KEY = 'sandpie-system-prompt';
-  const MIGRATED_KEY = 'sandpie-sysprompt-migrated';
+  const KEY = 'sandpie-system-prompt';              // legacy localStorage suffix (migrated → FILE)
+  const FILE = 'sandpie/config/system-prompt.json'; // synced source of truth
+  const MIGRATED_KEY = 'sandpie-sysprompt-migrated';      // sandpie_memory.md → KEY (legacy)
+  const FILE_MIGRATED_KEY = 'sandpie-sysprompt-file-v1';  // KEY → FILE (one-time)
   const DEFAULT = `You are an agent that gets real work done with tools. You are judged by whether
 the task is actually done and verified — not by how much you explain.
 
@@ -54,23 +57,63 @@ and concisely — don't force tools where none are needed.`;
   // default and can never be replaced from the Settings modal. get() composes
   // DEFAULT + suffix. A stored value equal to DEFAULT (an old explicit copy)
   // counts as no suffix so the default is never duplicated.
-  function suffix() {
-    const v = localStorage.getItem(KEY);
-    if (v == null) return '';
-    const s = String(v).trim();
-    return (s && s !== DEFAULT) ? s : '';
+  // Storage: OPFS file sandpie/config/system-prompt.json {"text": "…"} — synced
+  // via Dropbox and visible in the file browser — mirrored into the sync
+  // _suffix cache. get()/getAppend() are async; set() writes debounced and
+  // emits file:changed so the sync provider uploads it.
+  let _suffix = '';
+  let _ready = null;   // Promise of the initial file read (null → not started / retry)
+  let _ver = 0;        // bumped on set(); guards stale reads from clobbering a newer value
+  function clean(s) { const t = String(s || '').trim(); return (t && t !== DEFAULT) ? t : ''; }
+  function readFile() {
+    return (async () => {
+      try {
+        if (!(window.opfs && opfs.readBytes)) return '';
+        const buf = await opfs.readBytes(FILE);
+        const obj = JSON.parse(new TextDecoder().decode(buf));
+        return (obj && typeof obj.text === 'string') ? obj.text : '';
+      } catch (_) { return ''; }   // missing/unparseable → no suffix
+    })();
   }
-  function get() { const s = suffix(); return s ? DEFAULT + '\n\n' + s : DEFAULT; }
+  function writeFile(text) {
+    return (async () => {
+      if (!(window.opfs && opfs.write)) return false;
+      await opfs.write(FILE, new Blob([JSON.stringify({ text })], { type: 'application/json' }));
+      if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:changed', FILE);
+      return true;
+    })();
+  }
+  function ensureLoaded() {
+    if (!_ready) {
+      _ready = (async () => {
+        const v = _ver;
+        const s = await readFile();
+        if (v === _ver) _suffix = s;          // skip if a set() landed during the read
+        if (!(window.opfs && opfs.readBytes)) { _ready = null; return ''; }  // opfs not mounted yet — retry next call
+        return s;
+      })();
+    }
+    return _ready;
+  }
+  async function get() { await ensureLoaded(); const s = clean(_suffix); return s ? DEFAULT + '\n\n' + s : DEFAULT; }
   // Raw stored text exactly as the user typed it ('' when unset or a duplicate
   // of DEFAULT) — what the Settings textarea shows and edits.
-  function getAppend() {
-    const v = localStorage.getItem(KEY);
-    if (v == null) return '';
-    const s = String(v).trim();
-    return (s && s !== DEFAULT) ? String(v) : '';
+  async function getAppend() { await ensureLoaded(); return clean(_suffix) ? _suffix : ''; }
+  function isCustom() { return clean(_suffix) !== ''; }
+  // Debounced write: the modal fires on every keystroke; persist ~350ms after
+  // the last one and flash 'Saved' only when the file write actually lands.
+  let _writeTimer = null;
+  function set(v) {
+    const text = (v == null) ? '' : String(v);
+    _ver++;
+    _suffix = text;
+    _ready = Promise.resolve(text);
+    if (_writeTimer) clearTimeout(_writeTimer);
+    _writeTimer = setTimeout(() => {
+      _writeTimer = null;
+      writeFile(text).then(() => flashMsg('Saved')).catch(() => {});
+    }, 350);
   }
-  function set(v) { if (v == null || String(v).trim() === '') localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(v)); }
-  function isCustom() { return suffix() !== ''; }
 
   // One-time migration off the old OPFS sandpie_memory.md. Seed the local prompt
   // from it (hydrating first if it's a dehydrated placeholder), then remove the
@@ -100,8 +143,25 @@ and concisely — don't force tools where none are needed.`;
     } catch (_) { /* leave MIGRATED_KEY unset → retry next load */ }
   }
 
+  // One-time migration: localStorage KEY (previous storage) → OPFS FILE. The
+  // file is now the source of truth; a legacy per-device suffix seeds it on
+  // first run, then the key is dropped. No-op once FILE_MIGRATED_KEY is set.
+  async function migrateFile() {
+    if (localStorage.getItem(FILE_MIGRATED_KEY) === '1') return;
+    try {
+      if (!(window.opfs && opfs.write)) return;   // retry next init
+      const existing = await readFile();
+      if (!existing) {
+        const stored = localStorage.getItem(KEY);
+        if (stored != null) await writeFile(stored);
+      }
+      localStorage.removeItem(KEY);
+      localStorage.setItem(FILE_MIGRATED_KEY, '1');
+    } catch (_) { /* leave FILE_MIGRATED_KEY unset → retry next load */ }
+  }
+
   const HTML = `
-        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Use this box to add your own <b>rules or persona</b> for the AI — anything you type here is <b>appended</b> to the base prompt and sent to the AI in <b>every conversation</b>. Stored locally in this browser only — not synced and not saved as a file.</p>
+        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Use this box to add your own <b>rules or persona</b> for the AI — anything you type here is <b>appended</b> to the base prompt and sent to the AI in <b>every conversation</b>.</p>
         <textarea id="sysPromptText" rows="6" spellcheck="false" placeholder="Append to the base prompt (optional)…" style="width:100%; resize:vertical; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font:0.82rem 'JetBrains Mono', Consolas, monospace; line-height:1.45;"></textarea>
         <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.4rem;">
           <span id="sysPromptStatus" style="font-size:0.7rem; color:var(--sp-text-dim); flex:1; min-width:0;"></span>
@@ -220,10 +280,11 @@ and concisely — don't force tools where none are needed.`;
     const ta = panel.querySelector('#sysPromptText');
     const resetBtn = panel.querySelector('#sysPromptReset');
     if (ta) {
-      ta.value = getAppend();
-      ta.addEventListener('input', () => { set(ta.value); flashMsg('Saved'); });
+      ta.value = _suffix;   // sync best-effort from cache…
+      ensureLoaded().then(() => { if (ta && document.activeElement !== ta) ta.value = _suffix; });   // …then exact value from the file
+      ta.addEventListener('input', () => { set(ta.value); });   // 'Saved' flashes when the debounced write lands
     }
-    if (resetBtn) resetBtn.addEventListener('click', () => { set(''); if (ta) ta.value = getAppend(); flashMsg('Reset to default'); });
+    if (resetBtn) resetBtn.addEventListener('click', () => { set(''); if (ta) ta.value = ''; flashMsg('Reset to default'); });
     renderTools(panel);
     renderSkills(panel);
     const createBtn = panel.querySelector('#spSkillCreate');
@@ -234,9 +295,20 @@ and concisely — don't force tools where none are needed.`;
   }
 
   let _retry = 0;
-  function init() {
+  async function init() {
     forgetLegacyDefault();
-    migrate();
+    try { await migrate(); } catch (_) {}
+    try { await migrateFile(); } catch (_) {}
+    ensureLoaded();   // warm the suffix cache
+    if (window.Sandpie && Sandpie.events) {
+      // Another device (or our own write) changed the file → refresh the cache.
+      Sandpie.events.on('file:changed', (p) => {
+        if (typeof p === 'string' && p === FILE) {
+          const v = _ver;
+          readFile().then(s => { if (v === _ver) { _suffix = s; _ready = Promise.resolve(s); } });
+        }
+      });
+    }
     if (window.SandpieSettings) {
       SandpieSettings.register({ id: 'system-prompt', title: 'System', order: 15, render(panel) { panel.innerHTML = HTML; wire(panel); }, onShow(panel) { renderSkills(panel); } });
       return;

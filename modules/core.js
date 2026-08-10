@@ -222,7 +222,7 @@ window.SandpieCommands = SandpieCommands;
         derived = text.slice(0, 60);
       }
       let sysContent = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
-        ? SandpieSystemPrompt.get()
+        ? await SandpieSystemPrompt.get()
         : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
       if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
         try { sysContent += SandpieMindframe.systemBlock(convMessages); } catch (_) {}
