@@ -53,6 +53,12 @@
     } catch (_) { return ''; }
   }
 
+  // Phase 1: read LOCAL bytes only — instant, never blocks on downloads.
+  // Phase 2 (background, parallel, time-limited): hydrate cloud-only fonts so
+  // their family/size fill in. A stuck hydration times out and the row stays
+  // under 'Other' rather than hanging the whole list.
+  const HYDRATE_TIMEOUT_MS = 8000;
+
   async function listFonts() {
     const names = [];
     try { names.push(...(await opfs._listFontFiles())); } catch (_) {}
@@ -60,16 +66,30 @@
     for (const name of names.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
       let size = null, family = '';
       try {
-        // Hydrate so the family is readable even for cloud-only fonts.
-        const bytes = await opfs.readBytesHydrating(FONTS_DIR + '/' + name);
-        if (bytes && bytes.byteLength) {
-          size = bytes.byteLength;
-          family = fontFamily(bytes);
-        }
+        const bytes = await opfs.readBytes(FONTS_DIR + '/' + name);
+        if (bytes && bytes.byteLength) { size = bytes.byteLength; family = fontFamily(bytes); }
       } catch (_) {}
-      out.push({ name, size, family });
+      out.push({ name, size, family, local: size != null });
     }
     return out;
+  }
+
+  async function hydrateOne(f) {
+    if (f.local) return f;
+    try {
+      const bytes = await Promise.race([
+        opfs.readBytesHydrating(FONTS_DIR + '/' + f.name),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), HYDRATE_TIMEOUT_MS)),
+      ]);
+      if (bytes && bytes.byteLength) { f.size = bytes.byteLength; f.family = fontFamily(bytes); f.local = true; }
+    } catch (_) {}
+    return f;
+  }
+
+  // Fill in families/sizes for cloud-only fonts in parallel, then re-render once.
+  async function hydrateInBackground(fonts) {
+    await Promise.allSettled(fonts.filter(f => !f.local).map(hydrateOne));
+    if (listEl && listEl.isConnected) refresh();
   }
 
   async function refresh() {
@@ -114,6 +134,9 @@
           listEl.appendChild(li);
         }
       }
+      // Non-blocking: hydrate cloud-only fonts in the background; when done it
+      // re-renders with real families/sizes.
+      hydrateInBackground(fonts);
     } catch (e) { console.warn('[fonts] refresh failed:', e); }
     finally { busy = false; }
   }
