@@ -101,8 +101,7 @@ and concisely — don't force tools where none are needed.`;
   }
 
   const HTML = `
-        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">The base system prompt is <b>fixed and cannot be edited</b> (read-only below). Anything you type in the box is <b>appended</b> to it for every conversation. Stored locally in this browser only — not synced and not saved as a file.</p>
-        <pre id="sysPromptBase" style="width:100%; max-height:10rem; overflow:auto; margin:0 0 0.5rem; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text-dim); font:0.72rem 'JetBrains Mono', Consolas, monospace; line-height:1.4; white-space:pre-wrap; word-break:break-word;"></pre>
+        <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">The base system prompt is <b>fixed and cannot be edited</b>. Anything you type in the box is <b>appended</b> to it for every conversation. Stored locally in this browser only — not synced and not saved as a file.</p>
         <textarea id="sysPromptText" rows="6" spellcheck="false" placeholder="Append to the base prompt (optional)…" style="width:100%; resize:vertical; padding:0.5rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font:0.82rem 'JetBrains Mono', Consolas, monospace; line-height:1.45;"></textarea>
         <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.4rem;">
           <span id="sysPromptStatus" style="font-size:0.7rem; color:var(--sp-text-dim); flex:1; min-width:0;"></span>
@@ -218,8 +217,6 @@ and concisely — don't force tools where none are needed.`;
   }
 
   function wire(panel) {
-    const base = panel.querySelector('#sysPromptBase');
-    if (base) base.textContent = DEFAULT;
     const ta = panel.querySelector('#sysPromptText');
     const resetBtn = panel.querySelector('#sysPromptReset');
     if (ta) {
