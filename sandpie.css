@@ -2879,6 +2879,7 @@ body.sp-decoding *::after {
   background: transparent;
   color: var(--sp-accent);
   border: 1px solid var(--sp-border);
+  border-radius: 8px;
 }
 [data-theme="clear"] aside button.ghost:hover {
   background: var(--sp-accent-dim);
