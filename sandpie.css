@@ -3230,8 +3230,7 @@ body.sp-decoding *::after {
     color: var(--sp-text); font: 0.78rem inherit; padding: 0.4rem 0.7rem; cursor: pointer;
   }
   .font-actions .act:hover { border-color: var(--sp-accent); }
-  .font-actions .font-clean { color: var(--sp-warn); }
-  .font-actions .font-clean:hover { border-color: var(--sp-warn); }
+
 .share-opt.share-pin { margin-top: 0.3rem; padding-top: 0.5rem; border-top: 1px solid var(--sp-border); font-size: 0.8rem; color: var(--sp-text-dim); }
 
 .share-banner {

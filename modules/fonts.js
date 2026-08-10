@@ -50,7 +50,6 @@
         listEl.appendChild(li);
         return;
       }
-      const legacy = fonts.filter(f => LEGACY_RE.test(f.name));
       for (const f of fonts) {
         const li = document.createElement('li');
         li.className = 'font-row' + (LEGACY_RE.test(f.name) ? ' legacy' : '');
@@ -69,8 +68,6 @@
         li.append(name, fam, size, del);
         listEl.appendChild(li);
       }
-      const clean = document.getElementById('fontLegacyClean');
-      if (clean) clean.style.display = legacy.length ? '' : 'none';
     } catch (e) { console.warn('[fonts] refresh failed:', e); }
     finally { busy = false; }
   }
@@ -80,18 +77,6 @@
     const rel = FONTS_DIR + '/' + name;
     try { await opfs.remove(rel); } catch (_) {}          // dehydrated → NotFoundError, fine
     try { Sandpie.events.emit('file:deleted', rel); } catch (_) {}  // → Dropbox delete_v2
-    await refresh();
-  }
-
-  async function cleanLegacy() {
-    const fonts = await listFonts();
-    const legacy = fonts.filter(f => LEGACY_RE.test(f.name));
-    if (!legacy.length) return;
-    if (!confirm('Remove ' + legacy.length + ' legacy backup font' + (legacy.length === 1 ? '' : 's') + ' (*.OTF.orig / *.OTF.cffdisabled)? These are conversion leftovers the app never loads.')) return;
-    for (const f of legacy) {
-      try { await opfs.remove(FONTS_DIR + '/' + f.name); } catch (_) {}
-      try { Sandpie.events.emit('file:deleted', FONTS_DIR + '/' + f.name); } catch (_) {}
-    }
     await refresh();
   }
 
@@ -140,10 +125,7 @@
       const add = document.createElement('button');
       add.className = 'act'; add.textContent = '+ Add fonts';
       add.onclick = () => fileInput.click();
-      const clean = document.createElement('button');
-      clean.className = 'act font-clean'; clean.id = 'fontLegacyClean'; clean.textContent = 'Remove legacy backups';
-      clean.onclick = () => cleanLegacy();
-      actions.append(add, clean);
+      actions.append(add);
 
       const fileInput = document.createElement('input');
       fileInput.type = 'file'; fileInput.accept = '.ttf,.otf,.ttc'; fileInput.multiple = true;
