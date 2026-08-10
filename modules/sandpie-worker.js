@@ -50,6 +50,8 @@ self.addEventListener('unhandledrejection', (ev) => {
 
 // Dropbox context pushed from the page so search (cloud leg) + hydration can call the API.
 let _dbxCtx = null;
+let _dbxTokenReq = null;          // in-flight lazy Dropbox token request (page round-trip)
+let _dbxReqSeq = 0;
 
 // Dehydrated-Dropbox state (opt-in JIT hydration). When on, the page stops
 // bulk-downloading and pushes the cloud INDEX here; files are fetched lazily on
@@ -168,6 +170,18 @@ self.addEventListener('message', async (event) => {
     _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, homeNs: data.homeNs || '', workingRoot: data.workingRoot || '' };
     _dehydrated = !!data.dehydrated;
     _pyBroadcast(data);   // keep the Pyodide pool's sync-hydrate context in step
+    return;
+  }
+
+  if (data.type === 'dbx-token-ack') {
+    // Reply to a lazy token request (tool used before the page pushed the token
+    // — first-login OAuth race). The page also posts 'dbx-token' itself when it
+    // has one; ok:false means still unconnected, so don't keep waiting.
+    if (_dbxTokenReq && _dbxTokenReq.id === data.id) {
+      clearTimeout(_dbxTokenReq.timer);
+      _dbxTokenReq.resolve(!!data.ok);
+      _dbxTokenReq = null;
+    }
     return;
   }
 
@@ -1198,6 +1212,7 @@ async function opfsCollect(startRel, { recursive = false, includeDirs = false, m
 }
 
 async function tool_read_file({ path, offset, limit }) {
+  await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (hydration)
   const norm = normFilesPath(path);
   if (!norm) return { result: 'Error: path is required.' };
   let file;
@@ -1228,6 +1243,7 @@ async function tool_read_file({ path, offset, limit }) {
 }
 
 async function tool_list_files({ path, pattern, recursive, scope }) {
+  await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet
   const rx = pattern ? globToRegExp(pattern) : null;
   const raw = (path == null) ? '' : String(path).trim();
   const connected = !!(_dbxCtx && _dbxCtx.token);
@@ -1435,6 +1451,24 @@ async function _localGrep(rx, norm, include, files_only) {
   return { buf, matches, scanned, truncated, hitFiles };
 }
 
+// Lazily obtain the Dropbox token from the page. The page pushes it once at load
+// (pushDbxTokenToSW), but on FIRST login the OAuth code exchange completes AFTER
+// that one-shot push already dead-ended on empty tokens — so without this, every
+// Dropbox-needing tool reports 'not connected' until a page reload. When the
+// worker lacks a token it asks the page (dbx-request-token -> dbx-token-ack) and
+// waits for the push; ok:false (or timeout) means truly unconnected → error out
+// as before instead of stalling.
+async function _ensureDbxCtx(timeoutMs = 4000) {
+  if (_dbxCtx && _dbxCtx.token) return true;
+  const id = ++_dbxReqSeq;
+  const p = new Promise((resolve) => {
+    _dbxTokenReq = { id, resolve, timer: setTimeout(() => resolve(false), timeoutMs) };
+  });
+  try { self.postMessage({ type: 'dbx-request-token', id }); } catch (_) {}
+  await p;
+  return !!(_dbxCtx && _dbxCtx.token);
+}
+
 // Unified search. Path-aware: inside the working root it greps local files and
 // (when dehydrated) merges Dropbox content-search hits for un-downloaded files;
 // an absolute Dropbox path OUTSIDE the working root does a pure cloud search.
@@ -1443,6 +1477,7 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
   let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
   catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
 
+  await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet
   const connected = !!(_dbxCtx && _dbxCtx.token);
   const wr = ((_dbxCtx && _dbxCtx.workingRoot) || '').replace(/\/+$/, '');
   const raw = (path == null) ? '' : String(path).trim();
@@ -1579,6 +1614,7 @@ async function _forkLocal(src, dest) {
 // "ns:<home_namespace_id>/…" path so the copy can cross namespaces server-side.
 // Only offered when Dropbox is connected (gated in tools.js toolDefs).
 async function tool_copy_to_workspace({ src, dest }) {
+  await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (cloud import)
   const from = (src == null ? '' : String(src)).trim();
   if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
   // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared-installed/…): fork in OPFS, no Dropbox needed.

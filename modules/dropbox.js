@@ -1104,7 +1104,7 @@
       return;
     }
     const t = tokens();
-    if (!t) return;
+    if (!t) { setTimeout(pushDbxTokenToSW, 1000); return; }   // first-login: keep polling until the OAuth exchange lands
     // pathRoot is now TEAM-ONLY: the worker uses it for cloud browse/search (so the
     // model can still see /R+D+I), never for workspace paths. The workspace lives in
     // the home namespace, i.e. NO header — see _dbxHeaders() in sandpie-worker.js.
@@ -1124,6 +1124,22 @@
     const worker = window._sandpieWorker;
     if (!worker) { setTimeout(pushDbxIndexToSW, 1000); return; }
     worker.postMessage({ type: 'dbx-index', index: dehydrated() ? cloudIndex() : null, exempt: EXEMPT_PREFIXES });
+  }
+  // Lazy token acquisition: when a Dropbox-needing tool runs before the page
+  // pushed the token (first-login OAuth race), the worker posts a
+  // dbx-request-token and we answer with the current token + an ack.
+  // ok:false when still unconnected — the worker errors out right away.
+  function wireTokenRequestListener() {
+    const worker = window._sandpieWorker;
+    if (!worker) { setTimeout(wireTokenRequestListener, 500); return; }
+    if (worker._dbxTokReqWired) return;
+    worker._dbxTokReqWired = true;
+    worker.addEventListener('message', (ev) => {
+      const d = ev.data; if (!d || d.type !== 'dbx-request-token') return;
+      const had = !!tokens();
+      pushDbxTokenToSW();
+      try { worker.postMessage({ type: 'dbx-token-ack', id: d.id, ok: had }); } catch (_) {}
+    });
   }
   function wireServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -1829,6 +1845,7 @@
     Sandpie.events.on('file:deleted', onFileDeleted);
     Sandpie.events.on('file:changed', onFileChanged);
     Sandpie.events.on('account:signedin', maybeAutoConnect);   // managed login → auto-connect Dropbox
+    wireTokenRequestListener();
     wireServiceWorker();
     setInterval(() => { if (!document.hidden) sync(); }, 60000);
 
@@ -1837,6 +1854,7 @@
       exchangeCode(code).then(async () => {
         history.replaceState({}, '', location.pathname);
         await ensureWorkingRoot();
+        pushDbxTokenToSW();   // worker may have missed the first-login push; deliver now
         await maybeMigrateToHome();   // MIGRATE_TO_HOME (temporary) — must precede the first sync
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
