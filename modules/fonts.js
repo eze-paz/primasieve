@@ -58,7 +58,7 @@
         name.title = f.name;
         const fam = document.createElement('span');
         fam.className = 'font-fam';
-        fam.textContent = f.fams.length ? f.fams.slice(0, 2).join(' · ') : (f.cloudOnly ? 'cloud-only' : '');
+        fam.textContent = f.fams.length ? f.fams.slice(0, 2).join(' · ') : '';
         const size = document.createElement('span');
         size.className = 'font-size'; size.textContent = f.cloudOnly ? '' : fmtSize(f.size);
         const del = document.createElement('button');
