@@ -2663,10 +2663,10 @@ function buildQuestionsView(questions, onAnswer) {
   body.className = 'ask-body';
   wrap.appendChild(body);
 
-  // --- Navigation dots ---
+  // --- Navigation dots (only appended when there are 2+ questions) ---
   const dots = document.createElement('div');
   dots.className = 'ask-dots';
-  wrap.appendChild(dots);
+  if (qs.length > 1) wrap.appendChild(dots);
 
   // --- Actions: Atrás + Siguiente/Responder ---
   const actions = document.createElement('div');
@@ -2686,12 +2686,14 @@ function buildQuestionsView(questions, onAnswer) {
     qTitle.textContent = q.question || '';
     qCount.textContent = (i + 1) + '/' + qs.length;
 
-    // Dots
+    // Dots — only when there are 2+ questions (a single question needs no progress dots)
     dots.innerHTML = '';
-    for (let j = 0; j < qs.length; j++) {
-      const dot = document.createElement('span');
-      dot.className = 'ask-dot' + (j === i ? ' active' : '') + (state.answers[j] ? ' done' : '');
-      dots.appendChild(dot);
+    if (qs.length > 1) {
+      for (let j = 0; j < qs.length; j++) {
+        const dot = document.createElement('span');
+        dot.className = 'ask-dot' + (j === i ? ' active' : '') + (state.answers[j] ? ' done' : '');
+        dots.appendChild(dot);
+      }
     }
 
     // Chips (full-width rows; recommended dashed + 'rec', default pre-selected)
@@ -2710,7 +2712,8 @@ function buildQuestionsView(questions, onAnswer) {
     html += '</div>';
     // Free text ALWAYS available (never disabled); 'Otro:' lives in the placeholder
     const prevFree = (state.answers[i] && state.answers[i]._freeText) ? state.answers[i]._freeText : '';
-    html += '<textarea class="ask-free-input" rows="1" wrap="soft" placeholder="Otro: escribe tu propia respuesta\u2026">' + tcEscape(prevFree) + '</textarea>';
+    // language-agnostic placeholder: just an ellipsis, no words
+    html += '<textarea class="ask-free-input" rows="1" wrap="soft" placeholder="\u2026">' + tcEscape(prevFree) + '</textarea>';
     html += '</div>';
     body.innerHTML = html;
 
@@ -2740,7 +2743,7 @@ function buildQuestionsView(questions, onAnswer) {
 
     // Buttons
     const isLast = i === qs.length - 1;
-    nextBtn.textContent = isLast ? 'Responder' : 'Siguiente \u2192';
+    nextBtn.textContent = isLast ? '\u2713' : '\u2192';   // ✓ respond / → next — language-agnostic
     backBtn.style.display = i === 0 ? 'none' : '';
     nextBtn.onclick = () => {
       saveAnswer(i);
@@ -2772,6 +2775,9 @@ function buildQuestionsView(questions, onAnswer) {
     saveAnswer(state.current);
     const answers = state.answers.filter(Boolean).map(a => ({ question: a.question, answer: a.answer }));
     wrap._answers = answers;
+    // Click = disappear, unconditionally: the card is removed before any worker
+    // round-trip (the summary still renders into the tool-call box afterwards).
+    wrap.remove();
     if (state.onAnswer) state.onAnswer(answers);
   }
 
