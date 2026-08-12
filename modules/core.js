@@ -207,13 +207,20 @@ window.SandpieCommands = SandpieCommands;
   SandpieCommands.register({
     name: 'copy',
     module: 'core',
-    help: 'Copy the entire conversation object to clipboard',
-    usage: '>>> copy',
-    async run() {
+    help: 'Copy the conversation object to clipboard — whole transcript by default; >>> copy active copies the active (post-compaction) transcript',
+    usage: '>>> copy [active]',
+    async run(text, parts) {
+      // '>>> copy active' ships the ACTIVE transcript: what the model actually
+      // sees after a compaction — the summary + the messages after the boundary,
+      // omitting the pre-compaction span. Mirrors buildAgentConfig() in
+      // conversations.js; the marker is duplicated here because core.js loads
+      // first as a classic script and cannot see module-scoped bindings.
+      const SUMMARY_MARKER = '[Earlier conversation auto-summarized to preserve context]';
+      const activeOnly = !!(parts && parts.length > 1 && parts[1] === 'active');
       const s = (typeof activeStream === 'function') ? activeStream() : (convStreams ? convStreams.get(activeConvId) : null);
-      const convMessages = s ? s.messages : messages;
-      if (!convMessages || !convMessages.length) return 'No active conversation to copy.';
-      const firstUser = convMessages.find(m => m.role === 'user');
+      const fullMessages = s ? s.messages : messages;
+      if (!fullMessages || !fullMessages.length) return 'No active conversation to copy.';
+      const firstUser = fullMessages.find(m => m.role === 'user');
       let derived = 'Untitled';
       if (firstUser && firstUser.content) {
         const text = typeof firstUser.content === 'string'
@@ -225,20 +232,33 @@ window.SandpieCommands = SandpieCommands;
         ? await SandpieSystemPrompt.get()
         : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
       if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
-        try { sysContent += SandpieMindframe.systemBlock(convMessages); } catch (_) {}
+        try { sysContent += SandpieMindframe.systemBlock(fullMessages); } catch (_) {}
+      }
+      const compaction = (s && s.compaction) ? s.compaction : null;
+      let messagesToCopy = fullMessages;
+      if (activeOnly && compaction && compaction.boundary > 0 && compaction.boundary < fullMessages.length) {
+        // Non-destructive compaction: the summary becomes the head message and
+        // the pre-boundary span is omitted. Boundary state is dropped from the
+        // payload because the summary is now materialized inline — the copy must
+        // round-trip as a self-contained conversation.
+        messagesToCopy = [
+          { role: 'user', content: SUMMARY_MARKER + '\n\n' + compaction.summary },
+          ...fullMessages.slice(compaction.boundary),
+        ];
       }
       const payload = {
         id: activeConvId,
         title: derived,
         updated: new Date().toISOString(),
-        messages: convMessages,
+        messages: messagesToCopy,
         systemPrompt: { role: 'system', content: sysContent },
-        compaction: s ? s.compaction : null,
+        compaction: activeOnly ? null : compaction,
       };
       const json = JSON.stringify(payload, null, 2);
       try {
         await navigator.clipboard.writeText(json);
-        return 'Copied ' + convMessages.length + ' message(s) to clipboard (' + json.length + ' chars).';
+        const label = activeOnly ? ' (active transcript)' : '';
+        return 'Copied ' + messagesToCopy.length + ' message(s)' + label + ' to clipboard (' + json.length + ' chars).';
       } catch (e) {
         return 'Clipboard error: ' + e.message;
       }
