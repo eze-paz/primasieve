@@ -1,1 +1,6 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">&#9642;</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="sandpie">
+  <rect width="32" height="32" rx="6" fill="#0F1419"/>
+  <text x="16" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="700" font-size="12">
+    <tspan fill="#3FB950">[</tspan><tspan fill="#E6EDF3">sp</tspan><tspan fill="#3FB950">]</tspan>
+  </text>
+</svg>
