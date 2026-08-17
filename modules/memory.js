@@ -548,7 +548,7 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-node { cursor:pointer; }
     #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); }
-    #${SB_SECTION_ID} .sb-new { stroke:var(--sp-success); stroke-width:1.1; }
+    #${SB_SECTION_ID} .sb-new { fill:var(--sp-success); stroke:var(--sp-success); stroke-width:1.1; }
     #${SB_SECTION_ID} .sb-lane { fill:var(--sp-accent-dim); opacity:0.30; }
     #${SB_SECTION_ID} .sb-lane-act { fill:var(--sp-accent-dim); opacity:0.65; stroke:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-lane-lbl { fill:var(--sp-text); font-size:7px; font-weight:600; font-family:Consolas,monospace; }
@@ -647,7 +647,8 @@ const SandpieMemory = (function () {
       const y0 = 8 + li * laneH, yc = y0 + laneH / 2;
       const act = k === '…rest' ? 0 : laneAct(k);
       laneBg.push(`<rect class="sb-lane${act ? ' sb-lane-act' : ''}" x="3" y="${(y0 + 1).toFixed(1)}" width="${SB_W - 6}" height="${(laneH - 2).toFixed(1)}"/>`);
-      laneBg.push(`<text class="sb-lane-lbl" x="8" y="${(yc + 2).toFixed(1)}">${_sbEsc(k === '…rest' ? '…rest' : k.replace('sandpie/', 'SP/').slice(0, 11))}${act ? ' ·' + act : ''}</text>`);
+            const lbl = k === '…rest' ? '…rest' : k.replace('sandpie/', '').slice(0, 11); // sandpie implied — show the real subdir
+      laneBg.push(`<text class="sb-lane-lbl" x="8" y="${(yc + 2).toFixed(1)}">${_sbEsc(lbl)}${act ? ' ·' + act : ''}</text>`);
       shown.forEach((i, kk) => {
         const f = facts[i], x = RIGHT - (kk + 1) * PITCH;
         const isNew = (f.created || '').slice(0, 10) === td;
