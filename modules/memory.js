@@ -761,14 +761,14 @@ const SandpieMemory = (function () {
       }
       _sbRender().then(n => { if (!_sbDetails.open) _sbStopAnim(); });
     };
-    // Count FIRST so the section can default open when there are >10 memories
-    // (and show the real badge immediately instead of '…').
+    // Count FIRST so the badge shows the real number immediately instead of '…'.
+    // The section is always open by default.
     list().then(facts => {
-      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: String(facts.length || '…'), open: facts.length > 10, onRender(body) { _sbBody = body; } });
+      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: String(facts.length || '…'), open: true, onRender(body) { _sbBody = body; } });
       _sbPlaceAboveFiles();
       wireEvents();
     }).catch(() => {
-      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: false, onRender(body) { _sbBody = body; } });
+      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: true, onRender(body) { _sbBody = body; } });
       _sbPlaceAboveFiles();
       wireEvents();
     });
