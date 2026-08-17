@@ -555,9 +555,6 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0.3rem 0.1rem; }
     #${SB_SECTION_ID} .sb-legend span { font-size:0.62rem; color:var(--sp-text-dim); display:flex; align-items:center; gap:0.25rem; }
     #${SB_SECTION_ID} .sb-legend i { width:7px; height:7px; border-radius:50%; display:inline-block; }
-    #${SB_SECTION_ID} .sb-hover { font-size:0.66rem; color:var(--sp-text-dim); min-height:2em; line-height:1.3; margin-top:0.25rem;
-      overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-    #${SB_SECTION_ID} .sb-hover b { color:var(--sp-text); font-weight:600; }
     #${SB_SECTION_ID} svg.sb-spark { width:100%; height:26px; display:block; margin-top:0.3rem; }
     #${SB_SECTION_ID} .sb-spark-line { fill:none; stroke:var(--sp-accent); stroke-width:1.2; }
     #${SB_SECTION_ID} .sb-spark-fill { fill:var(--sp-accent-dim); stroke:none; }
@@ -651,7 +648,7 @@ const SandpieMemory = (function () {
 
     // chip-rack geometry — chips fill the width (6..SB_W-6), height grows with content
     const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 84;
-    const CELL = 4.5, GAP = 3.5, PITCH = CELL + GAP;
+    const CELL = 4.5, GAP = 2.5, PITCH = CELL + GAP;
     const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - 8) / PITCH));
     let y = 8, chip_i = 0, totalH = 8;
     const chips = [];
@@ -667,7 +664,7 @@ const SandpieMemory = (function () {
       chips.push(`<rect class="sb-chip-edge" x="${(CHIP_X + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(CHIP_W - 2).toFixed(1)}" height="1"/>`);
       chips.push(`<rect class="sb-chip-notch" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="3" height="${chip_h.toFixed(1)}"/>`);
       const lbl = _sbEsc(k === 'other' ? 'other' : k.replace('sandpie/', '').slice(0, 14));
-      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 6).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
+      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
       for (let r = 0; r < nr; r++) {
         for (let c = 0; c < rows_per_chip; c++) {
           const sx = CHIP_X + LABEL_W + 4 + c * PITCH, sy = y + 2 + r * PITCH;
@@ -683,11 +680,11 @@ const SandpieMemory = (function () {
         const d = chip_i * 220 + kk * 6;
         chips.push(`<rect class="sb-cell ${cls}" data-i="${i}" x="${cx.toFixed(1)}" y="${ey.toFixed(1)}" width="${CELL.toFixed(1)}" height="${CELL.toFixed(1)}" rx="1" opacity="${op.toFixed(2)}" style="animation-delay:${d}ms"/>`);
       });
-      y += chip_h + 8;
+      y += chip_h + 2;
       chip_i++;
       totalH = y;
     });
-    totalH += 4;
+    totalH += 6;
 
     const nOn = facts.filter(f => _lastActiveNames.has(f.name)).length;
     const nOff = facts.length - nOn;
@@ -711,17 +708,16 @@ const SandpieMemory = (function () {
     _sbBody.innerHTML = `
       <svg class="sb-net" viewBox="0 0 ${SB_W} ${totalH.toFixed(1)}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
       <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>
-      <div class="sb-hover" id="sbHover"></div>
       <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
       <div class="sb-spark-lbl">last 30 days</div>`;
 
-    const hover = _sbBody.querySelector('#sbHover');
     const svg = _sbBody.querySelector('svg.sb-net');
     svg.querySelectorAll('rect.sb-cell').forEach(el => {
       const i = +el.dataset.i, f = facts[i];
       _sbNodes.push({ el, x: +el.getAttribute('x'), y: +el.getAttribute('y') });
-      el.addEventListener('mouseenter', () => { el.setAttribute('stroke', 'var(--sp-text)'); el.setAttribute('stroke-width', '0.9'); hover.innerHTML = `<b>${_sbEsc(f.name)}</b> · ${_sbEsc(f.description)}`; });
-      el.addEventListener('mouseleave', () => { el.removeAttribute('stroke'); hover.textContent = ''; });
+      el.setAttribute('title', _sbEsc(f.name) + ' — ' + _sbEsc(f.description));
+      el.addEventListener('mouseenter', () => { el.setAttribute('stroke', 'var(--sp-text)'); el.setAttribute('stroke-width', '0.9'); });
+      el.addEventListener('mouseleave', () => { el.removeAttribute('stroke'); });
       el.addEventListener('click', () => {
         if (window.SandpieFileViewer && SandpieFileViewer.open) SandpieFileViewer.open(DIR + '/' + f.file, f.file);
         else if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + f.name);
