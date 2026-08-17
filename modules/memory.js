@@ -540,9 +540,6 @@ const SandpieMemory = (function () {
   const SB_W = 240, SB_H = 170;
 
   const SB_CSS = `
-    #${SB_SECTION_ID} .sb-count { font-size:1.5rem; font-weight:600; color:var(--sp-text); line-height:1; }
-    #${SB_SECTION_ID} .sb-count-row { display:flex; align-items:baseline; gap:0.4rem; margin-bottom:0.3rem; }
-    #${SB_SECTION_ID} .sb-count-lbl { font-size:0.7rem; color:var(--sp-text-dim); }
     #${SB_SECTION_ID} .sb-today { font-size:0.65rem; color:var(--sp-success); border:1px solid var(--sp-success); border-radius:8px; padding:0 0.35rem; }
     #${SB_SECTION_ID} svg.sb-net { width:100%; height:auto; display:block; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:8px; }
     #${SB_SECTION_ID} .sb-chip { fill:var(--sp-panel); stroke:var(--sp-border); stroke-width:0.7; rx:2.5; }
@@ -555,7 +552,7 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-new { fill:var(--sp-success); }
     #${SB_SECTION_ID} .sb-c-lbl { fill:var(--sp-text-dim); font-size:8.5px; font-weight:600; letter-spacing:.05em; }
     #${SB_SECTION_ID} .sb-c-lbl-act { fill:var(--sp-accent); }
-    #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0 0.1rem; }
+    #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0.3rem 0.1rem; }
     #${SB_SECTION_ID} .sb-legend span { font-size:0.62rem; color:var(--sp-text-dim); display:flex; align-items:center; gap:0.25rem; }
     #${SB_SECTION_ID} .sb-legend i { width:7px; height:7px; border-radius:50%; display:inline-block; }
     #${SB_SECTION_ID} .sb-hover { font-size:0.66rem; color:var(--sp-text-dim); min-height:2em; line-height:1.3; margin-top:0.25rem;
@@ -712,7 +709,6 @@ const SandpieMemory = (function () {
     const linePts = cum.map((v, i) => `${sx(i)},${sy(v)}`).join(' ');
 
     _sbBody.innerHTML = `
-      <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
       <svg class="sb-net" viewBox="0 0 ${SB_W} ${totalH.toFixed(1)}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
       <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>
       <div class="sb-hover" id="sbHover"></div>
