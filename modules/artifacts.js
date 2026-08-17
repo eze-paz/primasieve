@@ -312,6 +312,11 @@ function renderArtifact(host, path) {
   // superseded check is skipped by the seq guard).
   armConsoleNoteCheck(wrap, frame, clean);
   loadArtifactFrame(wrap, frame, resolvedP, clean);
+  // New artifact just rendered: enforce the per-pane open cap. On the 4th
+  // show_artifact (or replaying a long conversation), the OLDEST open artifact
+  // collapses to its V2 card so only the newest 3 stay unminimized. Also covers
+  // historical replay: as each stored artifact re-renders, older ones collapse.
+  enforceArtifactCap(artifactPane(wrap), wrap);
 }
 
 // (Re)load an artifact's iframe from a fresh OPFS blob URL. Used both for the
@@ -402,6 +407,53 @@ function expandArtifact(wrap) {
 function toggleArtifactCollapse(wrap) {
   if (wrap.dataset.artifactCollapsed === '1') expandArtifact(wrap);
   else collapseArtifact(wrap);
+  // User expand/collapse: keep the per-pane cap. If the expand pushed the open
+  // count over the cap, auto-collapse the OLDEST open artifact (never the one
+  // the user just toggled). See enforceArtifactCap.
+  enforceArtifactCap(artifactPane(wrap), wrap);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Per-pane open-artifact cap                                                */
+/* -------------------------------------------------------------------------- */
+
+// Max unminimized artifact frames per pane (#messages / #messagesSide). When a
+// new show_artifact renders (or the user expands one) and the count would exceed
+// this, the OLDEST open artifact is auto-collapsed back to its V2 card — newest
+// N stay open. Panel-only / non-renderable artifacts have no inline frame, so
+// they never count toward the cap.
+const MAX_OPEN_ARTIFACTS_PER_PANE = 3;
+
+// Which pane a wrap lives in: 'side' (#messagesSide, the right conversation
+// panel) or 'main' (#messages). Anything not inside the side panel counts as
+// main — the cap is enforced separately per pane, so up to 2×N can be open.
+function artifactPane(wrap) {
+  return (wrap.closest && wrap.closest('#messagesSide')) ? 'side' : 'main';
+}
+
+function openArtifactFramesInPane(pane) {
+  return Array.from(document.querySelectorAll('.artifact-wrap')).filter(w =>
+    artifactPane(w) === pane &&
+    w.querySelector('.artifact-frame') &&
+    w.dataset.artifactCollapsed !== '1'
+  );
+}
+
+// Enforce the cap for a pane. keepWrap (the artifact just rendered/expanded) is
+// never a victim — it stays open, and the oldest OTHER open artifacts collapse
+// until only MAX_OPEN_ARTIFACTS_PER_PANE remain. No-op when under the cap.
+function enforceArtifactCap(pane, keepWrap) {
+  const open = openArtifactFramesInPane(pane);
+  if (open.length <= MAX_OPEN_ARTIFACTS_PER_PANE) return;
+  const ordered = open.slice().sort((a, b) =>
+    (parseInt(a.dataset.artifactCreated, 10) || 0) - (parseInt(b.dataset.artifactCreated, 10) || 0));
+  let count = open.length;
+  for (const wrap of ordered) {
+    if (count <= MAX_OPEN_ARTIFACTS_PER_PANE) break;
+    if (wrap === keepWrap) continue;
+    collapseArtifact(wrap);
+    count--;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
