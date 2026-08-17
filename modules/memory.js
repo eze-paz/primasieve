@@ -553,9 +553,9 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); opacity:0.35; }
     #${SB_SECTION_ID} .sb-new { fill:var(--sp-success); }
-    #${SB_SECTION_ID} .sb-c-lbl { fill:var(--sp-text-dim); font-size:6.5px; font-weight:500; letter-spacing:.05em; }
+    #${SB_SECTION_ID} .sb-c-lbl { fill:var(--sp-text-dim); font-size:8.5px; font-weight:600; letter-spacing:.05em; }
     #${SB_SECTION_ID} .sb-c-lbl-act { fill:var(--sp-accent); }
-    #${SB_SECTION_ID} .sb-c-ro { font-size:5.5px; text-anchor:end; font-variant-numeric:tabular-nums; }
+    #${SB_SECTION_ID} .sb-c-ro { font-size:7px; text-anchor:end; font-variant-numeric:tabular-nums; }
     #${SB_SECTION_ID} .sb-ro-act { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-ro-tot { fill:var(--sp-text-dim); }
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0 0.1rem; }
@@ -570,7 +570,7 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-spark-lbl { font-size:0.6rem; color:var(--sp-text-dim); margin-top:0.1rem; }
     #${SB_SECTION_ID} .sb-empty { font-size:0.72rem; color:var(--sp-text-dim); padding:0.4rem 0; }
     @keyframes sb-latch { 0%{opacity:0;filter:brightness(2.2)} 40%{opacity:1;filter:brightness(1.6)} 100%{opacity:1;filter:none} }
-    #${SB_SECTION_ID} .sb-cell { animation:sb-latch .3s ease-out both; }
+    #${SB_SECTION_ID} .sb-cell { animation:sb-latch .3s ease-out backwards; }
     @media (prefers-reduced-motion:reduce) { #${SB_SECTION_ID} .sb-cell { animation:none !important; } }
   `;
 
@@ -626,7 +626,7 @@ const SandpieMemory = (function () {
     }
     const td = _today();
     const newToday = facts.filter(f => (f.created || '').slice(0, 10) === td).length;
-    const G = _memGraph(facts);
+    _memGraph(facts);
     const SB_BUCKETS = ['scripts', 'skills', 'artifacts', 'modules', 'memory', 'fonts', 'conversations', 'secrets', 'config'];
     const laneOf = (f) => {
       const proj = (f.project || '').trim();
@@ -635,33 +635,44 @@ const SandpieMemory = (function () {
         const seg = p.split('/').filter(Boolean)[1] || '';
         return SB_BUCKETS.includes(seg) ? 'sandpie/' + seg : 'sandpie';
       }
-      return proj || 'other';
+      return proj;
     };
-    const lanes = {};
-    facts.forEach((f, i) => { const k = laneOf(f); (lanes[k] = lanes[k] || []).push(i); });
+    // single catch-all: facts with NO project go straight to the rest bucket
+    // (they are not a lane — merging them with the overflow lanes avoids the
+    // duplicate 'other'/'…rest' groups).
+    const lanes = {}, unassigned = [];
+    facts.forEach((f, i) => {
+      const proj = (f.project || '').trim();
+      if (!proj) { unassigned.push(i); return; }
+      const k = laneOf(f); (lanes[k] = lanes[k] || []).push(i);
+    });
     const laneAct = k => (lanes[k] || []).filter(i => _lastActiveNames.has(facts[i].name)).length;
     const laneOrder = Object.keys(lanes).sort((a, b) => (laneAct(b) ? 1 : 0) - (laneAct(a) ? 1 : 0) || lanes[b].length - lanes[a].length);
-    const top = laneOrder.slice(0, 8);
-    const rest = laneOrder.slice(8);
-    if (rest.length) top[7] = '…rest';
+    const maxNamed = unassigned.length ? 6 : 7;
+    const named = laneOrder.slice(0, maxNamed);
+    const overflow = laneOrder.slice(maxNamed);
+    const restMembers = unassigned.concat(overflow.reduce((a, r) => a.concat(lanes[r]), []));
+    const top = named.slice();
+    if (restMembers.length) top.push('…rest');
 
-    const CHIP_X = 54, CHIP_W = SB_W - 60, LABEL_W = 54, READOUT_W = 42;
-    const CELL = 4.0, GAP = 1.0, PITCH = CELL + GAP;
+    // chip-rack geometry — chips fill the width (6..SB_W-6), height grows with content
+    const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 54, READOUT_W = 42;
+    const CELL = 4.5, GAP = 1.0, PITCH = CELL + GAP;
     const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - READOUT_W - 8) / PITCH));
-    let y = 8, chip_i = 0;
+    let y = 8, chip_i = 0, totalH = 8;
     const chips = [];
-    top.forEach((k, li) => {
-      const members = (k === '…rest' ? rest.reduce((a, r) => a.concat(lanes[r]), []) : lanes[k])
+    top.forEach((k) => {
+      const members = (k === '…rest' ? restMembers : lanes[k])
         .slice().sort((a, b) => ((facts[b].last_verified || facts[b].created || '') < (facts[a].last_verified || facts[a].created || '') ? -1 : 1));
       const n = members.length;
       const nr = Math.ceil(n / rows_per_chip);
       const chip_h = 2 + nr * PITCH + 4;
       const yc = y + chip_h / 2;
-      const act = k === '…rest' ? 0 : laneAct(k);
+      const act = k === '…rest' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       chips.push(`<rect class="sb-chip" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="${CHIP_W.toFixed(1)}" height="${chip_h.toFixed(1)}"/>`);
       chips.push(`<rect class="sb-chip-edge" x="${(CHIP_X + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(CHIP_W - 2).toFixed(1)}" height="1"/>`);
       chips.push(`<rect class="sb-chip-notch" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="3" height="${chip_h.toFixed(1)}"/>`);
-      const lbl = _sbEsc(k === '…rest' ? '…rest' : k.replace('sandpie/', '').slice(0, 11));
+      const lbl = _sbEsc(k === '…rest' ? '…rest' : k.replace('sandpie/', '').slice(0, 10));
       chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 6).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
       chips.push(`<text class="sb-c-ro" x="${(CHIP_X + CHIP_W - 3).toFixed(1)}" y="${(yc + 2).toFixed(1)}"><tspan class="sb-ro-act">${act}</tspan><tspan class="sb-ro-tot">/${n}</tspan></text>`);
       for (let r = 0; r < nr; r++) {
@@ -679,8 +690,11 @@ const SandpieMemory = (function () {
         const d = chip_i * 220 + kk * 6;
         chips.push(`<rect class="sb-cell ${cls}" data-i="${i}" x="${cx.toFixed(1)}" y="${ey.toFixed(1)}" width="${CELL.toFixed(1)}" height="${CELL.toFixed(1)}" rx="1" opacity="${op.toFixed(2)}" style="animation-delay:${d}ms"/>`);
       });
-      y += chip_h + 2; chip_i++;
+      y += chip_h + 2;
+      chip_i++;
+      totalH = y;
     });
+    totalH += 4;
 
     const nOn = facts.filter(f => _lastActiveNames.has(f.name)).length;
     const nOff = facts.length - nOn;
@@ -703,9 +717,9 @@ const SandpieMemory = (function () {
 
     _sbBody.innerHTML = `
       <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
-      <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
-      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span><span style="color:var(--sp-warn)">+older</span></div>
-      <div class="sb-hover" id="sbHover">hover a memory — dimmer = older</div>
+      <svg class="sb-net" viewBox="0 0 ${SB_W} ${totalH.toFixed(1)}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
+      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>
+      <div class="sb-hover" id="sbHover"></div>
       <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
       <div class="sb-spark-lbl">last 30 days</div>`;
 
@@ -715,7 +729,7 @@ const SandpieMemory = (function () {
       const i = +el.dataset.i, f = facts[i];
       _sbNodes.push({ el, x: +el.getAttribute('x'), y: +el.getAttribute('y') });
       el.addEventListener('mouseenter', () => { el.setAttribute('stroke', 'var(--sp-text)'); el.setAttribute('stroke-width', '0.9'); hover.innerHTML = `<b>${_sbEsc(f.name)}</b> · ${_sbEsc(f.description)}`; });
-      el.addEventListener('mouseleave', () => { el.removeAttribute('stroke'); hover.textContent = 'hover a memory — dimmer = older'; });
+      el.addEventListener('mouseleave', () => { el.removeAttribute('stroke'); hover.textContent = ''; });
       el.addEventListener('click', () => {
         if (window.SandpieFileViewer && SandpieFileViewer.open) SandpieFileViewer.open(DIR + '/' + f.file, f.file);
         else if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + f.name);
