@@ -747,31 +747,23 @@ const SandpieMemory = (function () {
     const style = document.createElement('style');
     style.textContent = SB_CSS;
     document.head.appendChild(style);
-    const wireEvents = () => {
-      _sbDetails = SandpieMenu.get(SB_SECTION_ID);
-      if (_sbDetails) _sbDetails.addEventListener('toggle', _sbOnToggle);
-      document.addEventListener('visibilitychange', () => { document.visibilityState === 'visible' ? _sbStartAnim() : _sbStopAnim(); });
-      if (typeof Sandpie !== 'undefined' && Sandpie.events) {
-        Sandpie.events.on('memory:changed', () => {
-          if (_sbDetails && _sbDetails.open) _sbRender();
-          else { _sbDirty = true; list().then(f => SandpieMenu.updateBadge(SB_SECTION_ID, String(f.length || ''))).catch(() => {}); }
-        });
-        // Activation changed (a new turn promoted a different project) → re-colour.
-        Sandpie.events.on('memory:active', () => { if (_sbDetails && _sbDetails.open) _sbRender(); else _sbDirty = true; });
-      }
-      _sbRender().then(n => { if (!_sbDetails.open) _sbStopAnim(); });
-    };
-    // Count FIRST so the badge shows the real number immediately instead of '…'.
-    // The section is always open by default.
-    list().then(facts => {
-      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: String(facts.length || '…'), open: true, onRender(body) { _sbBody = body; } });
-      _sbPlaceAboveFiles();
-      wireEvents();
-    }).catch(() => {
-      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: true, onRender(body) { _sbBody = body; } });
-      _sbPlaceAboveFiles();
-      wireEvents();
-    });
+    // Add SYNCHRONOUSLY so the header is in the DOM on first paint — an async
+    // add made the whole section (header included) pop in ~1s after load.
+    // Always open by default; the real badge arrives when _sbRender finishes.
+    SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: true, onRender(body) { _sbBody = body; } });
+    _sbPlaceAboveFiles();
+    _sbDetails = SandpieMenu.get(SB_SECTION_ID);
+    if (_sbDetails) _sbDetails.addEventListener('toggle', _sbOnToggle);
+    document.addEventListener('visibilitychange', () => { document.visibilityState === 'visible' ? _sbStartAnim() : _sbStopAnim(); });
+    if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+      Sandpie.events.on('memory:changed', () => {
+        if (_sbDetails && _sbDetails.open) _sbRender();
+        else { _sbDirty = true; list().then(f => SandpieMenu.updateBadge(SB_SECTION_ID, String(f.length || ''))).catch(() => {}); }
+      });
+      // Activation changed (a new turn promoted a different project) → re-colour.
+      Sandpie.events.on('memory:active', () => { if (_sbDetails && _sbDetails.open) _sbRender(); else _sbDirty = true; });
+    }
+    _sbRender().then(() => { if (!_sbDetails.open) _sbStopAnim(); });
   }
 
   // Recompute the activated set from a conversation's context WITHOUT building
