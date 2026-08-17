@@ -2731,6 +2731,16 @@ function buildQuestionsView(questions, onAnswer) {
       };
       grow();
       freeInput.addEventListener('input', () => { saveAnswer(i); grow(); });
+
+      // Enter submits the current answer (Shift+Enter = newline). Mirrors the
+      // next/check button: on the last question this responds and closes the card.
+      freeInput.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' || ev.shiftKey) return;
+        ev.preventDefault();
+        saveAnswer(i);
+        if (isLast) returnAnswers();
+        else { state.current++; renderQuestion(); }
+      });
     }
 
     // Buttons
