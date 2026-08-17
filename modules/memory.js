@@ -548,9 +548,11 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-node { cursor:pointer; }
     #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); }
-    #${SB_SECTION_ID} .sb-edge { stroke:var(--sp-border-bright); stroke-width:0.7; opacity:0.6; }
-    #${SB_SECTION_ID} .sb-edge.sb-link { stroke:var(--sp-accent); opacity:0.5; }
-    #${SB_SECTION_ID} .sb-new { stroke:var(--sp-accent); stroke-width:1.2; }
+    #${SB_SECTION_ID} .sb-new { stroke:var(--sp-success); stroke-width:1.1; }
+    #${SB_SECTION_ID} .sb-lane { fill:var(--sp-accent-dim); opacity:0.30; }
+    #${SB_SECTION_ID} .sb-lane-act { fill:var(--sp-accent-dim); opacity:0.65; stroke:var(--sp-accent); }
+    #${SB_SECTION_ID} .sb-lane-lbl { fill:var(--sp-text); font-size:7px; font-weight:600; font-family:Consolas,monospace; }
+    #${SB_SECTION_ID} .sb-lane-over { fill:var(--sp-warn); font-size:6px; font-weight:600; font-family:Consolas,monospace; text-anchor:end; }
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0 0.1rem; }
     #${SB_SECTION_ID} .sb-legend span { font-size:0.62rem; color:var(--sp-text-dim); display:flex; align-items:center; gap:0.25rem; }
     #${SB_SECTION_ID} .sb-legend i { width:7px; height:7px; border-radius:50%; display:inline-block; }
@@ -578,14 +580,8 @@ const SandpieMemory = (function () {
 
   function _sbRunning() { return !!(_sbDetails && _sbDetails.open && document.visibilityState === 'visible' && _sbNodes.length); }
   function _sbTick() {
+    // flat 2D databank — no float/bob animation (it made the graph read as 3D)
     _sbRaf = 0;
-    if (!_sbRunning()) return;
-    _sbT += 0.025;
-    for (const n of _sbNodes) {
-      n.el.setAttribute('cy', (n.y + Math.sin(_sbT + n.phase) * 1.5).toFixed(2));
-      if (n.isNew) n.el.setAttribute('fill-opacity', (0.55 + 0.45 * (Math.sin(_sbT * 2 + n.phase) + 1) / 2).toFixed(2));
-    }
-    _sbRaf = requestAnimationFrame(_sbTick);
   }
   function _sbStartAnim() { if (!_sbRaf && _sbRunning()) _sbRaf = requestAnimationFrame(_sbTick); }
   function _sbStopAnim() { if (_sbRaf) { cancelAnimationFrame(_sbRaf); _sbRaf = 0; } }
@@ -598,6 +594,16 @@ const SandpieMemory = (function () {
   // by component ("sections": riscv, sandpie, tecnec, …); colour still encodes type.
   const _memGraph = _clusterFacts;
 
+  function _sbAgeOp(f) {
+    const ref = Date.parse(f.last_verified || f.created || '');
+    if (!Number.isFinite(ref)) return 0.4;
+    const d = Math.floor((Date.now() - ref) / 86400000);
+    if (d <= 1) return 1; if (d <= 7) return 0.88; if (d <= 30) return 0.72; if (d <= 90) return 0.58; return 0.42;
+  }
+
+  // LANES databank: one row per project (active projects first, highlighted); the
+  // newest MAX blocks per lane are right-aligned; '+N' badges the overflow. Flat 2D,
+  // no edges, no time axis. Block colour = state, opacity = verification age.
   async function _sbRender() {
     if (!_sbBody) return;
     _sbDirty = false;
@@ -607,37 +613,52 @@ const SandpieMemory = (function () {
     try { facts = await list(); } catch (_) {}
     if (typeof SandpieMenu !== 'undefined') SandpieMenu.updateBadge(SB_SECTION_ID, String(facts.length || ''));
     if (!facts.length) {
-      _sbBody.innerHTML = `<div class="sb-empty">No memories yet — sandpie saves durable facts as you work, and they'll appear here as a growing constellation.</div>`;
+      _sbBody.innerHTML = `<div class="sb-empty">No memories yet — sandpie saves durable facts as you work, and they'll appear here as a databank.</div>`;
       return;
     }
     const td = _today();
     const newToday = facts.filter(f => (f.created || '').slice(0, 10) === td).length;
-    // Layout by PATH-COMPONENT: each multi-member component gets a center (golden-angle
-    // spiral, radius grows with index so big clusters sit central); singletons ring the
-    // border. Colour still encodes type; position now encodes shared-file neighbourhood.
     const G = _memGraph(facts);
-    const multiCis = G.comps.map((g, ci) => ({ g, ci })).filter(x => x.g.length >= 2);
-    const centerByCi = {};
-    multiCis.forEach((x, k) => {
-      const ang = k * 2.3999632;
-      const rad = 0.14 + 0.32 * Math.sqrt(k / Math.max(1, multiCis.length - 1 || 1));
-      centerByCi[x.ci] = { x: SB_W * (0.5 + Math.cos(ang) * rad), y: SB_H * (0.5 + Math.sin(ang) * rad * 0.82) };
+    // lane key: stored project, or sandpie bucketed by its first path segment
+    const SB_BUCKETS = ['scripts', 'skills', 'artifacts', 'modules', 'memory', 'fonts', 'conversations', 'secrets', 'config'];
+    const laneOf = (f) => {
+      const proj = (f.project || '').trim();
+      if (proj === 'sandpie') {
+        const p = _parsePaths(f)[0] || '';
+        const seg = p.split('/').filter(Boolean)[1] || '';
+        return SB_BUCKETS.includes(seg) ? 'sandpie/' + seg : 'sandpie';
+      }
+      return proj || 'other';
+    };
+    const lanes = {};
+    facts.forEach((f, i) => { const k = laneOf(f); (lanes[k] = lanes[k] || []).push(i); });
+    const laneAct = k => (lanes[k] || []).filter(i => _lastActiveNames.has(facts[i].name)).length;
+    const laneOrder = Object.keys(lanes).sort((a, b) => (laneAct(b) ? 1 : 0) - (laneAct(a) ? 1 : 0) || lanes[b].length - lanes[a].length);
+    const top = laneOrder.slice(0, 8);
+    const rest = laneOrder.slice(8);
+    if (rest.length) top[7] = '…rest';
+    const MAX = 12, BLK = 4.8, PITCH = 6.4, RIGHT = SB_W - 5;
+    const laneH = (SB_H - 14) / top.length;
+    const laneBg = [], laneBlk = [];
+    top.forEach((k, li) => {
+      const members = (k === '…rest' ? rest.reduce((a, r) => a.concat(lanes[r]), []) : lanes[k])
+        .slice().sort((a, b) => ((facts[b].last_verified || facts[b].created || '') < (facts[a].last_verified || facts[a].created || '') ? -1 : 1));
+      const shown = members.slice(0, MAX), overflow = members.length - shown.length;
+      const y0 = 8 + li * laneH, yc = y0 + laneH / 2;
+      const act = k === '…rest' ? 0 : laneAct(k);
+      laneBg.push(`<rect class="sb-lane${act ? ' sb-lane-act' : ''}" x="3" y="${(y0 + 1).toFixed(1)}" width="${SB_W - 6}" height="${(laneH - 2).toFixed(1)}"/>`);
+      laneBg.push(`<text class="sb-lane-lbl" x="8" y="${(yc + 2).toFixed(1)}">${_sbEsc(k === '…rest' ? '…rest' : k.replace('sandpie/', 'SP/').slice(0, 11))}${act ? ' ·' + act : ''}</text>`);
+      shown.forEach((i, kk) => {
+        const f = facts[i], x = RIGHT - (kk + 1) * PITCH;
+        const isNew = (f.created || '').slice(0, 10) === td;
+        const cls = (isNew ? 'sb-new' : (_lastActiveNames.has(f.name) ? 'sb-active' : 'sb-inactive'));
+        const op = _sbAgeOp(f);
+        laneBlk.push(`<rect class="sb-node ${cls}" data-i="${i}" x="${x.toFixed(1)}" y="${(yc - BLK / 2).toFixed(1)}" width="${BLK}" height="${BLK}" opacity="${op.toFixed(2)}"/>`);
+      });
+      if (overflow > 0) laneBg.push(`<text class="sb-lane-over" x="${(RIGHT - (shown.length + 0.6) * PITCH).toFixed(1)}" y="${(yc + 1.5).toFixed(1)}">+${overflow}</text>`);
     });
-    const pos = facts.map((f, i) => {
-      const ci = G.compOf[i], sz = G.comps[ci].length, h = _sbHash(f.name);
-      const a = _sbRand01(h, 1) * Math.PI * 2;
-      let cx, cy, spread;
-      const ctr = centerByCi[ci];
-      if (ctr) { cx = ctr.x; cy = ctr.y; spread = 5 + Math.min(24, sz * 1.5); }
-      else { const ba = (h % 360) * Math.PI / 180; cx = SB_W * (0.5 + Math.cos(ba) * 0.46); cy = SB_H * (0.5 + Math.sin(ba) * 0.44); spread = 4; }
-      const r = _sbRand01(h, 2) * spread;
-      const isCluster = f.name.endsWith('-cluster');
-      return { f, x: Math.min(SB_W - 6, Math.max(6, cx + Math.cos(a) * r)), y: Math.min(SB_H - 6, Math.max(6, cy + Math.sin(a) * r * 0.8)), s: isCluster ? 4.5 : 1.8 + _sbRand01(h, 3) * 1.8, isCluster };
-    });
-    // Edges = shared canonical path; strong (≥2 shared files) drawn in accent.
-    const edges = G.edges.map(([i, j, w]) => [i, j, w >= 2]);
-    const edgeSvg = edges.map(([i, j, isLink]) => `<line class="sb-edge${isLink ? ' sb-link' : ''}" x1="${pos[i].x.toFixed(1)}" y1="${pos[i].y.toFixed(1)}" x2="${pos[j].x.toFixed(1)}" y2="${pos[j].y.toFixed(1)}"/>`).join('');
-    const nodeSvg = pos.map((p, i) => { const isNew = (p.f.created || '').slice(0, 10) === td; const cls = (_lastActiveNames.has(p.f.name) ? 'sb-active' : 'sb-inactive') + (p.isCluster ? ' sb-cluster' : '') + (isNew ? ' sb-new' : ''); return `<circle class="sb-node ${cls}" data-i="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p.s.toFixed(1)}"/>`; }).join('');
+    const nOn = facts.filter(f => _lastActiveNames.has(f.name)).length;
+    const nOff = facts.length - nOn;
     const now = Date.now();
     const counts = new Array(30).fill(0);
     let before = 0;
@@ -656,21 +677,21 @@ const SandpieMemory = (function () {
     const linePts = cum.map((v, i) => `${sx(i)},${sy(v)}`).join(' ');
     _sbBody.innerHTML = `
       <div class="sb-count-row"><span class="sb-count" id="sbCount">${facts.length}</span>${newToday ? `<span class="sb-today">+${newToday} today</span>` : ''}</div>
-      <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Constellation of ${facts.length}">${edgeSvg}${nodeSvg}</svg>
-      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>activated</span><span><i style="background:var(--sp-text-dim)"></i>deactivated</span></div>
-      <div class="sb-hover" id="sbHover">hover a memory</div>
+      <svg class="sb-net" viewBox="0 0 ${SB_W} ${SB_H}" role="img" aria-label="Memory databank of ${facts.length}">${laneBg.join('')}${laneBlk.join('')}</svg>
+      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span><span style="color:var(--sp-warn)">+older</span></div>
+      <div class="sb-hover" id="sbHover">hover a memory — dimmer = older</div>
       <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
       <div class="sb-spark-lbl">last 30 days</div>`;
     const hover = _sbBody.querySelector('#sbHover');
     const svg = _sbBody.querySelector('svg.sb-net');
-    svg.querySelectorAll('circle.sb-node').forEach(el => {
-      const i = +el.dataset.i, p = pos[i];
-      _sbNodes.push({ el, x: p.x, y: p.y, phase: _sbRand01(_sbHash(p.f.name), 4) * Math.PI * 2, isNew: el.classList.contains('sb-new') });
-      el.addEventListener('mouseenter', () => { el.setAttribute('r', (p.s * 1.9).toFixed(1)); hover.innerHTML = `<b>${_sbEsc(p.f.name)}</b> · ${_sbEsc(p.f.description)}`; });
-      el.addEventListener('mouseleave', () => { el.setAttribute('r', p.s.toFixed(1)); hover.textContent = 'hover a memory'; });
+    svg.querySelectorAll('rect.sb-node').forEach(el => {
+      const i = +el.dataset.i, f = facts[i];
+      _sbNodes.push({ el, x: +el.getAttribute('x'), y: +el.getAttribute('y') });
+      el.addEventListener('mouseenter', () => { el.setAttribute('stroke', 'var(--sp-text)'); el.setAttribute('stroke-width', '0.9'); hover.innerHTML = `<b>${_sbEsc(f.name)}</b> · ${_sbEsc(f.description)}`; });
+      el.addEventListener('mouseleave', () => { el.removeAttribute('stroke'); hover.textContent = 'hover a memory — dimmer = older'; });
       el.addEventListener('click', () => {
-        if (window.SandpieFileViewer && SandpieFileViewer.open) SandpieFileViewer.open(DIR + '/' + p.f.file, p.f.file);
-        else if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + p.f.name);
+        if (window.SandpieFileViewer && SandpieFileViewer.open) SandpieFileViewer.open(DIR + '/' + f.file, f.file);
+        else if (typeof SandpieCommands !== 'undefined' && SandpieCommands.dispatch) SandpieCommands.dispatch('>>> memory show ' + f.name);
       });
     });
     _sbStartAnim();
