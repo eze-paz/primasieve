@@ -654,7 +654,7 @@ const SandpieMemory = (function () {
 
     // chip-rack geometry — chips fill the width (6..SB_W-6), height grows with content
     const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 84;
-    const CELL = 4.5, GAP = 2.5, PITCH = CELL + GAP;
+    const CELL = 4.5, GAP = 3.5, PITCH = CELL + GAP;
     const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - 8) / PITCH));
     let y = 8, chip_i = 0, totalH = 8;
     const chips = [];
@@ -686,7 +686,7 @@ const SandpieMemory = (function () {
         const d = chip_i * 220 + kk * 6;
         chips.push(`<rect class="sb-cell ${cls}" data-i="${i}" x="${cx.toFixed(1)}" y="${ey.toFixed(1)}" width="${CELL.toFixed(1)}" height="${CELL.toFixed(1)}" rx="1" opacity="${op.toFixed(2)}" style="animation-delay:${d}ms"/>`);
       });
-      y += chip_h + 2;
+      y += chip_h + 8;
       chip_i++;
       totalH = y;
     });
