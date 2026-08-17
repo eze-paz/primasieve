@@ -555,9 +555,6 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-new { fill:var(--sp-success); }
     #${SB_SECTION_ID} .sb-c-lbl { fill:var(--sp-text-dim); font-size:8.5px; font-weight:600; letter-spacing:.05em; }
     #${SB_SECTION_ID} .sb-c-lbl-act { fill:var(--sp-accent); }
-    #${SB_SECTION_ID} .sb-c-ro { font-size:7px; text-anchor:end; font-variant-numeric:tabular-nums; }
-    #${SB_SECTION_ID} .sb-ro-act { fill:var(--sp-accent); }
-    #${SB_SECTION_ID} .sb-ro-tot { fill:var(--sp-text-dim); }
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0 0.1rem; }
     #${SB_SECTION_ID} .sb-legend span { font-size:0.62rem; color:var(--sp-text-dim); display:flex; align-items:center; gap:0.25rem; }
     #${SB_SECTION_ID} .sb-legend i { width:7px; height:7px; border-radius:50%; display:inline-block; }
@@ -639,7 +636,7 @@ const SandpieMemory = (function () {
     };
     // single catch-all: facts with NO project go straight to the rest bucket
     // (they are not a lane — merging them with the overflow lanes avoids the
-    // duplicate 'other'/'…rest' groups).
+    // one catch-all group).
     const lanes = {}, unassigned = [];
     facts.forEach((f, i) => {
       const proj = (f.project || '').trim();
@@ -653,28 +650,27 @@ const SandpieMemory = (function () {
     const overflow = laneOrder.slice(maxNamed);
     const restMembers = unassigned.concat(overflow.reduce((a, r) => a.concat(lanes[r]), []));
     const top = named.slice();
-    if (restMembers.length) top.push('…rest');
+    if (restMembers.length) top.push('other');
 
     // chip-rack geometry — chips fill the width (6..SB_W-6), height grows with content
-    const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 54, READOUT_W = 42;
-    const CELL = 4.5, GAP = 1.0, PITCH = CELL + GAP;
-    const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - READOUT_W - 8) / PITCH));
+    const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 84;
+    const CELL = 4.5, GAP = 2.5, PITCH = CELL + GAP;
+    const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - 8) / PITCH));
     let y = 8, chip_i = 0, totalH = 8;
     const chips = [];
     top.forEach((k) => {
-      const members = (k === '…rest' ? restMembers : lanes[k])
+      const members = (k === 'other' ? restMembers : lanes[k])
         .slice().sort((a, b) => ((facts[b].last_verified || facts[b].created || '') < (facts[a].last_verified || facts[a].created || '') ? -1 : 1));
       const n = members.length;
       const nr = Math.ceil(n / rows_per_chip);
       const chip_h = 2 + nr * PITCH + 4;
       const yc = y + chip_h / 2;
-      const act = k === '…rest' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
+      const act = k === 'other' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       chips.push(`<rect class="sb-chip" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="${CHIP_W.toFixed(1)}" height="${chip_h.toFixed(1)}"/>`);
       chips.push(`<rect class="sb-chip-edge" x="${(CHIP_X + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(CHIP_W - 2).toFixed(1)}" height="1"/>`);
       chips.push(`<rect class="sb-chip-notch" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="3" height="${chip_h.toFixed(1)}"/>`);
-      const lbl = _sbEsc(k === '…rest' ? '…rest' : k.replace('sandpie/', '').slice(0, 10));
+      const lbl = _sbEsc(k === 'other' ? 'other' : k.replace('sandpie/', '').slice(0, 14));
       chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 6).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
-      chips.push(`<text class="sb-c-ro" x="${(CHIP_X + CHIP_W - 3).toFixed(1)}" y="${(yc + 2).toFixed(1)}"><tspan class="sb-ro-act">${act}</tspan><tspan class="sb-ro-tot">/${n}</tspan></text>`);
       for (let r = 0; r < nr; r++) {
         for (let c = 0; c < rows_per_chip; c++) {
           const sx = CHIP_X + LABEL_W + 4 + c * PITCH, sy = y + 2 + r * PITCH;
