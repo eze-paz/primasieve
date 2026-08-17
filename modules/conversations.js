@@ -724,6 +724,8 @@ function mountConv(convId, pane = null) {
   }
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+  // Active conversation changed → re-colour the memory bank immediately.
+  if (convId) _recalcMemoryFor(convId);
 }
 /* ---- harness-reminder note visibility (drift / no-plan / stop guard) ----- */
 // The agentic loop emits `reminder` events when its guards fire. They are never
@@ -854,6 +856,23 @@ registerRewindCommand();
 registerDriftCommand();
 registerMetacogCommand();
 
+// Recompute which memories are active/standby immediately after the active
+// conversation changes — send-time systemBlock() only recalculates on submit.
+// Builds the same ctx as buildSystemPrompt (last user message + this
+// conversation's touched files) and asks memory.js to re-colour without
+// building the prompt block.
+function _recalcMemoryFor(id) {
+  try {
+    if (typeof SandpieMemory === 'undefined' || !SandpieMemory.refreshActive) return;
+    const st = ensureStream(id);
+    const msgs = (st && st.messages) || [];
+    const lastUser = [...msgs].reverse().find(m => m && m.role === 'user');
+    const c = lastUser && lastUser.content;
+    const ctx = { message: typeof c === 'string' ? c : (Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '') };
+    try { if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths) ctx.paths = SandpieAugmentations.getConvPaths(id); } catch (_) {}
+    SandpieMemory.refreshActive(ctx);
+  } catch (_) {}
+}
 async function loadConv(id) {
   if (id === activeConvId) return;
 
@@ -900,6 +919,7 @@ async function loadConv(id) {
       // the stream — wiping the history and re-triggering a full cold load on
       // the next visit. Only when this conv is still the active one.
       if (activeConvId === id) messages = s.messages;
+      _recalcMemoryFor(id);
       renderConversation(s.messages, s.compaction, s.host);
       const mEl = paneScrollEl($('messages'));
       if (mEl) mEl.scrollTop = mEl.scrollHeight;

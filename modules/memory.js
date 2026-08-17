@@ -613,7 +613,7 @@ const SandpieMemory = (function () {
     if (typeof SandpieMenu !== 'undefined') SandpieMenu.updateBadge(SB_SECTION_ID, String(facts.length || ''));
     if (!facts.length) {
       _sbBody.innerHTML = `<div class="sb-empty">No memories yet — sandpie saves durable facts as you work, and they'll appear here as a databank.</div>`;
-      return;
+      return 0;
     }
     const td = _today();
     const newToday = facts.filter(f => (f.created || '').slice(0, 10) === td).length;
@@ -724,6 +724,7 @@ const SandpieMemory = (function () {
       });
     });
     _sbStartAnim();
+    return facts.length;
   }
 
   function _sbOnToggle() {
@@ -731,24 +732,65 @@ const SandpieMemory = (function () {
     else _sbStopAnim();
   }
 
+  function _sbPlaceAboveFiles() {
+    // Sidebar order is conversations, memory, files. SandpieMenu appends new
+    // sections above the footer (below the static #filesSection), so lift the
+    // memory section to sit directly above Files.
+    try {
+      const filesEl = document.getElementById('filesSection');
+      const el = SandpieMenu.get(SB_SECTION_ID);
+      if (filesEl && el) filesEl.before(el);
+    } catch (_) {}
+  }
   function initSecondBrain() {
     if (typeof SandpieMenu === 'undefined') return;
     const style = document.createElement('style');
     style.textContent = SB_CSS;
     document.head.appendChild(style);
-    SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: false, onRender(body) { _sbBody = body; } });
-    _sbDetails = SandpieMenu.get(SB_SECTION_ID);
-    if (_sbDetails) _sbDetails.addEventListener('toggle', _sbOnToggle);
-    document.addEventListener('visibilitychange', () => { document.visibilityState === 'visible' ? _sbStartAnim() : _sbStopAnim(); });
-    if (typeof Sandpie !== 'undefined' && Sandpie.events) {
-      Sandpie.events.on('memory:changed', () => {
-        if (_sbDetails && _sbDetails.open) _sbRender();
-        else { _sbDirty = true; list().then(f => SandpieMenu.updateBadge(SB_SECTION_ID, String(f.length || ''))).catch(() => {}); }
-      });
-      // Activation changed (a new turn promoted a different project) → re-colour.
-      Sandpie.events.on('memory:active', () => { if (_sbDetails && _sbDetails.open) _sbRender(); else _sbDirty = true; });
-    }
-    _sbRender().then(() => { if (!_sbDetails.open) _sbStopAnim(); });
+    const wireEvents = () => {
+      _sbDetails = SandpieMenu.get(SB_SECTION_ID);
+      if (_sbDetails) _sbDetails.addEventListener('toggle', _sbOnToggle);
+      document.addEventListener('visibilitychange', () => { document.visibilityState === 'visible' ? _sbStartAnim() : _sbStopAnim(); });
+      if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+        Sandpie.events.on('memory:changed', () => {
+          if (_sbDetails && _sbDetails.open) _sbRender();
+          else { _sbDirty = true; list().then(f => SandpieMenu.updateBadge(SB_SECTION_ID, String(f.length || ''))).catch(() => {}); }
+        });
+        // Activation changed (a new turn promoted a different project) → re-colour.
+        Sandpie.events.on('memory:active', () => { if (_sbDetails && _sbDetails.open) _sbRender(); else _sbDirty = true; });
+      }
+      _sbRender().then(n => { if (!_sbDetails.open) _sbStopAnim(); });
+    };
+    // Count FIRST so the section can default open when there are >10 memories
+    // (and show the real badge immediately instead of '…').
+    list().then(facts => {
+      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: String(facts.length || '…'), open: facts.length > 10, onRender(body) { _sbBody = body; } });
+      _sbPlaceAboveFiles();
+      wireEvents();
+    }).catch(() => {
+      SandpieMenu.add(SB_SECTION_ID, { title: 'MEMORY', badge: '…', open: false, onRender(body) { _sbBody = body; } });
+      _sbPlaceAboveFiles();
+      wireEvents();
+    });
+  }
+
+  // Recompute the activated set from a conversation's context WITHOUT building
+  // the prompt block — called on conversation switch so the sidebar re-colours
+  // immediately (send-time systemBlock() would be too late). Mirrors the tiered
+  // semantics: standing user/feedback always active, plus contextual memories of
+  // the projects active for this conversation's ctx.
+  async function refreshActive(ctx) {
+    if (!isEnabled()) { _setActive([]); return; }
+    const facts = await list();
+    if (!facts.length) { _setActive([]); return; }
+    const cl = _clusterFacts(facts);
+    const active = _activeProjects(facts, cl, ctx || {});
+    const activated = new Set();
+    facts.forEach((f, i) => {
+      if (f.type === 'user' || f.type === 'feedback') activated.add(f.name);
+      else if (active.has(cl.projectOf[i])) activated.add(f.name);
+    });
+    _setActive(activated);
   }
 
   // Page-side fact writer for automatic capture (the harvester, Loop Lab's
@@ -769,7 +811,7 @@ const SandpieMemory = (function () {
     return { ok: true, name: slug };
   }
 
-  return { config, isEnabled, list, systemBlock, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
+  return { config, isEnabled, list, systemBlock, refreshActive, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
 })();
 window.SandpieMemory = SandpieMemory;
 
