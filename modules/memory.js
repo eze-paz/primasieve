@@ -555,10 +555,6 @@ const SandpieMemory = (function () {
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0.3rem 0.1rem; }
     #${SB_SECTION_ID} .sb-legend span { font-size:0.62rem; color:var(--sp-text-dim); display:flex; align-items:center; gap:0.25rem; }
     #${SB_SECTION_ID} .sb-legend i { width:7px; height:7px; border-radius:50%; display:inline-block; }
-    #${SB_SECTION_ID} svg.sb-spark { width:100%; height:26px; display:block; margin-top:0.3rem; }
-    #${SB_SECTION_ID} .sb-spark-line { fill:none; stroke:var(--sp-accent); stroke-width:1.2; }
-    #${SB_SECTION_ID} .sb-spark-fill { fill:var(--sp-accent-dim); stroke:none; }
-    #${SB_SECTION_ID} .sb-spark-lbl { font-size:0.6rem; color:var(--sp-text-dim); margin-top:0.1rem; }
     #${SB_SECTION_ID} .sb-empty { font-size:0.72rem; color:var(--sp-text-dim); padding:0.4rem 0; }
     @keyframes sb-latch { 0%{opacity:0;filter:brightness(2.2)} 40%{opacity:1;filter:brightness(1.6)} 100%{opacity:1;filter:none} }
     #${SB_SECTION_ID} .sb-cell { animation:sb-latch .3s ease-out backwards; }
@@ -688,28 +684,10 @@ const SandpieMemory = (function () {
 
     const nOn = facts.filter(f => _lastActiveNames.has(f.name)).length;
     const nOff = facts.length - nOn;
-    const now = Date.now();
-    const counts = new Array(30).fill(0);
-    let before = 0;
-    for (const f of facts) {
-      const t = Date.parse(f.created || '');
-      if (!Number.isFinite(t)) { before++; continue; }
-      const age = Math.floor((now - t) / 86400000);
-      if (age >= 30) before++; else counts[29 - Math.min(29, Math.max(0, age))]++;
-    }
-    let acc = before;
-    const cum = counts.map(c => (acc += c));
-    const max = Math.max(1, cum[29]), min = Math.min(before, cum[0]);
-    const span = Math.max(1, max - min);
-    const sx = i => (i * (SB_W / 29)).toFixed(1);
-    const sy = v => (22 - ((v - min) / span) * 18).toFixed(1);
-    const linePts = cum.map((v, i) => `${sx(i)},${sy(v)}`).join(' ');
 
     _sbBody.innerHTML = `
       <svg class="sb-net" viewBox="0 0 ${SB_W} ${totalH.toFixed(1)}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
-      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>
-      <svg class="sb-spark" viewBox="0 0 ${SB_W} 26" role="img" aria-label="Memory growth over the last 30 days"><polygon class="sb-spark-fill" points="0,24 ${linePts} ${SB_W},24"/><polyline class="sb-spark-line" points="${linePts}"/></svg>
-      <div class="sb-spark-lbl">last 30 days</div>`;
+      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>`;
 
     const svg = _sbBody.querySelector('svg.sb-net');
     svg.querySelectorAll('rect.sb-cell').forEach(el => {
