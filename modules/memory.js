@@ -542,10 +542,7 @@ const SandpieMemory = (function () {
   const SB_CSS = `
     #${SB_SECTION_ID} .sb-today { font-size:0.65rem; color:var(--sp-success); border:1px solid var(--sp-success); border-radius:8px; padding:0 0.35rem; }
     #${SB_SECTION_ID} svg.sb-net { width:100%; height:auto; display:block; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:8px; }
-    #${SB_SECTION_ID} .sb-chip { fill:var(--sp-panel); stroke:var(--sp-border); stroke-width:0.7; rx:2.5; }
-    #${SB_SECTION_ID} .sb-chip-edge { fill:var(--sp-border); opacity:0.6; }
-    #${SB_SECTION_ID} .sb-chip-notch { fill:var(--sp-border); opacity:0.35; }
-    #${SB_SECTION_ID} .sb-socket { fill:var(--sp-text-dim); opacity:0.22; }
+    #${SB_SECTION_ID} .sb-chip { fill:var(--sp-surface); rx:2.5; }
     #${SB_SECTION_ID} .sb-cell { cursor:pointer; }
     #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); opacity:0.35; }
@@ -657,16 +654,8 @@ const SandpieMemory = (function () {
       const yc = y + chip_h / 2;
       const act = k === 'other' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       chips.push(`<rect class="sb-chip" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="${CHIP_W.toFixed(1)}" height="${chip_h.toFixed(1)}"/>`);
-      chips.push(`<rect class="sb-chip-edge" x="${(CHIP_X + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(CHIP_W - 2).toFixed(1)}" height="1"/>`);
-      chips.push(`<rect class="sb-chip-notch" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="3" height="${chip_h.toFixed(1)}"/>`);
       const lbl = _sbEsc(k === 'other' ? 'other' : k.replace('sandpie/', '').slice(0, 14));
       chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
-      for (let r = 0; r < nr; r++) {
-        for (let c = 0; c < rows_per_chip; c++) {
-          const sx = CHIP_X + LABEL_W + 4 + c * PITCH, sy = y + 2 + r * PITCH;
-          chips.push(`<rect class="sb-socket" x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" width="${CELL.toFixed(1)}" height="${CELL.toFixed(1)}" rx="1"/>`);
-        }
-      }
       members.forEach((i, kk) => {
         const c = kk % rows_per_chip, r = Math.floor(kk / rows_per_chip);
         const cx = CHIP_X + LABEL_W + 4 + c * PITCH, ey = y + 2 + r * PITCH;
