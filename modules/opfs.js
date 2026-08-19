@@ -3917,15 +3917,11 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
 
   // Collapsible SANDPIE section: a "SANDPIE ▸" header at the bottom that expands
-
-
-  // in place to list sandpie/'s children (conversations, agents, skills, scripts,
-
-
-  // artifacts, memory). State persists in localStorage; collapsed by default.
-
-
-  if (sandpieEntry) {
+  // in place to list sandpie/'s children (the allowlisted system folders).
+  // HIDDEN by default — revealed only via the `>>> hidden on` command
+  // (localStorage 'sandpie-files-section-visible'). The open/collapsed state
+  // still persists once the section is shown.
+  if (sandpieEntry && localStorage.getItem('sandpie-files-section-visible') === '1') {
 
 
     const SANDPIE_OPEN_KEY = 'sandpie-files-section-open';
@@ -3943,7 +3939,7 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
     toggle.textContent = `SANDPIE ${open ? '▾' : '▸'}`;
 
 
-    toggle.title = "sandpie's own files — conversations, agents, skills, scripts, artifacts, memory";
+    toggle.title = "sandpie's system folders — config, conversations, fonts, memory, scripts, secrets, shared-installed, skills, agents";
 
 
     toggle.onclick = () => {

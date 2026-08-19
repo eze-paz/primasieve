@@ -734,6 +734,33 @@ function mountConv(convId, pane = null) {
 function _reminderNotesVisible() {
   try { return localStorage.getItem('sandpie-show-reminders') === '1'; } catch (_) { return false; }
 }
+/* ---- sandpie folder visibility in the file viewer (>>> hidden) ----------- */
+// The SANDPIE section in the sidebar Files list is hidden by default; reveal it
+// with `>>> hidden on` (hide again with `>>> hidden off`, or toggle with no arg).
+function _sandpieSectionVisible() {
+  try { return localStorage.getItem('sandpie-files-section-visible') === '1'; } catch (_) { return false; }
+}
+function registerHiddenCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'hidden',
+    module: 'core',
+    help: 'Show/hide the sandpie/ system-folder section in the sidebar file viewer',
+    usage: '>>> hidden [on|off]',
+    run(text, parts) {
+      let on;
+      if (parts.length > 1) on = /^(on|1|true|yes|show)$/i.test(parts[1]);
+      else on = !_sandpieSectionVisible();   // no arg → toggle
+      try { localStorage.setItem('sandpie-files-section-visible', on ? '1' : '0'); } catch (_) {}
+      if (window.opfs && opfs.refreshFileList) opfs.refreshFileList().catch(() => {});
+      return 'sandpie/ system folders are now ' + (on ? 'VISIBLE' : 'hidden')
+        + ' in the file viewer.\n(' + (on
+          ? 'The SANDPIE section appears at the bottom of the Files list.'
+          : 'The SANDPIE section is hidden again — reveal it anytime with `>>> hidden on`.') + ')';
+    }
+  });
+}
+
 function registerDriftCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({
@@ -854,6 +881,7 @@ function registerRewindCommand() {
 }
 registerRewindCommand();
 registerDriftCommand();
+registerHiddenCommand();
 registerMetacogCommand();
 
 // Recompute which memories are active/standby immediately after the active
