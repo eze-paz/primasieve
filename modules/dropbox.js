@@ -988,7 +988,7 @@
       // (delta covers dehydrated files too — they still changed on another device.)
       const _deviceSwitch = !!((delta && delta.length > 0) || (deletions && deletions.length > 0));
       _logSyncCause(delta, deletions, deltaOwn);
-      try { await retryPendingDeletes(); } catch (e) { console.warn('[dropbox] pending-delete retry failed:', e && e.message); }
+
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       // hub-managed subtree: drop legacy state entries so neither Pass 1 nor the
@@ -1117,6 +1117,9 @@
       }
       // Remember when sync last completed — used to detect device switches on next load
       stampSynced('sync #' + _syncCount + ' completed');
+      // Pending deletes are background cleanup — never block the splash or the sync
+      // timestamp. Fire-and-forget so the user never waits on paced delete_v2 calls.
+      retryPendingDeletes().catch(e => console.warn('[dropbox] pending-delete retry failed:', e && e.message));
       outcome = { ok: true };
     } catch (e) {
       dbxStatus('Sync failed: ' + e.message, 'error');
@@ -1186,7 +1189,11 @@
       .then(() => { forgetFromStateAndIndex(rel); removePendingDelete(rel); })
       .catch((e) => console.warn('[dropbox] delete pending (will retry):', rel, e && e.message));
   }
+  let _pendingDeleteInFlight = false;
   async function retryPendingDeletes() {
+    if (_pendingDeleteInFlight) return;   // don't double-process on overlapping syncs
+    _pendingDeleteInFlight = true;
+    try {
     const pend = pendingDeletes();
     if (!pend.length || !tokens()) return;
     const still = [];
@@ -1200,6 +1207,7 @@
       }
     }
     setPendingDeletes(still);
+    } finally { _pendingDeleteInFlight = false; }
   }
   // Fetch one dehydrated file into OPFS. Shared by the provider's hydrate() hook
   // and the service worker's /files/ fault-in — both need exactly this, and a
