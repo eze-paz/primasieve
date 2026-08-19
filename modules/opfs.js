@@ -4012,6 +4012,64 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
 
 
 
+// Boot-time hygiene for sandpie/scripts/ (the run_python scratch dir): keep it
+// FLAT — subfolders are not permitted and are deleted wholesale — and capped at
+// 100 files (oldest overflow deleted). Runs once on page load, never on an
+// interval. Deletion uses the canonical page-side pattern (opfs.remove + emit
+// file:deleted), so the Dropbox provider trims its state/cloud index and issues
+// delete_v2 — full propagation, identical to the context-menu Delete. In
+// dehydrated mode most scripts are cloud-only placeholders (no local bytes), so
+// the count merges the provider's sync state + cloud index; cloud-only entries
+// still get deleted remotely (opfs.remove throws NotFound; the file:deleted
+// event does the rest).
+opfs.pruneScriptsDir = async function() {
+  const DIR = 'sandpie/scripts';
+  const MAX_FILES = 100;
+  const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  const state = (_sp && _sp.getState) ? (_sp.getState() || {}) : {};
+  const cidx = (_sp && _sp.cloudIndex) ? (_sp.cloudIndex() || {}) : null;
+  const prefix = DIR + '/';
+  const del = async (fullKey) => {
+    try { await opfs.remove(fullKey); } catch (_) {}   // cloud-only → NotFound is fine
+    if (window.Sandpie) Sandpie.events.emit('file:deleted', fullKey);
+  };
+  let local = [];
+  try { local = await opfs.listDir(DIR); } catch (_) { return; }   // no scripts dir yet → nothing to do
+  // Merge local OPFS + sync state + cloud index into the DIRECT children of DIR.
+  const byName = new Map();
+  for (const e of local) byName.set(e.name, { kind: e.kind === 'directory' ? 'folder' : 'file', local: true });
+  const addRemote = (rel, kind) => {
+    if (!String(rel).startsWith(prefix)) return;
+    const rest = rel.slice(prefix.length);
+    if (!rest || rest.includes('/')) return;          // not a direct child (subfolder contents ride with the folder)
+    const cur = byName.get(rest);
+    if (!cur) byName.set(rest, { kind });
+    else if (kind === 'folder') cur.kind = 'folder';
+  };
+  for (const k of Object.keys(state)) addRemote(k, 'file');          // sync state only tracks files
+  if (cidx) for (const k of Object.keys(cidx)) addRemote(k, cidx[k] && cidx[k].kind === 'folder' ? 'folder' : 'file');
+  const folders = [], files = [];
+  for (const [name, info] of byName) {
+    const fullKey = prefix + name;
+    if (info.kind === 'folder') { folders.push(fullKey); continue; }
+    let mt = info.local ? await opfs.lastModified(fullKey) : 0;
+    if (!mt && cidx && cidx[fullKey] && cidx[fullKey].cloudMtime) mt = Date.parse(cidx[fullKey].cloudMtime) || 0;
+    if (!mt && state[fullKey] && state[fullKey].syncedMtime) mt = state[fullKey].syncedMtime;
+    files.push({ fullKey, mt });
+  }
+  // Flatness: subfolders inside scripts/ are not permitted — delete them whole.
+  for (const f of folders) { try { await del(f); } catch (_) {} }
+  if (!files.length) return;
+  // Cap at MAX_FILES: oldest first, delete the overflow.
+  files.sort((a, b) => (a.mt - b.mt) || a.fullKey.localeCompare(b.fullKey));
+  const overflow = files.length - MAX_FILES;
+  for (let i = 0; i < overflow; i++) { try { await del(files[i].fullKey); } catch (_) {} }
+  if (overflow > 0 || folders.length) { try { opfs.refreshFileList(); } catch (_) {} }
+};
+
+
+
+
 /* --- backward compat shims for browser/viewer/editor --- */
 
 
@@ -4585,7 +4643,11 @@ function initFileBrowser() {
 
   refreshFileList();
 
-
+  // Boot-time scripts-dir hygiene (one-shot on load — no running checks): cap
+  // sandpie/scripts/ at 100 files and keep it flat. dropbox.js loads before
+  // opfs.js, so by this point its boot() has attached the file:deleted listener
+  // and every deletion below propagates to Dropbox (delete_v2 + index trim).
+  try { if (window.opfs && opfs.pruneScriptsDir) opfs.pruneScriptsDir().catch((e) => console.warn('[opfs] scripts prune:', e)); } catch (_) {}
 }
 
 
