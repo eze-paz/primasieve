@@ -215,7 +215,16 @@ async function opfsReadBytes(path) {
   const handle = await dir.getFileHandle(name);
   return new Uint8Array(await (await handle.getFile()).arrayBuffer());
 }
+// /files/sandpie/ is system-only: exactly these folders may exist there (the
+// boot-time allowlist prune enforces it too). This guards Python-side writes
+// (the /files FS bridge) as well as tool writes.
+const SANDBOX_ALLOWED = new Set(['config', 'conversations', 'fonts', 'memory', 'scripts', 'secrets', 'shared-installed', 'skills', 'agents', 'shared-incoming']);
 async function opfsWriteBytes(path, bytes) {
+  const clean = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  if (clean === 'sandpie' || clean.startsWith('sandpie/')) {
+    const seg = clean.split('/')[1] || '';
+    if (!SANDBOX_ALLOWED.has(seg)) throw new Error('sandpie/ is system-only — allowed folders: ' + [...SANDBOX_ALLOWED].join(', ') + '. Write to the most relevant user folder under /files/ instead.');
+  }
   const { parts, name } = splitPath(path);
   const dir = await opfsResolveDir(parts, true);
   const handle = await dir.getFileHandle(name, { create: true });

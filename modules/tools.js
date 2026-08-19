@@ -3,22 +3,22 @@
 const tools = {
   run_python: {
     description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
-REQUIRED: path must point to a script already saved in OPFS (typically under sandpie/scripts/). Use write_file to create a script first, then call run_python with its path.
+REQUIRED: path must point to a script already saved in OPFS. Save task scripts in the MOST RELEVANT folder for the job — e.g. projects/<project>/… or the folder whose data the task acts on — so scripts sit next to what they operate on. (Reusable system instruments may live in sandpie/scripts/; the sandbox sandpie/ is otherwise system-only.) Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it blocks this run's interpreter and burns the timeout) — use await asyncio.sleep(n).
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
 HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
-OUTPUT: write to sandpie/artifacts/, then call show_artifact({"path":"sandpie/artifacts/file.html"}).
+OUTPUT: write to the most relevant folder (e.g. projects/<project>/out.html), then call show_artifact({"path":"projects/<project>/out.html"}).
 Examples:
-  run      → {path: "sandpie/scripts/random_numbers.py", args: ["5"]}
-  with arg → {path: "sandpie/scripts/analyze_machine.py", args: ["2026-05-03.csv"]}
+  run      → {path: "projects/<project>/random_numbers.py", args: ["5"]}
+  with arg → {path: "projects/<project>/analyze_machine.py", args: ["2026-05-03.csv"]}
   async    → script ends with await main()  (NOT asyncio.run(main()))
   pypi     → script runs: import micropip; await micropip.install('feedparser')
-  html out → script writes sandpie/artifacts/out.html, then show_artifact({"path":"sandpie/artifacts/out.html"})`,
+  html out → script writes projects/<project>/out.html, then show_artifact({"path":"projects/<project>/out.html"})`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "sandpie/scripts/foo.py"). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
+        path: { type: 'string', description: 'Path under /files/ to a saved Python script (e.g. "projects/<project>/foo.py" — the most relevant folder for the task). When set, sandpie reads that file and execs it with sys.argv = [path, *args].' },
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
         timeout: { type: 'number', description: 'Max seconds the script may run before it is killed (default 120, max 600). On timeout the run is aborted and its interpreter discarded, so it can never hang the conversation — raise this only for genuinely long computations.' },
       },
@@ -26,7 +26,7 @@ Examples:
     },
   },
   write_file: {
-  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ (e.g. "sandpie/scripts/analyze.py", "sandpie/artifacts/chart.html"). Use this to create scripts before running them with run_python.
+  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ — put files in the MOST RELEVANT folder for the task (e.g. "projects/<project>/analyze.py", "projects/<project>/chart.html"), never in the sandbox (sandpie/ is system-only). Use this to create scripts before running them with run_python.
 
 For large or multi-line content, you MAY skip JSON and emit the body as a raw block in your reply instead (no escaping of newlines/quotes needed):
 <|write_file:PATH|>
@@ -117,15 +117,15 @@ File type never blocks this — show any file the user might want:
 Use whenever the user says "show this", "artifact", "add into chat", "inject", or
 after you've written an output file worth surfacing.
 The file must already exist in OPFS — write it first (e.g. with run_python).
-Path is OPFS-relative — no leading slash (e.g. "sandpie/artifacts/chart.html").
-Default output folder is sandpie/artifacts/ — use it unless the user says otherwise.
+Path is OPFS-relative — no leading slash (e.g. "projects/<project>/chart.html").
+Write the artifact to the MOST RELEVANT folder (e.g. projects/<project>/…) so deliverables live where the user expects; the sandbox (sandpie/) is system-only.
 Typical flow:
-  run_python: open('sandpie/artifacts/chart.html', 'w').write(html)
-  show_artifact: { "path": "sandpie/artifacts/chart.html" }`,
+  run_python: open('projects/<project>/chart.html', 'w').write(html)
+  show_artifact: { "path": "projects/<project>/chart.html" }`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'OPFS path to the file (e.g. "sandpie/artifacts/chart.html"). No leading slash. Default folder: sandpie/artifacts/.' },
+        path: { type: 'string', description: 'OPFS path to the file (e.g. "projects/<project>/chart.html"). No leading slash.' },
       },
       required: ['path'],
     },
@@ -161,7 +161,7 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
         type: 'object',
         properties: {
           src:  { type: 'string', description: 'Either a workspace path to fork (e.g. "sandpie/shared-installed/impagados/dashboard.html") or an absolute Dropbox path to import (e.g. "/R+D+I/reports/q1.pdf").' },
-          dest: { type: 'string', description: 'Optional destination within the workspace (default: the source filename, lifted out of sandpie/shared-installed/), e.g. "imported/q1.pdf".' },
+          dest: { type: 'string', description: 'Optional destination within the workspace (default: the source filename at the workspace root — visible; never the sandbox), e.g. "imported/q1.pdf".' },
         },
         required: ['src'],
       },
@@ -170,11 +170,11 @@ Large images are refused: if a file's base64 form would exceed ~5 MB it is NOT l
       description: `Share a file or folder in OPFS with a team department.
 The share is performed by the page (Dropbox), so this tool returns once it is published.
 - type "team" (the only type): recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["IT"]) — the item is copied into IA/<department>/<name>/; only that department can read it (Dropbox folder membership is the boundary). A SKILL.md in the folder makes it a shared skill.
-path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
+path is OPFS-relative (e.g. "projects/<project>/report.html").`,
       parameters: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "sandpie/artifacts/x.html").' },
+          path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "projects/<project>/x.html").' },
           type: { type: 'string', enum: ['team'], description: '"team" = publish to a department folder.' },
           recipients: { type: 'array', items: { type: 'string' }, description: 'Department folder name(s), e.g. ["IT"].' },
         },
@@ -187,11 +187,11 @@ The share is performed by the page (Dropbox), so this tool returns once it is pu
 - type "team": recipients are TEAM/DEPARTMENT FOLDER names (e.g. ["R+D+I"]) — the item is copied into that department's shared hub; only that department can read it (Dropbox folder membership is the boundary).
 - type "p2p": recipients are EMAIL addresses — a folder is shared live in place, a single file is wrapped into an outbox folder, and each recipient is invited as a folder member.
 permissions: "viewer" (default, read-only) or "editor" (may write back); "read"/"write" aliases accepted. Permissions apply to p2p invites; team shares are bounded by the department folder membership.
-path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
+path is OPFS-relative (e.g. "projects/<project>/report.html").`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "sandpie/artifacts/x.html").' },
+        path: { type: 'string', description: 'OPFS path of the file or folder to share (e.g. "projects/<project>/x.html").' },
         type: { type: 'string', enum: ['team', 'p2p'], description: '"team" = publish to department hub(s); "p2p" = share 1:1 with email recipients.' },
         recipients: { type: 'array', items: { type: 'string' }, description: 'team: department folder names (e.g. ["R+D+I"]); p2p: recipient email addresses.' },
         pinFile: { type: 'string', description: 'Which file in the folder to set as the main/pinned file (e.g. "Impagats.html"). Only used when sharing a folder. Defaults to SKILL.md if present, else index.html, else the first file.' },
@@ -203,11 +203,11 @@ path is OPFS-relative (e.g. "sandpie/artifacts/report.html").`,
     description: `Read the browser console output of an HTML artifact that is shown in the conversation (rendered via show_artifact), so you can see console.log/warn/error output, uncaught errors, and unhandled promise rejections from the artifact's own JavaScript.
 WHEN TO USE: after showing an HTML artifact, when the user reports something looks broken (blank areas, missing elements, wrong layout) or you want to verify the page's JS ran without errors. The console is captured from load time (the capture script is injected before the artifact's own scripts), so load-time errors are included.
 WHEN NOT TO USE: for non-HTML artifacts (images, PDFs, office docs have no console). If the artifact is not currently open in the conversation, call show_artifact first — the console is read from the live preview frame.
-path: optional — omit to read the most recently shown artifact, or pass the exact path (e.g. "sandpie/artifacts/report.html").`,
+path: optional — omit to read the most recently shown artifact, or pass the exact path (e.g. "projects/<project>/report.html").`,
     parameters: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Optional OPFS path of the artifact (e.g. "sandpie/artifacts/report.html"). Omit to target the most recently shown artifact.' },
+        path: { type: 'string', description: 'Optional OPFS path of the artifact (e.g. "projects/<project>/report.html"). Omit to target the most recently shown artifact.' },
       },
       required: [],
     },
@@ -220,13 +220,13 @@ WHEN NOT TO USE: on files that are not HTML or images (a .docx/.pdf/.csv cannot 
 The artifact does NOT need to be shown in the conversation first: by default it is rendered offscreen at exact dimensions, which neither disturbs the user's view nor depends on what is currently on screen.
 The result lists FIDELITY CAVEATS when parts of the page could not be captured faithfully (e.g. cross-origin images, backdrop-filter, shadow DOM). Trust the rest of the image; treat flagged areas as unverified.
 Typical flow:
-  run_python: write sandpie/artifacts/report.html
-  screenshot: { "path": "sandpie/artifacts/report.html" }
+  run_python: write projects/<project>/report.html
+  screenshot: { "path": "projects/<project>/report.html" }
   -> see a clipped header -> edit_file to fix -> screenshot again to confirm`,
     parameters: {
       type: 'object',
       properties: {
-        path:      { type: 'string', description: 'OPFS path of the artifact to capture (e.g. "sandpie/artifacts/report.html"). HTML or an image file. No leading slash.' },
+        path:      { type: 'string', description: 'OPFS path of the artifact to capture (e.g. "projects/<project>/report.html"). HTML or an image file. No leading slash.' },
         width:     { type: 'integer', description: 'Viewport width in CSS pixels (default 1280). Use e.g. 375 to check the mobile layout. If the content turns out to be wider than this, the capture is automatically re-rendered wide enough to fit rather than handing you a clipped image — the result says so when that happens.' },
         exact_width: { type: 'boolean', description: 'Disable the auto-fit above and capture at exactly "width", clipped, as a real viewport of that size would show it. Use when the width itself is what you are testing (e.g. proving a page overflows at 375px).' },
         height:    { type: 'integer', description: 'Viewport height in CSS pixels (default 800). Ignored when full_page is true.' },

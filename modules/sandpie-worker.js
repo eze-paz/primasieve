@@ -133,7 +133,7 @@ function _metacogReminder(s, cfg) {
       s.firedShapes.add(sh);
       return { kind: 'reuse', meta: { shape: sh, n },
         text: '<system-reminder>You have rebuilt the same command ' + n + ' times: `' + sh.slice(0, 80)
-          + '`. If it will recur, save it once as a reusable script under sandpie/tools/ and remember() it — then it is one call, not a rewrite, next time.</system-reminder>' };
+          + '`. If it will recur, save it once as a reusable script under sandpie/scripts/ (or the most relevant project folder) and remember() it — then it is one call, not a rewrite, next time.</system-reminder>' };
     }
   }
   // C) remember() encouragement — once per session
@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.21.0-todos-single-active';
+const WORKER_VERSION = '2.22.0-sandbox-allowlist';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -446,7 +446,16 @@ async function opfsReadBytes(path) {
   const handle = await dir.getFileHandle(name);
   return new Uint8Array(await (await handle.getFile()).arrayBuffer());
 }
+// /files/sandpie/ is system-only: exactly these folders may exist there (the
+// boot-time allowlist prune enforces it too). Refuse to create anything else —
+// a stray sandpie/<x>/ dir would be wiped on the next load anyway.
+const SANDBOX_ALLOWED = new Set(['config', 'conversations', 'fonts', 'memory', 'scripts', 'secrets', 'shared-installed', 'skills', 'agents', 'shared-incoming']);
 async function opfsWriteBytes(path, bytes) {
+  const clean = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  if (clean === 'sandpie' || clean.startsWith('sandpie/')) {
+    const seg = clean.split('/')[1] || '';
+    if (!SANDBOX_ALLOWED.has(seg)) throw new Error('sandpie/ is system-only — allowed folders: ' + [...SANDBOX_ALLOWED].join(', ') + '. Write to the most relevant user folder under /files/ instead.');
+  }
   const { parts, name } = splitPath(path);
   const dir = await opfsResolveDir(parts, true);
   const handle = await dir.getFileHandle(name, { create: true });
@@ -1598,7 +1607,7 @@ async function _forkLocal(src, dest) {
     destRel = String(dest).trim().replace(/^\/+/, '').replace(/^files\//, '').replace(/\/+$/, '');
   } else {
     const base = srcRel.split('/').pop();
-    destRel = srcRel.startsWith(SHARED_ROOT) ? 'sandpie/' + base : base;   // lift out of the managed area
+    destRel = base;   // lift out of the managed area to the workspace root (visible — the sandbox is system-only)
   }
   if (!destRel || destRel.split('/').some(s => s === '..')) return { result: 'Error: invalid "dest".' };
   if (destRel.startsWith(SHARED_ROOT)) return { result: 'Error: "dest" cannot be inside sandpie/shared-installed/ — that area is managed by the hub sync. Pick an editable location outside it.' };
