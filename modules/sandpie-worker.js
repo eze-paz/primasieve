@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.20.0-ask-conv';
+const WORKER_VERSION = '2.21.0-todos-single-active';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // ---- message protocol entry point ------------------------------------------
@@ -686,6 +686,11 @@ async function tool_write_todos({ ops, todos }, ctx) {
     // Renumber compactly (skipped-empty items leave gaps) and remap blockedBy.
     const remap = {}; tree.forEach((t, i) => { remap[t.id] = String(i + 1); });
     tree.forEach(t => { t.id = remap[t.id]; if (t.blockedBy) t.blockedBy = t.blockedBy.map(x => remap[x]).filter(Boolean); });
+    // Single-active rule: at most ONE task may be in_progress at a time. A fresh
+    // list may declare several, but extras are demoted to pending (resume them
+    // with start once the current task is paused/completed/blocked).
+    let activeSeen = false;
+    tree.forEach(t => { if (t.status === 'in_progress') { if (activeSeen) t.status = 'pending'; else activeSeen = true; } });
     if (!tree.length) return { result: 'Error: empty checklist — send at least one task.' };
     if (ctx) ctx._todos = _todoFlat(tree);
     return { result: 'todos:' + JSON.stringify(tree) + '\nNew checklist (' + tree.length + ' tasks):\n' + _todoSummary(tree) };
@@ -694,7 +699,8 @@ async function tool_write_todos({ ops, todos }, ctx) {
   if (!Array.isArray(ops)) {
     return { result: 'Error: send {"ops":[…]}. Ops (IDs are shown in the checklist):\n'
       + '  {"op":"add","text":"…","blockedBy":["2"]?}  add a task (blockedBy = ids that must finish first)\n'
-      + '  {"op":"start","id":"…"}                      pending → in_progress (refused while blocked)\n'
+      + '  {"op":"start","id":"…"}                      pending → in_progress (refused while blocked; AT MOST ONE task may be active — starting pauses any other active task)\n'
+      + '  {"op":"pause","id":"…"}                      in_progress → pending (free the active slot; resume later with start)\n'
       + '  {"op":"complete","id":"…"}                   → completed\n'
       + '  {"op":"blocked","id":"…","reason":"…"}  mark BLOCKED — needs user input or an external dependency; NOT open, so the turn may end once everything is blocked/completed (start resumes)\n'
       + '  {"op":"delete","id":"…"}                     remove a task from the list\n'
@@ -702,7 +708,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       + 'A full {"todos":[…]} list is only accepted when the checklist is empty or all completed/deleted.' };
   }
 
-  const errs = [], added = [];
+  const errs = [], added = [], pausedNow = [];
   for (const op of ops) {
     const k = op && op.op;
     if (k === 'add') {
@@ -726,7 +732,14 @@ async function tool_write_todos({ ops, todos }, ctx) {
         // cannot start while any task in its blockedBy is still open.
         const open = _todoBlockers(t, byId);
         if (open.length) { errs.push('start "' + op.id + '": blocked by open task(s) ' + open.join(', ') + ' — finish or delete them first, or {"op":"unblock","id":"' + op.id + '","by":["' + open[0] + '"]} if that dependency no longer applies'); continue; }
+        // Single-active rule: at most ONE task may be in_progress at a time.
+        // Starting this one pauses any currently active task (it keeps its
+        // state and can be resumed later with a start).
+        for (const x of tree) { if (x.id !== t.id && x.status === 'in_progress') { x.status = 'pending'; delete x.reason; pausedNow.push(x.id); } }
         t.status = 'in_progress'; delete t.reason;
+      } else if (k === 'pause') {
+        if (t.status !== 'in_progress') { errs.push('pause "' + op.id + '": only an in_progress task can be paused (is ' + t.status + ')'); continue; }
+        t.status = 'pending'; delete t.reason;
       } else if (k === 'complete') {
         if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
         if (t.status === 'deleted') { errs.push('complete "' + op.id + '": deleted tasks cannot be completed'); continue; }
@@ -757,7 +770,8 @@ async function tool_write_todos({ ops, todos }, ctx) {
   const live = tree.filter(t => t.status !== 'deleted').length;
   let out = 'todos:' + JSON.stringify(tree) + '\n'
     + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + live + ' total'
-    + (added.length ? ' · added ' + added.join(', ') : '') + '\n' + _todoSummary(tree);
+    + (added.length ? ' · added ' + added.join(', ') : '')
+    + (pausedNow.length ? ' · paused ' + pausedNow.join(', ') : '') + '\n' + _todoSummary(tree);
   if (errs.length) out += '\n\nREJECTED (not applied):\n- ' + errs.join('\n- ');
   return { result: out };
 }

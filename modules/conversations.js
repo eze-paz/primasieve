@@ -1538,7 +1538,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=104');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=105');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2991,9 +2991,11 @@ function renderTcDone(div, fname) {
   // Tools whose result IS the point of the call render it inside the expanded box,
   // so show it by default (other tools stay collapsed behind the header toggle).
   // The user can still collapse it by clicking the header.
-  //   load_image  → the loaded image
-  //   write_todos → the checklist card (otherwise the user never sees the todos)
-  if (fname === 'load_image' || fname === 'write_todos' || fname === 'ask') div.classList.add('expanded');
+  //   load_image → the loaded image
+  //   ask        → the pending question card
+  // (write_todos used to auto-expand too — removed: the checklist card now
+  //  starts collapsed like every other tool's box.)
+  if (fname === 'load_image' || fname === 'ask') div.classList.add('expanded');
 }
 
 class RoundRenderer {

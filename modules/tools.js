@@ -246,7 +246,8 @@ FIRST plan: send a full list once — {"todos":[{"content":"…"}, …]} — acc
 THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"add","text":"Run tests","activeForm":"Running tests"?,"blockedBy":["2"]?}   add a task. text = imperative title; activeForm = present-continuous form shown while it runs; blockedBy = ids of tasks that must complete before this one can start.
   {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add/remove blockers (tasks that must complete before this one can start) after creation.
-  {"op":"start","id":"3"}   mark in_progress before you begin it. Refused while the task still has an open blocker; several tasks may be in progress at once if nothing blocks them.
+  {"op":"start","id":"3"}   mark in_progress before you begin it. Refused while the task still has an open blocker. AT MOST ONE task may be in_progress at a time: starting a task automatically pauses whichever task is currently active (it can be resumed later with start).
+  {"op":"pause","id":"3"}   in_progress → pending — pause the currently active task so another can start (e.g. you hit a blocker or want to switch focus). The paused task keeps its place and resumes with start.
   {"op":"complete","id":"3"}   mark done — ONLY when you have FULLY accomplished it. Never complete a task if tests fail, the implementation is partial, or errors are unresolved: keep it in_progress. If you hit a blocker you can't clear, keep the task in_progress and add a new task describing what must be resolved.
   {"op":"blocked","id":"3","reason":"waiting on …"}   mark a task BLOCKED — it needs user input, an external dependency, or something unobtainable this turn. Blocked tasks are NOT open: once everything is blocked/completed the turn may end. {"op":"start","id":"3"} resumes it later.
   {"op":"delete","id":"3"}   remove a task you're no longer doing (also removed from any other task's blockedBy).
@@ -260,7 +261,7 @@ IDs are shown in the returned checklist. You can batch several ops in one call. 
             items: {
               type: 'object',
               properties: {
-                op:        { type: 'string', enum: ['add', 'start', 'complete', 'delete', 'block', 'unblock', 'blocked'], description: 'The operation.' },
+                op:        { type: 'string', enum: ['add', 'start', 'pause', 'complete', 'delete', 'block', 'unblock', 'blocked'], description: 'The operation.' },
                 text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests").' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
                 activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
