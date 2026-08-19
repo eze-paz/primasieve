@@ -118,6 +118,65 @@ async function readConvJsonl(path) {
   return msgs;
 }
 function _serializeJsonl(msgs) { return msgs.length ? msgs.map(m => JSON.stringify(m)).join('\n') + '\n' : ''; }
+
+// ── Incremental NDJSON reader: reads from END of file backwards in chunks ──
+// Yields batches of parsed messages, newest-first. Each yield is { messages, bytesRead, totalSize, done }.
+// The first chunk may start mid-line (the leading partial line is carried over
+// to the next chunk and completed there). The final yield (offset reaches 0)
+// flushes any remaining carried partial.
+const TAIL_CHUNK = 65536;          // 64KB per read
+async function* readConvJsonlTail(path, totalSize) {
+  if (!totalSize) return;
+  let offset = totalSize;
+  let carry = '';   // partial line carried from the previous (lower) chunk
+  while (offset > 0) {
+    const readStart = Math.max(0, offset - TAIL_CHUNK);
+    const len = offset - readStart;
+    let chunk;
+    try { chunk = await opfs.readTail(path, readStart, len); } catch { return; }
+    offset = readStart;
+    // Prepend carry from the previous chunk, then split into lines.
+    const text = chunk + carry;
+    carry = '';
+    const lines = text.split('\n');
+    // If this is NOT the start of the file, the first line may be partial.
+    if (offset > 0) {
+      carry = lines.shift();   // carry the partial head to the next (lower) chunk
+    }
+    // Parse lines from the END (newest) backwards. Filter empties.
+    const batch = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const t = lines[i].trim();
+      if (!t) continue;
+      try { batch.push(JSON.parse(t)); } catch { /* tolerate torn line */ }
+    }
+    if (batch.length) {
+      yield { messages: batch, bytesRead: len, totalSize, done: offset <= 0 };
+    }
+  }
+  // Flush any remaining carry (shouldn't happen on well-formed files, but safe)
+  if (carry.trim()) {
+    try {
+      const msg = JSON.parse(carry.trim());
+      yield { messages: [msg], bytesRead: 0, totalSize, done: true };
+    } catch {}
+  }
+}
+
+// Render a batch of messages (in chronological order) PREPENDED before the
+// first existing child of host. Used by the incremental loader to fill in
+// older messages above the already-rendered recent batch.
+function renderMessagesBefore(msgs, host) {
+  if (!msgs.length || !host) return;
+  const frag = document.createDocumentFragment();
+  for (const m of msgs) renderHistoricalMessage(m, frag);
+  // Insert the fragment before the first existing child of the host.
+  // appendContent handles panes with a bottom anchor; for a .conv-host (the
+  // common case) we insert before the first child.
+  const firstChild = host.firstChild;
+  if (firstChild) host.insertBefore(frag, firstChild);
+  else host.appendChild(frag);
+}
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
   if (firstUser && firstUser.content) return (_convText(firstUser.content).slice(0, 60)) || 'Untitled';
@@ -934,28 +993,143 @@ async function loadConv(id) {
       // Save the PREVIOUS conversation in the background (its data is still in
       // its stream); no longer blocks the switch.
       if (prevId) { try { await saveConv(prevId, { touchUpdated: false }); } catch (_) {} }
-      const data = await readConvData(id);
-      if (!data) {
+
+      const loc = await convLocation(id);
+      if (!loc.format) {
         addMsg('err', 'Failed to load conversation.');
         if (prevId) mountConv(prevId);
         return;
       }
-      hydrateStreamFromData(s, data);
-      // mountConv() captured the EMPTY array reference when it mounted the host
-      // (it runs before the read). Re-sync the module `messages` to the loaded
-      // array, or parkActiveConv() later writes the stale empty array back onto
-      // the stream — wiping the history and re-triggering a full cold load on
-      // the next visit. Only when this conv is still the active one.
+
+      // Read the tiny meta file first (title, compaction, msgCount, etc.)
+      let meta = {};
+      if (loc.format === 'new') {
+        try { meta = JSON.parse(await opfs.read(metaPath(id, loc.archived))); } catch {}
+      } else {
+        // Legacy .json: no incremental path — fall back to full load
+        const data = await readConvData(id);
+        if (!data) { addMsg('err', 'Failed to load conversation.'); if (prevId) mountConv(prevId); return; }
+        hydrateStreamFromData(s, data);
+        if (activeConvId === id) messages = s.messages;
+        _recalcMemoryFor(id);
+        renderConversation(s.messages, s.compaction, s.host);
+        const mEl = paneScrollEl($('messages'));
+        if (mEl) mEl.scrollTop = mEl.scrollHeight;
+        await refreshConversationList();
+        return;
+      }
+
+      // ── Incremental load: read the END of the JSONL first ──
+      const jp = jsonlPath(id, loc.archived);
+      const fileSize = await opfs.getFileSize(jp);
+      s.compaction = meta.compaction || null;
+      s.todos = meta.todos || null;
+      s.lastTurn = meta.lastTurn || null;
+
+      if (!fileSize) {
+        // Empty conversation (no messages yet)
+        s.messages = [];
+        s.persistedCount = 0;
+        s._forceJsonlRewrite = false;
+        if (activeConvId === id) messages = s.messages;
+        _recalcMemoryFor(id);
+        renderConversation(s.messages, s.compaction, s.host);
+        await refreshConversationList();
+        return;
+      }
+
+      // Read the last chunk, parse messages, render the most recent batch first.
+      // We accumulate ALL messages on the stream (in chronological order) but
+      // render incrementally — newest first, then prepend older batches.
+      const allMsgs = [];       // chronological (oldest→newest), filled backwards
+      s.messages = allMsgs;     // grow on the stream NOW so concurrent sends see it
+      s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial-append saves mid-load
+      let firstBatchRendered = false;
+
+      for await (const result of readConvJsonlTail(jp, fileSize)) {
+        // result.messages is newest-first (reverse chrono). Prepend to allMsgs
+        // so allMsgs ends up in chronological order.
+        allMsgs.unshift(...result.messages);
+
+        if (!firstBatchRendered) {
+          // First batch: render the most recent messages, scroll to bottom.
+          // result.messages is newest-first; render in chronological order.
+          const batch = result.messages.slice().reverse();
+          // If there's a compaction boundary, render the compaction block first
+          // (it will be prepended along with older messages in later batches).
+          renderConversation(batch, null, s.host);
+          // Re-sync the module `messages` to the loaded array.
+          if (activeConvId === id) messages = s.messages;
+          _recalcMemoryFor(id);
+          const mEl = paneScrollEl($('messages'));
+          if (mEl) mEl.scrollTop = mEl.scrollHeight;
+          await refreshConversationList();
+          firstBatchRendered = true;
+
+          // If this was the only chunk (whole file fit in one read), we're done.
+          if (result.done) {
+            s.messages = allMsgs;
+            s._forceJsonlRewrite = false;
+            if (activeConvId === id) messages = s.messages;
+            // Handle compaction block + pending asks + settled timer
+            _finalizeIncrementalLoad(s, s.host);
+            return;
+          }
+        } else {
+          // Subsequent batches: render older messages prepended above existing content.
+          // result.messages is newest-first; render in chronological order.
+          const batch = result.messages.slice().reverse();
+          renderMessagesBefore(batch, s.host);
+
+          // Yield to the browser between batches so the UI stays responsive.
+          await new Promise(r => requestAnimationFrame(r));
+        }
+      }
+
+      // All chunks read — finalize the stream
+      s._forceJsonlRewrite = false;
       if (activeConvId === id) messages = s.messages;
-      _recalcMemoryFor(id);
-      renderConversation(s.messages, s.compaction, s.host);
-      const mEl = paneScrollEl($('messages'));
-      if (mEl) mEl.scrollTop = mEl.scrollHeight;
-      await refreshConversationList();
+      _finalizeIncrementalLoad(s, s.host);
     } finally {
       s._loading = false;
     }
   })();
+}
+
+// Post-load finalization shared by the incremental path: compaction block,
+// pending asks, settled timer — the things renderConversation() normally does
+// but that the incremental path skips (it renders batches manually).
+function _finalizeIncrementalLoad(s, host) {
+  // Re-render with compaction support: if there's a compaction boundary, we
+  // need to wrap the older messages in a compaction block. The simplest correct
+  // approach: clear and re-render everything via renderConversation now that
+  // all messages are loaded. This is O(N) but only runs once at the end, and
+  // the user has already seen the bottom (the first batch rendered instantly).
+  if (s.compaction && s.compaction.boundary > 0 && s.compaction.boundary < s.messages.length) {
+    host.innerHTML = '';
+    renderConversation(s.messages, s.compaction, host);
+  } else {
+    // No compaction — just handle pending asks + settled timer
+    const target = host;
+    const pending = findPendingAsk(s.messages);
+    const targetConvId = s.id;
+    if (pending && pending.tcId && targetConvId) {
+      _askingConvs.add(targetConvId);
+      if (!target.querySelector('.ask-card[data-ask-tc-id="' + pending.tcId + '"]')) {
+        renderQuestions(pending.tcId, pending.questions, (result) => {
+          let answers = [];
+          try { answers = JSON.parse(String(result || '').replace(/^answers:/, '')); } catch (_) {}
+          resolveStoredAsk(targetConvId, pending.tcId, answers);
+        }, targetConvId);
+      }
+    } else {
+      markStaleAsks(target);
+    }
+    rebuildSettledTimer(target, s);
+  }
+  // Scroll to bottom one final time (older messages prepended may have shifted)
+  const mEl = paneScrollEl($('messages'));
+  if (mEl) mEl.scrollTop = mEl.scrollHeight;
 }
 async function newConversation() {
   await saveActiveConv();

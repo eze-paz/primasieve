@@ -98,7 +98,23 @@ const opfs = {
 
     return new Uint8Array(await file.arrayBuffer());
 
+  },
 
+  // Read a byte range [offset, offset+length) from a file as text. Used by
+  // the incremental conversation loader to read the END of a large NDJSON
+  // file first (most recent messages) without loading the whole file.
+  // offset < 0 means |offset| bytes from the end of the file.
+  async readTail(path, offset, length) {
+    const { parts, name } = splitPath(path);
+    const dir = await this.resolveDir(parts);
+    const handle = await dir.getFileHandle(name);
+    const file = await handle.getFile();
+    const size = file.size;
+    let start = offset < 0 ? Math.max(0, size + offset) : offset;
+    let end = Math.min(size, start + length);
+    if (start >= size) return '';
+    const blob = file.slice(start, end);
+    return await blob.text();
   },
 
 
