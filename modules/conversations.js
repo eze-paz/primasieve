@@ -168,16 +168,14 @@ async function* readConvJsonlTail(path, totalSize) {
 // older messages above the already-rendered recent batch.
 function renderMessagesBefore(msgs, host, scrollEl) {
   if (!msgs.length || !host) return;
-  const prevHeight = scrollEl ? scrollEl.scrollHeight : 0;
-  const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
   const frag = document.createDocumentFragment();
   for (const m of msgs) renderHistoricalMessage(m, frag);
   // Insert the fragment before the first existing child of the host.
+  // The browser's scroll anchoring (overflow-anchor: auto, default) keeps
+  // the visible content pinned automatically when content is prepended above.
   const firstChild = host.firstChild;
   if (firstChild) host.insertBefore(frag, firstChild);
   else host.appendChild(frag);
-  // Pin the visible content: compensate scrollTop for the height added above.
-  if (scrollEl) scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
 }
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
