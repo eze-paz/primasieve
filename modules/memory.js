@@ -579,6 +579,25 @@ const SandpieMemory = (function () {
   function _sbStopAnim() { if (_sbRaf) { cancelAnimationFrame(_sbRaf); _sbRaf = 0; } }
   function _sbEsc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
+  // Label fitting: measure with a hidden span (inherits the app font) and ellipsize.
+  let _sbLblMeter = null;
+  function _sbLblWidth(s) {
+    if (!_sbLblMeter) {
+      _sbLblMeter = document.createElement('span');
+      _sbLblMeter.setAttribute('aria-hidden', 'true');
+      _sbLblMeter.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;white-space:nowrap;font-size:8.5px;font-weight:600;letter-spacing:.05em;';
+      document.body.appendChild(_sbLblMeter);
+    }
+    _sbLblMeter.textContent = s;
+    return _sbLblMeter.getBoundingClientRect().width;
+  }
+  function _sbEllipsize(s, maxW) {
+    if (_sbLblWidth(s) <= maxW) return s;
+    let t = String(s);
+    while (t.length > 1 && _sbLblWidth(t + '\u2026') > maxW) t = t.slice(0, -1);
+    return t + '\u2026';
+  }
+
   // ---- path-based graph -----------------------------------------------------
   // The graph shares ONE clustering with injection (_clusterFacts, module scope):
   // components = memories linked by a shared canonical file path (suffix-union, with
@@ -642,6 +661,8 @@ const SandpieMemory = (function () {
     // chip-rack geometry — chips fill the width (6..SB_W-6), height grows with content
     const CHIP_X = 6, CHIP_W = SB_W - 12, LABEL_W = 84;
     const CELL = 4.5, GAP = 2.5, PITCH = CELL + GAP;
+    // label zone: text starts at CHIP_X+10, must stop LBL_PAD_R before the cells
+    const LBL_PAD_R = 8, MAX_LBL_W = LABEL_W - 10 - LBL_PAD_R;
     const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - 8) / PITCH));
     let y = 8, chip_i = 0, totalH = 8;
     const chips = [];
@@ -654,7 +675,7 @@ const SandpieMemory = (function () {
       const yc = y + chip_h / 2;
       const act = k === 'other' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       chips.push(`<rect class="sb-chip" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="${CHIP_W.toFixed(1)}" height="${chip_h.toFixed(1)}"/>`);
-      const lbl = _sbEsc(k === 'other' ? 'other' : k.replace('sandpie/', '').slice(0, 14));
+      const lbl = _sbEsc(_sbEllipsize(k === 'other' ? 'other' : k.replace('sandpie/', ''), MAX_LBL_W));
       chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
       members.forEach((i, kk) => {
         const c = kk % rows_per_chip, r = Math.floor(kk / rows_per_chip);
