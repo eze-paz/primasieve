@@ -4070,6 +4070,47 @@ opfs.pruneScriptsDir = async function() {
 
 
 
+// Sandbox allowlist: /files/sandpie/ may contain ONLY these system folders (app data,
+// hub-installed packages, share inbox). No loose files, no stray folders — anything
+// else (created by a tool that slipped) is deleted wholesale via the canonical delete
+// path, so it propagates to Dropbox through the delete handshake. sandpie/artifacts is
+// deferred while the one-time migrateArtifactsOut() (dropbox.js, 'dbxfull-artifacts-out'
+// flag) hasn't run — deleting it first would lose real deliverables.
+const SANDBOX_ALLOW = new Set(['config', 'conversations', 'fonts', 'memory', 'scripts', 'secrets', 'shared-installed', 'skills', 'agents', 'shared-incoming']);
+opfs.pruneSandboxFolders = async function() {
+  const prefix = 'sandpie/';
+  const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  const state = (_sp && _sp.getState) ? (_sp.getState() || {}) : {};
+  const cidx = (_sp && _sp.cloudIndex) ? (_sp.cloudIndex() || {}) : null;
+  const pendingMigration = !localStorage.getItem('dbxfull-artifacts-out');
+  const del = async (fullKey) => {
+    try { await opfs.remove(fullKey); } catch (_) {}   // cloud-only → NotFound is fine
+    if (window.Sandpie) Sandpie.events.emit('file:deleted', fullKey);
+  };
+  let local = [];
+  try { local = await opfs.listDir('sandpie'); } catch (_) { return; }   // no sandbox yet
+  const byName = new Map();
+  for (const e of local) byName.set(e.name, true);
+  const addRemote = (rel) => {
+    if (!String(rel).startsWith(prefix)) return;
+    const rest = rel.slice(prefix.length);
+    if (!rest || rest.includes('/')) return;   // only direct children
+    byName.set(rest, true);
+  };
+  for (const k of Object.keys(state)) addRemote(k);
+  if (cidx) for (const k of Object.keys(cidx)) addRemote(k);
+  let changed = false;
+  for (const name of byName.keys()) {
+    if (SANDBOX_ALLOW.has(name)) continue;
+    if (pendingMigration && name === 'artifacts') continue;   // let migrateArtifactsOut() move it first
+    await del(prefix + name);
+    changed = true;
+  }
+  if (changed) { try { opfs.refreshFileList(); } catch (_) {} }
+};
+
+
+
 /* --- backward compat shims for browser/viewer/editor --- */
 
 
@@ -4648,6 +4689,11 @@ function initFileBrowser() {
   // opfs.js, so by this point its boot() has attached the file:deleted listener
   // and every deletion below propagates to Dropbox (delete_v2 + index trim).
   try { if (window.opfs && opfs.pruneScriptsDir) opfs.pruneScriptsDir().catch((e) => console.warn('[opfs] scripts prune:', e)); } catch (_) {}
+
+  // Boot-time sandbox allowlist (system-only folders under sandpie/). Deleting a stray
+  // folder propagates to Dropbox via the delete handshake.
+  try { if (window.opfs && opfs.pruneSandboxFolders) opfs.pruneSandboxFolders().catch((e) => console.warn('[opfs] sandbox prune:', e)); } catch (_) {}
+
 }
 
 

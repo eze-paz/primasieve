@@ -558,6 +558,33 @@
     try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
     try { if (window.refreshConversationList) window.refreshConversationList(); } catch (_) {}
   }
+  /* One-time move of sandpie/artifacts/ OUT of the sandbox to the workspace
+  root /artifacts (visible to the user). The sandbox allowlist
+  (config/conversations/fonts/memory/scripts/secrets/shared-installed/skills +
+  agents + shared-incoming) excludes artifacts — LLM deliverables now live in
+  the user's area. Same move_v2-then-local pattern as migrateExemptToSandpie;
+  the sync-state reset makes the next sync reconcile the new layout. Runs in
+  dropbox boot BEFORE the boot-time sandbox allowlist prune (which defers
+  sandpie/artifacts while this flag is unset), so a raced prune can never
+  delete deliverables mid-migration.
+  */
+  async function migrateArtifactsOut() {
+    if (localStorage.getItem('dbxfull-artifacts-out') === '1') return;
+    if (tokens()) {
+      let wr = '';
+      try { await ensureWorkingRoot(); wr = (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''); } catch (_) {}
+      if (!wr) return;   // root not resolved yet -> retry next boot
+      try { await api('/2/files/move_v2', { from_path: wr + '/sandpie/artifacts', to_path: wr + '/artifacts', autorename: false }); }
+      catch (e) {
+        const m = String((e && e.message) || '').toLowerCase();
+        if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox] artifacts migration deferred:', m); return; }
+      }
+      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
+    }
+    try { await opfsMoveDir('sandpie/artifacts', 'artifacts'); } catch (e) { console.warn('[dropbox] local artifacts move failed:', e && e.message); }
+    localStorage.setItem('dbxfull-artifacts-out', '1');
+    try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
+  }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
 
@@ -1954,6 +1981,7 @@
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
         await migrateExemptToSandpie();
+        await migrateArtifactsOut();
         sync();
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
@@ -1963,11 +1991,13 @@
         dbxStatus('', 'connected');
         await cleanupStaleArtifacts();
         await migrateExemptToSandpie();
+        await migrateArtifactsOut();
         // On-demand mode is now default; ephemeral purge happens in sync cycle
         sync();
       })();
     } else {
       migrateExemptToSandpie().catch(() => {});   // offline: local-only move under sandpie/
+      migrateArtifactsOut().catch(() => {});   // offline: local-only move of sandbox/artifacts to /artifacts
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

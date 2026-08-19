@@ -355,7 +355,7 @@
       const bytes = await O().readBytes(INSTALL_ROOT + '/' + id + '/' + rel);
       if (!bytes) return;
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const dst = 'sandpie/artifacts/' + id + '.conflicts/' + rel + '.' + ts;
+      const dst = 'artifacts/' + id + '.conflicts/' + rel + '.' + ts;   // visible area — sandbox artifacts migrated out
       await O().write(dst, new Blob([bytes]));
       markDirtyForWorkspace(dst);
       const mk = stateOf(id);
