@@ -104,13 +104,71 @@
     const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
     return { verifier, challenge: b64url(hash) };
   }
+  // ---- transport pacing + resilience --------------------------------------
+  // Dropbox rate-limits aggressively (429 "too_many_requests"), and a 429 comes
+  // back WITHOUT the CORS Access-Control-Allow-Origin header, so the browser
+  // reports it as a CORS failure rather than a status. When a noisy client (the
+  // boot-time sandpie/scripts prune deleting hundreds of files) fires delete_v2
+  // back-to-back, they ALL hit the limit and ALL look like network errors.
+  // Two rules make it self-healing, for EVERY Dropbox endpoint in this module
+  // (RPC api(), token refresh, content-API uploads, temp-link downloads):
+  //   1. PACE: max DBX_MAX_CONCURRENT in flight, >= DBX_GAP_MS between request
+  //      starts. On 429 the gap widens adaptively (x1.6 up to DBX_GAP_MAX_MS)
+  //      and only tightens again once traffic is healthy.
+  //   2. RETRY: transient failures (429/5xx/408/425, and fetch-throws — which
+  //      include the CORS-masked 429s) are retried with exponential backoff.
+  //      Permanent 4xx (400/401/403/404/409...) return to the caller untouched.
+  // The one exception: the OAuth code exchange (raw fetch) — one-shot, and its
+  // failures are permanent invalid_grant errors, never transient.
+  const DBX_MAX_CONCURRENT = 4;
+  const DBX_GAP_MS = 120;          // normal min spacing between request starts (~8/s)
+  const DBX_GAP_MAX_MS = 3000;
+  const DBX_MAX_RETRIES = 4;       // attempts total = 1 + this
+  const DBX_RETRY_BASE_MS = 400;   // 0.4s -> 0.8s -> 1.6s -> 3.2s (+jitter)
+  let _dbxActive = 0;
+  let _dbxLastStart = 0;
+  let _dbxGapMs = DBX_GAP_MS;
+  const _dbxSleep = (ms) => new Promise(r => setTimeout(r, ms));
+  async function dbxFetch(url, init = {}, { retries = DBX_MAX_RETRIES } = {}) {
+    const streamBody = !!(init.body && typeof init.body.getReader === 'function');   // streams are consumed on first attempt — never re-send
+    for (let attempt = 0; ; attempt++) {
+      // Claim a slot: bounded concurrency + min spacing between request starts.
+      // The claim is synchronous after the while, so no interleaving can push us
+      // past the cap.
+      while (!(_dbxActive < DBX_MAX_CONCURRENT && Date.now() - _dbxLastStart >= _dbxGapMs)) await _dbxSleep(40);
+      _dbxActive++;
+      _dbxLastStart = Date.now();
+      let res;
+      try {
+        res = await fetch(url, init);
+      } catch (e) {
+        _dbxActive--;
+        if (e && e.name === 'AbortError') throw e;   // caller cancelled — don't retry
+        if (streamBody || attempt >= retries) throw e;   // fetch-throw = network flap or CORS-masked 429
+        console.warn('[dropbox] dbxFetch retry (network/CORS):', url);
+        await _dbxSleep(Math.min(4000, DBX_RETRY_BASE_MS * Math.pow(2, attempt) + Math.random() * 200));
+        continue;
+      }
+      _dbxActive--;
+      if (res.ok) {
+        if (_dbxGapMs > DBX_GAP_MS) _dbxGapMs = Math.max(DBX_GAP_MS, Math.round(_dbxGapMs / 1.4));   // healthy again -> tighten stepwise
+        return res;
+      }
+      const status = res.status;
+      if ((status !== 429 && status !== 408 && status !== 425 && status < 500) || attempt >= retries) return res;   // permanent 4xx -> caller handles
+      if (status === 429) _dbxGapMs = Math.min(DBX_GAP_MAX_MS, _dbxGapMs * 1.6);   // rate-limited -> widen spacing
+      console.warn(`[dropbox] dbxFetch retry (HTTP ${status}):`, url);
+      await _dbxSleep(Math.min(4000, DBX_RETRY_BASE_MS * Math.pow(2, attempt) + Math.random() * 200));
+    }
+  }
+
   function tokens() { try { return JSON.parse(localStorage.getItem(TOKENS_KEY) || 'null'); } catch { return null; } }
   async function accessToken() {
     const stored = tokens();
     if (!stored) throw new Error('Dropbox not connected');
     if (Date.now() < stored.expires_at - 60000) return stored.access_token;
     const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: stored.refresh_token, client_id: stored.app_key });
-    const res = await fetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
+    const res = await dbxFetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
     });
     if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
@@ -149,7 +207,7 @@
     const token = await accessToken();
     const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
     Object.assign(headers, pathRootHeader({ team, ns }));
-    const res = await fetch(dbxRoute('https://api.dropboxapi.com' + path), {
+    const res = await dbxFetch(dbxRoute('https://api.dropboxapi.com' + path), {
       method: 'POST', headers, body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Dropbox ${path}: ${res.status} ${await res.text()}`);
@@ -188,13 +246,13 @@
     // (a plain GET = no custom headers = NO preflight, and the temp-link host returns
     // ACAO), which works cross-origin even under the prod COOP/COEP isolation.
     const tl = await api('/2/files/get_temporary_link', { path }, { team, ns });
-    const res = await fetch(dbxRoute(tl.link), { method: 'GET', signal });
+    const res = await dbxFetch(dbxRoute(tl.link), { method: 'GET', signal });
     if (!res.ok) throw new Error(`Download ${path}: ${res.status}`);
     return new Uint8Array(await res.arrayBuffer());
   }
   async function uploadSessionStart(content, close = true) {
     const token = await accessToken();
-    const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
+    const res = await dbxFetch(dbxRoute('https://content.dropboxapi.com/2/files/upload_session/start'), {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': apiArg({ close }) },
       body: content,
@@ -204,7 +262,7 @@
   }
   async function uploadSessionFinishBatch(entries) {
     const token = await accessToken();
-    const res = await fetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
+    const res = await dbxFetch(dbxRoute('https://api.dropboxapi.com/2/files/upload_session/finish_batch_v2'), {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries }),
@@ -1791,7 +1849,7 @@
       listTeamFolders: () => listTeamFolders(),      // departments this user may see
       async cloudUpload(absPath, bytes, { team = true, ns = '' } = {}) {
         const token = await accessToken();
-        const res = await fetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
+        const res = await dbxFetch(dbxRoute('https://content.dropboxapi.com/2/files/upload'), {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/octet-stream',
                      'Dropbox-API-Arg': apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }),
