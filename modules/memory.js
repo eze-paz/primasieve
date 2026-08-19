@@ -665,18 +665,20 @@ const SandpieMemory = (function () {
     const LBL_PAD_R = 8, MAX_LBL_W = LABEL_W - 10 - LBL_PAD_R;
     const rows_per_chip = Math.max(1, Math.floor((CHIP_W - LABEL_W - 8) / PITCH));
     let y = 8, chip_i = 0, totalH = 8;
-    const chips = [];
+    const chips = [], gridCs = [];
     top.forEach((k) => {
       const members = (k === 'other' ? restMembers : lanes[k])
         .slice().sort((a, b) => ((facts[b].last_verified || facts[b].created || '') < (facts[a].last_verified || facts[a].created || '') ? -1 : 1));
       const n = members.length;
       const nr = Math.ceil(n / rows_per_chip);
       const chip_h = 2 + nr * PITCH + 4;
-      const yc = y + chip_h / 2;
+      // vertical center of the cell block (rows span y+2 .. y+2+(nr-1)*PITCH+CELL)
+      const gridC = y + 2 + ((nr - 1) * PITCH) / 2 + CELL / 2;
+      gridCs.push(gridC);
       const act = k === 'other' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       chips.push(`<rect class="sb-chip" x="${CHIP_X.toFixed(1)}" y="${y.toFixed(1)}" width="${CHIP_W.toFixed(1)}" height="${chip_h.toFixed(1)}"/>`);
       const lbl = _sbEsc(_sbEllipsize(k === 'other' ? 'other' : k.replace('sandpie/', ''), MAX_LBL_W));
-      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(yc + 2).toFixed(1)}">${lbl}</text>`);
+      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(gridC + 3.5).toFixed(1)}">${lbl}</text>`);
       members.forEach((i, kk) => {
         const c = kk % rows_per_chip, r = Math.floor(kk / rows_per_chip);
         const cx = CHIP_X + LABEL_W + 4 + c * PITCH, ey = y + 2 + r * PITCH;
@@ -700,6 +702,12 @@ const SandpieMemory = (function () {
       <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>`;
 
     const svg = _sbBody.querySelector('svg.sb-net');
+    // Vertically center each label on its cell block: SVG <text> y is the baseline,
+    // so measure the rendered glyph box and shift y until its center hits gridC.
+    svg.querySelectorAll('text.sb-c-lbl').forEach((el, i) => {
+      const bb = el.getBBox();
+      el.setAttribute('y', (+el.getAttribute('y') - (bb.y + bb.height / 2) + gridCs[i]).toFixed(1));
+    });
     svg.querySelectorAll('rect.sb-cell').forEach(el => {
       const i = +el.dataset.i, f = facts[i];
       _sbNodes.push({ el, x: +el.getAttribute('x'), y: +el.getAttribute('y') });
