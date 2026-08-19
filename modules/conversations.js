@@ -166,16 +166,18 @@ async function* readConvJsonlTail(path, totalSize) {
 // Render a batch of messages (in chronological order) PREPENDED before the
 // first existing child of host. Used by the incremental loader to fill in
 // older messages above the already-rendered recent batch.
-function renderMessagesBefore(msgs, host) {
+function renderMessagesBefore(msgs, host, scrollEl) {
   if (!msgs.length || !host) return;
+  const prevHeight = scrollEl ? scrollEl.scrollHeight : 0;
+  const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
   const frag = document.createDocumentFragment();
   for (const m of msgs) renderHistoricalMessage(m, frag);
   // Insert the fragment before the first existing child of the host.
-  // appendContent handles panes with a bottom anchor; for a .conv-host (the
-  // common case) we insert before the first child.
   const firstChild = host.firstChild;
   if (firstChild) host.insertBefore(frag, firstChild);
   else host.appendChild(frag);
+  // Pin the visible content: compensate scrollTop for the height added above.
+  if (scrollEl) scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
 }
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
@@ -1079,7 +1081,8 @@ async function loadConv(id) {
           // Subsequent batches: render older messages prepended above existing content.
           // result.messages is newest-first; render in chronological order.
           const batch = result.messages.slice().reverse();
-          renderMessagesBefore(batch, s.host);
+          const mEl = paneScrollEl($('messages'));
+          renderMessagesBefore(batch, s.host, mEl);
 
           // Yield to the browser between batches so the UI stays responsive.
           await new Promise(r => requestAnimationFrame(r));
@@ -1127,9 +1130,13 @@ function _finalizeIncrementalLoad(s, host) {
     }
     rebuildSettledTimer(target, s);
   }
-  // Scroll to bottom one final time (older messages prepended may have shifted)
+  // Scroll to bottom only if the user is already near the bottom (hasn't
+  // scrolled up to read older messages). The incremental prepend path already
+  // pins scroll position per-batch, so this is just a final settle.
   const mEl = paneScrollEl($('messages'));
-  if (mEl) mEl.scrollTop = mEl.scrollHeight;
+  if (mEl && (mEl.scrollHeight - mEl.scrollTop - mEl.clientHeight <= 50)) {
+    mEl.scrollTop = mEl.scrollHeight;
+  }
 }
 async function newConversation() {
   await saveActiveConv();
