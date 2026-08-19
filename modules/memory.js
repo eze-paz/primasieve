@@ -540,13 +540,11 @@ const SandpieMemory = (function () {
   const SB_W = 240, SB_H = 170;
 
   const SB_CSS = `
-    #${SB_SECTION_ID} .sb-today { font-size:0.65rem; color:var(--sp-success); border:1px solid var(--sp-success); border-radius:8px; padding:0 0.35rem; }
     #${SB_SECTION_ID} svg.sb-net { width:100%; height:auto; display:block; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:8px; }
     #${SB_SECTION_ID} .sb-chip { fill:var(--sp-surface); rx:2.5; }
     #${SB_SECTION_ID} .sb-cell { cursor:pointer; }
     #${SB_SECTION_ID} .sb-active   { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-inactive { fill:var(--sp-text-dim); opacity:0.35; }
-    #${SB_SECTION_ID} .sb-new { fill:var(--sp-success); }
     #${SB_SECTION_ID} .sb-c-lbl { fill:var(--sp-text-dim); font-size:8.5px; font-weight:600; letter-spacing:.05em; }
     #${SB_SECTION_ID} .sb-c-lbl-act { fill:var(--sp-accent); }
     #${SB_SECTION_ID} .sb-legend { display:flex; flex-wrap:wrap; gap:0.15rem 0.6rem; margin:0.3rem 0.3rem 0.1rem; }
@@ -627,8 +625,6 @@ const SandpieMemory = (function () {
       _sbBody.innerHTML = `<div class="sb-empty">No memories yet — sandpie saves durable facts as you work, and they'll appear here as a databank.</div>`;
       return 0;
     }
-    const td = _today();
-    const newToday = facts.filter(f => (f.created || '').slice(0, 10) === td).length;
     _memGraph(facts);
     const SB_BUCKETS = ['scripts', 'skills', 'artifacts', 'modules', 'memory', 'fonts', 'conversations', 'secrets', 'config'];
     const laneOf = (f) => {
@@ -682,8 +678,7 @@ const SandpieMemory = (function () {
       members.forEach((i, kk) => {
         const c = kk % rows_per_chip, r = Math.floor(kk / rows_per_chip);
         const cx = CHIP_X + LABEL_W + 4 + c * PITCH, ey = y + 2 + r * PITCH;
-        const isNew = (facts[i].created || '').slice(0, 10) === td;
-        const cls = isNew ? 'sb-new' : (_lastActiveNames.has(facts[i].name) ? 'sb-active' : 'sb-inactive');
+        const cls = _lastActiveNames.has(facts[i].name) ? 'sb-active' : 'sb-inactive';
         const op = _sbAgeOp(facts[i]);
         const d = chip_i * 220 + kk * 6;
         chips.push(`<rect class="sb-cell ${cls}" data-i="${i}" x="${cx.toFixed(1)}" y="${ey.toFixed(1)}" width="${CELL.toFixed(1)}" height="${CELL.toFixed(1)}" rx="1" opacity="${op.toFixed(2)}" style="animation-delay:${d}ms"/>`);
@@ -699,7 +694,7 @@ const SandpieMemory = (function () {
 
     _sbBody.innerHTML = `
       <svg class="sb-net" viewBox="0 0 ${SB_W} ${totalH.toFixed(1)}" role="img" aria-label="Memory databank of ${facts.length}">${chips.join('')}</svg>
-      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span>${newToday ? `<span><i style="background:var(--sp-success)"></i>new ${newToday}</span>` : ''}</div>`;
+      <div class="sb-legend"><span><i style="background:var(--sp-accent)"></i>active ${nOn}</span><span><i style="background:var(--sp-text-dim)"></i>standby ${nOff}</span></div>`;
 
     const svg = _sbBody.querySelector('svg.sb-net');
     // Vertically center each label on its cell block: SVG <text> y is the baseline,
