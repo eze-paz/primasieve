@@ -623,6 +623,9 @@
           confirmed.push(rel);   // clear pending for any cursor entry (present or deleted)
         }
         if (confirmed.length) clearPending(confirmed);
+        // Deletions the server confirms (ours or another device's) are no longer
+        // pending — drop them from the handshake ledger so retries don't churn.
+        if (deletions.length) setPendingDeletes(pendingDeletes().filter(r => !deletions.includes(r)));
         setCursor(result.cursor); setCloudIndex(idx);
         return { index: idx, delta, deletions, deltaOwn: delta.filter(([rel]) => pendingBefore[rel]).map(([rel]) => rel) };
       } catch (err) {
@@ -958,6 +961,7 @@
       // (delta covers dehydrated files too — they still changed on another device.)
       const _deviceSwitch = !!((delta && delta.length > 0) || (deletions && deletions.length > 0));
       _logSyncCause(delta, deletions, deltaOwn);
+      try { await retryPendingDeletes(); } catch (e) { console.warn('[dropbox] pending-delete retry failed:', e && e.message); }
       if (dehydrated()) pushDbxIndexToSW();   // keep the worker's lazy index fresh
       const state = syncState();
       // hub-managed subtree: drop legacy state entries so neither Pass 1 nor the
@@ -1131,11 +1135,44 @@
     for (const k of Object.keys(idx)) { const kk = k.toLowerCase(); if (kk === lk || kk.startsWith(lk + '/')) { delete idx[k]; iChanged = true; } }
     if (iChanged) { setCloudIndex(idx); pushDbxIndexToSW(); }
   }
+  // ---- delete handshake (confirm-before-trim) -------------------------------
+  // A delete_v2 that fails (rate-limit, network, offline) used to trim the ledger
+  // FIRST, ghosting the file: still in Dropbox but missing from the manifest, so
+  // invisible in the viewer and unreachable by any cleanup. Now the ledger entry
+  // stays and the rel is tracked in dbxfull-pending-deletes until the deletion is
+  // CONFIRMED — delete_v2 success (incl. not_found), or the cursor delta reports
+  // it. sync() retries pending deletes every pass, so a stuck path stays visible
+  // (never ghosted) and self-heals once the transport recovers. Visible is the
+  // safe direction: a click hydrates it back, it is never silently hidden.
+  const PENDING_DEL_KEY = 'dbxfull-pending-deletes';
+  function pendingDeletes() { try { return JSON.parse(localStorage.getItem(PENDING_DEL_KEY) || '[]'); } catch { return []; } }
+  function setPendingDeletes(list) { try { localStorage.setItem(PENDING_DEL_KEY, JSON.stringify([...new Set(list)])); } catch (_) {} }
+  function removePendingDelete(rel) { setPendingDeletes(pendingDeletes().filter(r => r !== rel)); }
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
     if (isNoSyncRel(rel)) { forgetFromStateAndIndex(rel); return; }   // hub-managed: tidy local bookkeeping, never touch the personal cloud
-    forgetFromStateAndIndex(rel);
-    if (tokens()) del(relToCloud(rel)).catch(() => {});
+    // Handshake: keep the ledger entry until the remote delete is confirmed.
+    const pend = pendingDeletes();
+    if (!pend.includes(rel)) { pend.push(rel); setPendingDeletes(pend); }
+    if (!tokens()) return;   // offline: stays pending; sync() retries once connected
+    del(relToCloud(rel))
+      .then(() => { forgetFromStateAndIndex(rel); removePendingDelete(rel); })
+      .catch((e) => console.warn('[dropbox] delete pending (will retry):', rel, e && e.message));
+  }
+  async function retryPendingDeletes() {
+    const pend = pendingDeletes();
+    if (!pend.length || !tokens()) return;
+    const still = [];
+    for (const rel of pend) {
+      try {
+        await del(relToCloud(rel));
+        forgetFromStateAndIndex(rel);
+      } catch (e) {
+        still.push(rel);   // stays pending — visible in the viewer until it dies
+        console.warn('[dropbox] delete still pending:', rel, e && e.message);
+      }
+    }
+    setPendingDeletes(still);
   }
   // Fetch one dehydrated file into OPFS. Shared by the provider's hydrate() hook
   // and the service worker's /files/ fault-in — both need exactly this, and a
