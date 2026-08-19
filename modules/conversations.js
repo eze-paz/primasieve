@@ -1047,9 +1047,9 @@ async function loadConv(id) {
       let firstBatchRendered = false;
 
       for await (const result of readConvJsonlTail(jp, fileSize)) {
-        // result.messages is newest-first (reverse chrono). Prepend to allMsgs
-        // so allMsgs ends up in chronological order.
-        allMsgs.unshift(...result.messages);
+        // result.messages is newest-first (reverse chrono). Reverse it to
+        // chronological, then prepend to allMsgs so it ends up chronological.
+        allMsgs.unshift(...result.messages.slice().reverse());
 
         if (!firstBatchRendered) {
           // First batch: render the most recent messages, scroll to bottom.
