@@ -672,7 +672,7 @@ const SandpieMemory = (function () {
       gridCs.push(gridC);
       const act = k === 'other' ? restMembers.filter(i => _lastActiveNames.has(facts[i].name)).length : laneAct(k);
       const lbl = _sbEsc(_sbEllipsize(k === 'other' ? 'other' : k.replace('sandpie/', ''), MAX_LBL_W));
-      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(gridC + 2.0).toFixed(1)}">${lbl}</text>`);
+      chips.push(`<text class="sb-c-lbl${act ? ' sb-c-lbl-act' : ''}" x="${(CHIP_X + 10).toFixed(1)}" y="${(gridC + 2.2).toFixed(1)}">${lbl}</text>`);
       members.forEach((i, kk) => {
         const c = kk % rows_per_chip, r = Math.floor(kk / rows_per_chip);
         const cx = CHIP_X + LABEL_W + 4 + c * PITCH, ey = y + 2 + r * PITCH;
@@ -699,7 +699,7 @@ const SandpieMemory = (function () {
     // so measure the rendered glyph box and shift y until its center hits gridC.
     svg.querySelectorAll('text.sb-c-lbl').forEach((el, i) => {
       const bb = el.getBBox();
-      el.setAttribute('y', (+el.getAttribute('y') - (bb.y + bb.height / 2) + gridCs[i] - 1.5).toFixed(1));
+      el.setAttribute('y', (+el.getAttribute('y') - (bb.y + bb.height / 2) + gridCs[i] - 1.3).toFixed(1));
     });
     svg.querySelectorAll('rect.sb-cell').forEach(el => {
       const i = +el.dataset.i, f = facts[i];
