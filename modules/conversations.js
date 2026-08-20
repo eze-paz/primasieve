@@ -447,7 +447,7 @@ function renderHistoricalMessage(m, host = null) {
             expanded.innerHTML = '';
             expanded.appendChild(box);
           }
-          renderTcDone(tcDiv, tc.function.name);
+          renderTcDone(tcDiv, tc.function.name, tc.function.arguments);
           bindBubble(tcDiv, m);
         }
       }
@@ -3170,6 +3170,66 @@ function appendToolResultImage(tcId, path, scopeEl) {
   box.appendChild(resultDiv);
 }
 
+// Friendly display labels for tool-call boxes. Maps the raw API tool name to
+// the words the USER sees — a verb phrase ("doing" while running, "done" after),
+// optionally suffixed with a target pulled from the call's args (the file's
+// basename for `path`, or the value of `name`). The raw tool name is still kept
+// on div.dataset.fname and surfaced as a hover title, so power users lose nothing.
+// Unknown tools fall back to the raw name (never blank).
+const TC_LABELS = {
+  run_python:        { doing: 'Running code',        done: 'Ran code' },
+  write_file:        { doing: 'Creating',            done: 'Created',        target: 'path' },
+  edit_file:         { doing: 'Editing',             done: 'Edited',         target: 'path' },
+  read_file:         { doing: 'Reading',             done: 'Read',           target: 'path' },
+  list_files:        { doing: 'Browsing files',      done: 'Listed files' },
+  search:            { doing: 'Searching files',     done: 'Searched files' },
+  show_artifact:     { doing: 'Opening preview',     done: 'Showed',         target: 'path' },
+  screenshot:        { doing: 'Taking a screenshot', done: 'Screenshot',     target: 'path' },
+  html_console:      { doing: 'Checking the page',   done: 'Checked console' },
+  load_image:        { doing: 'Looking at',          done: 'Viewed',         target: 'path' },
+  load_skill:        { doing: 'Loading skill',       done: 'Loaded skill',   target: 'name' },
+  copy_to_workspace: { doing: 'Importing file',      done: 'Imported file' },
+  share:             { doing: 'Sharing',             done: 'Shared',         target: 'path' },
+  spawn_subagent:    { doing: 'Asking a helper',     done: 'Helper done' },
+  shell:             { doing: 'Running a command',   done: 'Ran command' },
+  remember:          { doing: 'Saving to memory',    done: 'Saved to memory' },
+  recall:            { doing: 'Recalling',           done: 'Recalled' },
+  write_todos:       { doing: 'Planning',            done: 'Planned' },
+  ask:               { doing: 'Asking you',          done: 'Asked you' },
+};
+function tcBasename(p) {
+  const s = String(p || '').replace(/\/+$/, '');
+  const i = s.lastIndexOf('/');
+  return i >= 0 ? s.slice(i + 1) : s;
+}
+// → { verb, target } — verb is shown plain, target (if any) bolded after it.
+function tcLabelParts(fname, phase, args) {
+  const spec = TC_LABELS[fname];
+  if (!spec) return { verb: fname || 'tool', target: '' };
+  const verb = phase === 'done' ? spec.done : spec.doing;
+  let target = '';
+  if (spec.target) {
+    try {
+      const v = JSON.parse(args || '{}')[spec.target];
+      if (v) target = spec.target === 'path' ? tcBasename(v) : String(v);
+    } catch (_) {}
+  }
+  return { verb, target };
+}
+// HTML for the header title: "<verb> <b><target></b>" (target optional).
+// Stashes a resolved target on the box so a later re-render that has no args in
+// hand (e.g. the on-abort sweep) can still show the filename instead of dropping
+// to the bare verb.
+function tcLabelHtml(div, fname, phase, args) {
+  const parts = tcLabelParts(fname, phase, args);
+  if (args !== undefined) {
+    if (parts.target && div) div.dataset.tcTarget = parts.target;
+  } else if (!parts.target && div && div.dataset.tcTarget) {
+    parts.target = div.dataset.tcTarget;
+  }
+  return tcEscape(parts.verb) + (parts.target ? ' <b>' + tcEscape(parts.target) + '</b>' : '');
+}
+
 function buildToolBox(args, toolName) {
   const name = toolName || 'tool';
   const box = document.createElement('div');
@@ -3206,7 +3266,7 @@ function renderTcPreparing(div, fname, args) {
   if (!el.querySelector('.repl-loader')) {
     el.innerHTML =
       REPL_LOADER('tc-dim') +
-      `<span class="tc-title tc-dim">Preparing <b>${tcEscape(fname || 'tool')}</b>…</span>` +
+      `<span class="tc-title tc-dim" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'doing', args)}…</span>` +
       '<span class="tc-meta"></span>' +
       '<span class="tc-chevron">▸</span>';
   }
@@ -3214,23 +3274,23 @@ function renderTcPreparing(div, fname, args) {
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
 }
 
-function renderTcRunning(div, fname) {
+function renderTcRunning(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
   if (!el.querySelector('.repl-loader')) {
     el.innerHTML =
       REPL_LOADER() +
-      `<span class="tc-title">Using <b>${tcEscape(fname)}</b>…</span>` +
+      `<span class="tc-title" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'doing', args)}…</span>` +
       '<span class="tc-chevron">▸</span>';
   }
 }
 
-function renderTcDone(div, fname) {
+function renderTcDone(div, fname, args) {
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
   el.innerHTML =
     '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
-    `<span class="tc-title tc-dim">${tcEscape(fname || 'tool')}</span>` +
+    `<span class="tc-title tc-dim" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'done', args)}</span>` +
     '<span class="tc-chevron">▸</span>';
   // Tools whose result IS the point of the call render it inside the expanded box,
   // so show it by default (other tools stay collapsed behind the header toggle).
@@ -3381,7 +3441,7 @@ class RoundRenderer {
       if (idx < 0) return;
     }
     this.toolCallEls[idx].classList.add('in-flight');
-    renderTcRunning(this.toolCallEls[idx], tc.function.name);
+    renderTcRunning(this.toolCallEls[idx], tc.function.name, tc.function.arguments);
   }
   // Create a tool-call box for a call that never streamed as deltas. Returns its
   // index (or -1 if it can't be built). Mirrors _applyToolCallDelta's box setup.
@@ -3413,7 +3473,7 @@ class RoundRenderer {
     }
     if (el) {
       el.classList.remove('in-flight');
-      renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname);
+      renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.arguments) || undefined);
     }
     const text = String(result || '');
     // Sentinel checks ignore the citable result-id tag ("[rN] ") the worker
