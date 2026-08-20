@@ -3197,16 +3197,77 @@ const TC_LABELS = {
   write_todos:       { doing: 'Planning',            done: 'Planned' },
   ask:               { doing: 'Asking you',          done: 'Asked you' },
 };
+// Localized verbs, keyed by base language code, mapping the canonical English
+// phrase (from TC_LABELS) → its translation. The tool-call label sits inline in
+// the message stream next to the model's own reply, so it should follow the
+// conversation language (SandpieLanguage), not stay English like the static
+// chrome. English is the fallback: any phrase or language not listed here shows
+// the canonical English. Adding a language = one object of the ~38 phrases.
+const TC_I18N = {
+  es: {
+    'Running code': 'Ejecutando código',      'Ran code': 'Código ejecutado',
+    'Creating': 'Creando',                     'Created': 'Creado',
+    'Editing': 'Editando',                     'Edited': 'Editado',
+    'Reading': 'Leyendo',                      'Read': 'Leído',
+    'Browsing files': 'Explorando archivos',   'Listed files': 'Archivos listados',
+    'Searching files': 'Buscando en archivos', 'Searched files': 'Búsqueda completada',
+    'Opening preview': 'Abriendo vista previa','Showed': 'Mostrado',
+    'Taking a screenshot': 'Capturando pantalla', 'Screenshot': 'Captura',
+    'Checking the page': 'Revisando la página','Checked console': 'Consola revisada',
+    'Looking at': 'Viendo',                    'Viewed': 'Visto',
+    'Loading skill': 'Cargando habilidad',     'Loaded skill': 'Habilidad cargada',
+    'Importing file': 'Importando archivo',    'Imported file': 'Archivo importado',
+    'Sharing': 'Compartiendo',                 'Shared': 'Compartido',
+    'Asking a helper': 'Consultando a un ayudante', 'Helper done': 'Ayudante listo',
+    'Running a command': 'Ejecutando un comando', 'Ran command': 'Comando ejecutado',
+    'Saving to memory': 'Guardando en memoria','Saved to memory': 'Guardado en memoria',
+    'Recalling': 'Recuperando',                'Recalled': 'Recuperado',
+    'Planning': 'Planificando',                'Planned': 'Planificado',
+    'Asking you': 'Preguntándote',             'Asked you': 'Te preguntó',
+  },
+  ca: {
+    'Running code': 'Executant codi',          'Ran code': 'Codi executat',
+    'Creating': 'Creant',                      'Created': 'Creat',
+    'Editing': 'Editant',                      'Edited': 'Editat',
+    'Reading': 'Llegint',                      'Read': 'Llegit',
+    'Browsing files': 'Explorant fitxers',     'Listed files': 'Fitxers llistats',
+    'Searching files': 'Cercant als fitxers',  'Searched files': 'Cerca completada',
+    'Opening preview': 'Obrint vista prèvia',  'Showed': 'Mostrat',
+    'Taking a screenshot': 'Capturant pantalla', 'Screenshot': 'Captura',
+    'Checking the page': 'Revisant la pàgina', 'Checked console': 'Consola revisada',
+    'Looking at': 'Veient',                    'Viewed': 'Vist',
+    'Loading skill': 'Carregant habilitat',    'Loaded skill': 'Habilitat carregada',
+    'Importing file': 'Important fitxer',      'Imported file': 'Fitxer importat',
+    'Sharing': 'Compartint',                   'Shared': 'Compartit',
+    'Asking a helper': 'Consultant un ajudant','Helper done': 'Ajudant llest',
+    'Running a command': 'Executant una ordre','Ran command': 'Ordre executada',
+    'Saving to memory': 'Desant a la memòria', 'Saved to memory': 'Desat a la memòria',
+    'Recalling': 'Recuperant',                 'Recalled': 'Recuperat',
+    'Planning': 'Planificant',                 'Planned': 'Planificat',
+    'Asking you': 'Preguntant-te',             'Asked you': "T'ha preguntat",
+  },
+};
+// Base language code the conversation is in (e.g. 'es' from 'es'/'es-419').
+// Falls back to 'en' whenever the language module is unavailable.
+function tcLang() {
+  try {
+    const code = window.SandpieLanguage && SandpieLanguage.effective && SandpieLanguage.effective();
+    return String(code || 'en').split(/[-_]/)[0];
+  } catch (_) { return 'en'; }
+}
 function tcBasename(p) {
   const s = String(p || '').replace(/\/+$/, '');
   const i = s.lastIndexOf('/');
   return i >= 0 ? s.slice(i + 1) : s;
 }
 // → { verb, target } — verb is shown plain, target (if any) bolded after it.
+// The verb is localized to the conversation language; English is the fallback.
 function tcLabelParts(fname, phase, args) {
   const spec = TC_LABELS[fname];
   if (!spec) return { verb: fname || 'tool', target: '' };
-  const verb = phase === 'done' ? spec.done : spec.doing;
+  const en = phase === 'done' ? spec.done : spec.doing;
+  const dict = TC_I18N[tcLang()];
+  const verb = (dict && dict[en]) || en;
   let target = '';
   if (spec.target) {
     try {
