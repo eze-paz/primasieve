@@ -417,7 +417,7 @@
     if (localStorage.getItem(SIG_KEY) !== sig) {
       localStorage.setItem(SIG_KEY, sig);
       localStorage.removeItem(STATE_KEY);
-      localStorage.removeItem(INDEX_KEY);
+      clearCloudIndex();
       localStorage.removeItem(CURSOR_KEY);
       localStorage.removeItem(PENDING_KEY);
     }
@@ -435,12 +435,86 @@
   }
 
   // ===========================================================================
+  //  Cloud index (IndexedDB-backed; was localStorage — quota at ~5MB / ~23k files)
+  // ===========================================================================
+  // In-memory cache: the synchronous read path. cloudIndex() returns this.
+  // Populated at boot by loadCloudIndex() (from IndexedDB, with a one-time
+  // migration from the old localStorage key).
+  let _idxCache = null;   // null = not yet loaded; {} = loaded (possibly empty)
+  const IDB_NAME = 'sandpie-dbxfull';
+  const IDB_STORE = 'cloudIndex';
+  const IDB_KEY = 'index';   // single-record store; the whole index is one value
+  function _idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  // Write-through: update cache synchronously, persist to IDB in the background.
+  // Never throws — a failed IDB write logs but does not crash the sync.
+  function _idbPutIndex(idx) {
+    _idbOpen().then(db => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(JSON.stringify(idx), IDB_KEY);
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => { db.close(); console.warn('[dropbox] IDB index write failed:', tx.error); };
+    }).catch(e => console.warn('[dropbox] IDB open (put) failed:', e));
+  }
+  function _idbClearIndex() {
+    _idbOpen().then(db => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => db.close();
+    }).catch(() => {});
+  }
+  // Async load: read from IDB into _idxCache. One-time migration from localStorage
+  // if the old key still has data and IDB is empty.
+  async function loadCloudIndex() {
+    if (_idxCache !== null) return _idxCache;
+    try {
+      const db = await _idbOpen();
+      _idxCache = await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+        req.onsuccess = () => { try { resolve(req.result ? JSON.parse(req.result) : null); } catch { resolve(null); } };
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      if (_idxCache === null) {
+        // One-time migration from localStorage
+        const raw = localStorage.getItem(INDEX_KEY);
+        if (raw) {
+          try { _idxCache = JSON.parse(raw); } catch { _idxCache = {}; }
+          _idbPutIndex(_idxCache);
+          localStorage.removeItem(INDEX_KEY);   // migrated — free the quota slot
+          console.info('[dropbox] cloud index migrated from localStorage to IndexedDB (' + Object.keys(_idxCache).length + ' entries)');
+        } else {
+          _idxCache = {};
+        }
+      }
+    } catch (e) {
+      console.warn('[dropbox] IDB load failed, using empty index:', e);
+      _idxCache = {};
+    }
+    return _idxCache;
+  }
+  // Clear the index from cache + IDB + any leftover localStorage.
+  function clearCloudIndex() {
+    _idxCache = {};
+    _idbClearIndex();
+    localStorage.removeItem(INDEX_KEY);
+  }
+
+  // ===========================================================================
   //  Sync state
   // ===========================================================================
   function syncState() { try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch { return {}; } }
   function setSyncState(s) { localStorage.setItem(STATE_KEY, JSON.stringify(s)); }
-  function cloudIndex() { try { return JSON.parse(localStorage.getItem(INDEX_KEY) || '{}'); } catch { return {}; } }
-  function setCloudIndex(i) { localStorage.setItem(INDEX_KEY, JSON.stringify(i)); }
+  function cloudIndex() { return _idxCache || {}; }   // synchronous — populated by loadCloudIndex() at boot
+  function setCloudIndex(i) { _idxCache = i; _idbPutIndex(i); }   // write-through to IndexedDB
   function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
@@ -549,7 +623,7 @@
       }
       // Dropbox now reflects the new layout — reset sync state so the next sync
       // reconciles it cleanly (the existing target-change reset path).
-      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
+      localStorage.removeItem(STATE_KEY); clearCloudIndex(); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
     }
     for (const [oldName, newRel] of SANDPIE_MOVES) {
       try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox] local move failed:', oldName, e && e.message); }
@@ -579,7 +653,7 @@
         const m = String((e && e.message) || '').toLowerCase();
         if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox] artifacts migration deferred:', m); return; }
       }
-      localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
+      localStorage.removeItem(STATE_KEY); clearCloudIndex(); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
     }
     try { await opfsMoveDir('sandpie/artifacts', 'artifacts'); } catch (e) { console.warn('[dropbox] local artifacts move failed:', e && e.message); }
     localStorage.setItem('dbxfull-artifacts-out', '1');
@@ -1371,7 +1445,7 @@
     // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the key, and so PARENT_KEY
     // can still locate the legacy team workspace if the import hasn't happened yet.
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
-    [TOKENS_KEY, STATE_KEY, INDEX_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, HOMENS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k));
+    [TOKENS_KEY, STATE_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, HOMENS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k)); clearCloudIndex();
     dbxStatus('Not connected', 'disconnected');
     Sandpie.refreshFiles();
   }
@@ -1589,7 +1663,7 @@
         localStorage.setItem(MIGRATED_KEY, '1');
         // The copy landed outside anything the local sync state knows about; drop
         // it so the next sync does a clean full listing of the new root.
-        localStorage.removeItem(STATE_KEY); localStorage.removeItem(INDEX_KEY);
+        localStorage.removeItem(STATE_KEY); clearCloudIndex();
         localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
         return;
       } catch (e) {
@@ -1885,6 +1959,7 @@
     // must not suppress the splash on some later unrelated load inside its window.
     localStorage.removeItem(FLUSH_KEY);
     addSection();
+    loadCloudIndex();   // populate _idxCache from IndexedDB (async, non-blocking)
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),
