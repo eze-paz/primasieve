@@ -840,19 +840,6 @@ ul.conv-list li.active {
     pointer-events: none;
     z-index: 120;
   }
-  /* Selection count badge next to the conversation count in the summary row. */
-  .conv-sel-count {
-    margin-left: 4px;
-    background: var(--sp-accent);
-    color: var(--sp-bg);
-    font-size: 0.62rem;
-    font-weight: 700;
-    padding: 0 5px;
-    border-radius: 8px;
-    line-height: 1;
-    display: none;
-  }
-
   /* Auto-title landing (auto-title.js → maybeAutoTitle): the row pulses accent
      while the generated name types itself in. The ring is a box-shadow, NOT
      border-color — the retitled row is usually the ACTIVE one, whose accent

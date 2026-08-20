@@ -1416,12 +1416,6 @@ function _selHighlight() {
   const ul = $('convList');
   if (ul) for (const li of ul.querySelectorAll('li[data-cid]'))
     li.classList.toggle('selected', _selConvs.has(li.dataset.cid));
-  const b = document.getElementById('selCount');
-  if (b) {
-    const n = _selConvs.size;
-    b.style.display = n ? 'inline-block' : 'none';
-    b.textContent = n ? String(n) : '';
-  }
 }
 function _selClear() { _selConvs.clear(); _selAnchor = -1; _selHighlight(); }
 function _selRangeTo(i, j, add) {
@@ -1517,7 +1511,7 @@ function buildConvLi(c, idx) {
     if (_selConvs.size > 1) {
       const ids = [..._selConvs];
       const items = [
-        { info: _selConvs.size + ' conversations selected' },
+        { info: true, label: _selConvs.size + ' conversations selected' },
         { label: 'Pin all',           action: () => bulkPinConvs(ids) },
         { label: 'Archive all',       action: () => bulkArchiveConvs(ids) },
         { label: 'Duplicate all',     action: () => bulkDuplicateConvs(ids) },
@@ -5646,6 +5640,14 @@ function _installConvListGestures() {
   // Click on empty sidebar space clears the selection (same as Esc).
   ul.addEventListener('click', (ev) => {
     if (ev.target === ul && _selConvs.size) _selClear();
+  });
+  // Clicking ANYWHERE outside the conversation list clears the selection -
+  // a mousedown on the document that is not inside a conv-list row. Listens on
+  // the whole document so the sidebar header, messages pane, etc. dismiss it.
+  document.addEventListener('mousedown', (ev) => {
+    if (!_selConvs.size) return;
+    if (ev.target.closest && ev.target.closest('ul#convList')) return;
+    _selClear();
   });
   // Esc clears the current multi-selection.
   document.addEventListener('keydown', (ev) => {
