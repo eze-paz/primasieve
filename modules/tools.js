@@ -7,7 +7,7 @@ REQUIRED: path must point to a script already saved in OPFS. Save task scripts i
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it blocks this run's interpreter and burns the timeout) — use await asyncio.sleep(n).
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
-HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path').
+HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path'). pyfetch does NOT raise on HTTP 4xx/5xx — check r.ok / r.status (or r.raise_for_status()) before using the body; a bad status is also auto-logged to stderr so you'll see it even if you forget.
 OUTPUT: write to the most relevant folder (e.g. projects/<project>/out.html), then call show_artifact({"path":"projects/<project>/out.html"}).
 Examples:
   run      → {path: "projects/<project>/random_numbers.py", args: ["5"]}

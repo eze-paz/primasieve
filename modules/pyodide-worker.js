@@ -119,6 +119,36 @@ let py = null;
 let pyInitPromise = null;
 let _nativefs = null;
 
+// pyodide.http.pyfetch returns a response and does NOT raise on HTTP 4xx/5xx —
+// a script that skips r.status / r.ok / raise_for_status() silently proceeds with
+// an error-page body, so an unhandled 429/502/501 is invisible in run_python's
+// output (which only carries stdout/stderr/exceptions). This wraps pyfetch to
+// emit ONE stderr warning per >=400 response (captured into the result the model
+// sees) without touching the return value — scripts that DO check status behave
+// identically, and network-level failures (DNS/CORS/refused) already raise.
+// Idempotent per interpreter; re-installed on each fresh interpreter by initPyodide.
+const _PYFETCH_WARN_PY = `
+import sys as _sp_sys, pyodide.http as _sp_http
+if not getattr(_sp_http, "_sandpie_pyfetch_wrapped", False):
+    _sp_orig_pyfetch = _sp_http.pyfetch
+    async def _sandpie_pyfetch(url, *a, **kw):
+        _resp = await _sp_orig_pyfetch(url, *a, **kw)
+        try:
+            _st = getattr(_resp, "status", None)
+            if isinstance(_st, int) and _st >= 400:
+                _m = kw.get("method", "GET")
+                print(f"\\u26a0 HTTP {_st} {_m} {url} \\u2014 pyfetch did NOT raise; the response body is likely an error page. Check r.status / r.ok or call r.raise_for_status() before using the body.", file=_sp_sys.stderr)
+        except Exception:
+            pass
+        return _resp
+    try: _sandpie_pyfetch.__doc__ = _sp_orig_pyfetch.__doc__
+    except Exception: pass
+    _sp_http.pyfetch = _sandpie_pyfetch
+    _sp_http._sandpie_pyfetch_wrapped = True
+    import builtins as _sp_bi
+    _sp_bi.pyfetch = _sandpie_pyfetch
+`;
+
 async function initPyodide() {
   if (py) return py;
   if (pyInitPromise) return pyInitPromise;
@@ -138,6 +168,9 @@ async function initPyodide() {
   pyInitPromise = (async () => {
     try {
       const p = await loadPyodide({ indexURL: PYODIDE_INDEX });
+      // Install the pyfetch HTTP-error warning BEFORE the OPFS mount (which can
+      // fail) so it's always active regardless of filesystem state.
+      try { p.runPython(_PYFETCH_WARN_PY); } catch (e) { console.warn('[pyodide-worker] pyfetch HTTP-error warning patch failed:', e); }
       try {
         const opfsRootDir = await navigator.storage.getDirectory();
         _nativefs = await p.mountNativeFS('/files', opfsRootDir);
