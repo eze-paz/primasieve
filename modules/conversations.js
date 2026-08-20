@@ -172,9 +172,18 @@ function renderMessagesBefore(msgs, host, scrollEl) {
   const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
   const frag = document.createDocumentFragment();
   for (const m of msgs) renderHistoricalMessage(m, frag);
-  // Insert the fragment before the first existing child of the host.
-  const firstChild = host.firstChild;
-  if (firstChild) host.insertBefore(frag, firstChild);
+  // Insert before the first .msg (or .compaction-block) — NOT before #homeCenter,
+  // which _placeHome() tucks in as the first child of the host. Inserting before
+  // host.firstChild would put older messages above #homeCenter, sandwiching it
+  // between old and new messages.
+  let anchor = null;
+  for (const child of host.children) {
+    if (child.classList && (child.classList.contains('msg') || child.classList.contains('compaction-block'))) {
+      anchor = child;
+      break;
+    }
+  }
+  if (anchor) host.insertBefore(frag, anchor);
   else host.appendChild(frag);
   // Pin the visible content: compensate scrollTop for the height added above.
   if (scrollEl) scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
