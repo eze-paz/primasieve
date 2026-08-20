@@ -3550,6 +3550,15 @@ class RoundRenderer {
   }
   endRound(finalContent) {
     this._finishThinking();
+    // Force-complete this round's text NOW, synchronously. The typewriter trickle
+    // (_drainTick) is setTimeout-driven, so any undrained tail in `pending` would
+    // otherwise wait on a timer that later heavy synchronous rendering (the next
+    // round's tool boxes / _paintContent) can starve — leaving the round visually
+    // cut off mid-word until the NEXT startRound's _flushAllPending finally dumps
+    // it (the "message completes three rounds later" race). Flushing here paints
+    // the whole round before any tool executes, decoupling completeness from the
+    // scheduler. One bounded render per round end.
+    this._flushAllPending();
     // The SW may rewrite this round's content — e.g. stripping a model's leaked
     // native tool-call tokens after recovering them into structured calls. When
     // the authoritative final content differs from what we live-typed, reconcile
