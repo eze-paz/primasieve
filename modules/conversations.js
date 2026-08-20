@@ -1444,36 +1444,35 @@ function buildConvLi(c, idx) {
   return li;
 }
 // Auto-archive conversations older than AUTO_ARCHIVE_DAYS that aren't pinned.
-// Runs at most once per hour (throttled by _lastAutoArchiveCheck) as part of
-// refreshConversationList. Pinned conversations are always exempt — pinning is
-// an explicit "keep visible" signal. Moving a conv to the archive is reversible
-// (Settings → Archive → Unarchive) and never deletes data.
+// Triggered once per boot by the 'sync:done' event (fires after the initial
+// Dropbox sync completes, while the splash is still visible). Pinned
+// conversations are always exempt — pinning is an explicit "keep visible"
+// signal. Moving a conv to the archive is reversible (Settings → Archive →
+// Unarchive) and never deletes data.
 const AUTO_ARCHIVE_DAYS = 60;
-let _lastAutoArchiveCheck = 0;
-async function autoArchiveStale(list) {  // returns count archived
-  const now = Date.now();
-  if (now - _lastAutoArchiveCheck < 3600_000) return 0;   // at most once per hour
-  _lastAutoArchiveCheck = now;
-  const cutoff = now - AUTO_ARCHIVE_DAYS * 86_400_000;
+let _autoArchiveDone = false;
+async function autoArchiveStale() {
+  if (_autoArchiveDone) return;
+  _autoArchiveDone = true;
+  let list;
+  try { list = await listConversations(); } catch { return; }
+  const cutoff = Date.now() - AUTO_ARCHIVE_DAYS * 86_400_000;
   const stale = list.filter(c =>
     !c.archived && !c.pinned && c.updated && new Date(c.updated).getTime() < cutoff
   );
-  if (!stale.length) return 0;
+  if (!stale.length) return;
   for (const c of stale) {
     try { await toggleArchiveConv(c.id, false); }
     catch (e) { console.warn('autoArchiveStale failed for', c.id, e); }
   }
   console.info("[sandpie] Auto-archived " + stale.length + " conversation(s) older than " + AUTO_ARCHIVE_DAYS + " days");
-  return stale.length;
+  await refreshConversationList();
 }
 
 async function refreshConversationList() {
   const ul = $('convList');
   if (!ul) return;
   let list = await listConversations();
-  const numArchived = await autoArchiveStale(list);
-  // Re-fetch if auto-archive moved any conversations out of the active list.
-  if (numArchived) list = await listConversations();
 
   const searchInput = $('convSearch');
   if (searchInput && searchInput.value.trim()) {
@@ -5376,6 +5375,9 @@ function bootConversations() {
     };
     Sandpie.events.on('file:changed', invalidateConvRow);
     Sandpie.events.on('file:deleted', invalidateConvRow);
+    // Auto-archive stale conversations once, after the initial Dropbox sync
+    // completes (splash still visible) — not on a timer.
+    Sandpie.events.on('sync:done', () => autoArchiveStale());
   }
   (async () => {
     await refreshConversationList();
