@@ -317,6 +317,8 @@ function renderArtifact(host, path) {
   // collapses to its V2 card so only the newest 3 stay unminimized. Also covers
   // historical replay: as each stored artifact re-renders, older ones collapse.
   enforceArtifactCap(artifactPane(wrap), wrap);
+  // Low-end devices: also freeze this frame while it's scrolled far off-screen.
+  observeArtifactVisibility(wrap);
 }
 
 // (Re)load an artifact's iframe from a fresh OPFS blob URL. Used both for the
@@ -331,9 +333,35 @@ async function loadArtifactFrame(wrap, frame, resolvedP, clean) {
     if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
     frame._blobUrl = url;
     frame.src = url;
+    delete frame.dataset.frozen;   // any load makes the frame live again (also self-heals readArtifactConsole)
   } catch (e) {
     showArtifactError(wrap, frame, 'failed to load: ' + (clean || p || '') + ' — ' + (e && e.message || e));
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Frame freeze / thaw — reclaim a hidden or off-screen artifact's memory     */
+/* -------------------------------------------------------------------------- */
+
+// Freezing an iframe is the real memory lever: display:none alone keeps the whole
+// child document, its JS timers/RAF loops, and (crucially) any WebGL/WebGPU/canvas
+// GPU context fully alive. Pointing src at about:blank and revoking the blob URL
+// tears the renderer down, so a collapsed or scrolled-away artifact costs ~nothing.
+// The path lives on wrap.dataset.artifactPath, so thawFrame can rebuild it verbatim.
+function freezeFrame(frame) {
+  if (!frame || frame.dataset.frozen === '1') return;
+  frame.dataset.frozen = '1';
+  if (frame._blobUrl) { URL.revokeObjectURL(frame._blobUrl); frame._blobUrl = null; }
+  frame.src = 'about:blank';
+}
+
+// Reload a frozen frame from OPFS. No-op if it was never frozen (so expanding an
+// already-live frame doesn't needlessly reload and re-run its scripts).
+function thawFrame(wrap, frame) {
+  if (!frame || frame.dataset.frozen !== '1') return;
+  const p = wrap.dataset.artifactPath;
+  if (p) loadArtifactFrame(wrap, frame, resolveArtifactPath(p), p);
+  else delete frame.dataset.frozen;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -366,7 +394,7 @@ function collapseArtifact(wrap) {
   const metaRow = wrap.querySelector('.artifact-meta-row');
   const colBtn = wrap.querySelector('.artifact-collapse-btn');
 
-  if (frame) frame.style.display = 'none';
+  if (frame) { frame.style.display = 'none'; freezeFrame(frame); }
   if (colBtn) { colBtn.textContent = '+'; colBtn.title = 'Expand'; }
   if (metaRow) {
     metaRow.style.display = 'block';
@@ -399,7 +427,7 @@ function expandArtifact(wrap) {
   const metaRow = wrap.querySelector('.artifact-meta-row');
   const colBtn = wrap.querySelector('.artifact-collapse-btn');
 
-  if (frame) frame.style.display = 'block';
+  if (frame) { frame.style.display = 'block'; thawFrame(wrap, frame); }
   if (metaRow) metaRow.style.display = 'none';
   if (colBtn) { colBtn.textContent = '−'; colBtn.title = 'Collapse'; }
 }
@@ -417,12 +445,21 @@ function toggleArtifactCollapse(wrap) {
 /*  Per-pane open-artifact cap                                                */
 /* -------------------------------------------------------------------------- */
 
+// Low-end device detection: coarse, synchronous, free. deviceMemory is bucketed
+// in GB (2/4/8…), hardwareConcurrency is logical cores. Either being small is a
+// good proxy for "an artifact-heavy conversation will thrash this machine". Both
+// can be undefined (Firefox has no deviceMemory) — default to the roomy branch so
+// we never over-restrict a capable browser that just doesn't expose the hint.
+const LOW_END_DEVICE = ((navigator.deviceMemory || 8) <= 4) || ((navigator.hardwareConcurrency || 8) <= 4);
+
 // Max unminimized artifact frames per pane (#messages / #messagesSide). When a
 // new show_artifact renders (or the user expands one) and the count would exceed
 // this, the OLDEST open artifact is auto-collapsed back to its V2 card — newest
 // N stay open. Panel-only / non-renderable artifacts have no inline frame, so
-// they never count toward the cap.
-const MAX_OPEN_ARTIFACTS_PER_PANE = 3;
+// they never count toward the cap. Low-end machines keep just ONE live frame:
+// combined with freeze-on-collapse (see freezeFrame), that means at most one
+// artifact renderer/GPU context is alive per pane on weak hardware.
+const MAX_OPEN_ARTIFACTS_PER_PANE = LOW_END_DEVICE ? 1 : 3;
 
 // Which pane a wrap lives in: 'side' (#messagesSide, the right conversation
 // panel) or 'main' (#messages). Anything not inside the side panel counts as
@@ -454,6 +491,35 @@ function enforceArtifactCap(pane, keepWrap) {
     collapseArtifact(wrap);
     count--;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Off-screen freezing (low-end devices only)                                */
+/* -------------------------------------------------------------------------- */
+
+// On weak hardware, even an under-the-cap open artifact costs memory while it sits
+// scrolled far off-screen. A single shared IntersectionObserver freezes an EXPANDED
+// frame once it leaves the viewport (plus ~a screenful of slack) and thaws it when
+// it returns. Collapsed frames are skipped — the cap/collapse path already froze
+// them and owns their lifecycle. Disabled on roomy devices: the reload-on-scroll-
+// back flash isn't worth it when RAM is plentiful. rootMargin keeps a generous
+// margin so normal scrolling near an artifact doesn't churn it.
+let _artifactVisIO = null;
+function observeArtifactVisibility(wrap) {
+  if (!LOW_END_DEVICE || typeof IntersectionObserver === 'undefined') return;
+  if (!_artifactVisIO) {
+    _artifactVisIO = new IntersectionObserver((entries) => {
+      for (const ent of entries) {
+        const w = ent.target;
+        if (w.dataset.artifactCollapsed === '1') continue;   // cap/collapse owns these
+        const frame = w.querySelector('.artifact-frame');
+        if (!frame) continue;
+        if (ent.isIntersecting) thawFrame(w, frame);
+        else freezeFrame(frame);
+      }
+    }, { rootMargin: '800px 0px' });
+  }
+  _artifactVisIO.observe(wrap);
 }
 
 /* -------------------------------------------------------------------------- */
