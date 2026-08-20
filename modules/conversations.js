@@ -1299,6 +1299,9 @@ async function duplicateConv(id, title) {
 async function deleteConv(id, title) {
   const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
   if (!confirm(`Delete conversation "${title}"?${dbxNote}`)) return;
+  await _deleteConvFiles(id);
+}
+async function _deleteConvFiles(id) {
   // Explicit user delete removes EVERY file for this id in both dirs — the new pair
   // AND any legacy .json backup. Leaving the .json behind would resurrect the conv
   // on the next list scan. (This is the one place old files are intentionally
@@ -1336,6 +1339,32 @@ async function deleteConv(id, title) {
   }
   await refreshConversationList();
 }
+// ---- Bulk actions over a multi-conversation selection ----
+// Pin every selected conversation (idempotent). One list refresh at the end.
+async function bulkPinConvs(ids) {
+  for (const id of ids) await updateConvFile(id, { pinned: true });
+  _selClear();
+  await refreshConversationList();
+}
+async function bulkArchiveConvs(ids) {
+  for (const id of ids) await toggleArchiveConv(id, false);
+  _selClear();
+  await refreshConversationList();
+}
+async function bulkDuplicateConvs(ids) {
+  for (const id of ids) await duplicateConv(id, '');
+  _selClear();
+  await refreshConversationList();
+}
+async function bulkDeleteConvs(ids) {
+  const n = ids.length;
+  const dbxNote = Sandpie.syncProvider()?.isConnected?.() ? ' This will also remove the cloud copy.' : '';
+  if (n === 1) { await deleteConv(ids[0], '(selected)'); return; }
+  if (!confirm(`Delete ${n} conversations?${dbxNote}`)) return;
+  for (const id of ids) await _deleteConvFiles(id);
+  _selClear();
+  await refreshConversationList();
+}
 function fmtRelTime(iso) {
   if (!iso) return '';
   const then = new Date(iso);
@@ -1370,17 +1399,54 @@ function fmtElapsed(totalSec, tenths = false) {
   const h = Math.floor(totalSec / 3600);
   return h > 0 ? `${h}h${m}m${s}s` : `${m}m${s}s`;
 }
+// ---- Multi-conversation selection (shift/ctrl click + shift-drag rubber band) ----
+// PC-first: shift+click = range (anchor to row), ctrl/cmd+click = toggle, 
+// shift+drag on empty list space = rubber-band, right-click on selection = bulk
+// actions (Pin all / Archive all / Duplicate all / Delete all). Plain click opens.
+const _selConvs = new Set();
+let _selAnchor = -1;
+function _selectedRowCids() {
+  const out = [];
+  const ul = $('convList');
+  if (ul) for (const li of ul.querySelectorAll('li[data-cid]')) out.push(li.dataset.cid);
+  return out;
+}
+function _selIndex(cid) { return _selectedRowCids().indexOf(cid); }
+function _selHighlight() {
+  const ul = $('convList');
+  if (ul) for (const li of ul.querySelectorAll('li[data-cid]'))
+    li.classList.toggle('selected', _selConvs.has(li.dataset.cid));
+  const b = document.getElementById('selCount');
+  if (b) {
+    const n = _selConvs.size;
+    b.style.display = n ? 'inline-block' : 'none';
+    b.textContent = n ? String(n) : '';
+  }
+}
+function _selClear() { _selConvs.clear(); _selAnchor = -1; _selHighlight(); }
+function _selRangeTo(i, j, add) {
+  const rows = _selectedRowCids();
+  const lo = Math.min(i, j), hi = Math.max(i, j);
+  for (let k = lo; k <= hi; k++) {
+    const id = rows[k];
+    if (id && add) _selConvs.add(id);
+  }
+  _selAnchor = hi;
+  _selHighlight();
+}
 function buildConvLi(c, idx) {
+
   const li = document.createElement('li');
   li.dataset.cid = c.id;
   if (c.id === activeConvId) li.classList.add('active');
   if (sidePanel?.isOpen && c.id === sidePanel.sideId) li.classList.add('in-panel');
   if (c.archived) li.classList.add('archived');
+  if (_selConvs.has(c.id)) li.classList.add('selected');
+  li.dataset.selorder = String(idx);
   const span = document.createElement('span');
   span.className = 'name';
   span.textContent = (c.pinned ? '> ' : '') + c.title;
   span.title = c.updated || '';
-  span.onclick = () => loadConv(c.id);
   li.appendChild(span);
   // This conversation was just auto-titled: play the landing animation on the row
   // we're building (the old one is already gone — see maybeAutoTitle). The final
@@ -1415,7 +1481,51 @@ function buildConvLi(c, idx) {
     if (hasNew && c.id !== activeConvId) meta.classList.add('unseen');
   }
   li.appendChild(meta);
+  // Row click: multi-select aware (shift = range, ctrl/cmd = toggle). Plain click
+  // either opens the conversation or, if it lands on a selected row, keeps the
+  // selection (so bulk actions stay usable).
+  li.addEventListener('click', (ev) => {
+    if (ev.button !== undefined && ev.button !== 0) return;
+    const idx = parseInt(li.dataset.selorder || '-1', 10);
+    if (ev.shiftKey || ev.ctrlKey || ev.metaKey) {
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.shiftKey) {
+        if (_selConvs.size === 0) { _selConvs.add(c.id); _selAnchor = idx; _selHighlight(); }
+        else _selRangeTo(_selAnchor, idx, true);
+      } else {
+        if (_selConvs.has(c.id)) _selConvs.delete(c.id); else _selConvs.add(c.id);
+        _selAnchor = idx;
+        _selHighlight();
+      }
+      return;
+    }
+    // Plain click: if this row is part of a selection, keep selection (no open).
+    if (_selConvs.size > 0 && _selConvs.has(c.id)) {
+      ev.preventDefault(); ev.stopPropagation();
+      return;
+    }
+    // Plain click outside a selection: clear selection, then open normally.
+    _selClear();
+    loadConv(c.id);
+  });
   const _openConvMenu = (ev) => {
+    // Right-clicking a row that is NOT part of the current selection collapses the
+    // selection to just that row (standard multi-select UX).
+    if (_selConvs.size > 0 && !_selConvs.has(c.id)) {
+      _selConvs.clear(); _selConvs.add(c.id); _selHighlight();
+    }
+    if (_selConvs.size > 1) {
+      const ids = [..._selConvs];
+      const items = [
+        { info: _selConvs.size + ' conversations selected' },
+        { label: 'Pin all',           action: () => bulkPinConvs(ids) },
+        { label: 'Archive all',       action: () => bulkArchiveConvs(ids) },
+        { label: 'Duplicate all',     action: () => bulkDuplicateConvs(ids) },
+        { label: 'Delete all', danger: true, action: () => bulkDeleteConvs(ids) },
+      ];
+      showContextMenu(ev.clientX, ev.clientY, items);
+      return;
+    }
     const items = [
       { label: 'Rename',                             action: () => renameConv(c.id, c.title) },
       { label: c.pinned ? 'Unpin' : 'Pin',           action: () => togglePinConv(c.id, c.pinned) },
@@ -1439,6 +1549,8 @@ function buildConvLi(c, idx) {
 
   li.draggable = true;
   li.addEventListener('dragstart', (ev) => {
+    // Shift+drag on a row is a selection gesture, not a panel drag.
+    if (ev.shiftKey) { ev.preventDefault(); return; }
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
     ev.dataTransfer.effectAllowed = 'copy';
     // Show the dashed drop zone immediately, before the pointer even reaches the
@@ -5484,6 +5596,62 @@ function registerArchiveSettingsTab() {
   });
 }
 
+// ---- Rubber-band multi-select (shift+drag on empty sidebar space) + clear ----//
+// A translucent band is drawn from the press point as the pointer drags, and every
+// conv row its rectangle intersects joins the selection. Drops the band on release.
+// Also: Esc in the sidebar clears the current selection.
+let _rbActive = false, _rbStart = null;
+function _installConvListGestures() {
+  const ul = $('convList');
+  if (!ul) return;
+  const band = document.createElement('div');
+  band.className = 'conv-rubber';
+  band.style.display = 'none';
+  document.body.appendChild(band);
+  const styleBand = (x, y) => {
+    const a = _rbStart;
+    const left = Math.min(a.x, x), top = Math.min(a.y, y);
+    band.style.left = left + 'px'; band.style.top = top + 'px';
+    band.style.width = (Math.abs(x - a.x)) + 'px';
+    band.style.height = (Math.abs(y - a.y)) + 'px';
+    band.style.display = 'block';
+    const rbRect = band.getBoundingClientRect();
+    _selConvs.clear();
+    for (const li of ul.querySelectorAll('li[data-cid]')) {
+      const lr = li.getBoundingClientRect();
+      const hit = !(lr.right < rbRect.left || lr.left > rbRect.right ||
+                    lr.bottom < rbRect.top || lr.top > rbRect.bottom);
+      if (hit) _selConvs.add(li.dataset.cid);
+    }
+    _selHighlight();
+  };
+  ul.addEventListener('pointerdown', (ev) => {
+    if (!ev.shiftKey) return;                 // only shift+drag selects
+    if (ev.target !== ul && ev.target.closest('li[data-cid]')) { return; } // starting on a row: let normal click handle it
+    _rbActive = true; _rbStart = { x: ev.clientX, y: ev.clientY };
+    ev.preventDefault();
+  });
+  ul.addEventListener('pointermove', (ev) => {
+    if (!_rbActive) return;
+    styleBand(ev.clientX, ev.clientY);
+  });
+  const _rbEnd = () => {
+    if (!_rbActive) return;
+    _rbActive = false;
+    band.style.display = 'none';
+    _rbStart = null;
+  };
+  ul.addEventListener('pointerup', _rbEnd);
+  ul.addEventListener('pointercancel', _rbEnd);
+  // Click on empty sidebar space clears the selection (same as Esc).
+  ul.addEventListener('click', (ev) => {
+    if (ev.target === ul && _selConvs.size) _selClear();
+  });
+  // Esc clears the current multi-selection.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && _selConvs.size) _selClear();
+  });
+}
 function bootConversations() {
   registerArchiveSettingsTab();
   if (typeof Sandpie !== 'undefined' && Sandpie.events) {
@@ -5508,6 +5676,7 @@ function bootConversations() {
     // Auto-archive stale conversations once, after the initial Dropbox sync
     // completes (splash still visible) — not on a timer.
     Sandpie.events.on('sync:done', () => autoArchiveStale());
+    _installConvListGestures();
   }
   (async () => {
     await refreshConversationList();

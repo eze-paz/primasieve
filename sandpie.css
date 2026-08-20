@@ -824,6 +824,34 @@ ul.conv-list li.active {
   outline: 1px solid var(--sp-accent);
 }
   ul.conv-list li.lp-active { background: var(--sp-accent-dim); border-color: var(--sp-accent); }
+  /* Multi-select (shift/ctrl click + rubber band): a row in the active selection. */
+  ul.conv-list li.selected {
+    background: var(--sp-accent-dim);
+    border-color: var(--sp-accent);
+  }
+  ul.conv-list li.selected .name { color: var(--sp-text); }
+  /* Translucent rubber-band rectangle drawn when the user shift+drags on empty
+     sidebar space; every conv row it intersects joins the selection. */
+  .conv-rubber {
+    position: fixed;
+    background: rgba(88, 166, 255, 0.14);
+    border: 1px solid var(--sp-accent);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 120;
+  }
+  /* Selection count badge next to the conversation count in the summary row. */
+  .conv-sel-count {
+    margin-left: 4px;
+    background: var(--sp-accent);
+    color: var(--sp-bg);
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0 5px;
+    border-radius: 8px;
+    line-height: 1;
+    display: none;
+  }
 
   /* Auto-title landing (auto-title.js → maybeAutoTitle): the row pulses accent
      while the generated name types itself in. The ring is a box-shadow, NOT
