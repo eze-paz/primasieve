@@ -1340,9 +1340,9 @@ function fmtRelTime(iso) {
   const day = Math.floor(hr / 24);
   if (day < 7) return day + 'd';
   const wk = Math.floor(day / 7);
-  if (wk < 4) return wk + 'w';
+  if (wk < 5) return wk + 'w';
   const mo = Math.floor(day / 30);
-  if (mo < 12) return mo + 'mo';
+  if (mo <= 12) return mo + 'mo';
   return Math.floor(day / 365) + 'y';
 }
 // Sibling to fmtRelTime() above. That renders a past instant as a coarse
