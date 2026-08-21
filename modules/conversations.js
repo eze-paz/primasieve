@@ -185,11 +185,11 @@ function renderMessagesBefore(msgs, host, scrollEl) {
   }
   if (anchor) host.insertBefore(frag, anchor);
   else host.appendChild(frag);
-  // Pin the visible content: compensate scrollTop for the height added above.
-  // Skip when native scroll anchoring is active for the load (sp-load-anchor):
-  // the browser already holds the viewport (through async reflow too), so manual
-  // compensation would double-shift and reintroduce the jiggle.
-  if (scrollEl && !scrollEl.classList.contains('sp-load-anchor')) {
+  // The conv-host anchors by default (overflow-anchor:auto), so the browser holds
+  // the viewport through this prepend AND later async reflow — no manual pinning
+  // needed, and doing it here would double-shift. Only compensate in the rare case
+  // anchoring is off (mid-stream, sp-streaming), where the app drives scroll itself.
+  if (scrollEl && scrollEl.classList.contains('sp-streaming')) {
     scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
   }
 }
@@ -1124,11 +1124,6 @@ async function loadConv(id) {
       s.messages = allMsgs;     // grow on the stream NOW so concurrent sends see it
       s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial-append saves mid-load
       let firstBatchRendered = false;
-      // Native scroll anchoring for the duration of the load: the browser pins the
-      // viewport through both the prepends and their later async reflow, so the DOM
-      // doesn't jiggle. renderMessagesBefore skips its manual compensation while
-      // this class is set (they would double-shift). Removed in the finally.
-      try { s.host.classList.add('sp-load-anchor'); } catch (_) {}
 
       for await (const result of readConvJsonlTail(jp, fileSize)) {
         // result.messages is newest-first (reverse chrono). Reverse it to
@@ -1177,10 +1172,6 @@ async function loadConv(id) {
       _finalizeIncrementalLoad(s, s.host);
     } finally {
       s._loading = false;
-      // Load done → revert to manual scroll control (overflow-anchor:none) so
-      // streaming's scroll-to-bottom behaves. rAF so any final async reflow from
-      // the last batch settles under anchoring before we hand control back.
-      try { const h = s.host; requestAnimationFrame(() => { try { h.classList.remove('sp-load-anchor'); } catch (_) {} }); } catch (_) {}
     }
   })();
 }
@@ -1728,12 +1719,19 @@ function setStreamSending(stream, sending) {
   if (sending) {
     stream.abort = new AbortController();
     stream.generating = true;
+    // Streaming drives scroll manually (token-by-token scroll-to-bottom), so turn
+    // OFF the conv-host's default overflow-anchor for the turn — anchoring would
+    // fight the follow. Single source of truth for the class (tracks generating).
+    try { if (stream.host) stream.host.classList.add('sp-streaming'); } catch (_) {}
     // A new turn starts fresh — clear any stale pending-ask flag for this conv
     // (left behind if a previous turn was aborted mid-question).
     _askingConvs.delete(activeConvId);
   } else {
     stream.abort = null;
     stream.generating = false;
+    // Turn ended (normal or abort) → restore default anchoring so reading/loading
+    // never jiggles.
+    try { if (stream.host) stream.host.classList.remove('sp-streaming'); } catch (_) {}
 
     for (const el of stream.host.querySelectorAll('.tool-call')) {
       if (el.querySelector('.tc-prompt')) continue;
