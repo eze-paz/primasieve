@@ -1434,15 +1434,6 @@ ul.conv-list li.active {
     padding: 0.2rem 0.6rem;
   }
   .tool-call { padding: 0; }
-  .tool-call + .tool-call { margin-top: -0.6rem; }
-  /* `display: none` hides the thought box but leaves it in the sibling chain, so a
-     hidden one between two tool calls breaks the `+` match above and reopens the
-     full 1rem host gap — that is the irregular-gap artefact. Skip over hidden
-     boxes (up to three in a row, all a round realistically produces). Scoped to
-     thoughts-hidden: when they are shown the box genuinely separates the calls. */
-  body:not(.thoughts-visible) .tool-call + .msg.think + .tool-call,
-  body:not(.thoughts-visible) .tool-call + .msg.think + .msg.think + .tool-call,
-  body:not(.thoughts-visible) .tool-call + .msg.think + .msg.think + .msg.think + .tool-call { margin-top: -0.6rem; }
   .tool-call .tc-expanded { display: none; }
   .tool-call.expanded .tc-expanded { display: block; }
 
