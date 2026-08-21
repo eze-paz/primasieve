@@ -1462,6 +1462,60 @@ ul.conv-list li.active {
   .tool-call .tc-collapsed:hover .tc-chevron { opacity: 0.7; }
   .tool-call.expanded .tc-collapsed .tc-chevron { transform: rotate(90deg); opacity: 0.7; }
 
+  /* ---- Task Register: consecutive tool calls grouped in one block titled by
+     the active checklist item (tgLogFor in conversations.js). Collapsed, only
+     the newest call row shows, so a long grind stays one block tall; the header
+     strip draws one DRAM-style cell per call (pulsing = running) plus a hollow
+     cell per remaining checklist item. */
+  .msg.tool-group {
+    padding: 0;
+    align-self: flex-start;
+    width: fit-content;
+    min-width: min(22rem, 100%);
+    max-width: 88%;
+    border: 1px solid var(--sp-border);
+    border-radius: 10px;
+    overflow: hidden;
+    font: 12px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+  }
+  .tool-group .tg-hd {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.38rem 0.7rem;
+    border-bottom: 1px solid var(--sp-border);
+    cursor: pointer; user-select: none;
+    transition: background 0.15s ease;
+  }
+  .tool-group .tg-hd:hover { background: var(--sp-panel); }
+  .tool-group .tg-prompt { flex: none; color: var(--sp-accent); font-weight: 700; }
+  .tool-group .tg-title {
+    color: var(--sp-text); font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tool-group .tg-count { flex: none; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
+  .tool-group .tg-strip {
+    display: flex; align-items: center; gap: 3px;
+    margin-left: auto; flex: none; padding-left: 0.5rem;
+  }
+  .tool-group .tg-cell { width: 6px; height: 6px; border-radius: 1.5px; background: var(--sp-accent); flex: none; }
+  .tool-group .tg-cell.run {
+    background: transparent;
+    outline: 1.5px solid var(--sp-accent); outline-offset: -1.5px;
+    animation: tg-pulse 1s ease-in-out infinite;
+  }
+  .tool-group .tg-cell.off { background: var(--sp-border); }
+  @keyframes tg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .tool-group .tg-cell.run { animation: none; } }
+  .tool-group .tg-more { flex: none; color: var(--sp-text-dim); font-size: 9.5px; }
+  .tool-group .tg-chevron {
+    flex: none; color: var(--sp-text-dim); opacity: 0.5; font-size: 10px;
+    transition: transform 0.2s ease;
+  }
+  .tool-group.tg-open .tg-chevron { transform: rotate(90deg); }
+  .tool-group .tg-log { display: flex; flex-direction: column; padding: 0.15rem 0.3rem; }
+  /* Collapsed register: only the live/latest call row is visible. */
+  .tool-group:not(.tg-open) .tg-log > .msg.tool-call:not(:last-child) { display: none; }
+  .tool-group .tg-log > .msg.tool-call { max-width: 100%; }
+
   .tool-box {
     background: var(--sp-bg);
     border: 1px solid var(--sp-border);

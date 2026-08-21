@@ -507,6 +507,7 @@ function renderHistoricalMessage(m, host = null) {
         if (todos) {
           if (box) { renderTodos(tcId, todos, target); }
           else { target.appendChild(buildTodosView(todos)); }
+          tgOnTodos(target, todos);
         }
       } else if (sent.startsWith('answers:')) {
         // Tool result: answered questions. The box already shows the human-readable
@@ -600,6 +601,9 @@ function markStaleAsks(host) {
 }
 
 function renderConversation(msgs, compaction, host = null) {
+  // Fresh replay: drop any Task Register state left from a previous render of
+  // this target — groups AND the replayed-todos snapshot that titles them.
+  tgReset(_tgResolveTarget(host));
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
   if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
   else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host); }
@@ -1706,6 +1710,10 @@ function setStreamSending(stream, sending) {
       el.classList.remove('in-flight');
       renderTcDone(el, el.dataset.fname);
     }
+    // Settle every register's strip (no pulsing cells after the turn ends) and
+    // end the current group so the next turn opens a fresh block.
+    for (const g of stream.host.querySelectorAll('.msg.tool-group')) tgUpdate(g);
+    tgBreak(stream.host);
   }
   if (stream === activeStream()) refreshSendButtonForActive();
 
@@ -2768,6 +2776,9 @@ function addMsg(role, text = '', host = null) {
   const visible = !!scrollHost;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
+  // Task Register: tool calls mount inside the current group's log; any other
+  // message ends the run so the next call opens a fresh group.
+  const mount = role === 'tool-call' ? tgLogFor(target) : (tgBreak(target), target);
   if (role === 'tool-call') {
 
     const expanded = document.createElement('span');
@@ -2825,7 +2836,8 @@ function addMsg(role, text = '', host = null) {
     }
     div.appendChild(bubble);
   }
-  appendContent(target, div);
+  if (mount !== target) { mount.appendChild(div); tgUpdate(mount.parentNode); }
+  else appendContent(target, div);
 
   const timer = target.querySelector(':scope > .msg-timer:not(.done)');
   if (timer) appendContent(target, timer);
@@ -3479,6 +3491,130 @@ function renderTcDone(div, fname, args) {
   if (fname === 'load_image' || fname === 'ask') div.classList.add('expanded');
 }
 
+// ---- Task Register ---------------------------------------------------------
+// Consecutive tool calls render inside ONE block (.msg.tool-group) titled by
+// the active checklist item, instead of N loose rows each paying the conv-host
+// 1rem flex gap. State is per render target (a .conv-host or a history
+// DocumentFragment): the current group, its title, and the checklist as of the
+// last write_todos seen ON THAT TARGET — deliberately not stream.todos, which
+// during a history replay already holds the FINAL checklist and would title
+// early groups with a task that hadn't started yet.
+// A group ends when: a non-tool message renders (addMsg), the active checklist
+// item changes (tgOnTodos), or the turn ends (the turn-end sweep). If something
+// rendered after the group (thinking box, artifact, ask card), the next call
+// re-anchors the group to the bottom rather than splitting it.
+const _tgByTarget = new WeakMap();
+const TG_FALLBACK = { en: 'Working', es: 'Trabajando', ca: 'Treballant' };
+const TG_CALLS = { en: ['call', 'calls'], es: ['llamada', 'llamadas'], ca: ['crida', 'crides'] };
+const TG_MAX_CELLS = 24;
+
+function _tgResolveTarget(host) {
+  // Mirror addMsg's target resolution so all hooks key the same element.
+  return host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
+}
+function _tgState(target) {
+  let st = _tgByTarget.get(target);
+  if (!st) { st = { group: null, title: '', todos: null }; _tgByTarget.set(target, st); }
+  return st;
+}
+function tgActiveTitle(todos) {
+  const t = (todos || []).find(x => x && x.status === 'in_progress');
+  return t ? (t.activeForm || t.content || '') : '';
+}
+// Any non-tool message ends the current run of calls.
+function tgBreak(target) {
+  const st = _tgByTarget.get(target);
+  if (st) st.group = null;
+}
+// Full reset (conversation re-render): drop the group AND the replayed todos.
+function tgReset(target) {
+  if (target) _tgByTarget.set(target, { group: null, title: '', todos: null });
+}
+// A write_todos result landed on this target: adopt the checklist, refresh the
+// open group's header, and end the group if the active item changed.
+function tgOnTodos(host, todos) {
+  const target = _tgResolveTarget(host);
+  if (!target || !Array.isArray(todos)) return;
+  const st = _tgState(target);
+  st.todos = todos;
+  if (st.group) {
+    tgUpdate(st.group);
+    if (tgActiveTitle(todos) !== st.title) st.group = null;
+  }
+}
+// The mount point for a new tool-call div: the current group's log, creating or
+// re-anchoring the group as needed. Falls back to the bare target if the DOM
+// shape is unexpected, so a tool call is never silently dropped.
+function tgLogFor(target) {
+  const st = _tgState(target);
+  // The pane was cleared/re-rendered under us (contains() also works on fragments).
+  if (st.group && !target.contains(st.group)) st.group = null;
+  if (!st.group) {
+    st.title = tgActiveTitle(st.todos) || (TG_FALLBACK[tcLang()] || TG_FALLBACK.en);
+    st.group = _tgBuild(st.title, st);
+    appendContent(target, st.group);
+  } else {
+    // Something (thinking box, artifact, ask card) rendered below the group —
+    // move the group back to the bottom so the run stays one block.
+    let n = st.group.nextElementSibling;
+    while (n && n.classList && n.classList.contains('msg-timer')) n = n.nextElementSibling;
+    if (n) appendContent(target, st.group);
+  }
+  return st.group.querySelector(':scope > .tg-log') || target;
+}
+function _tgBuild(title, st) {
+  const g = document.createElement('div');
+  g.className = 'msg tool-group';
+  g._tgSt = st;
+  const hd = document.createElement('div');
+  hd.className = 'tg-hd';
+  hd.innerHTML =
+    '<span class="tg-prompt">&gt;&gt;&gt;</span>' +
+    `<span class="tg-title" title="${tcEscape(title)}">${tcEscape(title)}</span>` +
+    '<span class="tg-count"></span>' +
+    '<span class="tg-strip"></span>' +
+    '<span class="tg-chevron">▸</span>';
+  hd.addEventListener('click', (ev) => { ev.stopPropagation(); g.classList.toggle('tg-open'); });
+  const log = document.createElement('div');
+  log.className = 'tg-log';
+  g.append(hd, log);
+  return g;
+}
+// Repaint a group's header (call count, checklist progress, cell strip) from
+// its current DOM. Cheap enough to run per tool event; an emptied group (its
+// only call was a removed respond box) removes itself.
+function tgUpdate(group) {
+  if (!group || !group.classList || !group.classList.contains('tool-group')) return;
+  const log = group.querySelector(':scope > .tg-log');
+  const calls = log ? log.querySelectorAll(':scope > .msg.tool-call') : [];
+  if (!calls.length) {
+    if (group._tgSt && group._tgSt.group === group) group._tgSt.group = null;
+    group.remove();
+    return;
+  }
+  const todos = (group._tgSt && group._tgSt.todos) || [];
+  const done = todos.filter(t => t && t.status === 'completed').length;
+  const pending = todos.filter(t => t && t.status === 'pending').length;
+  const countEl = group.querySelector('.tg-count');
+  if (countEl) {
+    const w = TG_CALLS[tcLang()] || TG_CALLS.en;
+    countEl.textContent =
+      (todos.length ? done + '/' + todos.length + ' · ' : '') +
+      calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+  }
+  const strip = group.querySelector('.tg-strip');
+  if (strip) {
+    let html = '';
+    const over = calls.length - TG_MAX_CELLS;
+    if (over > 0) html += `<span class="tg-more">+${over}</span>`;
+    for (let i = Math.max(0, over); i < calls.length; i++) {
+      html += `<span class="tg-cell${calls[i].classList.contains('in-flight') ? ' run' : ''}"></span>`;
+    }
+    for (let i = 0; i < Math.min(pending, 8); i++) html += '<span class="tg-cell off"></span>';
+    strip.innerHTML = html;
+  }
+}
+
 class RoundRenderer {
   constructor(host, convMessages, isLocal = false, convId = null) {
     this.host = host;
@@ -3542,7 +3678,11 @@ class RoundRenderer {
   retryRound() {
     if (this.reply) { this.reply.remove(); this.reply = null; }
     if (this.thinkEl) { this.thinkEl.remove(); this.thinkEl = null; }
-    for (const el of this.toolCallEls) if (el) el.remove();
+    // Collect the registers holding this round's boxes BEFORE removing them, so
+    // an emptied group can remove itself (tgUpdate) instead of lingering.
+    const groups = new Set();
+    for (const el of this.toolCallEls) if (el) { const g = el.closest('.msg.tool-group'); if (g) groups.add(g); el.remove(); }
+    for (const g of groups) tgUpdate(g);
     this.startRound();
   }
   applyDelta(delta) {
@@ -3639,6 +3779,7 @@ class RoundRenderer {
     }
     this.toolCallEls[idx].classList.add('in-flight');
     renderTcRunning(this.toolCallEls[idx], tc.function.name, tc.function.arguments);
+    tgUpdate(this.toolCallEls[idx].closest('.msg.tool-group'));
   }
   // Create a tool-call box for a call that never streamed as deltas. Returns its
   // index (or -1 if it can't be built). Mirrors _applyToolCallDelta's box setup.
@@ -3663,7 +3804,11 @@ class RoundRenderer {
     // fallback below, which would staple this result onto a different tool.
     if (String(result || '').replace(/^\[r\d+\]\s*/, '').startsWith('respond:')) {
       const j = this.toolCalls.findIndex(t => t && t.id === tcId);
-      if (j >= 0 && this.toolCallEls[j]) { this.toolCallEls[j].remove(); this.toolCallEls[j] = null; }
+      if (j >= 0 && this.toolCallEls[j]) {
+        const g = this.toolCallEls[j].closest('.msg.tool-group');
+        this.toolCallEls[j].remove(); this.toolCallEls[j] = null;
+        tgUpdate(g);   // an emptied group removes itself
+      }
       return;
     }
     let idx = this.toolCalls.findIndex(t => t && t.id === tcId);
@@ -3681,6 +3826,7 @@ class RoundRenderer {
     if (el) {
       el.classList.remove('in-flight');
       renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.arguments) || undefined);
+      tgUpdate(el.closest('.msg.tool-group'));
     }
     const text = String(result || '');
     // Sentinel checks ignore the citable result-id tag ("[rN] ") the worker
@@ -3722,6 +3868,7 @@ class RoundRenderer {
         if (s) s.todos = todos;
       }
       if (todos && el) renderTodos(el, todos, this.host);
+      if (todos) tgOnTodos(this.host, todos);
       return;
     }
 
@@ -4684,6 +4831,7 @@ class SidePanel {
     if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
     const s = ensureStream(id);
     hydrateStreamFromData(s, data);
+    tgReset(s.host);
     for (const m of s.messages) renderHistoricalMessage(m, s.host);
   }
 
