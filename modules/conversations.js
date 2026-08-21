@@ -639,12 +639,22 @@ function renderConversation(msgs, compaction, host = null) {
 // No-op when the stream has no completed turn (timerStart/lastUsage unset) or a
 // timer is already mounted.
 function rebuildSettledTimer(target, s) {
-  if (!target || !s || target.querySelector('.msg-timer')) return;
-  // The ONLY case where a conversation renders no timer line is a brand-new
-  // empty chat (nothing has ever been sent). Any conversation with messages
-  // must show the timer. Missing data points (elapsed, tok/s, label) degrade
-  // gracefully to their defaults rather than suppressing the whole line.
-  if (!s.messages || !s.messages.length) return;
+  if (!s) return;
+  const slot = _timerSlotFor(s);
+  if (!slot) return;
+  // A LIVE timer is ticking in this slot for the CURRENT conversation — do not
+  // overwrite it with a settled replica.
+  if (s.timerEl && s.timerEl === slot && !slot.classList.contains('done')) return;
+  // Brand-new empty chat: no timer line. Blank any stale previous-conversation
+  // text the slot may still hold.
+  if (!s.messages || !s.messages.length) {
+    if (slot.dataset.convId && slot.dataset.convId !== '' + s.id) {
+      slot.innerHTML = '';
+      slot.classList.remove('done');
+      delete slot.dataset.convId;
+    }
+    return;
+  }
   let sec = null, comp = null, label = 'done';
   // Live data (timerStart/lastUsage) from a warm stream takes precedence;
   // persisted data (lastTurn) covers a cold load after refresh.
@@ -672,13 +682,13 @@ function rebuildSettledTimer(target, s) {
     const cur = ip >= 0 ? ip + 1 : s.todos.filter(t => t && t.status === 'completed').length;
     parts.push(`<span class="mt-todos">${cur}/${s.todos.length}</span>`);
   }
-  const el = document.createElement('div');
-  el.className = 'msg-timer done';
-  el.innerHTML = parts.join('');
-  appendContent(target, el);
-  _wireCtxCounter(el, s.id);
+  // Fill the persistent per-pane slot (never create a timer element).
+  slot.classList.add('done');
+  slot.dataset.convId = '' + s.id;
+  slot.innerHTML = parts.join('');
+  _wireCtxCounter(slot, s.id);
   if (s.todos && s.todos.length) {
-    const badge = el.querySelector('.mt-todos');
+    const badge = slot.querySelector('.mt-todos');
     if (badge) {
       const snapshot = s.todos.slice();
       badge.onclick = () => {
@@ -786,6 +796,19 @@ function parkPaneConv(pane) {
   }
 }
 function mountConv(convId, pane = null) {
+  // Conversation switch: blank any stale previous-conversation timer content in
+  // the pane's persistent slot so the newly rendered conv repopulates it.
+  if (convId !== activeConvId) {
+    for (const slotId of ['msgTimerMain', 'msgTimerSide']) {
+      const wrap = document.getElementById(slotId);
+      const t = wrap && wrap.querySelector('.msg-timer');
+      if (t && t.dataset.convId && t.dataset.convId !== '' + convId) {
+        t.innerHTML = '';
+        t.classList.remove('done');
+        delete t.dataset.convId;
+      }
+    }
+  }
   activeConvId = convId;
   if (convId) {
     localStorage.setItem('sandpie-active-conv', convId);
@@ -5199,22 +5222,28 @@ function _wireCtxCounter(el, convId) {
   _paintCtxCounter(el, convId);
 }
 
+// The msg-timer no longer lives inside the scrollable conv-host. Each PANE has
+// one persistent slot above its composer (#msgTimerMain / #msgTimerSide) that
+// is always present in the markup and is only ever FILLED (never created or
+// removed) by conversation logic. Which slot a stream owns follows the pane
+// hosting its .conv-host; unmounted/ambiguous defaults to the main pane.
+function _timerSlotFor(stream) {
+  let h = stream && stream.host;
+  while (h && h.id !== 'messages' && h.id !== 'messagesSide') h = h.parentElement;
+  const side = !!(h && h.id === 'messagesSide');
+  const slot = document.getElementById(side ? 'msgTimerSide' : 'msgTimerMain');
+  return slot ? slot.querySelector('.msg-timer') : null;
+}
+
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
+  const el = _timerSlotFor(stream);
+  if (!el) return;
   stream.timerStart = Date.now();
-
-  // ONE timer per host — a new live turn REPLACES the previous turn's settled
-  // (.done) line instead of stacking a second one above it. endTotalTimer
-  // leaves the element (so refresh can rebuild it from lastTurn) but nulls
-  // stream.timerEl, so the guard above would otherwise pass and the host would
-  // accumulate one .done per turn.
-  if (stream.host) {
-    const prev = stream.host.querySelector(':scope > .msg-timer');
-    if (prev) prev.remove();
-  }
-
-  const el = document.createElement('div');
-  el.className = 'msg-timer';
+  // ONE timer per pane: the persistent slot above the composer is reused for a
+  // new live turn — clear any settled (.done) state so only the live line shows.
+  el.classList.remove('done');
+  el.dataset.convId = '' + (stream.id || '');
   // Built once; the tick mutates the leaf <span>s in place. No live tok/s — with
   // estimation removed there is no per-turn token count until the provider reports
   // usage at turn end (local WebGPU models report via the engine; see endTotalTimer).
@@ -5223,7 +5252,6 @@ function startTotalTimer(stream) {
     '<span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
     '<span class="mt-todos"></span>';
-  stream.host.appendChild(el);
   stream.timerEl = el;
 
   const timeEl = el.querySelector('.mt-time');
@@ -5268,7 +5296,8 @@ function startTotalTimer(stream) {
     // s.host.innerHTML) detaches the live timer, and startTotalTimer's guard
     // then never rebuilds it — so it vanishes for the rest of the turn. If it's
     // been orphaned, re-append it to the (rebuilt) host at the next tick.
-    if (!stream.timerEl.isConnected && stream.host) stream.host.appendChild(stream.timerEl);
+    // The slot is a persistent element in the pane (not the conv-host), so a host
+    // re-render can never detach it. Left intentionally bare. 
     set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
     paintTodos();
 
@@ -5283,7 +5312,10 @@ function endTotalTimer(stream, label) {
   clearInterval(stream.timerInterval);
   stream.timerInterval = null;
   if (label === null) {
-    stream.timerEl.remove();
+    // Persistent per-pane bar: never remove the element — blank it so it stays.
+    stream.timerEl.innerHTML = '';
+    stream.timerEl.classList.remove('done');
+    delete stream.timerEl.dataset.convId;
   } else {
     const sec = (Date.now() - stream.timerStart) / 1000;
     // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. tok/s comes

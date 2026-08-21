@@ -647,6 +647,7 @@
   .msg-timer .mt-nn.thinking svg .r3 { animation: ring-out-d2 1.6s ease-out infinite; }
   .msg-timer .mt-nn.thinking svg .r-c { animation: ring-center 1.6s ease-in-out infinite; }
   .msg-timer .mt-nn.thinking { opacity: 1; color: var(--sp-accent); }
+  .msg-timer:empty { display: none; }
   .msg-timer .mt-todos:empty { display: none; }
 
   /* ---- per-conversation context popup (anchored to the ctx counter) ---- */
