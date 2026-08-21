@@ -3557,11 +3557,14 @@ function tgLogFor(target) {
   const st = _tgState(target);
   // The pane was cleared/re-rendered under us (contains() also works on fragments).
   if (st.group && !target.contains(st.group)) st.group = null;
-  // No checklist item in_progress → NO register, ever. A fabricated title
-  // ("Working") is a lie about the plan; pre-plan calls render as plain rows.
+  // No checklist item in_progress → an UNTITLED register: same card and tray,
+  // but the header shows the latest call's own label, dimmed (tgUpdate keeps it
+  // current) — never a fabricated task name. Orphan calls (gate exemptions like
+  // the run-end memory harvest, or a model slip) stay visually consistent.
   const title = tgActiveTitle(st.todos);
-  if (!title) { st.group = null; return target; }
-  if (st.group && st.title !== title) st.group = null;
+  const untitled = !title;
+  if (st.group && (st.group.classList.contains('tg-untitled') !== untitled
+                   || (!untitled && st.title !== title))) st.group = null;
   if (!st.group) {
     // Merge instead of duplicating: if the last VISIBLE thing in the pane is
     // already a register with this exact title (the run was broken by something
@@ -3578,13 +3581,17 @@ function tgLogFor(target) {
       break;
     }
     if (prev && prev.classList && prev.classList.contains('tool-group')
-        && (prev.querySelector('.tg-title') || {}).textContent === title) {
+        && (untitled
+            ? prev.classList.contains('tg-untitled')
+            : (!prev.classList.contains('tg-untitled')
+               && (prev.querySelector('.tg-title') || {}).textContent === title))) {
       st.group = prev;
-      st.title = title;
+      st.title = untitled ? '' : title;
       prev._tgSt = st;
     } else {
-      st.title = title;
+      st.title = untitled ? '' : title;
       st.group = _tgBuild(st.title, st);
+      if (untitled) st.group.classList.add('tg-untitled');
       appendContent(target, st.group);
     }
   } else {
@@ -3644,6 +3651,14 @@ function tgUpdate(group) {
     if (!plan) calls.push(el);
   }
   group.classList.toggle('tg-empty', !calls.length);
+  // Untitled register: the header mirrors the LATEST call's own label ("Saving
+  // to memory…" → "Saved to memory") instead of a fabricated task name.
+  if (group.classList.contains('tg-untitled')) {
+    const last = calls[calls.length - 1];
+    const t = last ? ((last.querySelector('.tc-title') || {}).textContent || '') : '';
+    const titleEl = group.querySelector('.tg-title');
+    if (titleEl && titleEl.textContent !== t) { titleEl.textContent = t; titleEl.title = t; }
+  }
   // Count is calls ONLY — checklist progress already lives in the msg-timer
   // badge. On change the number pops (tg-count-pop, restarted via reflow).
   const countEl = group.querySelector('.tg-count');
