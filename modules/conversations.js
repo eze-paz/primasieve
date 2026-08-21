@@ -4102,7 +4102,7 @@ function paneScrollEl(pane) {
 // insert before. Returns null for a .conv-host (no cluster; plain append).
 function paneBottomAnchor(pane) {
   if (!pane || !pane.querySelector) return null;
-  return pane.querySelector(':scope > .cmd-output') || pane.querySelector(':scope > .composer');
+  return pane.querySelector(':scope > .cmd-output') || pane.querySelector(':scope > .msg-timer-slot') || pane.querySelector(':scope > .composer');
 }
 // Append content into a target that may be a PANE (#messages / #messagesSide)
 // rather than a .conv-host. A pane's last children are the command panel and the
