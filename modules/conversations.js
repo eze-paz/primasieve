@@ -5182,6 +5182,16 @@ function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   stream.timerStart = Date.now();
 
+  // ONE timer per host — a new live turn REPLACES the previous turn's settled
+  // (.done) line instead of stacking a second one above it. endTotalTimer
+  // leaves the element (so refresh can rebuild it from lastTurn) but nulls
+  // stream.timerEl, so the guard above would otherwise pass and the host would
+  // accumulate one .done per turn.
+  if (stream.host) {
+    const prev = stream.host.querySelector(':scope > .msg-timer');
+    if (prev) prev.remove();
+  }
+
   const el = document.createElement('div');
   el.className = 'msg-timer';
   // Built once; the tick mutates the leaf <span>s in place. No live tok/s — with
@@ -5208,6 +5218,29 @@ function startTotalTimer(stream) {
   // null → empty tree → the model rewrites and loses state.
   const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
 
+  // The live timer shows the checklist inherited from the stream (seeded from
+  // meta.todos on load) — cur/total plus a click-through to the full view — even
+  // when every item is already completed (a finished checklist is still state
+  // worth showing). Repaint on every tick so mid-turn write_todos updates
+  // appear without waiting for turn end.
+  const paintTodos = () => {
+    const t = stream.todos;
+    if (!t || !t.length) { set(todosEl, ''); return; }
+    const ip = t.findIndex(x => x && x.status === 'in_progress');
+    const cur = ip >= 0 ? ip + 1 : t.filter(x => x && x.status === 'completed').length;
+    set(todosEl, cur + '/' + t.length);
+    if (!todosEl._mtTodosWired) {
+      todosEl._mtTodosWired = true;
+      todosEl.style.cursor = 'pointer';
+      todosEl.title = 'Checklist — click for details';
+      todosEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const snapshot = (stream.todos || []).slice();
+        showCmdPanelForEl(todosEl, buildTodosView(snapshot), 'Checklist');
+      });
+    }
+  };
+
   const paint = () => {
     if (!stream.timerEl) return;
     // Self-heal: a mid-turn host re-render (e.g. a compaction that clears
@@ -5216,6 +5249,7 @@ function startTotalTimer(stream) {
     // been orphaned, re-append it to the (rebuilt) host at the next tick.
     if (!stream.timerEl.isConnected && stream.host) stream.host.appendChild(stream.timerEl);
     set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
+    paintTodos();
 
   };
 
