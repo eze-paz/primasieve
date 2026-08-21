@@ -3586,12 +3586,27 @@ function _tgBuild(title, st) {
 function tgUpdate(group) {
   if (!group || !group.classList || !group.classList.contains('tool-group')) return;
   const log = group.querySelector(':scope > .tg-log');
-  const calls = log ? log.querySelectorAll(':scope > .msg.tool-call') : [];
-  if (!calls.length) {
+  const all = log ? [...log.querySelectorAll(':scope > .msg.tool-call')] : [];
+  if (!all.length) {
     if (group._tgSt && group._tgSt.group === group) group._tgSt.group = null;
     group.remove();
     return;
   }
+  // Planning (write_todos) is bookkeeping, not work: it's excluded from the
+  // visible log, the count, and the cell strip — otherwise every register ends
+  // on "Planned" (the write_todos that closed it). Its checklist card stays
+  // reachable via the timer badge. A group holding ONLY planning hides whole;
+  // a group with nothing running collapses to its header pill (tg-idle).
+  const calls = [];
+  let running = 0;
+  for (const el of all) {
+    const plan = el.dataset.fname === 'write_todos';
+    el.classList.toggle('tc-plan', plan);
+    if (el.classList.contains('in-flight')) running++;
+    if (!plan) calls.push(el);
+  }
+  group.classList.toggle('tg-empty', !calls.length && !running);
+  group.classList.toggle('tg-idle', !running);
   const todos = (group._tgSt && group._tgSt.todos) || [];
   const done = todos.filter(t => t && t.status === 'completed').length;
   const pending = todos.filter(t => t && t.status === 'pending').length;
