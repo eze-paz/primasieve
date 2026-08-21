@@ -3504,7 +3504,6 @@ function renderTcDone(div, fname, args) {
 // rendered after the group (thinking box, artifact, ask card), the next call
 // re-anchors the group to the bottom rather than splitting it.
 const _tgByTarget = new WeakMap();
-const TG_FALLBACK = { en: 'Working', es: 'Trabajando', ca: 'Treballant' };
 const TG_CALLS = { en: ['call', 'calls'], es: ['llamada', 'llamadas'], ca: ['crida', 'crides'] };
 const TG_MAX_CELLS = 24;
 
@@ -3549,10 +3548,36 @@ function tgLogFor(target) {
   const st = _tgState(target);
   // The pane was cleared/re-rendered under us (contains() also works on fragments).
   if (st.group && !target.contains(st.group)) st.group = null;
+  // No checklist item in_progress → NO register, ever. A fabricated title
+  // ("Working") is a lie about the plan; pre-plan calls render as plain rows.
+  const title = tgActiveTitle(st.todos);
+  if (!title) { st.group = null; return target; }
+  if (st.group && st.title !== title) st.group = null;
   if (!st.group) {
-    st.title = tgActiveTitle(st.todos) || (TG_FALLBACK[tcLang()] || TG_FALLBACK.en);
-    st.group = _tgBuild(st.title, st);
-    appendContent(target, st.group);
+    // Merge instead of duplicating: if the last VISIBLE thing in the pane is
+    // already a register with this exact title (the run was broken by something
+    // invisible — a hidden reminder, a collapsed/hidden thinking box, a mid-turn
+    // compaction), adopt it rather than stacking a second same-title block.
+    // Any visible element between (a user bubble, a reply) stops the scan and a
+    // fresh block is correct.
+    let prev = null;
+    const inDoc = !!target.isConnected;   // offsetParent is meaningless inside a fragment
+    for (let n = target.lastElementChild; n; n = n.previousElementSibling) {
+      if (n.classList && (n.classList.contains('msg-timer') || n.classList.contains('think'))) continue;
+      if (inDoc && n.offsetParent === null && !(n.classList && n.classList.contains('tool-group'))) continue;
+      prev = n;
+      break;
+    }
+    if (prev && prev.classList && prev.classList.contains('tool-group')
+        && (prev.querySelector('.tg-title') || {}).textContent === title) {
+      st.group = prev;
+      st.title = title;
+      prev._tgSt = st;
+    } else {
+      st.title = title;
+      st.group = _tgBuild(st.title, st);
+      appendContent(target, st.group);
+    }
   } else {
     // Something (thinking box, artifact, ask card) rendered below the group —
     // move the group back to the bottom so the run stays one block.
@@ -3595,28 +3620,22 @@ function tgUpdate(group) {
   // Planning (write_todos) is bookkeeping, not work: it NEVER renders — not in
   // the log (any state), the count, or the cell strip. Its checklist card stays
   // reachable via the timer badge. A group holding ONLY planning hides whole,
-  // even while the plan call runs; a group with no REAL call running collapses
-  // to its header pill (tg-idle).
+  // even while the plan call runs.
   const calls = [];
-  let running = 0;
   for (const el of all) {
     const plan = el.dataset.fname === 'write_todos';
     el.classList.toggle('tc-plan', plan);
-    if (!plan && el.classList.contains('in-flight')) running++;
     if (!plan) calls.push(el);
   }
   group.classList.toggle('tg-empty', !calls.length);
-  group.classList.toggle('tg-idle', !running);
-  const todos = (group._tgSt && group._tgSt.todos) || [];
-  const done = todos.filter(t => t && t.status === 'completed').length;
-  const pending = todos.filter(t => t && t.status === 'pending').length;
+  // Count is calls ONLY — checklist progress already lives in the msg-timer badge.
   const countEl = group.querySelector('.tg-count');
   if (countEl) {
     const w = TG_CALLS[tcLang()] || TG_CALLS.en;
-    countEl.textContent =
-      (todos.length ? done + '/' + todos.length + ' · ' : '') +
-      calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+    countEl.textContent = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
   }
+  // Strictly ONE cell per call — mixing in hollow cells for remaining todos
+  // made the strip read as a wrong call count.
   const strip = group.querySelector('.tg-strip');
   if (strip) {
     let html = '';
@@ -3625,7 +3644,6 @@ function tgUpdate(group) {
     for (let i = Math.max(0, over); i < calls.length; i++) {
       html += `<span class="tg-cell${calls[i].classList.contains('in-flight') ? ' run' : ''}"></span>`;
     }
-    for (let i = 0; i < Math.min(pending, 8); i++) html += '<span class="tg-cell off"></span>';
     strip.innerHTML = html;
   }
 }

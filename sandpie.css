@@ -1502,7 +1502,6 @@ ul.conv-list li.active {
     outline: 1.5px solid var(--sp-accent); outline-offset: -1.5px;
     animation: tg-pulse 1s ease-in-out infinite;
   }
-  .tool-group .tg-cell.off { background: var(--sp-border); }
   @keyframes tg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
   @media (prefers-reduced-motion: reduce) { .tool-group .tg-cell.run { animation: none; } }
   .tool-group .tg-more { flex: none; color: var(--sp-text-dim); font-size: 9.5px; }
@@ -1517,12 +1516,11 @@ ul.conv-list li.active {
      holding only planning hides entirely (tgUpdate sets the classes). */
   .tool-group .tg-log > .msg.tool-call.tc-plan { display: none; }
   .msg.tool-group.tg-empty { display: none; }
-  /* Collapsed register: only the calls running RIGHT NOW are visible; settled
-     calls live behind the header toggle. With nothing running (tg-idle) the
-     register collapses to the header pill alone. */
-  .tool-group:not(.tg-open) .tg-log > .msg.tool-call:not(.in-flight) { display: none; }
-  .tool-group.tg-idle:not(.tg-open) .tg-hd { border-bottom: none; }
-  .tool-group.tg-idle:not(.tg-open) .tg-log { display: none; }
+  /* Collapsed register: the header pill ALONE — running calls included (a live
+     call is signalled by the pulsing strip cell, not a row, so nothing janks
+     as sub-second calls come and go). The log lives behind the header toggle. */
+  .tool-group:not(.tg-open) .tg-hd { border-bottom: none; }
+  .tool-group:not(.tg-open) .tg-log { display: none; }
   .tool-group .tg-log > .msg.tool-call { max-width: 100%; }
 
   .tool-box {
