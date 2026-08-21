@@ -242,7 +242,8 @@ Typical flow:
 Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).
 Do NOT use it for: a single straightforward task; trivial work; anything doable in under 3 steps; purely conversational requests — it only adds overhead there.
 The harness holds the list as a FLAT set of tasks with IDs; you send deterministic OPS and it returns the current state. You do NOT resend or rewrite the whole list (that silently erased work in the past).
-FIRST plan: send a full list once — {"todos":[{"content":"…"}, …]} — accepted only when there is no checklist yet.
+FIRST plan: send a full list once — {"todos":[{"content":"…","est":8}, …]} — accepted only when there is no checklist yet.
+Each task MAY carry "est": your honest estimate of how many TOOL CALLS it will take (not time). The user sees it as live progress ("14/~20" plus a time projection from the run's own pace), so estimate what you actually expect — including reads and checks — and skip it when you genuinely can't tell.
 THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"add","text":"Run tests","activeForm":"Running tests"?,"blockedBy":["2"]?}   add a task. text = imperative title; activeForm = present-continuous form shown while it runs; blockedBy = ids of tasks that must complete before this one can start.
   {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add/remove blockers (tasks that must complete before this one can start) after creation.
@@ -266,6 +267,7 @@ PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_tod
                 text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests").' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
                 activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
+                est:       { type: 'integer', description: 'For "add": your honest estimate of how many TOOL CALLS the task will take (not time). Shown to the user as live progress — skip it when you have no idea.' },
                 id:        { type: 'string', description: 'For start/complete/delete/block/unblock/blocked: the target task id.' },
                 by:        { type: 'array', items: { type: 'string' }, description: 'For block: mark tasks that must complete before this one can start. For unblock: the blocker ids to remove.' },
                 reason:    { type: 'string', description: 'For "blocked": why the task is stalled (shown in the checklist).' },
@@ -283,6 +285,7 @@ PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_tod
                 status:    { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'Mark tasks (from this same list) that must complete before this one can start.' },
                 activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. "Running tests").' },
+                est:       { type: 'integer', description: 'Your honest estimate of how many TOOL CALLS this task will take (not time). Shown to the user as live progress ("14/~20") — skip it when you have no idea rather than guessing wildly.' },
               },
               required: ['content'],
             },

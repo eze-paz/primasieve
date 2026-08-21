@@ -653,7 +653,10 @@ const _TODO_UNSAT = new Set(['pending', 'in_progress', 'blocked']);   // depende
 const _TODO_ALL = ['pending', 'in_progress', 'completed', 'blocked', 'deleted'];
 function _todoNextId(tree) { let mx = 0; for (const t of tree) { const n = parseInt(t.id, 10); if (n > mx) mx = n; } return String(mx + 1); }
 function _todoBlockers(t, byId) { return (Array.isArray(t.blockedBy) ? t.blockedBy : []).filter(id => { const b = byId.get(id); return b && _TODO_UNSAT.has(b.status); }); }
-function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed, blockedBy: t.blockedBy, activeForm: t.activeForm, reason: t.reason })); }
+function _todoFlat(tree) { return tree.map(t => ({ content: t.content, status: t.status, created: t.created, completed: t.completed, blockedBy: t.blockedBy, activeForm: t.activeForm, reason: t.reason, est: t.est })); }
+// Clamp a model-declared call estimate: a positive integer, capped so a wild
+// guess can't render hundreds of placeholder cells. 0 = no estimate.
+function _todoEst(v) { const n = Math.round(+v); return Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 0; }
 function _todoSummary(tree) {
   const byId = new Map(tree.map(t => [t.id, t]));
   const mark = s => s === 'completed' ? '[x]' : s === 'in_progress' ? '[~]' : s === 'blocked' ? '[!]' : s === 'deleted' ? '[-]' : '[ ]';
@@ -688,6 +691,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       const task = { id: ids[i], content, status, created: now };
       if (Array.isArray(t.blockedBy) && t.blockedBy.length) task.blockedBy = t.blockedBy.map(String).filter(x => ids.includes(x) && x !== ids[i]);
       if (typeof t.activeForm === 'string' && t.activeForm.trim()) task.activeForm = t.activeForm.trim();
+      { const e = _todoEst(t && t.est); if (e) task.est = e; }
       if (status === 'blocked' && t && typeof t.reason === 'string' && t.reason.trim()) task.reason = t.reason.trim();
       if (status === 'completed') task.completed = now;
       tree.push(task);
@@ -731,6 +735,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
         task.blockedBy = bb.filter(id => id !== task.id);
       }
       if (typeof op.activeForm === 'string' && op.activeForm.trim()) task.activeForm = op.activeForm.trim();
+      { const e = _todoEst(op.est); if (e) task.est = e; }
       tree.push(task); byId.set(task.id, task); added.push(task.id);
     } else if (k === 'start' || k === 'complete' || k === 'delete' || k === 'block' || k === 'unblock' || k === 'blocked') {
       const t = byId.get(op.id);

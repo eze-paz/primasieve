@@ -1939,7 +1939,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=112');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=113');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3659,12 +3659,26 @@ function tgUpdate(group) {
     const titleEl = group.querySelector('.tg-title');
     if (titleEl && titleEl.textContent !== t) { titleEl.textContent = t; titleEl.title = t; }
   }
-  // Count is calls ONLY — checklist progress already lives in the msg-timer
-  // badge. On change the number pops (tg-count-pop, restarted via reflow).
+  // ETA: only the register of the CURRENTLY ACTIVE task measures itself
+  // against the model's est (expected tool calls, declared in write_todos);
+  // settled and untitled registers show a plain count.
+  const tds = (group._tgSt && group._tgSt.todos) || [];
+  const act = tds.find(t => t && t.status === 'in_progress');
+  const est = (!group.classList.contains('tg-untitled')
+               && act && (act.activeForm || act.content || '') === (group._tgSt && group._tgSt.title)
+               && Number.isFinite(+act.est) && +act.est > 0) ? Math.round(+act.est) : 0;
+  // Counter: "14/~20 · ≈17s" while under the estimate, an honest "23/20+" past
+  // it (no negative countdown), plain "N calls" otherwise. Pops on change.
   const countEl = group.querySelector('.tg-count');
   if (countEl) {
     const w = TG_CALLS[tcLang()] || TG_CALLS.en;
-    const txt = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+    let txt;
+    if (est && calls.length > est) txt = calls.length + '/' + est + '+';
+    else if (est) {
+      txt = calls.length + '/~' + est;
+      const eta = _tgEtaText(group._tgSt, est - calls.length);
+      if (eta) txt += ' · ≈' + eta;
+    } else txt = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
     if (countEl.textContent !== txt) {
       countEl.textContent = txt;
       countEl.classList.remove('tick');
@@ -3672,23 +3686,39 @@ function tgUpdate(group) {
       countEl.classList.add('tick');
     }
   }
-  // Strictly ONE cell per call — mixing in hollow cells for remaining todos
-  // made the strip read as a wrong call count. Reconciled INCREMENTALLY, never
-  // rebuilt: existing cells keep their DOM node so only a genuinely new cell
-  // plays the entrance animation (tg-cell-in stretches the block smoothly).
+  // One cell per call, uncapped, plus HOLLOW cells for the estimated remainder
+  // (they fill left-to-right as calls land — a truthful progress meter; none
+  // once the estimate is exceeded). Reconciled INCREMENTALLY, never rebuilt:
+  // existing cells keep their DOM node so only a genuinely new cell plays the
+  // entrance animation (tg-cell-in stretches the block smoothly).
   const strip = group.querySelector('.tg-strip');
   if (strip) {
-    // Uncapped — one cell per call, always; the strip wraps like text.
+    const hollow = est > calls.length ? Math.min(est - calls.length, 60) : 0;
+    const total = calls.length + hollow;
     let cells = strip.querySelectorAll(':scope > .tg-cell');
-    for (let i = cells.length; i < calls.length; i++) {
+    for (let i = cells.length; i < total; i++) {
       strip.appendChild(Object.assign(document.createElement('span'), { className: 'tg-cell' }));
     }
-    for (let i = cells.length - 1; i >= calls.length; i--) cells[i].remove();
+    for (let i = cells.length - 1; i >= total; i--) cells[i].remove();
     cells = strip.querySelectorAll(':scope > .tg-cell');
     cells.forEach((c, i) => {
-      c.classList.toggle('run', !!(calls[i] && calls[i].classList.contains('in-flight')));
+      const call = calls[i];
+      c.classList.toggle('est', !call);
+      c.classList.toggle('run', !!(call && call.classList.contains('in-flight')));
     });
   }
+}
+// Median observed seconds-per-call on this target × remaining estimated calls
+// → "17s" / "2m 05s". '' until at least two live samples exist (history replay
+// records none), so a reload never shows a made-up time.
+function _tgEtaText(st, remaining) {
+  const d = st && st.durs;
+  if (!d || d.length < 2 || remaining <= 0) return '';
+  const s = d.slice().sort((a, b) => a - b);
+  const sec = Math.round(s[Math.floor(s.length / 2)] * remaining);
+  if (sec < 1) return '';
+  if (sec < 60) return sec + 's';
+  return Math.floor(sec / 60) + 'm ' + String(sec % 60).padStart(2, '0') + 's';
 }
 
 class RoundRenderer {
@@ -3854,6 +3884,7 @@ class RoundRenderer {
       if (idx < 0) return;
     }
     this.toolCallEls[idx].classList.add('in-flight');
+    this.toolCallEls[idx]._tcT0 = performance.now();   // pace sample for the ETA
     renderTcRunning(this.toolCallEls[idx], tc.function.name, tc.function.arguments);
     tgUpdate(this.toolCallEls[idx].closest('.msg.tool-group'));
   }
@@ -3901,8 +3932,17 @@ class RoundRenderer {
     }
     if (el) {
       el.classList.remove('in-flight');
+      const g = el.closest('.msg.tool-group');
+      // Record this call's duration on the target state — the ETA converts the
+      // model's est (expected calls) to time via the run's own observed pace.
+      // Live-only by construction: history replay never passes through here.
+      if (el._tcT0 && g && g._tgSt) {
+        const durs = g._tgSt.durs || (g._tgSt.durs = []);
+        durs.push((performance.now() - el._tcT0) / 1000);
+        if (durs.length > 20) durs.shift();
+      }
       renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.arguments) || undefined);
-      tgUpdate(el.closest('.msg.tool-group'));
+      tgUpdate(g);
     }
     const text = String(result || '');
     // Sentinel checks ignore the citable result-id tag ("[rN] ") the worker

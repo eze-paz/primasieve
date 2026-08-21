@@ -1528,6 +1528,9 @@ ul.conv-list li.active {
        toggling .run mid-flight never restarts the entrance. */
     animation: tg-cell-in 0.28s ease, tg-pulse 1s ease-in-out infinite;
   }
+  /* Estimated-remainder cell: hollow, border-toned; fills (drops .est) as the
+     call it predicted actually lands. */
+  .tool-group .tg-cell.est { background: transparent; outline: 1px solid var(--sp-border); outline-offset: -1px; }
   @keyframes tg-cell-in { from { width: 0; opacity: 0; } }
   @keyframes tg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
   @media (prefers-reduced-motion: reduce) {
