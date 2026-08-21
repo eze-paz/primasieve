@@ -2698,6 +2698,14 @@ async function runAgent(config, ctx) {
   // ONLY from respond(), plain content is hidden, and respond() is the only clean
   // way to end. Subagents (no respond in their toolset) are unaffected.
   const _respondForced = Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'respond');
+  // Plan-first gate: when write_todos is in the toolset, no tool may run until a
+  // plan exists AND a task is active (in_progress). write_todos (planning) and
+  // respond (delivering the reply / ending) are exempt. A completed plan leaves no
+  // in_progress task, so the next tool is blocked until a fresh plan starts one.
+  // Subagents whose toolset lacks write_todos are unaffected. Surfaces the active
+  // item to the user before any work happens.
+  const _planForced = Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'write_todos');
+  const _hasActiveTask = () => Array.isArray(ctx._todos) && ctx._todos.some(t => t && t.status === 'in_progress');
   // "Open" = pending or in_progress. completed AND deleted are both closed.
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
   const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
@@ -2950,6 +2958,16 @@ async function runAgent(config, ctx) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
       let parsedArgs = {}; try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
+      // Plan-first gate: block any tool other than write_todos/respond until a task
+      // is in_progress. No UI box for a blocked call (gate runs before tool_started)
+      // — just an error back to the model so it plans first, then retries.
+      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'respond' && !_hasActiveTask()) {
+        const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or op:"start"). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
+        const bmsg = { role: 'tool', tool_call_id: tc.id, content: blk };
+        messages.push(bmsg);
+        await emitAdded(bmsg);
+        continue;
+      }
       ctx.emit({ type: 'tool_started', tc });
       if (tc.function.name === 'respond') {
         // Deliver the reply to the page via a sentinel tool_result (the page
