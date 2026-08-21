@@ -1057,6 +1057,10 @@ async function loadConv(id) {
       s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial-append saves mid-load
       let firstBatchRendered = false;
 
+      // Pause the parallax before streaming chunks: each prepend fires a scroll
+      // event (scrollTop compensation), which would make the parallax lerp loop
+      // animate --py on every .msg.user bubble and jiggle the whole transcript.
+      if (window._sandbladeParallax) window._sandbladeParallax.setPaused(true);
       for await (const result of readConvJsonlTail(jp, fileSize)) {
         // result.messages is newest-first (reverse chrono). Reverse it to
         // chronological, then prepend to allMsgs so it ends up chronological.
@@ -1146,6 +1150,8 @@ function _finalizeIncrementalLoad(s, host) {
   if (mEl && (mEl.scrollHeight - mEl.scrollTop - mEl.clientHeight <= 50)) {
     mEl.scrollTop = mEl.scrollHeight;
   }
+  // Chunked load is fully settled — resume the parallax (one re-sync, no jiggle).
+  if (window._sandbladeParallax) window._sandbladeParallax.setPaused(false);
 }
 async function newConversation() {
   await saveActiveConv();
@@ -5050,6 +5056,26 @@ window.sidePanel = sidePanel;
   if (!messages) return;
   const state = new Map();
   let animating = false;
+  // Suspendable: the chunked conversation loader prepends + compensates scrollTop,
+  // which fires scroll events for every .msg.user (their rects shift as content
+  // inserts above). Without a pause, the lerp loop animates --py on every user
+  // bubble each chunk -> the visible "jiggle". Expose a setPaused so loading can
+  // silence parallax mid-stream and re-sync once the conversation has settled.
+  let _parallaxPaused = false;
+  function _allUserEls() { return messages.querySelectorAll('.msg.user'); }
+  function _parallaxSetPaused(p) {
+    if (p === _parallaxPaused) return;
+    _parallaxPaused = p;
+    animating = false;
+    if (p) {
+      state.clear();                                   // drop any in-flight lerp state
+      for (const m of _allUserEls()) m.style.setProperty('--py', '0');   // snap to neutral
+    } else {
+      updateTargets();                                 // re-derive targets from clean rects
+      requestAnimationFrame(tick);                      // paint them
+    }
+  }
+  window._sandbladeParallax = { setPaused: _parallaxSetPaused };
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
   }
@@ -5070,6 +5096,7 @@ window.sidePanel = sidePanel;
     }
   }
   function tick() {
+    if (_parallaxPaused) { animating = false; return; }
     let moving = false;
     for (const [msg, s] of state) {
 
@@ -5089,6 +5116,7 @@ window.sidePanel = sidePanel;
     }
   }
   function onScroll() {
+    if (_parallaxPaused) return;   // silence during chunked load
     // if (_localInferring) return;  // local-LLM removed
     updateTargets();
     if (!animating) {
