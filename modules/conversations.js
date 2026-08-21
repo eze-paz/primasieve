@@ -163,31 +163,6 @@ async function* readConvJsonlTail(path, totalSize) {
   }
 }
 
-// Render a batch of messages (in chronological order) PREPENDED before the
-// first existing child of host. Used by the incremental loader to fill in
-// older messages above the already-rendered recent batch.
-function renderMessagesBefore(msgs, host, scrollEl) {
-  if (!msgs.length || !host) return;
-  const prevHeight = scrollEl ? scrollEl.scrollHeight : 0;
-  const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
-  const frag = document.createDocumentFragment();
-  for (const m of msgs) renderHistoricalMessage(m, frag);
-  // Insert before the first .msg (or .compaction-block) — NOT before #homeCenter,
-  // which _placeHome() tucks in as the first child of the host. Inserting before
-  // host.firstChild would put older messages above #homeCenter, sandwiching it
-  // between old and new messages.
-  let anchor = null;
-  for (const child of host.children) {
-    if (child.classList && (child.classList.contains('msg') || child.classList.contains('compaction-block'))) {
-      anchor = child;
-      break;
-    }
-  }
-  if (anchor) host.insertBefore(frag, anchor);
-  else host.appendChild(frag);
-  // Pin the visible content: compensate scrollTop for the height added above.
-  if (scrollEl) scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
-}
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
   if (firstUser && firstUser.content) return (_convText(firstUser.content).slice(0, 60)) || 'Untitled';
@@ -1055,58 +1030,38 @@ async function loadConv(id) {
         return;
       }
 
-      // Read the last chunk, parse messages, render the most recent batch first.
-      // We accumulate ALL messages on the stream (in chronological order) but
-      // render incrementally — newest first, then prepend older batches.
-      const allMsgs = [];       // chronological (oldest→newest), filled backwards
-      s.messages = allMsgs;     // grow on the stream NOW so concurrent sends see it
-      s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial-append saves mid-load
-      let firstBatchRendered = false;
+      // Build the conversation incrementally from the END of the JSONL (most
+      // recent messages first), but render every chunk into a DETACHED staging
+      // fragment. The visible scroll container is only mutated ONCE, when all
+      // chunks are read — so the user sees a single atomic transition instead
+      // of many per-chunk refolls (which is what read as a "jiggle").
+      const allMsgs = [];      // chronological (oldest→newest), filled backwards
+      s.messages = allMsgs;    // grow on the stream NOW so concurrent sends see it
+      s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial writes
+      const staging = document.createDocumentFragment();
 
       for await (const result of readConvJsonlTail(jp, fileSize)) {
-        // result.messages is newest-first (reverse chrono). Reverse it to
-        // chronological, then prepend to allMsgs so it ends up chronological.
-        allMsgs.unshift(...result.messages.slice().reverse());
-
-        if (!firstBatchRendered) {
-          // First batch: render the most recent messages, scroll to bottom.
-          // result.messages is newest-first; render in chronological order.
-          const batch = result.messages.slice().reverse();
-          // If there's a compaction boundary, render the compaction block first
-          // (it will be prepended along with older messages in later batches).
-          renderConversation(batch, null, s.host);
-          // Re-sync the module `messages` to the loaded array.
-          if (activeConvId === id) messages = s.messages;
-          _recalcMemoryFor(id);
-          const mEl = paneScrollEl($('messages'));
-          if (mEl) mEl.scrollTop = mEl.scrollHeight;
-          await refreshConversationList();
-          firstBatchRendered = true;
-
-          // If this was the only chunk (whole file fit in one read), we're done.
-          if (result.done) {
-            s.messages = allMsgs;
-            s._forceJsonlRewrite = false;
-            if (activeConvId === id) messages = s.messages;
-            // Handle compaction block + pending asks + settled timer
-            _finalizeIncrementalLoad(s, s.host);
-            return;
-          }
-        } else {
-          // Subsequent batches: render older messages prepended above existing content.
-          // result.messages is newest-first; render in chronological order.
-          const batch = result.messages.slice().reverse();
-          const mEl = paneScrollEl($('messages'));
-          renderMessagesBefore(batch, s.host, mEl);
-
-          // Yield to the browser between batches so the UI stays responsive.
-          await new Promise(r => requestAnimationFrame(r));
-        }
+        const batch = result.messages.slice().reverse();  // newest-first -> chronological
+        allMsgs.unshift(...batch);
+        for (const m of batch) renderHistoricalMessage(m, staging);
+        // Yield so the file-read loop stays responsive while chunks stream in.
+        await new Promise(r => requestAnimationFrame(r));
       }
 
-      // All chunks read — finalize the stream
+      // One atomic insert: mount the staged older messages above whatever is
+      // already in the host, then finalize + scroll to bottom. No intermediate
+      // paint under the scroll container, so no jiggle.
+      if (staging.firstChild) {
+        let anchor = null;
+        for (const child of s.host.children) {
+          if (child.classList && (child.classList.contains('msg') || child.classList.contains('compaction-block'))) { anchor = child; break; }
+        }
+        if (anchor) s.host.insertBefore(staging, anchor);
+        else s.host.appendChild(staging);
+      }
       s._forceJsonlRewrite = false;
       if (activeConvId === id) messages = s.messages;
+      _recalcMemoryFor(id);
       _finalizeIncrementalLoad(s, s.host);
     } finally {
       s._loading = false;
@@ -5018,8 +4973,6 @@ function trackPaneScroll(pane) {
 trackPaneScroll($('messages'));
 trackPaneScroll($('messagesSide'));
 
-
-
 sidePanel = new SidePanel();
 window.sidePanel = sidePanel;
 
@@ -5073,8 +5026,6 @@ window.sidePanel = sidePanel;
     resizer.addEventListener('pointercancel', onUp);
   });
 })();
-
-
 
 /* expose moved page-glue for inline handlers (HTML onclick) + the host contract */
 window.anyStreamGenerating = anyStreamGenerating;
