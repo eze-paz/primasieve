@@ -1478,8 +1478,11 @@ ul.conv-list li.active {
     overflow: hidden;
     font: 12px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
   }
+  /* Two stacked layers: row 1 is ">>> title · N calls ▸", row 2 is the cell
+     strip, full width, wrapping left-to-right like text. Nothing squeezes or
+     truncates anything at any pane width. */
   .tool-group .tg-hd {
-    display: flex; align-items: center; gap: 0.5rem;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem;
     padding: 0.38rem 0.7rem;
     border-bottom: 1px solid var(--sp-border);
     cursor: pointer; user-select: none;
@@ -1487,21 +1490,21 @@ ul.conv-list li.active {
   }
   .tool-group .tg-hd:hover { background: var(--sp-panel); }
   .tool-group .tg-prompt { flex: none; color: var(--sp-accent); font-weight: 700; }
-  /* The title is the user's main feedback — never truncate it; wrap instead. */
+  /* The title is the user's main feedback — never truncate it; wrap by WORD
+     (break-word: mid-word breaks only when a single word can't fit at all). */
   .tool-group .tg-title {
     color: var(--sp-text); font-weight: 600;
-    flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere;
+    flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
   }
   .tool-group .tg-count { flex: none; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
   .tool-group .tg-count.tick { animation: tg-count-pop 0.3s ease; }
   @keyframes tg-count-pop { 30% { transform: scale(1.2); color: var(--sp-accent); } }
   .tool-group .tg-strip {
     display: flex; align-items: center; gap: 3px;
-    flex-wrap: wrap; justify-content: flex-end;
-    /* floor ≈ 10 cells per row so a long (wrapping) title can't squeeze the
-       strip into a one-cell-wide column */
-    margin-left: auto; flex: 0 1 auto; min-width: 96px; padding-left: 0.5rem;
+    flex-wrap: wrap; justify-content: flex-start;
+    flex-basis: 100%;
   }
+  .tool-group .tg-strip:empty { display: none; }
   .tool-group .tg-cell {
     width: 6px; height: 6px; border-radius: 1.5px; background: var(--sp-accent); flex: none;
     animation: tg-cell-in 0.28s ease;
@@ -1518,7 +1521,6 @@ ul.conv-list li.active {
   @media (prefers-reduced-motion: reduce) {
     .tool-group .tg-cell, .tool-group .tg-cell.run, .tool-group .tg-count.tick { animation: none; }
   }
-  .tool-group .tg-more { flex: none; color: var(--sp-text-dim); font-size: 9.5px; }
   .tool-group .tg-chevron {
     flex: none; color: var(--sp-text-dim); opacity: 0.5; font-size: 10px;
     transition: transform 0.2s ease;

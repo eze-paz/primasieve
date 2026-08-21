@@ -3515,7 +3515,6 @@ function renderTcDone(div, fname, args) {
 // re-anchors the group to the bottom rather than splitting it.
 const _tgByTarget = new WeakMap();
 const TG_CALLS = { en: ['call', 'calls'], es: ['llamada', 'llamadas'], ca: ['crida', 'crides'] };
-const TG_MAX_CELLS = 24;
 
 function _tgResolveTarget(host) {
   // Mirror addMsg's target resolution so all hooks key the same element.
@@ -3657,28 +3656,15 @@ function tgUpdate(group) {
   // plays the entrance animation (tg-cell-in stretches the block smoothly).
   const strip = group.querySelector('.tg-strip');
   if (strip) {
-    const over = calls.length - TG_MAX_CELLS;
-    const want = Math.min(calls.length, TG_MAX_CELLS);
-    let more = strip.querySelector('.tg-more');
-    if (over > 0) {
-      if (!more) {
-        more = document.createElement('span');
-        more.className = 'tg-more';
-        strip.insertBefore(more, strip.firstChild);
-      }
-      const mtxt = '+' + over;
-      if (more.textContent !== mtxt) more.textContent = mtxt;
-    } else if (more) more.remove();
+    // Uncapped — one cell per call, always; the strip wraps like text.
     let cells = strip.querySelectorAll(':scope > .tg-cell');
-    for (let i = cells.length; i < want; i++) {
+    for (let i = cells.length; i < calls.length; i++) {
       strip.appendChild(Object.assign(document.createElement('span'), { className: 'tg-cell' }));
     }
-    for (let i = cells.length - 1; i >= want; i--) cells[i].remove();
+    for (let i = cells.length - 1; i >= calls.length; i--) cells[i].remove();
     cells = strip.querySelectorAll(':scope > .tg-cell');
-    const base = Math.max(0, over);
     cells.forEach((c, i) => {
-      const call = calls[base + i];
-      c.classList.toggle('run', !!(call && call.classList.contains('in-flight')));
+      c.classList.toggle('run', !!(calls[i] && calls[i].classList.contains('in-flight')));
     });
   }
 }
