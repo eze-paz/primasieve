@@ -3602,12 +3602,19 @@ function _tgBuild(title, st) {
   g._tgSt = st;
   const hd = document.createElement('div');
   hd.className = 'tg-hd';
+  // Tray layout: row 1 is pure text (prompt + title + chevron, title wrapping
+  // internally); the cells + counter live in a tinted footer tray beneath a
+  // hairline, so the machinery reads as its own stratum.
   hd.innerHTML =
-    '<span class="tg-prompt">&gt;&gt;&gt;</span>' +
-    `<span class="tg-title" title="${tcEscape(title)}">${tcEscape(title)}</span>` +
-    '<span class="tg-count"></span>' +
-    '<span class="tg-strip"></span>' +
-    '<span class="tg-chevron">▸</span>';
+    '<span class="tg-row">' +
+      '<span class="tg-prompt">&gt;&gt;&gt;</span>' +
+      `<span class="tg-title" title="${tcEscape(title)}">${tcEscape(title)}</span>` +
+      '<span class="tg-chevron">▸</span>' +
+    '</span>' +
+    '<span class="tg-tray">' +
+      '<span class="tg-strip"></span>' +
+      '<span class="tg-count"></span>' +
+    '</span>';
   hd.addEventListener('click', (ev) => { ev.stopPropagation(); g.classList.toggle('tg-open'); });
   const log = document.createElement('div');
   log.className = 'tg-log';

@@ -1478,17 +1478,20 @@ ul.conv-list li.active {
     overflow: hidden;
     font: 12px/1.5 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
   }
-  /* Two stacked layers: row 1 is ">>> title · N calls ▸", row 2 is the cell
-     strip, full width, wrapping left-to-right like text. Nothing squeezes or
-     truncates anything at any pane width. */
+  /* Tray layout: row 1 is pure text (">>> title ▸", title wraps by word); the
+     cells + counter sit in a tinted footer tray under a hairline, so the
+     machinery reads as its own stratum. */
   .tool-group .tg-hd {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem;
-    padding: 0.38rem 0.7rem;
+    display: flex; flex-direction: column;
     border-bottom: 1px solid var(--sp-border);
     cursor: pointer; user-select: none;
+  }
+  .tool-group .tg-row {
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    padding: 0.38rem 0.7rem;
     transition: background 0.15s ease;
   }
-  .tool-group .tg-hd:hover { background: var(--sp-panel); }
+  .tool-group .tg-hd:hover .tg-row { background: var(--sp-panel); }
   .tool-group .tg-prompt { flex: none; color: var(--sp-accent); font-weight: 700; }
   /* The title is the user's main feedback — never truncate it; wrap by WORD
      (break-word: mid-word breaks only when a single word can't fit at all). */
@@ -1496,15 +1499,21 @@ ul.conv-list li.active {
     color: var(--sp-text); font-weight: 600;
     flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
   }
-  .tool-group .tg-count { flex: none; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
+  .tool-group .tg-tray {
+    display: flex; align-items: center; gap: 0.6rem;
+    border-top: 1px solid var(--sp-border);
+    background: var(--sp-panel);
+    padding: 0.3rem 0.7rem;
+  }
+  .tool-group .tg-count { flex: none; margin-left: auto; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
   .tool-group .tg-count.tick { animation: tg-count-pop 0.3s ease; }
   @keyframes tg-count-pop { 30% { transform: scale(1.2); color: var(--sp-accent); } }
+  .tool-group .tg-chevron { line-height: 18px; }
   .tool-group .tg-strip {
     display: flex; align-items: center; gap: 3px;
     flex-wrap: wrap; justify-content: flex-start;
-    flex-basis: 100%;
+    flex: 1 1 auto; min-width: 0;
   }
-  .tool-group .tg-strip:empty { display: none; }
   .tool-group .tg-cell {
     width: 6px; height: 6px; border-radius: 1.5px; background: var(--sp-accent); flex: none;
     animation: tg-cell-in 0.28s ease;
