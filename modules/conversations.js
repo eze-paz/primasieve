@@ -796,17 +796,18 @@ function parkPaneConv(pane) {
   }
 }
 function mountConv(convId, pane = null) {
-  // Conversation switch: blank any stale previous-conversation timer content in
-  // the pane's persistent slot so the newly rendered conv repopulates it.
+  // Conversation switch: blank a stale timer only in the pane being mounted —
+  // never the other pane's slot, which may still hold a live side-pane conv.
+  const mountTarget = convId ? (pane || (sidePanel ? sidePanel.activeMountTarget() : document.getElementById('messages'))) : null;
+  const isSide = !!(mountTarget && mountTarget.id === 'messagesSide');
+  const slotId = isSide ? 'msgTimerSide' : 'msgTimerMain';
   if (convId !== activeConvId) {
-    for (const slotId of ['msgTimerMain', 'msgTimerSide']) {
-      const wrap = document.getElementById(slotId);
-      const t = wrap && wrap.querySelector('.msg-timer');
-      if (t && t.dataset.convId && t.dataset.convId !== '' + convId) {
-        t.innerHTML = '';
-        t.classList.remove('done');
-        delete t.dataset.convId;
-      }
+    const wrap = document.getElementById(slotId);
+    const t = wrap && wrap.querySelector('.msg-timer');
+    if (t && t.dataset.convId && t.dataset.convId !== '' + convId) {
+      t.innerHTML = '';
+      t.classList.remove('done');
+      delete t.dataset.convId;
     }
   }
   activeConvId = convId;
@@ -4606,6 +4607,12 @@ class SidePanel {
     this._sideId = id;
     const s = convStreams.get(id);
     if (s?.host) _mountInPane(s.host, this.right);
+    // The side-pane load path (unlike the main pane's renderConversation) never
+    // builds the settled msg-timer — _lazyLoad renders messages but has no
+    // renderConversation to trigger rebuildSettledTimer. Do it here, AFTER the
+    // host is mounted into #messagesSide, so the slot lookup resolves the SIDE
+    // slot; the main-pane code path already covers its own.
+    if (s) rebuildSettledTimer(s.host, s);
     this._render();
 
     requestAnimationFrame(() => { const se = paneScrollEl(this.right); if (se) se.scrollTop = se.scrollHeight; });
@@ -4803,6 +4810,8 @@ class SidePanel {
     this._open = true;
     const s = convStreams.get(id);
     if (s?.host) _mountInPane(s.host, this.right);
+    // Same as open(): rebuild the settled timer into the side slot after mount.
+    if (s) rebuildSettledTimer(s.host, s);
     this._render();
     requestAnimationFrame(() => { const se = paneScrollEl(this.right); if (se) se.scrollTop = se.scrollHeight; });
     refreshConversationList();
