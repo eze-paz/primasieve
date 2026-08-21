@@ -2859,12 +2859,22 @@ async function runAgent(config, ctx) {
     const respondCall = round.tool_calls.find(tc => tc && tc.function && tc.function.name === 'respond');
     let respondText = null;
     let _forceRespondRetry = false;
+    // Content the model writes outside respond() is never the visible reply — but
+    // it is NOT nuked: fold it into the reasoning channel so it shows in the
+    // collapsed thinking box and persists there (asstMsg.reasoning), like CoT.
+    // (A model that duplicates its answer into content will echo it there too;
+    // harmless — the box is collapsed.)
+    const _stashAside = (t) => {
+      if (t && t.trim()) round.reasoning_content = (round.reasoning_content ? round.reasoning_content + '\n\n' : '') + t;
+    };
     if (respondCall) {
       try { respondText = String(JSON.parse(respondCall.function.arguments || '{}').text ?? ''); }
       catch (_) { respondText = ''; }
+      _stashAside(round.content);                        // keep any non-respond prose as thinking
       round.content = respondText;                       // the visible reply IS respond's text
     } else if (_respondForced && round.tool_calls.length) {
-      round.content = '';                                // working-tool round: hide any prose the model leaked
+      _stashAside(round.content);                        // working-tool round: keep leaked prose as thinking
+      round.content = '';
     } else if (_respondForced && !round.tool_calls.length && !ctx.signal?.aborted
                && ctx._respondRetries < MAX_RESPOND_RETRIES) {
       round.content = '';                                // bare prose attempt — hide it; we'll force respond() below
