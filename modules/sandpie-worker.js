@@ -2803,13 +2803,21 @@ async function runAgent(config, ctx) {
       ctx.emit({ type: 'reminder', kind: pendingReminder.kind, text: pendingReminder.text, meta: pendingReminder.meta });
       pendingReminder = null;
     }
+    // Hard plan-first gate: until a task is in_progress, OFFER only write_todos and
+    // respond. Work tools aren't on the menu, so the model literally cannot call one
+    // before planning (greetings can still respond). Once a task is active, the full
+    // toolset returns. The server-side block below is a fallback for a provider that
+    // ignores the restricted list.
+    const _availTools = (_planForced && !_hasActiveTask())
+      ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'respond'))
+      : config.tools;
     // the model reads it immediately before generating (recency beats a rule
     const reqBody = {
       model: config.model,
       messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
       stream: true,
       stream_options: { include_usage: true },
-      tools: config.tools,
+      tools: _availTools,
     };
     // Force a tool call every round when respond() is in play: the model can never
     // emit free-form prose, so the visible chat is exactly its tool actions + the
@@ -2838,7 +2846,7 @@ async function runAgent(config, ctx) {
             messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
-            tools: config.tools,
+            tools: _availTools,
           };
           if (_respondForced) compactedReqBody.tool_choice = 'required';
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
@@ -2958,11 +2966,15 @@ async function runAgent(config, ctx) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
       let parsedArgs = {}; try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
-      // Plan-first gate: block any tool other than write_todos/respond until a task
-      // is in_progress. No UI box for a blocked call (gate runs before tool_started)
-      // — just an error back to the model so it plans first, then retries.
+      // Plan-first gate fallback: normally the restricted tool list above means a
+      // work tool can't even be called before planning, but a provider that ignores
+      // that list could still emit one. Reject it here. Emit tool_started+tool_result
+      // so the box RESOLVES to the blocked message — never leave it spinning (the box
+      // may already exist from streamed arg deltas).
       if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'respond' && !_hasActiveTask()) {
         const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or op:"start"). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
+        ctx.emit({ type: 'tool_started', tc });
+        ctx.emit({ type: 'tool_result', id: tc.id, result: blk });
         const bmsg = { role: 'tool', tool_call_id: tc.id, content: blk };
         messages.push(bmsg);
         await emitAdded(bmsg);
