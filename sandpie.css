@@ -406,7 +406,6 @@
     position: relative;
     padding: 0;
     background: transparent;
-    --py: 0;
     max-width: 82%;
   }
   .user .bubble {
@@ -416,7 +415,6 @@
     color: var(--sp-text);
     white-space: pre-wrap;
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translateY(calc(var(--py) * 2px));
   }
   .user::before {
     content: "";
@@ -424,7 +422,7 @@
     inset: 0;
     background: rgba(88, 166, 255, 0.5);
     clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-    transform: translate(5px, calc(5px + var(--py) * -4px));
+    transform: translate(5px, 5px);
   }
   .assistant {
     align-self: flex-start;
