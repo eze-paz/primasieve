@@ -659,6 +659,15 @@ function _fillPlaceholderTimer(slot, convId) {
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
 }
+// Seed both pane timer slots with the resting placeholder when empty, so the bar
+// is present in the DOM from first paint — not only once a conversation mounts.
+function _ensureTimerPlaceholders() {
+  for (const id of ['msgTimerMain', 'msgTimerSide']) {
+    const wrap = document.getElementById(id);
+    const slot = wrap && wrap.querySelector('.msg-timer');
+    if (slot && !slot.innerHTML.trim()) _fillPlaceholderTimer(slot, null);
+  }
+}
 function rebuildSettledTimer(target, s) {
   if (!s) return;
   const slot = _timerSlotFor(s);
@@ -841,6 +850,10 @@ function mountConv(convId, pane = null) {
   } else {
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
+    // No conversation mounted (home) → reset the main pane's timer bar to the
+    // resting placeholder rather than leaving a stale conversation's line.
+    const mainSlot = document.querySelector('#msgTimerMain .msg-timer');
+    if (mainSlot) _fillPlaceholderTimer(mainSlot, null);
   }
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
@@ -5782,6 +5795,7 @@ function bootConversations() {
   (async () => {
     await refreshConversationList();
     refreshPaneBars();   // bar always shows on desktop from first paint — 'New chat' when no conversation is mounted
+    _ensureTimerPlaceholders();   // resting timer bar present in the DOM from first paint, even with no conversation mounted
     if (activeConvId) {
       const restoreId = activeConvId;
       activeConvId = null;
