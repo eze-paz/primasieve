@@ -3529,10 +3529,11 @@ function tgActiveTitle(todos) {
   const t = (todos || []).find(x => x && x.status === 'in_progress');
   return t ? (t.activeForm || t.content || '') : '';
 }
-// Any non-tool message ends the current run of calls.
+// Any non-tool message ends the current run of calls. Also drops the pace
+// anchor so an idle gap (user typing) never enters the ETA median.
 function tgBreak(target) {
   const st = _tgByTarget.get(target);
-  if (st) st.group = null;
+  if (st) { st.group = null; st.lastDoneT = 0; }
 }
 // Full reset (conversation re-render): drop the group AND the replayed todos.
 function tgReset(target) {
@@ -3885,7 +3886,6 @@ class RoundRenderer {
       if (idx < 0) return;
     }
     this.toolCallEls[idx].classList.add('in-flight');
-    this.toolCallEls[idx]._tcT0 = performance.now();   // pace sample for the ETA
     renderTcRunning(this.toolCallEls[idx], tc.function.name, tc.function.arguments);
     tgUpdate(this.toolCallEls[idx].closest('.msg.tool-group'));
   }
@@ -3934,13 +3934,21 @@ class RoundRenderer {
     if (el) {
       el.classList.remove('in-flight');
       const g = el.closest('.msg.tool-group');
-      // Record this call's duration on the target state — the ETA converts the
-      // model's est (expected calls) to time via the run's own observed pace.
-      // Live-only by construction: history replay never passes through here.
-      if (el._tcT0 && g && g._tgSt) {
-        const durs = g._tgSt.durs || (g._tgSt.durs = []);
-        durs.push((performance.now() - el._tcT0) / 1000);
-        if (durs.length > 20) durs.shift();
+      // Pace sample for the ETA: the gap between CONSECUTIVE call completions,
+      // not the tool's own execution time — most tools finish in milliseconds,
+      // while the real per-call cost is the model round-trip between calls
+      // (timing only execution made every ETA round to 0s and never show).
+      // The 2-minute cap keeps a stall/pause from poisoning the median, and
+      // tgBreak clears lastDoneT so cross-turn idle gaps never enter. Live-only
+      // by construction: history replay never passes through here.
+      if (g && g._tgSt) {
+        const st = g._tgSt, now = performance.now();
+        if (st.lastDoneT && now - st.lastDoneT < 120000) {
+          const durs = st.durs || (st.durs = []);
+          durs.push((now - st.lastDoneT) / 1000);
+          if (durs.length > 20) durs.shift();
+        }
+        st.lastDoneT = now;
       }
       renderTcDone(el, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.name) || el.dataset.fname, (idx >= 0 && this.toolCalls[idx] && this.toolCalls[idx].function.arguments) || undefined);
       tgUpdate(g);
