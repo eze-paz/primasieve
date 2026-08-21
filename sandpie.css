@@ -1487,23 +1487,37 @@ ul.conv-list li.active {
   }
   .tool-group .tg-hd:hover { background: var(--sp-panel); }
   .tool-group .tg-prompt { flex: none; color: var(--sp-accent); font-weight: 700; }
+  /* The title is the user's main feedback — never truncate it; wrap instead. */
   .tool-group .tg-title {
     color: var(--sp-text); font-weight: 600;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere;
   }
   .tool-group .tg-count { flex: none; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
+  .tool-group .tg-count.tick { animation: tg-count-pop 0.3s ease; }
+  @keyframes tg-count-pop { 30% { transform: scale(1.2); color: var(--sp-accent); } }
   .tool-group .tg-strip {
     display: flex; align-items: center; gap: 3px;
-    margin-left: auto; flex: none; padding-left: 0.5rem;
+    flex-wrap: wrap; justify-content: flex-end;
+    /* floor ≈ 10 cells per row so a long (wrapping) title can't squeeze the
+       strip into a one-cell-wide column */
+    margin-left: auto; flex: 0 1 auto; min-width: 96px; padding-left: 0.5rem;
   }
-  .tool-group .tg-cell { width: 6px; height: 6px; border-radius: 1.5px; background: var(--sp-accent); flex: none; }
+  .tool-group .tg-cell {
+    width: 6px; height: 6px; border-radius: 1.5px; background: var(--sp-accent); flex: none;
+    animation: tg-cell-in 0.28s ease;
+  }
   .tool-group .tg-cell.run {
     background: transparent;
     outline: 1.5px solid var(--sp-accent); outline-offset: -1.5px;
-    animation: tg-pulse 1s ease-in-out infinite;
+    /* tg-cell-in stays first in BOTH lists: animations persist by name, so
+       toggling .run mid-flight never restarts the entrance. */
+    animation: tg-cell-in 0.28s ease, tg-pulse 1s ease-in-out infinite;
   }
+  @keyframes tg-cell-in { from { width: 0; opacity: 0; } }
   @keyframes tg-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-  @media (prefers-reduced-motion: reduce) { .tool-group .tg-cell.run { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tool-group .tg-cell, .tool-group .tg-cell.run, .tool-group .tg-count.tick { animation: none; }
+  }
   .tool-group .tg-more { flex: none; color: var(--sp-text-dim); font-size: 9.5px; }
   .tool-group .tg-chevron {
     flex: none; color: var(--sp-text-dim); opacity: 0.5; font-size: 10px;

@@ -3638,23 +3638,48 @@ function tgUpdate(group) {
     if (!plan) calls.push(el);
   }
   group.classList.toggle('tg-empty', !calls.length);
-  // Count is calls ONLY — checklist progress already lives in the msg-timer badge.
+  // Count is calls ONLY — checklist progress already lives in the msg-timer
+  // badge. On change the number pops (tg-count-pop, restarted via reflow).
   const countEl = group.querySelector('.tg-count');
   if (countEl) {
     const w = TG_CALLS[tcLang()] || TG_CALLS.en;
-    countEl.textContent = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+    const txt = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+    if (countEl.textContent !== txt) {
+      countEl.textContent = txt;
+      countEl.classList.remove('tick');
+      void countEl.offsetWidth;
+      countEl.classList.add('tick');
+    }
   }
   // Strictly ONE cell per call — mixing in hollow cells for remaining todos
-  // made the strip read as a wrong call count.
+  // made the strip read as a wrong call count. Reconciled INCREMENTALLY, never
+  // rebuilt: existing cells keep their DOM node so only a genuinely new cell
+  // plays the entrance animation (tg-cell-in stretches the block smoothly).
   const strip = group.querySelector('.tg-strip');
   if (strip) {
-    let html = '';
     const over = calls.length - TG_MAX_CELLS;
-    if (over > 0) html += `<span class="tg-more">+${over}</span>`;
-    for (let i = Math.max(0, over); i < calls.length; i++) {
-      html += `<span class="tg-cell${calls[i].classList.contains('in-flight') ? ' run' : ''}"></span>`;
+    const want = Math.min(calls.length, TG_MAX_CELLS);
+    let more = strip.querySelector('.tg-more');
+    if (over > 0) {
+      if (!more) {
+        more = document.createElement('span');
+        more.className = 'tg-more';
+        strip.insertBefore(more, strip.firstChild);
+      }
+      const mtxt = '+' + over;
+      if (more.textContent !== mtxt) more.textContent = mtxt;
+    } else if (more) more.remove();
+    let cells = strip.querySelectorAll(':scope > .tg-cell');
+    for (let i = cells.length; i < want; i++) {
+      strip.appendChild(Object.assign(document.createElement('span'), { className: 'tg-cell' }));
     }
-    strip.innerHTML = html;
+    for (let i = cells.length - 1; i >= want; i--) cells[i].remove();
+    cells = strip.querySelectorAll(':scope > .tg-cell');
+    const base = Math.max(0, over);
+    cells.forEach((c, i) => {
+      const call = calls[base + i];
+      c.classList.toggle('run', !!(call && call.classList.contains('in-flight')));
+    });
   }
 }
 
