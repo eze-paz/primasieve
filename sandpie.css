@@ -964,10 +964,11 @@ ul.conv-list li.active {
        compensation. */
     overflow-y: auto; padding: 1.5rem; scrollbar-gutter: stable; overflow-anchor: auto;
   }
-  /* Only during active streaming do we hand scroll control back to the app's
-     manual token-by-token scroll-to-bottom — auto anchoring would fight it.
-     Toggled on stream start/end (sp-streaming). */
-  .conv-host.sp-streaming { overflow-anchor: none; }
+  /* Anchoring is handed back to the app's explicit scroll control during active
+     streaming (token-by-token scroll-to-bottom) and during a chunked load (a
+     per-frame stick-to-bottom pin) — in both, auto anchoring would fight it. */
+  .conv-host.sp-streaming,
+  .conv-host.sp-load-pin { overflow-anchor: none; }
 
   @media (prefers-reduced-motion: reduce) {
   }
