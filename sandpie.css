@@ -1512,9 +1512,10 @@ ul.conv-list li.active {
   .tool-group.tg-open .tg-chevron { transform: rotate(90deg); }
   .tool-group .tg-log { display: flex; flex-direction: column; padding: 0.15rem 0.3rem; }
   /* Planning (write_todos) rows are bookkeeping, not work: never shown, in any
-     state — the checklist stays reachable via the timer badge. A register
-     holding only planning hides entirely (tgUpdate sets the classes). */
-  .tool-group .tg-log > .msg.tool-call.tc-plan { display: none; }
+     state, grouped OR loose (the pre-plan call lands ungrouped) — the checklist
+     stays reachable via the timer badge. A register holding only planning hides
+     entirely (tgUpdate/tcMarkPlan set the classes). */
+  .msg.tool-call.tc-plan { display: none; }
   .msg.tool-group.tg-empty { display: none; }
   /* Collapsed register: the header pill ALONE — running calls included (a live
      call is signalled by the pulsing strip cell, not a row, so nothing janks

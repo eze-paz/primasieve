@@ -3446,7 +3446,15 @@ function buildToolBox(args, toolName) {
 // thinking box. Styled by .repl-loader / @keyframes repl-sweep in sandpie.css.
 const REPL_LOADER = (cls) => `<span class="repl-loader${cls ? ' ' + cls : ''}"><i>&gt;</i><i>&gt;</i><i>&gt;</i></span>`;
 
+// Planning (write_todos) never renders — inside a register OR loose (the
+// pre-plan call under the plan-first gate lands ungrouped). Marked at every
+// render phase so no path can miss it; hidden by .msg.tool-call.tc-plan.
+function tcMarkPlan(div, fname) {
+  if (div && div.classList && fname) div.classList.toggle('tc-plan', fname === 'write_todos');
+}
+
 function renderTcPreparing(div, fname, args) {
+  tcMarkPlan(div, fname);
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
 
@@ -3464,6 +3472,7 @@ function renderTcPreparing(div, fname, args) {
 }
 
 function renderTcRunning(div, fname, args) {
+  tcMarkPlan(div, fname);
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
   if (!el.querySelector('.repl-loader')) {
@@ -3475,6 +3484,7 @@ function renderTcRunning(div, fname, args) {
 }
 
 function renderTcDone(div, fname, args) {
+  tcMarkPlan(div, fname);
   const el = div && div.querySelector && div.querySelector('.tc-collapsed');
   if (!el) return;
   el.innerHTML =
