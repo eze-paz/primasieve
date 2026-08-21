@@ -2391,6 +2391,8 @@ ul.conv-list li.active {
 [data-theme="aurora"] .context-menu { background: #0f172a; border-color: rgba(148,163,184,0.12); box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
 [data-theme="aurora"] .context-item:hover { background: rgba(56,189,248,0.08); }
 [data-theme="aurora"] .modal-content { background: #0f172a; }
+[data-theme="aurora"] .ctx-popup { background: #0f172a; border-color: rgba(148,163,184,0.12); }
+[data-theme="aurora"] .ctx-popup .ctx-popup-row b { color: #f1f5f9; }
 
 [data-theme="electric"] {
   --sp-accent-2: #ffcc00;
