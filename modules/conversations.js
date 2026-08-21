@@ -2187,12 +2187,6 @@ function workerAgentStream(worker, id, signal) {
   });
 }
 
-// Byte size of what will actually be sent (system prompt + resolved messages + tool defs). Compared only against the gateway's absolute ~1 MB body cap (transport limit) — the model context is protected by the token-based guards (maybeAutoCompact / maybeCompactMidTurn).
-function _sentRequestBytes(config) {
-  try { return new Blob([JSON.stringify(config.messages || []) + JSON.stringify(config.systemPrompt || '') + JSON.stringify(config.tools || [])]).size; }
-  catch { try { return (JSON.stringify(config.messages || []) || '').length; } catch { return 0; } }
-}
-
 async function sendSingle(text, stream, opts = {}) {
   const { id: convId, messages: convMessages, host } = stream;
 
@@ -2251,42 +2245,9 @@ async function sendSingle(text, stream, opts = {}) {
     mk.textContent = '📷 → ' + ((config.model || 'vision model'));
     userBubbleEl.appendChild(mk);
   }
-  // Reactive boundary correction. If the BUILT request is still over the gateway's
-  // ~1 MB cap, the compaction boundary is behind where it should be — e.g. an older
-  // chat whose mid-turn compactions never persisted a boundary, so buildAgentConfig
-  // sliced from a stale point and loaded far more than the compacted tail. Advance
-  // the boundary with a REAL compaction (summarize the aged span + persist it), then
-  // rebuild so we send only [summary, …tail] — the content that's supposed to load,
-  // not the whole history. Shrink the kept tail each pass until it fits or the
-  // boundary can no longer advance. This permanently fixes an already-bloated chat
-  // on its next send (the advanced boundary is saved).
-  if (typeof SandpieCompactor !== 'undefined' && SandpieCompactor.isEnabled && SandpieCompactor.isEnabled()) {
-    const base = SandpieCompactor.config();
-    // Budget = the gateway's absolute request-body cap (~1 MB), with headroom.
-    // This is a TRANSPORT limit, deliberately NOT derived from the model's token
-    // window: bytes are a terrible token proxy (JSON escaping, \uXXXX unicode,
-    // base64 images), so a window-relative byte budget used to force compaction
-    // on conversations that were nowhere near the context limit. The model
-    // context itself is protected by the token-based guards (maybeAutoCompact
-    // pre-send + maybeCompactMidTurn in the worker), both fed by REAL reported
-    // prompt tokens. The worker's 413-compact-retry backstops this reactively.
-    const budget = 900_000;
-    // Shrink the kept tail until the request fits. keepTail=10 is only a STARTING
-    // point: if the last 10 messages alone exceed the budget (big tool outputs),
-    // halve it (10→5→2) so the boundary advances PAST them. "nothing to compact"
-    // means the current keepTail still protects the whole over-budget slice → shrink
-    // and retry, don't give up. Only stop on a real summarizer failure or at the
-    // keepTail=2 floor (can't drop the current turn's own request/response).
-    let keep = base.keepTail;
-    for (let i = 0; i < 8; i++) {
-      if (_sentRequestBytes(config) <= budget) break;
-      const r = await _performCompaction(convId, { ...base, keepTail: keep });
-      if (r && !r.ok && !/nothing/.test(r.reason || '')) break;   // real failure (e.g. summarizer down)
-      config = await buildAgentConfig(stream.messages, stream.compaction, stream.todos, convId);
-      if (keep <= 2) break;                                        // already at the floor
-      keep = Math.max(2, Math.floor(keep / 2));
-    }
-  }
+  // No byte-based compaction here: context limits are guarded purely by reported
+  // tokens (maybeAutoCompact above, maybeCompactMidTurn in the worker), and an
+  // oversized body is handled reactively by the worker's 413-compact-retry.
 
   const ctrl = new AbortController();
   stream.requestId = ctrl;
