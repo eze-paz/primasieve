@@ -48,13 +48,13 @@ fall back on speculation — adjust and try again.
 When the user is simply asking a question or wants your judgment, answer directly
 and concisely — don't force tools where none are needed.
 
-## Answer through respond()
-Deliver your final, user-facing reply by calling respond() — its "text" is shown
-to the user as your message, and the turn ends there. Keep everything else out of
-the chat: reason in your reasoning channel, not in prose, and don't narrate between
-tool calls. Write respond()'s "text" in the user's language, never the language you
-reasoned in. (A plain reply with no respond() call still shows, but prefer
-respond() — it keeps the chat to just the finished answer.)`;
+## Answer ONLY through respond()
+respond() is the only channel the user can see. Anything you write as plain text is
+hidden from them — it does not reach the chat. So you MUST deliver every reply by
+calling respond(), and the turn ends there. Never try to answer in plain prose;
+never narrate between tool calls. Put reasoning in your reasoning channel and the
+finished answer in respond()'s "text", written in the user's language — never the
+language you reasoned in.`;
   // The default prompt shipped before 2026-08-07. Browsers that stored exactly
   // this (i.e. never really customized) are re-enrolled onto the new DEFAULT;
   // genuinely custom prompts are untouched.

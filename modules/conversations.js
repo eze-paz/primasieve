@@ -1894,7 +1894,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=107');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=108');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3548,7 +3548,12 @@ class RoundRenderer {
     if (r) this._appendReasoning(r);
     if (delta.content) {
       this._finishThinking();
-      this._appendContent(delta.content);
+      // Cloud turns force respond(): the ONLY visible reply is respond()'s text,
+      // painted once at round end (endRound reconciles from round.content, which
+      // the worker sets to the respond text and blanks on every other round). So
+      // streamed content is never shown live — swallow it here. Local models have
+      // no respond()/tool_choice, so they still stream their answer normally.
+      if (this.isLocal) this._appendContent(delta.content);
     }
     if (delta.tool_calls) {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);

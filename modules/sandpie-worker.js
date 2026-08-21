@@ -2682,6 +2682,7 @@ async function runAgent(config, ctx) {
   ctx._roundsSinceTodo = 0;   // CUMULATIVE rounds since the last real write_todos; only reset by touchedTodo
   ctx._lastNagAt = 0;         // value of _roundsSinceTodo at the last nag (cadence gate, does NOT reset the count)
   ctx._stopBlocks = 0;
+  ctx._respondRetries = 0;    // bare-prose attempts rejected this turn while forcing respond()
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
   // Escalating preamble keyed to how long the plan has actually gone stale — a
@@ -2692,6 +2693,11 @@ async function runAgent(config, ctx) {
     return 'You have run ' + n + ' tool rounds without updating your plan.';
   };
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
+  const MAX_RESPOND_RETRIES = 3;   // bare-prose attempts to reject before falling back to showing content
+  // This turn forces respond() when the tool is present: the visible reply comes
+  // ONLY from respond(), plain content is hidden, and respond() is the only clean
+  // way to end. Subagents (no respond in their toolset) are unaffected.
+  const _respondForced = Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'respond');
   // "Open" = pending or in_progress. completed AND deleted are both closed.
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
   const hasOpenTodos = () => ctx._todos.length > 0 && openTodos().length > 0;
@@ -2797,6 +2803,11 @@ async function runAgent(config, ctx) {
       stream_options: { include_usage: true },
       tools: config.tools,
     };
+    // Force a tool call every round when respond() is in play: the model can never
+    // emit free-form prose, so the visible chat is exactly its tool actions + the
+    // respond() reply. Working tools still satisfy "required" mid-task; the turn
+    // ends when respond() is called.
+    if (_respondForced) reqBody.tool_choice = 'required';
     const reasoning = _openRouterReasoning(config);
     if (config.maxTokens != null) reqBody[reasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
@@ -2821,6 +2832,7 @@ async function runAgent(config, ctx) {
             stream_options: { include_usage: true },
             tools: config.tools,
           };
+          if (_respondForced) compactedReqBody.tool_choice = 'required';
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
@@ -2846,15 +2858,36 @@ async function runAgent(config, ctx) {
     // the tool loop / after it, below.
     const respondCall = round.tool_calls.find(tc => tc && tc.function && tc.function.name === 'respond');
     let respondText = null;
+    let _forceRespondRetry = false;
     if (respondCall) {
       try { respondText = String(JSON.parse(respondCall.function.arguments || '{}').text ?? ''); }
       catch (_) { respondText = ''; }
-      round.content = respondText;
+      round.content = respondText;                       // the visible reply IS respond's text
+    } else if (_respondForced && round.tool_calls.length) {
+      round.content = '';                                // working-tool round: hide any prose the model leaked
+    } else if (_respondForced && !round.tool_calls.length && !ctx.signal?.aborted
+               && ctx._respondRetries < MAX_RESPOND_RETRIES) {
+      round.content = '';                                // bare prose attempt — hide it; we'll force respond() below
+      _forceRespondRetry = true;
     }
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
     if (!round.tool_calls.length) {
+      // The model tried to answer in plain text without respond(). It was hidden
+      // (round.content blanked above); reject it and force a respond() call so the
+      // reply reaches the user through the one visible channel. Capped — on the cap
+      // we fall through and show the plain content so the turn can never hang blank.
+      if (_forceRespondRetry) {
+        ctx._respondRetries++;
+        setReminder('force-respond',
+          '<system-reminder>Your last message was plain text with no respond() call, so it was NOT shown to the user. '
+          + 'The ONLY thing the user sees is the "text" you pass to the respond() tool. '
+          + 'Call respond() now with your complete answer, written in the user\'s language. Do not answer any other way. '
+          + '(attempt ' + ctx._respondRetries + '/' + MAX_RESPOND_RETRIES + ')</system-reminder>',
+          { attempt: ctx._respondRetries });
+        continue;
+      }
       if (round.content) {
         const m = { role: 'assistant', content: round.content, finish_reason: round.finish_reason };
         messages.push(m);
