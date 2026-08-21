@@ -3557,10 +3557,11 @@ function tgLogFor(target) {
   const st = _tgState(target);
   // The pane was cleared/re-rendered under us (contains() also works on fragments).
   if (st.group && !target.contains(st.group)) st.group = null;
-  // No checklist item in_progress → an UNTITLED register: same card and tray,
-  // but the header shows the latest call's own label, dimmed (tgUpdate keeps it
-  // current) — never a fabricated task name. Orphan calls (gate exemptions like
-  // the run-end memory harvest, or a model slip) stay visually consistent.
+  // No checklist item in_progress → an UNTITLED register, and those are HIDDEN
+  // entirely (CSS .tg-untitled): taskless calls are blocked by the worker's
+  // plan-first gate, so what lands here is the blocked attempt's box or a gate
+  // exemption (run-end memory harvest) — bookkeeping the user never sees. The
+  // DOM still exists so tool results always have a box to attach to.
   const title = tgActiveTitle(st.todos);
   const untitled = !title;
   if (st.group && (st.group.classList.contains('tg-untitled') !== untitled

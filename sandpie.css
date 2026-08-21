@@ -1499,9 +1499,10 @@ ul.conv-list li.active {
     color: var(--sp-text); font-weight: 600;
     flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
   }
-  /* Untitled register (no active task): header mirrors the latest call's own
-     label, dimmed — it's a fact about a call, not a task name. */
-  .tool-group.tg-untitled .tg-title { color: var(--sp-text-dim); font-weight: 500; }
+  /* Untitled register (no active task): taskless calls are blocked by the
+     worker's plan-first gate anyway — hide the whole card. The DOM stays (tool
+     results still need somewhere to land) but the user never sees it. */
+  .msg.tool-group.tg-untitled { display: none; }
   .tool-group .tg-tray {
     display: flex; align-items: center; gap: 0.6rem;
     border-top: 1px solid var(--sp-border);
