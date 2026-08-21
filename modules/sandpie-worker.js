@@ -1697,7 +1697,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','screenshot','ask'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -1775,6 +1775,10 @@ async function runTool(name, args, ctx) {
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
     case 'recall':        return tool_recall(args, ctx);
+    // Safety net: respond is normally intercepted in runAgent's tool loop (it is
+    // terminal + renders the reply bubble via a sentinel). This case only fires if
+    // it is reached through the single-tool path — return a plain ack.
+    case 'respond':       return { result: 'Delivered to the user.' };
     default:              return unknownTool(name);
   }
 }
@@ -2834,6 +2838,19 @@ async function runAgent(config, ctx) {
         throw e;
       }
     }
+    // respond() is the user-facing-reply whitelist: whatever it carries in "text"
+    // IS the visible reply, and it ends the turn. Pre-scan the round so the reply
+    // bubble shows ONLY that text — any prose the model leaked into round.content
+    // (scratch narration, other-language reasoning) is dropped from what the user
+    // sees and from persisted history. Actual delivery + terminal break happen in
+    // the tool loop / after it, below.
+    const respondCall = round.tool_calls.find(tc => tc && tc.function && tc.function.name === 'respond');
+    let respondText = null;
+    if (respondCall) {
+      try { respondText = String(JSON.parse(respondCall.function.arguments || '{}').text ?? ''); }
+      catch (_) { respondText = ''; }
+      round.content = respondText;
+    }
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
@@ -2891,6 +2908,18 @@ async function runAgent(config, ctx) {
       if (!tc.function?.name) continue;
       let parsedArgs = {}; try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
       ctx.emit({ type: 'tool_started', tc });
+      if (tc.function.name === 'respond') {
+        // Deliver the reply to the page via a sentinel tool_result (the page
+        // renders it as the assistant bubble), and answer the tool_call with a
+        // minimal ack so the assistant tool_calls entry is never left orphaned.
+        // Not tagged with an [rN] id and never truncated — it is a delivery, not
+        // an observation of the world the model might cite.
+        ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + respondText });
+        const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
+        messages.push(rmsg);
+        await emitAdded(rmsg);
+        continue;
+      }
       ctx._currentToolCallId = tc.id;   // so spawn_subagent can tag its nested events to this box
       let toolOut;
       try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
@@ -2920,6 +2949,9 @@ async function runAgent(config, ctx) {
       await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
+    // respond() delivered the turn's final reply — it is terminal. Skip the
+    // drift/compaction bookkeeping (there is no next round) and end the turn.
+    if (respondCall) break;
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
     // completion clears the stop guard, so a model that keeps finishing items is
     // helped indefinitely while one that merely rewrites the list without progress

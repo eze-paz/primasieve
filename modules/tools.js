@@ -404,6 +404,20 @@ Each question must be phrased as a clear choice with 2-5 mutually exclusive, non
       },
     },
 
+    respond: {
+      description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown — and the turn ENDS immediately after, so call it exactly once, last.
+WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.
+LANGUAGE: write "text" in the user's language (the one you were instructed to reply in). Do not leak the language you reasoned in.
+WHEN: as the last thing you do in a turn — once the task is done, or to answer a question. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'Your complete user-facing reply, in the user\'s language. Markdown supported. Shown to the user exactly as written.' },
+        },
+        required: ['text'],
+      },
+    },
+
 };
 //// Tool enable/disable + description editing were REMOVED 2026-08-07 (product
 // decision): every tool is always ON with its shipped description — isEnabled()

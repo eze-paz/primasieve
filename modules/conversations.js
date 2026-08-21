@@ -437,6 +437,9 @@ function renderHistoricalMessage(m, host = null) {
               if (!existing) renderArtifact(host, path);
             }
           } catch (_) {}
+        } else if (tc.function.name === 'respond') {
+          /* respond(): its text is rendered as the assistant reply bubble from
+             m.content above — never as a tool box. */
         } else {
           const tcDiv = addMsg('tool-call', '', host);
           tcDiv.dataset.fname = tc.function.name;
@@ -454,6 +457,9 @@ function renderHistoricalMessage(m, host = null) {
     }
   } else if (m.role === 'tool') {
     const content = String(m.content || '');
+    // respond()'s tool ack carries no user-visible output (the reply was rendered
+    // from the assistant content) — skip it so it doesn't staple onto another box.
+    if (content === '[respond delivered]') return;
     const target = host || paneScrollEl($('messages'));
     const toolCalls = target.querySelectorAll('.msg.tool-call');
     // Attach this result to ITS OWN tool call, matched by tool_call_id. The old
@@ -1888,7 +1894,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=106');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=107');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3606,6 +3612,9 @@ class RoundRenderer {
     }
   }
   markToolStarted(tc) {
+    // respond() has no box (rendered as the reply bubble) — don't let the
+    // no-box fallback build one for it.
+    if (tc && tc.function && tc.function.name === 'respond') return;
     let idx = this.toolCalls.findIndex(t => t && t.id === tc.id);
     // No box for this call yet — happens when the model emitted its tool calls as
     // leaked/Hermes TEXT rather than structured streaming deltas, so _applyToolCallDelta
@@ -3635,6 +3644,16 @@ class RoundRenderer {
     return i;
   }
   markToolDone(tcId, result) {
+    // respond(): the reply is already painted into the assistant bubble by
+    // endRound (the worker set round.content to respond's text before round_end),
+    // and respond has no tool box. Just drop any box that slipped through for this
+    // id and stop — never fall through to the "attach to an in-flight box"
+    // fallback below, which would staple this result onto a different tool.
+    if (String(result || '').replace(/^\[r\d+\]\s*/, '').startsWith('respond:')) {
+      const j = this.toolCalls.findIndex(t => t && t.id === tcId);
+      if (j >= 0 && this.toolCallEls[j]) { this.toolCallEls[j].remove(); this.toolCallEls[j] = null; }
+      return;
+    }
     let idx = this.toolCalls.findIndex(t => t && t.id === tcId);
     let el = idx >= 0 ? this.toolCallEls[idx] : null;
     // Fallback: if the result's id doesn't match a tracked call (the executed
@@ -3804,6 +3823,13 @@ class RoundRenderer {
     if (tc.function?.name) this.toolCalls[i].function.name += tc.function.name;
     if (tc.function?.arguments) this.toolCalls[i].function.arguments += tc.function.arguments;
     if (!this.toolCalls[i].function.name) return;
+    // respond() is never drawn as a tool box — its text renders as the assistant
+    // reply bubble (endRound). Bail before creating a box so no raw {"text":…}
+    // JSON flashes on screen. The prefix test also covers partially-streamed names
+    // ("r","re"…); r-prefixed real tools (read_file/recall/remember) diverge within
+    // a char or two and get their box then, a sub-frame later.
+    { const nm = this.toolCalls[i].function.name;
+      if (nm === 'respond' || 'respond'.startsWith(nm)) return; }
     if (!this.toolCallEls[i]) {
 
       this.toolCallEls[i] = addMsg('tool-call', '→ ' + this.toolCalls[i].function.name + '(', this.host);
