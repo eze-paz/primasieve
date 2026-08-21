@@ -314,6 +314,11 @@ self.addEventListener('message', async (event) => {
 // ============================================================
 const PY_POOL_MAX = (() => {
   try { if (globalThis.__noPyPool) return 1; } catch (_) {}   // debug escape hatch
+  // Each pool worker is a full interpreter (~150-200MB) plus a MEMFS mirror of
+  // OPFS, so on memory-starved machines extra workers cause wasm OOM / tab
+  // kills. navigator.deviceMemory (Chromium-only; capped at 8) <= 4 → one worker.
+  const mem = (typeof navigator !== 'undefined' && navigator.deviceMemory) || 0;
+  if (mem > 0 && mem <= 4) return 1;
   const n = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
   return Math.min(3, Math.max(1, n - 1));
 })();
