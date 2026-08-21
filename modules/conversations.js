@@ -638,40 +638,55 @@ function renderConversation(msgs, compaction, host = null) {
 // on the stream, so a rebuilt line reads "done" — the distinction is cosmetic).
 // No-op when the stream has no completed turn (timerStart/lastUsage unset) or a
 // timer is already mounted.
+// The thoughts-toggle button — shared by the live line, the settled line, and the
+// placeholder so every timer state carries the same leading icon.
+function _timerNnBtn() {
+  const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
+  const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
+  return `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`;
+}
+// Resting placeholder for a slot with no live/finished turn to show. Mirrors the
+// settled timer's shape (nn icon · idle · 0s · – ctx) and dims via .done, so an
+// idle conversation shows a real-looking bar — never a bare "· idle ·".
+function _fillPlaceholderTimer(slot, convId) {
+  if (!slot) return;
+  slot.classList.add('done');
+  slot.dataset.convId = convId == null ? '' : '' + convId;
+  slot.innerHTML =
+    _timerNnBtn() +
+    '<span class="mt-label">idle</span>' +
+    '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
+    '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
+  _wireCtxCounter(slot, convId);
+}
 function rebuildSettledTimer(target, s) {
   if (!s) return;
   const slot = _timerSlotFor(s);
   if (!slot) return;
-  // A LIVE timer is ticking in this slot for the CURRENT conversation — do not
-  // overwrite it with a settled replica.
-  if (s.timerEl && s.timerEl === slot && !slot.classList.contains('done')) return;
-  // Brand-new empty chat: no timer line. Blank any stale previous-conversation
-  // text the slot may still hold.
-  if (!s.messages || !s.messages.length) {
-    if (slot.dataset.convId && slot.dataset.convId !== '' + s.id) {
-      slot.innerHTML = '';
-      slot.classList.remove('done');
-      delete slot.dataset.convId;
-    }
+  // A live turn owns the slot via startTotalTimer's ticking paint — never stamp a
+  // settled replica or placeholder over it.
+  if (s.generating) return;
+  // No finished turn to show (brand-new chat, or a conv that never ran this
+  // session) → resting placeholder, not a blank slot.
+  if (!s.lastTurn && !(s.timerStart && s.lastUsage)) {
+    _fillPlaceholderTimer(slot, s.id);
     return;
   }
   let sec = null, comp = null, label = 'done';
-  // Live data (timerStart/lastUsage) from a warm stream takes precedence;
-  // persisted data (lastTurn) covers a cold load after refresh.
-  if (s.timerStart && s.lastUsage) {
-    sec = (Date.now() - s.timerStart) / 1000;
-    const u = s.lastUsage;
-    comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
-  } else if (s.lastTurn) {
+  // Persisted lastTurn is authoritative for a finished turn; timerStart/lastUsage
+  // is the warm-stream fallback (its sec would otherwise keep growing post-turn).
+  if (s.lastTurn) {
     sec = s.lastTurn.sec;
     comp = s.lastTurn.completionTokens || 0;
     label = s.lastTurn.label || 'done';
+  } else {
+    sec = (Date.now() - s.timerStart) / 1000;
+    const u = s.lastUsage;
+    comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
   }
   const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
-  const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
-  const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   const parts = [
-    `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
+    _timerNnBtn(),
     `<span class="mt-label">${label}</span>`,
     `<span class="mt-sep">·</span><span class="mt-time">${sec == null ? '–' : fmtElapsed(sec, true)}</span>`,
   ];
@@ -817,6 +832,12 @@ function mountConv(convId, pane = null) {
 
     const target = pane || (sidePanel ? sidePanel.activeMountTarget() : $('messages'));
     if (s.host.parentNode !== target) _mountInPane(s.host, target);
+    // Sync the pane's timer slot to the conversation now on screen: re-attach the
+    // live ticking timer if it is still generating (so switching back restores the
+    // running timer instead of a blank/placeholder bar), otherwise paint its
+    // settled line or the resting placeholder.
+    if (s.generating && typeof s._tickTimer === 'function') s._tickTimer();
+    else rebuildSettledTimer(target, s);
   } else {
     localStorage.removeItem('sandpie-active-conv');
     messages = [];
@@ -5242,73 +5263,76 @@ function _timerSlotFor(stream) {
   const slot = document.getElementById(side ? 'msgTimerSide' : 'msgTimerMain');
   return slot ? slot.querySelector('.msg-timer') : null;
 }
+// True when the stream's conversation is CURRENTLY on screen. _mountInPane removes
+// a non-viewed conv's host from the DOM, so isConnected is a reliable "is viewed"
+// signal. The per-pane timer slot is shared across conversations, so the live
+// timer must only ever touch it while its own conversation is the one shown —
+// otherwise a backgrounded generating conv would clobber the viewed one, or write
+// to detached nodes (the "· idle ·" on switch-back bug).
+function _streamViewed(s) { return !!(s && s.host && s.host.isConnected); }
+
+// Live-line markup, rebuilt into the slot whenever this conversation owns it.
+const _LIVE_TIMER_HTML = () =>
+  _timerNnBtn() +
+  '<span class="mt-time">0s</span>' +
+  '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
+  '<span class="mt-todos"></span>';
 
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
   const el = _timerSlotFor(stream);
   if (!el) return;
   stream.timerStart = Date.now();
-  // ONE timer per pane: the persistent slot above the composer is reused for a
-  // new live turn — clear any settled (.done) state so only the live line shows.
-  el.classList.remove('done');
-  el.dataset.convId = '' + (stream.id || '');
-  // Built once; the tick mutates the leaf <span>s in place. No live tok/s — with
-  // estimation removed there is no per-turn token count until the provider reports
-  // usage at turn end (local WebGPU models report via the engine; see endTotalTimer).
-  el.innerHTML =
-    '<button class="mt-nn" title="Show thoughts" onclick="toggleThoughts()">' + NN_SVG_INLINE + '</button>' +
-    '<span class="mt-time">0s</span>' +
-    '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
-    '<span class="mt-todos"></span>';
   stream.timerEl = el;
-
-  const timeEl = el.querySelector('.mt-time');
-  // queueEl wiring removed (queue system removed)
-  _wireCtxCounter(el, stream.id);
-  const todosEl = el.querySelector('.mt-todos');
-  stream.todosEl = todosEl;
   // Do NOT reset stream.todos here. It is the persistent checklist (task tree),
   // carried across turns + reloads (meta.todos → hydrate → s.todos) and seeded
   // into the worker via config.todos so write_todos OPS apply to the existing
   // tree. Nulling it (a relic of the old full-replace design) detached the
   // checklist every turn — buildAgentConfig, called right after this, would read
   // null → empty tree → the model rewrites and loses state.
-  const set = (node, txt) => { if (node.textContent !== txt) node.textContent = txt; };
+  const set = (node, txt) => { if (node && node.textContent !== txt) node.textContent = txt; };
 
-  // The live timer shows the checklist inherited from the stream (seeded from
-  // meta.todos on load) — cur/total plus a click-through to the full view — even
-  // when every item is already completed (a finished checklist is still state
-  // worth showing). Repaint on every tick so mid-turn write_todos updates
-  // appear without waiting for turn end.
-  const paintTodos = () => {
-    const t = stream.todos;
-    if (!t || !t.length) { set(todosEl, ''); return; }
-    const cur = t.filter(x => x && x.status === 'completed').length;   // completed only — match the checklist card
-    set(todosEl, cur + '/' + t.length);
-    if (!todosEl._mtTodosWired) {
-      todosEl._mtTodosWired = true;
-      todosEl.style.cursor = 'pointer';
-      todosEl.title = 'Checklist — click for details';
-      todosEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const snapshot = (stream.todos || []).slice();
-        showCmdPanelForEl(todosEl, buildTodosView(snapshot), 'Checklist');
-      });
+  // Ownership-aware, self-healing paint. The timer slot is ONE persistent element
+  // per pane, shared across conversations, so:
+  //  - only paint when THIS conversation is the one on screen (_streamViewed) —
+  //    a backgrounded generating conv must not clobber the viewed one, nor write
+  //    to nodes another conv has since replaced;
+  //  - re-resolve the slot each tick and re-assert the live structure if a
+  //    conversation switch blanked it / stamped a settled or placeholder line —
+  //    this is what re-attaches the ticking timer when you return to a still-
+  //    generating conversation (the "shows · idle · on switch-back" bug).
+  const paint = () => {
+    if (!_streamViewed(stream)) return;
+    const slot = _timerSlotFor(stream);
+    if (!slot) return;
+    stream.timerEl = slot;
+    if (slot.dataset.convId !== '' + (stream.id || '') || slot.classList.contains('done') || !slot.querySelector('.mt-time')) {
+      slot.classList.remove('done');
+      slot.dataset.convId = '' + (stream.id || '');
+      slot.innerHTML = _LIVE_TIMER_HTML();
+      _wireCtxCounter(slot, stream.id);
+    }
+    set(slot.querySelector('.mt-time'), fmtElapsed((Date.now() - stream.timerStart) / 1000));
+    const todosEl = slot.querySelector('.mt-todos');
+    if (todosEl) {
+      const t = stream.todos;
+      if (!t || !t.length) { set(todosEl, ''); }
+      else {
+        const cur = t.filter(x => x && x.status === 'completed').length;   // completed only — match the checklist card
+        set(todosEl, cur + '/' + t.length);
+        if (!todosEl._mtTodosWired) {
+          todosEl._mtTodosWired = true;
+          todosEl.style.cursor = 'pointer';
+          todosEl.title = 'Checklist — click for details';
+          todosEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showCmdPanelForEl(todosEl, buildTodosView((stream.todos || []).slice()), 'Checklist');
+          });
+        }
+      }
     }
   };
-
-  const paint = () => {
-    if (!stream.timerEl) return;
-    // Self-heal: a mid-turn host re-render (e.g. a compaction that clears
-    // s.host.innerHTML) detaches the live timer, and startTotalTimer's guard
-    // then never rebuilds it — so it vanishes for the rest of the turn. If it's
-    // been orphaned, re-append it to the (rebuilt) host at the next tick.
-    // The slot is a persistent element in the pane (not the conv-host), so a host
-    // re-render can never detach it. Left intentionally bare. 
-    set(timeEl, fmtElapsed((Date.now() - stream.timerStart) / 1000));
-    paintTodos();
-
-  };
+  stream._tickTimer = paint;   // so a conversation switch can re-attach immediately
 
   paint();
   stream.timerInterval = setInterval(paint, TIMER_TICK_MS);
@@ -5318,50 +5342,55 @@ function endTotalTimer(stream, label) {
   if (!stream || !stream.timerEl) return;
   clearInterval(stream.timerInterval);
   stream.timerInterval = null;
+  stream._tickTimer = null;
+  const sec = (Date.now() - stream.timerStart) / 1000;
+  const u = stream.lastUsage;
+  const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
+  // Always persist the finished turn so the settled line can be rebuilt later
+  // (cold load, or switching back to this conversation) — even if this turn
+  // finished while another conversation was on screen.
+  if (label !== null) stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp };
+  // Only touch the shared per-pane slot if THIS conversation is the one on screen;
+  // a backgrounded turn finishing must not overwrite the viewed conversation's bar.
+  // When it isn't viewed, rebuildSettledTimer paints the settled line from lastTurn
+  // the moment the user switches back.
+  const slot = _streamViewed(stream) ? _timerSlotFor(stream) : null;
+  if (!slot) { stream.timerEl = null; return; }
   if (label === null) {
-    // Persistent per-pane bar: never remove the element — blank it so it stays.
-    stream.timerEl.innerHTML = '';
-    stream.timerEl.classList.remove('done');
-    delete stream.timerEl.dataset.convId;
-  } else {
-    const sec = (Date.now() - stream.timerStart) / 1000;
-    // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. tok/s comes
-    // ONLY from the provider's reported completion_tokens (no estimate); omitted
-    // when the provider reported no usage (e.g. some local paths).
-    const u = stream.lastUsage;
-    const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
-    const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
-    const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
-    const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
-    const parts = [
-      `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`,
-      `<span class="mt-label">${label}</span>`,
-      `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
-    ];
-    if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
-    parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
-    if (stream.todos && stream.todos.length) {
-      const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
-      parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
+    // Turn cancelled with nothing to show → resting placeholder (never a bare slot).
+    _fillPlaceholderTimer(slot, stream.id);
+    stream.timerEl = null;
+    return;
+  }
+  // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. tok/s comes
+  // ONLY from the provider's reported completion_tokens (no estimate); omitted
+  // when the provider reported no usage (e.g. some local paths).
+  const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
+  const parts = [
+    _timerNnBtn(),
+    `<span class="mt-label">${label}</span>`,
+    `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
+  ];
+  if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+  parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
+  if (stream.todos && stream.todos.length) {
+    const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
+    parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
+  }
+  slot.innerHTML = parts.join('');
+  slot.classList.add('done');
+  slot.dataset.convId = '' + (stream.id || '');
+  _wireCtxCounter(slot, stream.id);
+  if (stream.todos && stream.todos.length) {
+    const badge = slot.querySelector('.mt-todos');
+    if (badge) {
+      // Snapshot THIS turn's checklist so the finished badge always shows the
+      // state at turn-end, immune to later turns reassigning stream.todos.
+      const snapshot = stream.todos.slice();
+      badge.onclick = () => {
+        showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
+      };
     }
-    stream.timerEl.innerHTML = parts.join('');
-    stream.timerEl.classList.add('done');
-    _wireCtxCounter(stream.timerEl, stream.id);
-    if (stream.todos && stream.todos.length) {
-      const badge = stream.timerEl.querySelector('.mt-todos');
-      if (badge) {
-        // Snapshot THIS turn's checklist so the finished badge always shows the
-        // state at turn-end, immune to later turns reassigning/clearing
-        // stream.todos (startTotalTimer resets it to null next turn).
-        const snapshot = stream.todos.slice();
-        badge.onclick = () => {
-          showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
-        };
-      }
-    }
-    // Persist the finished turn's data so the timer can be rebuilt on cold
-    // loads (refresh → hydrateStreamFromData → renderConversation).
-    stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp };
   }
   stream.timerEl = null;
 }

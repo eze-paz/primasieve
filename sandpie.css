@@ -646,8 +646,9 @@
   .msg-timer .mt-nn.thinking svg .r3 { animation: ring-out-d2 1.6s ease-out infinite; }
   .msg-timer .mt-nn.thinking svg .r-c { animation: ring-center 1.6s ease-in-out infinite; }
   .msg-timer .mt-nn.thinking { opacity: 1; color: var(--sp-accent); }
-  /* The timer bar NEVER hides. An empty slot renders a dim placeholder. */
-  .msg-timer:empty::before { content: '· idle ·'; color: var(--sp-text-dim); }
+  /* The timer bar NEVER hides. An idle slot is filled by JS with a real-looking
+     placeholder (nn icon · idle · 0s · – ctx), dimmed via .done — see
+     _fillPlaceholderTimer in conversations.js. No bare-text fallback here. */
   .msg-timer .mt-todos:empty { display: none; }
 
   /* ---- per-conversation context popup (anchored to the ctx counter) ---- */
