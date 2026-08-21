@@ -186,7 +186,12 @@ function renderMessagesBefore(msgs, host, scrollEl) {
   if (anchor) host.insertBefore(frag, anchor);
   else host.appendChild(frag);
   // Pin the visible content: compensate scrollTop for the height added above.
-  if (scrollEl) scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
+  // Skip when native scroll anchoring is active for the load (sp-load-anchor):
+  // the browser already holds the viewport (through async reflow too), so manual
+  // compensation would double-shift and reintroduce the jiggle.
+  if (scrollEl && !scrollEl.classList.contains('sp-load-anchor')) {
+    scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
+  }
 }
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
@@ -1119,6 +1124,11 @@ async function loadConv(id) {
       s.messages = allMsgs;     // grow on the stream NOW so concurrent sends see it
       s.persistedCount = meta.msgCount || 0;  // known total from meta; prevents partial-append saves mid-load
       let firstBatchRendered = false;
+      // Native scroll anchoring for the duration of the load: the browser pins the
+      // viewport through both the prepends and their later async reflow, so the DOM
+      // doesn't jiggle. renderMessagesBefore skips its manual compensation while
+      // this class is set (they would double-shift). Removed in the finally.
+      try { s.host.classList.add('sp-load-anchor'); } catch (_) {}
 
       for await (const result of readConvJsonlTail(jp, fileSize)) {
         // result.messages is newest-first (reverse chrono). Reverse it to
@@ -1167,6 +1177,10 @@ async function loadConv(id) {
       _finalizeIncrementalLoad(s, s.host);
     } finally {
       s._loading = false;
+      // Load done → revert to manual scroll control (overflow-anchor:none) so
+      // streaming's scroll-to-bottom behaves. rAF so any final async reflow from
+      // the last batch settles under anchoring before we hand control back.
+      try { const h = s.host; requestAnimationFrame(() => { try { h.classList.remove('sp-load-anchor'); } catch (_) {} }); } catch (_) {}
     }
   })();
 }

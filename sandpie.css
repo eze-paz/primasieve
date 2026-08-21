@@ -960,6 +960,11 @@ ul.conv-list li.active {
     flex: 1 1 auto; min-height: 0;
     overflow-y: auto; padding: 1.5rem; scrollbar-gutter: stable; overflow-anchor: none;
   }
+  /* During a chunked conversation load, let the browser anchor the viewport so
+     prepended older messages — and their async reflow (artifacts/images/KaTeX) —
+     don't jiggle the view. Reverts to `none` after load for streaming's manual
+     scroll-to-bottom. Toggled by the loader (sp-load-anchor). */
+  .conv-host.sp-load-anchor { overflow-anchor: auto; }
 
   @media (prefers-reduced-motion: reduce) {
   }
