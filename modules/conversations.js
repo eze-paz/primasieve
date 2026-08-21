@@ -2187,7 +2187,7 @@ function workerAgentStream(worker, id, signal) {
   });
 }
 
-// Byte size of what will actually be sent (system prompt + resolved messages + tool defs). No pre-send byte cap — the token-based guard (maybeAutoCompact) protects the model context.
+// Byte size of what will actually be sent (system prompt + resolved messages + tool defs). Compared only against the gateway's absolute ~1 MB body cap (transport limit) — the model context is protected by the token-based guards (maybeAutoCompact / maybeCompactMidTurn).
 function _sentRequestBytes(config) {
   try { return new Blob([JSON.stringify(config.messages || []) + JSON.stringify(config.systemPrompt || '') + JSON.stringify(config.tools || [])]).size; }
   catch { try { return (JSON.stringify(config.messages || []) || '').length; } catch { return 0; } }
@@ -2262,9 +2262,15 @@ async function sendSingle(text, stream, opts = {}) {
   // on its next send (the advanced boundary is saved).
   if (typeof SandpieCompactor !== 'undefined' && SandpieCompactor.isEnabled && SandpieCompactor.isEnabled()) {
     const base = SandpieCompactor.config();
-        // Budget = the provider's context WINDOW (converted to bytes at ~4 bytes/token, targeting base.pct% of it). No artificial byte-size cap — the token-based compaction (maybeAutoCompact) protects the model context.
-    let budget = Infinity;
-    try { const win = SandpieTokens.contextWindow && SandpieTokens.contextWindow(); if (win) budget = Math.min(budget, Math.round(win * (base.pct / 100) * 4)); } catch (_) {}
+    // Budget = the gateway's absolute request-body cap (~1 MB), with headroom.
+    // This is a TRANSPORT limit, deliberately NOT derived from the model's token
+    // window: bytes are a terrible token proxy (JSON escaping, \uXXXX unicode,
+    // base64 images), so a window-relative byte budget used to force compaction
+    // on conversations that were nowhere near the context limit. The model
+    // context itself is protected by the token-based guards (maybeAutoCompact
+    // pre-send + maybeCompactMidTurn in the worker), both fed by REAL reported
+    // prompt tokens. The worker's 413-compact-retry backstops this reactively.
+    const budget = 900_000;
     // Shrink the kept tail until the request fits. keepTail=10 is only a STARTING
     // point: if the last 10 messages alone exceed the budget (big tool outputs),
     // halve it (10→5→2) so the boundary advances PAST them. "nothing to compact"

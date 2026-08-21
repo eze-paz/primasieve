@@ -31,11 +31,18 @@ const SandpieTokens = (() => {
   // pass an explicit id to measure a BACKGROUND conversation (compaction runs per
   // conversation regardless of which one is on screen).
   async function conversationTokens(convId) {
+    const u = await _readUsage(convId);
+    return u ? usageTotal(u) : 0;
+  }
+  // The raw stored usage object for a conversation (or null). Kept separate from
+  // conversationTokens so contextPct can also read the window the usage was
+  // recorded against (_window, stamped by recordUsage).
+  async function _readUsage(convId) {
     convId = convId || localStorage.getItem('sandpie-active-conv');
-    if (!convId) return 0;
+    if (!convId) return null;
     try {
       const stored = localStorage.getItem(USAGE_PREFIX + convId);
-      if (stored) return usageTotal(JSON.parse(stored));
+      if (stored) { const u = JSON.parse(stored); if (u) return u; }
     } catch {}
     // Disk fallback: new format stores usage in the meta sidecar; legacy convs in
     // the monolithic .json. Try both (archived paths included).
@@ -43,21 +50,33 @@ const SandpieTokens = (() => {
     for (const rel of [convId + '.meta.json', 'archived/' + convId + '.meta.json', convId + '.json', 'archived/' + convId + '.json']) {
       try {
         const data = JSON.parse(await window.opfs.read(base + rel));
-        if (data && data.usage) return usageTotal(data.usage);
+        if (data && data.usage) return data.usage;
       } catch {}
     }
-    return 0;
+    return null;
   }
 
   // The single source of truth for "how full is the context window" — reported
-  // tokens ÷ the active provider's window, as a percentage. null when the window
-  // is unknown or nothing has been reported. The compaction trigger, the live ctx
-  // counter, and the context popup all read this so they can never disagree.
+  // tokens ÷ the window, as a percentage. null when the window is unknown or
+  // nothing has been reported. The compaction trigger, the live ctx counter, and
+  // the context popup all read this so they can never disagree.
+  //
+  // Window choice: the usage was measured under whatever provider the turn ran
+  // on, so its stamped _window is the honest denominator — NOT whatever provider
+  // happens to be selected right now. We take min(recorded, active): switching
+  // DOWN to a smaller-window model must still trigger compaction (the next send
+  // really will hit the smaller window), but switching UP to a bigger one must
+  // not keep reporting the old model's inflated %. Legacy usage without a stamp
+  // falls back to the active window (old behavior).
   async function contextPct(convId) {
-    const w = contextWindow();
-    if (!w) return null;
-    const used = await conversationTokens(convId);
+    const u = await _readUsage(convId);
+    if (!u) return null;
+    const used = usageTotal(u);
     if (!used) return null;
+    const rec = (u._window > 0) ? u._window : null;
+    const act = contextWindow();
+    const w = (rec && act) ? Math.min(rec, act) : (rec || act);
+    if (!w) return null;
     return (used / w) * 100;
   }
 
@@ -68,6 +87,9 @@ const SandpieTokens = (() => {
 
   function recordUsage(convId, usage) {
     if (!usage) return;
+    // Stamp the context window the usage was measured against, so contextPct
+    // keeps an honest denominator after the user switches the active provider.
+    try { const w = contextWindow(); if (w) usage = { ...usage, _window: w }; } catch {}
     localStorage.setItem(USAGE_PREFIX + convId, JSON.stringify(usage));
     const log = prune(loadLog());
     log.push({ t: Date.now(), tokens: usageTotal(usage) });
