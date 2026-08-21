@@ -3511,7 +3511,10 @@ class RoundRenderer {
     // the last reference to it — so clear it here before taking a new one.
     // Checked after _flushAllPending, so genuinely-streamed text is never dropped.
     if (this.reply && !(this.content && this.content.trim())) this.reply.remove();
-    this.reply = addMsg('assistant', '', this.host);
+    // Created lazily by _ensureReply() only once there's real content to show, so
+    // an empty <div class="msg assistant"> never sits in the DOM during generation
+    // (cloud turns route content to the thinking box, so many rounds have none).
+    this.reply = null;
     this.content = '';
     this.displayed = '';
     this.pending = '';
@@ -3808,8 +3811,21 @@ class RoundRenderer {
     this.pending += chunk;
     this._scheduleDrain();
   }
+  // Create the assistant reply div on demand. Never called for empty content, so
+  // the DOM never holds an empty <div class="msg assistant">.
+  _ensureReply() {
+    if (this.reply && this.reply.parentNode) return this.reply;
+    this.reply = addMsg('assistant', '', this.host);
+    if (this._boundMessage) bindBubble(this.reply, this._boundMessage);
+    return this.reply;
+  }
   _paintContent() {
-    if (!this.reply) return;
+    // Nothing to show yet → don't materialize an empty bubble; drop a stale empty one.
+    if (!this.displayed) {
+      if (this.reply && !(this.content && this.content.trim())) { this.reply.remove(); this.reply = null; }
+      return;
+    }
+    this._ensureReply();
     if (this.isLocal) {
       // Skip marked+DOMPurify per token — main thread stays free for GPU inference.
       // Full markdown render happens once in finalize() when generation is done.
