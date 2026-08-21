@@ -2808,8 +2808,20 @@ async function runAgent(config, ctx) {
     // before planning (greetings can still respond). Once a task is active, the full
     // toolset returns. The server-side block below is a fallback for a provider that
     // ignores the restricted list.
+    // While gated, the surviving write_todos def carries the names of the hidden
+    // tools — without this the model looks at a two-tool list and truthfully
+    // reports "I can't run python" instead of planning to unlock it.
     const _availTools = (_planForced && !_hasActiveTask())
       ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'respond'))
+          .map(t => {
+            if (t.function.name !== 'write_todos') return t;
+            const hidden = (config.tools || [])
+              .map(x => x && x.function && x.function.name)
+              .filter(n => n && n !== 'write_todos' && n !== 'respond');
+            if (!hidden.length) return t;
+            return { ...t, function: { ...t.function, description: (t.function.description || '') +
+              '\nCURRENTLY HIDDEN by the plan-first gate (they exist and unlock the moment a task is in_progress): ' + hidden.join(', ') + '.' } };
+          })
       : config.tools;
     // the model reads it immediately before generating (recency beats a rule
     const reqBody = {
