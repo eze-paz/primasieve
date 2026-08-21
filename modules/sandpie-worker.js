@@ -353,7 +353,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=8', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=9', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -2984,6 +2984,15 @@ async function runAgent(config, ctx) {
     await emitAdded(asstMsg);
     const loadedImages = [];
     let touchedTodo = false;
+    // Same-round grace, PRESENTATION TOOLS ONLY: if a task was active when this
+    // round's calls were emitted and an earlier write_todos in the batch
+    // completed the final task, the batch's remaining show_artifact/remember
+    // calls still run — the natural "mark done + show the result" pair.
+    // Work tools (python, shell, files, …) get NO grace: completing the plan
+    // still blocks them instantly, so a model can't smuggle plan-less work
+    // into the tail of a round.
+    const _roundGrace = _hasActiveTask();
+    const _GRACE_TOOLS = new Set(['show_artifact', 'remember']);
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
@@ -2993,7 +3002,8 @@ async function runAgent(config, ctx) {
       // that list could still emit one. Reject it here. Emit tool_started+tool_result
       // so the box RESOLVES to the blocked message — never leave it spinning (the box
       // may already exist from streamed arg deltas).
-      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'respond' && !_hasActiveTask()) {
+      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'respond' && !_hasActiveTask()
+          && !(_roundGrace && _GRACE_TOOLS.has(tc.function.name))) {
         const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or op:"start"). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
         ctx.emit({ type: 'tool_started', tc });
         ctx.emit({ type: 'tool_result', id: tc.id, result: blk });

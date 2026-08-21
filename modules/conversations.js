@@ -403,6 +403,76 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   await refreshConversationList();
   refreshPaneBars();
 }
+// show_artifact calls seen during history replay, keyed by tool-call id; the
+// matching tool RESULT decides whether the artifact actually renders (a
+// blocked call renders nothing — same contract as the live path).
+const _histArtifacts = new Map();
+
+// ---- Local-file references in replies --------------------------------------
+// After a reply paints, its OPFS references come alive:
+//   <img src="projects/…/x.svg">  (markdown ![](path)) → loads the real file
+//   <a href="local/path">, <code>local/path.ext</code> → click opens the viewer
+// Idempotent (data-lr-done) so the streaming repaint can call it every tick.
+const _lrBlobUrls = new Map();   // normalized path → blob URL (session cache)
+const _LR_PATHISH = /^[\w.\-][\w.\- ()]*(?:\/[\w.\- ()]+)+\.[A-Za-z0-9]{1,8}$/;
+const _LR_IMG_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon' };
+function _lrNorm(p) {
+  p = String(p || '').trim();
+  try { p = decodeURIComponent(p); } catch (_) {}
+  return p.replace(/^\.\//, '').replace(/^\/?files\//, '').replace(/^opfs:\/\//, '').replace(/^\/+/, '');
+}
+async function _lrBlobUrl(path) {
+  if (_lrBlobUrls.has(path)) return _lrBlobUrls.get(path);
+  try {
+    const bytes = await opfs.readBytes(path);
+    const mime = _LR_IMG_MIME[path.split('.').pop().toLowerCase()];
+    if (!mime) return null;
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    _lrBlobUrls.set(path, url);
+    return url;
+  } catch (_) { return null; }
+}
+function _lrOpen(path) {
+  try { if (typeof SandpieFileViewer !== 'undefined' && _LR_PATHISH.test(path)) SandpieFileViewer.open(path); } catch (_) {}
+}
+function hydrateLocalRefs(root) {
+  if (!root || !root.querySelectorAll) return;
+  for (const img of root.querySelectorAll('img[src]')) {
+    if (img.dataset.lrDone) continue;
+    const raw = img.getAttribute('src') || '';
+    if (/^(https?:|data:|blob:)/i.test(raw)) { img.dataset.lrDone = '1'; continue; }
+    const path = _lrNorm(raw);
+    if (!_LR_PATHISH.test(path) || !_LR_IMG_MIME[path.split('.').pop().toLowerCase()]) { img.dataset.lrDone = '1'; continue; }
+    img.dataset.lrDone = '1';
+    img.style.maxWidth = 'min(320px, 100%)';
+    img.style.maxHeight = '240px';
+    _lrBlobUrl(path).then(u => {
+      if (u) {
+        img.src = u; img.title = path; img.style.cursor = 'pointer';
+        img.onclick = () => _lrOpen(path);
+      } else {
+        img.alt = '(image not found: ' + path + ')';
+      }
+    });
+  }
+  for (const el of root.querySelectorAll('a[href], code')) {
+    if (el.dataset.lrDone) continue;
+    const isA = el.tagName === 'A';
+    if (!isA && el.parentElement && el.parentElement.tagName === 'PRE') continue;   // fenced blocks: leave alone
+    const raw = isA ? (el.getAttribute('href') || '') : (el.textContent || '');
+    if (isA && /^(https?:|mailto:|data:|blob:|#)/i.test(raw)) { el.dataset.lrDone = '1'; continue; }
+    if (!_LR_PATHISH.test(_lrNorm(raw))) { if (isA) el.dataset.lrDone = '1'; continue; }
+    el.dataset.lrDone = '1';
+    el.classList.add('lr-file');
+    el.title = 'Open ' + _lrNorm(raw);
+    // Resolve the path AT CLICK TIME — a code span painted mid-stream may still
+    // be growing when this handler is attached.
+    el.addEventListener('click', (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      _lrOpen(_lrNorm(isA ? (el.getAttribute('href') || '') : (el.textContent || '')));
+    });
+  }
+}
 function renderHistoricalMessage(m, host = null) {
   if (m.role === 'user') {
     if (m._loadedImage) return;   // model-only image (load_image); shown in its tool-call box, not as a bubble
@@ -413,6 +483,7 @@ function renderHistoricalMessage(m, host = null) {
     if (contentStr && contentStr.trim()) {
       const div = addMsg('assistant', '', host);
       div.innerHTML = renderMd(contentStr);
+      hydrateLocalRefs(div);
       bindBubble(div, m);
     }
     // Saved reasoning (chain of thought) — cloud tool-call turns persist it as
@@ -434,13 +505,13 @@ function renderHistoricalMessage(m, host = null) {
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
         if (tc.function.name === 'show_artifact') {
+          // Defer to the tool RESULT (below) — same contract as the live path,
+          // which renders only on the 'artifact:' sentinel. Rendering from the
+          // call's args here made a BLOCKED show_artifact (plan-first gate)
+          // appear on reload despite never showing live.
           try {
             const { path } = JSON.parse(tc.function.arguments || '{}');
-            if (path) {
-              const target = host || paneScrollEl($('messages'));
-              const existing = target.querySelector('.artifact-wrap[data-artifact-path="' + path + '"]');
-              if (!existing) renderArtifact(host, path);
-            }
+            if (path && tc.id) _histArtifacts.set(tc.id, path);
           } catch (_) {}
         } else if (tc.function.name === 'respond') {
           /* respond(): its text is rendered as the assistant reply bubble from
@@ -466,6 +537,17 @@ function renderHistoricalMessage(m, host = null) {
     // from the assistant content) — skip it so it doesn't staple onto another box.
     if (content === '[respond delivered]') return;
     const target = host || paneScrollEl($('messages'));
+    // show_artifact settles here, exactly like live: render only when the call
+    // actually succeeded (a 'Blocked:' result renders nothing).
+    if (m.tool_call_id && _histArtifacts.has(m.tool_call_id)) {
+      const apath = _histArtifacts.get(m.tool_call_id);
+      _histArtifacts.delete(m.tool_call_id);
+      if (!content.replace(/^\[r\d+\]\s*/, '').startsWith('Blocked:')) {
+        const existing = target.querySelector && target.querySelector('.artifact-wrap[data-artifact-path="' + apath + '"]');
+        if (!existing) renderArtifact(host, apath);
+      }
+      return;
+    }
     const toolCalls = target.querySelectorAll('.msg.tool-call');
     // Attach this result to ITS OWN tool call, matched by tool_call_id. The old
     // code matched positionally to the LAST rendered box, so in a turn with
@@ -1939,7 +2021,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=114');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=115');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -4020,6 +4102,7 @@ class RoundRenderer {
     // Full markdown render deferred from local inference — do it once now, then scroll.
     if (this.isLocal && this.reply && this.displayed) {
       streamDiff(this.reply.querySelector('.bubble') || this.reply, renderMd(this.displayed));
+      hydrateLocalRefs(this.reply);
     }
     if (this.isLocal) {
       const sh = this._scrollHost();
@@ -4110,6 +4193,7 @@ class RoundRenderer {
       return;
     }
     streamDiff(this.reply.querySelector('.bubble') || this.reply, renderMd(this.displayed));
+    hydrateLocalRefs(this.reply);
   }
   _applyToolCallDelta(tc) {
     const i = tc.index || 0;
