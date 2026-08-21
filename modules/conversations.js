@@ -3592,20 +3592,20 @@ function tgUpdate(group) {
     group.remove();
     return;
   }
-  // Planning (write_todos) is bookkeeping, not work: it's excluded from the
-  // visible log, the count, and the cell strip — otherwise every register ends
-  // on "Planned" (the write_todos that closed it). Its checklist card stays
-  // reachable via the timer badge. A group holding ONLY planning hides whole;
-  // a group with nothing running collapses to its header pill (tg-idle).
+  // Planning (write_todos) is bookkeeping, not work: it NEVER renders — not in
+  // the log (any state), the count, or the cell strip. Its checklist card stays
+  // reachable via the timer badge. A group holding ONLY planning hides whole,
+  // even while the plan call runs; a group with no REAL call running collapses
+  // to its header pill (tg-idle).
   const calls = [];
   let running = 0;
   for (const el of all) {
     const plan = el.dataset.fname === 'write_todos';
     el.classList.toggle('tc-plan', plan);
-    if (el.classList.contains('in-flight')) running++;
+    if (!plan && el.classList.contains('in-flight')) running++;
     if (!plan) calls.push(el);
   }
-  group.classList.toggle('tg-empty', !calls.length && !running);
+  group.classList.toggle('tg-empty', !calls.length);
   group.classList.toggle('tg-idle', !running);
   const todos = (group._tgSt && group._tgSt.todos) || [];
   const done = todos.filter(t => t && t.status === 'completed').length;
@@ -4030,6 +4030,12 @@ class RoundRenderer {
     // id) still finds this box instead of silently dropping the output.
     if (this.toolCalls[i].id && this.toolCallEls[i].dataset.tcId !== this.toolCalls[i].id) {
       this.toolCallEls[i].dataset.tcId = this.toolCalls[i].id;
+    }
+    // Same for the name: it can stream in pieces, and the register's planning
+    // filter (tc-plan) keys off dataset.fname — keep it current.
+    if (this.toolCallEls[i].dataset.fname !== this.toolCalls[i].function.name) {
+      this.toolCallEls[i].dataset.fname = this.toolCalls[i].function.name;
+      tgUpdate(this.toolCallEls[i].closest('.msg.tool-group'));
     }
     if (tc.function?.arguments) {
       this.toolPending[i] = (this.toolPending[i] || '') + tc.function.arguments;

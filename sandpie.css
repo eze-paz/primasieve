@@ -1512,11 +1512,10 @@ ul.conv-list li.active {
   }
   .tool-group.tg-open .tg-chevron { transform: rotate(90deg); }
   .tool-group .tg-log { display: flex; flex-direction: column; padding: 0.15rem 0.3rem; }
-  /* Planning (write_todos) rows are bookkeeping, not work: visible only while
-     actually running ("Planning…"), hidden once done — otherwise every register
-     ends on a "Planned" row. A register holding only planning hides entirely
-     (tgUpdate sets the classes). */
-  .tool-group .tg-log > .msg.tool-call.tc-plan:not(.in-flight) { display: none; }
+  /* Planning (write_todos) rows are bookkeeping, not work: never shown, in any
+     state — the checklist stays reachable via the timer badge. A register
+     holding only planning hides entirely (tgUpdate sets the classes). */
+  .tool-group .tg-log > .msg.tool-call.tc-plan { display: none; }
   .msg.tool-group.tg-empty { display: none; }
   /* Collapsed register: only the calls running RIGHT NOW are visible; settled
      calls live behind the header toggle. With nothing running (tg-idle) the
