@@ -678,8 +678,7 @@ function rebuildSettledTimer(target, s) {
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
   parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
   if (s.todos && s.todos.length) {
-    const ip = s.todos.findIndex(t => t && t.status === 'in_progress');
-    const cur = ip >= 0 ? ip + 1 : s.todos.filter(t => t && t.status === 'completed').length;
+    const cur = s.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card; an active task is not "done"
     parts.push(`<span class="mt-todos">${cur}/${s.todos.length}</span>`);
   }
   // Fill the persistent per-pane slot (never create a timer element).
@@ -2948,7 +2947,7 @@ function renderTodos(tcId, todos, scopeEl) {
   if (liveTimer && todos && todos.length) {
     const badge = liveTimer.querySelector('.mt-todos');
     if (badge) {
-      const cur = ip >= 0 ? ip + 1 : (todos || []).filter(t => t && t.status === 'completed').length;
+      const cur = (todos || []).filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
       badge.textContent = cur + '/' + todos.length;
       badge.title = (todos[ip] && todos[ip].content) || 'Checklist';
       badge.onclick = () => {
@@ -5284,8 +5283,7 @@ function startTotalTimer(stream) {
   const paintTodos = () => {
     const t = stream.todos;
     if (!t || !t.length) { set(todosEl, ''); return; }
-    const ip = t.findIndex(x => x && x.status === 'in_progress');
-    const cur = ip >= 0 ? ip + 1 : t.filter(x => x && x.status === 'completed').length;
+    const cur = t.filter(x => x && x.status === 'completed').length;   // completed only — match the checklist card
     set(todosEl, cur + '/' + t.length);
     if (!todosEl._mtTodosWired) {
       todosEl._mtTodosWired = true;
@@ -5343,8 +5341,7 @@ function endTotalTimer(stream, label) {
     if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
     parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>');
     if (stream.todos && stream.todos.length) {
-      const ip = stream.todos.findIndex(t => t && t.status === 'in_progress');
-      const cur = ip >= 0 ? ip + 1 : stream.todos.filter(t => t && t.status === 'completed').length;
+      const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
       parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
     }
     stream.timerEl.innerHTML = parts.join('');
