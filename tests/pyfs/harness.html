@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>pyodide-worker FS harness</title></head>
+<body>
+<h1>pyodide-worker lazy-FS harness</h1>
+<pre id="log"></pre>
+<script>
+// Test harness: this page plays the POOL MANAGER (sandpie-worker.js) against a
+// real pyodide-worker.js — seeds OPFS, spawns the worker, posts the manager
+// protocol (run-python / fs-changed / fs-removed / dbx-*), and exposes
+// everything to Playwright via window.* promises.
+
+const logEl = document.getElementById('log');
+function hlog(s) { logEl.textContent += s + '\n'; }
+
+// ---- OPFS helpers (page side = "the user's view") ----
+async function _root() { return navigator.storage.getDirectory(); }
+async function _dir(parts, create) {
+  let d = await _root();
+  for (const p of parts) d = await d.getDirectoryHandle(p, { create: !!create });
+  return d;
+}
+function _split(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  return { parts: parts.slice(0, -1), name: parts[parts.length - 1] };
+}
+window.opfsClear = async () => {
+  const root = await _root();
+  const names = [];
+  for await (const [name] of root.entries()) names.push(name);
+  for (const name of names) { try { await root.removeEntry(name, { recursive: true }); } catch (e) {} }
+  return names.length;
+};
+window.opfsWrite = async (path, text) => {
+  const { parts, name } = _split(path);
+  const d = await _dir(parts, true);
+  const h = await d.getFileHandle(name, { create: true });
+  const w = await h.createWritable();
+  await w.write(new TextEncoder().encode(text));
+  await w.close();
+};
+window.opfsWriteBytes = async (path, len, seed) => {
+  // Deterministic pattern so Python can verify without shipping bytes around.
+  const bytes = new Uint8Array(len);
+  let x = seed >>> 0;
+  for (let i = 0; i < len; i++) { x = (x * 1664525 + 1013904223) >>> 0; bytes[i] = x & 0xff; }
+  const { parts, name } = _split(path);
+  const d = await _dir(parts, true);
+  const h = await d.getFileHandle(name, { create: true });
+  const w = await h.createWritable();
+  await w.write(bytes);
+  await w.close();
+  let sum = 0;
+  for (let i = 0; i < len; i++) sum = (sum + bytes[i]) % 1000000007;
+  return sum;
+};
+window.opfsMkdir = async (path) => { await _dir(String(path).split('/').filter(Boolean), true); };
+window.opfsRead = async (path) => {
+  const { parts, name } = _split(path);
+  const d = await _dir(parts, false);
+  const f = await (await d.getFileHandle(name)).getFile();
+  return new TextDecoder().decode(await f.arrayBuffer());
+};
+window.opfsExists = async (path) => {
+  try {
+    const { parts, name } = _split(path);
+    const d = await _dir(parts, false);
+    try { await d.getFileHandle(name); return true; } catch (_) {}
+    try { await d.getDirectoryHandle(name); return true; } catch (_) {}
+    return false;
+  } catch (_) { return false; }
+};
+window.opfsDelete = async (path) => {
+  const { parts, name } = _split(path);
+  const d = await _dir(parts, false);
+  await d.removeEntry(name, { recursive: true });
+};
+
+// ---- worker management (page side = "the pool manager") ----
+let worker = null;
+let seq = 0;
+const pending = new Map();      // id -> resolve
+window.workerLogs = [];
+window.pageEvents = [];         // forward-to-page payloads
+
+window.spawnWorker = (opts) => {
+  opts = opts || {};
+  if (worker) { worker.terminate(); worker = null; }
+  window.workerLogs = [];
+  window.pageEvents = [];
+  const url = '/modules/pyodide-worker.js?v=9' + (opts.eager ? '&eager=1' : '');
+  worker = new Worker(url, { name: 'pyT' + (seq++) });
+  worker.addEventListener('message', (ev) => {
+    const msg = ev.data;
+    if (!msg) return;
+    if (msg.type === 'python-result' || msg.type === 'debug-stats') {
+      const r = pending.get(msg.id);
+      if (r) { pending.delete(msg.id); r(msg.type === 'python-result' ? msg.result : msg); }
+      return;
+    }
+    if (msg.type === 'sandpie-worker-log') { window.workerLogs.push(msg.text); hlog('[w] ' + msg.text); return; }
+    if (msg.type === 'forward-to-page') { window.pageEvents.push(msg.payload); return; }
+  });
+  worker.addEventListener('error', (e) => hlog('[worker error] ' + (e.message || e)));
+  return true;
+};
+window.killWorker = () => { if (worker) { worker.terminate(); worker = null; } return true; };
+window.sendMsg = (msg) => { worker.postMessage(msg); return true; };
+
+let scriptSeq = 0;
+// Run python code: write it to OPFS (like write_file would), then run-python.
+window.runScript = async (code, opts) => {
+  opts = opts || {};
+  const path = '_test/script_' + (scriptSeq++) + '.py';
+  await window.opfsWrite(path, code);
+  const id = 'job' + (seq++) + '-' + Math.random().toString(36).slice(2);
+  const timeoutMs = opts.timeoutMs || 90000;
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => { pending.delete(id); reject(new Error('runScript timed out after ' + timeoutMs + 'ms')); }, timeoutMs);
+    pending.set(id, (result) => { clearTimeout(t); resolve(result); });
+    worker.postMessage({ type: 'run-python', id, path, args: opts.args || [] });
+  });
+};
+window.debugStats = () => {
+  const id = 'st' + (seq++);
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => { pending.delete(id); reject(new Error('debug-stats timed out')); }, 10000);
+    pending.set(id, (msg) => { clearTimeout(t); resolve(msg); });
+    worker.postMessage({ type: 'debug-stats', id });
+  });
+};
+
+window.measureMem = async () => {
+  if (!performance.measureUserAgentSpecificMemory) return null;
+  const m = await performance.measureUserAgentSpecificMemory();
+  return { bytes: m.bytes, breakdown: m.breakdown.map(b => ({ bytes: b.bytes, types: b.types })) };
+};
+
+window.harnessInfo = () => ({
+  coi: !!self.crossOriginIsolated,
+  sab: typeof SharedArrayBuffer !== 'undefined',
+});
+hlog('harness ready — crossOriginIsolated=' + self.crossOriginIsolated);
+</script>
+</body>
+</html>

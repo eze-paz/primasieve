@@ -44,6 +44,158 @@ self.addEventListener('unhandledrejection', (ev) => {
 
 console.log('[pyodide-worker] boot — id=' + _WID);
 
+// ============================================================
+// Lazy /files mount. Historically init did FS.syncfs(true) — a FULL copy of
+// OPFS into MEMFS (RAM inside this worker), per pool worker. On memory-starved
+// machines that alone caused wasm OOM. Lazy mode instead builds a metadata-only
+// index of OPFS (names/sizes/mtimes, no bytes) and faults bytes in on first
+// access, exactly like the dehydrated-Dropbox tier below — OPFS is simply a
+// nearer tier consulted first. Byte hydration inside the synchronous
+// FS.lookupNode fault-in blocks on Atomics.wait while a sibling IO worker
+// (opfs-io-worker.js) does the async OPFS read (SharedArrayBuffer bridge —
+// needs cross-origin isolation, which prod has). Without SAB, or with
+// ?eager=1 on the worker URL (A/B + escape hatch), init falls back to the old
+// eager full-copy behaviour.
+// ============================================================
+const _EAGER_FORCED = /[?&]eager=1/.test((self.location && self.location.search) || '');
+let _lazyFs = false;              // decided at init: SAB available and not forced eager
+let _opfsIndex = null;            // Map rel -> {kind:'file'|'folder', size, mtime(ms)} — lazy mode only
+let _ioWorker = null;
+let _ioCtrl = null;               // Int32Array over the control SAB
+let _ioData = null;               // Uint8Array over the data SAB
+const IO_DATA_BYTES = 4 * 1024 * 1024;
+let _hydratedFromOpfs = [];       // debug-stats: rels whose bytes were faulted in
+let _hydratingNow = false;        // suppress capture/index churn during hydration writes
+
+let _ioReadyPromise = null;
+// Spawn the IO worker and resolve once its Atomics.waitAsync serve-loop is
+// running. This MUST be awaited before any Python runs: a nested worker's
+// startup and postMessage delivery can be starved by a parent blocked in
+// Atomics.wait, which is why (a) readiness is handshaken here, and (b) each
+// read request is signaled purely through the SAB, never via postMessage.
+function _ioEnsure() {
+  if (_ioReadyPromise) return _ioReadyPromise;
+  const ctrlSab = new SharedArrayBuffer(64);
+  const dataSab = new SharedArrayBuffer(IO_DATA_BYTES);
+  _ioCtrl = new Int32Array(ctrlSab);
+  _ioData = new Uint8Array(dataSab);
+  _ioWorker = new Worker('./opfs-io-worker.js?v=1');
+  _ioReadyPromise = new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('opfs-io-worker not ready after 8s')), 8000);
+    _ioWorker.addEventListener('message', (ev) => {
+      const m = ev.data;
+      if (m && m.type === 'io-ready') { clearTimeout(t); resolve(); }
+      else if (m && m.type === 'io-log') console.log('[opfs-io] ' + m.text);
+    });
+    _ioWorker.addEventListener('error', (e) => {
+      console.error('[pyodide-worker] opfs-io-worker error:', (e && e.message) || e);
+      clearTimeout(t);
+      reject(new Error('opfs-io-worker failed: ' + ((e && e.message) || e)));
+    });
+    _ioWorker.postMessage({ type: 'init', ctrl: ctrlSab, data: dataSab });
+  });
+  return _ioReadyPromise;
+}
+
+// Synchronous OPFS read (lazy-mode byte hydration). Blocks this thread until
+// the IO worker has fed the whole file through the SAB. Throws on error/timeout.
+function _syncOpfsRead(rel) {
+  if (!_ioCtrl) throw new Error('OPFS IO bridge not initialized');
+  const pathBytes = new TextEncoder().encode(String(rel));
+  if (pathBytes.length > _ioData.length) throw new Error('path too long: ' + rel);
+  _ioData.set(pathBytes, 0);
+  Atomics.store(_ioCtrl, 4, pathBytes.length);
+  Atomics.store(_ioCtrl, 0, 0);
+  Atomics.store(_ioCtrl, 3, 1);          // request pending — wakes the serve loop
+  Atomics.notify(_ioCtrl, 3);
+  let out = null, off = 0;
+  for (;;) {
+    if (Atomics.load(_ioCtrl, 0) === 0) {
+      const r = Atomics.wait(_ioCtrl, 0, 0, 30000);
+      if (r === 'timed-out') { Atomics.store(_ioCtrl, 0, -1); throw new Error('OPFS read timed out: ' + rel); }
+    }
+    const state = Atomics.load(_ioCtrl, 0);
+    if (state === -1) throw new Error('OPFS read failed: ' + rel);
+    const len = Atomics.load(_ioCtrl, 1);
+    if (!out) out = new Uint8Array(Atomics.load(_ioCtrl, 2));
+    out.set(_ioData.subarray(0, len), off);
+    off += len;
+    if (state === 2) return out;
+    Atomics.store(_ioCtrl, 0, 0);
+    Atomics.notify(_ioCtrl, 0);
+  }
+}
+
+// One async walk of OPFS at init: names + sizes + mtimes, zero bytes. Plays the
+// role _dbxIndex plays for the Dropbox tier. Corrupt entries (see the OPFS
+// phantom-entry incident) are skipped per-entry rather than failing the walk.
+async function _buildOpfsIndex() {
+  const idx = new Map();
+  async function walk(dir, prefix) {
+    let it;
+    try { it = dir.entries(); } catch (_) { return; }
+    for (;;) {
+      let step;
+      try { step = await it.next(); } catch (_) { break; }
+      if (step.done) break;
+      const [name, handle] = step.value;
+      const rel = prefix ? prefix + '/' + name : name;
+      try {
+        if (handle.kind === 'directory') {
+          idx.set(rel, { kind: 'folder', size: 0, mtime: 0 });
+          await walk(handle, rel);
+        } else {
+          const f = await handle.getFile();
+          idx.set(rel, { kind: 'file', size: f.size, mtime: f.lastModified });
+        }
+      } catch (e) { console.warn('[pyodide-worker] index walk skipped', rel, (e && e.message) || e); }
+    }
+  }
+  await walk(await opfsRoot(), '');
+  return idx;
+}
+
+function _localEntry(rel) {
+  if (!_opfsIndex) return null;
+  return _opfsIndex.get(String(rel).replace(/^\/+/, '')) || null;
+}
+// Record <rel> (and its ancestor folders) in the index; kind 'file'|'folder'.
+function _idxPut(rel, kind, size, mtime) {
+  if (!_opfsIndex) return;
+  const r = String(rel).replace(/^\/+/, '');
+  if (!r) return;
+  const segs = r.split('/');
+  let cur = '';
+  for (let i = 0; i < segs.length - 1; i++) {
+    cur = cur ? cur + '/' + segs[i] : segs[i];
+    if (!_opfsIndex.has(cur)) _opfsIndex.set(cur, { kind: 'folder', size: 0, mtime: 0 });
+  }
+  _opfsIndex.set(r, { kind, size: size || 0, mtime: mtime || Date.now() });
+}
+// Drop <rel> and (for folders) every descendant.
+function _idxDrop(rel) {
+  if (!_opfsIndex) return;
+  const r = String(rel).replace(/^\/+/, '');
+  if (!r) return;
+  _opfsIndex.delete(r);
+  const prefix = r + '/';
+  for (const k of [..._opfsIndex.keys()]) if (k.startsWith(prefix)) _opfsIndex.delete(k);
+}
+function _idxMove(oldRel, newRel) {
+  if (!_opfsIndex) return;
+  const o = String(oldRel).replace(/^\/+/, ''), n = String(newRel).replace(/^\/+/, '');
+  if (!o || !n) return;
+  const moves = [];
+  for (const k of [..._opfsIndex.keys()]) {
+    if (k === o || k.startsWith(o + '/')) moves.push(k);
+  }
+  for (const k of moves) {
+    const e = _opfsIndex.get(k);
+    _opfsIndex.delete(k);
+    _opfsIndex.set(n + k.slice(o.length), e);
+  }
+}
+
 // Dropbox / dehydration context (pushed by the manager, mirrored from the page).
 let _dbxCtx = null;
 let _dehydrated = false;
@@ -68,14 +220,15 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'fs-removed' && Array.isArray(data.paths)) {
+    for (const rel of data.paths) _idxDrop(rel);
     if (!py) return;
     await withPy(async () => {
       for (const rel of data.paths) {
         const full = '/files/' + String(rel).replace(/^\/+/, '');
         try {
-          const st = py.FS.stat(full);
+          const st = _noFault(() => py.FS.stat(full));
           if (py.FS.isDir(st.mode)) _swRmTree(full);
-          else py.FS.unlink(full);
+          else _noFault(() => py.FS.unlink(full));
         } catch (_) {}
       }
     });
@@ -87,6 +240,26 @@ self.addEventListener('message', async (event) => {
     await withPy(async () => {
       const rel = String(data.rel).replace(/^\/+/, '');
       const full = '/files/' + rel;
+      if (_lazyFs) {
+        // Lazy mode: INVALIDATE rather than copy — refresh the index entry from
+        // OPFS metadata and drop any stale MEMFS copy so the next access
+        // re-faults the fresh bytes. Copying eagerly here would re-grow every
+        // worker's RAM with every external write.
+        // Drop the stale MEMFS copy FIRST (its onDeletePath hook drops the
+        // index entry too — _hydratingNow suppresses that, but keep the order
+        // safe regardless), then refresh the index from OPFS metadata.
+        _hydratingNow = true;
+        try { _noFault(() => py.FS.unlink(full)); } catch (_) {} finally { _hydratingNow = false; }
+        try {
+          const f = await _opfsGetFile(rel);
+          _idxPut(rel, 'file', f.size, f.lastModified);
+        } catch (_) { _idxDrop(rel); }
+        _cloudDeleted.delete(rel);   // recreated after a Python delete → un-tombstone
+        // The Python-side tombstone must also clear, or a file recreated by the
+        // page after a Python delete would stay invisible to stat/listdir.
+        try { py.runPython('_deleted_set.discard(' + JSON.stringify(rel) + ')'); } catch (_) {}
+        return;
+      }
       try {
         const bytes = await opfsReadBytes(rel);
         const dir = full.substring(0, full.lastIndexOf('/'));
@@ -96,6 +269,40 @@ self.addEventListener('message', async (event) => {
         console.warn('[pyodide-worker] fs-changed sync failed for', rel, e);
       }
     });
+    return;
+  }
+
+  // Introspection for tests/diagnostics: which files were byte-hydrated from
+  // OPFS, whether lazy mode is on, and the index size. No side effects.
+  if (data.type === 'debug-stats') {
+    try {
+      // memfsBytes = file bytes RESIDENT IN RAM under /files (each is a real
+      // JS-heap byte) — the exact cost the lazy mount removes.
+      let memfsBytes = -1;
+      if (py) {
+        const sum = (full) => {
+          let total = 0, names = [];
+          try { names = _noFault(() => py.FS.readdir(full)); } catch (_) { return 0; }
+          for (const name of names) {
+            if (name === '.' || name === '..') continue;
+            const child = full + '/' + name;
+            try {
+              const st = _noFault(() => py.FS.stat(child));
+              total += py.FS.isDir(st.mode) ? sum(child) : (st.size || 0);
+            } catch (_) {}
+          }
+          return total;
+        };
+        try { memfsBytes = sum('/files'); } catch (_) {}
+      }
+      self.postMessage({
+        type: 'debug-stats', id: data.id, lazy: _lazyFs,
+        hydrated: _hydratedFromOpfs.slice(),
+        indexSize: _opfsIndex ? _opfsIndex.size : -1,
+        memfsBytes,
+        wasmHeapBytes: (py && py._module && py._module.HEAPU8) ? py._module.HEAPU8.length : -1,
+      });
+    } catch (_) {}
     return;
   }
 
@@ -172,21 +379,43 @@ async function initPyodide() {
       // fail) so it's always active regardless of filesystem state.
       try { p.runPython(_PYFETCH_WARN_PY); } catch (e) { console.warn('[pyodide-worker] pyfetch HTTP-error warning patch failed:', e); }
       try {
-        const opfsRootDir = await navigator.storage.getDirectory();
-        _nativefs = await p.mountNativeFS('/files', opfsRootDir);
-        // A freshly-spawned pool worker must be born coherent with whatever the
-        // other workers / write_file have already put in OPFS. syncfs(true)
-        // populates MEMFS from the backing OPFS once at mount time. (Ongoing
-        // changes arrive as targeted fs-changed/fs-removed messages, which avoid
-        // syncfs's known delete-fragility.)
-        await new Promise((resolve) => {
-          try { p.FS.syncfs(true, () => resolve()); } catch (_) { resolve(); }
-        });
+        _lazyFs = !_EAGER_FORCED && typeof SharedArrayBuffer !== 'undefined';
+        if (_lazyFs) {
+          // The IO bridge must be READY before any Python can block this
+          // thread; if it can't come up, fall back to the eager mount.
+          try { await _ioEnsure(); }
+          catch (e) { console.warn('[pyodide-worker] IO bridge unavailable — falling back to eager /files:', (e && e.message) || e); _lazyFs = false; }
+        }
+        if (_lazyFs) {
+          // Lazy mount: a PLAIN MEMFS dir — mountNativeFS would itself copy all
+          // of OPFS into MEMFS at mount time (that populate is built into the
+          // mount, not just into syncfs), which is the very cost lazy mode
+          // removes. Write-back never needed the nativefs mount: it is
+          // event-driven (trackingDelegate + flushCaptureToOpfs → direct OPFS
+          // writes). Bytes fault in on first access via the lookupNode wrapper
+          // + the SAB IO bridge; metadata comes from a names/sizes-only index.
+          // Per-worker RAM becomes proportional to files actually touched.
+          p.FS.mkdirTree('/files');
+          _nativefs = { lazy: true };   // truthy so the write-back paths stay armed
+          _opfsIndex = await _buildOpfsIndex();
+          console.log('[pyodide-worker] lazy /files: indexed ' + _opfsIndex.size + ' OPFS entries (no bytes copied)');
+        } else {
+          // Eager fallback (no cross-origin isolation, or ?eager=1): the
+          // historical behaviour — a freshly-spawned worker is born coherent by
+          // mountNativeFS + syncfs(true) copying ALL of OPFS into MEMFS.
+          const opfsRootDir = await navigator.storage.getDirectory();
+          _nativefs = await p.mountNativeFS('/files', opfsRootDir);
+          _opfsIndex = null;
+          await new Promise((resolve) => {
+            try { p.FS.syncfs(true, () => resolve()); } catch (_) { resolve(); }
+          });
+          console.log('[pyodide-worker] eager /files: full OPFS copy into MEMFS' + (_EAGER_FORCED ? ' (?eager=1)' : ' (no SharedArrayBuffer)'));
+        }
         p.runPython('import os; os.chdir("/files")');
         p.FS.trackingDelegate = Object.assign(p.FS.trackingDelegate || {}, _fsTrackingDelegate());
         try { p.runPython(_HYDRATE_AUDIT_PY); } catch (e) { console.warn('[pyodide-worker] hydrate audit hook install failed:', e); }
         try { p.runPython(_CLOUD_FS_PY); } catch (e) { console.warn('[pyodide-worker] cloud fs view patch install failed:', e); }
-        _installFsFaultIn();   // generic cloud-index fault-in at the Emscripten FS layer
+        _installFsFaultIn(p);  // generic index fault-in at the Emscripten FS layer
         console.log('[pyodide-worker] OPFS mounted at /files (cwd); FS tracking installed');
       } catch (e) {
         _nativefs = null;
@@ -207,6 +436,8 @@ function resetPyodide(reason) {
   py = null;
   pyInitPromise = null;
   _nativefs = null;
+  _opfsIndex = null;        // rebuilt (fresh walk) by the next initPyodide
+  _lookupOrigRef = null;    // belongs to the dead interpreter's FS
 }
 
 function isPyodideFatal(e, msg, stderr) {
@@ -348,25 +579,78 @@ function _syncDownloadBytes(cloudPath) {
   for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
   return b;
 }
+// Run <fn> with the lookupNode fault-in wrapper temporarily removed, so FS
+// operations issued from hydration itself (analyzePath, mkdirTree, writeFile)
+// can never recurse into another fault-in.
+let _lookupOrigRef = null;   // set by _installFsFaultIn
+function _noFault(fn) {
+  const cur = py.FS.lookupNode;
+  if (_lookupOrigRef) py.FS.lookupNode = _lookupOrigRef;
+  try { return fn(); } finally { py.FS.lookupNode = cur; }
+}
+function _memfsHas(full) {
+  try { return _noFault(() => py.FS.analyzePath(full).exists); } catch (_) { return false; }
+}
+function _writeMemfs(full, bytes) {
+  _hydratingNow = true;   // hydration writes are not user mutations: no capture, no index churn
+  try {
+    _noFault(() => {
+      const dir = full.slice(0, full.lastIndexOf('/'));
+      if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
+      py.FS.writeFile(full, bytes);
+    });
+  } finally { _hydratingNow = false; }
+}
 self._sandpie_hydrate_sync = function (pathStr) {
   try {
-    if (!_dehydrated || !_dbxIndex || !_dbxCtx || !py) return;
+    if (!py) return;
     let full = String(pathStr || '');
     if (!full) return;
     if (!full.startsWith('/')) full = '/files/' + full.replace(/^files\//, '');
     if (!full.startsWith('/files/')) return;
     const rel = full.slice('/files/'.length).replace(/^\/+/, '');
-    if (!rel || _relExempt(rel)) return;
+    if (!rel) return;
     _ensureCloudDirs(full);   // materialize cloud-folder ancestors (create-mode opens in cloud dirs)
-    try { if (py.FS.analyzePath(full).exists) return; } catch (_) {}
+    if (_memfsHas(full)) return;
+    // Tier 1 — local OPFS (lazy mode): bytes come through the SAB IO bridge.
+    const le = _localEntry(rel);
+    if (le) {
+      if (le.kind === 'folder') { _hydratingNow = true; try { _noFault(() => { try { py.FS.mkdirTree(full); } catch (_) {} }); } finally { _hydratingNow = false; } return; }
+      _writeMemfs(full, _syncOpfsRead(rel));
+      _hydratedFromOpfs.push(rel);
+      return;
+    }
+    // Tier 2 — dehydrated Dropbox: bytes come via sync XHR.
+    if (!_dehydrated || !_dbxIndex || !_dbxCtx) return;
+    if (_relExempt(rel) || _cloudDeleted.has(rel)) return;
     const entry = _dbxIndex[rel];
     if (!entry || entry.kind !== 'file') return;
-    const bytes = _syncDownloadBytes(_cloudPathFor(rel, entry));
-    const dir = full.slice(0, full.lastIndexOf('/'));
-    if (dir && dir !== '/files') { try { py.FS.mkdirTree(dir); } catch (_) {} }
-    py.FS.writeFile(full, bytes);
-    _hydratedSet.add(rel);
+    _writeMemfs(full, _syncDownloadBytes(_cloudPathFor(rel, entry)));
+    _hydratedSet.add(rel); _reportHydrated(rel);
   } catch (e) { console.warn('[pyodide-worker] sync hydrate failed:', pathStr, (e && e.message) || e); }
+};
+// Fault in an entire subtree (bytes for files, mkdir for folders) ahead of an
+// os.rename/os.replace of a directory: MEMFS renames re-parent only the nodes
+// that exist, so unfaulted children must be materialized first or the write-back
+// (delete old OPFS tree + write new from MEMFS) would lose them. No-op for
+// paths with no index entries below them.
+self._sandpie_hydrate_tree = function (pathStr) {
+  try {
+    if (!py) return;
+    let full = String(pathStr || '');
+    if (!full) return;
+    if (!full.startsWith('/')) full = '/files/' + full.replace(/^files\//, '');
+    if (!full.startsWith('/files/')) return;
+    const rel = full.slice('/files/'.length).replace(/^\/+/, '');
+    if (!rel) return;
+    const under = (k) => k === rel || k.startsWith(rel + '/');
+    const seen = new Set();
+    if (_opfsIndex) for (const k of _opfsIndex.keys()) { if (under(k)) { seen.add(k); self._sandpie_hydrate_sync('/files/' + k); } }
+    if (_dehydrated && _dbxIndex) for (const k0 of Object.keys(_dbxIndex)) {
+      const k = k0.replace(/^\/+/, '');
+      if (under(k) && !seen.has(k)) self._sandpie_hydrate_sync('/files/' + k);
+    }
+  } catch (e) { console.warn('[pyodide-worker] tree hydrate failed:', pathStr, (e && e.message) || e); }
 };
 // Materialize ancestor DIRECTORIES that exist in the cloud index, so create-mode
 // opens / mkdir / chdir inside a cloud-only folder can proceed. Only folders
@@ -396,6 +680,7 @@ self._sandpie_cloud_delete = function (rel, isDir) {
     const r = String(rel || '').replace(/^\/+/, '');
     if (!r) return;
     _cloudDeleted.add(r);                       // the FS fault-in must not resurrect it
+    _idxDrop(r);                                // nor the local index (listdir/stat)
     try { swOpfsDelete(r, !!isDir); } catch (_) {}
     try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [r] } }); } catch (_) {}
   } catch (_) {}
@@ -410,7 +695,7 @@ self._sandpie_cloud_delete = function (rel, isDir) {
 // the wrapper unwraps itself while faulting in (hydration/mkdir write through
 // this same FS), and a per-rel guard + the JS deletion tombstone prevent
 // recursive fault-ins and resurrection of deleted files.
-function _installFsFaultIn() {
+function _installFsFaultIn(py) {   // shadows the module-level `py`: at install time the global is not yet assigned
   try {
     // The REAL path-resolution chokepoint: Emscripten's lookupPath resolves via
     // a flat FS.nameTable through FS.lookupNode, and only falls back to
@@ -419,17 +704,27 @@ function _installFsFaultIn() {
     // AND C-level opens (sqlite's C open goes FS.open -> lookupPath ->
     // FS.lookupNode), with zero per-extension rules.
     const orig = py.FS.lookupNode;
+    _lookupOrigRef = orig;
     const _faulting = new Set();
-    // Nodes under the /files mount carry .mount.mountpoint === '/files'. Their
-    // .parent chains SKIP the mountpoint node (the mount root's name is '/'),
-    // so the path base must come from mount.mountpoint, not from the chain.
+    // Absolute path of parent/name. Two layouts must both work: lazy mode puts
+    // /files as a PLAIN dir on the root MEMFS mount (chain climbs to the FS
+    // root), eager mode mounts nativefs AT /files (chain stops at the mount
+    // root, whose name is '/', so the mountpoint must be prefixed).
     function _relFor(parent, name) {
-      const mnt = parent.mount;
-      if (!mnt || mnt.mountpoint !== '/files') return null;
       const parts = [];
       let n = parent, seen = 0;
-      while (n && n.mount === mnt && seen < 64) { parts.push(n.name); n = n.parent; seen++; }
-      return (mnt.mountpoint + '/' + parts.reverse().join('/') + '/' + name).replace(/\/+/g, '/');
+      while (n && seen < 64) {
+        if (n.parent === n) break;                    // FS/mount root
+        parts.push(n.name);
+        n = n.parent; seen++;
+      }
+      let base = '/' + parts.reverse().filter(s => s && s !== '/').join('/');
+      const mnt = parent.mount;
+      if (mnt && mnt.mountpoint && mnt.mountpoint !== '/'
+          && base !== mnt.mountpoint && !base.startsWith(mnt.mountpoint + '/')) {
+        base = (mnt.mountpoint + base).replace(/\/+/g, '/');
+      }
+      return (base + '/' + name).replace(/\/+/g, '/');
     }
     const wrapped = function (parent, name) {
       try { return orig(parent, name); }
@@ -438,15 +733,23 @@ function _installFsFaultIn() {
         const rel = _relFor(parent, name);
         if (!rel || rel.indexOf('/files/') !== 0) throw e; // outside /files — real miss
         const r = rel.slice('/files/'.length);
-        if (!r || _relExempt(r) || _cloudDeleted.has(r) || _faulting.has(rel)) throw e;
-        if (!_dehydrated || !_dbxIndex) throw e;
-        const entry = _dbxIndex[r];
-        if (!entry) throw e;                               // genuinely absent — clean ENOENT
+        if (!r || _faulting.has(rel)) throw e;
+        // Tier 1 — local OPFS index (lazy mode). Exempt paths (sandpie/*) are
+        // exempt from CLOUD hydration only: locally they are real files and
+        // must fault in like any other.
+        const le = _localEntry(r);
+        // Tier 2 — dehydrated Dropbox index.
+        const ce = (!le && _dehydrated && _dbxIndex && !_relExempt(r) && !_cloudDeleted.has(r)) ? _dbxIndex[r] : null;
+        if (!le && !ce) throw e;                           // genuinely absent — clean ENOENT
+        const entry = le || ce;
         _faulting.add(rel);
         try {
           py.FS.lookupNode = orig;                         // unwrap: fault-in writes through this FS
           try {
-            if (entry.kind === 'folder') { try { py.FS.mkdirTree('/files/' + r); } catch (_) {} }
+            if (entry.kind === 'folder') {
+              _hydratingNow = true;
+              try { py.FS.mkdirTree('/files/' + r); } catch (_) {} finally { _hydratingNow = false; }
+            }
             else _sandpie_hydrate_sync('/files/' + r);
           } finally { py.FS.lookupNode = wrapped; }
         } finally { _faulting.delete(rel); }
@@ -467,47 +770,67 @@ function _installFsFaultIn() {
 // messages, so these read the freshest snapshot on every call.
 self._sandpie_cloud_stat = function (rel) {
   try {
-    if (!_dehydrated || !_dbxIndex) return null;
     const r = String(rel || '').replace(/^\/+/, '').replace(/\/+$/, '');
-    if (!r || _relExempt(r)) return null;
+    if (!r) return null;
+    // A node already in MEMFS is the freshest truth (possibly dirty) — return
+    // null so Python uses the real os.stat on it.
+    if (py && _memfsHas('/files/' + r)) return null;
+    // Tier 1 — local OPFS index (lazy mode).
+    const le = _localEntry(r);
+    if (le) return { kind: le.kind === 'file' ? 'file' : 'folder', size: le.kind === 'file' ? (le.size || 0) : 0, mtime: Math.max(0, Math.floor((le.mtime || 0) / 1000)) };
+    // Tier 2 — dehydrated Dropbox index.
+    if (!_dehydrated || !_dbxIndex) return null;
+    if (_relExempt(r)) return null;
     const e = _dbxIndex[r];
     if (!e) return null;
     return { kind: e.kind === 'file' ? 'file' : 'folder', size: e.kind === 'file' ? (e.size || 0) : 0, mtime: e.cloudMtime ? Math.max(0, Math.floor(new Date(e.cloudMtime).getTime() / 1000)) : 0 };
   } catch (_) { return null; }
 };
+// Enumerate direct children of <base> in an index object/Map into out/dirs/seen.
+function _childrenFrom(keys, getKind, base, out, dirs, seen, exemptCheck) {
+  const prefix = base ? base + '/' : '';
+  for (const k0 of keys) {
+    const k = String(k0).replace(/^\/+/, '');
+    if (!k || (exemptCheck && _relExempt(k))) continue;
+    if (prefix && !k.startsWith(prefix)) continue;
+    const rest = k.slice(prefix.length);
+    if (!rest) continue;
+    const slash = rest.indexOf('/');
+    if (slash >= 0) { dirs.add(rest.slice(0, slash)); continue; }
+    if (seen.has(rest)) continue;               // folder already aggregated via its children
+    seen.add(rest);
+    out.push({ name: rest, kind: getKind(k0) === 'folder' ? 'folder' : 'file' });
+  }
+}
 self._sandpie_cloud_children = function (rel) {
   try {
-    if (!_dehydrated || !_dbxIndex) return null;
     const base = String(rel || '').replace(/^\/+/, '').replace(/\/+$/, '');
-    const prefix = base ? base + '/' : '';
+    const haveLocal = !!_opfsIndex;
+    const haveCloud = !!(_dehydrated && _dbxIndex);
+    if (!haveLocal && !haveCloud) return null;
     const out = [], dirs = new Set(), seen = new Set();
-    for (const k0 of Object.keys(_dbxIndex)) {
-      const k = k0.replace(/^\/+/, '');
-      if (!k || _relExempt(k)) continue;
-      if (prefix && !k.startsWith(prefix)) continue;
-      const rest = k.slice(prefix.length);
-      if (!rest) continue;
-      const slash = rest.indexOf('/');
-      if (slash >= 0) { dirs.add(rest.slice(0, slash)); continue; }
-      if (seen.has(rest)) continue;               // folder already aggregated via its children
-      seen.add(rest);
-      const e = _dbxIndex[k0];
-      out.push({ name: rest, kind: (e && e.kind === 'folder') ? 'folder' : 'file' });
-    }
+    if (haveLocal) _childrenFrom(_opfsIndex.keys(), k => _opfsIndex.get(k).kind, base, out, dirs, seen, false);
+    if (haveCloud) _childrenFrom(Object.keys(_dbxIndex), k => (_dbxIndex[k] || {}).kind, base, out, dirs, seen, true);
     for (const d of dirs) if (!seen.has(d)) out.push({ name: d, kind: 'folder' });
     return out;
   } catch (_) { return null; }
 };
 const _HYDRATE_AUDIT_PY = `
-import sys
+import sys as __sp_sys, os as __sp_os
 from js import _sandpie_hydrate_sync as __sp_hydrate
 def __sp_audit(event, args):
     if event == 'open' and args:
         p = args[0]
         if isinstance(p, str) and (p.startswith('/files') or (p[:1] not in ('/', '<'))):
-            try: __sp_hydrate(p)
+            try:
+                # Resolve relative paths against the REAL cwd (may be a subdir
+                # after os.chdir) — 'a.txt' in /files/sub must hydrate sub/a.txt,
+                # not root a.txt. getcwd/normpath raise no 'open' audit events.
+                if not p.startswith('/'):
+                    p = __sp_os.path.normpath(__sp_os.path.join(__sp_os.getcwd(), p))
+                __sp_hydrate(p)
             except Exception: pass
-sys.addaudithook(__sp_audit)
+__sp_sys.addaudithook(__sp_audit)
 `;
 
 // ---- Cloud-index view for Python: wrap the three introspection choke points ----
@@ -533,6 +856,8 @@ _orig_access = os.access
 _orig_listdir = os.listdir
 _orig_scandir = os.scandir
 
+_orig_getcwd = os.getcwd
+
 def _cloud_rel(path):
     try:
         p = os.fspath(path)
@@ -545,16 +870,22 @@ def _cloud_rel(path):
             return None
     if not isinstance(p, str):
         return None
+    # Resolve relative paths against the REAL cwd (which may be a subdir of
+    # /files after os.chdir), and normalize '.'/'..' segments — otherwise
+    # 'a.txt' in /files/sub would consult the index at root 'a.txt'.
+    if not p.startswith('/'):
+        try:
+            p = os.path.normpath(os.path.join(_orig_getcwd(), p))
+        except Exception:
+            return None
+    else:
+        p = os.path.normpath(p)
     if p.startswith('/files/'):
         rel = p[len('/files/'):]
-    elif p == '/files' or p == '/files/':
+    elif p == '/files':
         rel = ''
-    elif p.startswith('files/'):
-        rel = p[len('files/'):]
-    elif p.startswith('/'):
-        return None
     else:
-        rel = p
+        return None
     rel = rel.strip('/')
     if rel == '.' or rel == '..':
         rel = ''
@@ -587,48 +918,40 @@ def _cloud_result(m):
         return None
 
 def _patched_stat(path, *args, **kwargs):
-    try:
-        return _orig_stat(path, *args, **kwargs)
-    except (FileNotFoundError, NotADirectoryError):
-        if kwargs.get('dir_fd') is not None:
-            raise
+    # Index FIRST: the JS stat returns None whenever a MEMFS node exists (the
+    # real stat is then authoritative) — and for index-only entries this serves
+    # truthful metadata with ZERO byte hydration. Going through _orig_stat first
+    # would trip the FS-level fault-in and download/copy the bytes just to stat.
+    if kwargs.get('dir_fd') is None:
         m = _cloud_meta(_cloud_rel(path))
-        r = _cloud_result(m) if m is not None else None
-        if r is None:
-            raise
-        return r
+        if m is not None:
+            r = _cloud_result(m)
+            if r is not None:
+                return r
+    return _orig_stat(path, *args, **kwargs)
 
 def _patched_lstat(path, *args, **kwargs):
-    try:
-        return _orig_lstat(path, *args, **kwargs)
-    except (FileNotFoundError, NotADirectoryError):
-        if kwargs.get('dir_fd') is not None:
-            raise
+    if kwargs.get('dir_fd') is None:
         m = _cloud_meta(_cloud_rel(path))
-        r = _cloud_result(m) if m is not None else None
-        if r is None:
-            raise
-        return r
+        if m is not None:
+            r = _cloud_result(m)
+            if r is not None:
+                return r
+    return _orig_lstat(path, *args, **kwargs)
 
 def _patched_access(path, mode, *args, **kwargs):
-    # os.access returns False on ENOENT (it does not raise), so a False result
-    # must also fall back to the cloud index.
+    if kwargs.get('dir_fd') is None:
+        m = _cloud_meta(_cloud_rel(path))
+        if m is not None:
+            if mode == 0:
+                return True
+            if m.get('kind') == 'folder':
+                return bool(mode & (os.R_OK | os.W_OK | os.X_OK))
+            return bool(mode & (os.R_OK | os.W_OK))
     try:
-        r = _orig_access(path, mode, *args, **kwargs)
+        return _orig_access(path, mode, *args, **kwargs)
     except (FileNotFoundError, NotADirectoryError):
-        r = False
-    if r:
-        return r
-    if kwargs.get('dir_fd') is not None:
-        return r
-    m = _cloud_meta(_cloud_rel(path))
-    if m is None:
-        return r
-    if mode == 0:
-        return True
-    if m.get('kind') == 'folder':
-        return bool(mode & (os.R_OK | os.W_OK | os.X_OK))
-    return bool(mode & (os.R_OK | os.W_OK))
+        return False
 
 def _cloud_children(rel):
     if rel is None:
@@ -768,6 +1091,7 @@ _orig_replace = os.replace
 _orig_chmod = os.chmod
 _orig_utime = os.utime
 from js import _sandpie_hydrate_sync as _sp_hydrate
+from js import _sandpie_hydrate_tree as _sp_hydrate_tree
 from js import _sandpie_cloud_delete as _sp_cloud_delete
 
 def _cloud_folder(rel):
@@ -842,17 +1166,21 @@ def _patched_unlink(path, **kw):
 
 def _patched_rmdir(path, **kw):
     rel = _cloud_rel(path)
+    # A MEMFS dir can be empty while the index still lists unfaulted children —
+    # the physical rmdir would succeed and silently orphan them. Check the
+    # MERGED listing first, like a real POSIX rmdir would.
+    if rel is not None and kw.get('dir_fd') is None:
+        try:
+            if _patched_listdir(path):
+                raise OSError(39, 'Directory not empty', os.fspath(path))
+        except (FileNotFoundError, NotADirectoryError):
+            pass
     try:
         _orig_rmdir(path, **kw)
     except (FileNotFoundError, NotADirectoryError):
         m = _cloud_meta(rel)
         if m is None or m.get('kind') != 'folder':
             raise
-        try:
-            if _patched_listdir(path):
-                raise OSError(39, 'Directory not empty', os.fspath(path))
-        except FileNotFoundError:
-            pass
         _drop_local(path, rel, True)
     else:
         if rel is not None and _cloud_meta(rel) is not None:
@@ -870,9 +1198,20 @@ def _hydrate_src(path):
     except Exception:
         return False
 
+def _hydrate_tree_for_move(src):
+    # Renaming a directory re-parents only the MEMFS nodes that exist; children
+    # still living only in an index (OPFS or cloud) must be faulted in first or
+    # the post-run write-back (delete old tree, write new from MEMFS) loses them.
+    try:
+        _sp_hydrate_tree(os.fspath(src))
+    except Exception:
+        pass
+
 def _patched_rename(src, dst, **kw):
     srel = _cloud_rel(src)
     sm = _cloud_meta(srel)
+    if srel is not None:
+        _hydrate_tree_for_move(src)
     drel = _cloud_rel(dst)
     dm = _cloud_meta(drel)
     if dm is not None and dm.get('kind') == 'file':
@@ -897,6 +1236,8 @@ def _patched_rename(src, dst, **kw):
 def _patched_replace(src, dst, **kw):
     srel = _cloud_rel(src)
     sm = _cloud_meta(srel)
+    if srel is not None:
+        _hydrate_tree_for_move(src)
     drel = _cloud_rel(dst)
     dm = _cloud_meta(drel)
     if dm is not None and dm.get('kind') == 'file':
@@ -960,35 +1301,71 @@ function _opfsRelFromFs(fsPath) {
 }
 
 function _fsTrackingDelegate() {
-  const touch = (fsPath) => {
-    if (!_capActive) return;
+  // Two jobs per hook: (a) capture for the post-run OPFS write-back (gated on
+  // _capActive, as before), (b) keep the lazy-mode local index truthful the
+  // moment the FS mutates, so a same-run unlink→listdir can't resurrect the
+  // entry from stale index metadata. Hydration writes are neither (bytes came
+  // FROM OPFS/the index) — _hydratingNow suppresses both.
+  const touch = (fsPath, kind) => {
+    if (_hydratingNow) return;
     const rel = _opfsRelFromFs(fsPath); if (rel == null) return;
+    _idxPut(rel, kind, 0, Date.now());
+    if (!_capActive) return;
     _capTouched.add(rel); _capDeleted.delete(rel);
   };
   const drop = (fsPath) => {
-    if (!_capActive) return;
+    if (_hydratingNow) return;
     const rel = _opfsRelFromFs(fsPath); if (rel == null) return;
+    _idxDrop(rel);
+    if (!_capActive) return;
     _capDeleted.add(rel); _capTouched.delete(rel);
   };
   return {
-    onWriteToFile:   (path) => touch(path),
-    onMakeDirectory: (path) => touch(path),
+    onWriteToFile:   (path) => touch(path, 'file'),
+    onMakeDirectory: (path) => touch(path, 'folder'),
     onDeletePath:    (path) => drop(path),
-    onMovePath:      (oldPath, newPath) => { drop(oldPath); touch(newPath); },
+    onMovePath:      (oldPath, newPath) => {
+      // Index: a real move — carry the subtree (unfaulted descendants included).
+      if (!_hydratingNow) {
+        const o = _opfsRelFromFs(oldPath), n = _opfsRelFromFs(newPath);
+        if (o != null && n != null) _idxMove(o, n);
+      }
+      if (!_capActive) return;
+      const o = _opfsRelFromFs(oldPath); if (o != null) { _capDeleted.add(o); _capTouched.delete(o); }
+      const n = _opfsRelFromFs(newPath); if (n != null) { _capTouched.add(n); _capDeleted.delete(n); }
+    },
   };
 }
 
 async function flushCaptureToOpfs() {
-  const removed = [], written = [];
-  for (const rel of _capDeleted) { if (await swOpfsDelete(rel, true)) removed.push(rel); }
-  for (const rel of _capTouched) {
+  const removed = [], written = [], done = new Set();
+  const flushOne = async (rel) => {
+    if (done.has(rel)) return;
+    done.add(rel);
     const full = '/files/' + rel;
-    let st; try { st = py.FS.stat(full); } catch (_) { continue; }
+    let st; try { st = _noFault(() => py.FS.stat(full)); } catch (_) { return; }
     try {
-      if (py.FS.isDir(st.mode)) await opfsResolveDir(rel.split('/').filter(Boolean), true);
-      else { await opfsWriteBytes(rel, py.FS.readFile(full)); written.push(rel); }
+      if (py.FS.isDir(st.mode)) {
+        await opfsResolveDir(rel.split('/').filter(Boolean), true);
+        // A touched directory (mkdir or the target of a dir rename) must flush
+        // its whole MEMFS subtree: a rename re-parents children in MEMFS
+        // without firing per-child hooks, so the top entry is all we captured.
+        let names = []; try { names = _noFault(() => py.FS.readdir(full)); } catch (_) {}
+        for (const name of names) {
+          if (name === '.' || name === '..') continue;
+          await flushOne(rel + '/' + name);
+        }
+      }
+      else {
+        const bytes = _noFault(() => py.FS.readFile(full));
+        await opfsWriteBytes(rel, bytes);
+        written.push(rel);
+        _idxPut(rel, 'file', bytes.length, Date.now());
+      }
     } catch (e) { console.warn('[pyodide-worker] OPFS write-back failed:', rel, e); }
-  }
+  };
+  for (const rel of _capDeleted) { if (await swOpfsDelete(rel, true)) removed.push(rel); _idxDrop(rel); }
+  for (const rel of _capTouched) await flushOne(rel);
   return { removed, written };
 }
 

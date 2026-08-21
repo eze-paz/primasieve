@@ -193,9 +193,9 @@ self.addEventListener('message', async (event) => {
   }
 
   // OPFS edits made outside Python (page/SW) are fanned out to every live pool
-  // worker so each interpreter's MEMFS view stays coherent. A newly-spawned
-  // worker instead pulls current OPFS via syncfs(true) at init, so it needs no
-  // back-fill here.
+  // worker so each interpreter's view stays coherent (lazy mode: index refresh
+  // + MEMFS invalidation; eager mode: MEMFS byte copy). A newly-spawned worker
+  // instead builds a fresh index / full copy at init, so it needs no back-fill.
   if (data.type === 'opfs-removed' && Array.isArray(data.paths)) {
     _pyBroadcast({ type: 'fs-removed', paths: data.paths });
     return;
