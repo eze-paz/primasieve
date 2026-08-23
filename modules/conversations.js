@@ -3822,6 +3822,7 @@ class RoundRenderer {
     this.convId = convId;
 
     this.reply = null;
+    this._streamReveal = false;
 
     this.content = '';
     this.displayed = '';
@@ -3868,6 +3869,7 @@ class RoundRenderer {
     this.thinkSummary = null;
     this.thinkStart = 0;
     this._thinkDone = false;
+    this._streamReveal = false;
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
   }
@@ -3907,19 +3909,24 @@ class RoundRenderer {
   }
   endRound(finalContent) {
     this._finishThinking();
-    // Force-complete this round's text NOW, synchronously. The typewriter trickle
-    // (_drainTick) is setTimeout-driven, so any undrained tail in `pending` would
-    // otherwise wait on a timer that later heavy synchronous rendering (the next
-    // round's tool boxes / _paintContent) can starve — leaving the round visually
-    // cut off mid-word until the NEXT startRound's _flushAllPending finally dumps
-    // it (the "message completes three rounds later" race). Flushing here paints
-    // the whole round before any tool executes, decoupling completeness from the
-    // scheduler. One bounded render per round end.
+    // CASE A - the reply from a respond()/cloud turn. The worker delivers the whole
+    // ready answer in ONE hunk (cloud deltas go to the reasoning box, never into
+    // this.content), so nothing was live-typed. Don't paint the monolith at once:
+    // enqueue it as pending and let the typewriter drain reveal it, so the reply
+    // visibly streams into conv-host instead of popping in whole.
+    if (typeof finalContent === 'string' && finalContent && !(this.content && this.content.trim())) {
+      this._streamReveal = true;
+      this.content = finalContent;
+      this.displayed = '';
+      this.pending = finalContent;
+      this.toolsShouldClose = true;
+      this._scheduleDrain();
+      return;
+    }
+    // CASE B - anything already live-typed (local models, or completions that leaked
+    // native tool-call tokens). Force-complete the typewriter tail now, synchronously
+    // (see drain comments), then reconcile the authoritative final content.
     this._flushAllPending();
-    // The SW may rewrite this round's content — e.g. stripping a model's leaked
-    // native tool-call tokens after recovering them into structured calls. When
-    // the authoritative final content differs from what we live-typed, reconcile
-    // so those raw tokens don't linger on screen. No-op in the normal case.
     if (typeof finalContent === 'string' && finalContent !== this.content) {
       this.content = finalContent;
       this.displayed = finalContent;
@@ -3934,6 +3941,7 @@ class RoundRenderer {
       this.reply = null;
     }
   }
+
   bindMessage(msg, workerPersisted) {
     this.convMessages.push(msg);
     // Persist the just-committed round so a mid-turn crash can't lose it. When
@@ -4104,6 +4112,15 @@ class RoundRenderer {
   }
   finalize() {
 
+    if (this._streamReveal) {
+      // A respond()/cloud reply is mid-typewriter-reveal: endRound enqueued it
+      // into pending and the scheduled drain is already running to type it out. This
+      // turn is terminal - nothing after it starves the drain - so just let the
+      // reveal finish on its own. Do NOT flush or cancel the scheduled drain.
+      this._streamReveal = false;
+      this._scheduleDrain();
+      return;
+    }
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
     this._flushAllPending();
