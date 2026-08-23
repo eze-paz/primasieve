@@ -2261,6 +2261,13 @@ async function sendSingle(text, stream, opts = {}) {
     // flight when the worker's first assistant reply lands, the reply would be
     // written at EOF BEFORE the user message — wrong order in the file.
     await saveConv(convId).catch(() => {});
+
+    // Name the conversation NOW, from the user message alone, concurrently with
+    // the generation below — so the sidebar shows a real title while the reply is
+    // still streaming instead of after the turn ends. Fire-and-forget: it needs
+    // nothing from this turn, and maybeAutoTitle itself is a no-op for anything
+    // already titled/locked. The turn-end call remains as the retry fallback.
+    maybeAutoTitle(convId).catch(() => {});
   }
 
   // If no model is selected but a configured provider has one, use it rather than
@@ -2423,8 +2430,10 @@ async function sendSingle(text, stream, opts = {}) {
     flushIncrementalSave(convId);
     await saveConv(convId);
 
-    // Name the conversation from its opening exchange, if it's still carrying the
-    // derived placeholder title. Awaited (the UI was released above, so this costs
+    // Fallback titling pass: the title normally lands at send time (see sendSingle),
+    // concurrently with the generation. This retries the ones that missed — send-time
+    // attempt failed (offline, unusable answer) or is still in flight (_titling guard
+    // makes this a no-op then). Awaited (the UI was released above, so this costs
     // no visible latency) so the new title is on disk before the sync below —
     // one write, one sync — and before the notification reads it.
     const _newTitle = await maybeAutoTitle(convId);
