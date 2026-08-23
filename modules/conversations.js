@@ -3148,7 +3148,7 @@ function buildQuestionsView(questions, onAnswer) {
   actions.className = 'ask-actions';
   const backBtn = document.createElement('button');
   backBtn.className = 'ask-btn';
-  backBtn.textContent = '\u2190 Atr\u00e1s';
+  backBtn.textContent = '\u2190';
   const nextBtn = document.createElement('button');
   nextBtn.className = 'ask-btn primary';
   actions.append(backBtn, nextBtn);
