@@ -3273,9 +3273,14 @@ body.sp-decoding *::after {
     overflow: hidden;
     padding: 0;
   }
+  /* Fade first, THEN reclaim the space: the box is already invisible by 60%,
+     so no shrinking box is ever seen — the first message just slides up into
+     the emptied gap. (The old version animated height+fade together, which
+     read as a visible shrink.) */
   @keyframes home-out {
-    0%   { opacity: 1; max-height: var(--home-h, 520px); transform: none; }
-    100% { opacity: 0; max-height: 0; transform: translateY(-12px); }
+    0%   { opacity: 1; max-height: var(--home-h, 520px); }
+    60%  { opacity: 0; max-height: var(--home-h, 520px); }
+    100% { opacity: 0; max-height: 0; }
   }
   @media (prefers-reduced-motion: reduce) { #homeCenter.home-leave { max-height: 0; opacity: 0; overflow: hidden; } }
 .shared-home { width: 100%; text-align: left; user-select: none; }
