@@ -1869,7 +1869,13 @@ async function _withProviderRetry(ctx, headers, label, attemptFn) {
       }
       if (!isRetryableError(e)) throw e;
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
-      ctx.emit({ type: 'info', message: `${label} error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
+      // Flaky providers throw transient 5xx constantly and the retry usually
+      // succeeds within a couple of seconds — a popup for every blip is noise.
+      // Stay silent for the first two errors; surface it from the 3rd error on
+      // (attempt is 0-based) or when the wait is long enough (≥10s) to explain.
+      if (attempt >= 2 || delay >= 10000) {
+        ctx.emit({ type: 'info', message: `${label} error (${e.status || 'network'}) — retrying in ${delay / 1000}s… (attempt ${attempt + 1})` });
+      }
       await swSleep(delay, ctx.signal);
     }
   }
