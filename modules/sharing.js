@@ -277,7 +277,6 @@
       for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} markDirtyForWorkspace(dir + '/' + rel); }
       try { await O().remove(dir); } catch (_) {}
       console.info('[sharing] local skill "' + t.name + '" replaced by hub skill "' + id + '"');
-      wbNotify('info', '🧩 Local skill "' + t.name + '" was replaced by the hub version ("' + id + '").');
     }
   }
   // Which file the home row opens: the publisher's pick, else conventions.
