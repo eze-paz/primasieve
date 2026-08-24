@@ -384,7 +384,8 @@ DO NOT USE when:
 - It is a matter of taste you can decide yourself.
 
 ALWAYS BATCH: if several ambiguities exist, ask them ALL in ONE call (multiple questions), never one question at a time. Keep to at most 4 questions per call.
-Each question must be phrased as a clear choice with 2-5 mutually exclusive, non-overlapping options, and you MUST set a default (the option you would pick if the user skips) so a single click resolves it. Prefer short, concrete option labels.`,
+Each question must be phrased as a clear choice with 2-5 mutually exclusive, non-overlapping options, and you MUST set a default (the option you would pick if the user skips) so a single click resolves it. Prefer short, concrete option labels.
+LANGUAGE: the questions and options are shown to the user verbatim — write them in the user's language (the one you reply in), never the language you reason in.`,
       parameters: {
         type: 'object',
         properties: {
@@ -396,8 +397,8 @@ Each question must be phrased as a clear choice with 2-5 mutually exclusive, non
             items: {
               type: 'object',
               properties: {
-                question: { type: 'string', description: 'The clarification, phrased as a choice. Concise and specific.' },
-                options: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' }, description: '2-5 mutually exclusive, concrete options. No overlap.' },
+                question: { type: 'string', description: 'The clarification, phrased as a choice. Concise and specific, in the user\'s language.' },
+                options: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' }, description: '2-5 mutually exclusive, concrete options. No overlap. In the user\'s language.' },
                 allow_freeform: { type: 'boolean', description: 'If true, ALSO offer a free-text "Other" input so the user can type a custom answer (default false).' },
                 default: { type: 'string', description: 'The option that is pre-selected if the user skips. Must exactly match one of options.' },
               },

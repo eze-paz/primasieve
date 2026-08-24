@@ -696,6 +696,10 @@ function renderConversation(msgs, compaction, host = null) {
   if (rhost && rhost.dataset && rhost.dataset.convId && rhost.firstChild) {
     _evacuateHome(rhost);
     rhost.innerHTML = '';
+    // _evacuateHome APPENDS the home lists to the pane (below the host); re-tuck
+    // them as the host's first child now so they sit above the replayed messages,
+    // not stranded at the bottom of the conversation.
+    _placeHome();
   }
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
   if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
@@ -5108,6 +5112,7 @@ class SidePanel {
       tgReset(s.host);
       _evacuateHome(s.host);
       s.host.innerHTML = '';
+      _placeHome();   // evacuation appends the home lists to the pane bottom — re-tuck them
       for (const m of s.messages) renderHistoricalMessage(m, s.host);
     } catch (e) {
       // Failed load: don't leave an empty registered stream behind — a later
