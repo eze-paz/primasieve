@@ -1851,8 +1851,13 @@ function _composerConv(which) {
 function _commandPanelTo(pane) {
   const panel = $('commandOutput');
   if (!panel || !pane || panel.parentNode === pane) return;
-  const composer = pane.querySelector(':scope > .composer');
-  if (composer) pane.insertBefore(panel, composer); else pane.appendChild(panel);
+  // Insert ABOVE the msg-timer-slot, not the composer: the cluster order the rest
+  // of the code relies on is [.cmd-output, .msg-timer-slot, .composer] — that is
+  // what paneBottomAnchor anchors conv-host mounts against. Dropping the panel
+  // between slot and composer left the slot ABOVE the next mounted conv-host
+  // (the "timer bar renders at the top of the conversation" bug).
+  const anchor = pane.querySelector(':scope > .msg-timer-slot') || pane.querySelector(':scope > .composer');
+  if (anchor) pane.insertBefore(panel, anchor); else pane.appendChild(panel);
 }
 // Route the shared command panel to the pane that an element lives in, then
 // show content there. Used by timer badges (mt-todos) that can sit in either
