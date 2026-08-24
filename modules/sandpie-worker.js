@@ -1869,7 +1869,13 @@ async function _withProviderRetry(ctx, headers, label, attemptFn) {
         }
         ctx.emit({ type: 'session_expired', message: 'Session expired — redirecting to login…' });
       }
-      if (!isRetryableError(e)) throw e;
+      // Managed provider (routed through the sandpie server): a 404 is a
+      // server-side condition — a catalog/routing misconfig or a mid-deploy
+      // window — never the user's fault, and the admin fix hot-reloads. Treat
+      // it like a 429 and keep retrying. Personal providers keep 404 fatal:
+      // there it usually means a typo'd endpoint URL that no retry can fix.
+      const managed404 = !!(e && e.status === 404 && ctx._authRefreshUrl);
+      if (!isRetryableError(e) && !managed404) throw e;
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
       // Flaky providers throw transient 5xx constantly and the retry usually
       // succeeds within a couple of seconds — a popup for every blip is noise.
