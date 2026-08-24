@@ -253,7 +253,8 @@ THEN update with ops: {"ops":[ … ]}. Each op:
   {"op":"blocked","id":"3","reason":"waiting on …"}   mark a task BLOCKED — it needs user input, an external dependency, or something unobtainable this turn. Blocked tasks are NOT open: once everything is blocked/completed the turn may end. {"op":"start","id":"3"} resumes it later.
   {"op":"delete","id":"3"}   remove a task you're no longer doing (also removed from any other task's blockedBy).
 IDs are shown in the returned checklist. You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or delete them first.
-PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_todos and respond — every other tool (python, shell, files, search, …) is HIDDEN, not missing. Creating a plan and starting a task (in_progress) unlocks the full toolset immediately. Never tell the user a tool is unavailable or ask them to enable it: plan, start the task, then call the tool.`,
+PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_todos and respond — every other tool (python, shell, files, search, …) is HIDDEN, not missing. Creating a plan and starting a task (in_progress) unlocks the full toolset immediately. Never tell the user a tool is unavailable or ask them to enable it: plan, start the task, then call the tool.
+LANGUAGE: the checklist is shown to the user verbatim — write every "content"/"text"/"activeForm"/"reason" in the user's language (the one you reply in), never the language you reason in.`,
       parameters: {
         type: 'object',
         properties: {
@@ -264,7 +265,7 @@ PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_tod
               type: 'object',
               properties: {
                 op:        { type: 'string', enum: ['add', 'start', 'pause', 'complete', 'delete', 'block', 'unblock', 'blocked'], description: 'The operation.' },
-                text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests").' },
+                text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests"), in the user\'s language.' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
                 activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
                 est:       { type: 'integer', description: 'For "add": your honest estimate of how many TOOL CALLS the task will take (not time). Shown to the user as live progress — skip it when you have no idea.' },
@@ -281,7 +282,7 @@ PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_tod
             items: {
               type: 'object',
               properties: {
-                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. "Run tests").' },
+                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. "Run tests"), in the user\'s language.' },
                 status:    { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'Mark tasks (from this same list) that must complete before this one can start.' },
                 activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. "Running tests").' },
