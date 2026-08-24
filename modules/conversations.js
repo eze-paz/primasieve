@@ -2060,12 +2060,27 @@ function _placeHome() {
   const host = pane.querySelector(':scope > .conv-host');
   if (host) {
     if (hc.parentNode !== host || host.firstChild !== hc) host.insertBefore(hc, host.firstChild);
-    // Fresh (empty) host → the home screen belongs here again: undo a retire
-    // a previous conversation's first message left behind.
-    const hasMsg = [...host.children].some(c => c !== hc && c.classList && c.classList.contains('msg'));
+    // Show the home screen ONLY for the welcome state: no conversation, or a
+    // brand-new chat with zero messages. Decide from the STREAM, not the DOM —
+    // a historical load wipes the host (innerHTML='') and only re-renders the
+    // messages AFTER _placeHome() returns, so a DOM-only check reads an empty
+    // host at that instant and wrongly springs the home box back open above a
+    // loaded conversation.
+    const convId = host.dataset && host.dataset.convId;
+    const st = convId ? convStreams.get(convId) : null;
+    const hasMsg = (st && st.messages && st.messages.length > 0)
+      || [...host.children].some(c => c !== hc && c.classList && c.classList.contains('msg'));
     if (!hasMsg) {
       host._homeFading = false;
-      unretire();
+      unretire();   // welcome / brand-new empty chat
+    } else if (!hc.classList.contains('home-leave')) {
+      // A conversation with messages is on screen — the welcome box must stay
+      // retired (collapsed to 0 height). Force it even on a fresh host mount of
+      // an old conversation (boot restore of a historical conv), so its loaded
+      // transcript never reveals the home screen above it.
+      try { hc.style.setProperty('--home-h', Math.ceil(hc.getBoundingClientRect().height) + 'px'); } catch (_) {}
+      hc.classList.add('home-leave');
+      host._homeFading = true;
     }
   } else {
     if (hc.parentNode !== pane) appendContent(pane, hc);
