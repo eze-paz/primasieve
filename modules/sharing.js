@@ -67,6 +67,29 @@
   const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
   const norm = (p) => String(p == null ? '' : p).replace(/^\/+/, '').replace(/\/+$/, '');
 
+  // A SKILL.md is never shared as a bare file called "SKILL.md": the shareable
+  // unit is the SKILL — its folder. Retarget the share to the parent folder so
+  // the artifact is named after the skill, and the installed copy keeps the
+  // skills/<name>/SKILL.md shape that context.js discovery expects.
+  const isSkillFile = (p) => /(^|\/)SKILL\.md$/i.test(p);
+  function skillTarget(src) {
+    if (!isSkillFile(src)) return src;
+    const cut = src.lastIndexOf('/');
+    return cut > 0 ? src.slice(0, cut) : src;   // SKILL.md at the root: nothing to retarget to
+  }
+  // The skill's name: frontmatter `name:` when it parses, else null. The caller
+  // falls back to the folder name, so the shared id matches the frontmatter when
+  // the two agree (context.js flags them when they don't).
+  async function skillFmName(dirPath) {
+    try {
+      const bytes = await O().readBytes(dirPath + '/SKILL.md');
+      if (!bytes) return null;
+      const fm = window.SandpieContext && SandpieContext.parseFrontmatter && SandpieContext.parseFrontmatter(new TextDecoder().decode(bytes));
+      const n = fm && fm.name && String(fm.name).trim();
+      return n || null;
+    } catch (_) { return null; }
+  }
+
   /* ── identity ─────────────────────────────────────────────────────────── */
   function me() {
     try { const o = JSON.parse(localStorage.getItem(ID_OVERRIDE_KEY) || 'null'); if (o && o.user) return { user: String(o.user), teams: Array.isArray(o.teams) ? o.teams : [] }; } catch (_) {}
@@ -211,10 +234,17 @@
     saveState(a.id, mk);
     // Pin the main file on first install; afterwards follow the publisher only if
     // the user still has the old main file pinned (a deliberate unpin stays).
+    // Skills are the exception: they never appear on the home screen — they show
+    // in Settings → Sharing as installed skills — so never pin one, and clear any
+    // pin a previous build left behind.
     if (window.SandpiePins) try {
-      const main = mainFile(mk, Object.keys(revs));
-      if (fresh) { if (main) SandpiePins.add(dst + '/' + main); }
-      else if (pin && prev && prev.pin && pin !== prev.pin && SandpiePins.isPinned(dst + '/' + prev.pin)) { SandpiePins.remove(dst + '/' + prev.pin); SandpiePins.add(dst + '/' + pin); }
+      if (kind === 'skill') {
+        for (const p of SandpiePins.list()) if (p === dst || p.startsWith(dst + '/')) SandpiePins.remove(p);
+      } else {
+        const main = mainFile(mk, Object.keys(revs));
+        if (fresh) { if (main) SandpiePins.add(dst + '/' + main); }
+        else if (pin && prev && prev.pin && pin !== prev.pin && SandpiePins.isPinned(dst + '/' + prev.pin)) { SandpiePins.remove(dst + '/' + prev.pin); SandpiePins.add(dst + '/' + pin); }
+      }
     } catch (_) {}
     if (changed) {
       console.info('[sharing] ' + a.id + ' ← ' + a.dept + ': ' + changed + ' file(s) updated');
@@ -388,14 +418,17 @@
   }
   async function publish(srcPath, dept, opts) {
     opts = opts || {};
-    const src = norm(srcPath || '');
+    const src = skillTarget(norm(srcPath || ''));   // a SKILL.md shares its whole skill folder
     if (!src) throw new Error('publish: srcPath required');
     if (!dept) throw new Error('publish: a department is required');
     const dir = await isDir(src), base = src.split('/').pop();
-    const id = opts.id || slug(base);
     // META is excluded from the upload loop even though SKIP now allows it: it is
     // written once, explicitly, after the content lands (see below).
     const files = (await srcFileList(src, dir)).filter(rel => !SKIP(rel) && rel !== META);
+    // A skill is named after the skill itself, never "SKILL.md": frontmatter
+    // `name:` first, folder name second.
+    const name = (dir && files.includes('SKILL.md') && await skillFmName(src)) || base;
+    const id = opts.id || slug(name);
     const readSrc = async (rel) => {
       const path = dir ? src + '/' + rel : src;
       try { const b = await O().readBytes(path); if (b) return b; } catch (_) {}
@@ -412,7 +445,7 @@
     const pin = (opts.pinFile && sent.includes(opts.pinFile)) ? opts.pinFile
               : sent.includes('SKILL.md') ? 'SKILL.md'
               : sent.includes('index.html') ? 'index.html' : sent.slice().sort()[0];
-    try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: base }))); }
+    try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: name }))); }
     catch (e) { console.warn('[sharing] main-file marker failed:', (e && e.message) || e); }
     _forceNext = true;      // we just changed the hub — next pass reads the listing, doorbell or not
     fire();
@@ -453,18 +486,20 @@
       if (_shareEmptyEl) _shareEmptyEl.style.display = list.length ? 'none' : '';
       if (!list.length) { box.innerHTML = ''; return; }
       // No remove button: an artifact leaves this list by leaving the hub.
+      // Skills carry an "installed skill" badge instead of a pin button — they
+      // live in the model's skill index, not on the home screen.
       box.innerHTML = list.map((g, i) =>
         '<div class="shared-file" data-i="' + i + '">' +
           '<button class="shared-file-open">' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title) + '</button>' +
           '<span class="shared-by">from ' + esc(g.team) + '</span>' +
-          '<button class="shared-pin"></button>' +
+          (g.kind === 'skill' ? '<span class="shared-skill-badge">installed skill</span>' : '<button class="shared-pin"></button>') +
         '</div>').join('');
       for (const row of box.querySelectorAll('.shared-file')) {
         const g = list[+row.getAttribute('data-i')];
         const full = INSTALL_ROOT + '/' + g.id + '/' + g.entry;
         row.querySelector('.shared-file-open').onclick = () => { try { opfs.openFile(full, g.entry.split('/').pop()); } catch (_) {} };
         const pb = row.querySelector('.shared-pin');
-        if (window.SandpiePins) { try { SandpiePins.bindButton(pb, full); } catch (_) { pb.remove(); } } else pb.remove();
+        if (pb) { if (window.SandpiePins) { try { SandpiePins.bindButton(pb, full); } catch (_) { pb.remove(); } } else pb.remove(); }
       }
     } catch (e) { console.warn('[sharing] renderHome failed', e); } finally { homeBusy = false; if (homePending) { homePending = false; renderHome(); } }
   }
@@ -472,16 +507,20 @@
 
   /* ── share dialog ────────────────────────────────────────────────────── */
   async function shareDialog(srcPath) {
-    const src = norm(srcPath || '');
+    const src = skillTarget(norm(srcPath || ''));   // a SKILL.md shares its whole skill folder
     const dir = await isDir(src);
     const folderFiles = (await srcFileList(src, dir)).filter(f => !SKIP(f)).sort();
-    const defPin = folderFiles.includes('SKILL.md') ? 'SKILL.md' : folderFiles.includes('index.html') ? 'index.html' : folderFiles[0];
+    const skill = dir && folderFiles.includes('SKILL.md');
+    // Skills are titled by the skill name (frontmatter, else folder), never "SKILL.md".
+    const dlgName = (skill && await skillFmName(src)) || src.split('/').pop();
+    const defPin = skill ? 'SKILL.md' : folderFiles.includes('index.html') ? 'index.html' : folderFiles[0];
     const back = document.createElement('div'); back.className = 'share-modal-back';
     back.innerHTML =
       '<div class="share-modal" data-chrome>' +
-        '<div class="share-modal-h">Share “' + esc(src.split('/').pop()) + '”</div>' +
+        '<div class="share-modal-h">Share “' + esc(dlgName) + '”' + (skill ? ' <span class="shared-skill-badge">skill</span>' : '') + '</div>' +
         '<label class="share-opt">Department: <select class="share-in" data-k="team"><option value="">loading…</option></select></label>' +
-        (dir ? '<div class="share-pin-file"><label class="share-opt">Main file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
+        // A skill's main file is SKILL.md by definition — no selector to show.
+        (dir && !skill ? '<div class="share-pin-file"><label class="share-opt">Main file: <select class="share-in" data-k="pinfile">' + folderFiles.map(f => '<option value="' + esc(f) + '"' + (f === defPin ? ' selected' : '') + '>' + esc(f) + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="share-modal-btns"><button class="ghost" data-act="cancel">Cancel</button><button class="ghost share-primary" data-act="share">Share</button></div>' +
         '<div class="share-modal-msg"></div>' +
       '</div>';
@@ -497,7 +536,7 @@
       const dept = sel.value; if (!dept) { msg.textContent = 'Pick a department first.'; return; }
       msg.textContent = 'Sharing…';
       try {
-        const pinFile = dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
+        const pinFile = skill ? 'SKILL.md' : dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
         const out = await publish(src, dept, { pinFile });
         msg.textContent = '✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.';
         await autoSync({ full: true });
