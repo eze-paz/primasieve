@@ -64,7 +64,13 @@
   const O = () => window.opfs;
   const prov = () => { try { return window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider(); } catch (_) { return null; } };
   const cloudOn = () => { const p = prov(); return !!(p && p.cloudConnected && p.cloudConnected()); };
-  const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
+  // Underscores survive: skill names allow them (context.js NAME_RE), and folding
+  // them to '-' minted a hub artifact whose name no longer matched the source
+  // skill (web_search → web-search), so the two could never reconcile.
+  const slug = (s) => String(s || '').toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'pkg';
+  // '-'/'_' folded name equality — legacy hub artifacts still carry the slugged
+  // name, so web-search (hub) must match web_search (local).
+  const foldName = (s) => String(s || '').toLowerCase().replace(/_/g, '-');
   const norm = (p) => String(p == null ? '' : p).replace(/^\/+/, '').replace(/\/+$/, '');
 
   // A SKILL.md is never shared as a bare file called "SKILL.md": the shareable
@@ -226,6 +232,13 @@
       changed++;
     }
     const kind = ('SKILL.md' in a.files) ? 'skill' : 'folder';
+    // The hub is the authority on skills: an installed hub skill REPLACES any
+    // local skill of the same (folded) name — the local folder is deleted, not
+    // shadowed, so publishing an update remotely retires every stale local copy
+    // instead of leaving twins polluting the skill list. This includes the
+    // publisher's own source folder: after sharing, the one live copy is the
+    // installed one, and edits to it write back to the hub.
+    if (kind === 'skill') await adoptSkill(a.id);
     const mk = {
       id: a.id, team: a.dept, from: 'team', kind, revs, dirty,
       title: title || (prev && prev.title) || a.id,
@@ -253,6 +266,20 @@
     return changed;
   }
   const hubRead = async (a, rel) => { try { return await hubDownload(hubPath(a.dept, a.id, rel)); } catch (e) { console.warn('[sharing] download failed', a.id + '/' + rel, (e && e.message) || e); return null; } };
+  // Delete local sandpie/skills/<name>/ folders whose folded name matches an
+  // installed hub skill. Deletions emit file:changed per file so cloud sync
+  // propagates them; the user is told once per replaced folder.
+  async function adoptSkill(id) {
+    let tops = []; try { tops = await O().listDir('sandpie/skills'); } catch (_) { return; }
+    for (const t of tops) {
+      if (t.kind !== 'directory' || foldName(t.name) !== foldName(id)) continue;
+      const dir = 'sandpie/skills/' + t.name;
+      for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} markDirtyForWorkspace(dir + '/' + rel); }
+      try { await O().remove(dir); } catch (_) {}
+      console.info('[sharing] local skill "' + t.name + '" replaced by hub skill "' + id + '"');
+      wbNotify('info', '🧩 Local skill "' + t.name + '" was replaced by the hub version ("' + id + '").');
+    }
+  }
   // Which file the home row opens: the publisher's pick, else conventions.
   // META is installed like any other file, so it has to be excluded here or the
   // last resort ("first alphabetically") would pick the dotfile every time.

@@ -1193,11 +1193,13 @@ async function tool_load_skill({ name }, ctx) {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(n)) return { result: 'Error: invalid skill name "' + name + '". Use the exact name from the Skills section.' };
   const file = 'sandpie/skills/' + n + '/SKILL.md';
   const sharedFile = 'sandpie/shared-installed/' + n + '/SKILL.md';   // shared, installed skill package
+  // Shared first: the hub copy is authoritative (it replaces same-named local
+  // skills), so the model must load the same copy the skill index advertises.
   let text;
-  try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
+  try { text = new TextDecoder().decode(await opfsReadBytes(sharedFile)); }
   catch (e) {
-    try { text = new TextDecoder().decode(await opfsReadBytes(sharedFile)); }
-    catch (e2) { return { result: 'Error: could not read ' + file + ' — no such skill, or its SKILL.md is missing.' }; }
+    try { text = new TextDecoder().decode(await opfsReadBytes(file)); }
+    catch (e2) { return { result: 'Error: no skill named "' + n + '" — neither ' + sharedFile + ' nor ' + file + ' exists.' }; }
   }
   const body = text.replace(/^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, '').trim();
   return { result: body || text };

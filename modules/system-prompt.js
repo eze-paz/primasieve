@@ -273,7 +273,7 @@ language you reasoned in.`;
     for (const s of idx.skills) {
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = s.enabled;
       cb.addEventListener('change', () => { SandpieContext.setSkillEnabled(s.name, cb.checked); flashMsg('Saved'); renderSkills(panel); });
-      const { row, body } = makeRow(cb, s.name, '', null);   // skill name only — no description preview in the modal
+      const { row, body } = makeRow(cb, s.name, s.shared ? 'shared' : '', null);   // skill name only — no description preview; hub-installed skills say so
       const ta = document.createElement('textarea'); ta.className = 'sp-edit'; ta.rows = 12; ta.spellcheck = false; ta.value = 'Loading…'; ta.disabled = true;
       const btns = document.createElement('div'); btns.className = 'sp-item-btns';
       const save = document.createElement('button'); save.type = 'button'; save.className = 'ghost'; save.textContent = 'Save'; save.disabled = true;

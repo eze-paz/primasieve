@@ -257,9 +257,14 @@ const SandpieContext = (() => {
       }
       skills.push({ name: folder, desc, path, file, enabled: isSkillEnabled(folder) });
     }
-    // Shared skills: installed, read-only packages under sandpie/shared-installed/<id>/ that
-    // carry a SKILL.md. Discovered + advertised like local skills; load_skill falls
-    // back to the shared path. A local skill of the same name takes precedence.
+    // Shared skills: installed packages under sandpie/shared-installed/<id>/ that
+    // carry a SKILL.md. Discovered + advertised like local skills; load_skill
+    // resolves the shared path first. The HUB WINS a name collision (compared
+    // with '-'/'_' folded — legacy shares slugged web_search → web-search): the
+    // sharing sync deletes the local twin outright, and this replacement covers
+    // the window before that pass runs, so a doomed local copy is never
+    // advertised alongside its hub replacement.
+    const foldName = (n) => String(n).replace(/_/g, '-');
     try {
       for (const e of await opfs.listDir('sandpie/shared-installed')) {
         if (e.kind !== 'directory' || !NAME_RE.test(e.name)) continue;
@@ -267,7 +272,9 @@ const SandpieContext = (() => {
         let text; try { text = await opfs.read(file); } catch { continue; }   // not a skill package
         const fm = parseFrontmatter(text);
         const desc = cleanDescription(fm && fm.description);
-        if (!desc || descAlnum(desc) < MIN_DESC_ALNUM || skills.some(s => s.name === e.name)) continue;
+        if (!desc || descAlnum(desc) < MIN_DESC_ALNUM) continue;
+        const dup = skills.findIndex(s => foldName(s.name) === foldName(e.name));
+        if (dup >= 0) skills.splice(dup, 1);
         skills.push({ name: e.name, desc, path, file, enabled: isSkillEnabled(e.name), shared: true });
       }
     } catch (_) {}
