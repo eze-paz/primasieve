@@ -352,23 +352,47 @@ opfs.formatSize = function(bytes) {
 };
 
 // Lightweight transient toast (no CSS dependency) — reused for folder-zip progress.
-opfs._toast = function(msg, ms) {
-  let el = document.getElementById('opfsToast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'opfsToast';
-    el.style.cssText = 'position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%);' +
+opfs._toast = function(msg, ms, onCancel) {
+  let root = document.getElementById('opfsToast');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'opfsToast';
+    root.style.cssText = 'position:fixed;left:50%;bottom:1.3rem;transform:translateX(-50%);display:flex;align-items:center;gap:0.45rem;' +
       'background:var(--sp-surface,#1c2128);color:var(--sp-text,#e6edf3);' +
-      'border:1px solid var(--sp-border,#30363d);border-radius:8px;padding:0.5rem 0.9rem;' +
-      'font:0.82rem system-ui,sans-serif;z-index:4000;box-shadow:0 4px 16px rgba(0,0,0,0.45);' +
-      'max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;';
-    document.body.appendChild(el);
+      'border:1px solid var(--sp-border,#30363d);border-radius:8px;padding:0.4rem 0.85rem;' +
+      'font:0.84rem system-ui,sans-serif;z-index:4000;box-shadow:0 4px 16px rgba(0,0,0,0.45);' +
+      'max-width:80vw;pointer-events:none;';
+    document.body.appendChild(root);
   }
-  el.textContent = msg;
-  el.style.display = 'block';
-  clearTimeout(el._t);
-  if (ms) el._t = setTimeout(() => { el.style.display = 'none'; }, ms);
-  return el;
+  let txt = root.querySelector('.opfs-toast-txt');
+  if (!txt) {
+    txt = document.createElement('span');
+    txt.className = 'opfs-toast-txt';
+    txt.style.cssText = 'flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    root.appendChild(txt);
+  }
+  txt.textContent = msg;
+  const old = root.querySelector('.opfs-toast-cancel');
+  if (old) old.remove();
+  if (onCancel) {
+    root.style.pointerEvents = 'auto';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opfs-toast-cancel';
+    b.textContent = '✕';
+    b.setAttribute('aria-label', 'Cancel');
+    b.title = 'Cancel';
+    b.style.cssText = 'flex:none;border:none;background:transparent;color:var(--sp-text-dim,#9ca3af);' +
+      'font-size:0.95rem;line-height:1;cursor:pointer;padding:0 0.15rem;border-radius:4px;';
+    b.onclick = onCancel;
+    root.appendChild(b);
+  } else {
+    root.style.pointerEvents = 'none';
+  }
+  root.style.display = 'flex';
+  clearTimeout(root._t);
+  if (ms) root._t = setTimeout(() => { root.style.display = 'none'; }, ms);
+  return root;
 };
 
 // Download an entire OPFS folder as a .zip. Collects every file under the folder
@@ -392,8 +416,11 @@ opfs.downloadFolderZip = async function(folderKey) {
     const files = [...fileSet].sort();
     if (!files.length) { opfs._toast(folderName + ' is empty — nothing to download', 3500); return; }
 
+    opfs._zipCancel = false;
+    const cancelZip = () => { opfs._zipCancel = true; opfs._toast('Cancelling ' + folderName + ' zip…', 2500); };
+
     if (!window.JSZip) {
-      opfs._toast('Preparing…');
+      opfs._toast('Preparing…', 0, cancelZip);
       await opfs._loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
     }
     if (!window.JSZip) throw new Error('zip library unavailable');
@@ -402,7 +429,8 @@ opfs.downloadFolderZip = async function(folderKey) {
     let added = 0, skipped = 0;
     for (let i = 0; i < files.length; i++) {
       const rel = files[i];
-      if (files.length > 3 && i % 4 === 0) opfs._toast('Zipping ' + folderName + ' — ' + (i + 1) + '/' + files.length + '…');
+      if (opfs._zipCancel) { console.warn('[opfs] zip cancelled:', folderKey); return; }
+      if (files.length > 3 && i % 4 === 0) opfs._toast('Zipping ' + folderName + ' — ' + (i + 1) + '/' + files.length + '…', 0, cancelZip);
       let bytes = null;
       try { bytes = await opfs.readBytes(rel); } catch (_) {}
       if (bytes == null && sp && sp.hydrate) {   // cloud-only placeholder → fetch then read
@@ -414,8 +442,9 @@ opfs.downloadFolderZip = async function(folderKey) {
     }
     if (!added) { opfs._toast('Could not read any files in ' + folderName, 4000); return; }
 
-    opfs._toast('Compressing ' + folderName + '…');
+    opfs._toast('Compressing ' + folderName + '…', 0, cancelZip);
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    if (opfs._zipCancel) { console.warn('[opfs] zip cancelled during compression:', folderKey); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = folderName + '.zip';
