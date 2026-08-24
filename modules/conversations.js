@@ -1859,6 +1859,22 @@ function showCmdPanelForEl(el, content, title) {
   if (pane) _commandPanelTo(pane);
   if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(content, title);
 }
+// The command panel shows a checklist SNAPSHOT (the badge click builds it once),
+// so a write_todos landing while it's open would leave stale rows on screen.
+// Called from renderTodos on every checklist update: if the panel is open, is
+// showing the Checklist, and lives in the same pane as the conversation that
+// updated (the panel is a single shared element — the OTHER pane's checklist
+// must not be overwritten), rebuild its content in place.
+function refreshOpenChecklistPanel(todos, scopeEl) {
+  const panel = $('commandOutput');
+  if (!panel || panel.style.display === 'none') return;
+  const prompt = panel.querySelector('.cmd-prompt');
+  if (!prompt || prompt.textContent !== '>>> Checklist') return;
+  const panelPane = panel.closest('#messages, #messagesSide');
+  const convPane = scopeEl && scopeEl.closest ? scopeEl.closest('#messages, #messagesSide') : null;
+  if (panelPane && convPane && panelPane !== convPane) return;
+  if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(todos || []), 'Checklist');
+}
 async function handleSubmit(which = 'main') {
   const ta = which === 'side' ? $('inputSide') : $('input');
   const pane = which === 'side' ? $('messagesSide') : $('messages');
@@ -3048,6 +3064,8 @@ function renderTodos(tcId, todos, scopeEl) {
       };
     }
   }
+  // An already-open checklist panel tracks the update instead of going stale.
+  refreshOpenChecklistPanel(todos, scopeEl);
 }
 
 // Build a checklist DOM element from a todos array.
