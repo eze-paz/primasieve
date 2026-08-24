@@ -1371,8 +1371,16 @@
         return;
       }
       if (d.type === 'opfs-deleted-by-python' && Array.isArray(d.paths)) {
-        (async () => { if (!tokens()) return; for (const p of d.paths) { try { await del(relToCloud(p)); } catch {} } })();
-        for (const p of d.paths) forgetFromStateAndIndex(p);
+        // Worker-side deletion channel (python os.remove, and the delete_file
+        // tool — the message name is historical). Route through the SAME
+        // confirm-before-trim handshake the UI path uses (Sandpie.events
+        // 'file:deleted' → onFileDeleted): the ledger entry survives until the
+        // remote delete is CONFIRMED, so a failed delete_v2 can no longer ghost
+        // the file (gone from the manifest, still in Dropbox), and isNoSyncRel
+        // is honoured so a hub-managed file is never deleted from the user's
+        // personal cloud. This handler previously trimmed immediately and
+        // skipped both guards.
+        for (const p of d.paths) onFileDeleted(p);
         // Fan the deletion to the worker pool so sibling interpreters drop their
         // MEMFS copies (the manager broadcasts fs-removed to every pyodide worker).
         try { const w = window._sandpieWorker; if (w) w.postMessage({ type: 'opfs-removed', paths: d.paths }); } catch (_) {}

@@ -63,6 +63,17 @@ For multi-line edits, you MAY skip JSON and emit a raw SEARCH/REPLACE block in y
     required: ['path', 'old_str'],
   },
 },
+  delete_file: {
+    description: `Delete a file (or directory) from OPFS under /files/. Use it to clean up after yourself — scratch scripts, failed drafts, superseded intermediates — and whenever the user asks for a file to be removed. It also unblocks the "start over" case: if a file is corrupted beyond editing you may either delete_file it and write_file fresh, or simply write_file with overwrite:true. NEVER work around an unwanted file by saving a renamed copy. The deletion propagates to the user's cloud sync, so it removes the file everywhere, not just locally — it is immediate and unrecoverable. Delete only files you created in this conversation, or files the user explicitly named; if you are unsure, ask first. Refuses anything under sandpie/ (system data: memories, skills, conversations).`,
+    parameters: {
+      type: 'object',
+      properties: {
+        path:      { type: 'string',  description: 'OPFS path relative to /files/ of the file or directory to delete.' },
+        recursive: { type: 'boolean', description: 'Set true to delete a directory AND everything inside it. Default false: non-empty directories are refused.' },
+      },
+      required: ['path'],
+    },
+  },
   read_file: {
     description: `Read a UTF-8 text file from OPFS (/files/). PREFER THIS over run_python for reading — it's instant and can't crash the runtime. Output is line-numbered as "<n>\\t<line>"; the numbers are for reference only — never include them when calling write_file/edit_file. Reports total lines + byte size. For large files or head/tail, page with offset (1-based start line) + limit. Re-reading a file that has NOT changed since you last saw it returns a short "unchanged" note instead of the content — the copy already in your context is authoritative; work from it rather than re-reading. For images use load_image instead.`,
     parameters: {

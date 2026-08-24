@@ -1808,6 +1808,7 @@ async function runTool(name, args, ctx) {
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
+    case 'delete_file':   return tool_delete_file(args, ctx);
     case 'write_todos':   return tool_write_todos(args, ctx);
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
@@ -3201,6 +3202,40 @@ async function tool_write_file({ path, content, overwrite, _conv }) {
     _pyBroadcast({ type: 'fs-changed', rel: norm });
     return { result: `${existed ? 'Overwrote' : 'Created'}: ${norm} (${new Blob([content]).size} bytes)` };
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
+}
+
+// ============================================================
+// delete_file
+// ============================================================
+// Removes a file (or directory) from OPFS and propagates the deletion the same
+// way a python-side os.remove does: the page relays `opfs-deleted-by-python`
+// (name is historical — it is the generic deletion channel) to dropbox.js,
+// which deletes the cloud copy through the confirm-before-trim handshake and
+// fans `opfs-removed` out to the Pyodide pool so sibling interpreters drop
+// their MEMFS copies. sandpie/ is refused: it holds system state (memories,
+// skills, conversation JSONL) that has its own flows.
+async function tool_delete_file({ path, recursive }) {
+  if (!path) return { result: 'Error: path is required.' };
+  const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  if (!norm) return { result: 'Refused: cannot delete the /files/ root.' };
+  if (norm === 'sandpie' || norm.startsWith('sandpie/')) {
+    return { result: `Refused: ${norm} is under sandpie/ — system data (memories, skills, conversations, scripts). Not deletable with this tool.` };
+  }
+  try {
+    const root = await opfsRoot();
+    const parts = norm.split('/').filter(Boolean); const name = parts.pop();
+    let dir = root;
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: false });
+    await dir.removeEntry(name, { recursive: !!recursive });
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [norm] } });
+    return { result: `Deleted: ${norm}` };
+  } catch (e) {
+    if (e && e.name === 'NotFoundError') return { result: `Not found: ${norm} — nothing to delete.` };
+    if (e && (e.name === 'InvalidModificationError' || /not empty/i.test((e && e.message) || ''))) {
+      return { result: `Refused: ${norm} is a non-empty directory — pass recursive:true to delete it and everything inside.` };
+    }
+    return { result: `Delete failed: ${(e && e.message) || e}` };
+  }
 }
 
 function _matchEol(orig, lf) { return /\r\n/.test(orig) ? lf.replace(/\n/g, '\r\n') : lf; }

@@ -23,6 +23,7 @@ function extract(marker) {
 const srcFnv    = extract('function _fnv1a(');
 const srcRead   = extract('async function tool_read_file(');
 const srcWrite  = extract('async function tool_write_file(');
+const srcDelete = extract('async function tool_delete_file(');
 const srcParse  = extract('function parseBlobToolCalls(');
 
 // ── in-memory OPFS mock + worker-global stubs ──────────────────────────────
@@ -30,7 +31,8 @@ const mockSrc = `
 const FILE_TEXT_MAX = 2 * 1024 * 1024;
 const FILE_TOOL_CAP = 30000;
 let _toolCallSeq = 0;
-const self = { postMessage() {} };
+const POSTED = [];
+const self = { postMessage(m) { POSTED.push(m); } };
 const _pyBroadcast = () => {};
 const _ensureDbxCtx = async () => {};
 const _indexEntry = () => null;
@@ -48,6 +50,17 @@ const opfsRoot = async () => {
       if (!FS.has(prefix + name)) throw _nf();
       return {};
     },
+    async removeEntry(name, opts) {
+      const p = prefix + name;
+      if (FS.has(p)) { FS.delete(p); return; }
+      const kids = [...FS.keys()].filter(k => k.startsWith(p + '/'));
+      if (!kids.length && !DIRS.has(p)) throw _nf();
+      if (kids.length && !(opts && opts.recursive)) {
+        const e = new Error('directory not empty'); e.name = 'InvalidModificationError'; throw e;
+      }
+      for (const k of kids) FS.delete(k);
+      DIRS.delete(p);
+    },
   });
   return dirHandle('');
 };
@@ -61,14 +74,15 @@ const _opfsGetFile = async rel => {
 const _emittedFileHashes = new Map();
 `;
 
-const factory = new Function('FS', 'DIRS',
-  mockSrc + srcFnv + srcRead + srcWrite + srcParse +
-  '\nreturn { tool_read_file, tool_write_file, parseBlobToolCalls, _fnv1a, _emittedFileHashes };');
+const factory = new Function('FS', 'DIRS', 'POSTED',
+  mockSrc.replace('const POSTED = [];\n', '') + srcFnv + srcRead + srcWrite + srcDelete + srcParse +
+  '\nreturn { tool_read_file, tool_write_file, tool_delete_file, parseBlobToolCalls, _fnv1a, _emittedFileHashes };');
 
 // fresh world per test group
 function world(files = {}, dirs = ['proj']) {
   const FS = new Map(Object.entries(files));
-  return { FS, api: factory(FS, new Set(dirs)) };
+  const POSTED = [];
+  return { FS, POSTED, api: factory(FS, new Set(dirs), POSTED) };
 }
 
 let passed = 0, failed = 0;
@@ -164,6 +178,44 @@ function ok(cond, label, extra) {
 
   const r8 = await api.tool_read_file({ path: 'proj/missing.txt', _conv: 'c1' });
   ok(/file not found/.test(r8.result), 'missing file still errors normally', r8.result);
+}
+
+// ── delete_file ─────────────────────────────────────────────────────────────
+{
+  const { FS, POSTED, api } = world({ 'proj/a.txt': 'v1', 'proj/sub/b.txt': 'x', 'proj/sub/c.txt': 'y' });
+
+  const r1 = await api.tool_delete_file({ path: 'proj/a.txt' });
+  ok(/^Deleted: proj\/a\.txt/.test(r1.result) && !FS.has('proj/a.txt'), 'delete a file', r1.result);
+  const msg = POSTED.find(m => m.payload && m.payload.type === 'opfs-deleted-by-python');
+  ok(msg && msg.payload.paths[0] === 'proj/a.txt', 'delete emits opfs-deleted-by-python (dropbox propagation channel)', msg && msg.payload);
+
+  const r2 = await api.tool_delete_file({ path: 'proj/missing.txt' });
+  ok(/Not found/.test(r2.result), 'delete missing: not-found message', r2.result);
+
+  const r3 = await api.tool_delete_file({ path: 'proj/sub' });
+  ok(/non-empty directory/.test(r3.result) && /recursive:true/.test(r3.result) && FS.has('proj/sub/b.txt'),
+     'delete non-empty dir without recursive: refused', r3.result);
+
+  const r4 = await api.tool_delete_file({ path: 'proj/sub', recursive: true });
+  ok(/^Deleted: proj\/sub/.test(r4.result) && !FS.has('proj/sub/b.txt') && !FS.has('proj/sub/c.txt'),
+     'delete dir recursive: removes tree', r4.result);
+
+  const r5 = await api.tool_delete_file({ path: 'sandpie/memory/x.md' });
+  ok(/Refused/.test(r5.result) && /system data/.test(r5.result), 'delete under sandpie/: refused', r5.result);
+
+  const r6 = await api.tool_delete_file({ path: 'sandpie' });
+  ok(/Refused/.test(r6.result), 'delete sandpie root: refused', r6.result);
+
+  const r7 = await api.tool_delete_file({ path: '/' });
+  ok(/Refused|not found|root/i.test(r7.result), 'delete /files/ root: refused', r7.result);
+
+  const r8 = await api.tool_delete_file({});
+  ok(/path is required/.test(r8.result), 'delete without path: error', r8.result);
+
+  // /files/ prefix stripping parity with write/read
+  FS.set('proj/z.txt', 'z');
+  const r9 = await api.tool_delete_file({ path: 'files/proj/z.txt' });
+  ok(/^Deleted: proj\/z\.txt/.test(r9.result) && !FS.has('proj/z.txt'), 'delete strips files/ prefix', r9.result);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
