@@ -2020,6 +2020,12 @@ function _placeHome() {
   const hc = _homeEl();
   const pane = $('messages');
   if (!hc || !pane) return;
+  // Undo a fade-out retire (_fadeHomeOnFirst): clear the collapse class + the
+  // measured height so the box springs back open and takes up space again.
+  const unretire = () => {
+    if (hc.classList.contains('home-leave')) hc.classList.remove('home-leave');
+    try { if (hc.style.getPropertyValue('--home-h')) hc.style.removeProperty('--home-h'); } catch (_) {}
+  };
   const host = pane.querySelector(':scope > .conv-host');
   if (host) {
     if (hc.parentNode !== host || host.firstChild !== hc) host.insertBefore(hc, host.firstChild);
@@ -2028,11 +2034,15 @@ function _placeHome() {
     const hasMsg = [...host.children].some(c => c !== hc && c.classList && c.classList.contains('msg'));
     if (!hasMsg) {
       host._homeFading = false;
-      if (hc.classList.contains('home-leave')) hc.classList.remove('home-leave');
-      try { if (hc.style.getPropertyValue('--home-h')) hc.style.removeProperty('--home-h'); } catch (_) {}
+      unretire();
     }
-  } else if (hc.parentNode !== pane) {
-    appendContent(pane, hc);
+  } else {
+    if (hc.parentNode !== pane) appendContent(pane, hc);
+    // No conversation mounted → the home screen IS the pane's content and must be
+    // visible. Deleting a conv whose first message had faded the home box used to
+    // evacuate it back STILL COLLAPSED (opacity 0, max-height 0): nothing filled
+    // the pane and the timer-slot + composer cluster floated to the top.
+    unretire();
   }
 }
 // Move the home lists out of a host that is about to be detached, so they stay
