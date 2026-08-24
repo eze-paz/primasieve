@@ -685,7 +685,18 @@ function markStaleAsks(host) {
 function renderConversation(msgs, compaction, host = null) {
   // Fresh replay: drop any Task Register state left from a previous render of
   // this target — groups AND the replayed-todos snapshot that titles them.
-  tgReset(_tgResolveTarget(host));
+  const rhost = _tgResolveTarget(host);
+  tgReset(rhost);
+  // A full replay must start from a CLEAN host. Every caller is a
+  // load/rewind/compaction replay of the whole message list, but some reach
+  // here racing another load of the same conversation (boot-restore vs a
+  // sidebar click, side-pane open vs loadConv) — appending onto the earlier
+  // render showed the conversation twice. Only conv hosts are wiped, and the
+  // home lists are evacuated first (they can live inside the main-pane host).
+  if (rhost && rhost.dataset && rhost.dataset.convId && rhost.firstChild) {
+    _evacuateHome(rhost);
+    rhost.innerHTML = '';
+  }
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
   if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
   else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host); }
@@ -5065,13 +5076,29 @@ class SidePanel {
   }
 
   async _lazyLoad(id) {
+    // Warm — or a load is already in flight and will render when it resolves.
+    // The stream is registered SYNCHRONOUSLY below, before any await, so two
+    // rapid opens (or an open racing loadConv's cold path) can never both run
+    // the load: that raced and rendered every message twice into one host.
     if (convStreams.has(id)) return;
-    const data = await readConvData(id);
-    if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
     const s = ensureStream(id);
-    hydrateStreamFromData(s, data);
-    tgReset(s.host);
-    for (const m of s.messages) renderHistoricalMessage(m, s.host);
+    s._loading = true;
+    try {
+      const data = await readConvData(id);
+      if (!data) { addMsg('err', 'Failed to load conv.'); throw new Error('conv not found: ' + id); }
+      hydrateStreamFromData(s, data);
+      tgReset(s.host);
+      _evacuateHome(s.host);
+      s.host.innerHTML = '';
+      for (const m of s.messages) renderHistoricalMessage(m, s.host);
+    } catch (e) {
+      // Failed load: don't leave an empty registered stream behind — a later
+      // open would see it as "warm" and show a blank conversation forever.
+      if (!s.messages.length) convStreams.delete(id);
+      throw e;
+    } finally {
+      s._loading = false;
+    }
   }
 
   _render() {
