@@ -1981,6 +1981,30 @@ function _homeEl() {
   }
   return _homeCenterEl;
 }
+// First live user message lands in a fresh conversation: fade the home screen
+// (pinned grid + shared lists) out instead of letting it stay anchored above the
+// first bubble. Runs ONLY from the live send path (addMsg animate=true); a load
+// replay can't trigger it. A brand-new chat gets a new empty host, so re-arm is
+// automatic (the .home-leave class + display:none reset in _placeHome when the
+// host has no message yet).
+function _fadeHomeOnFirst(host) {
+  if (!host) return;
+  const hc = _homeEl();
+  if (!hc || !hc.isConnected) return;
+  if (host._homeFading || !host.contains(hc)) return;
+  let first = true;
+  for (const c of host.children) {
+    if (c !== hc && c.classList && c.classList.contains('msg')) { first = false; break; }
+  }
+  if (!first) return;                       // only the very first message retires it
+  host._homeFading = true;
+  hc.classList.remove('home-leave');
+  void hc.offsetWidth;                      // restart the animation if re-shown
+  hc.classList.add('home-leave');
+  setTimeout(() => {                        // retire from layout once faded
+    if (hc.isConnected && hc.classList.contains('home-leave')) hc.style.display = 'none';
+  }, 700);
+}
 // Put the home lists where they belong: first child of the LEFT pane's conv-host
 // when one is mounted (so they scroll with the conversation), else the left pane
 // itself above its bottom cluster. Always the left pane — the home screen only
@@ -1993,6 +2017,14 @@ function _placeHome() {
   const host = pane.querySelector(':scope > .conv-host');
   if (host) {
     if (hc.parentNode !== host || host.firstChild !== hc) host.insertBefore(hc, host.firstChild);
+    // Fresh (empty) host → the home screen belongs here again: undo a retire
+    // a previous conversation's first message left behind.
+    const hasMsg = [...host.children].some(c => c !== hc && c.classList && c.classList.contains('msg'));
+    if (!hasMsg) {
+      host._homeFading = false;
+      if (hc.classList.contains('home-leave')) hc.classList.remove('home-leave');
+      if (hc.style.display === 'none') hc.style.display = '';
+    }
   } else if (hc.parentNode !== pane) {
     appendContent(pane, hc);
   }
@@ -2025,7 +2057,7 @@ function steerActive(s, content) {
   // Render a provisional bubble now for immediate feedback; the authoritative
   // array insert + persistence happen when the worker echoes it back as a
   // message_added event (RoundRenderer.bindMessage reconciles against this list).
-  const el = addMsg('user', content, s.host);
+  const el = addMsg('user', content, s.host, true);
   (s._pendingSteer = s._pendingSteer || []).push({ el, content, msg: null });
   try { getSandpieWorker().postMessage({ type: 'steer', id: s.agentId, content }); } catch (_) {}
 }
@@ -2285,7 +2317,7 @@ async function sendSingle(text, stream, opts = {}) {
   if (!opts?.resume) {
     const userMsg = { role: 'user', content: text };
     convMessages.push(userMsg);
-    userBubbleEl = addMsg('user', text, host);
+    userBubbleEl = addMsg('user', text, host, true);
     bindBubble(userBubbleEl, userMsg);
     // Awaited: the worker now appends committed messages to the JSONL itself,
     // starting from persisted_count. If this user-message save were still in
@@ -2890,7 +2922,7 @@ function buildFileChip(f) {
   return chip;
 }
 
-function addMsg(role, text = '', host = null) {
+function addMsg(role, text = '', host = null, animate = false) {
 
   // Prefer the mounted .conv-host even when the caller didn't thread `host`
   // through (most addMsg('err', …) calls don't) — paneScrollEl resolves it.
@@ -2959,6 +2991,14 @@ function addMsg(role, text = '', host = null) {
       bubble.textContent = text;
     }
     div.appendChild(bubble);
+  }
+  if (role === 'user' && animate) {
+    // LIVE user bubble (Enter-to-send only — load replays pass animate=false):
+    // entrance animation + (if this is the first message of a fresh conversation)
+    // fade the home screen out. Probe BEFORE the bubble is appended so the
+    // first-message scan doesn't count the bubble it is about to add.
+    div.classList.add('msg-enter');
+    _fadeHomeOnFirst(target);
   }
   if (mount !== target) { mount.appendChild(div); tgUpdate(mount.parentNode); }
   else appendContent(target, div);
@@ -3993,7 +4033,7 @@ class RoundRenderer {
       const s = convStreams.get(this.convId);
       const pend = s && s._pendingSteer && s._pendingSteer.find(p => !p.msg);
       if (pend) { pend.msg = msg; bindBubble(pend.el, msg); }
-      else bindBubble(addMsg('user', msg.content, this.host), msg);
+      else bindBubble(addMsg('user', msg.content, this.host, true), msg);
       return;
     }
     if (msg.role === 'assistant') {
