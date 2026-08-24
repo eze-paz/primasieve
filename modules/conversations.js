@@ -1131,6 +1131,7 @@ registerMetacogCommand();
 function _recalcMemoryFor(id) {
   try {
     if (typeof SandpieMemory === 'undefined' || !SandpieMemory.refreshActive) return;
+    if (id !== activeConvId) return;   // only recompute memory for the currently-active conversation — a stale queued load (opened N cold convs fast) must not re-colour the bank
     const st = ensureStream(id);
     const msgs = (st && st.messages) || [];
     const lastUser = [...msgs].reverse().find(m => m && m.role === 'user');
