@@ -2293,12 +2293,14 @@ async function sendSingle(text, stream, opts = {}) {
     // written at EOF BEFORE the user message — wrong order in the file.
     await saveConv(convId).catch(() => {});
 
-    // NOTE: do NOT fire maybeAutoTitle here (tried in bc13374, reverted). The
-    // title call is a second provider request on the same key, concurrent with
-    // the generation below — providers that allow one in-flight request per key
-    // kill/reject the main stream, the worker retries the round (re-thinking
-    // each time), and the two calls' backoffs keep colliding: turns "think 3x"
-    // or appear to hang. Titling happens at turn end, when the wire is free.
+    // Name the conversation NOW, from the user message alone, concurrently with
+    // the generation below — so the sidebar shows a real title while the reply is
+    // still streaming instead of after the turn ends. Fire-and-forget: it needs
+    // nothing from this turn, and maybeAutoTitle itself is a no-op for anything
+    // already titled/locked. The turn-end call remains as the retry fallback.
+    // (History: reverted in 104c044 on a wrong diagnosis — the "thinks 3x" bug
+    // was the force-respond retry loop, fixed in 6c4cc0d, not this concurrency.)
+    maybeAutoTitle(convId).catch(() => {});
   }
 
   // If no model is selected but a configured provider has one, use it rather than
@@ -2461,9 +2463,11 @@ async function sendSingle(text, stream, opts = {}) {
     flushIncrementalSave(convId);
     await saveConv(convId);
 
-    // Name the conversation from its opening exchange, if it's still carrying the
-    // derived placeholder title. Awaited (the UI was released above, so this costs
-    // no visible latency) so the new title is on disk before the sync below —
+    // Fallback titling pass: the title normally lands at send time (see above),
+    // concurrently with the generation. This retries the ones that missed — the
+    // send-time attempt failed (offline, unusable answer) or is still in flight
+    // (the _titling guard makes this a no-op then). Awaited (the UI was released
+    // above, so this costs no visible latency) so the new title is on disk before the sync below —
     // one write, one sync — and before the notification reads it.
     const _newTitle = await maybeAutoTitle(convId);
 
