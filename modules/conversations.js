@@ -1985,8 +1985,8 @@ function _homeEl() {
 // (pinned grid + shared lists) out instead of letting it stay anchored above the
 // first bubble. Runs ONLY from the live send path (addMsg animate=true); a load
 // replay can't trigger it. A brand-new chat gets a new empty host, so re-arm is
-// automatic (the .home-leave class + display:none reset in _placeHome when the
-// host has no message yet).
+// automatic (._placeHome clears .home-leave + --home-h when the host has no
+// message yet, letting the box spring back open).
 function _fadeHomeOnFirst(host) {
   if (!host) return;
   const hc = _homeEl();
@@ -1998,12 +1998,13 @@ function _fadeHomeOnFirst(host) {
   }
   if (!first) return;                       // only the very first message retires it
   host._homeFading = true;
+  // Drive the collapse from the home page's own measured height so the outgoing
+  // box closes cleanly and the first message below rides up into its place —
+  // not snapping once a display:none retirement drops the whole list at once.
+  try { hc.style.setProperty('--home-h', Math.ceil(hc.getBoundingClientRect().height) + 'px'); } catch (_) {}
   hc.classList.remove('home-leave');
   void hc.offsetWidth;                      // restart the animation if re-shown
   hc.classList.add('home-leave');
-  setTimeout(() => {                        // retire from layout once faded
-    if (hc.isConnected && hc.classList.contains('home-leave')) hc.style.display = 'none';
-  }, 700);
 }
 // Put the home lists where they belong: first child of the LEFT pane's conv-host
 // when one is mounted (so they scroll with the conversation), else the left pane
@@ -2023,7 +2024,7 @@ function _placeHome() {
     if (!hasMsg) {
       host._homeFading = false;
       if (hc.classList.contains('home-leave')) hc.classList.remove('home-leave');
-      if (hc.style.display === 'none') hc.style.display = '';
+      try { if (hc.style.getPropertyValue('--home-h')) hc.style.removeProperty('--home-h'); } catch (_) {}
     }
   } else if (hc.parentNode !== pane) {
     appendContent(pane, hc);

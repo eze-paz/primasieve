@@ -3266,9 +3266,18 @@ body.sp-decoding *::after {
   @media (prefers-reduced-motion: reduce) { .msg.user.msg-enter { animation: none; } }
 
   /* Shared home screen sinks out on the first live message of a fresh chat. */
-  #homeCenter.home-leave { animation: home-out .5s ease forwards; pointer-events: none; }
-  @keyframes home-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-16px); } }
-  @media (prefers-reduced-motion: reduce) { #homeCenter.home-leave { animation: none; } }
+  #homeCenter.home-leave {
+    animation: home-out .55s ease forwards;
+    pointer-events: none;
+    max-height: var(--home-h, 520px);
+    overflow: hidden;
+    padding: 0;
+  }
+  @keyframes home-out {
+    0%   { opacity: 1; max-height: var(--home-h, 520px); transform: none; }
+    100% { opacity: 0; max-height: 0; transform: translateY(-12px); }
+  }
+  @media (prefers-reduced-motion: reduce) { #homeCenter.home-leave { max-height: 0; opacity: 0; overflow: hidden; } }
 .shared-home { width: 100%; text-align: left; user-select: none; }
 .shared-home-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-text-dim); margin: 0.8rem 0 0.4rem; padding-left: 0.2rem; }
 .shared-tile { flex: none; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; background: var(--sp-panel); border: 1px solid var(--sp-border); color: var(--sp-text-dim); }
