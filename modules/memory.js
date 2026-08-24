@@ -760,9 +760,10 @@ const SandpieMemory = (function () {
   // immediately (send-time systemBlock() would be too late). Mirrors the tiered
   // semantics: standing user/feedback always active, plus contextual memories of
   // the projects active for this conversation's ctx.
-  async function refreshActive(ctx) {
+  async function refreshActive(ctx, stillActive) {
     if (!isEnabled()) { _setActive([]); return; }
     const facts = await list();
+    if (stillActive && !stillActive()) return;   // superseded mid-flight — a newer conversation switch won; drop without re-colouring
     if (!facts.length) { _setActive([]); return; }
     const cl = _clusterFacts(facts);
     const active = _activeProjects(facts, cl, ctx || {});
