@@ -2703,7 +2703,12 @@ async function runAgent(config, ctx) {
     return 'You have run ' + n + ' tool rounds without updating your plan.';
   };
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
-  const MAX_RESPOND_RETRIES = 3;   // bare-prose attempts to reject before falling back to showing content
+  // Bare-prose attempts to reject before falling back to showing the content.
+  // Exactly ONE: the first bare-prose round already defied tool_choice:'required',
+  // and the single retry carries an explicit system-reminder — a model that
+  // ignores BOTH will ignore them again, so further retries just burn a full
+  // re-think each (seen live: 4 thinking phases on "Tell me about Paris").
+  const MAX_RESPOND_RETRIES = 1;
   // This turn forces respond() when the tool is present: the visible reply comes
   // ONLY from respond(), plain content is hidden, and respond() is the only clean
   // way to end. Subagents (no respond in their toolset) are unaffected.
