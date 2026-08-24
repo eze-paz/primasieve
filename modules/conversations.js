@@ -2146,7 +2146,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=119');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=120');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2730,6 +2730,19 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
     session_id: await ensureSessionId(convId || activeConvId),
+    // Volatile context (currently the Recent-paths block) for the worker to
+    // inject as an ephemeral reminder at the END of each request. Kept OUT of
+    // the system prompt on purpose: it changes with every tool call, and any
+    // change near the top of the request invalidates the provider's cached
+    // prefix for the whole conversation. The worker adds the minute-level clock.
+    volatileContext: await (async () => {
+      try {
+        if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {
+          return String(await SandpieAugmentations.systemBlock() || '').trim();
+        }
+      } catch (_) {}
+      return '';
+    })(),
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],
@@ -4655,13 +4668,17 @@ async function buildSystemPrompt(convMessages) {
   let content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
     ? await SandpieSystemPrompt.get()
     : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
-  // Current local time, prepended and rebuilt every turn, so the model can reason
-  // about "now" (dates, staleness of recalled state, scheduling).
+  // Current local DATE (day granularity), prepended. Deliberately NOT the time:
+  // this line sits at byte ~0 of every request, and provider prompt-caching only
+  // works on a byte-stable prefix — a minute-level stamp here invalidated the
+  // whole conversation's cache every turn. The minute-level clock now rides in
+  // the ephemeral volatile-context reminder the worker appends at the END of
+  // each request (see config.volatileContext), where it can't invalidate anything.
   try {
     const now = new Date();
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    const stamp = now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    content = 'The current local date and time is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as "now".\n\n' + content;
+    const stamp = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    content = 'The current date is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as today; the precise time arrives with each request.\n\n' + content;
   } catch (_) {}
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill
@@ -4701,10 +4718,10 @@ async function buildSystemPrompt(convMessages) {
     try { content += await SandpieMemory.systemBlock(memCtx); }
     catch (e) { console.warn('[sandpie] memory block failed:', e); }
   }
-  if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {
-    try { content += await SandpieAugmentations.systemBlock(); }
-    catch (e) { console.warn('[sandpie] augmentations block failed:', e); }
-  }
+  // NOTE: the augmentations block (Recent paths) is no longer appended here.
+  // That list reshuffles on every tool call, which churned the system prompt —
+  // the cached-prefix killer. It now travels in config.volatileContext and is
+  // injected by the worker at the END of each request instead.
   return { role: 'system', content };
 }
 

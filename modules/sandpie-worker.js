@@ -2832,6 +2832,19 @@ async function runAgent(config, ctx) {
       ctx.emit({ type: 'reminder', kind: pendingReminder.kind, text: pendingReminder.text, meta: pendingReminder.meta });
       pendingReminder = null;
     }
+    // Ephemeral volatile-context tail: the minute-level clock + whatever the page
+    // passed in config.volatileContext (Recent paths). Lives at the END of the
+    // request — the system prompt stays byte-stable so the provider's prompt
+    // cache holds across turns; this tail only ever invalidates itself. Rebuilt
+    // fresh each round, never persisted to the conversation.
+    let volatileMsg = null;
+    try {
+      const _now = new Date();
+      const _tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      let _vt = 'Current local date and time: ' + _now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + (_tz ? ' (' + _tz + ')' : '') + '. Treat this as "now".';
+      if (config.volatileContext) _vt += '\n\n' + config.volatileContext;
+      volatileMsg = { role: 'user', content: '<system-reminder>' + _vt + '</system-reminder>' };
+    } catch (_) {}
     // Hard plan-first gate: until a task is in_progress, OFFER only write_todos and
     // respond. Work tools aren't on the menu, so the model literally cannot call one
     // before planning (greetings can still respond). Once a task is active, the full
@@ -2855,7 +2868,7 @@ async function runAgent(config, ctx) {
     // the model reads it immediately before generating (recency beats a rule
     const reqBody = {
       model: config.model,
-      messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
+      messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
       stream: true,
       stream_options: { include_usage: true },
       tools: _availTools,
@@ -2884,7 +2897,7 @@ async function runAgent(config, ctx) {
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
             model: config.model,
-            messages: fixToolPairing([config.systemPrompt, ...messages, reminderMsg].filter(Boolean)),
+            messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
             tools: _availTools,
