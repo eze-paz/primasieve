@@ -257,13 +257,25 @@ sandpiePersistence.check();
    --------------------------------------------------------------------------- */
 
 /* metadata helpers */
+// Per-sync stat bursts call lastModified for hundreds of paths in a handful of
+// directories; the biggest cost was re-resolving the whole ancestor chain from
+// the OPFS root every time. Cache the resolved directory handles (they stay
+// valid for stat even across writes) keyed by parent path, capped.
+const _opfsDirCache = new Map();
+async function _opfsCachedDir(parts) {
+  const key = parts.join('/');
+  const hit = _opfsDirCache.get(key);
+  if (hit) return hit;
+  let dir = await navigator.storage.getDirectory();
+  for (const p of parts) dir = await dir.getDirectoryHandle(p);
+  if (_opfsDirCache.size > 256) _opfsDirCache.clear();
+  _opfsDirCache.set(key, dir);
+  return dir;
+}
 opfs.lastModified = async function(path) {
   try {
     const { parts, name } = splitPath(path);
-    let dir = await navigator.storage.getDirectory();
-    for (const p of parts) {
-      dir = await dir.getDirectoryHandle(p);
-    }
+    const dir = await _opfsCachedDir(parts);
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
     return file.lastModified;

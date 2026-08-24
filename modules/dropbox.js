@@ -756,7 +756,7 @@
     return { index: out, delta: null, deltaOwn: [] };
   }
   // ---- bounded-parallel per-file download ------------------------------------
-  const DL_CONCURRENCY = 16;
+  const DL_CONCURRENCY = 32;   // wire drain is still capped by dbxFetch pacing (429 safety); this lets more write/mtime tail queue behind in-flight fetches
   async function bulkDownload(items, state, opfs, onProgress) {
     if (!items.length) return;
     let i = 0, done = 0;
@@ -1157,10 +1157,14 @@
         } else {
           _splashLog('[splash] lifting splash — nothing to download'
             + (_deviceSwitch ? ' (the cursor delta needs no local writes)' : ' (no cursor delta)'));
-          _hideSyncSplashAfterHome(true);
+          // no work: the post-bulkDownload hide covers this; never wait on sharing
         }
       }
       await bulkDownload(toDownload, state, opfs, _splashActive ? function(d, t) { _updateSyncSplash(d, t); } : null);
+      // All user-visible pull work is done (pass 1/2 deletions + every download).
+      // Lift the full-screen splash NOW — pushDirty/dehydratePurge below are
+      // local/upload/prune work the user should never wait on.
+      if (_splashActive) _hideSyncSplash(true);
 
       // push: only files explicitly marked dirty (syncedMtime===0) by edit events.
       // A full-scan upload that treated "no state entry" as dirty has been removed

@@ -35,12 +35,12 @@ if("serviceWorker"in navigator){
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js?v=44"></script>
   <script src="modules/console.js?v=3"></script>
-  <script src="modules/dropbox.js?v=76"></script>
+  <script src="modules/dropbox.js?v=77"></script>
   <script src="modules/images.js?v=10"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=62"></script>
   <script src="modules/screenshot.js?v=4"></script>
-  <script src="modules/opfs.js?v=48"></script>
+  <script src="modules/opfs.js?v=49"></script>
   <script src="modules/html-editor.js?v=20"></script>
   <script src="modules/file-viewer.js?v=26"></script>
   <script src="modules/univer.js?v=1"></script>
@@ -93,7 +93,7 @@ if("serviceWorker"in navigator){
   // A stale timestamp (device switch, first load) keeps the splash — the first
   // sync's cursor check then decides: delta → stay + progress, none → removed
   // instantly (see _hideSyncSplash(/*instant*/true)).
-  var RECENT_SYNC_MS = 60000;
+  var RECENT_SYNC_MS = 300000;   // 5 min: treat a casual refresh as no device-switch and skip the splash
   // A pre-reload flush (Sandpie.reload) pushes our work and reads the cursor right
   // before this load. It is not a full sync, so it does NOT touch the last-sync
   // timestamp — it records its own, and a very short window is enough because the
