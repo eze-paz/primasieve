@@ -1289,6 +1289,7 @@
   async function hydrateRel(rel) {
     const r = String(rel).replace(/^\/+/, '');
     if (!dehydrated() || isExemptRel(r)) return false;
+    if (_idxCache === null) await loadCloudIndex();   // index may still be loading from IDB at boot — don't treat "not yet loaded" as "genuinely absent"
     const e = cloudIndex()[r];
     if (!e || e.kind !== 'file') return false;      // unknown to the cloud index ⇒ genuinely absent, no request
     if (await Sandpie.opfs.exists(r)) return true;
@@ -1324,7 +1325,8 @@
   }
   // Push the cloud INDEX to the worker so dehydrated mode can list/hydrate from
   // it. index:null clears it (mode off) → worker falls back to OPFS-only.
-  function pushDbxIndexToSW() {
+  async function pushDbxIndexToSW() {
+    if (_idxCache === null) await loadCloudIndex();   // never push an index while it's still loading from IDB at boot
     const worker = window._sandpieWorker;
     if (!worker) { setTimeout(pushDbxIndexToSW, 1000); return; }
     worker.postMessage({ type: 'dbx-index', index: dehydrated() ? cloudIndex() : null, exempt: EXEMPT_PREFIXES });
