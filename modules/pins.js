@@ -257,7 +257,9 @@
     if (!el) return;
     try {
       if (window.SandpieSharing && SandpieSharing.acceptedList) {
-        const n = (await SandpieSharing.acceptedList()).length;
+        // Skills aren't pinnable — they live in Settings → Sharing as installed
+        // skills — so they don't count toward the +Add (pinnable apps) badge.
+        const n = (await SandpieSharing.acceptedList()).filter(g => g.kind !== 'skill').length;
         el.textContent = n;
       }
     } catch (_) {}
