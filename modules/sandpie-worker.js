@@ -1246,7 +1246,23 @@ async function opfsCollect(startRel, { recursive = false, includeDirs = false, m
   return out;
 }
 
-async function tool_read_file({ path, offset, limit }) {
+// ── file-content dedupe ──────────────────────────────────────────────────
+// Don't re-emit file content the model already has in context. Keyed
+// conv|path|range → FNV-1a hash of the exact payload last emitted for that
+// slice; an unchanged re-read returns a small stub pointing at the earlier
+// copy instead of the bytes. Correctness needs NO write-invalidation
+// bookkeeping: the hash is recomputed from the CURRENT file on every read, so
+// any change (write_file, edit_file, a run_python write) hashes differently
+// and re-emits in full. Cleared on mid-turn compaction — the earlier copy may
+// have been summarized away, so the next read must re-emit.
+const _emittedFileHashes = new Map();
+function _fnv1a(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+async function tool_read_file({ path, offset, limit, force, _conv }) {
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (hydration)
   const norm = normFilesPath(path);
   if (!norm) return { result: 'Error: path is required.' };
@@ -1274,7 +1290,16 @@ async function tool_read_file({ path, offset, limit }) {
     buf += row; lastShown = i;
   }
   if (truncated) buf += `…[truncated at line ${lastShown}; call again with offset=${lastShown + 1} for more]`;
-  return { result: buf.replace(/\n$/, '') };
+  const payload = buf.replace(/\n$/, '');
+  // Dedupe: same conversation, same slice, byte-identical payload as the last
+  // time we emitted it → stub instead of re-sending content already in context.
+  const dedupeKey = (_conv || '') + '|' + norm + '|' + start + '|' + lastShown;
+  const h = _fnv1a(payload);
+  if (!force && _emittedFileHashes.get(dedupeKey) === h) {
+    return { result: header + ' — UNCHANGED since the copy already in your context from an earlier read/write this conversation; not re-emitted. Work from that copy. Pass force:true only if you genuinely need it re-sent.' };
+  }
+  _emittedFileHashes.set(dedupeKey, h);
+  return { result: payload };
 }
 
 async function tool_list_files({ path, pattern, recursive, scope }) {
@@ -1776,7 +1801,7 @@ async function runTool(name, args, ctx) {
     case 'ask':           return tool_ask(args, ctx);
     case 'load_image':    return tool_load_image(args, ctx);
     case 'load_skill':    return tool_load_skill(args, ctx);
-    case 'read_file':     return tool_read_file(args, ctx);
+    case 'read_file':     return tool_read_file({...args, _conv: convFileName}, ctx);
     case 'list_files':    return tool_list_files(args, ctx);
     case 'search':        return tool_search(args, ctx);
     case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
@@ -1922,18 +1947,19 @@ function parseBlobToolCalls(text) {
   if (typeof text !== 'string' || (text.indexOf('<|write_file:') === -1 && text.indexOf('<|edit_file:') === -1)) {
     return { toolCalls, stripped: text };
   }
-  const blockRe = /<\|(write_file|edit_file):([^\n|]+?)\|>([\s\S]*?)<\|end_\1\|>/g;
+  const blockRe = /<\|(write_file|edit_file):([^\n|]+?)(\|overwrite)?\|>([\s\S]*?)<\|end_\1\|>/g;
   const srRe = /<{5,9} SEARCH\r?\n([\s\S]*?)\r?\n={3,}\r?\n([\s\S]*?)\r?\n>{5,9} REPLACE/;
   const spans = [];   // consumed [start,end) ranges, stripped from content afterward
   let m;
   while ((m = blockRe.exec(text)) !== null) {
-    const [full, kind, rawPath, body] = m;
+    const [full, kind, rawPath, owFlag, body] = m;
     const path = rawPath.trim();
     if (!path) continue;
     let args;
     if (kind === 'write_file') {
       // Drop only the single newline adjacent to each sentinel; keep the rest byte-exact.
       args = { path, content: body.replace(/^\r?\n/, '').replace(/\r?\n$/, '') };
+      if (owFlag) args.overwrite = true;   // <|write_file:PATH|overwrite|> variant
     } else {
       const sr = srRe.exec(body);
       if (!sr) continue;   // malformed edit body → leave as text so the model can retry
@@ -2435,6 +2461,9 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
   if (summary) {
     // Drop [0, split) — old summary + aged body — and prepend the fresh, folded summary.
     messages.splice(0, split, { role: 'user', content: marker + '\n\n' + summary });
+    // The compacted-away slice may have held the only full copy of files the
+    // read-dedupe stubs point at — force full re-emission on the next read.
+    _emittedFileHashes.clear();
     // Tell the PAGE to advance its persisted compaction boundary. `kept` = the tail
     // messages retained (everything after the summary); since the worker's tail is
     // the newest messages, the page maps this to boundary = convMessages.length -
@@ -3127,10 +3156,11 @@ async function runAgent(config, ctx) {
 // ============================================================
 // write_file / edit_file
 // ============================================================
-async function tool_write_file({ path, content, _conv }) {
+async function tool_write_file({ path, content, overwrite, _conv }) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
-  try {
+  let existed = false;
+  if (!overwrite) try {
     const root = await opfsRoot();
     const parts = norm.split('/').filter(Boolean); const name = parts.pop();
     let dir = root;
@@ -3138,10 +3168,29 @@ async function tool_write_file({ path, content, _conv }) {
     try {
       await dir.getFileHandle(name);
       let existing = ''; try { existing = new TextDecoder().decode(await opfsReadBytes(norm)); } catch (_) {}
-      const CAP = 12000;
-      const shown = existing.length > CAP ? existing.slice(0, CAP) + `\n…(truncated; ${existing.length} bytes total — use read_file to page the rest)` : existing;
-      return { result: `${norm} already exists — NOT overwritten. To change it, use edit_file (do NOT rewrite the whole file or save a renamed copy like ${name.replace(/(\.[^.]*)?$/, '_v2$1')}). Its current content:\n\n${shown}` };
+      // Writing byte-identical content over itself is a no-op, not a conflict.
+      if ((content || '') === existing) return { result: `${norm} already contains exactly this content (${existing.length} bytes) — no write needed.` };
+      // Refusal echo dedupe: if this exact content was already emitted into the
+      // conversation (a prior read or refusal), don't re-echo it.
+      const echoKey = (_conv || '') + '|' + norm + '|refusal';
+      const hint = `Pick ONE: (a) small change → edit_file it in place; (b) full replacement intended → call write_file again with overwrite:true. NEVER save a renamed copy like ${name.replace(/(\.[^.]*)?$/, '_v2$1')}.`;
+      const h = _fnv1a(existing);
+      if (_emittedFileHashes.get(echoKey) === h) {
+        return { result: `${norm} already exists (${existing.length} bytes, unchanged since it last appeared in your context) — NOT overwritten. ${hint}` };
+      }
+      _emittedFileHashes.set(echoKey, h);
+      const CAP = 2000;
+      const shown = existing.length > CAP ? existing.slice(0, CAP) + `\n…(truncated; ${existing.length} bytes total — read_file to see the rest)` : existing;
+      return { result: `${norm} already exists (${existing.length} bytes) — NOT overwritten. ${hint} Current content (head):\n\n${shown}` };
     } catch (e) { if (e.name !== 'NotFoundError') throw e; }
+  } catch (_) {}
+  else try {
+    // Overwrite path: only note whether the file existed, for an honest verb.
+    const root = await opfsRoot();
+    const parts = norm.split('/').filter(Boolean); const name = parts.pop();
+    let dir = root;
+    for (const p of parts) { dir = await dir.getDirectoryHandle(p, { create: false }); }
+    await dir.getFileHandle(name); existed = true;
   } catch (_) {}
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
@@ -3150,7 +3199,7 @@ async function tool_write_file({ path, content, _conv }) {
     // Keep the Pyodide pool's MEMFS coherent with this OPFS write so a following
     // run_python sees it (per-worker FIFO ⇒ this lands before any later run).
     _pyBroadcast({ type: 'fs-changed', rel: norm });
-    return { result: `Created: ${norm} (${new Blob([content]).size} bytes)` };
+    return { result: `${existed ? 'Overwrote' : 'Created'}: ${norm} (${new Blob([content]).size} bytes)` };
   } catch (e) { return { result: `Write failed: ${e.message}` }; }
 }
 

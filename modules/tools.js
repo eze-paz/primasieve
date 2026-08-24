@@ -26,9 +26,9 @@ Examples:
     },
   },
   write_file: {
-  description: `Create a NEW file in OPFS under /files/. If the file already exists it is NOT overwritten — its current content is returned instead, so you can edit_file it in place (don't rewrite it or save a renamed copy). Path is relative to /files/ — put files in the MOST RELEVANT folder for the task (e.g. "projects/<project>/analyze.py", "projects/<project>/chart.html"), never in the sandbox (sandpie/ is system-only). Use this to create scripts before running them with run_python.
+  description: `Write a file in OPFS under /files/. By default it only CREATES: if the file already exists nothing is written and its current state is returned. Then pick the right follow-up: for a small or targeted change, edit_file it in place; to REPLACE the content wholesale (wrong or corrupted beyond editing), call write_file again with overwrite:true. NEVER save a renamed copy (foo_v2.html) to work around an existing file. Path is relative to /files/ — put files in the MOST RELEVANT folder for the task (e.g. "projects/<project>/analyze.py", "projects/<project>/chart.html"), never in the sandbox (sandpie/ is system-only). Use this to create scripts before running them with run_python.
 
-For large or multi-line content, you MAY skip JSON and emit the body as a raw block in your reply instead (no escaping of newlines/quotes needed):
+For large or multi-line content, you MAY skip JSON and emit the body as a raw block in your reply instead (no escaping of newlines/quotes needed); append |overwrite inside the header to replace an existing file:
 <|write_file:PATH|>
 <file content, verbatim>
 <|end_write_file|>`,
@@ -37,6 +37,7 @@ For large or multi-line content, you MAY skip JSON and emit the body as a raw bl
     properties: {
       path:    { type: 'string', description: 'OPFS path relative to /files/' },
       content: { type: 'string', description: 'Full file content' },
+      overwrite: { type: 'boolean', description: 'Set true to replace an existing file with `content` — only once you know what it holds (from a previous write_file refusal or a read_file). Default false: existing files are never touched.' },
     },
     required: ['path', 'content'],
   },
@@ -63,13 +64,14 @@ For multi-line edits, you MAY skip JSON and emit a raw SEARCH/REPLACE block in y
   },
 },
   read_file: {
-    description: `Read a UTF-8 text file from OPFS (/files/). PREFER THIS over run_python for reading — it's instant and can't crash the runtime. Output is line-numbered as "<n>\\t<line>"; the numbers are for reference only — never include them when calling write_file/edit_file. Reports total lines + byte size. For large files or head/tail, page with offset (1-based start line) + limit. For images use load_image instead.`,
+    description: `Read a UTF-8 text file from OPFS (/files/). PREFER THIS over run_python for reading — it's instant and can't crash the runtime. Output is line-numbered as "<n>\\t<line>"; the numbers are for reference only — never include them when calling write_file/edit_file. Reports total lines + byte size. For large files or head/tail, page with offset (1-based start line) + limit. Re-reading a file that has NOT changed since you last saw it returns a short "unchanged" note instead of the content — the copy already in your context is authoritative; work from it rather than re-reading. For images use load_image instead.`,
     parameters: {
       type: 'object',
       properties: {
         path:   { type: 'string', description: 'OPFS path relative to /files/ (e.g. "sandpie/scripts/foo.py").' },
         offset: { type: 'integer', description: '1-based line to start at (default 1). Use for paging / tail.' },
         limit:  { type: 'integer', description: 'Max lines to return (default 2000).' },
+        force:  { type: 'boolean', description: 'Re-emit the content even if unchanged since your last read of this exact range. Use only when the copy in your context is unusable (e.g. after a context summarization).' },
       },
       required: ['path'],
     },
