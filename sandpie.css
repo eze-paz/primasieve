@@ -641,11 +641,11 @@
   @keyframes ring-out-d1 { 0%{ color: #334155; opacity: 0; } 25%{ color: var(--sp-accent); opacity: 0.8; filter: drop-shadow(0 0 2px currentColor); } 85%{ color: #334155; opacity: 0; } 100%{ opacity: 0; } }
   @keyframes ring-out-d2 { 0%{ color: #334155; opacity: 0; } 25%{ color: #334155; opacity: 0; } 45%{ color: var(--sp-accent); opacity: 0.7; filter: drop-shadow(0 0 2px currentColor); } 90%{ color: #334155; opacity: 0; } 100%{ opacity: 0; } }
   @keyframes ring-center { 0%,100%{ color: var(--sp-accent); opacity: 1; } 50%{ color: var(--sp-accent); opacity: 0.5; } }
-  .msg-timer .mt-nn.thinking svg .r1 { animation: ring-out 1.6s ease-out infinite; }
-  .msg-timer .mt-nn.thinking svg .r2 { animation: ring-out-d1 1.6s ease-out infinite; }
-  .msg-timer .mt-nn.thinking svg .r3 { animation: ring-out-d2 1.6s ease-out infinite; }
-  .msg-timer .mt-nn.thinking svg .r-c { animation: ring-center 1.6s ease-in-out infinite; }
-  .msg-timer .mt-nn.thinking { opacity: 1; color: var(--sp-accent); }
+  .msg-timer .mt-nn.thinking svg .r1, .msg-timer .mt-nn.streaming svg .r1 { animation: ring-out 1.6s ease-out infinite; }
+  .msg-timer .mt-nn.thinking svg .r2, .msg-timer .mt-nn.streaming svg .r2 { animation: ring-out-d1 1.6s ease-out infinite; }
+  .msg-timer .mt-nn.thinking svg .r3, .msg-timer .mt-nn.streaming svg .r3 { animation: ring-out-d2 1.6s ease-out infinite; }
+  .msg-timer .mt-nn.thinking svg .r-c, .msg-timer .mt-nn.streaming svg .r-c { animation: ring-center 1.6s ease-in-out infinite; }
+  .msg-timer .mt-nn.thinking, .msg-timer .mt-nn.streaming { opacity: 1; color: var(--sp-accent); }
   /* The timer bar NEVER hides. An idle slot is filled by JS with a real-looking
      placeholder (nn icon · idle · 0s · – ctx), dimmed via .done — see
      _fillPlaceholderTimer in conversations.js. No bare-text fallback here. */

@@ -5759,6 +5759,12 @@ function startTotalTimer(stream) {
       slot.innerHTML = _LIVE_TIMER_HTML();
       _wireCtxCounter(slot, stream.id);
     }
+    // Ripple while a completion is actively streaming (respond()/plain content),
+    // not only while a thought box is open. `generating` is the single source of
+    // truth — true from send until the stream ends/aborts — re-asserted each tick
+    // because the live line may have just been rebuilt above.
+    const _snn = slot.querySelector('.mt-nn');
+    if (_snn) _snn.classList.toggle('streaming', !!stream.generating);
     set(slot.querySelector('.mt-time'), fmtElapsed((Date.now() - stream.timerStart) / 1000));
     const todosEl = slot.querySelector('.mt-todos');
     if (todosEl) {
