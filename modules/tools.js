@@ -2,7 +2,7 @@
 
 const tools = {
   run_python: {
-    description: `Execute a Python script from OPFS via Pyodide. Working dir is /files/ (persistent).
+    description: `Execute a Python script from OPFS via Pyodide. The script runs with its OWN folder as the working directory (like \`python script.py\`), so a relative save — doc.save("out.docx"), open("out.csv","w") — lands NEXT TO the script (e.g. projects/<project>/out.docx), not at the /files root. Use a path relative to the script, or an absolute /files/… path, and show_artifact that same path.
 REQUIRED: path must point to a script already saved in OPFS. Save task scripts in the MOST RELEVANT folder for the job — e.g. projects/<project>/… or the folder whose data the task acts on — so scripts sit next to what they operate on. (Reusable system instruments may live in sandpie/scripts/; the sandbox sandpie/ is otherwise system-only.) Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it blocks this run's interpreter and burns the timeout) — use await asyncio.sleep(n).

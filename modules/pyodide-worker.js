@@ -1437,6 +1437,14 @@ async function tool_run_python({ path, args }) {
       if (normPath) {
         self._sandpie_argv = [normPath, ...scriptArgs];
         try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
+        // Run WITH the script's own folder as cwd — like `python script.py` does —
+        // so a relative save (doc.save("out.docx")) lands NEXT TO the script, not
+        // at the /files root where the model then can't find it. Restored to
+        // /files in the finally so the pooled interpreter stays consistent.
+        const _slash = normPath.lastIndexOf('/');
+        const _scriptDir = '/files' + (_slash > 0 ? '/' + normPath.slice(0, _slash) : '');
+        try { p.FS.mkdirTree(_scriptDir); } catch (_) {}
+        try { p.runPython('import os; os.chdir(' + JSON.stringify(_scriptDir) + ')'); } catch (_) {}
       }
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       _capReset(); _capActive = true;
@@ -1472,6 +1480,9 @@ async function tool_run_python({ path, args }) {
       return { result: 'Error: ' + (msg || 'unknown (no message)') + (src ? '\n\n--- ' + normPath + ' (around the error) ---\n' + src : '') + tail };
     } finally {
       _capActive = false;
+      // Restore cwd to /files: the interpreter is pooled and reused, and the OPFS
+      // lazy-mount/hydration logic assumes /files is the working directory.
+      try { p && p.runPython('import os; os.chdir("/files")'); } catch (_) {}
       try { p && p.setStdout({}); } catch (_) {}
       try { p && p.setStderr({}); } catch (_) {}
     }

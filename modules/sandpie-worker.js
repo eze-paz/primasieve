@@ -353,7 +353,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=9', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=10', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -636,6 +636,12 @@ function truncateToolResult(result) {
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
 async function tool_run_python({ path, args, timeout }, ctx) {
   if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
+  // A script can write or delete any files (os.remove, doc.save, _cleanup.py, …)
+  // that the worker never sees individually, so drop the whole read/refusal cache:
+  // a stale "unchanged, work from your copy" stub for a file Python just rewrote or
+  // deleted is exactly what sent an earlier session into a rebuild loop. The cache
+  // is tiny; over-clearing only costs one honest re-emit on the next read.
+  _emittedFileHashes.clear();
   return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal });
 }
 
@@ -1256,6 +1262,18 @@ async function opfsCollect(startRel, { recursive = false, includeDirs = false, m
 // and re-emits in full. Cleared on mid-turn compaction — the earlier copy may
 // have been summarized away, so the next read must re-emit.
 const _emittedFileHashes = new Map();
+// Drop every cached read/refusal hash for one path (any offset/limit range and
+// the refusal-echo key). MUST run whenever a path's content could have changed
+// out from under the cache — write_file, edit_file, delete_file, run_python —
+// otherwise a later read_file returns "unchanged, work from your copy" for a
+// file that was in fact deleted or rewritten, and the model can't recover it.
+// Keys are `conv|path|suffix`; matching `|path|` is exact (a prefix like `foo`
+// won't match `foobar` thanks to the trailing separator).
+function _invalidateFileCache(norm) {
+  if (!norm) return;
+  const needle = '|' + norm + '|';
+  for (const k of _emittedFileHashes.keys()) if (k.includes(needle)) _emittedFileHashes.delete(k);
+}
 function _fnv1a(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
@@ -3213,6 +3231,7 @@ async function tool_write_file({ path, content, overwrite, _conv }) {
   } catch (_) {}
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
+    _invalidateFileCache(norm);   // content changed → a re-read must re-emit, not stub
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
     self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
     // Keep the Pyodide pool's MEMFS coherent with this OPFS write so a following
@@ -3245,6 +3264,7 @@ async function tool_delete_file({ path, recursive }) {
     let dir = root;
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: false });
     await dir.removeEntry(name, { recursive: !!recursive });
+    _invalidateFileCache(norm);   // gone → a re-read must NOT claim "unchanged, in your context"
     self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [norm] } });
     return { result: `Deleted: ${norm}` };
   } catch (e) {
@@ -3381,6 +3401,7 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
   if (res.error) return { result: res.error };
   try {
     await opfsWriteBytes(norm, new TextEncoder().encode(res.updated));
+    _invalidateFileCache(norm);   // content changed → a re-read must re-emit, not stub
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
     self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
     _pyBroadcast({ type: 'fs-changed', rel: norm });

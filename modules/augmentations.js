@@ -154,7 +154,19 @@
     // Path-shape filter: cleans any pre-existing junk entries (21, len, panic!,
     // {, {:#x}) written before the _shellFileTargets fix, so they never reach the
     // prompt. The stored file self-heals via its 50-cap as real paths push them out.
-    const paths = (await getRecentPaths()).filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)));
+    const shaped = (await getRecentPaths())
+      .filter(p => typeof p === 'string' && (p.includes('/') || /\.[A-Za-z0-9]{1,8}$/.test(p)))
+      .map(p => p.replace(/^\/+/, '').replace(/^files\//, ''))
+      .slice(0, 40);
+    // EXISTENCE filter: only inject paths that STILL resolve in OPFS. Recorded
+    // paths include the model's own typos (a hyphen/underscore variant, a slash
+    // that became a hyphen) and since-deleted files; feeding those back makes the
+    // model chase a path that never existed. Checked in parallel; on a transient
+    // lookup error keep the path rather than lose real data.
+    const checked = await Promise.all(shaped.map(async p => {
+      try { return (await opfs.exists(p)) ? p : null; } catch (_) { return p; }
+    }));
+    const paths = checked.filter(Boolean);
     if (paths.length) {
       block += '\n\n## Recent paths\n\nFiles touched recently:\n' + paths.map(p => '- ' + p).join('\n') + '\n';
     }
