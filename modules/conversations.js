@@ -3069,6 +3069,37 @@ function addMsg(role, text = '', host = null, animate = false) {
       bubble.textContent = text;
     }
     div.appendChild(bubble);
+    if (role === 'assistant') {
+      // Hover-reveal copy action: copy this reply as plain text.
+      const acts = document.createElement('div');
+      acts.className = 'msg-actions';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'act-copy';
+      copy.title = 'Copy this reply';
+      copy.setAttribute('aria-label', 'Copy this reply');
+      copy.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>';
+      copy.addEventListener('click', () => {
+        const bub = div.querySelector(':scope > .bubble');
+        const text = (bub ? bub.innerText : div.innerText).trim();
+        const NL = String.fromCharCode(10);
+        const parts = text.split(NL);
+        const out = [];
+        for (let i = 0; i < parts.length; i++) {
+          const ln = parts[i].trim();
+          if (ln) { out.push(ln); continue; }
+          if (out.length && out[out.length-1]) out.push('');
+        }
+        navigator.clipboard.writeText(out.join(NL)).then(() => {
+          copy.classList.add('done');
+          const prev = copy.innerHTML;
+          copy.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+          setTimeout(() => { copy.innerHTML = prev; copy.classList.remove('done'); }, 1300);
+        }).catch(() => {});
+      });
+      acts.appendChild(copy);
+      div.appendChild(acts);
+    }
   }
   if (role === 'user' && animate) {
     // LIVE user bubble (Enter-to-send only — load replays pass animate=false):

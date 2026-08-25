@@ -435,6 +435,20 @@
   .assistant .bubble {
     display: block;
   }
+
+  /* Hover-reveal copy action under assistant replies */
+  .msg-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 0; transition: opacity 0.12s ease; }
+  .assistant:hover > .msg-actions, .msg-actions:focus-within { opacity: 1; }
+  @media (hover: none) { .msg-actions { opacity: 1; } }
+  .msg-actions .act-copy {
+    width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+    background: transparent; border: 1px solid transparent; border-radius: 6px;
+    color: var(--sp-text-dim); cursor: pointer;
+    transition: color 0.1s, background 0.1s, border-color 0.1s;
+  }
+  .msg-actions .act-copy svg { width: 14px; height: 14px; fill: currentColor; }
+  .msg-actions .act-copy:hover { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-border-bright); }
+  .msg-actions .act-copy.done { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-accent); }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
   .info { align-self: center; color: var(--sp-text-dim); font-style: italic; font-size: 0.85em; }
   .assistant > *:first-child { margin-top: 0; }
