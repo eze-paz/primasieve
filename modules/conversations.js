@@ -482,7 +482,11 @@ function renderHistoricalMessage(m, host = null) {
       m.content.filter(p => p.type === 'text').map(p => p.text).join('');
     if (contentStr && contentStr.trim()) {
       const div = addMsg('assistant', '', host);
-      div.innerHTML = renderMd(contentStr);
+      // Render INTO the bubble span addMsg left empty, so the hover copy
+      // strip it appended stays a sibling — historical and live replies
+      // keep the same DOM shape (.bubble + .msg-actions).
+      const bub = div.querySelector(':scope > .bubble') || div;
+      bub.innerHTML = renderMd(contentStr);
       hydrateLocalRefs(div);
       bindBubble(div, m);
     }
