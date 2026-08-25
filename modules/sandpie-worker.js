@@ -731,12 +731,20 @@ async function tool_write_todos({ ops, todos }, ctx) {
           tree.push(task); byId.set(task.id, task); order.push(task); addedIds.push(task.id);
         }
       }
-      // KEEP (and report) open tasks the incoming list omitted — never drop live work.
-      const keptOpen = [];
+      // (FIX 2) A full-list replacement is authoritative: open tasks the new list
+      // omits are DROPPED (marked deleted + detached from blockers) and reported,
+      // so a clobber is never silent, but a full re-type of the list still
+      // replaces the old one. Completed tasks stay on the record.
+      const dropped = [];
       for (const t of tree) {
         if (t.status === 'deleted' || matched.has(t.id) || order.includes(t)) continue;
-        if (_TODO_OPEN.has(t.status)) keptOpen.push(t.id);
-        order.push(t);
+        if (_TODO_OPEN.has(t.status)) {
+          t.status = 'deleted'; t.deleted = now;
+          for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
+          dropped.push(t.id);
+        } else {
+          order.push(t);
+        }
       }
       // Rebuild in reconciled order (ids stay stable), deleted tasks kept on record.
       const deletedTasks = tree.filter(t => t.status === 'deleted');
@@ -753,7 +761,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       const liveR = tree.filter(t => t.status !== 'deleted').length;
       let outR = 'todos:' + JSON.stringify(tree) + '\nChecklist reconciled to your list (' + doneR + ' done, ' + openCount() + ' open, ' + liveR + ' total'
         + (addedIds.length ? ' · added ' + addedIds.join(', ') : '') + '):\n' + _todoSummary(tree);
-      if (keptOpen.length) outR += '\n\nKept ' + keptOpen.length + ' open task(s) you did not restate: ' + keptOpen.join(', ') + ' — still active. If they are done or dropped, remove them with {"ops":[{"op":"delete","id":"…"}]}.';
+      if (dropped.length) outR += '\n\nDROPPED ' + dropped.length + ' open task(s) this replacement omitted: ' + dropped.join(', ') + ' — send them again (full list or {"op":"add"}) if you meant to keep them.';
       return { result: outR };
     }
     tree.length = 0; byId.clear();
@@ -797,6 +805,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
   }
 
   const errs = [], added = [], pausedNow = [];
+  const ID_OPS = ['start', 'pause', 'complete', 'delete', 'block', 'unblock', 'blocked'];
   for (const op of ops) {
     const k = op && op.op;
     if (k === 'add') {
@@ -812,10 +821,24 @@ async function tool_write_todos({ ops, todos }, ctx) {
       if (typeof op.activeForm === 'string' && op.activeForm.trim()) task.activeForm = op.activeForm.trim();
       { const e = _todoEst(op.est); if (e) task.est = e; }
       tree.push(task); byId.set(task.id, task); added.push(task.id);
-    } else if (k === 'start' || k === 'complete' || k === 'delete' || k === 'block' || k === 'unblock' || k === 'blocked') {
-      const t = byId.get(op.id);
-      if (!t) { errs.push(k + ': unknown id "' + op.id + '"'); continue; }
+    } else if (ID_OPS.includes(k)) {
+      // (FIX 1) An id-requiring op needs a real "id". The common model error is
+      // {"op":"start","text":"1"} — "text" is only legal on "add" — which used
+      // to fall through to `unknown id "undefined"` and get retried forever.
+      // Say exactly what is wrong so the model can fix it.
+      if (op.id == null || op.id === '') {
+        const hint = (op.text != null && op.text !== '') ? ('you sent it as "text":"' + String(op.text).slice(0, 24) + '"') : ('no "id" field at all');
+        errs.push(k + ': needs the checklist number in the "id" field — ' + hint + ' ("text" only works on "add"). Use {"op":"' + k + '","id":"<number shown in checklist>"}.');
+        continue;
+      }
+      const tid = String(op.id);
+      const t = byId.get(tid);
+      if (!t) { errs.push(k + ': there is no task with id "' + tid + '" — use the numbers the checklist shows (add it first if needed).'); continue; }
       if (k === 'start') {
+        // (FIX 3) Starting the ALREADY-active task is a calm no-op, not an error.
+        // A rejection on "start" of the current task just made the model ping-pong.
+        // (Single-active rule still auto-pauses a DIFFERENT active task.)
+        if (t.status === 'in_progress') continue;
         if (t.status !== 'pending' && t.status !== 'blocked') { errs.push('start "' + op.id + '": only a pending or blocked task can start (is ' + t.status + ')'); continue; }
         // Ordering is enforced by blockers, not by a one-at-a-time lock: a task
         // cannot start while any task in its blockedBy is still open.
