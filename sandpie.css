@@ -436,10 +436,8 @@
     display: block;
   }
 
-  /* Hover-reveal copy action under assistant replies */
-  .msg-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 0; transition: opacity 0.12s ease; }
-  .assistant:hover > .msg-actions, .msg-actions:focus-within { opacity: 1; }
-  @media (hover: none) { .msg-actions { opacity: 1; } }
+  /* Copy action under assistant replies (always visible) */
+  .msg-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 1; }
   .msg-actions .act-copy {
     width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
     background: transparent; border: 1px solid transparent; border-radius: 6px;
