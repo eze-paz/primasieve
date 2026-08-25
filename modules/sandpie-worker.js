@@ -870,6 +870,122 @@ async function tool_write_todos({ ops, todos }, ctx) {
   return { result: out };
 }
 
+// ── Deliverable localization (worker side) ──────────────────────────────────
+// The model authors deliverables in ENGLISH (system directive). When the
+// conversation has a localize target, show_artifact translates the deliverable's
+// TEXT into the user's language so the delivered FILE matches. Fail-OPEN: on any
+// error the English file is kept and shown. Text formats are handled directly;
+// .docx is round-tripped through python-docx (per paragraph, so paragraph styles
+// like Heading survive — intra-paragraph run formatting is not preserved).
+const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
+async function _wLocalize(texts, ctx) {
+  if (!Array.isArray(texts) || !texts.length) return texts;
+  const cfg = ctx && ctx._agentConfig;
+  if (!cfg || !cfg.url) return texts;
+  const loc = ctx._localize || {};
+  const tgt = loc.name || loc.code || 'the target language';
+  const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
+  const CHUNK = 50;   // keep each request modest (upstream body cap ~1MB)
+  const out = [];
+  for (let i = 0; i < texts.length; i += CHUNK) {
+    const slice = texts.slice(i, i + CHUNK);
+    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
+    let arr = null;
+    try {
+      const r = await fetch(cfg.url, { method: 'POST', headers: Object.assign({}, cfg.headers, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+      const j = await r.json();
+      let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
+      content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+      arr = JSON.parse(content);
+    } catch (e) { console.warn('[wLocalize] chunk failed (keeping English):', (e && e.message) || e); }
+    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
+  }
+  return out;
+}
+const _DOCX_LX_EXTRACT = `import sys, json
+try:
+    from docx import Document
+except ImportError:
+    import micropip; await micropip.install('python-docx'); from docx import Document
+d = Document('/files/' + sys.argv[1])
+out = []
+def para_text(p):
+    return ''.join(r.text for r in p.runs)
+for p in d.paragraphs:
+    t = para_text(p)
+    if t.strip(): out.append(t)
+for tbl in d.tables:
+    for row in tbl.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                t = para_text(p)
+                if t.strip(): out.append(t)
+print('<<<LXJSON>>>' + json.dumps(out, ensure_ascii=False))
+`;
+const _DOCX_LX_REINJECT = `import sys, json
+try:
+    from docx import Document
+except ImportError:
+    import micropip; await micropip.install('python-docx'); from docx import Document
+d = Document('/files/' + sys.argv[1])
+tr = json.load(open('/files/' + sys.argv[2]))
+it = iter(tr)
+def setp(p):
+    t = ''.join(r.text for r in p.runs)
+    if t.strip():
+        try: nt = next(it)
+        except StopIteration: return
+        if p.runs:
+            p.runs[0].text = nt
+            for r in p.runs[1:]: r.text = ''
+for p in d.paragraphs: setp(p)
+for tbl in d.tables:
+    for row in tbl.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs: setp(p)
+d.save('/files/' + sys.argv[1])
+print('LXOK')
+`;
+async function _localizeArtifact(path, ctx) {
+  const loc = ctx && ctx._localize;
+  if (!loc || !loc.code) return;
+  // Idempotency: never translate the same deliverable twice (a re-show, or an
+  // already-Catalan file), which would garble it (EN→CA on Catalan text).
+  ctx._localizedArtifacts = ctx._localizedArtifacts || new Set();
+  if (ctx._localizedArtifacts.has(path)) return;
+  ctx._localizedArtifacts.add(path);
+  const lower = String(path).toLowerCase();
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  try {
+    if (/\.(md|markdown|txt|html?|csv)$/.test(lower)) {
+      const text = dec.decode(await opfsReadBytes(path));
+      const blocks = text.split(/(\n{2,})/);   // keep separators
+      const idx = [], toTr = [];
+      blocks.forEach((b, i) => { if (b.trim() && !/^\s+$/.test(b)) { idx.push(i); toTr.push(b); } });
+      if (!toTr.length) return;
+      const tr = await _wLocalize(toTr, ctx);
+      idx.forEach((bi, k) => { blocks[bi] = tr[k]; });
+      await opfsWriteBytes(path, enc.encode(blocks.join('')));
+      return;
+    }
+    if (/\.docx$/.test(lower)) {
+      const sig = ctx && ctx.signal;
+      await opfsWriteBytes('sandpie/scripts/_lx_extract.py', enc.encode(_DOCX_LX_EXTRACT));
+      const ex = await dispatchPython({ path: 'sandpie/scripts/_lx_extract.py', args: [path], timeout: 120, signal: sig });
+      const raw = String(ex && ex.result || '');
+      const m = raw.indexOf('<<<LXJSON>>>');
+      if (m < 0) { console.warn('[localizeArtifact] docx extract failed:', raw.slice(0, 160)); return; }
+      let texts; try { texts = JSON.parse(raw.slice(m + 12).trim()); } catch (_) { return; }
+      if (!Array.isArray(texts) || !texts.length) return;
+      const tr = await _wLocalize(texts, ctx);
+      await opfsWriteBytes('sandpie/scripts/_lx_tr.json', enc.encode(JSON.stringify(tr)));
+      await opfsWriteBytes('sandpie/scripts/_lx_reinject.py', enc.encode(_DOCX_LX_REINJECT));
+      await dispatchPython({ path: 'sandpie/scripts/_lx_reinject.py', args: [path, 'sandpie/scripts/_lx_tr.json'], timeout: 120, signal: sig });
+      return;
+    }
+  } catch (e) { console.warn('[localizeArtifact] failed (keeping English):', (e && e.message) || e); }
+}
+
 async function tool_show_artifact({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const clean = String(path).replace(/^\/+/, '');
@@ -880,8 +996,15 @@ async function tool_show_artifact({ path }, ctx) {
   if (!clean.startsWith('sandpie/')) candidates.push('sandpie/' + clean);
   else candidates.push(clean.slice('sandpie/'.length));
   for (const p of candidates) {
-    try { await opfsReadBytes(p); return { result: 'artifact:' + p }; } catch (_) {}
-    if (_indexEntry(p)) { try { await hydrateAsync(p); return { result: 'artifact:' + p }; } catch (_) {} }
+    let found = false;
+    try { await opfsReadBytes(p); found = true; } catch (_) {}
+    if (!found && _indexEntry(p)) { try { await hydrateAsync(p); found = true; } catch (_) {} }
+    if (found) {
+      // Localize the deliverable in place (its text → the user's language) when
+      // the conversation is authored-in-English. Fail-open; never blocks the show.
+      if (ctx && ctx._localize) { try { await _localizeArtifact(p, ctx); } catch (_) {} }
+      return { result: 'artifact:' + p };
+    }
   }
   return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
 }
@@ -2782,6 +2905,10 @@ async function runAgent(config, ctx) {
   ctx._authRefreshUrl = config.authRefreshUrl || null;
   // Relay base URL for the `shell` tool (worker has no localStorage).
   ctx._shellRelayUrl = config.shellRelayUrl || 'http://localhost:8765';
+  // Localization target ({code,name}) for this turn, or null. When set, a
+  // deliverable shown via show_artifact is localized (its text translated) so the
+  // user's file is in their language, while the model authored it in English.
+  ctx._localize = config.localize || null;
   // Seed the task list from the persisted checklist (page passes config.todos).
   // Migrate legacy items: flat items (no id) → sequential ids; the retired
   // 'withdrawn' status → 'deleted'; drop dead tree/evidence/audit fields.

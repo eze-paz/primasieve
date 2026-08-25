@@ -2150,7 +2150,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=125');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=126');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2679,9 +2679,15 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     }
   }
   const _ep = (effective && effective.endpoint) ? String(effective.endpoint).replace(/\/$/, '') : $('endpoint').value.replace(/\/$/, '');
+  // Localization target for this turn: detected user language the active model
+  // can't generate. Drives the author-in-English directive, the display-side
+  // render hooks (_activeLocalize), and the worker's deliverable localization.
+  const _loc = await _resolveLocale(convMessages, effective);
+  _activeLocalize = _loc;
   return {
     url: new URL(api(_ep + '/chat/completions'), location.href).href,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
+    localize: _loc,
     // Managed (company sign-in) provider only: let the worker silently re-mint the
     // session token from the SSO cookie via /auth/token on a 401, so an expired JWT
     // never interrupts the user mid-generation. null for personal providers — a 401
@@ -2689,7 +2695,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     authRefreshUrl: (effective && effective.managed) ? new URL('/auth/token', location.href).href : null,
     _hermesMode: !!(effective && effective.type === 'hermes'),
     model: (effective && effective.model) || $('model').value,
-    systemPrompt: await buildSystemPrompt(convMessages),
+    systemPrompt: await buildSystemPrompt(convMessages, _loc),
     messages: resolvedMessages,
     tools: toolDefs(),
     // Rerouted to the vision fallback for this turn (user attached an image to a
@@ -3186,6 +3192,112 @@ function appendToolResult(tcId, result, scopeEl) {
 // result. Each write_todos call gets its own card attached to that call, so the
 // history reads as a running log of the plan; replay rebuilds each from the tool
 // message content.
+/* ── Localization (prototype): English is canonical — the model's context, the
+   stored todos, and file content stay English. User-facing text is localized on
+   DISPLAY ONLY and NEVER written back. Gated by window.__localizeTo={code,name}
+   (stands in for conv.localize until detection is wired). Fail-OPEN (show the
+   English on any error). Uses the internal localizer model from models.json. ── */
+const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
+const _localizeCache = new Map();   // 'code::text' -> translated
+async function localize(texts, to, toName) {
+  if (!Array.isArray(texts) || !texts.length) return texts;
+  const out = texts.slice();
+  const miss = [], missIdx = [];
+  texts.forEach((t, i) => {
+    if (typeof t !== 'string' || !t.trim()) return;
+    const key = to + '::' + t;
+    if (_localizeCache.has(key)) { out[i] = _localizeCache.get(key); return; }
+    miss.push(t); missIdx.push(i);
+  });
+  if (!miss.length) return out;
+  try {
+    const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
+    const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + (toName || to) + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + (toName || to) + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
+    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(miss) }], stream: false, temperature: 0 };
+    const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
+    const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
+    const j = await r.json();
+    let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
+    content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+    const arr = JSON.parse(content);
+    missIdx.forEach((oi, k) => { const tr = arr[k]; if (typeof tr === 'string') { out[oi] = tr; _localizeCache.set(to + '::' + texts[oi], tr); } });
+    return out;
+  } catch (e) { console.warn('[localize] failed (showing English):', e && e.message || e); return texts; }
+}
+// Localize a single user-facing string (bubbles/status). Returns English on failure.
+async function renderUserText(text, loc) {
+  if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) return text;
+  const [t] = await localize([text], loc.code, loc.name);
+  return t || text;
+}
+// Clone a todos array with DISPLAY text localized (content). Canonical is untouched.
+async function renderUserTodos(todos, loc) {
+  if (!loc || !loc.code) return todos;
+  try {
+    const arr = todos || [];
+    // Localize content + activeForm together (one call), then re-split.
+    const contents = arr.map(t => (t && t.content) || '');
+    const actives = arr.map(t => (t && t.activeForm) || '');
+    const tr = await localize(contents.concat(actives), loc.code, loc.name);
+    const n = arr.length;
+    return arr.map((t, i) => Object.assign({}, t, {
+      content: tr[i] || t.content,
+      activeForm: t.activeForm ? (tr[n + i] || t.activeForm) : t.activeForm,
+    }));
+  } catch (_) { return todos; }
+}
+
+/* ── Locale detection + resolution ──────────────────────────────────────────
+   Which language the user writes in, and whether the ACTIVE model can generate
+   it. If not, the conversation is authored in English and localized on output.
+   Conservative: detectLocale only flags a language we're confident about, so a
+   miss falls through to normal (English/fluent) behavior — never worse. ── */
+function detectLocale(text) {
+  if (typeof text !== 'string' || text.trim().length < 8) return null;
+  const t = ' ' + text.toLowerCase().replace(/\s+/g, ' ') + ' ';
+  // Strong, Catalan-specific signals (NOTE: avoid \b after accented letters — "à"
+  // is not an ASCII word char, so \b never matches there). Any strong signal, OR
+  // two distinctly-Catalan function words (not shared with Spanish), => Catalan.
+  const strong = /catal[aà]|l·l|·l|l\.l/.test(t);
+  const distinct = [' amb ', ' això ', ' també ', ' què ', ' perquè ', ' mitjançant ', ' nosaltres ', ' aquest ', ' aquesta ', ' però ', ' fins ', ' seva ', ' mateix ', ' aquests ', ' mentre ', ' tot i ', " d'", " l'", " s'"].filter(w => t.includes(w)).length;
+  if (strong || distinct >= 2) return { code: 'ca', name: 'Catalan' };
+  return null;
+}
+let _catalogCache = null;
+async function _catalog() {
+  if (_catalogCache) return _catalogCache;
+  try { _catalogCache = await (await fetch(new URL('/models', location.href).href, { credentials: 'same-origin' })).json(); }
+  catch (_) { _catalogCache = { models: [] }; }
+  return _catalogCache;
+}
+async function _fluentFor(modelId) {
+  const c = await _catalog();
+  const m = (c.models || []).find(x => x.id === modelId);
+  return (m && Array.isArray(m.fluent)) ? m.fluent : [];   // no fluent listed => English-only (localize non-English)
+}
+// Resolve the localization target for a conversation: the detected language IF
+// the active model can't generate it. window.__localizeTo overrides (testing).
+async function _resolveLocale(convMessages, effective) {
+  try {
+    if (typeof window !== 'undefined' && window.__localizeTo) return window.__localizeTo;
+    const firstUser = (convMessages || []).find(m => m && m.role === 'user');
+    if (!firstUser) return null;
+    const c = firstUser.content;
+    const txt = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '';
+    const det = detectLocale(txt);
+    if (!det) return null;
+    const model = (effective && effective.model) || ((typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {}).model;
+    const fluent = await _fluentFor(model);
+    if (fluent.includes(det.code)) return null;   // the active model handles this language natively
+    return det;
+  } catch (_) { return null; }
+}
+// The active conversation's locale, for the display-side render hooks. Set by
+// buildAgentConfig at send; window override wins for manual testing.
+let _activeLocalize = null;
+// window.__localizeTo is an optional manual override (testing / forcing a locale).
+function _currentLocale() { return (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || null; }
+
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
@@ -3210,6 +3322,21 @@ function renderTodos(tcId, todos, scopeEl) {
   const list = buildTodosView(todos || []);
   box.appendChild(sep);
   box.appendChild(list);
+
+  // Localization (display-only): re-render the checklist in the user's language.
+  // The canonical `todos` (what the model re-reads each turn) stays English.
+  const _loc = _currentLocale();
+  if (_loc && _loc.code && (todos || []).length) {
+    renderUserTodos(todos, _loc).then(loc => {
+      try {
+        if (loc && box.contains(list)) {
+          const l2 = buildTodosView(loc);
+          l2.className = list.className;
+          box.replaceChild(l2, list);
+        }
+      } catch (_) {}
+    });
+  }
 
   // Live timer badge: show current checklist progress in the active timer.
   const ip = (todos || []).findIndex(t => t && t.status === 'in_progress');
@@ -4104,10 +4231,21 @@ class RoundRenderer {
     // visibly streams into conv-host instead of popping in whole.
     if (typeof finalContent === 'string' && finalContent && !(this.content && this.content.trim())) {
       this._streamReveal = true;
-      this.content = finalContent;
+      this.content = finalContent;   // CANONICAL (English) — persisted/re-sent; never localized
       this.displayed = '';
-      this.pending = finalContent;
       this.toolsShouldClose = true;
+      // Localization: the user sees the reply in their language. We reveal the
+      // localized text (display only); this.content stays English so the model's
+      // own context is never poisoned. Fail-open to English.
+      const _loc = _currentLocale();
+      if (_loc && _loc.code) {
+        this.pending = '';
+        renderUserText(finalContent, _loc)
+          .then(tr => { this.pending = tr || finalContent; this._scheduleDrain(); })
+          .catch(() => { this.pending = finalContent; this._scheduleDrain(); });
+        return;
+      }
+      this.pending = finalContent;
       this._scheduleDrain();
       return;
     }
@@ -4698,7 +4836,7 @@ function toggleThoughts() {
 }
 
 /* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
-async function buildSystemPrompt(convMessages) {
+async function buildSystemPrompt(convMessages, localizeTarget) {
   // The system prompt is an editable value cached in localStorage (Settings →
   // System prompt) — NOT a synced or browsable OPFS file. The single DEFAULT
   // literal lives in system-prompt.js (SandpieSystemPrompt.DEFAULT); the
@@ -4760,6 +4898,21 @@ async function buildSystemPrompt(convMessages) {
   // That list reshuffles on every tool call, which churned the system prompt —
   // the cached-prefix killer. It now travels in config.volatileContext and is
   // injected by the worker at the END of each request instead.
+  // PROTOTYPE (localization): when the conversation targets a language the active
+  // model generates poorly, the model authors EVERYTHING in English and the
+  // harness localizes only at the render surfaces. English is canonical;
+  // localization is a pure display transform, never fed back into context.
+  try {
+    const _loc = localizeTarget || (typeof window !== 'undefined' && window.__localizeTo) || null;
+    if (_loc && _loc.name) {
+      content += '\n\n## Output language — author in English\n'
+        + 'The user writes in ' + _loc.name + ', and expects the final deliverables in ' + _loc.name + '. '
+        + 'But you MUST author EVERYTHING in ENGLISH — all reasoning, all document/file content, every todo item, and every reply to the user. '
+        + 'Do NOT write ' + _loc.name + ' yourself: you produce corrupted, garbled text when you generate it directly. '
+        + 'The system automatically translates your finished English deliverables and your replies into ' + _loc.name + ' for the user — that is handled for you, downstream, and is not your job. '
+        + 'Write clean, correct, professional English throughout, and build the document normally (e.g. python-docx with English content). Never second-guess the language; if you catch yourself writing ' + _loc.name + ', switch back to English.';
+    }
+  } catch (_) {}
   return { role: 'system', content };
 }
 
