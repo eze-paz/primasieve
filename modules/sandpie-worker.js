@@ -901,11 +901,26 @@ async function tool_write_todos({ ops, todos }, ctx) {
 // .docx is round-tripped through python-docx (per paragraph, so paragraph styles
 // like Heading survive — intra-paragraph run formatting is not preserved).
 const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
-async function _wLocalize(texts, ctx) {
+// Resolve an explicit per-deliverable `language` arg (BCP-47 / ISO code) into a
+// {code,name} locale for the translator. The page's Reply selector is the
+// default; this is ONLY the explicit override on a show_artifact / respond call.
+function _langName(code){
+  const c = String(code||'').split(/[-_]/)[0].toLowerCase();
+  const m = { en:'English',ca:'Catalan',es:'Spanish',fr:'French',de:'German',it:'Italian',pt:'Portuguese',nl:'Dutch',pl:'Polish',zh:'Chinese',ja:'Japanese',ko:'Korean',ru:'Russian',ar:'Arabic',hi:'Hindi',uk:'Ukrainian',tr:'Turkish',sv:'Swedish',no:'Norwegian',da:'Danish',fi:'Finnish',el:'Greek',cs:'Czech',hu:'Hungarian',ro:'Romanian',bg:'Bulgarian',he:'Hebrew',th:'Thai',vi:'Vietnamese',id:'Indonesian',ms:'Malay' };
+  return m[c] || c || 'English';
+}
+function _locFromOverride(code){
+  if (!code || !String(code).trim()) return null;
+  const cc = String(code).trim().split(/[-_]/)[0] || '';
+  if (!cc) return null;
+  return { code: cc, name: _langName(cc) };
+}
+
+async function _wLocalize(texts, ctx, target) {
   if (!Array.isArray(texts) || !texts.length) return texts;
   const cfg = ctx && ctx._agentConfig;
   if (!cfg || !cfg.url) return texts;
-  const loc = ctx._localize || {};
+  const loc = target || (ctx && ctx._localize) || {};
   const tgt = loc.name || loc.code || 'the target language';
   const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
   const CHUNK = 50;   // keep each request modest (upstream body cap ~1MB)
@@ -969,14 +984,15 @@ for tbl in d.tables:
 d.save('/files/' + sys.argv[1])
 print('LXOK')
 `;
-async function _localizeArtifact(path, ctx) {
-  const loc = ctx && ctx._localize;
+async function _localizeArtifact(path, ctx, target) {
+  const loc = target || (ctx && ctx._localize);
   if (!loc || !loc.code) return;
-  // Idempotency: never translate the same deliverable twice (a re-show, or an
-  // already-Catalan file), which would garble it (EN→CA on Catalan text).
+  // Idempotency per (path,language): never translate the same deliverable twice
+  // (a re-show, or an already-translated file), which would garble it.
   ctx._localizedArtifacts = ctx._localizedArtifacts || new Set();
-  if (ctx._localizedArtifacts.has(path)) return;
-  ctx._localizedArtifacts.add(path);
+  const lxKey = (target ? 'x:'+target.code : 'd:') + ':' + path;
+  if (ctx._localizedArtifacts.has(lxKey)) return;
+  ctx._localizedArtifacts.add(lxKey);
   const lower = String(path).toLowerCase();
   const enc = new TextEncoder(), dec = new TextDecoder();
   try {
@@ -986,7 +1002,7 @@ async function _localizeArtifact(path, ctx) {
       const idx = [], toTr = [];
       blocks.forEach((b, i) => { if (b.trim() && !/^\s+$/.test(b)) { idx.push(i); toTr.push(b); } });
       if (!toTr.length) return;
-      const tr = await _wLocalize(toTr, ctx);
+      const tr = await _wLocalize(toTr, ctx, target);
       idx.forEach((bi, k) => { blocks[bi] = tr[k]; });
       await opfsWriteBytes(path, enc.encode(blocks.join('')));
       return;
@@ -1000,7 +1016,7 @@ async function _localizeArtifact(path, ctx) {
       if (m < 0) { console.warn('[localizeArtifact] docx extract failed:', raw.slice(0, 160)); return; }
       let texts; try { texts = JSON.parse(raw.slice(m + 12).trim()); } catch (_) { return; }
       if (!Array.isArray(texts) || !texts.length) return;
-      const tr = await _wLocalize(texts, ctx);
+      const tr = await _wLocalize(texts, ctx, target);
       await opfsWriteBytes('sandpie/scripts/_lx_tr.json', enc.encode(JSON.stringify(tr)));
       await opfsWriteBytes('sandpie/scripts/_lx_reinject.py', enc.encode(_DOCX_LX_REINJECT));
       await dispatchPython({ path: 'sandpie/scripts/_lx_reinject.py', args: [path, 'sandpie/scripts/_lx_tr.json'], timeout: 120, signal: sig });
@@ -1009,8 +1025,9 @@ async function _localizeArtifact(path, ctx) {
   } catch (e) { console.warn('[localizeArtifact] failed (keeping English):', (e && e.message) || e); }
 }
 
-async function tool_show_artifact({ path }, ctx) {
+async function tool_show_artifact({ path, language }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
+  const _saOverride = _locFromOverride(language);   // explicit per-deliverable language (eq selector)
   const clean = String(path).replace(/^\/+/, '');
   // Legacy-path fallback: user files moved from /files/<dir>/ to /files/sandpie/<dir>/,
   // so old calls like "artifacts/x.html" resolve against the new prefix too (and
@@ -1023,9 +1040,10 @@ async function tool_show_artifact({ path }, ctx) {
     try { await opfsReadBytes(p); found = true; } catch (_) {}
     if (!found && _indexEntry(p)) { try { await hydrateAsync(p); found = true; } catch (_) {} }
     if (found) {
-      // Localize the deliverable in place (its text → the user's language) when
-      // the conversation is authored-in-English. Fail-open; never blocks the show.
-      if (ctx && ctx._localize) { try { await _localizeArtifact(p, ctx); } catch (_) {} }
+      // Localize the deliverable in place (its text → the user's language).
+      // Target = the explicit `language` argument, else the Reply selector. Fail-open.
+      const saTarget = _saOverride || (ctx && ctx._localize) || null;
+      if (saTarget && saTarget.code) { try { await _localizeArtifact(p, ctx, saTarget); } catch (_) {} }
       return { result: 'artifact:' + p };
     }
   }
@@ -3222,8 +3240,9 @@ async function runAgent(config, ctx) {
     const _stashAside = (t) => {
       if (t && t.trim()) round.reasoning_content = (round.reasoning_content ? round.reasoning_content + '\n\n' : '') + t;
     };
+    let respondLocaleOverride = null;
     if (respondCall) {
-      try { respondText = String(JSON.parse(respondCall.function.arguments || '{}').text ?? ''); }
+      try { const _a = JSON.parse(respondCall.function.arguments || '{}'); respondText = String(_a.text ?? ''); respondLocaleOverride = _locFromOverride(_a.language); }
       catch (_) { respondText = ''; }
       _stashAside(round.content);                        // keep any non-respond prose as thinking
       round.content = respondText;                       // the visible reply IS respond's text
@@ -3235,7 +3254,7 @@ async function runAgent(config, ctx) {
       round.content = '';                                // bare prose attempt — hide it; we'll force respond() below
       _forceRespondRetry = true;
     }
-    ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls });
+    ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls, locale: respondLocaleOverride || undefined });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
     if (!round.tool_calls.length) {

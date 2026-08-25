@@ -139,6 +139,7 @@ Typical flow:
       type: 'object',
       properties: {
         path: { type: 'string', description: 'OPFS path to the file (e.g. "projects/<project>/chart.html"). No leading slash.' },
+        language: { type: 'string', description: 'The language this deliverable file should be delivered in (e.g. "ca", "es", "en"). Defaults to the user\'s Reply language. Set ONLY when the user explicitly asked for this file in a specific language.' },
       },
       required: ['path'],
     },
@@ -437,6 +438,7 @@ WHEN: as the last thing you do in a turn — once the task is done, or to answer
         type: 'object',
         properties: {
           text: { type: 'string', description: 'Your complete user-facing reply, in the user\'s language. Markdown supported. Shown to the user exactly as written.' },
+          language: { type: 'string', description: 'The language the reply should be delivered in (e.g. "ca", "es", "en"). Defaults to the user\'s Reply language. Set ONLY when the user explicitly asked for this reply in a specific language.' },
         },
         required: ['text'],
       },

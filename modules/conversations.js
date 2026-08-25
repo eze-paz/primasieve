@@ -2682,7 +2682,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   // Localization target for this turn: detected user language the active model
   // can't generate. Drives the author-in-English directive, the display-side
   // render hooks (_activeLocalize), and the worker's deliverable localization.
-  const _loc = await _resolveLocale(convMessages, effective);
+  const _loc = _replyLocale();
   _activeLocalize = _loc;
   return {
     url: new URL(api(_ep + '/chat/completions'), location.href).href,
@@ -2898,7 +2898,7 @@ function dispatchAgentEvent(ev, renderer, host) {
     case 'round_start':   return renderer.startRound();
     case 'round_retry':   return renderer.retryRound();
     case 'delta':         return renderer.applyDelta(ev.delta);
-    case 'round_end':     return renderer.endRound(ev.content);
+    case 'round_end':     return renderer.endRound(ev.content, ev.locale);
     case 'message_added': {
       // Worker-side persistence: the event carries the worker's running JSONL
       // line count — keep the page's persistedCount in lockstep so the turn-end
@@ -3247,56 +3247,30 @@ async function renderUserTodos(todos, loc) {
   } catch (_) { return todos; }
 }
 
-/* ── Locale detection + resolution ──────────────────────────────────────────
-   Which language the user writes in, and whether the ACTIVE model can generate
-   it. If not, the conversation is authored in English and localized on output.
-   Conservative: detectLocale only flags a language we're confident about, so a
-   miss falls through to normal (English/fluent) behavior — never worse. ── */
-function detectLocale(text) {
-  if (typeof text !== 'string' || text.trim().length < 8) return null;
-  const t = ' ' + text.toLowerCase().replace(/\s+/g, ' ') + ' ';
-  // Strong, Catalan-specific signals (NOTE: avoid \b after accented letters — "à"
-  // is not an ASCII word char, so \b never matches there). Any strong signal, OR
-  // two distinctly-Catalan function words (not shared with Spanish), => Catalan.
-  const strong = /catal[aà]|l·l|·l|l\.l/.test(t);
-  const distinct = [' amb ', ' això ', ' també ', ' què ', ' perquè ', ' mitjançant ', ' nosaltres ', ' aquest ', ' aquesta ', ' però ', ' fins ', ' seva ', ' mateix ', ' aquests ', ' mentre ', ' tot i ', " d'", " l'", " s'"].filter(w => t.includes(w)).length;
-  if (strong || distinct >= 2) return { code: 'ca', name: 'Catalan' };
-  return null;
-}
-let _catalogCache = null;
-async function _catalog() {
-  if (_catalogCache) return _catalogCache;
-  try { _catalogCache = await (await fetch(new URL('/models', location.href).href, { credentials: 'same-origin' })).json(); }
-  catch (_) { _catalogCache = { models: [] }; }
-  return _catalogCache;
-}
-async function _fluentFor(modelId) {
-  const c = await _catalog();
-  const m = (c.models || []).find(x => x.id === modelId);
-  return (m && Array.isArray(m.fluent)) ? m.fluent : [];   // no fluent listed => English-only (localize non-English)
-}
-// Resolve the localization target for a conversation: the detected language IF
-// the active model can't generate it. window.__localizeTo overrides (testing).
-async function _resolveLocale(convMessages, effective) {
+/* == Reply-language resolution ================================================
+   The Reply language is the SOLE authority for the language sandpie replies in and
+   delivers files in. It comes from the Account-picker selector (SandpieLanguage: an
+   explicit choice, or the browser/OS language auto-selected once on first run, then
+   editable). NOTHING is auto-detected from message content - a message that merely
+   mentions another language must NEVER change it. The only per-deliverable override is
+   an explicit 'language' argument on a respond / show_artifact call, applied at delivery.
+   ---------------------------------------------------------------------------------- */
+function _replyLocale() {
   try {
-    if (typeof window !== 'undefined' && window.__localizeTo) return window.__localizeTo;
-    const firstUser = (convMessages || []).find(m => m && m.role === 'user');
-    if (!firstUser) return null;
-    const c = firstUser.content;
-    const txt = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '';
-    const det = detectLocale(txt);
-    if (!det) return null;
-    const model = (effective && effective.model) || ((typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {}).model;
-    const fluent = await _fluentFor(model);
-    if (fluent.includes(det.code)) return null;   // the active model handles this language natively
-    return det;
-  } catch (_) { return null; }
+    if (typeof window === 'undefined') return { code: 'en', name: 'English' };
+    const SL = window.SandpieLanguage;
+    const eff = (SL && SL.effective && SL.effective()) || 'en';
+    const code = String(eff).split(/[-_]/)[0] || 'en';
+    const nm = (SL && SL.name && SL.name(code)) || (code === 'en' ? 'English' : code);
+    return { code: code, name: nm };
+  } catch (_) { return { code: 'en', name: 'English' }; }
 }
+
 // The active conversation's locale, for the display-side render hooks. Set by
 // buildAgentConfig at send; window override wins for manual testing.
 let _activeLocalize = null;
 // window.__localizeTo is an optional manual override (testing / forcing a locale).
-function _currentLocale() { return (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || null; }
+function _currentLocale(override) { return override || (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || null; }
 
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
@@ -4222,7 +4196,7 @@ class RoundRenderer {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
     }
   }
-  endRound(finalContent) {
+  endRound(finalContent, localeOverride) {
     this._finishThinking();
     // CASE A - the reply from a respond()/cloud turn. The worker delivers the whole
     // ready answer in ONE hunk (cloud deltas go to the reasoning box, never into
@@ -4237,7 +4211,7 @@ class RoundRenderer {
       // Localization: the user sees the reply in their language. We reveal the
       // localized text (display only); this.content stays English so the model's
       // own context is never poisoned. Fail-open to English.
-      const _loc = _currentLocale();
+      const _loc = _currentLocale(localeOverride);
       if (_loc && _loc.code) {
         this.pending = '';
         renderUserText(finalContent, _loc)
@@ -4898,20 +4872,19 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   // That list reshuffles on every tool call, which churned the system prompt —
   // the cached-prefix killer. It now travels in config.volatileContext and is
   // injected by the worker at the END of each request instead.
-  // PROTOTYPE (localization): when the conversation targets a language the active
-  // model generates poorly, the model authors EVERYTHING in English and the
-  // harness localizes only at the render surfaces. English is canonical;
-  // localization is a pure display transform, never fed back into context.
+    // Reply-language directive - UNCONDITIONAL. English is the canonical authoring
+  // language for ALL internal work (models run at full capacity only in English);
+  // the Reply selector (or an explicit per-deliverable `language` argument) is
+  // applied at the delivery surface only, so no internal output is ever authored
+  // in the target language.
   try {
-    const _loc = localizeTarget || (typeof window !== 'undefined' && window.__localizeTo) || null;
-    if (_loc && _loc.name) {
-      content += '\n\n## Output language — author in English\n'
-        + 'The user writes in ' + _loc.name + ', and expects the final deliverables in ' + _loc.name + '. '
-        + 'But you MUST author EVERYTHING in ENGLISH — all reasoning, all document/file content, every todo item, and every reply to the user. '
-        + 'Do NOT write ' + _loc.name + ' yourself: you produce corrupted, garbled text when you generate it directly. '
-        + 'The system automatically translates your finished English deliverables and your replies into ' + _loc.name + ' for the user — that is handled for you, downstream, and is not your job. '
-        + 'Write clean, correct, professional English throughout, and build the document normally (e.g. python-docx with English content). Never second-guess the language; if you catch yourself writing ' + _loc.name + ', switch back to English.';
-    }
+    const _rl = _replyLocale();
+    const _nm = (_rl && _rl.name) || 'English';
+    content += "\n\n## Deliver in " + _nm + ", author in English\n"
+      + "The user reads chat and deliverables in " + _nm + ". "
+      + "You MUST author ALL internal content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, and your own reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
+      + "The system automatically translates your finished reply (respond) and your delivered deliverables (show_artifact) into " + _nm + " for the user; that is handled downstream and is not your job. "
+      + "To have ONE specific deliverable or reply in a different language, pass that explicit language on the respond or show_artifact call (e.g. language: 'ca' for Catalan); otherwise ALWAYS omit the language argument so it defaults to " + _nm + ". Never author the target language, announce this rule, or second-guess it."
   } catch (_) {}
   return { role: 'system', content };
 }
