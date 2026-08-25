@@ -11,15 +11,17 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workerSrc = readFileSync(join(here, '..', '..', 'modules', 'sandpie-worker.js'), 'utf8');
+const convSrc   = readFileSync(join(here, '..', '..', 'modules', 'conversations.js'), 'utf8');
 
 // ── extract function sources (from declaration to the first column-0 "}") ──
-function extract(marker) {
-  const i = workerSrc.indexOf(marker);
+function extractFrom(src, marker) {
+  const i = src.indexOf(marker);
   if (i < 0) throw new Error('extract: not found: ' + marker);
-  const end = workerSrc.indexOf('\n}\n', i);
+  const end = src.indexOf('\n}\n', i);
   if (end < 0) throw new Error('extract: no terminator for ' + marker);
-  return workerSrc.slice(i, end + 3);
+  return src.slice(i, end + 3);
 }
+const extract = marker => extractFrom(workerSrc, marker);
 const srcFnv    = extract('function _fnv1a(');
 const srcRead   = extract('async function tool_read_file(');
 const srcWrite  = extract('async function tool_write_file(');
@@ -216,6 +218,40 @@ function ok(cond, label, extra) {
   FS.set('proj/z.txt', 'z');
   const r9 = await api.tool_delete_file({ path: 'files/proj/z.txt' });
   ok(/^Deleted: proj\/z\.txt/.test(r9.result) && !FS.has('proj/z.txt'), 'delete strips files/ prefix', r9.result);
+}
+
+// ── isContextOverflowError (Fix 1: emergency-net classifier) ────────────────
+{
+  const src = extract('function isContextOverflowError(');
+  const isOverflow = new Function(src + '\nreturn isContextOverflowError;')();
+  ok(isOverflow({ status: 413 }), 'overflow: HTTP 413');
+  ok(isOverflow({ status: 400, message: "This model's maximum context length is 1048576 tokens. However, your messages resulted in 1223673 tokens." }), 'overflow: 400 maximum context length (the real error)');
+  ok(isOverflow({ message: 'context_length_exceeded' }), 'overflow: context_length_exceeded code');
+  ok(isOverflow({ status: 422, message: 'Please reduce the length of the messages.' }), 'overflow: reduce the length (any status)');
+  ok(isOverflow({ message: 'prompt is too long: 200000 tokens > limit' }), 'overflow: prompt is too long');
+  ok(!isOverflow({ status: 429, message: 'rate-limited upstream' }), 'NOT overflow: 429 rate limit');
+  ok(!isOverflow({ status: 500, message: 'internal error' }), 'NOT overflow: 500');
+  ok(!isOverflow(null) && !isOverflow(undefined), 'NOT overflow: null/undefined');
+}
+
+// ── _estimateContextPct (Fix 2: live pre-send estimate) ─────────────────────
+{
+  // Extract the fn and inject a stubbed SandpieTokens.contextWindow.
+  const src = extractFrom(convSrc, 'function _estimateContextPct(');
+  const make = win => new Function('SandpieTokens', src + '\nreturn _estimateContextPct;')({ contextWindow: () => win });
+  const est1M = make(1000000);
+  ok(est1M([]) === null, 'estimate: empty messages → null');
+  ok(make(0)([{ role: 'user', content: 'hi' }]) === null, 'estimate: unknown window → null');
+  // ~4 chars/token: a 400k-char message ≈ 100k tokens ≈ 10% of 1M
+  const big = { role: 'user', content: 'x'.repeat(400000) };
+  const p = est1M([big]);
+  ok(p > 8 && p < 14, 'estimate: 400k chars ≈ 10% of 1M window', p);
+  // the failing case shape: ~4.9M chars ≈ 1.22M tokens > 100% of 1M
+  const huge = est1M([{ role: 'user', content: 'y'.repeat(4900000) }]);
+  ok(huge > 100, 'estimate: 4.9M chars exceeds 1M window (would trigger compaction)', huge);
+  // inline base64 image is counted (not invisible like reported-token gate)
+  const withImg = est1M([{ role: 'user', content: [{ type: 'text', text: 'see' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,' + 'A'.repeat(800000) } }] }]);
+  ok(withImg > 15, 'estimate: inline base64 image counts toward the estimate', withImg);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

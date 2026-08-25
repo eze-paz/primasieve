@@ -1834,6 +1834,18 @@ function isRetryableError(e) {
   if (e instanceof TypeError) return true;
   return false;
 }
+// An over-context rejection: the request exceeded the model's window. Arrives
+// as HTTP 413 (some providers) OR as a mid-stream/body error — usually code 400
+// — whose message says so ("maximum context length…", "context_length_exceeded",
+// "reduce the length of the messages"). Both mean the same thing and take the
+// same cure: compact and retry. Keyed on the MESSAGE, not just status, because
+// providers disagree on the code (400/422/413) for this condition.
+function isContextOverflowError(e) {
+  if (!e) return false;
+  if (e.status === 413) return true;
+  const m = String((e && e.message) || '');
+  return /context[_ ]length|maximum context|reduce the length|too many tokens|prompt is too long/i.test(m);
+}
 // Convert an in-stream provider error object ({code, message} — OpenRouter's
 // mid-stream error event, per-choice error, or a bare JSON error body on a 200)
 // into a throwable with `status` set so isRetryableError can classify it. An
@@ -2920,8 +2932,14 @@ async function runAgent(config, ctx) {
     try {
       round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
     } catch (e) {
-      if (e && e.status === 413) {
-        // Provider rejected the body as too large. Compact and retry once.
+      if (isContextOverflowError(e)) {
+        // Request exceeded the model's context window (HTTP 413, or a 400/422
+        // "maximum context length…" the provider streamed back). Same cure:
+        // compact the aged span and retry once. This is the safety net for a
+        // turn that ballooned past the window between the last measured size
+        // and this send — the pre-send/mid-turn gates read a LAGGING reported
+        // token count and can miss it, so this is the backstop that must catch it.
+        ctx.emit({ type: 'info', message: 'Context window exceeded — compacting and retrying…' });
         try {
           await maybeCompactMidTurn(config, messages, ctx, null); // null promptTokens forces compaction
           // Rebuild reqBody with compacted messages and retry
@@ -2944,7 +2962,7 @@ async function runAgent(config, ctx) {
             ctx.emit({ type: 'error', message: compactErr.message || 'Compaction failed.' });
             break;
           }
-          throw e; // re-throw original 413 if compaction didn't help
+          throw e; // re-throw the original overflow error if compaction didn't help
         }
       } else {
         throw e;
