@@ -284,7 +284,7 @@ self.addEventListener('message', async (event) => {
     const { id, name, args, conversation_file_name } = data;
     const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
     let out;
-    try { out = await runTool(name, args || {}, ctx); }
+    try { out = await runToolGuarded(name, args || {}, ctx); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
     try {
       self.postMessage({
@@ -755,7 +755,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       if (!tree.filter(t => t.status !== 'deleted').length) return { result: 'Error: empty checklist — send at least one task.' };
       if (ctx) ctx._todos = _todoFlat(tree);
       if (_sigOf() === _sigBefore) {
-        return { result: 'No change — the checklist already matches your list. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits.\n' + _todoSummary(tree) };
+        return { result: 'No change — the checklist already matches your list. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits. Repeating this exact call trips the LOOP GUARD.\n' + _todoSummary(tree) };
       }
       const doneR = tree.filter(t => t.status === 'completed').length;
       const liveR = tree.filter(t => t.status !== 'deleted').length;
@@ -853,7 +853,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
         if (t.status !== 'in_progress') { errs.push('pause "' + op.id + '": only an in_progress task can be paused (is ' + t.status + ')'); continue; }
         t.status = 'pending'; delete t.reason;
       } else if (k === 'complete') {
-        if (t.status === 'completed') { errs.push('complete "' + op.id + '": already completed'); continue; }
+        if (t.status === 'completed') continue;   // idempotent calm no-op — a repeat-complete must not REJECT
         if (t.status === 'deleted') { errs.push('complete "' + op.id + '": deleted tasks cannot be completed'); continue; }
         t.status = 'completed'; t.completed = now;
       } else if (k === 'blocked') {
@@ -881,7 +881,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
   // No-op guard: ops that changed nothing and were all accepted (e.g. re-completing
   // an already-done list) → calm "already matches" so the model stops re-issuing it.
   if (!errs.length && !added.length && !pausedNow.length && _sigOf() === _sigBefore) {
-    return { result: 'No change — the checklist already matches. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits.\n' + _todoSummary(tree) };
+    return { result: 'No change — the checklist already matches. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits. Repeating this exact call trips the LOOP GUARD.\n' + _todoSummary(tree) };
   }
   const done = tree.filter(t => t.status === 'completed').length;
   const live = tree.filter(t => t.status !== 'deleted').length;
@@ -2040,6 +2040,30 @@ async function unknownTool(name) {
   return { result: 'Error: unknown tool "' + name + '". Available tools: ' + KNOWN_TOOLS.join(', ') + '.' };
 }
 
+// ── Repetition loop-breaker (added 2026-08-25) ─────────────────────────────
+// Degenerate failure mode: a SIGTERM-killed poll left the model emitting the
+// SAME no-op write_todos every round; the stop-guard forced continuation and
+// ~50 identical calls burned ~176K tokens of context. Guard: remember the last
+// call's name+args key AND its exact result text. THREE consecutive identical
+// call+result pairs = zero progress → escalate ONCE by blocking the active
+// todo (a legal stop-guard release) and returning a finish-now directive.
+// Poll-style repeats (same command, growing log output) never match on result
+// TEXT, so they are never punished. Pure read-only tools never trip it.
+const _REP_LIMIT = 3;
+const _REP_NEVER = new Set(['read_file', 'list_files', 'search', 'search_dropbox', 'recall', 'load_image']);
+function _repGuardState(ctx) { return ctx._repGuard || (ctx._repGuard = { key: '', res: '', n: 0, fired: false }); }
+function _todoBlockForLoop(ctx) {
+  try {
+    const tree = Array.isArray(ctx._todoTree) ? ctx._todoTree : [];
+    if (!tree.length) return '';
+    const t = tree.find(x => x.status === 'in_progress') || tree.find(x => x.status === 'pending');
+    if (!t || t.status === 'blocked' || t.status === 'completed' || t.status === 'deleted') return '';
+    t.status = 'blocked'; delete t.completed;
+    t.reason = 'loop guard: identical no-op tool call repeated with no effect';
+    ctx._todos = _todoFlat(tree);
+    return t.id;
+  } catch (_) { return ''; }
+}
 async function runTool(name, args, ctx) {
   const convFileName = ctx._conversation_file_name || 'unknown';
   switch (name) {
@@ -2070,6 +2094,30 @@ async function runTool(name, args, ctx) {
     case 'respond':       return { result: 'Delivered to the user.' };
     default:              return unknownTool(name);
   }
+}
+
+async function runToolGuarded(name, args, ctx) {
+  if (!ctx || _REP_NEVER.has(String(name))) return runTool(name, args, ctx);
+  const rg = _repGuardState(ctx);
+  const key = String(name) + '\u0000' + JSON.stringify(args == null ? {} : args);
+  const out = await runTool(name, args, ctx);
+  const res = out && typeof out.result === 'string' ? out.result : JSON.stringify(out == null ? {} : out);
+  if (key === rg.key && res === rg.res) {
+    rg.n++;
+    if (!rg.fired && rg.n >= _REP_LIMIT - 1) {
+      rg.fired = true;
+      const bid = _todoBlockForLoop(ctx);
+      return { result: 'LOOP GUARD: this exact call has returned the IDENTICAL result ' + _REP_LIMIT
+        + ' times in a row — nothing is progressing and another repeat cannot change anything.'
+        + (bid ? (' Active task #' + bid + ' is now BLOCKED ("loop guard: identical no-op tool call"), which releases the stop-guard.')
+               : '')
+        + ' Finish your reply now, or switch to genuinely different work.' };
+    }
+    if (rg.fired) return { result: 'LOOP GUARD active: this call is a proven no-op. Finish your reply or do different work.' };
+  } else {
+    rg.key = key; rg.res = res; rg.n = 0;
+  }
+  return out;
 }
 
 // ============================================================
@@ -3363,7 +3411,7 @@ async function runAgent(config, ctx) {
       }
       ctx._currentToolCallId = tc.id;   // so spawn_subagent can tag its nested events to this box
       let toolOut;
-      try { toolOut = await runTool(tc.function.name, parsedArgs, ctx); }
+      try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
       if (tc.function.name === 'write_todos') touchedTodo = true;
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
