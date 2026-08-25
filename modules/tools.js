@@ -322,11 +322,16 @@ WHEN: a subtask is bounded and describable in one brief — "audit this claim ag
       },
     },
     shell: {
-      description: `Run a shell command and get back its stdout, stderr, and exit code. This is a real terminal on the machine hosting the sandpie relay — run the relay INSIDE your target environment (e.g. WSL) so commands land where your project lives.
-EVERYTHING IS JUST A COMMAND: local work ("cargo test"), a different machine over SSH ("ssh myserver 'systemctl restart app'"), file transfer ("scp myserver:/var/log/x.log /tmp/"). ssh/scp use the relay host's own ~/.ssh — there is no key setup or target switch here.
-WRITE A FILE WITH ZERO ESCAPING: pipe the content through stdin instead of a heredoc — {"command":"cat > /path/file.rs", "stdin":"<the entire file content>"}. The content never touches the command line, so quotes, $, backticks, (parens) and newlines survive verbatim. Read it back with {"command":"cat /path/file.rs"}. NEVER build cat<<EOF / sed one-liners for file content — use stdin.
+      description: `Run a command on the REMOTE relay host and get back its stdout, stderr, and exit code.
+
+⚠️ THE RELAY IS A SEPARATE MACHINE WITH ITS OWN, DIFFERENT FILESYSTEM — it is NOT your workspace. Your workspace is /files: the persistent store that write_file, edit_file, read_file, delete_file, list_files, run_python and show_artifact all act on. A file you create in your workspace does NOT exist on the relay, and the relay's paths (/tmp, /root, ~, /home, and any projects/… there) are NOT your workspace files. The two never share a path, so shell can't see your files and you can't reach the relay's files with the file tools.
+
+Do NOT use shell for workspace file operations — creating, reading, editing, listing, verifying, moving, or deleting files under /files. Use the file tools instead: list_files to see what exists, read_file / show_artifact to read, write_file / edit_file to change, delete_file to remove, run_python to process. In particular, after write_file or run_python, VERIFY with list_files / read_file — never with \`ls\`/\`cat\`/\`test -f\` in shell, which run on the other machine and will report your files missing.
+
+Use shell ONLY when the task is genuinely about the relay machine itself: run a program or build that lives there ("cargo test"), reach another host ("ssh myserver 'systemctl restart app'"), or move data between the relay and elsewhere ("scp myserver:/var/log/x.log /tmp/"). ssh/scp use the relay host's own ~/.ssh — no key setup here.
+WRITE A FILE ON THE RELAY (not your workspace) WITH ZERO ESCAPING: pipe content through stdin — {"command":"cat > /path/on/relay.rs", "stdin":"<the entire file content>"} — quotes, $, backticks, (parens), newlines survive verbatim; read it back with {"command":"cat /path/on/relay.rs"}. Never build cat<<EOF / sed one-liners for file content.
 LONG JOBS (>~120s: full builds, kernel boots): a call is killed at ~120s, so launch detached and poll a log — {"command":"nohup cargo build --release >/tmp/b.log 2>&1 & echo $!"} then {"command":"tail -40 /tmp/b.log"}.
-Requires the local relay running; on a connection error, tell the user to start it and do NOT retry in a loop.`,
+Requires the relay running on that machine; on a connection error, tell the user to start it and do NOT retry in a loop.`,
       parameters: {
         type: 'object',
         properties: {
