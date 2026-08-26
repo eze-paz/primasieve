@@ -255,62 +255,47 @@ Typical flow:
       description: `Create and manage a structured task list for the current session. This helps you track progress, organize complex work, and demonstrate to the user that you understand the scope.
 Use it for: complex multi-step tasks (3+ distinct steps); non-trivial work that needs planning; when the user gives you multiple tasks or explicitly asks for a todo list; when you start a task (mark it in_progress) and when you finish one (mark it completed and add any follow-ups).
 Do NOT use it for: a single straightforward task; trivial work; anything doable in under 3 steps; purely conversational requests — it only adds overhead there.
-The harness holds the list as a FLAT set of tasks with IDs; you send deterministic OPS and it returns the current state. You do NOT resend or rewrite the whole list (that silently erased work in the past).
-FIRST plan: send a full list once — {"todos":[{"content":"…","est":8}, …]} — accepted only when there is no checklist yet.
+The harness holds the list as a FLAT set of tasks with IDs. You send the FULL list every time — it is reconciled to the existing checklist (matched by content, ids kept, open tasks you omit are dropped and reported). There are NO ops — just send {"todos":[...]} with the complete list.
 Each task MAY carry "est": your honest estimate of how many TOOL CALLS it will take (not time). The user sees it as live progress ("14/~20" plus a time projection from the run's own pace), so estimate what you actually expect — including reads and checks — and skip it when you genuinely can't tell.
-THEN update with ops: {"ops":[ … ]}. Each op:
-  {"op":"add","text":"Run tests","activeForm":"Running tests"?,"blockedBy":["2"]?}   add a task. text = imperative title; activeForm = present-continuous form shown while it runs; blockedBy = ids of tasks that must complete before this one can start.
-  {"op":"block","id":"3","by":["1"]}  /  {"op":"unblock","id":"3","by":["1"]}   add/remove blockers (tasks that must complete before this one can start) after creation.
-  {"op":"start","id":"3"}   mark in_progress before you begin it. Refused while the task still has an open blocker. AT MOST ONE task may be in_progress at a time: starting a task automatically pauses whichever task is currently active (it can be resumed later with start).
-  {"op":"pause","id":"3"}   in_progress → pending — pause the currently active task so another can start (e.g. you hit a blocker or want to switch focus). The paused task keeps its place and resumes with start.
-  {"op":"complete","id":"3"}   mark done — ONLY when you have FULLY accomplished it. Never complete a task if tests fail, the implementation is partial, or errors are unresolved: keep it in_progress. If you hit a blocker you can't clear, keep the task in_progress and add a new task describing what must be resolved.
-  {"op":"blocked","id":"3","reason":"waiting on …"}   mark a task BLOCKED — it needs user input, an external dependency, or something unobtainable this turn. Blocked tasks are NOT open: once everything is blocked/completed the turn may end. {"op":"start","id":"3"} resumes it later.
-  {"op":"delete","id":"3"}   remove a task you're no longer doing (also removed from any other task's blockedBy).
-IDEMPOTENT + SAFE: every op is a calm no-op when already in that state. If a call changes NOTHING it answers "No change …" — NEVER re-send an identical call that returned "No change": a THIRD identical repeat trips the LOOP GUARD, which marks the active task BLOCKED so the turn can end.
-IDs are shown in the returned checklist. You can batch several ops in one call. A full {"todos":[…]} replacement is refused while any task is still open — complete or delete them first.
-PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_todos and respond — every other tool (python, shell, files, search, …) is HIDDEN, not missing. Creating a plan and starting a task (in_progress) unlocks the full toolset immediately. Never tell the user a tool is unavailable or ask them to enable it: plan, start the task, then call the tool.
-LANGUAGE: the checklist is shown to the user verbatim — write every "content"/"text"/"activeForm"/"reason" in the user's language (the one you reply in), never the language you reason in.`,
+At most ONE task may be in_progress at a time. The checklist and your scratchpad are injected into your context every round, so you always see your plan and working notes without re-reading.
+PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_todos, scratch, and respond — every other tool (python, shell, files, search, …) is HIDDEN, not missing. Creating a plan and starting a task (in_progress) unlocks the full toolset immediately. Never tell the user a tool is unavailable or ask them to enable it: plan, start the task, then call the tool.
+LANGUAGE: the checklist is shown to the user verbatim — write every "content"/"activeForm"/"reason" in the user's language (the one you reply in), never the language you reason in.`,
       parameters: {
         type: 'object',
         properties: {
-          ops: {
-            type: 'array',
-            description: 'Operations to apply, in order. Use this to update an existing checklist.',
-            items: {
-              type: 'object',
-              properties: {
-                op:        { type: 'string', enum: ['add', 'start', 'pause', 'complete', 'delete', 'block', 'unblock', 'blocked'], description: 'The operation.' },
-                text:      { type: 'string', description: 'For "add": the task, as a brief imperative title (e.g. "Run tests"), in the user\'s language.' },
-                blockedBy: { type: 'array', items: { type: 'string' }, description: 'For "add": mark tasks that must complete before this one can start (e.g. ["2"]).' },
-                activeForm:{ type: 'string', description: 'For "add": the present continuous form shown while the task is in progress (e.g. "Running tests").' },
-                est:       { type: 'integer', description: 'For "add": your honest estimate of how many TOOL CALLS the task will take (not time). Shown to the user as live progress — skip it when you have no idea.' },
-                id:        { type: 'string', description: 'For start/complete/delete/block/unblock/blocked: the target task id.' },
-                by:        { type: 'array', items: { type: 'string' }, description: 'For block: mark tasks that must complete before this one can start. For unblock: the blocker ids to remove.' },
-                reason:    { type: 'string', description: 'For "blocked": why the task is stalled (shown in the checklist).' },
-              },
-              required: ['op'],
-            },
-          },
           todos: {
             type: 'array',
-            description: 'Full list — ONLY for the initial plan, or a reset when every task is completed/deleted. Refused while any task is open.',
+            description: 'The full task list. Send this every time you want to update the checklist — it is reconciled to the existing one (matched by content, ids kept, open tasks you omit are dropped and reported). At most ONE task may be in_progress.',
             items: {
               type: 'object',
               properties: {
-                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. "Run tests"), in the user\'s language.' },
-                status:    { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Initial state (usually "pending").' },
+                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. \'Run tests\'), in the user\'s language.' },
+                status:    { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'], description: 'Task state. At most ONE may be in_progress.' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'Mark tasks (from this same list) that must complete before this one can start.' },
-                activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. "Running tests").' },
-                est:       { type: 'integer', description: 'Your honest estimate of how many TOOL CALLS this task will take (not time). Shown to the user as live progress ("14/~20") — skip it when you have no idea rather than guessing wildly.' },
+                activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. \'Running tests\').' },
+                est:       { type: 'integer', description: 'Your honest estimate of how many TOOL CALLS this task will take (not time). Shown to the user as live progress (\'14/~20\') — skip it when you have no idea rather than guessing wildly.' },
+                reason:    { type: 'string', description: 'For \'blocked\': why the task is stalled (shown in the checklist).' },
               },
               required: ['content'],
             },
           },
         },
-        required: [],
+        required: ['todos'],
       },
     },
-    spawn_subagent: {
+    scratch: {
+      description: `Set your working notes for this conversation — plan hypotheses, blockers, next steps, state that must survive compaction. Overwrites previous content. Re-injected into your context every round (ephemeral, not in messages) so you always see your working state without re-reading. NOT shown to the user.
+Use it for: recording what you tried and what happened, tracking blockers, noting next steps, keeping state across compaction. Distinct from remember() (permanent, cross-conversation) — scratch is session-scoped working memory.
+Cap ~4KB. The result echoes the byte count stored.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'The full new content of the scratchpad (overwrites previous).' },
+        },
+        required: ['text'],
+      },
+    },
+        spawn_subagent: {
       description: `Delegate a well-scoped subtask to a fresh subagent that runs its OWN short agent loop in an ISOLATED context (it does NOT see this conversation) and returns only its final result. Use this to keep your own context clean on a big task: hand off focused exploration, research, verification, or a self-contained piece of work, and get back a bounded summary you can act on.
 HOW: pick an agent by name — each is defined in sandpie/agents/<name>.md, whose file sets that subagent's system prompt, which tools it may use, its model, and its round budget. Then write a SELF-CONTAINED prompt: state the goal and include EVERY path, id, and constraint it needs, because it starts from a blank context and cannot ask you follow-up questions. It works independently and hands back a distilled result.
 WHEN: a subtask is bounded and describable in one brief — "audit this claim against the code", "find where X is implemented and how it's wired", "research Y and report". Skip it for trivial one-step things you can just do yourself. A subagent cannot spawn further subagents.`,

@@ -890,6 +890,7 @@ function hydrateStreamFromData(s, data) {
   s.messages = (data.messages || []).slice();
   s.compaction = data.compaction || null;
   s.todos = data.todos || null;
+  s.scratchpad = data.scratchpad || '';
   s.lastTurn = data.lastTurn || null;
   // Messages loaded from the new JSONL are already persisted; those from a legacy
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
@@ -1239,6 +1240,7 @@ async function loadConv(id) {
       const fileSize = await opfs.getFileSize(jp);
       s.compaction = meta.compaction || null;
       s.todos = meta.todos || null;
+      s.scratchpad = meta.scratchpad || '';
       s.lastTurn = meta.lastTurn || null;
 
       if (!fileSize) {
@@ -1461,6 +1463,7 @@ async function duplicateConv(id, title) {
   };
   if (data.compaction) meta.compaction = data.compaction;
   if (data.todos) meta.todos = data.todos;
+  if (data.scratchpad != null) meta.scratchpad = data.scratchpad;
   // Intentionally do NOT copy session_id: the duplicate is a distinct
   // conversation and must get its own cache key (ensureSessionId on first send).
   const mp = metaPath(newId, false);
@@ -2150,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=128');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=129');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2486,6 +2489,7 @@ async function sendSingle(text, stream, opts = {}) {
       lastInFlightTool = ev.tc?.function?.name || 'unknown';
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolStarted(activeConvId, ev.tc);
     }
+    if (ev.type === 'scratchpad') { stream.scratchpad = ev.text || ''; }
     if (ev.type === 'tool_result') {
       lastInFlightTool = null;
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolResult(activeConvId, ev.result);
@@ -2759,6 +2763,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],
+    scratchpad: (typeof stream !== 'undefined' && stream.scratchpad) || '',
     // Base URL of the local relay the `shell` tool runs commands through (run it
     // in your target env, e.g. WSL). The worker has no localStorage, so pass it in.
     shellRelayUrl: (typeof SandpieTools !== 'undefined' && SandpieTools.shellRelayUrl) ? SandpieTools.shellRelayUrl() : 'http://localhost:8765',

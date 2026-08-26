@@ -678,7 +678,7 @@ function _todoSummary(tree) {
       + (open.length ? ' (blocked by ' + open.join(', ') + ')' : '');
   }).join('\n');
 }
-async function tool_write_todos({ ops, todos }, ctx) {
+async function tool_write_todos({ todos }, ctx) {
   const tree = (ctx && Array.isArray(ctx._todoTree)) ? ctx._todoTree : (ctx ? (ctx._todoTree = []) : []);
   const now = new Date().toISOString();
   const byId = new Map(tree.map(t => [t.id, t]));
@@ -697,7 +697,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
   //    content, update matched tasks through the same state rules, add new ones,
   //    and KEEP + REPORT open tasks the list omits so in-flight work is never
   //    silently dropped.
-  if (Array.isArray(todos) && !Array.isArray(ops)) {
+  if (Array.isArray(todos)) {
     if (tree.length && openCount() > 0) {
       const _norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const byContent = new Map();
@@ -761,7 +761,7 @@ async function tool_write_todos({ ops, todos }, ctx) {
       const liveR = tree.filter(t => t.status !== 'deleted').length;
       let outR = 'todos:' + JSON.stringify(tree) + '\nChecklist reconciled to your list (' + doneR + ' done, ' + openCount() + ' open, ' + liveR + ' total'
         + (addedIds.length ? ' · added ' + addedIds.join(', ') : '') + '):\n' + _todoSummary(tree);
-      if (dropped.length) outR += '\n\nDROPPED ' + dropped.length + ' open task(s) this replacement omitted: ' + dropped.join(', ') + ' — send them again (full list or {"op":"add"}) if you meant to keep them.';
+      if (dropped.length) outR += '\n\nDROPPED ' + dropped.length + ' open task(s) this replacement omitted: ' + dropped.join(', ') + ' — send them again (full list) if you meant to keep them.';
       return { result: outR };
     }
     tree.length = 0; byId.clear();
@@ -792,105 +792,24 @@ async function tool_write_todos({ ops, todos }, ctx) {
     return { result: 'todos:' + JSON.stringify(tree) + '\nNew checklist (' + tree.length + ' tasks):\n' + _todoSummary(tree) };
   }
 
-  if (!Array.isArray(ops)) {
-    return { result: 'Error: send {"ops":[…]}. Ops (IDs are shown in the checklist):\n'
-      + '  {"op":"add","text":"…","blockedBy":["2"]?}  add a task (blockedBy = ids that must finish first)\n'
-      + '  {"op":"start","id":"…"}                      pending → in_progress (refused while blocked; AT MOST ONE task may be active — starting pauses any other active task)\n'
-      + '  {"op":"pause","id":"…"}                      in_progress → pending (free the active slot; resume later with start)\n'
-      + '  {"op":"complete","id":"…"}                   → completed\n'
-      + '  {"op":"blocked","id":"…","reason":"…"}  mark BLOCKED — needs user input or an external dependency; NOT open, so the turn may end once everything is blocked/completed (start resumes)\n'
-      + '  {"op":"delete","id":"…"}                     remove a task from the list\n'
-      + '  {"op":"block","id":"…","by":["1"]} / {"op":"unblock","id":"…","by":["1"]}   adjust dependencies\n'
-      + 'You may also send a full {"todos":[…]} list at any time — it is reconciled to the existing checklist (matched by content, ids kept, open tasks you omit are kept and reported).' };
-  }
+  return { result: 'Error: send {"todos":[\u2026]} with the full list. Each item: {"content":"\u2026","status":"pending|in_progress|completed|blocked","activeForm":"\u2026","est":N,"reason":"\u2026"}. The list is reconciled to the existing checklist (matched by content, ids kept, open tasks you omit are dropped and reported). At most ONE task may be in_progress.' };
+}
 
-  const errs = [], added = [], pausedNow = [];
-  const ID_OPS = ['start', 'pause', 'complete', 'delete', 'block', 'unblock', 'blocked'];
-  for (const op of ops) {
-    const k = op && op.op;
-    if (k === 'add') {
-      const content = String(op.text || op.content || '').trim();
-      if (!content) { errs.push('add: empty text'); continue; }
-      const task = { id: _todoNextId(tree), content, status: 'pending', created: now };
-      if (Array.isArray(op.blockedBy) && op.blockedBy.length) {
-        const bb = op.blockedBy.map(String);
-        const unknown = bb.filter(id => !byId.has(id));
-        if (unknown.length) { errs.push('add "' + content.slice(0, 30) + '": unknown blocker id(s) ' + unknown.join(', ')); continue; }
-        task.blockedBy = bb.filter(id => id !== task.id);
-      }
-      if (typeof op.activeForm === 'string' && op.activeForm.trim()) task.activeForm = op.activeForm.trim();
-      { const e = _todoEst(op.est); if (e) task.est = e; }
-      tree.push(task); byId.set(task.id, task); added.push(task.id);
-    } else if (ID_OPS.includes(k)) {
-      // (FIX 1) An id-requiring op needs a real "id". The common model error is
-      // {"op":"start","text":"1"} — "text" is only legal on "add" — which used
-      // to fall through to `unknown id "undefined"` and get retried forever.
-      // Say exactly what is wrong so the model can fix it.
-      if (op.id == null || op.id === '') {
-        const hint = (op.text != null && op.text !== '') ? ('you sent it as "text":"' + String(op.text).slice(0, 24) + '"') : ('no "id" field at all');
-        errs.push(k + ': needs the checklist number in the "id" field — ' + hint + ' ("text" only works on "add"). Use {"op":"' + k + '","id":"<number shown in checklist>"}.');
-        continue;
-      }
-      const tid = String(op.id);
-      const t = byId.get(tid);
-      if (!t) { errs.push(k + ': there is no task with id "' + tid + '" — use the numbers the checklist shows (add it first if needed).'); continue; }
-      if (k === 'start') {
-        // (FIX 3) Starting the ALREADY-active task is a calm no-op, not an error.
-        // A rejection on "start" of the current task just made the model ping-pong.
-        // (Single-active rule still auto-pauses a DIFFERENT active task.)
-        if (t.status === 'in_progress') continue;
-        if (t.status !== 'pending' && t.status !== 'blocked') { errs.push('start "' + op.id + '": only a pending or blocked task can start (is ' + t.status + ')'); continue; }
-        // Ordering is enforced by blockers, not by a one-at-a-time lock: a task
-        // cannot start while any task in its blockedBy is still open.
-        const open = _todoBlockers(t, byId);
-        if (open.length) { errs.push('start "' + op.id + '": blocked by open task(s) ' + open.join(', ') + ' — finish or delete them first, or {"op":"unblock","id":"' + op.id + '","by":["' + open[0] + '"]} if that dependency no longer applies'); continue; }
-        // Single-active rule: at most ONE task may be in_progress at a time.
-        // Starting this one pauses any currently active task (it keeps its
-        // state and can be resumed later with a start).
-        for (const x of tree) { if (x.id !== t.id && x.status === 'in_progress') { x.status = 'pending'; delete x.reason; pausedNow.push(x.id); } }
-        t.status = 'in_progress'; delete t.reason;
-      } else if (k === 'pause') {
-        if (t.status !== 'in_progress') { errs.push('pause "' + op.id + '": only an in_progress task can be paused (is ' + t.status + ')'); continue; }
-        t.status = 'pending'; delete t.reason;
-      } else if (k === 'complete') {
-        if (t.status === 'completed') continue;   // idempotent calm no-op — a repeat-complete must not REJECT
-        if (t.status === 'deleted') { errs.push('complete "' + op.id + '": deleted tasks cannot be completed'); continue; }
-        t.status = 'completed'; t.completed = now;
-      } else if (k === 'blocked') {
-        if (t.status === 'completed') { errs.push('blocked "' + op.id + '": completed tasks stay on the record'); continue; }
-        if (t.status === 'deleted') { errs.push('blocked "' + op.id + '": deleted tasks cannot be blocked'); continue; }
-        t.status = 'blocked'; delete t.completed;
-        const reason = (op.reason !== undefined ? String(op.reason) : '').trim();
-        if (reason) t.reason = reason; else delete t.reason;
-      } else if (k === 'block' || k === 'unblock') {
-        const by = (Array.isArray(op.by) ? op.by : []).map(String);
-        if (!by.length) { errs.push(k + ' "' + op.id + '": pass "by":["<id>", …]'); continue; }
-        const unknown = by.filter(id => !byId.has(id) || id === t.id);
-        if (unknown.length) { errs.push(k + ' "' + op.id + '": unknown/self blocker id(s) ' + unknown.join(', ')); continue; }
-        const set = new Set(Array.isArray(t.blockedBy) ? t.blockedBy : []);
-        if (k === 'block') by.forEach(id => set.add(id)); else by.forEach(id => set.delete(id));
-        t.blockedBy = [...set];
-      } else { // delete — drop the task and detach it from other tasks' blockers
-        if (t.status === 'completed') { errs.push('delete "' + op.id + '": completed tasks stay on the record; delete is for tasks you are dropping'); continue; }
-        t.status = 'deleted'; t.deleted = now;
-        for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
-      }
-    } else { errs.push('unknown op "' + k + '" (use add/start/complete/delete/block/unblock/blocked)'); }
+// — Scratchpad (hidden working memory) —————————————————————————————————
+// Free-form text the model writes as its externalized brain: plan hypotheses,
+// blockers, next steps, state that must survive compaction. Overwrite-whole,
+// capped at ~4KB. Injected into the system prompt each round (ephemeral, not in
+// messages) so the model always sees its working state without re-reading.
+// NOT shown to the user — it replaces the drift guard's nagging.
+async function tool_scratch({ text }, ctx) {
+  const MAX = 4096;
+  let t = String(text || '');
+  if (t.length > MAX) t = t.slice(0, MAX);
+  if (ctx) {
+    ctx._scratchpad = t;
+    ctx.emit({ type: 'scratchpad', text: t });
   }
-  if (ctx) ctx._todos = _todoFlat(tree);
-  // No-op guard: ops that changed nothing and were all accepted (e.g. re-completing
-  // an already-done list) → calm "already matches" so the model stops re-issuing it.
-  if (!errs.length && !added.length && !pausedNow.length && _sigOf() === _sigBefore) {
-    return { result: 'No change — the checklist already matches. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits. Repeating this exact call trips the LOOP GUARD.\n' + _todoSummary(tree) };
-  }
-  const done = tree.filter(t => t.status === 'completed').length;
-  const live = tree.filter(t => t.status !== 'deleted').length;
-  let out = 'todos:' + JSON.stringify(tree) + '\n'
-    + 'Checklist: ' + done + ' done, ' + openCount() + ' open, ' + live + ' total'
-    + (added.length ? ' · added ' + added.join(', ') : '')
-    + (pausedNow.length ? ' · paused ' + pausedNow.join(', ') : '') + '\n' + _todoSummary(tree);
-  if (errs.length) out += '\n\nREJECTED (not applied):\n- ' + errs.join('\n- ');
-  return { result: out };
+  return { result: 'scratch:' + t.length + ' bytes stored. Re-injected each round.' };
 }
 
 // ── Deliverable localization (worker side) ──────────────────────────────────
@@ -1985,7 +1904,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -2085,6 +2004,7 @@ async function runTool(name, args, ctx) {
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'delete_file':   return tool_delete_file(args, ctx);
     case 'write_todos':   return tool_write_todos(args, ctx);
+    case 'scratch':       return tool_scratch(args, ctx);
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
     case 'recall':        return tool_recall(args, ctx);
@@ -3038,6 +2958,7 @@ async function runAgent(config, ctx) {
   //     don't let it — re-prompt and continue. Only a real user stop (abort) or
   //     genuine progress stalling out (MAX_STOP_BLOCKS) ends the turn.
   ctx._todos = _todoFlat(ctx._todoTree);   // flat view of the seeded tree
+  ctx._scratchpad = config.scratchpad || '';   // hidden working memory (persisted, re-injected each round)
   // Citable result ids (F1): every tool result is prefixed "[rN]" so the model
   // can cite it as evidence when closing a claim-todo. Recover the counter and
   // the set of already-issued ids from the persisted transcript, so claims can
@@ -3053,14 +2974,6 @@ async function runAgent(config, ctx) {
   ctx._stopBlocks = 0;
   ctx._respondRetries = 0;    // bare-prose attempts rejected this turn while forcing respond()
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
-  const REMIND_AFTER_ROUNDS = 6;   // tool rounds w/o a write_todos before nudging
-  // Escalating preamble keyed to how long the plan has actually gone stale — a
-  // reminder that always said "6 rounds" was trivial to keep ignoring.
-  const driftPreamble = (n) => {
-    if (n >= 50) return 'STOP. You have run ' + n + ' tool rounds without touching your plan — you are ignoring this reminder and drifting badly. Before ANY further tool call, update the checklist with write_todos or delete what you have abandoned.';
-    if (n >= 20) return 'You have now run ' + n + ' tool rounds without updating your plan. This is well past drift. Update the checklist with write_todos NOW before continuing.';
-    return 'You have run ' + n + ' tool rounds without updating your plan.';
-  };
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
   // Bare-prose attempts to reject before falling back to showing the content.
   // Exactly ONE: the first bare-prose round already defied tool_choice:'required',
@@ -3118,32 +3031,8 @@ async function runAgent(config, ctx) {
     // nag — cadence gate only. We do NOT reset _roundsSinceTodo here (that is the
     // cumulative staleness, reset solely by a real write_todos), so the count
     // shown keeps climbing and the tone escalates until the model actually acts.
-    if (!maxRounds && !pendingReminder && ctx._roundsSinceTodo - ctx._lastNagAt >= REMIND_AFTER_ROUNDS) {
-      const n = ctx._roundsSinceTodo;
-      if (hasOpenTodos()) {
-        setReminder('drift',
-          '<system-reminder>' + driftPreamble(n) + ' '
-          + 'Current todos:\n' + renderTodos() + '\n\nRe-read them, then either update the list with write_todos '
-          + 'or state your next concrete step before continuing. Do not drift from the task.</system-reminder>');
-      } else if (ctx._todos.length === 0) {
-        setReminder('no-plan',
-          '<system-reminder>You have run ' + n + ' tool rounds but have not set up a task list. '
-          + 'If this is a multi-step task, STRONGLY consider laying out a plan with write_todos before proceeding — '
-          + 'it keeps you from drifting and lets progress be tracked and verified. If the task is genuinely trivial '
-          + 'and single-step, you may ignore this.</system-reminder>');
-      } else {
-        // Checklist exists but every task is completed/withdrawn — yet the model
-        // is still making tool calls. Unplanned work is the same drift risk as
-        // no plan at all: make it either extend the plan or wrap up.
-        setReminder('plan-exhausted',
-          '<system-reminder>Your checklist is fully closed, yet you have run ' + n
-          + ' more tool rounds since. Whatever you are doing now is NOT on the plan. Either add the remaining '
-          + 'work to the checklist with write_todos (a full new {"todos":[…]} list is accepted now that every '
-          + 'task is closed) so it can be tracked, or stop and report your results. Do not keep working '
-          + 'unplanned.</system-reminder>');
-      }
-      ctx._lastNagAt = ctx._roundsSinceTodo;
-    }
+    // Drift guard removed — plan + scratchpad are injected every round (volatileMsg),
+    // so the model always sees its working state. No nagging needed.
     // METACOG (c'): newest-artifact console note — the page queued it after the
     // newest artifact rendered and logged console output. Higher priority than the
     // grind/reuse nudges below; one-shot (consumed here).
@@ -3188,6 +3077,13 @@ async function runAgent(config, ctx) {
       const _tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
       let _vt = 'Current local date and time: ' + _now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + (_tz ? ' (' + _tz + ')' : '') + '. Treat this as "now".';
       if (config.volatileContext) _vt += '\n\n' + config.volatileContext;
+      // Per-round ephemeral injection of the plan + scratchpad (replaces drift guard).
+      // Both are rebuilt from ctx state each round — survive compaction, never in messages.
+      const _planLines = (ctx._todos || []).filter(t => t.status !== 'deleted').map(t =>
+        (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]') + ' ' + t.content
+      ).join('\n');
+      if (_planLines) _vt += '\n\n[plan]\n' + _planLines;
+      if (ctx._scratchpad) _vt += '\n\n[scratch]\n' + ctx._scratchpad;
       volatileMsg = { role: 'user', content: '<system-reminder>' + _vt + '</system-reminder>' };
     } catch (_) {}
     // Hard plan-first gate: until a task is in_progress, OFFER only write_todos and
@@ -3199,12 +3095,12 @@ async function runAgent(config, ctx) {
     // tools — without this the model looks at a two-tool list and truthfully
     // reports "I can't run python" instead of planning to unlock it.
     const _availTools = (_planForced && !_hasActiveTask())
-      ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'respond'))
+      ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'scratch' || t.function.name === 'respond'))
           .map(t => {
             if (t.function.name !== 'write_todos') return t;
             const hidden = (config.tools || [])
               .map(x => x && x.function && x.function.name)
-              .filter(n => n && n !== 'write_todos' && n !== 'respond');
+              .filter(n => n && n !== 'write_todos' && n !== 'scratch' && n !== 'respond');
             if (!hidden.length) return t;
             return { ...t, function: { ...t.function, description: (t.function.description || '') +
               '\nCURRENTLY HIDDEN by the plan-first gate (they exist and unlock the moment a task is in_progress): ' + hidden.join(', ') + '.' } };
@@ -3342,7 +3238,7 @@ async function runAgent(config, ctx) {
             + 'When an item is genuinely done, mark it completed with write_todos. Only stop once every item '
             + 'is completed. If an item is genuinely blocked — it needs user input, an external credential or '
             + 'file, or something you cannot obtain this turn — mark it blocked with write_todos '
-            + '({"op":"blocked","id":"…","reason":"…"}) and the turn may end with only blocked/completed items. '
+            + 'a full {"todos":[…]} list with the task status set to "blocked" and a "reason" field. '
             + '(auto-continue ' + ctx._stopBlocks + '/' + MAX_STOP_BLOCKS + ')</system-reminder>',
             { open: openTodos().length, attempt: ctx._stopBlocks });
           continue;
@@ -3376,7 +3272,7 @@ async function runAgent(config, ctx) {
     // still blocks them instantly, so a model can't smuggle plan-less work
     // into the tail of a round.
     const _roundGrace = _hasActiveTask();
-    const _GRACE_TOOLS = new Set(['show_artifact', 'remember']);
+    const _GRACE_TOOLS = new Set(['show_artifact', 'remember', 'scratch']);
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
@@ -3386,9 +3282,9 @@ async function runAgent(config, ctx) {
       // that list could still emit one. Reject it here. Emit tool_started+tool_result
       // so the box RESOLVES to the blocked message — never leave it spinning (the box
       // may already exist from streamed arg deltas).
-      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'respond' && !_hasActiveTask()
+      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'scratch' && tc.function.name !== 'respond' && !_hasActiveTask()
           && !(_roundGrace && _GRACE_TOOLS.has(tc.function.name))) {
-        const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or op:"start"). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
+        const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or set status:"in_progress" in the list). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
         ctx.emit({ type: 'tool_started', tc });
         ctx.emit({ type: 'tool_result', id: tc.id, result: blk });
         const bmsg = { role: 'tool', tool_call_id: tc.id, content: blk };
@@ -3413,21 +3309,21 @@ async function runAgent(config, ctx) {
       let toolOut;
       try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
-      if (tc.function.name === 'write_todos') touchedTodo = true;
+      if (tc.function.name === 'write_todos' || tc.function.name === 'scratch') touchedTodo = true;
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
       // write_todos results must round-trip intact: the page renders + persists
       // the checklist from the 'todos:' JSON line, and history rendering parses
       // it back on reload — a 30kB cut mid-JSON made the persisted result
       // unparseable, so the checklist rendered EMPTY from history. Like the
       // citable-id tag below, checklist bookkeeping is exempt from truncation.
-      let safeResult = tc.function.name === 'write_todos'
+      let safeResult = (tc.function.name === 'write_todos' || tc.function.name === 'scratch')
         ? toolOut.result
         : truncateToolResult(toolOut.result);
       // Citable result id (F1): tag the result so the model can cite it as
       // evidence ("r7") when closing a claim-todo. write_todos output is
       // checklist bookkeeping, not observations of the world — never tagged,
       // so a claim can't cite the checklist as proof of itself.
-      if (tc.function.name !== 'write_todos') {
+      if (tc.function.name !== 'write_todos' && tc.function.name !== 'scratch') {
         const rid = 'r' + (++ctx._resultSeq);
         (ctx._resultIds || (ctx._resultIds = new Set())).add(rid);
         safeResult = '[' + rid + '] ' + safeResult;
