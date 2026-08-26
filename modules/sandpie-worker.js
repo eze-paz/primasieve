@@ -2974,6 +2974,10 @@ async function runAgent(config, ctx) {
   ctx._lastNagAt = 0;         // value of _roundsSinceTodo at the last nag (cadence gate, does NOT reset the count)
   ctx._stopBlocks = 0;
   ctx._respondRetries = 0;    // bare-prose attempts rejected this turn while forcing respond()
+  ctx._responded = false;      // at least one respond() delivered this turn (multi-respond support)
+  ctx._langRejectCount = 0;    // respond() calls rejected for missing language this turn
+  ctx._respondLangs = new Set(); // language codes already delivered this turn (dedup)
+  ctx._respondCount = 0;        // successful respond() deliveries this turn (hard cap)
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
   // Bare-prose attempts to reject before falling back to showing the content.
@@ -2982,6 +2986,7 @@ async function runAgent(config, ctx) {
   // ignores BOTH will ignore them again, so further retries just burn a full
   // re-think each (seen live: 4 thinking phases on "Tell me about Paris").
   const MAX_RESPOND_RETRIES = 1;
+  const MAX_RESPOND_DELIVERIES = 5;   // hard cap on respond() deliveries per turn
   // This turn forces respond() when the tool is present: the visible reply comes
   // ONLY from respond(), plain content is hidden, and respond() is the only clean
   // way to end. Subagents (no respond in their toolset) are unaffected.
@@ -3118,8 +3123,8 @@ async function runAgent(config, ctx) {
     // Force a tool call every round when respond() is in play: the model can never
     // emit free-form prose, so the visible chat is exactly its tool actions + the
     // respond() reply. Working tools still satisfy "required" mid-task; the turn
-    // ends when respond() is called.
-    if (_respondForced) reqBody.tool_choice = 'required';
+    // ends when the model emits a round with no tool calls (natural end).
+    if (_respondForced && !ctx._responded) reqBody.tool_choice = 'required';
     const reasoning = _openRouterReasoning(config);
     if (config.maxTokens != null) reqBody[reasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
@@ -3150,7 +3155,7 @@ async function runAgent(config, ctx) {
             stream_options: { include_usage: true },
             tools: _availTools,
           };
-          if (_respondForced) compactedReqBody.tool_choice = 'required';
+          if (_respondForced && !ctx._responded) compactedReqBody.tool_choice = 'required';
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
@@ -3186,18 +3191,36 @@ async function runAgent(config, ctx) {
       if (t && t.trim()) round.reasoning_content = (round.reasoning_content ? round.reasoning_content + '\n\n' : '') + t;
     };
     let respondLocaleOverride = null;
+    let _rejectRespondLang = false;
+    let _rejectReason = '';
     if (respondCall) {
-      try { const _a = JSON.parse(respondCall.function.arguments || '{}'); respondText = String(_a.text ?? ''); respondLocaleOverride = _locFromOverride(_a.language); }
-      catch (_) { respondText = ''; }
+      try { const _a = JSON.parse(respondCall.function.arguments || '{}'); respondText = String(_a.text ?? ''); respondLocaleOverride = _locFromOverride(_a.language); if (!respondLocaleOverride) { _rejectRespondLang = true; _rejectReason = 'missing'; } }
+      catch (_) { respondText = ''; _rejectRespondLang = true; _rejectReason = 'missing'; }
       _stashAside(round.content);                        // keep any non-respond prose as thinking
-      round.content = respondText;                       // the visible reply IS respond's text
+      if (_rejectRespondLang) {
+        round.content = '';                              // rejected — don't deliver
+      } else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) {
+        _rejectRespondLang = true; _rejectReason = 'cap';
+        round.content = '';
+      } else if (ctx._respondLangs && ctx._respondLangs.has(respondLocaleOverride.code)) {
+        _rejectRespondLang = true; _rejectReason = 'duplicate';
+        round.content = '';
+      } else {
+        round.content = respondText;                     // the visible reply IS respond's text
+        ctx._responded = true;                           // at least one respond delivered this turn
+        ctx._respondCount++;
+        ctx._respondLangs.add(respondLocaleOverride.code);
+      }
     } else if (_respondForced && round.tool_calls.length) {
       _stashAside(round.content);                        // working-tool round: keep leaked prose as thinking
       round.content = '';
     } else if (_respondForced && !round.tool_calls.length && !ctx.signal?.aborted
-               && ctx._respondRetries < MAX_RESPOND_RETRIES) {
+               && !ctx._responded && ctx._respondRetries < MAX_RESPOND_RETRIES) {
       round.content = '';                                // bare prose attempt — hide it; we'll force respond() below
       _forceRespondRetry = true;
+    } else if (_respondForced && !round.tool_calls.length && ctx._responded) {
+      _stashAside(round.content);                        // already responded — bare prose after respond is not shown
+      round.content = '';
     }
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls, locale: respondLocaleOverride || undefined });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
@@ -3295,12 +3318,54 @@ async function runAgent(config, ctx) {
       }
       ctx.emit({ type: 'tool_started', tc });
       if (tc.function.name === 'respond') {
-        // Deliver the reply to the page via a sentinel tool_result (the page
-        // renders it as the assistant bubble), and answer the tool_call with a
-        // minimal ack so the assistant tool_calls entry is never left orphaned.
-        // Not tagged with an [rN] id and never truncated — it is a delivery, not
-        // an observation of the world the model might cite.
-        ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + respondText });
+        // Per-call validation: the first respond in the round was validated by
+        // the pre-scan; subsequent ones (rare: multiple respond() in one round)
+        // are validated here individually.
+        let _tcText, _tcLocale, _tcReject = false, _tcReason = '';
+        if (tc === respondCall) {
+          _tcText = respondText; _tcLocale = respondLocaleOverride;
+          _tcReject = _rejectRespondLang; _tcReason = _rejectReason;
+        } else {
+          try {
+            const _a2 = JSON.parse(tc.function.arguments || '{}');
+            _tcText = String(_a2.text ?? '');
+            _tcLocale = _locFromOverride(_a2.language);
+            if (!_tcLocale) { _tcReject = true; _tcReason = 'missing'; }
+            else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) { _tcReject = true; _tcReason = 'cap'; }
+            else if (ctx._respondLangs.has(_tcLocale.code)) { _tcReject = true; _tcReason = 'duplicate'; }
+          } catch (_) { _tcText = ''; _tcReject = true; _tcReason = 'missing'; }
+        }
+        if (_tcReject) {
+          let _rejMsg;
+          if (_tcReason === 'cap') {
+            _rejMsg = 'TURN ENDED: You have delivered the maximum number of replies ('
+              + MAX_RESPOND_DELIVERIES + ') this turn. Do not call respond() again.';
+          } else if (_tcReason === 'duplicate') {
+            _rejMsg = 'REJECTED: You already delivered a reply in this language ('
+              + (_tcLocale ? _tcLocale.code : '?') + '). Do not repeat the same language. '
+              + 'If you have no more languages to deliver, simply stop calling tools — the turn will end.';
+          } else {
+            ctx._langRejectCount = (ctx._langRejectCount || 0) + 1;
+            if (ctx._langRejectCount > 3) {
+              ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
+              const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
+              messages.push(rmsg); await emitAdded(rmsg); continue;
+            }
+            _rejMsg = 'REJECTED: The "language" parameter is REQUIRED on respond(). '
+              + 'Call respond() again with the SAME text but include the "language" field '
+              + 'set to the language code the user asked for (e.g. "ca", "es", "en").';
+          }
+          ctx.emit({ type: 'tool_result', id: tc.id, result: _rejMsg });
+          const rmsg = { role: 'tool', tool_call_id: tc.id, content: _rejMsg };
+          messages.push(rmsg); await emitAdded(rmsg); continue;
+        }
+        // Accepted — deliver. Track for subsequent calls if not the pre-scanned one.
+        if (tc !== respondCall) {
+          ctx._responded = true;
+          ctx._respondCount++;
+          ctx._respondLangs.add(_tcLocale.code);
+        }
+        ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
         const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
         messages.push(rmsg);
         await emitAdded(rmsg);
@@ -3335,9 +3400,11 @@ async function runAgent(config, ctx) {
       await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
-    // respond() delivered the turn's final reply — it is terminal. Skip the
-    // drift/compaction bookkeeping (there is no next round) and end the turn.
-    if (respondCall) break;
+    // Hard cap on respond() deliveries — force turn end to prevent loops.
+    if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) break;
+    // respond() no longer ends the turn — the model may call respond() again
+    // (e.g. for a different language) or end naturally with no tool calls.
+    // Continue to drift/compaction bookkeeping and the next round.
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
     // completion clears the stop guard, so a model that keeps finishing items is
     // helped indefinitely while one that merely rewrites the list without progress

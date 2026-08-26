@@ -22,7 +22,7 @@ Examples:
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
         timeout: { type: 'number', description: 'Max seconds the script may run before it is killed (default 120, max 600). On timeout the run is aborted and its interpreter discarded, so it can never hang the conversation — raise this only for genuinely long computations.' },
       },
-      required: ['path'],
+      required: ['path', 'language'],
     },
   },
   write_file: {
@@ -139,9 +139,9 @@ Typical flow:
       type: 'object',
       properties: {
         path: { type: 'string', description: 'OPFS path to the file (e.g. "projects/<project>/chart.html"). No leading slash.' },
-        language: { type: 'string', description: 'The language this deliverable file should be delivered in (e.g. "ca", "es", "en"). Defaults to the user\'s Reply language. Set ONLY when the user explicitly asked for this file in a specific language.' },
+        language: { type: 'string', description: 'REQUIRED. The language code for this deliverable (e.g. "ca", "es", "en").' },
       },
-      required: ['path'],
+      required: ['path', 'language'],
     },
   },
     load_skill: {
@@ -292,7 +292,7 @@ Cap ~4KB. The result echoes the byte count stored.`,
         properties: {
           text: { type: 'string', description: 'The full new content of the scratchpad (overwrites previous).' },
         },
-        required: ['text'],
+        required: ['text', 'language'],
       },
     },
         spawn_subagent: {
@@ -416,17 +416,17 @@ LANGUAGE: the questions and options are shown to the user verbatim — write the
     },
 
     respond: {
-      description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown — and the turn ENDS immediately after, so call it exactly once, last.
+      description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown.
 WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.
-LANGUAGE: write "text" in the user's language (the one you were instructed to reply in). Do not leak the language you reasoned in.
-WHEN: as the last thing you do in a turn — once the task is done, or to answer a question. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
+LANGUAGE: "language" is REQUIRED. Set it to the language code the user asked for (e.g. "ca", "es", "en"). Write "text" in that language. Do not leak the language you reasoned in.
+WHEN: as the last thing you do in a turn — once the task is done, or to answer a question. You may call respond() multiple times in one turn if the user asked for replies in multiple languages — each call delivers one reply in one language. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
       parameters: {
         type: 'object',
         properties: {
           text: { type: 'string', description: 'Your complete user-facing reply, in the user\'s language. Markdown supported. Shown to the user exactly as written.' },
-          language: { type: 'string', description: 'The language the reply should be delivered in (e.g. "ca", "es", "en"). Defaults to the user\'s Reply language. Set ONLY when the user explicitly asked for this reply in a specific language.' },
+          language: { type: 'string', description: 'REQUIRED. The language code for this reply (e.g. "ca", "es", "en").' },
         },
-        required: ['text'],
+        required: ['text', 'language'],
       },
     },
 

@@ -28,3 +28,4 @@ _bonsai17/
 _hf/
 *.cpu.bin
 _cpukern/target/
+test/lang-harness/.env
