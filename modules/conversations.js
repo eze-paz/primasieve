@@ -2153,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=129');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=130');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3219,6 +3219,7 @@ async function localize(texts, to, toName) {
     const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
     const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + (toName || to) + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + (toName || to) + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
     const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(miss) }], stream: false, temperature: 0 };
+    if (activeConvId) body.session_id = 'Translate:' + (await ensureSessionId(activeConvId));   // parent-session marker
     const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
     const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
     const j = await r.json();
@@ -5141,6 +5142,7 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
     const title = await SandpieAutoTitle.generate({
       userText: _convText(firstUser.content),
       assistantText: firstAsst ? _convText(firstAsst.content) : '',
+      sessionId: 'Retitle:' + (await ensureSessionId(convId)),   // parent-session marker for /admin/transcripts
     });
     if (!title || title === stored) return '';
     await updateConvFile(convId, { title, titleLocked: true });

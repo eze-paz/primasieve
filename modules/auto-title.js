@@ -85,7 +85,7 @@ const SandpieAutoTitle = (function () {
   // in-browser) via the shared SandpieProviders.complete(). Returns a clean title
   // or '' — it never throws for a bad/empty answer, only for a transport failure,
   // which the caller treats as "leave the title alone and try again next turn".
-  async function generate({ userText = '', assistantText = '', signal } = {}) {
+  async function generate({ userText = '', assistantText = '', signal, sessionId = null } = {}) {
     if (!isEnabled()) return '';
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return '';
     const u = String(userText || '').trim().slice(0, CHARS_PER_MSG);
@@ -103,6 +103,7 @@ const SandpieAutoTitle = (function () {
       maxTokens: isLocal ? MAXTOK_LOCAL : MAXTOK_CLOUD,
       noReasoning: true,
       signal,
+      sessionId,   // inherit parent session so /admin/transcripts groups the retitle op
     });
     const title = clean(out);
     // Don't fail silently: a model that answered but whose answer was unusable is

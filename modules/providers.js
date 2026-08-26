@@ -168,7 +168,7 @@ function getActiveProvider() {
 // maxTokens: null (default) sends NO max_tokens on the wire for cloud providers
 // (OpenAI-spec default — the model's own cap). In-browser engines still need a
 // concrete generation budget, so the local paths below fall back to 1024.
-async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal, noReasoning = false } = {}) {
+async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal, noReasoning = false, sessionId = null } = {}) {
   const active = getActiveProvider();
   const localMax = maxTokens != null ? maxTokens : 1024;
   // local-LM inference paths removed
@@ -183,6 +183,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
   // exact failure that blocked memory consolidation. SSE keeps tokens flowing so the
   // idle-timeout never fires; we just assemble the text and return it.
   const body = { model: mdl, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], stream: true, stream_options: { include_usage: true } };
+  if (sessionId) body.session_id = sessionId;   // parent-session marker e.g. "Retitle:<sid>"
   if (maxTokens != null) body.max_tokens = maxTokens;
   if (active && active.temperature != null) body.temperature = active.temperature;
   // noReasoning: for a short utility call (a conversation title), thinking is pure

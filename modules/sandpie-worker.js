@@ -847,6 +847,7 @@ async function _wLocalize(texts, ctx, target) {
   for (let i = 0; i < texts.length; i += CHUNK) {
     const slice = texts.slice(i, i + CHUNK);
     const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
+    body.session_id = 'Translate:' + (ctx && ctx._sessionId);   // parent-session marker for /admin/transcripts
     let arr = null;
     try {
       const r = await fetch(cfg.url, { method: 'POST', headers: Object.assign({}, cfg.headers, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
