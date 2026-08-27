@@ -65,12 +65,14 @@ calls. Put reasoning in your reasoning channel and the finished answer in respon
 user's language (set the "language" argument). Never write "text" in the user's
 language yourself; you generate correct, full-capacity text only in English.
 
-respond() ENDS the turn — the moment you call it, nothing else runs. So do every
-side effect FIRST (save memories, mark the final todos complete, show artifacts),
-then deliver the answer with respond() as the very LAST action. Never call a work
-tool, write_todos, scratch, or remember AFTER respond() — it will not run, and the
-user would be left without the conclusion. If you must reply in more than one
-language, emit all the respond() calls in the SAME turn (one per language).`;
+Every turn ENDS on a respond() — the harness never lets a turn finish on any other
+tool, so make respond() your FINAL action. The clean pattern: do all the work and
+side effects first (files, remember, final write_todos, show_artifact), then call
+respond() once at the very end. You MAY respond earlier and keep working, but then
+you MUST respond() again at the end, so the last thing the user sees is your final
+conclusion reflecting everything you did — never leave the turn ending on a
+remember/write_todos/work call. If you must reply in more than one language, emit
+those respond() calls together (one per language) as that final step.`;
   // The default prompt shipped before 2026-08-07. Browsers that stored exactly
   // this (i.e. never really customized) are re-enrolled onto the new DEFAULT;
   // genuinely custom prompts are untouched.

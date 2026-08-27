@@ -3020,6 +3020,8 @@ async function runAgent(config, ctx) {
   ctx._respondLangs = new Set(); // language codes already delivered this turn (dedup)
   ctx._respondCount = 0;        // successful respond() deliveries this turn (hard cap)
   ctx._forceRespondNext = false; // one-shot: the NEXT request must compel respond() BY NAME (armed after a bare-prose round)
+  ctx._respondIsLatest = false;  // was the MOST RECENT tool action a respond()? true on deliver/synth, false on any other tool → the turn may only end when true (final action is always respond)
+  ctx._finalRespondForces = 0;   // times we've forced a closing respond() because the model tried to end on a non-respond action
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
   // Bare-prose attempts to reject before falling back to DELIVERING the prose.
@@ -3031,6 +3033,7 @@ async function runAgent(config, ctx) {
   // session Reply language) — never a blank turn.
   const MAX_RESPOND_RETRIES = 2;
   const MAX_RESPOND_DELIVERIES = 5;   // hard cap on respond() deliveries per turn
+  const MAX_FINAL_RESPOND_FORCES = 3; // times we re-prompt for a closing respond() before giving up and ending anyway
   // This turn forces respond() when the tool is present: the visible reply comes
   // ONLY from respond(), plain content is hidden, and respond() is the only clean
   // way to end. Subagents (no respond in their toolset) are unaffected.
@@ -3162,11 +3165,13 @@ async function runAgent(config, ctx) {
     // BY NAME. Plain 'required' is too weak — it's satisfiable by write_todos /
     // scratch / remember, so the model dodges the one visible channel and the user
     // never sees a reply. One-shot: consumed for this round's request(s).
-    const _forceRespondNow = _respondForced && !ctx._responded && ctx._forceRespondNext;
+    // Applies both BEFORE the first respond (bare-prose dodge) and AFTER it (a
+    // closing respond forced because the model tried to end on a non-respond action).
+    const _forceRespondNow = _respondForced && ctx._forceRespondNext;
     ctx._forceRespondNext = false;
     const _respondToolChoice = _forceRespondNow
       ? { type: 'function', function: { name: 'respond' } }
-      : 'required';
+      : (_respondForced && !ctx._responded ? 'required' : undefined);
     const reqBody = {
       model: config.model,
       messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
@@ -3174,12 +3179,13 @@ async function runAgent(config, ctx) {
       stream_options: { include_usage: true },
       tools: _availTools,
     };
-    // Force a tool call every round when respond() is in play: the model can never
-    // emit free-form prose, so the visible chat is exactly its tool actions + the
-    // respond() reply. Working tools still satisfy "required" mid-task; the turn
-    // ends when the model emits a round with no tool calls (natural end). After a
-    // bare-prose round, _respondToolChoice compels respond() specifically.
-    if (_respondForced && !ctx._responded) reqBody.tool_choice = _respondToolChoice;
+    // Force a tool call every round when respond() is in play (until the first
+    // respond): the visible chat is exactly the tool actions + the respond() reply.
+    // Working tools satisfy 'required' mid-task. _respondToolChoice escalates to
+    // respond()-by-name when a respond is being forced (bare-prose dodge, or the
+    // closing respond). After the first respond it is undefined (model may keep
+    // working) unless a closing respond is being forced.
+    if (_respondToolChoice) reqBody.tool_choice = _respondToolChoice;
     const reasoning = _openRouterReasoning(config);
     if (config.maxTokens != null) reqBody[reasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
@@ -3210,7 +3216,7 @@ async function runAgent(config, ctx) {
             stream_options: { include_usage: true },
             tools: _availTools,
           };
-          if (_respondForced && !ctx._responded) compactedReqBody.tool_choice = _respondToolChoice;
+          if (_respondToolChoice) compactedReqBody.tool_choice = _respondToolChoice;
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
@@ -3268,6 +3274,7 @@ async function runAgent(config, ctx) {
       } else {
         round.content = respondText;                     // the visible reply IS respond's text
         ctx._responded = true;                           // at least one respond delivered this turn
+        ctx._respondIsLatest = true;                     // most recent action is a respond → turn may end here
         ctx._respondCount++;
         ctx._respondLangs.add(respondLocaleOverride.code);
       }
@@ -3289,6 +3296,7 @@ async function runAgent(config, ctx) {
       // frees up and the reply isn't re-forced. round.content is left intact.
       respondLocaleOverride = ctx._localize || null;     // session Reply-language authority (null = English)
       ctx._responded = true;
+      ctx._respondIsLatest = true;                        // synth reply counts as the closing respond
       ctx._respondCount++;
       if (respondLocaleOverride && respondLocaleOverride.code) ctx._respondLangs.add(respondLocaleOverride.code);
     } else if (_respondForced && !round.tool_calls.length && ctx._responded) {
@@ -3322,6 +3330,12 @@ async function runAgent(config, ctx) {
       // (or while it was finishing) keep the loop alive so that message gets
       // answered instead of stranded until a fresh turn. Otherwise the turn ends.
       if (!ctx.signal?.aborted && ((_agentSteers.get(ctx.agentId) || []).length)) { await drainSteers(); continue; }
+      // A reply was delivered AND it was the model's MOST RECENT action → the turn
+      // ends here, on the answer. This is the only clean way a respond()-forced turn
+      // ends, so the last thing the user sees is ALWAYS a respond(). (If the model
+      // responded earlier but then did more work, _respondIsLatest is false and we
+      // fall through to force a closing respond below.)
+      if (ctx._respondIsLatest) break;
       // Don't let the model end the turn with todos still open — a finished task
       // is often just left unmarked, or the provider dropped the closing round.
       // Re-prompt and continue, unless the user stopped it (abort) or we've hit
@@ -3350,6 +3364,23 @@ async function runAgent(config, ctx) {
         ctx.emit({ type: 'reminder', kind: 'stop-anyway',
           text: 'Ended with ' + openTodos().length + ' open todo(s) after ' + MAX_STOP_BLOCKS
             + ' auto-continues without progress.' });
+      }
+      // INVARIANT: a turn ALWAYS ends on a respond(). We only reach here when the
+      // model tried to end but its last action was NOT a respond() — either it never
+      // answered, or it answered earlier and then did more work (remember, write_todos,
+      // tools). Force a closing respond() (named tool_choice) so the conclusion is the
+      // final thing on screen. Capped so a model that refuses can't loop forever.
+      if (_respondForced && !ctx.signal?.aborted && ctx._finalRespondForces < MAX_FINAL_RESPOND_FORCES) {
+        ctx._finalRespondForces++;
+        ctx._forceRespondNext = true;   // next request compels respond() BY NAME
+        setReminder('final-respond',
+          '<system-reminder>You are ending the turn, but your LAST action was not respond() — '
+          + (ctx._responded ? 'you delivered a reply earlier, then did more work since.' : 'you have not delivered a reply at all.')
+          + ' Every turn must END with respond(): call respond() NOW with your final conclusion, reflecting everything you just did '
+          + '(authored in ENGLISH; set the "language" argument). It must be the LAST thing you do this turn — do not run any other tool after it. '
+          + '(final-respond ' + ctx._finalRespondForces + '/' + MAX_FINAL_RESPOND_FORCES + ')</system-reminder>',
+          { attempt: ctx._finalRespondForces });
+        continue;
       }
       break;
     }
@@ -3439,6 +3470,7 @@ async function runAgent(config, ctx) {
           } else {
             ctx._langRejectCount = (ctx._langRejectCount || 0) + 1;
             if (ctx._langRejectCount > 3) {
+              ctx._responded = true; ctx._respondIsLatest = true;
               ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
               const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
               messages.push(rmsg); await emitAdded(rmsg); continue;
@@ -3457,6 +3489,7 @@ async function runAgent(config, ctx) {
           ctx._respondCount++;
           ctx._respondLangs.add(_tcLocale.code);
         }
+        ctx._respondIsLatest = true;   // a respond just executed → it is the latest action (order matters within a batch)
         ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
         const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
         messages.push(rmsg);
@@ -3464,6 +3497,7 @@ async function runAgent(config, ctx) {
         continue;
       }
       ctx._currentToolCallId = tc.id;   // so spawn_subagent can tag its nested events to this box
+      ctx._respondIsLatest = false;      // a non-respond tool is executing → respond is no longer the latest action; the turn can't end until a fresh respond
       let toolOut;
       try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
@@ -3492,13 +3526,11 @@ async function runAgent(config, ctx) {
       await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
-    // respond() is TERMINAL: once the reply is delivered the turn ENDS after this
-    // round — nothing runs after it, so the user's conclusion is ALWAYS the last
-    // thing on screen (no post-answer remember/todo/work churn in later rounds, no
-    // buried reply). To reply in more than one language, emit all the respond()
-    // calls together in THIS single round (they were all delivered in the loop
-    // above). The per-call cap (MAX_RESPOND_DELIVERIES) still rejects excess langs.
-    if (ctx._responded) break;
+    // respond() is NOT terminal: the model MAY respond and then keep working. The
+    // turn-end invariant (last action is always a respond) is enforced in the no-tool
+    // block above via _respondIsLatest + the closing-respond force. Here we only cap
+    // total deliveries so a runaway respond loop can't spin forever.
+    if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) break;
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
     // completion clears the stop guard, so a model that keeps finishing items is
     // helped indefinitely while one that merely rewrites the list without progress
