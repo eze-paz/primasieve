@@ -3275,6 +3275,31 @@ async function renderUserTodos(todos, loc) {
     }));
   } catch (_) { return todos; }
 }
+// Clone an ask() questions array with DISPLAY strings localized (question text,
+// option labels, default). Canonical English is untouched — the caller maps the
+// picked answer back to the English option before replying to the model.
+async function renderUserQuestions(questions, loc) {
+  if (!loc || !loc.code) return questions;
+  try {
+    const qs = questions || [];
+    const strs = [], refs = [];   // refs: ['q',i] | ['o',i,j] | ['d',i]
+    qs.forEach((q, i) => {
+      if (q && typeof q.question === 'string' && q.question.trim()) { strs.push(q.question); refs.push(['q', i]); }
+      ((q && q.options) || []).forEach((o, j) => { if (typeof o === 'string' && o.trim()) { strs.push(o); refs.push(['o', i, j]); } });
+      if (q && typeof q.default === 'string' && q.default.trim()) { strs.push(q.default); refs.push(['d', i]); }
+    });
+    if (!strs.length) return questions;
+    const tr = await localize(strs, loc.code, loc.name);
+    const out = qs.map(q => Object.assign({}, q, { options: (q && Array.isArray(q.options)) ? q.options.slice() : (q && q.options) }));
+    refs.forEach((r, k) => {
+      const v = tr[k]; if (typeof v !== 'string' || !v) return;
+      if (r[0] === 'q') out[r[1]].question = v;
+      else if (r[0] === 'o') { if (Array.isArray(out[r[1]].options)) out[r[1]].options[r[2]] = v; }
+      else if (r[0] === 'd') out[r[1]].default = v;
+    });
+    return out;
+  } catch (_) { return questions; }
+}
 
 /* == Reply-language resolution ================================================
    The Reply language is the SOLE authority for the language sandpie replies in and
@@ -3379,11 +3404,38 @@ function renderQuestions(tcId, questions, reply, convId) {
   const stream = (convId && convStreams.get(convId)) || activeStream();
   const host = (stream && stream.host) || paneScrollEl($('messages')) || $('messages');
   if (!host) return null;
-  const card = buildQuestionsView(questions || [], (answers) => {
+  const qs = questions || [];
+  const card = buildQuestionsView(qs, (answers) => {
     try { reply('answers:' + JSON.stringify(answers)); } catch (_) {}
   });
   if (tcId) card.dataset.askTcId = tcId;
   host.appendChild(card);
+  // Display-only localization: re-render the card in the user's language, but map
+  // each picked answer back to the English canonical option before replying, so
+  // the model always receives the English choice it offered (free text passes
+  // through as typed). Same-order arrays → map by index.
+  const _loc = _currentLocale();
+  if (_loc && _loc.code && qs.length) {
+    renderUserQuestions(qs, _loc).then(qLoc => {
+      try {
+        if (!qLoc || !host.contains(card)) return;
+        const mapReply = (answers) => {
+          const eng = (answers || []).map(a => {
+            const i = qLoc.findIndex(q => q && q.question === a.question);
+            if (i < 0) return a;
+            const en = qs[i] || {};
+            const oj = Array.isArray(qLoc[i].options) ? qLoc[i].options.indexOf(a.answer) : -1;
+            const answer = (oj >= 0 && Array.isArray(en.options) && en.options[oj] != null) ? en.options[oj] : a.answer;
+            return { question: en.question || a.question, answer };
+          });
+          try { reply('answers:' + JSON.stringify(eng)); } catch (_) {}
+        };
+        const l2 = buildQuestionsView(qLoc, mapReply);
+        if (tcId) l2.dataset.askTcId = tcId;
+        host.replaceChild(l2, card);
+      } catch (_) {}
+    });
+  }
   return card;
 }
 
