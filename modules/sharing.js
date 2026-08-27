@@ -267,16 +267,22 @@
   }
   const hubRead = async (a, rel) => { try { return await hubDownload(hubPath(a.dept, a.id, rel)); } catch (e) { console.warn('[sharing] download failed', a.id + '/' + rel, (e && e.message) || e); return null; } };
   // Delete local sandpie/skills/<name>/ folders whose folded name matches an
-  // installed hub skill. Deletions emit file:changed per file so cloud sync
-  // propagates them; the user is told once per replaced folder.
+  // installed hub skill. The deletion must reach the workspace CLOUD too, via
+  // 'file:deleted' on the folder (recursive delete_v2 + pending-delete handshake
+  // + subtree state/index cleanup in dropbox.js). The old code emitted
+  // 'file:changed' per removed file, which marks a nonexistent file dirty and
+  // never deletes the cloud copy — and since sandpie/skills/**/SKILL.md is
+  // exempt (eagerly pulled even in dehydrated mode), every reload re-downloaded
+  // the twin's SKILL.md just for adoptSkill to delete it again, forever.
   async function adoptSkill(id) {
     let tops = []; try { tops = await O().listDir('sandpie/skills'); } catch (_) { return; }
     for (const t of tops) {
       if (t.kind !== 'directory' || foldName(t.name) !== foldName(id)) continue;
       const dir = 'sandpie/skills/' + t.name;
-      for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} markDirtyForWorkspace(dir + '/' + rel); }
+      for (const rel of await listOpfs(dir, '', [])) { try { await O().remove(dir + '/' + rel); } catch (_) {} }
       try { await O().remove(dir); } catch (_) {}
-      console.info('[sharing] local skill "' + t.name + '" replaced by hub skill "' + id + '"');
+      try { if (window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', dir); } catch (_) {}
+      console.info('[sharing] local skill "' + t.name + '" replaced by hub skill "' + id + '" (cloud copy queued for deletion)');
     }
   }
   // Which file the home row opens: the publisher's pick, else conventions.
