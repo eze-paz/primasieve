@@ -3679,8 +3679,9 @@ function buildTodosView(todos) {
   wrap.className = 'tool-todos';
   const head = document.createElement('div');
   head.className = 'tool-todos-head';
-  const done = (todos || []).filter(t => t && t.status === 'completed').length;
-  head.textContent = 'Checklist \u00b7 ' + done + '/' + todos.length + ' done';
+  const live = (todos || []).filter(t => t && t.status !== 'deleted' && t.status !== 'withdrawn');
+  const done = live.filter(t => t.status === 'completed').length;
+  head.textContent = 'Checklist \u00b7 ' + done + '/' + live.length + ' done';
   wrap.appendChild(head);
   for (const t of (todos || [])) {
     const st = (t && t.status) || 'pending';
