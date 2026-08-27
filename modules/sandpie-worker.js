@@ -3065,6 +3065,27 @@ async function runAgent(config, ctx) {
   const maxRounds = config.maxRounds || 0;
   let _roundNo = 0;
 
+  // ---- Per-turn profiling ----------------------------------------------------
+  // Splits the turn's wall time into: completion (waiting on the model stream),
+  // tool compute (each tool timed individually — run_python IS the pyodide cost),
+  // and mid-turn compaction (summarizer model calls). Emitted once as a `timing`
+  // event just before agent_done; the page forwards it to /api/usage/timing for
+  // the admin profiling panel. Subagents (maxRounds set) never emit — their whole
+  // runtime is already counted under the PARENT's spawn_subagent tool time, so a
+  // separate report would double-count.
+  const _profNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const _prof = {
+    completionMs: 0, completionCalls: 0, compactionMs: 0,
+    toolMs: 0, toolCalls: 0, tools: Object.create(null),
+    wallStart: _profNow(),
+  };
+  ctx._prof = _prof;
+  const _profTool = (name, ms, isErr) => {
+    const t = _prof.tools[name] || (_prof.tools[name] = { ms: 0, calls: 0, errors: 0 });
+    t.ms += ms; t.calls++; if (isErr) t.errors++;
+    _prof.toolMs += ms; _prof.toolCalls++;
+  };
+
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
     if (maxRounds && _roundNo >= maxRounds) {
@@ -3195,9 +3216,12 @@ async function runAgent(config, ctx) {
     // providers in order, e.g. ['deepseek'] to hit DeepSeek's own endpoint first.
     if (config.providerRouting) reqBody.provider = config.providerRouting;
     let round;
+    const _cWaitStart = _profNow();
     try {
       round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
+      _prof.completionMs += _profNow() - _cWaitStart; _prof.completionCalls++;
     } catch (e) {
+      _prof.completionMs += _profNow() - _cWaitStart;   // the failed wait still cost wall time
       if (isContextOverflowError(e)) {
         // Request exceeded the model's context window (HTTP 413, or a 400/422
         // "maximum context length…" the provider streamed back). Same cure:
@@ -3207,7 +3231,9 @@ async function runAgent(config, ctx) {
         // token count and can miss it, so this is the backstop that must catch it.
         ctx.emit({ type: 'info', message: 'Context window exceeded — compacting and retrying…' });
         try {
+          const _cmpStart = _profNow();
           await maybeCompactMidTurn(config, messages, ctx, null); // null promptTokens forces compaction
+          _prof.compactionMs += _profNow() - _cmpStart;
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
             model: config.model,
@@ -3222,7 +3248,9 @@ async function runAgent(config, ctx) {
           if (config.topP != null) compactedReqBody.top_p = config.topP;
           if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
           if (config.providerRouting) compactedReqBody.provider = config.providerRouting;
+          const _cWaitStart2 = _profNow();
           round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
+          _prof.completionMs += _profNow() - _cWaitStart2; _prof.completionCalls++;
         } catch (compactErr) {
           if (compactErr && compactErr.compactionFailed) {
             ctx.emit({ type: 'error', message: compactErr.message || 'Compaction failed.' });
@@ -3499,8 +3527,14 @@ async function runAgent(config, ctx) {
       ctx._currentToolCallId = tc.id;   // so spawn_subagent can tag its nested events to this box
       ctx._respondIsLatest = false;      // a non-respond tool is executing → respond is no longer the latest action; the turn can't end until a fresh respond
       let toolOut;
+      const _toolStart = _profNow();
+      let _toolErr = false;
       try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
-      catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; }
+      catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; _toolErr = true; }
+      // Profiling: per-tool wall time (run_python == pyodide). Count as an error
+      // when the call threw or the tool returned an "Error:" result.
+      _profTool(tc.function.name, _profNow() - _toolStart,
+        _toolErr || /^(\[r\d+\] )?Error:/.test((toolOut && toolOut.result) || ''));
       if (tc.function.name === 'write_todos' || tc.function.name === 'scratch') touchedTodo = true;
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
       // write_todos results must round-trip intact: the page renders + persists
@@ -3557,11 +3591,29 @@ async function runAgent(config, ctx) {
     // don't do this on the turn's final (no-tool) round — worker compaction is
     // ephemeral (not persisted), so it would be a wasted summarizer call.
     try {
+      const _cmpStart = _profNow();
       await maybeCompactMidTurn(config, messages, ctx, round.usage && round.usage.prompt_tokens);
+      _prof.compactionMs += _profNow() - _cmpStart;
     } catch (e) {
       if (e && e.compactionFailed) { ctx.emit({ type: 'error', message: (e && e.message) || 'Compaction failed.' }); break; }
       console.warn('[sandpie] mid-turn compaction error:', e);
     }
+  }
+  // Per-turn profiling report (main loop only — see the _prof note above). Wall
+  // time that isn't completion/tool/compaction is loop overhead + any idle gaps.
+  if (!maxRounds) {
+    ctx.emit({ type: 'timing', timing: {
+      session_id: ctx._sessionId || null,
+      completion_ms: Math.round(_prof.completionMs),
+      completion_calls: _prof.completionCalls,
+      compaction_ms: Math.round(_prof.compactionMs),
+      tool_ms: Math.round(_prof.toolMs),
+      tool_calls: _prof.toolCalls,
+      wall_ms: Math.round(_profNow() - _prof.wallStart),
+      rounds: _roundNo,
+      tools: Object.fromEntries(Object.entries(_prof.tools).map(
+        ([k, v]) => [k, { ms: Math.round(v.ms), calls: v.calls, errors: v.errors }])),
+    } });
   }
   ctx.emit({ type: 'agent_done', persistedCount: ctx._persistCount });
 }

@@ -2163,7 +2163,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=142');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=143');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2511,6 +2511,9 @@ async function sendSingle(text, stream, opts = {}) {
       // Round boundary: recordUsage just wrote the fresh reported size, so repaint
       // the live ctx counter now instead of waiting for the whole turn to end.
       if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
+    }
+    if (ev.type === 'timing') {
+      reportTurnTiming(convId, ev.timing, convMessages.length);
     }
     dispatchAgentEvent(ev, renderer, host);
   };
@@ -2890,6 +2893,44 @@ function addReportAction(container, reason) {
     });
     container.appendChild(btn);
   } catch (_) {}
+}
+
+// Report per-turn PROFILING to the server for the admin panel. The worker splits
+// the turn's wall time into completion (waiting on the model stream), tool compute
+// (per tool — run_python is the pyodide cost), and mid-turn compaction, and emits
+// it as a `timing` event at turn end. Same transport contract as reportTurnUsage:
+// same-origin cookie auth (never the provider key), best-effort, fire-and-forget —
+// a failure NEVER touches the chat. `timing.session_id` is the stable per-conv
+// cache key the transcript capture also stores, so the server joins the two.
+function reportTurnTiming(convId, timing, turnIndex) {
+  try {
+    if (!convId || !timing || typeof timing.wall_ms !== 'number') return;
+    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const body = {
+      conversation_id: convId,
+      session_id: timing.session_id || null,
+      turn_index: turnIndex | 0,
+      model: (typeof $ === 'function' && $('model')) ? $('model').value : null,
+      provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
+      timing: {
+        completion_ms: timing.completion_ms | 0,
+        completion_calls: timing.completion_calls | 0,
+        compaction_ms: timing.compaction_ms | 0,
+        tool_ms: timing.tool_ms | 0,
+        tool_calls: timing.tool_calls | 0,
+        wall_ms: timing.wall_ms | 0,
+        rounds: timing.rounds | 0,
+        tools: timing.tools && typeof timing.tools === 'object' ? timing.tools : {},
+      },
+    };
+    fetch(new URL('/api/usage/timing', location.href).href, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) { /* analytics must never break the chat */ }
 }
 
 async function readAgentEvents(body, onEvent) {
