@@ -849,8 +849,11 @@ async function _wLocalize(texts, ctx, target) {
   const loc = target || (ctx && ctx._localize) || {};
   const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
   if (!code || code === 'en') return texts;
-  // Primary: Bergamot on-device — hosted packs (ca/es); en handled above. On any
-  // miss (unsupported code / pack not hosted / error) fall through to gemini.
+  // On-device Bergamot only (gemini disabled). en handled above. Coverage = whichever
+  // en->X packs are hosted server-side (fetched on demand, OPFS-cached). The per-call
+  // `target` (from show_artifact's `language`) wins over the system locale, so a
+  // "translate to X" task localizes each deliverable to X, ignoring the system language.
+  // Fail-open to English on a missing pack / error.
   try {
     _ensureBergamot();
     if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
@@ -861,31 +864,9 @@ async function _wLocalize(texts, ctx, target) {
     });
     return await Bergamot.translate(texts, code);
   } catch (e) {
-    console.warn('[wLocalize] bergamot miss (→ gemini):', (e && e.message) || e);
+    console.warn('[wLocalize] bergamot failed (keeping English):', (e && e.message) || e);
+    return texts;
   }
-  // Fallback: gemini localizer — universal coverage so a deliverable in ANY
-  // requested language still works, not just the hosted Bergamot packs.
-  const cfg = ctx && ctx._agentConfig;
-  if (!cfg || !cfg.url) return texts;
-  const tgt = loc.name || loc.code || 'the target language';
-  const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
-  const CHUNK = 50;   // keep each request modest (upstream body cap ~1MB)
-  const out = [];
-  for (let i = 0; i < texts.length; i += CHUNK) {
-    const slice = texts.slice(i, i + CHUNK);
-    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
-    body.session_id = 'Translate:' + (ctx && ctx._sessionId);   // parent-session marker for /admin/transcripts
-    let arr = null;
-    try {
-      const r = await fetch(cfg.url, { method: 'POST', headers: Object.assign({}, cfg.headers, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
-      const j = await r.json();
-      let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
-      content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
-      arr = JSON.parse(content);
-    } catch (e) { console.warn('[wLocalize] chunk failed (keeping English):', (e && e.message) || e); }
-    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
-  }
-  return out;
 }
 const _DOCX_LX_EXTRACT = `import sys, json
 try:
