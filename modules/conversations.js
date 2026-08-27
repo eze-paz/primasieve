@@ -2347,6 +2347,28 @@ function workerAgentStream(worker, id, signal) {
   const queue = [];
   let streamDone = false;
   let notify = null;
+  let cleaned = false;
+
+  // Idempotent teardown. `sendAbort` posts {type:'abort', id} so the worker's
+  // agent loop actually stops (cascades to run_python kills, shell/fetch aborts
+  // via _agentAborts). Detaches the message listener AND the abort listener so
+  // neither leaks across turns.
+  const cleanup = (sendAbort) => {
+    if (cleaned) return;
+    cleaned = true;
+    worker.removeEventListener('message', messageHandler);
+    if (signal) signal.removeEventListener('abort', onAbort);
+    if (sendAbort) { try { worker.postMessage({ type: 'abort', id }); } catch (_) {} }
+  };
+
+  // When the turn's signal fires we CANNOT rely on the ReadableStream's cancel()
+  // to reach the worker: aborting rejects pull(), which *errors* the stream, and
+  // per the Streams spec an errored stream never invokes the source's cancel().
+  // So do the worker abort + listener teardown here, directly off the signal.
+  const onAbort = () => {
+    cleanup(true);
+    if (notify) { const n = notify; notify = null; n(); }
+  };
 
   const messageHandler = (event) => {
     const msg = event.data;
@@ -2354,16 +2376,15 @@ function workerAgentStream(worker, id, signal) {
     queue.push(JSON.stringify(msg.event) + '\n');
     if (msg.event.type === 'agent_done' || msg.event.type === 'error') {
       streamDone = true;
-      worker.removeEventListener('message', messageHandler);
+      cleanup(false);   // natural end: detach listeners, worker already stopped
     }
     if (notify) { const n = notify; notify = null; n(); }
   };
   worker.addEventListener('message', messageHandler);
-
-  const cleanup = () => {
-    worker.removeEventListener('message', messageHandler);
-    try { worker.postMessage({ type: 'abort', id }); } catch (_) {}
-  };
+  if (signal) {
+    if (signal.aborted) onAbort();   // aborted before we even wired up → stop the worker now
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
 
   const enc = new TextEncoder();
   return new ReadableStream({
@@ -2381,7 +2402,7 @@ function workerAgentStream(worker, id, signal) {
       while (queue.length > 0) controller.enqueue(enc.encode(queue.shift()));
       if (streamDone) controller.close();
     },
-    cancel() { cleanup(); },
+    cancel() { cleanup(true); },
   });
 }
 
