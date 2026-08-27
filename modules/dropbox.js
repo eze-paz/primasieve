@@ -739,8 +739,12 @@
       result = await listFolder(workingRoot(), { recursive: true });
     } catch (e) {
       if (String(e.message).includes('not_found')) {   // working folder doesn't exist yet (or was deleted)
+        // A not_found AFTER ensureWorkingRoot() is anomalous (transient namespace
+        // hiccup, or the folder briefly gone). `absent:true` tells the sync engine
+        // this listing is NOT authoritative, so it must NOT treat the empty index
+        // as "everything was deleted remotely" and wipe clean local files (C3).
         setCursor(null); setCloudIndex({}); setPending({});
-        return { index: {}, delta: null, deltaOwn: [] };
+        return { index: {}, delta: null, deltaOwn: [], absent: true };
       }
       throw e;
     }
@@ -753,7 +757,14 @@
     }
     if (confirmed.length) clearPending(confirmed);
     setCursor(result.cursor); setCloudIndex(out);
-    return { index: out, delta: null, deltaOwn: [] };
+    // An empty enumeration of an existing working root is likewise treated as
+    // non-authoritative for deletion. A genuinely-empty cloud (brand-new account)
+    // has nothing local to delete anyway, so skipping the delete passes is a no-op
+    // there; the only behaviour we forgo is auto-propagating a full remote wipe on
+    // a cursorless full-scan — which the next cursor-delta sync reports explicitly
+    // and safely (see the `deleted` branch above). Recoverable vs. irreversible.
+    const absent = Object.keys(out).length === 0;
+    return { index: out, delta: null, deltaOwn: [], absent };
   }
   // ---- bounded-parallel per-file download ------------------------------------
   const DL_CONCURRENCY = 32;   // wire drain is still capped by dbxFetch pacing (429 safety); this lets more write/mtime tail queue behind in-flight fetches
@@ -1056,7 +1067,7 @@
     try {
       await ensureWorkingRoot();
       dbxStatus('', 'connected');
-      const { index: cloud, delta, deletions, deltaOwn } = await cloudListWorking();
+      const { index: cloud, delta, deletions, deltaOwn, absent } = await cloudListWorking();
       // Device-switch signal: the cursor reported changes (adds/changes OR
       // deletions). No stale-time gate — splash fires on ANY delta now.
       // (delta covers dehydrated files too — they still changed on another device.)
@@ -1075,6 +1086,14 @@
       const cloudSet = new Set(Object.keys(cloud));
       const p = pending();
       const isConv = p => p.includes('conversations');
+
+      // C3 guard: an `absent` listing (not_found, or an empty enumeration) is NOT
+      // authoritative. Running the delete passes against its empty cloudSet would
+      // wipe every clean local file on a transient blip. Skip the two destructive
+      // passes; pulls, dirty-pushes, and cursor-reported deletions still proceed.
+      if (absent && cloudSet.size === 0) {
+        _splashLog('[dropbox] cleanup SKIPPED — cloud listing not authoritative (absent/empty); no local deletes this pass');
+      } else {
 
       // ── Pass 1: entries still in sync-state ──
       for (const path of Object.keys(state)) {
@@ -1124,6 +1143,8 @@
         }
       }
       _splashLog('[dropbox] cleanup done:', allLocal.length, 'local files,', cloudSet.size, 'cloud items,', removedCount, 'deleted,', keptCount, 'kept');
+
+      }   // end C3 authoritative-listing guard
 
       // pull
       const toConsider = (fullScan || delta === null) ? Object.entries(cloud) : delta;
