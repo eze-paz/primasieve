@@ -447,6 +447,16 @@
   .msg-actions .act-copy svg { width: 14px; height: 14px; fill: currentColor; }
   .msg-actions .act-copy:hover { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-border-bright); }
   .msg-actions .act-copy.done { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-accent); }
+  /* Report action outside the assistant actions strip (err/status bubbles) */
+  .msg > .act-copy.act-report {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
+    background: transparent; border: 1px solid transparent; border-radius: 6px;
+    color: var(--sp-text-dim); cursor: pointer; margin-top: 6px; font-style: normal;
+    transition: color 0.1s, background 0.1s, border-color 0.1s;
+  }
+  .msg > .act-copy.act-report svg { width: 14px; height: 14px; fill: currentColor; }
+  .msg > .act-copy.act-report:hover { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-border-bright); }
+  .msg > .act-copy.act-report.done { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-accent); }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
   .info { align-self: center; color: var(--sp-text-dim); font-style: italic; font-size: 0.85em; }
   .assistant > *:first-child { margin-top: 0; }
