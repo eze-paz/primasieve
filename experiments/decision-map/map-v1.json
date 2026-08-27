@@ -1,0 +1,52 @@
+{
+  "name": "generic-decision-map",
+  "version": 1,
+  "note": "First-pass map as sketched from theory. Kept for the record; superseded by map.json (v2) after the 100-prompt validation in validation.md.",
+  "router": "classify the prompt into exactly one shape, then execute its leaf",
+  "shapes": [
+    {
+      "id": "CHAT",
+      "cue": "phatic, simple, conversational",
+      "procedure": "just answer; all scaffolding off"
+    },
+    {
+      "id": "CLARIFY",
+      "cue": "underspecified request",
+      "procedure": "ask one question; forbidden to guess"
+    },
+    {
+      "id": "FACT_LOOKUP",
+      "cue": "answer exists in a corpus",
+      "procedure": "retrieve, cite, answer from retrieved text",
+      "negative": "forbidden to answer from weights"
+    },
+    {
+      "id": "COMPUTE",
+      "cue": "answer is derivable",
+      "procedure": "write code, run it, report the result",
+      "negative": "forbidden to do arithmetic in-token"
+    },
+    {
+      "id": "TRANSFORM",
+      "cue": "all needed info is in the input (summarize, translate, reformat, extract)",
+      "procedure": "map-reduce over chunks sized to coherence window",
+      "negative": "forbidden to add outside knowledge"
+    },
+    {
+      "id": "GENERATE",
+      "cue": "open-ended writing",
+      "procedure": "draft -> checklist critique -> final; best-of-N if quality matters"
+    },
+    {
+      "id": "DECIDE",
+      "cue": "choose among options",
+      "procedure": "author criteria checklist, score each option independently, compare",
+      "negative": "never holistic one-shot judgment"
+    },
+    {
+      "id": "AGENTIC",
+      "cue": "multi-step, stateful",
+      "procedure": "decompose into a todo list of the shapes above; each step re-enters the map"
+    }
+  ]
+}
