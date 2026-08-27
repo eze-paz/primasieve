@@ -2153,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=137');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=138');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3256,6 +3256,17 @@ function _bergamotCfg() {
 // Localize a single user-facing string (bubbles/status). Returns English on failure.
 async function renderUserText(text, loc) {
   if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) return text;
+  // Default: whole-string translate (best sentence quality). Only when the text
+  // carries structure the NMT would shred (a markdown table / code fence) switch
+  // to the structure-preserving per-cell translator — keeps sentence quality AND
+  // preserves markdown.
+  if (typeof Bergamot !== 'undefined' && Bergamot.isStructured(text)) {
+    try {
+      Bergamot.configure(_bergamotCfg());
+      const r = await Bergamot.translateMarkdown(text, loc.code);
+      if (typeof r === 'string' && r) return r;
+    } catch (_) {}
+  }
   const [t] = await localize([text], loc.code, loc.name);
   return t || text;
 }

@@ -840,7 +840,7 @@ function _locFromOverride(code){
 let _bergamotLoaded = false;
 function _ensureBergamot() {
   if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=3', self.location.href).href);
+  importScripts(new URL('bergamot.js?v=4', self.location.href).href);
   _bergamotLoaded = true;
 }
 
@@ -862,7 +862,18 @@ async function _wLocalize(texts, ctx, target) {
       wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
       modelBase:  new URL('../bergamot-models/', self.location.href).href,
     });
-    return await Bergamot.translate(texts, code);
+    // Structured items (a table/code fence — e.g. a markdown deliverable block) go
+    // through the per-cell translator to keep the grid intact; plain items keep the
+    // higher-quality whole-string batch translate.
+    const plainIdx = [], plain = [];
+    texts.forEach((t, i) => { if (typeof t === 'string' && !Bergamot.isStructured(t)) { plainIdx.push(i); plain.push(t); } });
+    const plainTr = plain.length ? await Bergamot.translate(plain, code) : [];
+    const out = texts.slice();
+    plainIdx.forEach((oi, k) => { out[oi] = plainTr[k]; });
+    for (let i = 0; i < texts.length; i++) {
+      if (typeof texts[i] === 'string' && Bergamot.isStructured(texts[i])) out[i] = await Bergamot.translateMarkdown(texts[i], code);
+    }
+    return out;
   } catch (e) {
     console.warn('[wLocalize] bergamot failed (keeping English):', (e && e.message) || e);
     return texts;

@@ -105,6 +105,74 @@
     return res;
   }
 
+  // Structure-preserving translation for a rich markdown string. Bergamot is a
+  // sentence-level NMT and would shred table grids (| --- |), so we translate ONLY
+  // the natural-language fragments (prose, header text, list-item text, table cell
+  // text) in ONE batch and leave every structural token untouched: table pipes and
+  // separator rows, fenced code blocks, numbers/symbols, and leading markers.
+  var _numCell = /^[\s\d.,%+\-−$€£¥():/xX~]*$/;   // numeric/symbol-only cell → keep
+  var _tableSep = /^\s*\|?[\s:|\-—−]+\|?\s*$/;               // | --- | --- | row
+  function _splitPrefix(line) {
+    var m = line.match(/^(\s*(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)?)([\s\S]*)$/);
+    return m ? [m[1], m[2]] : ['', line];
+  }
+  // True when the text carries structure the whole-string NMT would shred — a
+  // markdown table (a |---|---| separator row) or a fenced code block. Callers use
+  // this to switch from the default translate() to the structure-preserving
+  // translateMarkdown() only when needed (plain prose stays on the better default).
+  function isStructured(text) {
+    if (typeof text !== 'string' || !text) return false;
+    if (/(^|\n)\s*(```|~~~)/.test(text)) return true;
+    var ls = text.split('\n');
+    for (var i = 0; i < ls.length; i++) {
+      var l = ls[i];
+      if (l.indexOf('|') !== -1 && l.indexOf('-') !== -1 && /^\s*\|?[\s:|\-—−]+\|?\s*$/.test(l)) return true;
+    }
+    return false;
+  }
+  async function translateMarkdown(text, code) {
+    code = baseCode(code);
+    if (!code || code === 'en') return text;
+    if (typeof text !== 'string' || !text.trim()) return text;
+    var lines = text.split('\n');
+    var frags = [];             // natural-language fragments to translate
+    var plan = [];              // per line: how to reassemble
+    var inFence = false;
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; plan.push({ k: 'raw', line: line }); continue; }
+      if (inFence || !line.trim()) { plan.push({ k: 'raw', line: line }); continue; }
+      if (line.indexOf('|') !== -1 && _tableSep.test(line) && line.indexOf('-') !== -1) { plan.push({ k: 'raw', line: line }); continue; }
+      if (line.indexOf('|') !== -1) {
+        var cells = line.split('|');
+        var refs = cells.map(function (cell) {
+          var t = cell.trim();
+          if (t && !_numCell.test(t)) { frags.push(t); return frags.length - 1; }
+          return -1;
+        });
+        plan.push({ k: 'row', cells: cells, refs: refs });
+        continue;
+      }
+      var pb = _splitPrefix(line);
+      if (pb[1].trim()) { frags.push(pb[1]); plan.push({ k: 'prose', prefix: pb[0], ref: frags.length - 1 }); }
+      else plan.push({ k: 'raw', line: line });
+    }
+    if (!frags.length) return text;
+    var tr = await translate(frags, code);
+    var out = plan.map(function (p) {
+      if (p.k === 'raw') return p.line;
+      if (p.k === 'prose') return p.prefix + (tr[p.ref] || frags[p.ref]);
+      // table row: re-emit cells, keeping each cell's surrounding whitespace
+      return p.cells.map(function (cell, ci) {
+        if (p.refs[ci] < 0) return cell;
+        var lead = (cell.match(/^\s*/) || [''])[0];
+        var trail = (cell.match(/\s*$/) || [''])[0];
+        return lead + (tr[p.refs[ci]] || cell.trim()) + trail;
+      }).join('|');
+    });
+    return out.join('\n');
+  }
+
   // Fully warm a language ahead of first use (call on idle): load the WASM runtime,
   // download the pack (OPFS-cached), AND build the TranslationModel — so the first
   // real translate() is instant (~50ms) and its result lands before a re-render can
@@ -119,5 +187,5 @@
     } catch (_) { return false; }
   }
 
-  g.Bergamot = { configure: configure, translate: translate, prefetch: prefetch, supports: supports, SUPPORTED: SUPPORTED };
+  g.Bergamot = { configure: configure, translate: translate, translateMarkdown: translateMarkdown, isStructured: isStructured, prefetch: prefetch, supports: supports, SUPPORTED: SUPPORTED };
 })(typeof self !== 'undefined' ? self : this);
