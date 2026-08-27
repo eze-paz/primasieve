@@ -2986,14 +2986,17 @@ async function runAgent(config, ctx) {
   ctx._langRejectCount = 0;    // respond() calls rejected for missing language this turn
   ctx._respondLangs = new Set(); // language codes already delivered this turn (dedup)
   ctx._respondCount = 0;        // successful respond() deliveries this turn (hard cap)
+  ctx._forceRespondNext = false; // one-shot: the NEXT request must compel respond() BY NAME (armed after a bare-prose round)
   ctx._lastTodoDone = ctx._todos.filter(t => t.status === 'completed').length;
   const MAX_STOP_BLOCKS = 3;       // consecutive stop attempts w/o new progress
-  // Bare-prose attempts to reject before falling back to showing the content.
-  // Exactly ONE: the first bare-prose round already defied tool_choice:'required',
-  // and the single retry carries an explicit system-reminder — a model that
-  // ignores BOTH will ignore them again, so further retries just burn a full
-  // re-think each (seen live: 4 thinking phases on "Tell me about Paris").
-  const MAX_RESPOND_RETRIES = 1;
+  // Bare-prose attempts to reject before falling back to DELIVERING the prose.
+  // Each retry escalates tool_choice to respond() BY NAME (see _forceRespondNext) —
+  // not plain 'required', which the model satisfies with write_todos/scratch/remember
+  // and so never actually answers. Two forced attempts: providers vary in how
+  // eagerly they honor a named tool_choice. If both are ignored, the exhausted
+  // bare-prose round's own content is delivered as the reply (localized to the
+  // session Reply language) — never a blank turn.
+  const MAX_RESPOND_RETRIES = 2;
   const MAX_RESPOND_DELIVERIES = 5;   // hard cap on respond() deliveries per turn
   // This turn forces respond() when the tool is present: the visible reply comes
   // ONLY from respond(), plain content is hidden, and respond() is the only clean
@@ -3109,18 +3112,28 @@ async function runAgent(config, ctx) {
     // tools — without this the model looks at a two-tool list and truthfully
     // reports "I can't run python" instead of planning to unlock it.
     const _availTools = (_planForced && !_hasActiveTask())
-      ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'scratch' || t.function.name === 'respond'))
+      ? (config.tools || []).filter(t => t && t.function && (t.function.name === 'write_todos' || t.function.name === 'scratch' || t.function.name === 'respond' || t.function.name === 'remember'))
           .map(t => {
             if (t.function.name !== 'write_todos') return t;
             const hidden = (config.tools || [])
               .map(x => x && x.function && x.function.name)
-              .filter(n => n && n !== 'write_todos' && n !== 'scratch' && n !== 'respond');
+              .filter(n => n && n !== 'write_todos' && n !== 'scratch' && n !== 'respond' && n !== 'remember');
             if (!hidden.length) return t;
             return { ...t, function: { ...t.function, description: (t.function.description || '') +
               '\nCURRENTLY HIDDEN by the plan-first gate (they exist and unlock the moment a task is in_progress): ' + hidden.join(', ') + '.' } };
           })
       : config.tools;
     // the model reads it immediately before generating (recency beats a rule
+    // Force-respond escalation: a bare-prose round (the model tried to answer
+    // WITHOUT respond()) armed _forceRespondNext, so THIS request compels respond()
+    // BY NAME. Plain 'required' is too weak — it's satisfiable by write_todos /
+    // scratch / remember, so the model dodges the one visible channel and the user
+    // never sees a reply. One-shot: consumed for this round's request(s).
+    const _forceRespondNow = _respondForced && !ctx._responded && ctx._forceRespondNext;
+    ctx._forceRespondNext = false;
+    const _respondToolChoice = _forceRespondNow
+      ? { type: 'function', function: { name: 'respond' } }
+      : 'required';
     const reqBody = {
       model: config.model,
       messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
@@ -3131,8 +3144,9 @@ async function runAgent(config, ctx) {
     // Force a tool call every round when respond() is in play: the model can never
     // emit free-form prose, so the visible chat is exactly its tool actions + the
     // respond() reply. Working tools still satisfy "required" mid-task; the turn
-    // ends when the model emits a round with no tool calls (natural end).
-    if (_respondForced && !ctx._responded) reqBody.tool_choice = 'required';
+    // ends when the model emits a round with no tool calls (natural end). After a
+    // bare-prose round, _respondToolChoice compels respond() specifically.
+    if (_respondForced && !ctx._responded) reqBody.tool_choice = _respondToolChoice;
     const reasoning = _openRouterReasoning(config);
     if (config.maxTokens != null) reqBody[reasoning ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
     if (config.temperature != null) reqBody.temperature = config.temperature;
@@ -3163,7 +3177,7 @@ async function runAgent(config, ctx) {
             stream_options: { include_usage: true },
             tools: _availTools,
           };
-          if (_respondForced && !ctx._responded) compactedReqBody.tool_choice = 'required';
+          if (_respondForced && !ctx._responded) compactedReqBody.tool_choice = _respondToolChoice;
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
           if (config.temperature != null) compactedReqBody.temperature = config.temperature;
           if (config.topP != null) compactedReqBody.top_p = config.topP;
@@ -3226,6 +3240,19 @@ async function runAgent(config, ctx) {
                && !ctx._responded && ctx._respondRetries < MAX_RESPOND_RETRIES) {
       round.content = '';                                // bare prose attempt — hide it; we'll force respond() below
       _forceRespondRetry = true;
+      ctx._forceRespondNext = true;                      // next request compels respond() BY NAME (not plain 'required')
+    } else if (_respondForced && !round.tool_calls.length && !ctx.signal?.aborted
+               && !ctx._responded && (round.content || '').trim()) {
+      // Retries exhausted and the model STILL answered as bare prose (never called
+      // respond()). Never end the turn blank: deliver that prose AS the reply,
+      // localized to the session Reply language via the SAME path respond() uses —
+      // round_end below carries round.content + this locale, and the page localizes
+      // it (endRound CASE A → _currentLocale). Mark the turn answered so tool_choice
+      // frees up and the reply isn't re-forced. round.content is left intact.
+      respondLocaleOverride = ctx._localize || null;     // session Reply-language authority (null = English)
+      ctx._responded = true;
+      ctx._respondCount++;
+      if (respondLocaleOverride && respondLocaleOverride.code) ctx._respondLangs.add(respondLocaleOverride.code);
     } else if (_respondForced && !round.tool_calls.length && ctx._responded) {
       _stashAside(round.content);                        // already responded — bare prose after respond is not shown
       round.content = '';
@@ -3271,6 +3298,8 @@ async function runAgent(config, ctx) {
             + 'is completed. If an item is genuinely blocked — it needs user input, an external credential or '
             + 'file, or something you cannot obtain this turn — mark it blocked with write_todos '
             + 'a full {"todos":[…]} list with the task status set to "blocked" and a "reason" field. '
+            + 'And if the work is genuinely complete, deliver your answer with respond() — that is the ONLY '
+            + 'thing the user sees. Do not keep churning write_todos/scratch in place of answering. '
             + '(auto-continue ' + ctx._stopBlocks + '/' + MAX_STOP_BLOCKS + ')</system-reminder>',
             { open: openTodos().length, attempt: ctx._stopBlocks });
           continue;
@@ -3314,9 +3343,9 @@ async function runAgent(config, ctx) {
       // that list could still emit one. Reject it here. Emit tool_started+tool_result
       // so the box RESOLVES to the blocked message — never leave it spinning (the box
       // may already exist from streamed arg deltas).
-      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'scratch' && tc.function.name !== 'respond' && !_hasActiveTask()
+      if (_planForced && tc.function.name !== 'write_todos' && tc.function.name !== 'scratch' && tc.function.name !== 'respond' && tc.function.name !== 'remember' && !_hasActiveTask()
           && !(_roundGrace && _GRACE_TOOLS.has(tc.function.name))) {
-        const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or set status:"in_progress" in the list). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos and respond may be used without an active task. Then retry this call.';
+        const blk = 'Blocked: no active task. You must plan before acting. Call write_todos to create the checklist and mark the task you are about to work on as in_progress (status:"in_progress" in the initial list, or set status:"in_progress" in the list). If your previous plan is fully complete, make a NEW plan for the current request. Only write_todos, scratch, respond, and remember may be used without an active task. Then retry this call.';
         ctx.emit({ type: 'tool_started', tc });
         ctx.emit({ type: 'tool_result', id: tc.id, result: blk });
         const bmsg = { role: 'tool', tool_call_id: tc.id, content: blk };

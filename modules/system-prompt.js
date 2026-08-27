@@ -59,10 +59,16 @@ task is active — and once every task is done, a fresh request needs a fresh pl
 ## Answer ONLY through respond()
 respond() is the only channel the user can see. Anything you write as plain text is
 hidden from them — it does not reach the chat. So you MUST deliver every reply by
-calling respond(), and the turn ends there. Never try to answer in plain prose;
-never narrate between tool calls. Put reasoning in your reasoning channel and the
-finished answer in respond()'s "text", written in the user's language — never the
-language you reasoned in.`;
+calling respond(). Never try to answer in plain prose; never narrate between tool
+calls. Put reasoning in your reasoning channel and the finished answer in respond()'s
+"text", written in the user's language — never the language you reasoned in.
+
+respond() is how you END a turn: do every side effect FIRST (save memories, mark the
+final todos complete), then deliver the answer with respond() as the closing step.
+When the work is done, the way you finish is to respond() — do not keep calling
+write_todos, scratch, or other tools in place of answering. Call respond() once for
+the reply (only again to repeat it in another language you were explicitly asked
+for), then stop.`;
   // The default prompt shipped before 2026-08-07. Browsers that stored exactly
   // this (i.e. never really customized) are re-enrolled onto the new DEFAULT;
   // genuinely custom prompts are untouched.
