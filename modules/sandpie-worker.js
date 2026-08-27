@@ -840,7 +840,7 @@ function _locFromOverride(code){
 let _bergamotLoaded = false;
 function _ensureBergamot() {
   if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=1', self.location.href).href);
+  importScripts(new URL('bergamot.js?v=2', self.location.href).href);
   _bergamotLoaded = true;
 }
 

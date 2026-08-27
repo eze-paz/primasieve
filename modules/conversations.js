@@ -2153,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=131');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=133');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3217,6 +3217,13 @@ async function localize(texts, to, toName) {
   });
   if (!miss.length) return out;
   try {
+    // ── Bergamot on-device translator (replaces the gemini localizer) ──────────
+    if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
+    Bergamot.configure(_bergamotCfg());
+    const tr = await Bergamot.translate(miss, to);
+    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string' && t) { out[oi] = t; _localizeCache.set(to + '::' + texts[oi], t); } });
+    return out;
+    /* ── GEMINI PATH (commented out — superseded by Bergamot above) ─────────────
     const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
     const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + (toName || to) + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + (toName || to) + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
     const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(miss) }], stream: false, temperature: 0 };
@@ -3229,8 +3236,35 @@ async function localize(texts, to, toName) {
     const arr = JSON.parse(content);
     missIdx.forEach((oi, k) => { const tr = arr[k]; if (typeof tr === 'string') { out[oi] = tr; _localizeCache.set(to + '::' + texts[oi], tr); } });
     return out;
-  } catch (e) { console.warn('[localize] failed (showing English):', e && e.message || e); return texts; }
+    ── end gemini path ── */
+  } catch (e) { console.warn('[localize] bergamot failed (showing English):', e && e.message || e); return texts; }
 }
+// Asset config for the on-device Bergamot translator (page context, served same-origin).
+function _bergamotCfg() {
+  return {
+    runtimeUrl: new URL('modules/bergamot/bergamot-translator-worker.js', document.baseURI).href,
+    wasmUrl:    new URL('modules/bergamot/bergamot-translator-worker.wasm', document.baseURI).href,
+    modelBase:  new URL('bergamot-models/', document.baseURI).href,
+  };
+}
+// Prefetch the account's Reply-language pack into OPFS on idle, so the first
+// localization doesn't wait on a ~30MB download. Best-effort; en / unsupported = no-op.
+(function prewarmBergamot() {
+  try {
+    var go = function () {
+      try {
+        if (typeof Bergamot === 'undefined' || typeof _replyLocale !== 'function') return;
+        var loc = _replyLocale();
+        var code = loc && loc.code;
+        if (!code || code === 'en' || !Bergamot.supports(code)) return;
+        Bergamot.configure(_bergamotCfg());
+        Bergamot.prefetch(code);
+      } catch (_) {}
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 10000 });
+    else setTimeout(go, 5000);
+  } catch (_) {}
+})();
 // Localize a single user-facing string (bubbles/status). Returns English on failure.
 async function renderUserText(text, loc) {
   if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) return text;

@@ -86,6 +86,9 @@
   async function translate(texts, code) {
     if (!Array.isArray(texts) || !texts.length) return texts;
     code = baseCode(code);
+    // en->en (or no target): English is canonical — nothing to translate. Return
+    // untouched WITHOUT loading the engine or throwing (an expected no-op, not an error).
+    if (!code || code === 'en') return texts;
     if (!supports(code)) throw new Error('bergamot: unsupported target ' + code);
     await ensureInit();
     if (!_svc) throw new Error('bergamot: runtime unavailable');
@@ -102,5 +105,24 @@
     return res;
   }
 
-  g.Bergamot = { configure: configure, translate: translate, supports: supports, SUPPORTED: SUPPORTED };
+  // Warm a language pack into OPFS ahead of first use (call on idle). Downloads
+  // the ~30MB model + lex + vocab into the cache but does NOT build the model, so
+  // the first real translate() skips the network. No-op for en / unsupported /
+  // unconfigured. Never throws.
+  async function prefetch(code) {
+    try {
+      code = baseCode(code);
+      if (!code || code === 'en' || !supports(code) || !S.modelBase) return false;
+      var pair = 'en' + code;
+      var base = S.modelBase.replace(/\/?$/, '/') + pair + '/';
+      await Promise.all([
+        _fetchCached(base + 'model.' + pair + '.intgemm.alphas.bin', pair + '.model'),
+        _fetchCached(base + 'lex.50.50.' + pair + '.s2t.bin', pair + '.lex'),
+        _fetchCached(base + 'vocab.' + pair + '.spm', pair + '.vocab')
+      ]);
+      return true;
+    } catch (_) { return false; }
+  }
+
+  g.Bergamot = { configure: configure, translate: translate, prefetch: prefetch, supports: supports, SUPPORTED: SUPPORTED };
 })(typeof self !== 'undefined' ? self : this);
