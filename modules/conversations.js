@@ -2879,7 +2879,7 @@ function addReportAction(container, reason) {
     btn.className = 'act-copy act-report';
     btn.title = 'Report this conversation for developer review';
     btn.setAttribute('aria-label', 'Report this conversation');
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V5a2 2 0 0 0-2-2h-2v3h-2V3z" opacity="0"/><path d="M12 2 1 21h22L12 2zm0 4.5 7.5 13h-15l7.5-13zm1 7.5v4h-2v-4h2zm0-2h-2v-2h2v2z"/></svg>';
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>';
     btn.addEventListener('click', async () => {
       const prev = btn.innerHTML;
       btn.disabled = true;
