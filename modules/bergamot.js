@@ -112,6 +112,31 @@
   // separator rows, fenced code blocks, numbers/symbols, and leading markers.
   var _numCell = /^[\s\d.,%+\-−$€£¥():/xX~]*$/;   // numeric/symbol-only cell → keep
   var _tableSep = /^\s*\|?[\s:|\-—−]+\|?\s*$/;               // | --- | --- | row
+  // A cell "reads like prose" when it contains a word that BEGINS with a lowercase
+  // letter (a function word or verb: "on", "the", "passed"). All-Title-Case /
+  // ALLCAPS / symbol-only cells are names, tickers or codes ("Dow Jones", "S&P 500")
+  // that this sentence-level NMT mangles on such short fragments — so DATA cells that
+  // fail this test pass through untouched. Full-sentence data cells always pass it.
+  function _hasLowerWord(t) {
+    var w = String(t).split(/\s+/);
+    for (var i = 0; i < w.length; i++) {
+      var tok = w[i].replace(/^[^\p{L}]+/u, '');   // strip leading punctuation
+      if (tok && /^\p{Ll}/u.test(tok)) return true;
+    }
+    return false;
+  }
+  // Should a DATA cell be translated? A SINGLE word is translated when it holds any
+  // lowercase letter — this catches status labels ("Pending"→"Pendent", "Active",
+  // "Completed") which are common words the NMT knows, while single proper nouns
+  // (Nasdaq, Google, Tesla) are copied through unchanged by the NMT anyway, and
+  // ALLCAPS tickers ("AAPL") / symbol-only cells are left alone. A MULTI-word cell
+  // is translated only when it reads like prose (_hasLowerWord); an all-Title-case
+  // multi-word cell is a proper noun ("Dow Jones", "New York") and is kept as-is.
+  function _translatableCell(t) {
+    var words = String(t).trim().split(/\s+/);
+    if (words.length === 1) return /\p{Ll}/u.test(t);
+    return _hasLowerWord(t);
+  }
   function _splitPrefix(line) {
     var m = line.match(/^(\s*(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)?)([\s\S]*)$/);
     return m ? [m[1], m[2]] : ['', line];
@@ -138,16 +163,32 @@
     var frags = [];             // natural-language fragments to translate
     var plan = [];              // per line: how to reassemble
     var inFence = false;
+    // A table row is a HEADER iff the next non-blank line is a separator (|---|).
+    // Header cells are labels ("Index", "Price") and always translate. DATA cells
+    // translate ONLY when they read like prose (_hasLowerWord) — full sentences get
+    // translated, but proper-noun / ticker / code fragments ("Dow Jones", "S&P 500")
+    // pass through untouched so the NMT can't mangle them ("Pel·lícules Dow Jones").
+    var headerLines = {};
+    for (var hi = 0; hi < lines.length; hi++) {
+      var hl = lines[hi];
+      if (hl.indexOf('|') === -1 || (_tableSep.test(hl) && hl.indexOf('-') !== -1)) continue;
+      for (var hj = hi + 1; hj < lines.length; hj++) {
+        if (!lines[hj].trim()) continue;
+        if (lines[hj].indexOf('|') !== -1 && _tableSep.test(lines[hj]) && lines[hj].indexOf('-') !== -1) headerLines[hi] = true;
+        break;
+      }
+    }
     for (var li = 0; li < lines.length; li++) {
       var line = lines[li];
       if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; plan.push({ k: 'raw', line: line }); continue; }
       if (inFence || !line.trim()) { plan.push({ k: 'raw', line: line }); continue; }
       if (line.indexOf('|') !== -1 && _tableSep.test(line) && line.indexOf('-') !== -1) { plan.push({ k: 'raw', line: line }); continue; }
       if (line.indexOf('|') !== -1) {
+        var isHdr = !!headerLines[li];
         var cells = line.split('|');
         var refs = cells.map(function (cell) {
           var t = cell.trim();
-          if (t && !_numCell.test(t)) { frags.push(t); return frags.length - 1; }
+          if (t && !_numCell.test(t) && (isHdr || _translatableCell(t))) { frags.push(t); return frags.length - 1; }
           return -1;
         });
         plan.push({ k: 'row', cells: cells, refs: refs });
