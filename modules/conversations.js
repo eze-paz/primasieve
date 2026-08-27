@@ -489,6 +489,16 @@ function renderHistoricalMessage(m, host = null) {
       bub.innerHTML = renderMd(contentStr);
       hydrateLocalRefs(div);
       bindBubble(div, m);
+      // Localization (display-only): persisted content is English canonical; on
+      // reload re-localize the bubble to the current Reply language, exactly as the
+      // live endRound does — otherwise a reloaded reply reverts to English. Fail-open
+      // to the English already painted; guard against a conversation switch mid-await.
+      const _loc = _currentLocale();
+      if (_loc && _loc.code) {
+        renderUserText(contentStr, _loc).then(tr => {
+          if (tr && tr !== contentStr && div.isConnected) { bub.innerHTML = renderMd(tr); hydrateLocalRefs(div); }
+        }).catch(() => {});
+      }
     }
     // Saved reasoning (chain of thought) — cloud tool-call turns persist it as
     // m.reasoning. Render it as a collapsed thinking block matching the live
@@ -3335,7 +3345,16 @@ function _replyLocale() {
 // buildAgentConfig at send; window override wins for manual testing.
 let _activeLocalize = null;
 // window.__localizeTo is an optional manual override (testing / forcing a locale).
-function _currentLocale(override) { return override || (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || null; }
+// Fallback to _replyLocale(): _activeLocalize is ONLY set at send, so on a fresh
+// reload it is null and history would re-render in English. The Reply selector is
+// the sole language authority and is available immediately, so resolve from it —
+// this is what re-localizes a reloaded transcript (checklist, questions, bubbles).
+// Normalize English (or no target) to null so the many `if (_loc && _loc.code)`
+// guards skip the transform entirely instead of doing an en->en no-op.
+function _currentLocale(override) {
+  const loc = override || (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || _replyLocale();
+  return (loc && loc.code && loc.code !== 'en') ? loc : null;
+}
 
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
