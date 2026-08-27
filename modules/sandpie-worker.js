@@ -849,8 +849,9 @@ async function _wLocalize(texts, ctx, target) {
   const loc = target || (ctx && ctx._localize) || {};
   const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
   if (!code || code === 'en') return texts;
+  // Primary: Bergamot on-device — hosted packs (ca/es); en handled above. On any
+  // miss (unsupported code / pack not hosted / error) fall through to gemini.
   try {
-    // ── Bergamot on-device translator (replaces the gemini localizer) ──────────
     _ensureBergamot();
     if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
     Bergamot.configure({
@@ -860,10 +861,10 @@ async function _wLocalize(texts, ctx, target) {
     });
     return await Bergamot.translate(texts, code);
   } catch (e) {
-    console.warn('[wLocalize] bergamot failed (keeping English):', (e && e.message) || e);
-    return texts;
+    console.warn('[wLocalize] bergamot miss (→ gemini):', (e && e.message) || e);
   }
-  /* ── GEMINI PATH (commented out — superseded by Bergamot above) ──────────────
+  // Fallback: gemini localizer — universal coverage so a deliverable in ANY
+  // requested language still works, not just the hosted Bergamot packs.
   const cfg = ctx && ctx._agentConfig;
   if (!cfg || !cfg.url) return texts;
   const tgt = loc.name || loc.code || 'the target language';
@@ -885,7 +886,6 @@ async function _wLocalize(texts, ctx, target) {
     for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
   }
   return out;
-  ── end gemini path ── */
 }
 const _DOCX_LX_EXTRACT = `import sys, json
 try:

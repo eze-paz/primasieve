@@ -2153,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=133');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=134');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3217,27 +3217,30 @@ async function localize(texts, to, toName) {
   });
   if (!miss.length) return out;
   try {
-    // ── Bergamot on-device translator (replaces the gemini localizer) ──────────
-    if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
-    Bergamot.configure(_bergamotCfg());
-    const tr = await Bergamot.translate(miss, to);
-    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string' && t) { out[oi] = t; _localizeCache.set(to + '::' + texts[oi], t); } });
+    let tr = null;
+    // Primary: Bergamot on-device — hosted packs (ca/es) + en no-op. Throws for any
+    // language it can't serve (unsupported code, or pack not hosted) → gemini below.
+    if (typeof Bergamot !== 'undefined') {
+      try { Bergamot.configure(_bergamotCfg()); tr = await Bergamot.translate(miss, to); }
+      catch (be) { console.warn('[localize] bergamot miss (→ gemini):', (be && be.message) || be); tr = null; }
+    }
+    // Fallback: gemini localizer — universal coverage for languages Bergamot lacks,
+    // so a respond()/deliverable in ANY requested language still works (not just ca/es).
+    if (!tr) {
+      const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
+      const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + (toName || to) + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + (toName || to) + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
+      const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(miss) }], stream: false, temperature: 0 };
+      if (activeConvId) body.session_id = 'Translate:' + (await ensureSessionId(activeConvId));   // parent-session marker
+      const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
+      const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
+      const j = await r.json();
+      let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
+      content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+      tr = JSON.parse(content);
+    }
+    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string') { out[oi] = t; _localizeCache.set(to + '::' + texts[oi], t); } });
     return out;
-    /* ── GEMINI PATH (commented out — superseded by Bergamot above) ─────────────
-    const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
-    const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + (toName || to) + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + (toName || to) + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
-    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(miss) }], stream: false, temperature: 0 };
-    if (activeConvId) body.session_id = 'Translate:' + (await ensureSessionId(activeConvId));   // parent-session marker
-    const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
-    const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
-    const j = await r.json();
-    let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
-    content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
-    const arr = JSON.parse(content);
-    missIdx.forEach((oi, k) => { const tr = arr[k]; if (typeof tr === 'string') { out[oi] = tr; _localizeCache.set(to + '::' + texts[oi], tr); } });
-    return out;
-    ── end gemini path ── */
-  } catch (e) { console.warn('[localize] bergamot failed (showing English):', e && e.message || e); return texts; }
+  } catch (e) { console.warn('[localize] failed (showing English):', e && e.message || e); return texts; }
 }
 // Asset config for the on-device Bergamot translator (page context, served same-origin).
 function _bergamotCfg() {
