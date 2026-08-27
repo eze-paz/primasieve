@@ -835,11 +835,37 @@ function _locFromOverride(code){
   return { code: cc, name: _langName(cc) };
 }
 
+// Load the Bergamot classic script into the worker once (importScripts is a
+// worker global; bergamot.js sits beside this file at /modules/bergamot.js).
+let _bergamotLoaded = false;
+function _ensureBergamot() {
+  if (_bergamotLoaded) return;
+  importScripts(new URL('bergamot.js?v=1', self.location.href).href);
+  _bergamotLoaded = true;
+}
+
 async function _wLocalize(texts, ctx, target) {
   if (!Array.isArray(texts) || !texts.length) return texts;
+  const loc = target || (ctx && ctx._localize) || {};
+  const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
+  if (!code || code === 'en') return texts;
+  try {
+    // ── Bergamot on-device translator (replaces the gemini localizer) ──────────
+    _ensureBergamot();
+    if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
+    Bergamot.configure({
+      runtimeUrl: new URL('bergamot/bergamot-translator-worker.js', self.location.href).href,
+      wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
+      modelBase:  new URL('../bergamot-models/', self.location.href).href,
+    });
+    return await Bergamot.translate(texts, code);
+  } catch (e) {
+    console.warn('[wLocalize] bergamot failed (keeping English):', (e && e.message) || e);
+    return texts;
+  }
+  /* ── GEMINI PATH (commented out — superseded by Bergamot above) ──────────────
   const cfg = ctx && ctx._agentConfig;
   if (!cfg || !cfg.url) return texts;
-  const loc = target || (ctx && ctx._localize) || {};
   const tgt = loc.name || loc.code || 'the target language';
   const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
   const CHUNK = 50;   // keep each request modest (upstream body cap ~1MB)
@@ -859,6 +885,7 @@ async function _wLocalize(texts, ctx, target) {
     for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
   }
   return out;
+  ── end gemini path ── */
 }
 const _DOCX_LX_EXTRACT = `import sys, json
 try:
