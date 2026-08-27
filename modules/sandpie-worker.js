@@ -3393,18 +3393,20 @@ async function runAgent(config, ctx) {
           text: 'Ended with ' + openTodos().length + ' open todo(s) after ' + MAX_STOP_BLOCKS
             + ' auto-continues without progress.' });
       }
-      // INVARIANT: a turn ALWAYS ends on a respond(). We only reach here when the
-      // model tried to end but its last action was NOT a respond() — either it never
-      // answered, or it answered earlier and then did more work (remember, write_todos,
-      // tools). Force a closing respond() (named tool_choice) so the conclusion is the
-      // final thing on screen. Capped so a model that refuses can't loop forever.
-      if (_respondForced && !ctx.signal?.aborted && ctx._finalRespondForces < MAX_FINAL_RESPOND_FORCES) {
+      // INVARIANT: a turn must CONTAIN a delivered respond() — not necessarily as its
+      // literal last action. If the model already delivered a reply this turn
+      // (ctx._responded), the user has their answer, so a plain-prose stop ends the
+      // turn cleanly here — we do NOT force another respond(). Forcing one in that
+      // state is unsatisfiable: the only reply left to give is the same language it
+      // already delivered, which the duplicate guard rejects → livelock. We only
+      // force a closing respond() when NO reply has been delivered at all (the model
+      // tried to end without ever answering). Capped so a refusing model can't loop.
+      if (_respondForced && !ctx.signal?.aborted && !ctx._responded && ctx._finalRespondForces < MAX_FINAL_RESPOND_FORCES) {
         ctx._finalRespondForces++;
         ctx._forceRespondNext = true;   // next request compels respond() BY NAME
         setReminder('final-respond',
-          '<system-reminder>You are ending the turn, but your LAST action was not respond() — '
-          + (ctx._responded ? 'you delivered a reply earlier, then did more work since.' : 'you have not delivered a reply at all.')
-          + ' Every turn must END with respond(): call respond() NOW with your final conclusion, reflecting everything you just did '
+          '<system-reminder>You are ending the turn but have not delivered a reply at all. '
+          + 'Every turn must end with a respond(): call respond() NOW with your final conclusion, reflecting everything you just did '
           + '(authored in ENGLISH; set the "language" argument). It must be the LAST thing you do this turn — do not run any other tool after it. '
           + '(final-respond ' + ctx._finalRespondForces + '/' + MAX_FINAL_RESPOND_FORCES + ')</system-reminder>',
           { attempt: ctx._finalRespondForces });
@@ -3434,6 +3436,7 @@ async function runAgent(config, ctx) {
     // into the tail of a round.
     const _roundGrace = _hasActiveTask();
     const _GRACE_TOOLS = new Set(['show_artifact', 'remember', 'scratch']);
+    let _endTurnAfterRound = false;   // set when a duplicate-language respond() signals the turn is done
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
@@ -3479,14 +3482,23 @@ async function runAgent(config, ctx) {
             _rejMsg = 'TURN ENDED: You have delivered the maximum number of replies ('
               + MAX_RESPOND_DELIVERIES + ') this turn. Do not call respond() again.';
           } else if (_tcReason === 'duplicate') {
-            _rejMsg = 'REJECTED: You already delivered a reply in this language ('
-              + (_tcLocale ? _tcLocale.code : '?') + '). Do not repeat the same language. '
-              + 'If you have no more languages to deliver, simply stop calling tools — the turn will end.';
+            // A reply was already delivered in this language this turn. Re-delivering
+            // the same language means the model is failing to end the turn — so END it
+            // now (the reply is already on screen) instead of rejecting and looping.
+            // Together with the _responded guard on the closing-respond force above,
+            // this closes the respond()/duplicate-guard livelock.
+            _endTurnAfterRound = true;
+            _rejMsg = 'TURN ENDED: a reply was already delivered in this language ('
+              + (_tcLocale ? _tcLocale.code : '?') + '). The turn is now complete — no further action needed.';
           } else if (_tcReason === 'nonenglish') {
             ctx._nonEngRejectCount = (ctx._nonEngRejectCount || 0) + 1;
             if (ctx._nonEngRejectCount > 3) {
               // Model refuses to author English after repeated prompts — deliver as-is
-              // to avoid an infinite loop / blank turn (last resort).
+              // to avoid an infinite loop / blank turn (last resort). Mark the turn
+              // answered (like the missing-lang escape below) so the closing-respond
+              // force doesn't then re-prompt a reply we already delivered.
+              ctx._responded = true; ctx._respondIsLatest = true;
+              if (_tcLocale && _tcLocale.code) ctx._respondLangs.add(_tcLocale.code);
               ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
               const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
               messages.push(rmsg); await emitAdded(rmsg); continue;
@@ -3560,10 +3572,13 @@ async function runAgent(config, ctx) {
       await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
+    // A duplicate-language respond() this round signalled the turn is done (reply
+    // already delivered) — end here rather than loop on the rejection.
+    if (_endTurnAfterRound) break;
     // respond() is NOT terminal: the model MAY respond and then keep working. The
-    // turn-end invariant (last action is always a respond) is enforced in the no-tool
-    // block above via _respondIsLatest + the closing-respond force. Here we only cap
-    // total deliveries so a runaway respond loop can't spin forever.
+    // turn-end invariant (the turn must contain a delivered respond) is enforced in
+    // the no-tool block above via _respondIsLatest + the closing-respond force. Here
+    // we only cap total deliveries so a runaway respond loop can't spin forever.
     if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) break;
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
     // completion clears the stop guard, so a model that keeps finishing items is
