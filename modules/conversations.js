@@ -2841,6 +2841,57 @@ function reportTurnUsage(convId, usage, turnIndex) {
   } catch (_) { /* analytics must never break the chat */ }
 }
 
+// ── Report conversation (client → /api/report/conversation) ─────────────────
+// Lets any signed-in user flag the CURRENT conversation for developer review.
+// The report carries the stable session_id (per-conversation cache key) plus the
+// active model and an optional reason. Best-effort: a failure must never break
+// the chat. False-y when the conversation/model aren't resolved yet.
+async function reportConversation(reason) {
+  try {
+    const cid = activeConvId || (activeStream() && activeStream().id);
+    if (!cid) return;
+    const session_id = await ensureSessionId(cid);
+    if (!session_id) return;
+    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const model = (typeof $ === 'function' && $('model')) ? $('model').value : (active && active.model) || null;
+    const res = await fetch(new URL('/api/report/conversation', location.href).href, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id, model: model || null, reason: reason || null }),
+      keepalive: true,
+    });
+    return res.ok;
+  } catch (_) { return false; }
+}
+
+// Append a small "Report conversation" action to a bubble/div. `reason` is
+// embedded so the panel can tell "flagged at end of turn" vs "flagged on error".
+function addReportAction(container, reason) {
+  try {
+    if (!container || container._reportAdded) return;
+    container._reportAdded = true;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'act-copy act-report';
+    btn.title = 'Report this conversation for developer review';
+    btn.setAttribute('aria-label', 'Report this conversation');
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V5a2 2 0 0 0-2-2h-2v3h-2V3z" opacity="0"/><path d="M12 2 1 21h22L12 2zm0 4.5 7.5 13h-15l7.5-13zm1 7.5v4h-2v-4h2zm0-2h-2v-2h2v2z"/></svg>';
+    btn.addEventListener('click', async () => {
+      const prev = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add('done');
+      const ok = await reportConversation(reason);
+      btn.innerHTML = ok
+        ? '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+        : '<span style="font-size:11px">✗</span>';
+      btn.title = ok ? 'Reported — thank you' : 'Report failed (not signed in?)';
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = prev; btn.classList.remove('done'); }, 1300);
+    });
+    container.appendChild(btn);
+  } catch (_) {}
+}
+
 async function readAgentEvents(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -3123,9 +3174,16 @@ function addMsg(role, text = '', host = null, animate = false) {
           setTimeout(() => { copy.innerHTML = prev; copy.classList.remove('done'); }, 1300);
         }).catch(() => {});
       });
+      // Report action: flagged a completed turn for developer review.
+      addReportAction(acts, 'turn-end');
       acts.appendChild(copy);
       div.appendChild(acts);
     }
+  }
+  if (role === 'err' || role === 'info') {
+    // Error/status bubbles: append a Report action so a failed turn can be
+    // flagged right where it surfaced (the model/context is captured server-side).
+    addReportAction(div, role === 'err' ? 'error' : 'status');
   }
   if (role === 'user' && animate) {
     // LIVE user bubble (Enter-to-send only — load replays pass animate=false):
