@@ -1739,7 +1739,7 @@ function buildConvLi(c, idx) {
 // conversations are always exempt — pinning is an explicit "keep visible"
 // signal. Moving a conv to the archive is reversible (Settings → Archive →
 // Unarchive) and never deletes data.
-const AUTO_ARCHIVE_DAYS = 60;
+const AUTO_ARCHIVE_DAYS = 14; // 2 weeks: auto-archive conversations untouched for >14 days
 let _autoArchiveDone = false;
 async function autoArchiveStale() {
   if (_autoArchiveDone) return;
