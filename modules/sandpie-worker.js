@@ -3326,7 +3326,10 @@ async function runAgent(config, ctx) {
       // is often just left unmarked, or the provider dropped the closing round.
       // Re-prompt and continue, unless the user stopped it (abort) or we've hit
       // MAX_STOP_BLOCKS re-prompts with no new item completed (a genuine stall).
-      if (!ctx.signal?.aborted && hasOpenTodos()) {
+      // Exception: once a reply was delivered (respond() or the synth fallback) the
+      // turn is answered — never re-prompt for open todos, that would resume work
+      // AFTER the user already got their conclusion (exactly the churn we prevent).
+      if (!ctx.signal?.aborted && !ctx._responded && hasOpenTodos()) {
         if (ctx._stopBlocks < MAX_STOP_BLOCKS) {
           ctx._stopBlocks++;
           setReminder('stop-block',
@@ -3489,11 +3492,13 @@ async function runAgent(config, ctx) {
       await emitAdded(toolMsg);
       if (toolOut && toolOut.image && toolOut.image.dataUrl) loadedImages.push(toolOut.image);
     }
-    // Hard cap on respond() deliveries — force turn end to prevent loops.
-    if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) break;
-    // respond() no longer ends the turn — the model may call respond() again
-    // (e.g. for a different language) or end naturally with no tool calls.
-    // Continue to drift/compaction bookkeeping and the next round.
+    // respond() is TERMINAL: once the reply is delivered the turn ENDS after this
+    // round — nothing runs after it, so the user's conclusion is ALWAYS the last
+    // thing on screen (no post-answer remember/todo/work churn in later rounds, no
+    // buried reply). To reply in more than one language, emit all the respond()
+    // calls together in THIS single round (they were all delivered in the loop
+    // above). The per-call cap (MAX_RESPOND_DELIVERIES) still rejects excess langs.
+    if (ctx._responded) break;
     // Drift counter: reset when the plan was touched, else advance. Only a NEW
     // completion clears the stop guard, so a model that keeps finishing items is
     // helped indefinitely while one that merely rewrites the list without progress
