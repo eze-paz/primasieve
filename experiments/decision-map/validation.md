@@ -134,6 +134,30 @@ noise — they cluster into 8 themes:
 | G. DECIDE has no effort gate | 55,57,60 | Small stakes → direct recommendation + one-line why. High stakes → criteria matrix. Personal/life stakes → elicit the person's values before any scoring. |
 | H. Missing minor leaves | 9,17,93,97,99 | EVALUATE (review/critique), MONITOR (standing watch), INSPECT promoted to first-class (source-before-claim), verify-by-execution preferred over doc lookup when testable, TRANSFORM of executable content must execute the result. |
 
+## v3 addendum: the corrections above went the wrong direction
+
+User correction (2026-08-27), accepted: v2 aligned the map to the strong model's *instinct*,
+but instinct shortcuts are capability substitutes — reliable priors, calibration, taste, a
+world model — that the target executor does not have. The map exists precisely because the
+executor can't do what instinct does. Therefore:
+
+- **Instinct is the target OUTPUT, not the procedure.** The map's job is to force a weak
+  executor through explicit steps that land on the conclusion instinct reaches in one hop.
+- **The 51 disagreements are not map errors — they are the capability-delta map**: the exact
+  list of nodes where ability, not procedure, was doing the work. Those are where the tree
+  must be densest, i.e. where v2 removed machinery, v3 re-adds it in explicit form:
+  weights may draft but retrieval judges (RECALL atom-check); ambiguity is resolved by
+  mandatory enumeration, not silent inference (G3); every DECIDE gets a matrix, sized not
+  skipped; expressive CREATE replaces "taste" with best-of-N + tournament selection
+  (verification asymmetry: weak models rank far better than they generate); counsel and
+  teaching become scripts.
+- v2's structural additions (INVESTIGATE, continuation gate G1, source split, composition
+  rules, EVALUATE/MONITOR) survive unchanged — they added structure, which was the right
+  direction all along.
+
+See map.json v3 `executor_model` for the governing rules (collapse only via external
+verifier; generation never judges itself; latency is the currency we have).
+
 ## Meta-observations
 
 1. The 51% disagree rate is itself the finding: a shape taxonomy is necessary but the real
