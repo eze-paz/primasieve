@@ -2163,7 +2163,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=138');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=139');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -5020,11 +5020,12 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   try {
     const _rl = _replyLocale();
     const _nm = (_rl && _rl.name) || 'English';
+    const _cd = (_rl && _rl.code) || 'en';
     content += "\n\n## Deliver in " + _nm + ", author in English\n"
       + "The user reads chat and deliverables in " + _nm + ". "
-      + "You MUST author ALL internal content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, and your own reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
+      + "You MUST author ALL content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
       + "The system automatically translates your finished reply (respond) and your delivered deliverables (show_artifact) into " + _nm + " for the user; that is handled downstream and is not your job. "
-      + "To have ONE specific deliverable or reply in a different language, pass that explicit language on the respond or show_artifact call (e.g. language: 'ca' for Catalan); otherwise ALWAYS omit the language argument so it defaults to " + _nm + ". Never author the target language, announce this rule, or second-guess it."
+      + "On EVERY respond and show_artifact call, set the \"language\" argument to '" + _cd + "' (" + _nm + "); to deliver ONE specific reply or deliverable in a different language, set that language code instead. Never author the target language yourself, announce this rule, or second-guess it."
   } catch (_) {}
   return { role: 'system', content };
 }

@@ -259,7 +259,7 @@ The harness holds the list as a FLAT set of tasks with IDs. You send the FULL li
 Each task MAY carry "est": your honest estimate of how many TOOL CALLS it will take (not time). The user sees it as live progress ("14/~20" plus a time projection from the run's own pace), so estimate what you actually expect — including reads and checks — and skip it when you genuinely can't tell.
 At most ONE task may be in_progress at a time. The checklist and your scratchpad are injected into your context every round, so you always see your plan and working notes without re-reading.
 PLAN-FIRST GATE: while NO task is in_progress, the harness offers only write_todos, scratch, and respond — every other tool (python, shell, files, search, …) is HIDDEN, not missing. Creating a plan and starting a task (in_progress) unlocks the full toolset immediately. Never tell the user a tool is unavailable or ask them to enable it: plan, start the task, then call the tool.
-LANGUAGE: the checklist is shown to the user verbatim — write every "content"/"activeForm"/"reason" in the user's language (the one you reply in), never the language you reason in.`,
+LANGUAGE: author every "content"/"activeForm"/"reason" in ENGLISH — the system automatically translates the checklist into the user's language for display. Do NOT write them in the user's language yourself; you generate correct text only in English.`,
       parameters: {
         type: 'object',
         properties: {
@@ -269,7 +269,7 @@ LANGUAGE: the checklist is shown to the user verbatim — write every "content"/
             items: {
               type: 'object',
               properties: {
-                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. \'Run tests\'), in the user\'s language.' },
+                content:   { type: 'string', description: 'The task, as a brief imperative title (e.g. \'Run tests\'), in English (the system localizes it for display).' },
                 status:    { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'], description: 'Task state. At most ONE may be in_progress.' },
                 blockedBy: { type: 'array', items: { type: 'string' }, description: 'Mark tasks (from this same list) that must complete before this one can start.' },
                 activeForm:{ type: 'string', description: 'The present continuous form shown while the task is in progress (e.g. \'Running tests\').' },
@@ -390,7 +390,7 @@ DO NOT USE when:
 
 ALWAYS BATCH: if several ambiguities exist, ask them ALL in ONE call (multiple questions), never one question at a time. Keep to at most 4 questions per call.
 Each question must be phrased as a clear choice with 2-5 mutually exclusive, non-overlapping options, and you MUST set a default (the option you would pick if the user skips) so a single click resolves it. Prefer short, concrete option labels.
-LANGUAGE: the questions and options are shown to the user verbatim — write them in the user's language (the one you reply in), never the language you reason in.`,
+LANGUAGE: author the questions and options in ENGLISH — the system automatically translates them into the user's language for display. Do NOT write them in the user's language yourself; you generate correct text only in English.`,
       parameters: {
         type: 'object',
         properties: {
@@ -402,8 +402,8 @@ LANGUAGE: the questions and options are shown to the user verbatim — write the
             items: {
               type: 'object',
               properties: {
-                question: { type: 'string', description: 'The clarification, phrased as a choice. Concise and specific, in the user\'s language.' },
-                options: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' }, description: '2-5 mutually exclusive, concrete options. No overlap. In the user\'s language.' },
+                question: { type: 'string', description: 'The clarification, phrased as a choice. Concise and specific, in English (the system localizes it for display).' },
+                options: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' }, description: '2-5 mutually exclusive, concrete options. No overlap. In English (the system localizes them for display).' },
                 allow_freeform: { type: 'boolean', description: 'If true, ALSO offer a free-text "Other" input so the user can type a custom answer (default false).' },
                 default: { type: 'string', description: 'The option that is pre-selected if the user skips. Must exactly match one of options.' },
               },
@@ -418,12 +418,12 @@ LANGUAGE: the questions and options are shown to the user verbatim — write the
     respond: {
       description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown.
 WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.
-LANGUAGE: "language" is REQUIRED. Set it to the language code the user asked for (e.g. "ca", "es", "en"). Write "text" in that language. Do not leak the language you reasoned in.
+LANGUAGE: author "text" in ENGLISH — the system automatically translates it into the user's language for delivery; you generate correct, full-capacity text only in English. "language" is REQUIRED: set it to the user's reply language (e.g. "ca", "es", "en"), or to a different code to deliver THIS one reply in that language. Do NOT write "text" in the target language yourself.
 WHEN: as the last thing you do in a turn — once the task is done, or to answer a question. You may call respond() multiple times in one turn if the user asked for replies in multiple languages — each call delivers one reply in one language. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
       parameters: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: 'Your complete user-facing reply, in the user\'s language. Markdown supported. Shown to the user exactly as written.' },
+          text: { type: 'string', description: 'Your complete user-facing reply, authored in ENGLISH (the system translates it into the language set by "language"). Markdown supported.' },
           language: { type: 'string', description: 'REQUIRED. The language code for this reply (e.g. "ca", "es", "en").' },
         },
         required: ['text', 'language'],

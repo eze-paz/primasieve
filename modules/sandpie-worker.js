@@ -3281,7 +3281,7 @@ async function runAgent(config, ctx) {
         setReminder('force-respond',
           '<system-reminder>Your last message was plain text with no respond() call, so it was NOT shown to the user. '
           + 'The ONLY thing the user sees is the "text" you pass to the respond() tool. '
-          + 'Call respond() now with your complete answer, written in the user\'s language. Do not answer any other way. '
+          + 'Call respond() now with your complete answer authored in ENGLISH (set the "language" argument to the user\'s reply language; the system translates it for the user). Do not answer any other way. '
           + '(attempt ' + ctx._respondRetries + '/' + MAX_RESPOND_RETRIES + ')</system-reminder>',
           { attempt: ctx._respondRetries });
         continue;

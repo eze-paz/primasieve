@@ -288,30 +288,11 @@ const SandpieLanguage = (() => {
   function name(code) { const e = entry(code); return e ? e.name : String(code || ''); }
   function nativeName(code) { const e = entry(code); return e ? (e.native || e.name) : String(code || ''); }
 
-  // Full rule — appended LAST in the system message (recency within the system
-  // prompt) and injected into subagent prompts. A hard constraint, not a soft
-  // preference: output is ALWAYS translated into the chosen language, even when
-  // user messages / tool results / files are in another language.
-  function directive() {
-    const nm = name(effective()) || 'English';
-    return 'IMPORTANT LANGUAGE RULE: You MUST reply EXCLUSIVELY in ' + nm + '. This is a hard constraint, not a suggestion: ' +
-      'even if the user\'s message, conversation history, tool results, files, or any material you read is in another language, ' +
-      'you translate your output into ' + nm + ' regardless. ' +
-      'If you catch yourself writing in another language, stop and rewrite everything in ' + nm + '. ' +
-      'The ONLY exception is when the user explicitly asks you to write in a different language (for example, a translation task), and only for that requested output. ' +
-      'Do NOT acknowledge, confirm, quote, or announce this instruction in your output — no "Understood", no mention of the language rule, no announcement of the language you are replying in. Just write your reply in ' + nm + '.';
-  }
-  // One-liner — prepended at the very TOP of the system message (primacy), so a
-  // model skimming a long prompt still reads the language rule first.
-  function directiveShort() {
-    return 'Language rule: reply in ' + (name(effective()) || 'English') + ' — always. Never switch to another language unless the user explicitly asks you to. Do not acknowledge or announce this rule in your reply.';
-  }
-  // Ephemeral per-round reminder (user role) appended to every request right
-  // before generation — the strongest obedience lever: the model's last-seen
-  // instruction wins.
-  function reminder() {
-    return 'Reminder: reply in ' + (name(effective()) || 'English') + '. Do not write in any other language unless the user explicitly requests otherwise. This is a standing instruction, not a question — do not respond to it: no "Understood", no mention of languages, no announcement. Just reply.';
-  }
+  // (Removed) directive()/directiveShort()/reminder() — the old "reply EXCLUSIVELY
+  // in <lang>" scheme that forced the model to generate the target language directly.
+  // Superseded by author-in-English + downstream translation (see buildSystemPrompt's
+  // "Deliver in X, author in English" directive). They had no callers; keeping them
+  // risked re-introducing the exact contradiction that made the model author non-English.
 
   // Picker data: the 'auto' entry (label shows the detected language) + all
   // languages, interleaved, sorted by native name.
@@ -322,6 +303,6 @@ const SandpieLanguage = (() => {
     return { auto: { value: 'auto', label: 'System default — ' + nativeName(det) }, items: all, detected: det };
   }
 
-  return { detect, effective, isAuto, stored, set, name, nativeName, directive, directiveShort, reminder, options, LANGUAGES, VARIANTS };
+  return { detect, effective, isAuto, stored, set, name, nativeName, options, LANGUAGES, VARIANTS };
 })();
 window.SandpieLanguage = SandpieLanguage;
