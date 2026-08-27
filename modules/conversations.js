@@ -2153,7 +2153,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=135');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=136');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3332,11 +3332,15 @@ function renderTodos(tcId, todos, scopeEl) {
   if (_loc && _loc.code && (todos || []).length) {
     renderUserTodos(todos, _loc).then(loc => {
       try {
-        if (loc && box.contains(list)) {
-          const l2 = buildTodosView(loc);
-          l2.className = list.className;
-          box.replaceChild(l2, list);
-        }
+        if (!loc) return;
+        // Re-query the CURRENT checklist in the box: a later write_todos render may
+        // have replaced `list` while the (async) translation was in flight, so
+        // binding to the stale ref would silently drop the localized result.
+        const cur = box.querySelector('.tool-todos') || (box.contains(list) ? list : null);
+        if (!cur) return;
+        const l2 = buildTodosView(loc);
+        l2.className = cur.className;
+        box.replaceChild(l2, cur);
       } catch (_) {}
     });
   }
@@ -3995,15 +3999,20 @@ function tgLogFor(target) {
         && (untitled
             ? prev.classList.contains('tg-untitled')
             : (!prev.classList.contains('tg-untitled')
-               && (prev.querySelector('.tg-title') || {}).textContent === title))) {
+               // Compare the ENGLISH title (dataset.tgEn), not the visible .tg-title,
+               // which may already be localized — else the merge would never match.
+               && ((prev.dataset && prev.dataset.tgEn != null ? prev.dataset.tgEn : (prev.querySelector('.tg-title') || {}).textContent) === title)))) {
       st.group = prev;
       st.title = untitled ? '' : title;
+      prev.dataset.tgEn = st.title;
       prev._tgSt = st;
+      if (!untitled) _tgLocalizeTitle(prev, title);
     } else {
       st.title = untitled ? '' : title;
       st.group = _tgBuild(st.title, st);
       if (untitled) st.group.classList.add('tg-untitled');
       appendContent(target, st.group);
+      if (!untitled) _tgLocalizeTitle(st.group, st.title);
     }
   } else {
     // Something (thinking box, artifact, ask card) rendered below the group —
@@ -4014,10 +4023,30 @@ function tgLogFor(target) {
   }
   return st.group.querySelector(':scope > .tg-log') || target;
 }
+// Localize a titled register header (display-only). The .tg-title is built from the
+// in_progress todo's activeForm (English canonical); translate it to the user's
+// language and patch the DOM async. dataset.tgEn holds the English title as the
+// stale-guard AND the key the group-merge/adoption logic compares against (so a
+// localized visible title never defeats the merge).
+function _tgLocalizeTitle(group, englishTitle) {
+  try {
+    if (!group || !englishTitle) return;
+    const loc = _currentLocale();
+    if (!loc || !loc.code) return;
+    renderUserText(englishTitle, loc).then(tr => {
+      try {
+        if (!tr || group.dataset.tgEn !== englishTitle) return;   // title changed meanwhile
+        const el = group.querySelector('.tg-title');
+        if (el) { el.textContent = tr; el.title = tr; }
+      } catch (_) {}
+    });
+  } catch (_) {}
+}
 function _tgBuild(title, st) {
   const g = document.createElement('div');
   g.className = 'msg tool-group';
   g._tgSt = st;
+  g.dataset.tgEn = title || '';
   const hd = document.createElement('div');
   hd.className = 'tg-hd';
   // Tray layout: row 1 is pure text (prompt + title + chevron, title wrapping

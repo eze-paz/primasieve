@@ -105,21 +105,16 @@
     return res;
   }
 
-  // Warm a language pack into OPFS ahead of first use (call on idle). Downloads
-  // the ~30MB model + lex + vocab into the cache but does NOT build the model, so
-  // the first real translate() skips the network. No-op for en / unsupported /
-  // unconfigured. Never throws.
+  // Fully warm a language ahead of first use (call on idle): load the WASM runtime,
+  // download the pack (OPFS-cached), AND build the TranslationModel — so the first
+  // real translate() is instant (~50ms) and its result lands before a re-render can
+  // discard it. No-op for en / unsupported / unconfigured. Never throws.
   async function prefetch(code) {
     try {
       code = baseCode(code);
-      if (!code || code === 'en' || !supports(code) || !S.modelBase) return false;
-      var pair = 'en' + code;
-      var base = S.modelBase.replace(/\/?$/, '/') + pair + '/';
-      await Promise.all([
-        _fetchCached(base + 'model.' + pair + '.intgemm.alphas.bin', pair + '.model'),
-        _fetchCached(base + 'lex.50.50.' + pair + '.s2t.bin', pair + '.lex'),
-        _fetchCached(base + 'vocab.' + pair + '.spm', pair + '.vocab')
-      ]);
+      if (!code || code === 'en' || !supports(code) || !S.wasmUrl || !S.modelBase) return false;
+      await ensureInit();
+      await _model(code);   // fetch (OPFS-cached) + build, held in the model cache
       return true;
     } catch (_) { return false; }
   }
