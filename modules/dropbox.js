@@ -471,18 +471,29 @@
     }).catch(() => {});
   }
   // Async load: read from IDB into _idxCache. One-time migration from localStorage
-  // if the old key still has data and IDB is empty.
-  async function loadCloudIndex() {
-    if (_idxCache !== null) return _idxCache;
+  // if the old key still has data and IDB is empty. Single-flight: the boot()
+  // fire-and-forget call and any awaiting caller (first sync, hydrate) share one
+  // IDB read — a second concurrent read would clobber a setCloudIndex() that
+  // landed in between.
+  let _idxLoading = null;
+  function loadCloudIndex() {
+    if (_idxCache !== null) return Promise.resolve(_idxCache);
+    if (_idxLoading) return _idxLoading;
+    _idxLoading = _loadCloudIndexOnce().finally(() => { _idxLoading = null; });
+    return _idxLoading;
+  }
+  async function _loadCloudIndexOnce() {
     try {
       const db = await _idbOpen();
-      _idxCache = await new Promise((resolve, reject) => {
+      const fromIdb = await new Promise((resolve, reject) => {
         const tx = db.transaction(IDB_STORE, 'readonly');
         const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
         req.onsuccess = () => { try { resolve(req.result ? JSON.parse(req.result) : null); } catch { resolve(null); } };
         req.onerror = () => reject(req.error);
       });
       db.close();
+      if (_idxCache !== null) return _idxCache;   // setCloudIndex() won the race — its data is fresher than IDB's
+      _idxCache = fromIdb;
       if (_idxCache === null) {
         // One-time migration from localStorage
         const raw = localStorage.getItem(INDEX_KEY);
@@ -497,7 +508,7 @@
       }
     } catch (e) {
       console.warn('[dropbox] IDB load failed, using empty index:', e);
-      _idxCache = {};
+      if (_idxCache === null) _idxCache = {};
     }
     return _idxCache;
   }
@@ -691,6 +702,10 @@
 
   // ---- cloud listing of ONLY the working root (cursor delta) -----------------
   async function cloudListWorking() {
+    // The first sync races boot()'s fire-and-forget loadCloudIndex(): reading the
+    // index before IDB answers sees {} and discards a perfectly good stored cursor,
+    // degrading every boot to a full recursive re-list (~17 paginated requests).
+    if (_idxCache === null) await loadCloudIndex();
     const stored = cursor();
     const idx = cloudIndex();
     if (stored && Object.keys(idx).length > 0) {
