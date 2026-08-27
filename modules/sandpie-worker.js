@@ -834,6 +834,28 @@ function _locFromOverride(code){
   if (!cc) return null;
   return { code: cc, name: _langName(cc) };
 }
+// Language guard. The model MUST author replies in English (the translator localizes
+// them). Some models ignore that and write the target language directly, which the
+// en->X translator then mangles (double-translation → "d'd'" artifacts). Detect a
+// non-English reply with the bundled franc langid (statistical trigram model — NOT a
+// hardcoded word list) so we can reject it and make the model re-author in English.
+let _francLoaded = false;
+function _ensureFranc() {
+  if (_francLoaded) return;
+  importScripts(new URL('franc.js?v=1', self.location.href).href);
+  _francLoaded = true;
+}
+function _isNonEnglish(s) {
+  // Guard on length: statistical langid is unreliable on short text, so don't judge
+  // (and never block) replies below ~40 non-space chars. Fail-open on any error.
+  if (typeof s !== 'string' || s.replace(/\s+/g, '').length < 40) return false;
+  try {
+    _ensureFranc();
+    if (!self.Franc || !self.Franc.franc) return false;
+    const lang = self.Franc.franc(s);
+    return lang !== 'eng' && lang !== 'und';
+  } catch (_) { return false; }
+}
 
 // Load the Bergamot classic script into the worker once (importScripts is a
 // worker global; bergamot.js sits beside this file at /modules/bergamot.js).
@@ -3232,6 +3254,11 @@ async function runAgent(config, ctx) {
       _stashAside(round.content);                        // keep any non-respond prose as thinking
       if (_rejectRespondLang) {
         round.content = '';                              // rejected — don't deliver
+      } else if (_isNonEnglish(respondText)) {
+        // Model authored the reply in a non-English language (would be mangled by the
+        // en->X translator). Nuke it (don't deliver) and re-prompt to author in English.
+        _rejectRespondLang = true; _rejectReason = 'nonenglish';
+        round.content = '';
       } else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) {
         _rejectRespondLang = true; _rejectReason = 'cap';
         round.content = '';
@@ -3379,6 +3406,7 @@ async function runAgent(config, ctx) {
             _tcText = String(_a2.text ?? '');
             _tcLocale = _locFromOverride(_a2.language);
             if (!_tcLocale) { _tcReject = true; _tcReason = 'missing'; }
+            else if (_isNonEnglish(_tcText)) { _tcReject = true; _tcReason = 'nonenglish'; }
             else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) { _tcReject = true; _tcReason = 'cap'; }
             else if (ctx._respondLangs.has(_tcLocale.code)) { _tcReject = true; _tcReason = 'duplicate'; }
           } catch (_) { _tcText = ''; _tcReject = true; _tcReason = 'missing'; }
@@ -3392,6 +3420,19 @@ async function runAgent(config, ctx) {
             _rejMsg = 'REJECTED: You already delivered a reply in this language ('
               + (_tcLocale ? _tcLocale.code : '?') + '). Do not repeat the same language. '
               + 'If you have no more languages to deliver, simply stop calling tools — the turn will end.';
+          } else if (_tcReason === 'nonenglish') {
+            ctx._nonEngRejectCount = (ctx._nonEngRejectCount || 0) + 1;
+            if (ctx._nonEngRejectCount > 3) {
+              // Model refuses to author English after repeated prompts — deliver as-is
+              // to avoid an infinite loop / blank turn (last resort).
+              ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
+              const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
+              messages.push(rmsg); await emitAdded(rmsg); continue;
+            }
+            _rejMsg = 'REJECTED: your reply was NOT written in English. You MUST author "text" in ENGLISH — '
+              + 'the system automatically translates it into the user\'s language for delivery (keep the "language" '
+              + 'argument set to their language). Writing the target language yourself produces garbled, lossy output. '
+              + 'Re-call respond() with the SAME content, authored in English.';
           } else {
             ctx._langRejectCount = (ctx._langRejectCount || 0) + 1;
             if (ctx._langRejectCount > 3) {
