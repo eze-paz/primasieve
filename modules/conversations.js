@@ -777,20 +777,26 @@ function mergeFilesTouched(stream, files) {
   stream.filesTouched = [...cur.entries()].sort((a, b) => a[1] - b[1]).map(([path, ts]) => ({ path, ts }));
   return files;
 }
-function renderFilesTouched(host, files) {
+function renderFilesTouched(host, files, opts) {
   if (!Array.isArray(files) || !files.length) return;
+  const partial = !!(opts && opts.partial);
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   if (!target) return;
   tgBreak(target);   // file cards end the current tool-group run
   for (const f of files) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
-    // Drop any earlier card for this path (this pane only) — the fresh card below
-    // becomes the single, bottom-most occurrence.
-    for (const old of target.querySelectorAll('.artifact-wrap')) {
+    const olds = [...target.querySelectorAll('.artifact-wrap')].filter(old => {
       const p = old.dataset && old.dataset.artifactPath;
-      if (p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p)) old.remove();
-    }
+      return p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p);
+    });
+    // Mid-turn (partial): a card that already exists stays where it is — the
+    // artifact auto-reload refreshes its content on every write, and moving it
+    // around while the model works would make the conversation jumpy.
+    if (partial && olds.length) continue;
+    // Fresh render: the earlier card (if any) is dropped so the new one below
+    // becomes the single, bottom-most occurrence (most recently edited last).
+    for (const old of olds) old.remove();
     const ext = clean.split('.').pop().toLowerCase();
     try { renderArtifact(target, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
   }
@@ -2598,10 +2604,13 @@ async function sendSingle(text, stream, opts = {}) {
       reportTurnTiming(convId, ev.timing, convMessages.length);
     }
     if (ev.type === 'files_touched') {
-      // Turn-end file surfacing (replaces show_artifact): merge into the
-      // conversation's deduped list (persisted via meta) and render the cards.
+      // File surfacing (replaces show_artifact): merge into the conversation's
+      // deduped list (persisted via meta) and render cards. Partial events fire
+      // mid-turn as files first appear (existing cards are left in place — the
+      // artifact auto-reload keeps their content fresh); the final event
+      // consolidates order (dedupe, most recently edited last).
       mergeFilesTouched(stream, ev.files);
-      try { renderFilesTouched(host, ev.files); } catch (_) {}
+      try { renderFilesTouched(host, ev.files, { partial: !!ev.partial }); } catch (_) {}
     }
     dispatchAgentEvent(ev, renderer, host);
   };

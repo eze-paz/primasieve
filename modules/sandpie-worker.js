@@ -343,6 +343,11 @@ function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessa
 // relayed mid-await lands in the MOST RECENTLY ARMED sink — right in practice,
 // as the sink is armed only for the duration of that conversation's tool call.
 let _touchSink = null;
+// System paths never surface: everything under sandpie/ (conversations, memory,
+// skills, helper scripts) EXCEPT the user-visible legacy sandpie/artifacts/,
+// plus lab/infra trees.
+const _ftExcluded = p => (p.startsWith('sandpie/') && !p.startsWith('sandpie/artifacts/'))
+  || p.startsWith('looplab-runs/') || p.startsWith('.tokens');
 const _postRaw = self.postMessage.bind(self);
 self.postMessage = function (msg, ...rest) {
   try {
@@ -3192,9 +3197,12 @@ async function runAgent(config, ctx) {
   ctx._todos = _todoFlat(ctx._todoTree);   // flat view of the seeded tree
   ctx._scratchpad = config.scratchpad || '';   // hidden working memory (persisted, re-injected each round)
   // Files this turn touched (path → last-touch ts). Filled by the postMessage
-  // interceptor while a tool call is in flight; emitted as 'files_touched' at
-  // turn end so the page surfaces every touched file (dedupe, newest last).
+  // interceptor while a tool call is in flight; announced PROGRESSIVELY after
+  // each tool call (partial events — the user sees deliverables appear and
+  // build live via artifact auto-reload) and consolidated at turn end (full
+  // list → authoritative order + deliverable localization).
   ctx._filesTouched = new Map();
+  ctx._ftAnnounced = new Map();   // path → last ts already announced mid-turn
   // Citable result ids (F1): every tool result is prefixed "[rN]" so the model
   // can cite it as evidence when closing a claim-todo. Recover the counter and
   // the set of already-issued ids from the persisted transcript, so claims can
@@ -3755,6 +3763,20 @@ async function runAgent(config, ctx) {
       _profTool(tc.function.name, _profNow() - _toolStart,
         _toolErr || /^(\[r\d+\] )?Error:/.test((toolOut && toolOut.result) || ''));
       if (tc.function.name === 'write_todos' || tc.function.name === 'scratch') touchedTodo = true;
+      // Progressive file surfacing: announce files this call just touched so the
+      // user sees the deliverable appear NOW (its card auto-reloads on later
+      // writes); the turn-end emit re-sends the full list for final ordering.
+      if (!maxRounds && ctx._filesTouched && ctx._filesTouched.size) {
+        try {
+          const fresh = [];
+          for (const [p, ts] of ctx._filesTouched) {
+            if (!p || _ftExcluded(p)) continue;
+            if ((ctx._ftAnnounced.get(p) || 0) >= ts) continue;
+            ctx._ftAnnounced.set(p, ts); fresh.push({ path: p, ts });
+          }
+          if (fresh.length) ctx.emit({ type: 'files_touched', files: fresh, partial: true });
+        } catch (_) {}
+      }
       try { _metacogObserve(_statsFor(convFileName), tc.function.name, parsedArgs); } catch (_) {}   // METACOG (a)
       // write_todos results must round-trip intact: the page renders + persists
       // the checklist from the 'todos:' JSON line, and history rendering parses
@@ -3829,17 +3851,12 @@ async function runAgent(config, ctx) {
   // triggers here too, off-turn, for translatable deliverable formats.
   if (!maxRounds && ctx._filesTouched && ctx._filesTouched.size) {
     try {
-      // System paths never surface: everything under sandpie/ (conversations,
-      // memory, skills, helper scripts) EXCEPT the user-visible legacy
-      // sandpie/artifacts/, plus lab/infra trees.
-      const _ftExcluded = p => (p.startsWith('sandpie/') && !p.startsWith('sandpie/artifacts/'))
-        || p.startsWith('looplab-runs/') || p.startsWith('.tokens');
       const files = [...ctx._filesTouched.entries()]
         .filter(([p]) => p && !_ftExcluded(p))
         .sort((a, b) => a[1] - b[1])
         .map(([path, ts]) => ({ path, ts }));
       if (files.length) {
-        ctx.emit({ type: 'files_touched', files });
+        ctx.emit({ type: 'files_touched', files, partial: false });
         const lx = ctx._localize;
         if (lx && lx.code) for (const f of files) if (/\.(html?|docx|md)$/i.test(f.path)) _localizeArtifactOffTurn(f.path, ctx, lx);
       }
