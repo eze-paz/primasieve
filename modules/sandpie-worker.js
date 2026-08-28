@@ -943,7 +943,7 @@ function _isNonEnglish(s) {
 let _bergamotLoaded = false;
 function _ensureBergamot() {
   if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=6', self.location.href).href);
+  importScripts(new URL('bergamot.js?v=7', self.location.href).href);
   _bergamotLoaded = true;
 }
 
@@ -1038,7 +1038,30 @@ async function _localizeArtifact(path, ctx, target) {
   const lower = String(path).toLowerCase();
   const enc = new TextEncoder(), dec = new TextDecoder();
   try {
-    if (/\.(md|markdown|txt|html?|csv)$/.test(lower)) {
+    if (/\.html?$/.test(lower)) {
+      // Whole document through Bergamot's native HTML mode: markup is parsed and
+      // ONLY text nodes are translated — tags, attributes, <style> and <script>
+      // pass through untouched. NEVER feed HTML down the prose path below: the
+      // blank-line splitter hands CSS/markup blocks to the NMT, which "translates"
+      // them and shreds the file (Jordi's 2026-08-28 dashboard).
+      const text = dec.decode(await opfsReadBytes(path));
+      const loc = target || (ctx && ctx._localize) || {};
+      const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
+      if (!code || code === 'en') return;
+      _ensureBergamot();
+      Bergamot.configure({
+        runtimeUrl: new URL('bergamot/bergamot-translator-worker.js', self.location.href).href,
+        wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
+        modelBase:  new URL('../bergamot-models/', self.location.href).href,
+      });
+      const [tr] = await Bergamot.translate([text], code, { html: true });
+      if (typeof tr !== 'string' || !tr || tr === text) return;
+      // Off-turn safety: skip the write-back if the model edited the file meanwhile.
+      try { if (dec.decode(await opfsReadBytes(path)) !== text) return; } catch (_) { return; }
+      await opfsWriteBytes(path, enc.encode(tr));
+      return;
+    }
+    if (/\.(md|markdown|txt|csv)$/.test(lower)) {
       const text = dec.decode(await opfsReadBytes(path));
       const blocks = text.split(/(\n{2,})/);   // keep separators
       const idx = [], toTr = [];

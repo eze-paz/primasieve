@@ -92,8 +92,12 @@
   }
 
   // texts: string[]; code: BCP-47/ISO target. Returns same-length array; blank
-  // and non-string entries pass through untouched.
-  async function translate(texts, code) {
+  // and non-string entries pass through untouched. opts.html = true switches the
+  // engine into its native HTML mode (the one Firefox full-page translation uses):
+  // markup is parsed, ONLY text nodes are translated, tags/attributes/<style>/
+  // <script> pass through — REQUIRED for whole HTML documents (feeding markup
+  // through the plain sentence path translates CSS and shreds the file).
+  async function translate(texts, code, opts) {
     if (!Array.isArray(texts) || !texts.length) return texts;
     code = baseCode(code);
     // en->en (or no target): English is canonical — nothing to translate. Return
@@ -102,12 +106,13 @@
     if (!supports(code)) throw new Error('bergamot: unsupported target ' + code);
     await ensureInit();
     if (!_svc) throw new Error('bergamot: runtime unavailable');
+    var asHtml = !!(opts && opts.html);
     var tm = await _model(code);
     var input = new _M.VectorString(), idx = [];
     texts.forEach(function (t, i) { if (typeof t === 'string' && t.trim()) { idx.push(i); input.push_back(t); } });
     if (!idx.length) { input.delete(); return texts; }
     var vo = new _M.VectorResponseOptions();
-    for (var i = 0; i < idx.length; i++) vo.push_back({ qualityScores: false, alignment: false, html: false });
+    for (var i = 0; i < idx.length; i++) vo.push_back({ qualityScores: false, alignment: false, html: asHtml });
     var out = _svc.translate(tm, input, vo);
     var res = texts.slice();
     for (var k = 0; k < idx.length; k++) res[idx[k]] = out.get(k).getTranslatedText().trim();
@@ -287,12 +292,12 @@
         w.postMessage(Object.assign({ id: id, op: op, cfg: S }, payload));
       });
     };
-    _xlate = function (texts, code) {
+    _xlate = function (texts, code, opts) {
       if (!Array.isArray(texts) || !texts.length) return Promise.resolve(texts);
       var c = baseCode(code);
       if (!c || c === 'en') return Promise.resolve(texts);      // no-op stays local
       if (!supports(c)) return Promise.reject(new Error('bergamot: unsupported target ' + c));
-      return _rpc('translate', { texts: texts, code: c });
+      return _rpc('translate', { texts: texts, code: c, html: !!(opts && opts.html) });
     };
     _translateOut = _xlate;
     _prefetchOut = function (code) {
@@ -314,7 +319,7 @@
       try {
         if (m.cfg) configure(m.cfg);
         var res;
-        if (m.op === 'translate') res = await translate(m.texts, m.code);
+        if (m.op === 'translate') res = await translate(m.texts, m.code, { html: !!m.html });
         else if (m.op === 'prefetch') res = await prefetch(m.code);
         else if (m.op === 'translateStream') {
           res = await translateStreamLocal(m.texts, m.code, function (i, text) {
@@ -329,7 +334,7 @@
 
   g.Bergamot = {
     configure: configure,
-    translate: function (texts, code) { return _translateOut(texts, code); },
+    translate: function (texts, code, opts) { return _translateOut(texts, code, opts); },
     translateStream: function (texts, code, onPartial) { return _streamOut(texts, code, onPartial); },
     translateMarkdown: translateMarkdown,
     isStructured: isStructured,
