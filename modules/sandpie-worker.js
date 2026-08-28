@@ -964,6 +964,10 @@ async function _localizeArtifact(path, ctx, target) {
       blocks.forEach((b, i) => { if (b.trim() && !/^\s+$/.test(b)) { idx.push(i); toTr.push(b); } });
       if (!toTr.length) return;
       const tr = await _wLocalize(toTr, ctx, target);
+      // Off-turn safety: the agent loop keeps running while we translated. If the
+      // model edited the file meanwhile, writing back would clobber its edit —
+      // skip instead (fail-open: the newer English version stays).
+      try { if (dec.decode(await opfsReadBytes(path)) !== text) return; } catch (_) { return; }
       idx.forEach((bi, k) => { blocks[bi] = tr[k]; });
       await opfsWriteBytes(path, enc.encode(blocks.join('')));
       return;
@@ -986,6 +990,25 @@ async function _localizeArtifact(path, ctx, target) {
   } catch (e) { console.warn('[localizeArtifact] failed (keeping English):', (e && e.message) || e); }
 }
 
+// Off-turn deliverable localization: show_artifact used to AWAIT the whole
+// translation (30-45s dead time per HTML dashboard, measured in Jordi's
+// 2026-08-28 transcripts) before the turn could continue. Now the tool returns
+// immediately (the artifact renders in English), the translation runs on this
+// serialized queue (one at a time — the docx path shares helper files under
+// sandpie/scripts/, and ordered write-backs keep re-shows deterministic), and on
+// completion the page gets the same sw-opfs-changed ping the other file writers
+// use, so an OPEN artifact viewer reloads with the translated file. Fail-open:
+// any error just leaves the English deliverable.
+let _lxQueue = Promise.resolve();
+function _localizeArtifactOffTurn(path, ctx, target) {
+  _lxQueue = _lxQueue.then(async () => {
+    try {
+      await _localizeArtifact(path, ctx, target);
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } });
+    } catch (_) {}
+  });
+}
+
 async function tool_show_artifact({ path, language }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const _saOverride = _locFromOverride(language);   // explicit per-deliverable language (eq selector)
@@ -1001,10 +1024,11 @@ async function tool_show_artifact({ path, language }, ctx) {
     try { await opfsReadBytes(p); found = true; } catch (_) {}
     if (!found && _indexEntry(p)) { try { await hydrateAsync(p); found = true; } catch (_) {} }
     if (found) {
-      // Localize the deliverable in place (its text → the user's language).
+      // Localize the deliverable in place (its text → the user's language) OFF-TURN:
+      // the artifact shows in English now, reloads translated when the queue finishes.
       // Target = the explicit `language` argument, else the Reply selector. Fail-open.
       const saTarget = _saOverride || (ctx && ctx._localize) || null;
-      if (saTarget && saTarget.code) { try { await _localizeArtifact(p, ctx, saTarget); } catch (_) {} }
+      if (saTarget && saTarget.code) _localizeArtifactOffTurn(p, ctx, saTarget);
       return { result: 'artifact:' + p };
     }
   }
