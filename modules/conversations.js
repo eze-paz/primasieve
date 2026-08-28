@@ -328,20 +328,34 @@ function flushIncrementalSave(convId) {
 // tab close); other tabs view read-only — sends are refused and saves skipped.
 // Fail-open when the API is missing so a single-tab session never regresses.
 const _convWriterLocks = new Map();   // convId → release() while this tab holds the lock
+const _convLockAcquiring = new Map(); // convId → in-flight acquisition Promise<bool> (single-flight)
 function _convLockName(id) { return 'sandpie-conv-writer:' + id; }
 async function acquireConvWriterLock(convId) {
   if (!convId || typeof navigator === 'undefined' || !navigator.locks || !navigator.locks.request) return true;
   if (_convWriterLocks.has(convId)) return true;
-  try {
-    return await new Promise((resolve) => {
-      navigator.locks.request(_convLockName(convId), { ifAvailable: true }, (lock) => {
-        if (!lock) { resolve(false); return; }
-        resolve(true);
-        // Returned promise keeps the lock held until releaseConvWriterLock().
-        return new Promise((release) => { _convWriterLocks.set(convId, release); });
-      }).catch(() => resolve(true));   // request itself failed → fail open
-    });
-  } catch (_) { return true; }
+  // SINGLE-FLIGHT: one tab calls this from mount, send, AND save, often before
+  // the first call's lock callback has populated _convWriterLocks. Without
+  // coalescing, each call issues its OWN navigator.locks.request with
+  // ifAvailable:true; the first grabs the (tab-lifetime) lock and every later
+  // concurrent request sees it as unavailable → resolves FALSE → the tab wrongly
+  // decides "another tab owns this", skips the save / refuses the send, and the
+  // just-generated reply is never persisted (vanishes on the next render). Share
+  // ONE acquisition across all concurrent callers so the whole tab agrees.
+  if (_convLockAcquiring.has(convId)) return _convLockAcquiring.get(convId);
+  const p = (async () => {
+    try {
+      return await new Promise((resolve) => {
+        navigator.locks.request(_convLockName(convId), { ifAvailable: true }, (lock) => {
+          if (!lock) { resolve(false); return; }
+          resolve(true);
+          // Returned promise keeps the lock held until releaseConvWriterLock().
+          return new Promise((release) => { _convWriterLocks.set(convId, release); });
+        }).catch(() => resolve(true));   // request itself failed → fail open
+      });
+    } catch (_) { return true; }
+  })().finally(() => _convLockAcquiring.delete(convId));
+  _convLockAcquiring.set(convId, p);
+  return p;
 }
 function releaseConvWriterLock(convId) {
   const release = _convWriterLocks.get(convId);
