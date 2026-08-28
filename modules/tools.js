@@ -405,12 +405,12 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
     respond: {
       description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown.
 WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.
-LANGUAGE: author "text" in ENGLISH — the system automatically translates it into the user's language for delivery; you generate correct, full-capacity text only in English. "language" is REQUIRED: set it to the user's reply language (e.g. "ca", "es", "en"), or to a different code to deliver THIS one reply in that language. Do NOT write "text" in the target language yourself.
+LANGUAGE: "language" is REQUIRED — set it to this reply's language code (e.g. "ca", "es", "en"). Author "text" per the system language directive: directly in the reply language when the directive says you author it yourself (a language you generate fluently), in ENGLISH when the directive says the system translates delivery (a language you don't generate reliably). Never write a language the directive tells you not to author.
 WHEN: your FINAL action — every turn must END on a respond(), so the last thing the user sees is your conclusion. Finish all work and side effects FIRST (files, remember, final write_todos), THEN respond() once at the end. You MAY respond and then keep working, but you must respond() AGAIN afterward so the turn still ends on a respond() reflecting the latest work. If the user asked for replies in multiple languages, emit those respond() calls together (each = one language) as that closing step. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
       parameters: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: 'Your complete user-facing reply, authored in ENGLISH (the system translates it into the language set by "language"). Markdown supported.' },
+          text: { type: 'string', description: 'Your complete user-facing reply (Markdown supported), authored per the system language directive — English when an author-in-English directive is active (the system translates delivery), otherwise the reply language itself.' },
           language: { type: 'string', description: 'REQUIRED. The language code for this reply (e.g. "ca", "es", "en").' },
         },
         required: ['text', 'language'],

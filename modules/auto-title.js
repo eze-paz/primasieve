@@ -41,8 +41,25 @@ const SandpieAutoTitle = (function () {
     'Rules:',
     '- 3 to 6 words. Name the specific topic or task, not the genre ("Centering a div in CSS", never "Coding question" or "User asks about CSS").',
     '- Reply with the title ALONE: no quotes, no trailing period, no markdown, no "Title:" prefix, no explanation.',
-    '- Write it in the same language the user wrote in.',
   ].join('\n');
+  // Language line, appended per call: when the user's reply language is one the
+  // active model does NOT generate fluently (models.json `fluent` on the managed
+  // provider def), the title is authored in English and machine-translated after
+  // (a directly-authored title in a non-fluent language comes out garbled —
+  // same regime split as the chat itself). Fluent/unknown-language => the old
+  // behavior, title in the user's language.
+  function _titleLang() {
+    try {
+      const SL = window.SandpieLanguage;
+      const code = String((SL && SL.effective && SL.effective()) || 'en').split(/[-_]/)[0].toLowerCase();
+      if (!code || code === 'en') return { line: '- Write it in the same language the user wrote in.', tx: null };
+      const p = SandpieProviders.getActive ? SandpieProviders.getActive() : null;
+      const fl = (p && Array.isArray(p.fluent)) ? p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase()) : null;
+      if (fl && fl.includes(code)) return { line: '- Write it in the same language the user wrote in.', tx: null };
+      const name = (SL && SL.name && SL.name(code)) || code;
+      return { line: '- Write it in English.', tx: { code, name } };
+    } catch (_) { return { line: '- Write it in the same language the user wrote in.', tx: null }; }
+  }
 
   // Hardcoded 2026-08-07 (product decision): the Titles settings tab is removed
   // from the UI and the config is fixed for every user — auto-titling is always
@@ -97,18 +114,27 @@ const SandpieAutoTitle = (function () {
     let user = 'User: ' + u + (a ? '\n\nAssistant: ' + a : '');
     if (isLocal) user += '\n\n/no_think';
 
+    const lang = _titleLang();
     const out = await SandpieProviders.complete({
-      system: getPrompt(),
+      system: getPrompt() + '\n' + lang.line,
       user,
       maxTokens: isLocal ? MAXTOK_LOCAL : MAXTOK_CLOUD,
       noReasoning: true,
       signal,
       sessionId,   // inherit parent session so /admin/transcripts groups the retitle op
     });
-    const title = clean(out);
+    let title = clean(out);
     // Don't fail silently: a model that answered but whose answer was unusable is
     // indistinguishable from "no provider" at the call site otherwise.
     if (!title && out && out.trim()) console.warn('[sandpie] auto-title: unusable answer, keeping the derived title:', JSON.stringify(out.slice(0, 200)));
+    // Non-fluent reply language: the title was authored in English — translate it
+    // through the shared localizer (display-cached). Fail-open to the English title.
+    if (title && lang.tx && window.__locCache && window.__locCache.localize) {
+      try {
+        const [tr] = await window.__locCache.localize([title], lang.tx.code, lang.tx.name);
+        if (typeof tr === 'string' && tr.trim()) title = tr.trim();
+      } catch (_) {}
+    }
     return title;
   }
 

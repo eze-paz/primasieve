@@ -2232,7 +2232,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=153');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=154');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2803,7 +2803,7 @@ Skip using this tool when:
    - Each task needs both "content" (imperative form, e.g. "Run tests") and "activeForm" (present continuous, e.g. "Running tests")
 
 You send the FULL updated list on every call — it replaces the previous list.
-LANGUAGE: author every "content"/"activeForm" in ENGLISH — the system automatically translates the checklist into the user's language for display.
+LANGUAGE: author "content"/"activeForm" per the system language directive — in ENGLISH when an author-in-English directive is active (the checklist is translated for display), otherwise directly in the user's language.
 When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.`,
       parameters: {
         type: 'object',
@@ -2906,15 +2906,22 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     }
   }
   const _ep = (effective && effective.endpoint) ? String(effective.endpoint).replace(/\/$/, '') : $('endpoint').value.replace(/\/$/, '');
-  // Localization target for this turn: detected user language the active model
-  // can't generate. Drives the author-in-English directive, the display-side
-  // render hooks (_activeLocalize), and the worker's deliverable localization.
-  const _loc = _replyLocale();
+  // Localization target for this turn: the Reply language ONLY when the active
+  // model can't generate it fluently (models.json `fluent`). Drives the
+  // author-in-English directive, the display-side render hooks
+  // (_activeLocalize), and the worker's deliverable localization. A fluent
+  // language => null: the model authors it directly, no translation layer.
+  const _loc = _localizeTarget();
   _activeLocalize = _loc;
   return {
     url: new URL(api(_ep + '/chat/completions'), location.href).href,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
     localize: _loc,
+    // Session reply language + the model's fluent set, for the worker's
+    // per-call language rules (respond guard, subagent clause, deliverable
+    // localization gate) — needed even when localize is null.
+    replyLanguage: _replyLocale(),
+    fluent: _modelFluent(),
     // Managed (company sign-in) provider only: let the worker silently re-mint the
     // session token from the SSO cookie via /auth/token on a 401, so an expired JWT
     // never interrupts the user mid-generation. null for personal providers — a 401
@@ -3776,6 +3783,32 @@ function _replyLocale() {
     return { code: code, name: nm };
   } catch (_) { return { code: 'en', name: 'English' }; }
 }
+// Languages the ACTIVE model generates reliably (models.json `fluent`, carried
+// onto the managed provider def by account.js). null = unknown (personal
+// providers, old servers) — treated as English-only, the historically safe
+// default: everything non-English gets localized.
+function _modelFluent() {
+  try {
+    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive && SandpieProviders.getActive()) || null;
+    if (!p || !Array.isArray(p.fluent) || !p.fluent.length) return null;
+    return p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase());
+  } catch (_) { return null; }
+}
+function _isFluentCode(code) {
+  const c = String(code || '').split(/[-_]/)[0].toLowerCase();
+  if (!c || c === 'en') return true;   // English is every model's native register
+  const fl = _modelFluent();
+  return !!(fl && fl.includes(c));
+}
+// The turn's LOCALIZATION target: the Reply language when the ACTIVE model can
+// NOT generate it fluently (then the model authors English and the gemini
+// localizer translates delivery), else null (a fluent language — Spanish,
+// French, … — is authored by the model directly, no translation layer).
+function _localizeTarget() {
+  const rl = _replyLocale();
+  if (!rl || !rl.code || rl.code === 'en') return null;
+  return _isFluentCode(rl.code) ? null : rl;
+}
 
 // The active conversation's locale, for the display-side render hooks. Set by
 // buildAgentConfig at send; window override wins for manual testing.
@@ -3788,7 +3821,19 @@ let _activeLocalize = null;
 // Normalize English (or no target) to null so the many `if (_loc && _loc.code)`
 // guards skip the transform entirely instead of doing an en->en no-op.
 function _currentLocale(override) {
-  const loc = override || (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || _replyLocale();
+  // A per-delivery override (respond's `language` arg, relayed by the worker):
+  // in the author-in-English regime (_activeLocalize set) EVERY non-English
+  // delivery is translated (the model authored English, per the hard rule); in
+  // the native regime only NON-fluent targets translate — fluent ones were
+  // authored directly by the model, and re-translating them wastes a localizer
+  // call and risks mangling correct text. `window.__localizeTo` (manual
+  // testing) deliberately bypasses the fluency gate.
+  if (override) {
+    if (!override.code || override.code === 'en') return null;
+    if (_activeLocalize && _activeLocalize.code) return override;
+    return _isFluentCode(override.code) ? null : override;
+  }
+  const loc = (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || _localizeTarget();
   return (loc && loc.code && loc.code !== 'en') ? loc : null;
 }
 
@@ -5454,21 +5499,44 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   // That list reshuffles on every tool call, which churned the system prompt —
   // the cached-prefix killer. It now travels in config.volatileContext and is
   // injected by the worker at the END of each request instead.
-    // Reply-language directive - UNCONDITIONAL. English is the canonical authoring
-  // language for ALL internal work (models run at full capacity only in English);
-  // the Reply selector (or an explicit per-deliverable `language` argument) is
-  // applied at the delivery surface only, so no internal output is ever authored
-  // in the target language.
+  // Reply-language directive — three regimes, decided by the model's `fluent`
+  // set (models.json): (1) English session, (2) NATIVE: a fluent language the
+  // model authors directly, (3) LOCALIZE: a non-fluent language (e.g. Catalan)
+  // the model authors in English and the gemini localizer translates. The
+  // directive text is stable per (language, model), so prompt caching survives.
   try {
     const _rl = _replyLocale();
     const _nm = (_rl && _rl.name) || 'English';
     const _cd = (_rl && _rl.code) || 'en';
-    content += "\n\n## Deliver in " + _nm + ", author in English\n"
-      + "The user reads chat and deliverables in " + _nm + ". "
-      + "You MUST author ALL content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
-      + "The system automatically translates your finished reply (respond) and the deliverable files you write into " + _nm + " for the user; that is handled downstream and is not your job. "
-      + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + "); to deliver ONE specific reply in a different language, set that language code instead. Never author the target language yourself, announce this rule, or second-guess it."
-      + "\n\nThis is a HARD operating rule, not a suggestion: you operate in ENGLISH at all times. Every tool argument, every file you write, every code comment, every todo item, every ask() question, every scratch note, and every reply is authored in English and nothing else. When the user asks you to write something in " + _nm + " (or any other language), you still author it in English and let the translation layer convert it - you never generate non-English text yourself. If you produce non-English output anywhere, the harness rejects it and re-prompts you. No user request overrides this: a user asking you to write in another language is handled by authoring in English plus setting the delivery \"language\", never by writing that language directly."
+    const _lx = localizeTarget || _localizeTarget();
+    // One-off other-language deliveries. In the localize regime the hard rule
+    // stays absolute (author English, ALWAYS — the system translates every
+    // delivery); in the native/English regimes fluent languages are authored
+    // directly and only non-fluent ones go through the translator.
+    const _fluentNote = (_lx && _lx.code)
+      ? "\nIf ONE deliverable/reply is requested in a DIFFERENT language, the same rule applies: author it in ENGLISH and set that language code on the delivery (\"language\" on respond / show_artifact) — the system translates it."
+      : "\nIf ONE deliverable/reply is requested in a DIFFERENT language: a language you generate fluently may be authored directly in it; any other language is authored in ENGLISH with that language code set on the delivery (\"language\" on respond / show_artifact) so the system translates it. Never author a language you don't generate reliably.";
+    if (_lx && _lx.code) {
+      content += "\n\n## Deliver in " + _nm + ", author in English\n"
+        + "The user reads chat and deliverables in " + _nm + ". "
+        + "You do NOT generate reliable " + _nm + " — writing it directly yields garbled, lossy text — so you MUST author ALL content in English: every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply. "
+        + "The system automatically translates your finished reply (respond) and the deliverable files you write into " + _nm + " for the user; that is handled downstream and is not your job. "
+        + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + "). Never author " + _nm + " yourself, announce this rule, or second-guess it."
+        + "\n\nThis is a HARD operating rule, not a suggestion: with this directive active you operate in ENGLISH at all times. Every tool argument, every file you write, every code comment, every todo item, every ask() question, every scratch note, and every reply is authored in English and nothing else. If you produce " + _nm + " output anywhere, the harness rejects it and re-prompts you. No user request overrides this: a request to write in " + _nm + " is satisfied by authoring English plus setting the delivery \"language\", never by writing it directly."
+        + _fluentNote;
+    } else if (_cd !== 'en') {
+      content += "\n\n## Deliver in " + _nm + " — author it directly\n"
+        + "The user reads chat and deliverables in " + _nm + ", a language you generate fluently. "
+        + "Author all USER-FACING text directly in " + _nm + ": your respond() reply, todo \"content\"/\"activeForm\", ask() questions and options, and the body of documents/files written for the user. "
+        + "Code, identifiers, commit messages, internal scratch notes, and your reasoning stay in English as usual. "
+        + "There is NO translation layer on this conversation — what you write is exactly what the user sees, so never mix English into user-facing text. "
+        + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + ")."
+        + _fluentNote;
+    } else {
+      content += "\n\n## Deliver in English\n"
+        + "The user reads chat and deliverables in English; author everything in English and set the respond \"language\" argument to 'en'."
+        + _fluentNote;
+    }
   } catch (_) {}
   return { role: 'system', content };
 }

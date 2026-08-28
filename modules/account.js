@@ -110,6 +110,11 @@ const SandpieAccount = (() => {
         reasoningEffort: m.reasoningEffort,
         // Vision config pre-set by the company admin in models.json (yes/no only).
         vision: (m.vision === 'yes') ? 'yes' : 'no',
+        // Languages this model GENERATES reliably (models.json `fluent`). Drives
+        // the localization gate: a Reply language in this set is authored directly
+        // by the model; one outside it is authored in English and machine-
+        // translated. Omitted => undefined => localize everything non-English.
+        fluent: Array.isArray(m.fluent) ? m.fluent : undefined,
         visionFallbackId: m.visionFallback ? '__managed:' + m.visionFallback : undefined,
       })), cat.defaultModel);
     } else {

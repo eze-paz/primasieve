@@ -978,6 +978,23 @@ function _ensureFranc() {
   importScripts(new URL('franc.js?v=1', self.location.href).href);
   _francLoaded = true;
 }
+// Does delivering in `locale` require machine translation (i.e. the model was
+// required to author ENGLISH for it)? One predicate drives BOTH the English-
+// authoring guard and the translate decision, and it mirrors the page's
+// _currentLocale override rule exactly:
+// - author-in-English regime (ctx._localize set — the session language is not
+//   fluent): EVERY non-English delivery is authored English and translated,
+//   including one-offs in languages the model could otherwise write.
+// - native regime: only targets outside the model's `fluent` set translate;
+//   fluent ones are authored directly. Unknown fluency (null — personal
+//   providers) = the safe historical default: everything non-English translates.
+function _needsTx(locale, ctx) {
+  if (!locale || !locale.code) return false;
+  const c = String(locale.code).split(/[-_]/)[0].toLowerCase();
+  if (!c || c === 'en') return false;
+  if (ctx && ctx._localize && ctx._localize.code) return true;
+  return !(ctx && ctx._fluent && ctx._fluent.includes(c));
+}
 function _isNonEnglish(s) {
   // Guard on length: statistical langid is unreliable on short text, so don't judge
   // (and never block) replies below ~40 non-space chars. Fail-open on any error.
@@ -1151,8 +1168,17 @@ for tbl in d.tables:
 d.save('/files/' + sys.argv[1])
 print('LXOK')
 `;
-async function _localizeArtifact(path, ctx, target) {
+// Does this deliverable actually need translation? Returns the resolved target
+// locale, or null when the file was already authored in the target language.
+// Same predicate as the respond path (_needsTx): author-in-English regime
+// translates every non-English target (files are authored English); native
+// regime translates only NON-fluent targets (fluent ones authored directly).
+function _lxNeeded(ctx, target) {
   const loc = target || (ctx && ctx._localize);
+  return _needsTx(loc, ctx) ? loc : null;
+}
+async function _localizeArtifact(path, ctx, target) {
+  const loc = _lxNeeded(ctx, target);
   if (!loc || !loc.code) return;
   // Idempotency per (path,language): never translate the same deliverable twice
   // (a re-show, or an already-translated file), which would garble it.
@@ -1224,6 +1250,9 @@ async function _localizeArtifact(path, ctx, target) {
 // any error just leaves the English deliverable.
 let _lxQueue = Promise.resolve();
 function _localizeArtifactOffTurn(path, ctx, target) {
+  // No translation needed (English target, or a fluent language the model
+  // authored directly)? Skip entirely — no badge, no queue slot.
+  if (!_lxNeeded(ctx, target)) return;
   // Already translated (re-show)? Skip entirely — no badge flash, no queue slot.
   // Same key _localizeArtifact uses for its own idempotency guard.
   const lxKey = (target ? 'x:' + target.code : 'd:') + ':' + path;
@@ -2915,12 +2944,18 @@ async function tool_spawn_subagent({ agent, prompt }, ctx) {
     return nm && nm !== 'spawn_subagent' && allowed.has(nm);
   });
 
-  // We propagate the parent's reply-language rule (set by the page via
-  // config.localize) AND enforce the HARD English-only operating rule: a
-  // subagent authors everything - reasoning, tool calls, files, and its final
-  // result - in ENGLISH, never in another language. The caller/parent handles
-  // delivery-language translation downstream.
-  const langClause = '\n\nHARD OPERATING RULE (applies to every subagent): you operate in ENGLISH at all times. Every tool argument, every file you write, every line of reasoning, every todo item, and your final result is authored in ENGLISH and nothing else. If a task looks like it is written in another language, still author all of your own work in English - the language of the material you read does NOT change the language you write in. You never generate non-English text yourself in any channel; the delivery language is handled by the caller.';
+  // Subagent language rule mirrors the parent's regime. Author-in-English
+  // regime (ctx._localize set) or an English session: the HARD English rule —
+  // the parent's translation layer handles delivery. Native regime (a fluent
+  // reply language): user-facing deliverable content is authored directly in
+  // that language; internal work and the returned result stay English (the
+  // result feeds the parent model, not the user).
+  const _subNative = !(ctx && ctx._localize && ctx._localize.code)
+    && ctx && ctx._replyLang && ctx._replyLang.code && String(ctx._replyLang.code).split(/[-_]/)[0].toLowerCase() !== 'en'
+    ? ctx._replyLang : null;
+  const langClause = _subNative
+    ? '\n\nLANGUAGE RULE: the end user reads deliverables in ' + (_subNative.name || _subNative.code) + ', which you generate fluently. Author the BODY of any document/file written for the user directly in ' + (_subNative.name || _subNative.code) + '. Everything else — reasoning, tool arguments, code, comments, todo items, scratch notes, and your FINAL RESULT to the caller — stays in ENGLISH (your result feeds the calling agent, not the user). The language of the material you read does NOT change the language you write in.'
+    : '\n\nHARD OPERATING RULE (applies to every subagent): you operate in ENGLISH at all times. Every tool argument, every file you write, every line of reasoning, every todo item, and your final result is authored in ENGLISH and nothing else. If a task looks like it is written in another language, still author all of your own work in English - the language of the material you read does NOT change the language you write in. You never generate non-English text yourself in any channel; the delivery language is handled by the caller.';
   const sysBody = def.body || ('You are a focused subagent named ' + agent + '. Do the task and report the result.');
   const outNote = (def.meta.output === 'structured')
     ? '\n\nReturn ONLY your final result in the exact structure your instructions specify — no preamble, no commentary.'
@@ -3235,6 +3270,8 @@ async function runAgent(config, ctx) {
   // deliverable shown via show_artifact is localized (its text translated) so the
   // user's file is in their language, while the model authored it in English.
   ctx._localize = config.localize || null;
+  ctx._replyLang = config.replyLanguage || null;   // session reply language (even when localize is null)
+  ctx._fluent = Array.isArray(config.fluent) ? config.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase()) : null;
   // Seed the task list from the persisted checklist (page passes config.todos).
   // Migrate legacy items: flat items (no id) → sequential ids; the retired
   // 'withdrawn' status → 'deleted'; drop dead tree/evidence/audit fields.
@@ -3578,9 +3615,12 @@ async function runAgent(config, ctx) {
       _stashAside(round.content);                        // keep any non-respond prose as thinking
       if (_rejectRespondLang) {
         round.content = '';                              // rejected — don't deliver
-      } else if (_isNonEnglish(respondText)) {
-        // Model authored the reply in a non-English language (would be mangled by the
-        // en->X translator). Nuke it (don't deliver) and re-prompt to author in English.
+      } else if (_needsTx(respondLocaleOverride, ctx) && _isNonEnglish(respondText)) {
+        // The target language needs machine translation (not in the model's fluent
+        // set), so the text MUST be authored in English — a non-English reply here
+        // is the model writing the target language itself (garbled). Nuke it
+        // (don't deliver) and re-prompt to author in English. Fluent targets skip
+        // this guard entirely: the model authors them directly.
         _rejectRespondLang = true; _rejectReason = 'nonenglish';
         round.content = '';
       } else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) {
@@ -3634,7 +3674,9 @@ async function runAgent(config, ctx) {
         setReminder('force-respond',
           '<system-reminder>Your last message was plain text with no respond() call, so it was NOT shown to the user. '
           + 'The ONLY thing the user sees is the "text" you pass to the respond() tool. '
-          + 'Call respond() now with your complete answer authored in ENGLISH (set the "language" argument to the user\'s reply language; the system translates it for the user). Do not answer any other way. '
+          + ((ctx._localize && ctx._localize.code)
+             ? 'Call respond() now with your complete answer authored in ENGLISH (set the "language" argument to the user\'s reply language; the system translates it for the user). Do not answer any other way. '
+             : 'Call respond() now with your complete answer, following the system language directive (set the "language" argument to the user\'s reply language). Do not answer any other way. ')
           + '(attempt ' + ctx._respondRetries + '/' + MAX_RESPOND_RETRIES + ')</system-reminder>',
           { attempt: ctx._respondRetries });
         continue;
@@ -3782,7 +3824,7 @@ async function runAgent(config, ctx) {
             _tcText = String(_a2.text ?? '');
             _tcLocale = _locFromOverride(_a2.language);
             if (!_tcLocale) { _tcReject = true; _tcReason = 'missing'; }
-            else if (_isNonEnglish(_tcText)) { _tcReject = true; _tcReason = 'nonenglish'; }
+            else if (_needsTx(_tcLocale, ctx) && _isNonEnglish(_tcText)) { _tcReject = true; _tcReason = 'nonenglish'; }
             else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) { _tcReject = true; _tcReason = 'cap'; }
             else if (ctx._respondLangs.has(_tcLocale.code)) { _tcReject = true; _tcReason = 'duplicate'; }
           } catch (_) { _tcText = ''; _tcReject = true; _tcReason = 'missing'; }
