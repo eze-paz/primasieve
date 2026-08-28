@@ -840,8 +840,12 @@ function renderFilesTouched(host, files, opts) {
     });
     // Mid-turn (partial): a card that already exists stays where it is — the
     // artifact auto-reload refreshes its content on every write, and moving it
-    // around while the model works would make the conversation jumpy.
-    if (partial && olds.length) continue;
+    // around while the model works would make the conversation jumpy. Verify its
+    // header survived (see _artifactEnsureHeader — missing-header bug breadcrumb).
+    if (partial && olds.length) {
+      if (typeof window._artifactEnsureHeader === 'function') for (const o of olds) window._artifactEnsureHeader(o);
+      continue;
+    }
     // Fresh render: the earlier card (if any) is dropped so the new one below
     // becomes the single, bottom-most occurrence (most recently edited last).
     for (const old of olds) old.remove();
@@ -6720,6 +6724,7 @@ window.refreshConversationList = refreshConversationList;
 window.refreshSendButtonForActive = refreshSendButtonForActive;
 window.setStreamSending = setStreamSending;
 window.handleSubmit = handleSubmit;
+window.renderFilesTouched = renderFilesTouched;   // debug/test handle (touched-files surfacing)
 window.enqueueForActive = enqueueForActive;
 window.handleButtonClick = handleButtonClick;
 window.sendSingle = sendSingle;

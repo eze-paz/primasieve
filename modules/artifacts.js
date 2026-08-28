@@ -735,6 +735,27 @@ if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     }
   });
 }
+// Header-integrity self-heal (2026-08-28): a live report showed an expanded
+// artifact losing its .artifact-header after a later turn edited the same file
+// (not yet reproduced synthetically — every known code path preserves it).
+// Rather than leave a chrome-less frame, rebuild the card in place and log a
+// loud breadcrumb so the real trigger can be identified from the console.
+function _artifactEnsureHeader(wrap) {
+  try {
+    if (!wrap || !wrap.isConnected || wrap.querySelector(':scope > .artifact-header')) return;
+    const path = wrap.dataset.artifactPath;
+    console.warn('[artifact] header missing on "' + path + '" — rebuilding card. Please report what the turn was doing (breadcrumb for the missing-header bug).');
+    const target = wrap.parentElement;
+    const collapsed = wrap.dataset.artifactCollapsed === '1';
+    const next = wrap.nextSibling;
+    wrap.remove();
+    if (!path || !target) return;
+    renderArtifact(null, path, { collapsed });
+    const fresh = [...document.querySelectorAll('.artifact-wrap')].reverse().find(w => w.dataset.artifactPath === path);
+    if (fresh) target.insertBefore(fresh, next);
+  } catch (_) {}
+}
+window._artifactEnsureHeader = _artifactEnsureHeader;
 if (typeof Sandpie !== 'undefined' && Sandpie.events) {
   Sandpie.events.on('artifact:changed', (path) => {
     if (!path) return;
@@ -747,6 +768,8 @@ if (typeof Sandpie !== 'undefined' && Sandpie.events) {
         if (!cur) continue;
         const a = norm(cur);
         if (a !== b && strip(a) !== strip(b)) continue;
+        _artifactEnsureHeader(wrap);
+        if (!wrap.isConnected) continue;   // self-heal replaced it; the fresh card just loaded
         const frame = wrap.querySelector('.artifact-frame');
         if (frame) loadArtifactFrame(wrap, frame, Promise.resolve(resolved), resolved);
       }
