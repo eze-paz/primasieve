@@ -966,7 +966,7 @@ function _isNonEnglish(s) {
 let _bergamotLoaded = false;
 function _ensureBergamot() {
   if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=8', self.location.href).href);
+  importScripts(new URL('bergamot.js?v=9', self.location.href).href);
   _bergamotLoaded = true;
 }
 

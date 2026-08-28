@@ -235,11 +235,46 @@
   // letter — numbers ("4,657.10"), tickers ("GC=F", "VIX"), and symbol runs pass
   // through untouched. Entities are decoded for the NMT and re-encoded after.
   var _htmlSkipTags = { style: 1, script: 1, code: 1, pre: 1, svg: 1, noscript: 1, textarea: 1 };
+  // Decode numeric entities and the named ones LLM-authored pages actually use,
+  // BEFORE the translatability test — "&#9650; +55.29 &middot; +0.72%" must decode
+  // to "▲ +55.29 · +0.72%" (no lowercase -> skipped whole), or the entity
+  // NAMES themselves read as prose ("middot") and drag the fragment through the NMT.
+  var _entNamed = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    middot: '·', bull: '•', ndash: '–', mdash: '—', hellip: '…',
+    deg: '°', times: '×', minus: '−', plusmn: '±', laquo: '«',
+    raquo: '»', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+    trade: '™', copy: '©', reg: '®', euro: '€', pound: '£',
+    yen: '¥', cent: '¢', sect: '§', para: '¶',
+    uarr: '↑', darr: '↓', rarr: '→', larr: '←' };
   function _entDec(s) {
-    return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+    return s
+      .replace(/&#x([0-9a-fA-F]+);/g, function (_, h) { return String.fromCodePoint(parseInt(h, 16)); })
+      .replace(/&#(\d+);/g, function (_, d) { return String.fromCodePoint(parseInt(d, 10)); })
+      .replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, function (m0, n) {
+        return Object.prototype.hasOwnProperty.call(_entNamed, n) ? _entNamed[n] : m0;
+      });
   }
-  function _entEnc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  // Entity-aware escape: encode < > and BARE & only — an '&' still starting a
+  // well-formed entity (an unknown named one the decode left alone) must not
+  // become '&amp;middot;' and render as literal "&middot;" text.
+  function _entEnc(s) {
+    return s.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  // Graded translatability (mirrors the markdown cell heuristics): a SHORT
+  // fragment (≤3 words) is a label/name — translate it only when a word BEGINS
+  // with a lowercase letter, so "Dow Jones", "Nasdaq Composite", "WTI Crude"
+  // pass through untouched (the NMT mangles short proper nouns:
+  // "pel·lícula Dow Jones", "Nasdaq Compost") while single common words
+  // ("Gold" → "Or") and real prose still translate. Longer fragments are
+  // sentences — any lowercase letter qualifies.
+  function _htmlTranslatable(t) {
+    var words = t.split(/\s+/).filter(Boolean);
+    if (!words.length) return false;
+    if (words.length === 1) return /\p{Ll}/u.test(t);
+    if (words.length <= 3) return _hasLowerWord(t);
+    return /\p{Ll}/u.test(t);
+  }
   async function translateHtml(html, code) {
     code = baseCode(code);
     if (!code || code === 'en' || typeof html !== 'string' || !html.trim()) return html;
@@ -259,8 +294,9 @@
         continue;
       }
       if (skip) continue;
-      if (!/\p{Ll}/u.test(p)) continue;            // no lowercase letter → not prose
-      frags.push(_entDec(p.trim()));
+      var decoded = _entDec(p);
+      if (!_htmlTranslatable(decoded.trim())) continue;  // numbers/tickers/short proper nouns pass through
+      frags.push(decoded.trim());
       refs.push(i);
       lead.push((p.match(/^\s*/) || [''])[0]);
       trail.push((p.match(/\s*$/) || [''])[0]);
