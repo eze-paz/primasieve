@@ -284,6 +284,7 @@ function renderArtifact(host, path, opts) {
   if (!renderable) {
     const cb = wrap.querySelector('.artifact-collapse-btn');
     if (cb) cb.remove();
+    wrap.classList.add('artifact-compact');   // card-only: always the slim strip
     wrap.appendChild(buildArtifactCard(clean, ext, async () => {
       try { await opfs.openInNewTab(await resolvedP); }
       catch (e) { console.error('[artifact] open failed:', e); }
@@ -298,6 +299,7 @@ function renderArtifact(host, path, opts) {
   if (PANEL_ONLY_EXTS.has(ext)) {
     const cb = wrap.querySelector('.artifact-collapse-btn');
     if (cb) cb.remove();
+    wrap.classList.add('artifact-compact');   // card-only: always the slim strip
     wrap.appendChild(buildArtifactCard(clean, ext, async () => openArtifactPanel(await resolvedP)));
     _append(target, wrap);
     return;
@@ -405,6 +407,7 @@ function formatArtifactAge(ts) {
 function collapseArtifact(wrap) {
   if (!wrap || wrap.dataset.artifactCollapsed === '1') return;
   wrap.dataset.artifactCollapsed = '1';
+  wrap.classList.add('artifact-compact');   // slim single-strip presentation (CSS)
 
   const frame = wrap.querySelector('.artifact-frame');
   const metaRow = wrap.querySelector('.artifact-meta-row');
@@ -438,6 +441,7 @@ function collapseArtifact(wrap) {
 function expandArtifact(wrap) {
   if (!wrap || wrap.dataset.artifactCollapsed !== '1') return;
   delete wrap.dataset.artifactCollapsed;
+  wrap.classList.remove('artifact-compact');
 
   const frame = wrap.querySelector('.artifact-frame');
   const metaRow = wrap.querySelector('.artifact-meta-row');
