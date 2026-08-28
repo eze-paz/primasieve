@@ -30,5 +30,3 @@ _hf/
 _cpukern/target/
 test/lang-harness/.env
 
-# Bergamot model packs are hosted on sandpie-server static (server-side, untracked), not in git
-/bergamot-models/

@@ -990,49 +990,122 @@ function _isNonEnglish(s) {
   } catch (_) { return false; }
 }
 
-// Load the Bergamot classic script into the worker once (importScripts is a
-// worker global; bergamot.js sits beside this file at /modules/bergamot.js).
-let _bergamotLoaded = false;
-function _ensureBergamot() {
-  if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=9', self.location.href).href);
-  _bergamotLoaded = true;
-}
-
 async function _wLocalize(texts, ctx, target) {
   if (!Array.isArray(texts) || !texts.length) return texts;
+  const cfg = ctx && ctx._agentConfig;
+  if (!cfg || !cfg.url) return texts;
   const loc = target || (ctx && ctx._localize) || {};
   const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
   if (!code || code === 'en') return texts;
-  // On-device Bergamot only (gemini disabled). en handled above. Coverage = whichever
-  // en->X packs are hosted server-side (fetched on demand, OPFS-cached). The per-call
-  // `target` (from show_artifact's `language`) wins over the system locale, so a
-  // "translate to X" task localizes each deliverable to X, ignoring the system language.
-  // Fail-open to English on a missing pack / error.
-  try {
-    _ensureBergamot();
-    if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
-    Bergamot.configure({
-      runtimeUrl: new URL('bergamot/bergamot-translator-worker.js', self.location.href).href,
-      wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
-      modelBase:  new URL('../bergamot-models/', self.location.href).href,
-    });
-    // Structured items (a table/code fence — e.g. a markdown deliverable block) go
-    // through the per-cell translator to keep the grid intact; plain items keep the
-    // higher-quality whole-string batch translate.
-    const plainIdx = [], plain = [];
-    texts.forEach((t, i) => { if (typeof t === 'string' && !Bergamot.isStructured(t)) { plainIdx.push(i); plain.push(t); } });
-    const plainTr = plain.length ? await Bergamot.translate(plain, code) : [];
-    const out = texts.slice();
-    plainIdx.forEach((oi, k) => { out[oi] = plainTr[k]; });
-    for (let i = 0; i < texts.length; i++) {
-      if (typeof texts[i] === 'string' && Bergamot.isStructured(texts[i])) out[i] = await Bergamot.translateMarkdown(texts[i], code);
-    }
-    return out;
-  } catch (e) {
-    console.warn('[wLocalize] bergamot failed (keeping English):', (e && e.message) || e);
-    return texts;
+  // gemini-2.5-flash through the provider endpoint the agent loop already uses
+  // (ctx._agentConfig carries url+headers; the managed proxy injects the upstream
+  // key and pins the localizer via models.json). The LLM preserves markdown/code
+  // natively, so structured items need no special-casing. The per-call `target`
+  // (from show_artifact's `language`) wins over the system locale, so a
+  // "translate to X" task localizes each deliverable to X, ignoring the system
+  // language. Fail-open to English per chunk.
+  const tgt = loc.name || code;
+  const sys = 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
+  const CHUNK = 50;   // keep each request modest (upstream body cap ~1MB)
+  const out = [];
+  for (let i = 0; i < texts.length; i += CHUNK) {
+    const slice = texts.slice(i, i + CHUNK);
+    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
+    body.session_id = 'Translate:' + (ctx && ctx._sessionId);   // parent-session marker for /admin/transcripts
+    let arr = null;
+    try {
+      const r = await fetch(cfg.url, { method: 'POST', headers: Object.assign({}, cfg.headers, { 'Content-Type': 'application/json' }), body: JSON.stringify(body), signal: ctx && ctx.signal });
+      const j = await r.json();
+      let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
+      content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+      arr = JSON.parse(content);
+    } catch (e) { console.warn('[wLocalize] chunk failed (keeping English):', (e && e.message) || e); }
+    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
   }
+  return out;
+}
+// ---- HTML text-node localization (JS pre/post pass) -------------------------
+// Whole HTML documents are NEVER sent to the localizer in one piece: the model
+// could truncate or rewrite markup, and a big dashboard would blow the upstream
+// ~1MB body cap. Instead split on tags, collect only translatable TEXT nodes,
+// batch them through _wLocalize, and reinject — tags, attributes, and
+// <style>/<script>/<code>/<pre>/<svg> subtrees stay byte-identical.
+const _lxHtmlSkipTags = { style: 1, script: 1, code: 1, pre: 1, svg: 1, noscript: 1, textarea: 1 };
+// Decode numeric entities and the named ones LLM-authored pages actually use,
+// BEFORE the translatability test — "&#9650; +55.29 &middot; +0.72%" must decode
+// to "▲ +55.29 · +0.72%" (no lowercase -> skipped whole), or the entity NAMES
+// themselves read as prose ("middot") and drag numeric fragments into the request.
+const _lxEntNamed = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  middot: '·', bull: '•', ndash: '–', mdash: '—', hellip: '…',
+  deg: '°', times: '×', minus: '−', plusmn: '±', laquo: '«',
+  raquo: '»', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  trade: '™', copy: '©', reg: '®', euro: '€', pound: '£',
+  yen: '¥', cent: '¢', sect: '§', para: '¶',
+  uarr: '↑', darr: '↓', rarr: '→', larr: '←' };
+function _lxEntDec(s) {
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, (m0, n) => Object.prototype.hasOwnProperty.call(_lxEntNamed, n) ? _lxEntNamed[n] : m0);
+}
+// Entity-aware escape: encode < > and BARE & only — an '&' still starting a
+// well-formed entity (an unknown named one the decode left alone) must not
+// become '&amp;middot;' and render as literal "&middot;" text.
+function _lxEntEnc(s) {
+  return s.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;')
+          .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function _lxHasLowerWord(t) {
+  const w = String(t).split(/\s+/);
+  for (let i = 0; i < w.length; i++) {
+    const tok = w[i].replace(/^[^\p{L}]+/u, '');   // strip leading punctuation
+    if (tok && /^\p{Ll}/u.test(tok)) return true;
+  }
+  return false;
+}
+// Graded translatability: a SHORT fragment (≤3 words) is a label/name — translate
+// it only when a word BEGINS with a lowercase letter, so tickers and proper nouns
+// ("Dow Jones", "WTI Crude", "GC=F") pass through untouched while single common
+// words ("Gold") and real prose still translate. Numbers/symbol runs never match.
+// This also keeps request size (= cost) down: most dashboard cells are skipped.
+function _lxHtmlTranslatable(t) {
+  const words = t.split(/\s+/).filter(Boolean);
+  if (!words.length) return false;
+  if (words.length === 1) return /\p{Ll}/u.test(t);
+  if (words.length <= 3) return _lxHasLowerWord(t);
+  return /\p{Ll}/u.test(t);
+}
+async function _lxTranslateHtml(html, ctx, target) {
+  if (typeof html !== 'string' || !html.trim()) return html;
+  const parts = html.split(/(<[^>]*>)/);
+  let skip = 0;                                  // depth inside skip-tag subtrees
+  const frags = [], refs = [], lead = [], trail = [];
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p) continue;
+    if (p.charAt(0) === '<') {
+      const m = p.match(/^<\s*(\/?)([a-zA-Z][a-zA-Z0-9-]*)/);
+      if (m && _lxHtmlSkipTags[m[2].toLowerCase()]) {
+        if (m[1]) skip = Math.max(0, skip - 1);
+        else if (!/\/>\s*$/.test(p)) skip++;
+      }
+      continue;
+    }
+    if (skip) continue;
+    const decoded = _lxEntDec(p);
+    if (!_lxHtmlTranslatable(decoded.trim())) continue;  // numbers/tickers/short proper nouns pass through
+    frags.push(decoded.trim());
+    refs.push(i);
+    lead.push((p.match(/^\s*/) || [''])[0]);
+    trail.push((p.match(/\s*$/) || [''])[0]);
+  }
+  if (!frags.length) return html;
+  const tr = await _wLocalize(frags, ctx, target);
+  for (let k = 0; k < refs.length; k++) {
+    const t = tr[k];
+    if (typeof t === 'string' && t) parts[refs[k]] = lead[k] + _lxEntEnc(t) + trail[k];
+  }
+  return parts.join('');
 }
 const _DOCX_LX_EXTRACT = `import sys, json
 try:
@@ -1091,23 +1164,16 @@ async function _localizeArtifact(path, ctx, target) {
   const enc = new TextEncoder(), dec = new TextDecoder();
   try {
     if (/\.html?$/.test(lower)) {
-      // Whole document through translateHtml — a JS pass that splits on tags and
-      // translates ONLY text nodes (tags, attributes, <style>/<script> subtrees
-      // stay byte-identical; the WASM build has no native HTML mode). NEVER feed
-      // HTML down the prose path below: the blank-line splitter hands CSS/markup
-      // blocks to the NMT, which "translates" them and shreds the file (Jordi's
-      // 2026-08-28 dashboard).
+      // Whole document through _lxTranslateHtml — a JS pass that splits on tags
+      // and translates ONLY text nodes (tags, attributes, <style>/<script>
+      // subtrees stay byte-identical). NEVER feed HTML down the prose path
+      // below: the blank-line splitter hands CSS/markup blocks to the
+      // translator, which shreds the file (Jordi's 2026-08-28 dashboard).
       const text = dec.decode(await opfsReadBytes(path));
       const loc = target || (ctx && ctx._localize) || {};
       const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
       if (!code || code === 'en') return;
-      _ensureBergamot();
-      Bergamot.configure({
-        runtimeUrl: new URL('bergamot/bergamot-translator-worker.js', self.location.href).href,
-        wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
-        modelBase:  new URL('../bergamot-models/', self.location.href).href,
-      });
-      const tr = await Bergamot.translateHtml(text, code);
+      const tr = await _lxTranslateHtml(text, ctx, target);
       if (typeof tr !== 'string' || !tr || tr === text) return;
       // Off-turn safety: skip the write-back if the model edited the file meanwhile.
       try { if (dec.decode(await opfsReadBytes(path)) !== text) return; } catch (_) { return; }

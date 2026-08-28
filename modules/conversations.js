@@ -2232,7 +2232,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=152');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=153');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -3649,7 +3649,9 @@ async function _geminiTranslate(texts, to, toName) {
     content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
     let arr = null;
     try { arr = JSON.parse(content); } catch (_) {}
-    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
+    // Failed slots push null (NOT the English source) so localize() shows the
+    // English fail-open WITHOUT caching it as a "translation".
+    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string' && arr[k]) ? arr[k] : null);
   }
   return out;
 }
