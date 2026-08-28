@@ -331,6 +331,30 @@ let _pySpawnSeq = 0;
 
 function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessage(msg); } catch (_) {} } }
 
+// ── Touched-file tracking (replaces show_artifact) ─────────────────────────
+// Every OPFS write in this worker — direct file tools, copy, python writes
+// relayed from the pool — announces itself to the page as a
+// forward-to-page/sw-opfs-changed post. Intercept postMessage ONCE so any tool
+// call executed while a sink is armed records its writes with zero per-site
+// wiring; deletions drop the path. runAgent arms the sink around each tool call
+// (ctx._filesTouched) and emits the deduped, most-recent-last list as a
+// 'files_touched' event at turn end — the page renders the file cards from it.
+// NOTE: with two agent loops interleaving (main + side panel), a python write
+// relayed mid-await lands in the MOST RECENTLY ARMED sink — right in practice,
+// as the sink is armed only for the duration of that conversation's tool call.
+let _touchSink = null;
+const _postRaw = self.postMessage.bind(self);
+self.postMessage = function (msg, ...rest) {
+  try {
+    const p = msg && msg.type === 'forward-to-page' ? msg.payload : null;
+    if (_touchSink && p && Array.isArray(p.paths)) {
+      if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) _touchSink.set(String(x).replace(/^\/+/, ''), t); }
+      else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) _touchSink.delete(String(x).replace(/^\/+/, '')); }
+    }
+  } catch (_) {}
+  return _postRaw(msg, ...rest);
+};
+
 // Finish a job exactly once (result / timeout / crash all race), clearing its
 // deadline timer and freeing the slot.
 function _pySettle(slot, job, result) {
@@ -1159,12 +1183,14 @@ async function tool_show_artifact({ path, language }, ctx) {
     try { await opfsReadBytes(p); found = true; } catch (_) {}
     if (!found && _indexEntry(p)) { try { await hydrateAsync(p); found = true; } catch (_) {} }
     if (found) {
-      // Localize the deliverable in place (its text → the user's language) OFF-TURN:
-      // the artifact shows in English now, reloads translated when the queue finishes.
-      // Target = the explicit `language` argument, else the Reply selector. Fail-open.
-      const saTarget = _saOverride || (ctx && ctx._localize) || null;
-      if (saTarget && saTarget.code) _localizeArtifactOffTurn(p, ctx, saTarget);
-      return { result: 'artifact:' + p };
+      // TRANSITIONAL SHIM — show_artifact is no longer offered to the model
+      // (files it touches surface automatically at turn end; see the
+      // 'files_touched' emit in runAgent). A stale session that still calls it
+      // just marks the file touched; an explicit `language` override still
+      // routes to the localizer so old flows keep their translated deliverable.
+      if (ctx && ctx._filesTouched) ctx._filesTouched.set(p, Date.now());
+      if (_saOverride && _saOverride.code) _localizeArtifactOffTurn(p, ctx, _saOverride);
+      return { result: 'Noted — files you create or edit are shown to the user automatically at the end of the turn; you do not need to call show_artifact.' };
     }
   }
   return { result: 'Error: file not found: ' + clean + '. Write it with run_python first.' };
@@ -3160,6 +3186,10 @@ async function runAgent(config, ctx) {
   //     genuine progress stalling out (MAX_STOP_BLOCKS) ends the turn.
   ctx._todos = _todoFlat(ctx._todoTree);   // flat view of the seeded tree
   ctx._scratchpad = config.scratchpad || '';   // hidden working memory (persisted, re-injected each round)
+  // Files this turn touched (path → last-touch ts). Filled by the postMessage
+  // interceptor while a tool call is in flight; emitted as 'files_touched' at
+  // turn end so the page surfaces every touched file (dedupe, newest last).
+  ctx._filesTouched = new Map();
   // Citable result ids (F1): every tool result is prefixed "[rN]" so the model
   // can cite it as evidence when closing a claim-todo. Recover the counter and
   // the set of already-issued ids from the persisted transcript, so claims can
@@ -3708,8 +3738,13 @@ async function runAgent(config, ctx) {
       let toolOut;
       const _toolStart = _profNow();
       let _toolErr = false;
+      // Arm the touched-file sink for this call: every OPFS write the tool makes
+      // (directly or via a python job) lands in ctx._filesTouched (see the
+      // postMessage interceptor by _pyBroadcast).
+      _touchSink = ctx._filesTouched || null;
       try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; _toolErr = true; }
+      finally { _touchSink = null; }
       // Profiling: per-tool wall time (run_python == pyodide). Count as an error
       // when the call threw or the tool returned an "Error:" result.
       _profTool(tc.function.name, _profNow() - _toolStart,
@@ -3780,6 +3815,30 @@ async function runAgent(config, ctx) {
       if (e && e.compactionFailed) { ctx.emit({ type: 'error', message: (e && e.message) || 'Compaction failed.' }); break; }
       console.warn('[sandpie] mid-turn compaction error:', e);
     }
+  }
+  // Touched-file surfacing (main loop only): the deduped, oldest-first list of
+  // files this turn touched — the page renders one card per file (newest at the
+  // bottom; .html/images auto-expand, the rest collapse to a clickable card).
+  // This REPLACES show_artifact: surfacing is harness-owned, the model cannot
+  // forget it. Deliverable localization (the old show_artifact side effect)
+  // triggers here too, off-turn, for translatable deliverable formats.
+  if (!maxRounds && ctx._filesTouched && ctx._filesTouched.size) {
+    try {
+      // System paths never surface: everything under sandpie/ (conversations,
+      // memory, skills, helper scripts) EXCEPT the user-visible legacy
+      // sandpie/artifacts/, plus lab/infra trees.
+      const _ftExcluded = p => (p.startsWith('sandpie/') && !p.startsWith('sandpie/artifacts/'))
+        || p.startsWith('looplab-runs/') || p.startsWith('.tokens');
+      const files = [...ctx._filesTouched.entries()]
+        .filter(([p]) => p && !_ftExcluded(p))
+        .sort((a, b) => a[1] - b[1])
+        .map(([path, ts]) => ({ path, ts }));
+      if (files.length) {
+        ctx.emit({ type: 'files_touched', files });
+        const lx = ctx._localize;
+        if (lx && lx.code) for (const f of files) if (/\.(html?|docx|md)$/i.test(f.path)) _localizeArtifactOffTurn(f.path, ctx, lx);
+      }
+    } catch (_) {}
   }
   // Per-turn profiling report (main loop only — see the _prof note above). Wall
   // time that isn't completion/tool/compaction is loop overhead + any idle gaps.

@@ -568,7 +568,7 @@
       return await captureImageFile(clean, opts);
     }
     if (ext !== 'html' && ext !== 'htm') {
-      throw new Error('cannot screenshot a .' + ext + ' file — only HTML artifacts and image files can be rasterized. Open it with show_artifact instead.');
+      throw new Error('cannot screenshot a .' + ext + ' file — only HTML artifacts and image files can be rasterized.');
     }
 
     // live: the user's ACTUAL view, in preference order — side panel (where files

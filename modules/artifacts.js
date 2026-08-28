@@ -147,7 +147,11 @@ function buildArtifactCard(clean, ext, onOpen) {
   return el;
 }
 
-function renderArtifact(host, path) {
+function renderArtifact(host, path, opts) {
+  // opts.collapsed: start as the V2 card only — the iframe is created but left
+  // frozen (never loaded), so a collapsed card costs nothing until expanded.
+  // Used by the touched-files surfacing (only .html/images auto-expand).
+  const _startCollapsed = !!(opts && opts.collapsed);
   const target = host || (_activeStream() && _activeStream().host) || _paneScrollEl(_$('messages'));
   const clean = path ? String(path).replace(/^\/+/, '') : '';
   // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
@@ -311,15 +315,23 @@ function renderArtifact(host, path) {
   frame.style.cssText = 'width:100%;min-height:250px;border:0;background:transparent;display:block;';
   wrap.appendChild(frame);
   _append(target, wrap);
+  if (_startCollapsed) {
+    // Card-only start: mark the frame frozen WITHOUT ever loading it — expanding
+    // thaws it from OPFS (thawFrame resolves the path again). No renderer, no
+    // blob URL, no console instrumentation until the user asks for the preview.
+    frame.dataset.frozen = '1';
+    collapseArtifact(wrap);
+    observeArtifactVisibility(wrap);
+    return;
+  }
   // METACOG: if the NEWEST HTML artifact logs to the console, tell the worker
   // so it can inject a metacog note for the model (newest artifact only — a
   // superseded check is skipped by the seq guard).
   armConsoleNoteCheck(wrap, frame, clean);
   loadArtifactFrame(wrap, frame, resolvedP, clean);
-  // New artifact just rendered: enforce the per-pane open cap. On the 4th
-  // show_artifact (or replaying a long conversation), the OLDEST open artifact
-  // collapses to its V2 card so only the newest 3 stay unminimized. Also covers
-  // historical replay: as each stored artifact re-renders, older ones collapse.
+  // New artifact just rendered: enforce the per-pane open cap. When another
+  // expanded artifact lands (or replaying a long conversation), the OLDEST open
+  // artifact collapses to its V2 card so only the newest 3 stay unminimized.
   enforceArtifactCap(artifactPane(wrap), wrap);
   // Low-end devices: also freeze this frame while it's scrolled far off-screen.
   observeArtifactVisibility(wrap);
@@ -626,11 +638,28 @@ async function readArtifactConsole(path) {
     const frame = wrap.querySelector('.artifact-frame');
     if (frame) { found = { wrap, frame }; break; }
   }
+  if (!found && want) {
+    // Auto-render: artifacts surface automatically at turn end now, so a mid-turn
+    // console read may precede any card. Render the requested file expanded and
+    // read from that fresh frame.
+    try {
+      renderArtifact(null, want);
+      const wrap = Array.from(document.querySelectorAll('.artifact-wrap')).reverse().find(w => {
+        const c = norm(w.dataset.artifactPath || '');
+        return c && (wantForms.has(c) || wantForms.has(strip(c)));
+      });
+      const frame = wrap && wrap.querySelector('.artifact-frame');
+      if (frame) {
+        await new Promise(res => { frame.addEventListener('load', res, { once: true }); setTimeout(res, 5000); });
+        found = { wrap, frame };
+      }
+    } catch (_) {}
+  }
   if (!found) {
     const known = wraps.map(w => w.dataset.artifactPath).filter(Boolean).slice(0, 5);
     let detail;
     if (want) {
-      detail = 'Artifacts currently in the DOM (max 5): ' + (known.length ? known.map(p => '"' + p + '"').join(', ') : 'none') + '. Show the requested artifact with show_artifact first (it must render as an inline .artifact-frame, not a V2 placeholder card), or pass its exact path.';
+      detail = 'Artifacts currently in the DOM (max 5): ' + (known.length ? known.map(p => '"' + p + '"').join(', ') : 'none') + '. It could not be auto-rendered — check the exact path.';
     } else {
       detail = 'No path was given. Artifacts currently in the DOM (max 5): ' + (known.length ? known.map(p => '"' + p + '"').join(', ') : 'none') + '.';
     }
@@ -652,7 +681,7 @@ async function readArtifactConsole(path) {
       });
       w = found.frame.contentWindow;
     }
-    if (!w || !w.__sandpieConsole) return { error: 'This artifact has no console capture (loaded before instrumentation, or it is not an HTML file). Re-show it with show_artifact to instrument it.' };
+    if (!w || !w.__sandpieConsole) return { error: 'This artifact has no console capture (loaded before instrumentation, or it is not an HTML file).' };
     return { entries: w.__sandpieConsole.slice() };
   } catch (e) {
     return { error: 'Could not read artifact console: ' + ((e && e.message) || e) };

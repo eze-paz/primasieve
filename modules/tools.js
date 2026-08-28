@@ -2,19 +2,19 @@
 
 const tools = {
   run_python: {
-    description: `Execute a Python script from OPFS via Pyodide. The script runs with its OWN folder as the working directory (like \`python script.py\`), so a relative save — doc.save("out.docx"), open("out.csv","w") — lands NEXT TO the script (e.g. projects/<project>/out.docx), not at the /files root. Use a path relative to the script, or an absolute /files/… path, and show_artifact that same path.
+    description: `Execute a Python script from OPFS via Pyodide. The script runs with its OWN folder as the working directory (like \`python script.py\`), so a relative save — doc.save("out.docx"), open("out.csv","w") — lands NEXT TO the script (e.g. projects/<project>/out.docx), not at the /files root. Use a path relative to the script, or an absolute /files/… path. The file is surfaced to the user automatically at the end of the turn.
 REQUIRED: path must point to a script already saved in OPFS. Save task scripts in the MOST RELEVANT folder for the job — e.g. projects/<project>/… or the folder whose data the task acts on — so scripts sit next to what they operate on. (Reusable system instruments may live in sandpie/scripts/; the sandbox sandpie/ is otherwise system-only.) Use write_file to create a script first, then call run_python with its path.
 ONLY path: + args: are accepted. Scripts must be saved to OPFS before execution.
 ASYNC: your code runs ON an already-running event loop, so TOP-LEVEL await works — call coroutines directly (end the script with await main(), which works even inside an if __name__ == '__main__': block). Do NOT use asyncio.run(), loop.run_until_complete(), or asyncio.new_event_loop() — they raise "event loop is already running". Do NOT use time.sleep() (it blocks this run's interpreter and burns the timeout) — use await asyncio.sleep(n).
 PACKAGES: ~100 prebuilt (numpy, pandas, scipy, matplotlib, bs4, lxml, micropip…) — just import. Others: await micropip.install('name') then import. No compiled C extensions, no subprocess.
 HTTP: no sockets, so requests/urllib don't work. Use pyodide.http.pyfetch (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()). Non-CORS hosts: pyfetch('/proxy/host/path'). pyfetch does NOT raise on HTTP 4xx/5xx — check r.ok / r.status (or r.raise_for_status()) before using the body; a bad status is also auto-logged to stderr so you'll see it even if you forget.
-OUTPUT: write to the most relevant folder (e.g. projects/<project>/out.html), then call show_artifact({"path":"projects/<project>/out.html"}).
+OUTPUT: write to the most relevant folder (e.g. projects/<project>/out.html) — every file you write is shown to the user automatically at the end of the turn.
 Examples:
   run      → {path: "projects/<project>/random_numbers.py", args: ["5"]}
   with arg → {path: "projects/<project>/analyze_machine.py", args: ["2026-05-03.csv"]}
   async    → script ends with await main()  (NOT asyncio.run(main()))
   pypi     → script runs: import micropip; await micropip.install('feedparser')
-  html out → script writes projects/<project>/out.html, then show_artifact({"path":"projects/<project>/out.html"})`,
+  html out → script writes projects/<project>/out.html (shown to the user automatically at turn end)`,
     parameters: {
       type: 'object',
       properties: {
@@ -22,7 +22,7 @@ Examples:
         args: { type: 'array', items: { type: 'string' }, description: 'CLI args passed via sys.argv when path is used.' },
         timeout: { type: 'number', description: 'Max seconds the script may run before it is killed (default 120, max 600). On timeout the run is aborted and its interpreter discarded, so it can never hang the conversation — raise this only for genuinely long computations.' },
       },
-      required: ['path', 'language'],
+      required: ['path'],
     },
   },
   write_file: {
@@ -121,29 +121,11 @@ IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them 
       required: ['pattern'],
     }
   },
-  show_artifact: {
-    description: `Inject a file from OPFS into the chat as an artifact card.
-File type never blocks this — show any file the user might want:
-- HTML (full page, CDN JS works), SVG, PNG/JPG/GIF/WebP, PDF, CSV, TXT, JSON, and
-  Office docs (docx/xlsx/pptx, rendered in-app via LibreOffice) preview INLINE.
-- Any OTHER type shows a clickable card that opens/downloads the file — still useful.
-Use whenever the user says "show this", "artifact", "add into chat", "inject", or
-after you've written an output file worth surfacing.
-The file must already exist in OPFS — write it first (e.g. with run_python).
-Path is OPFS-relative — no leading slash (e.g. "projects/<project>/chart.html").
-Write the artifact to the MOST RELEVANT folder (e.g. projects/<project>/…) so deliverables live where the user expects; the sandbox (sandpie/) is system-only.
-Typical flow:
-  run_python: open('projects/<project>/chart.html', 'w').write(html)
-  show_artifact: { "path": "projects/<project>/chart.html" }`,
-    parameters: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'OPFS path to the file (e.g. "projects/<project>/chart.html"). No leading slash.' },
-        language: { type: 'string', description: 'REQUIRED. The language code for this deliverable (e.g. "ca", "es", "en").' },
-      },
-      required: ['path', 'language'],
-    },
-  },
+  // show_artifact REMOVED (2026-08-28): every file a turn touches is surfaced to
+  // the user automatically at turn end (worker 'files_touched' event → one card
+  // per file, .html/images expanded, the rest collapsed clickable cards), and
+  // deliverable localization triggers there too. The worker keeps a transitional
+  // shim for stale sessions that still call it.
     load_skill: {
       description: `Load a skill's full instructions by name (the available skills and when to use each are listed in the "# Skills" section). Don't re-load one already marked "(already loaded above)".`,
       parameters: {
@@ -214,9 +196,9 @@ path is OPFS-relative (e.g. "projects/<project>/report.html").`,
     },
   },
   html_console: {
-    description: `Read the browser console output of an HTML artifact that is shown in the conversation (rendered via show_artifact), so you can see console.log/warn/error output, uncaught errors, and unhandled promise rejections from the artifact's own JavaScript.
+    description: `Read the browser console output of an HTML artifact that is shown in the conversation, so you can see console.log/warn/error output, uncaught errors, and unhandled promise rejections from the artifact's own JavaScript.
 WHEN TO USE: after showing an HTML artifact, when the user reports something looks broken (blank areas, missing elements, wrong layout) or you want to verify the page's JS ran without errors. The console is captured from load time (the capture script is injected before the artifact's own scripts), so load-time errors are included.
-WHEN NOT TO USE: for non-HTML artifacts (images, PDFs, office docs have no console). If the artifact is not currently open in the conversation, call show_artifact first — the console is read from the live preview frame.
+WHEN NOT TO USE: for non-HTML artifacts (images, PDFs, office docs have no console). If the artifact is not currently open in the conversation it is rendered automatically first — the console is read from the live preview frame.
 path: optional — omit to read the most recently shown artifact, or pass the exact path (e.g. "projects/<project>/report.html").`,
     parameters: {
       type: 'object',
@@ -230,7 +212,7 @@ path: optional — omit to read the most recently shown artifact, or pass the ex
     description: `Render an artifact and SEE it as an image — the screenshot comes back as part of this tool call, visible to you on the next step, no further action needed.
 WHEN TO USE: after writing or editing an HTML artifact, to check what it actually looks like before telling the user it's done. Layout bugs — overlapping elements, clipped text, broken alignment, a chart that rendered empty, invisible low-contrast text — do NOT throw errors, so html_console cannot find them and reading your own source cannot either. Looking is the only way.
 Also use it to check responsive behaviour (pass width), and to verify a fix really landed rather than assuming it did.
-WHEN NOT TO USE: on files that are not HTML or images (a .docx/.pdf/.csv cannot be rasterized — use show_artifact). Don't screenshot the same unchanged file twice.
+WHEN NOT TO USE: on files that are not HTML or images (a .docx/.pdf/.csv cannot be rasterized). Don't screenshot the same unchanged file twice.
 The artifact does NOT need to be shown in the conversation first: by default it is rendered offscreen at exact dimensions, which neither disturbs the user's view nor depends on what is currently on screen.
 The result lists FIDELITY CAVEATS when parts of the page could not be captured faithfully (e.g. cross-origin images, backdrop-filter, shadow DOM). Trust the rest of the image; treat flagged areas as unverified.
 Typical flow:
@@ -424,7 +406,7 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
       description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown.
 WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.
 LANGUAGE: author "text" in ENGLISH — the system automatically translates it into the user's language for delivery; you generate correct, full-capacity text only in English. "language" is REQUIRED: set it to the user's reply language (e.g. "ca", "es", "en"), or to a different code to deliver THIS one reply in that language. Do NOT write "text" in the target language yourself.
-WHEN: your FINAL action — every turn must END on a respond(), so the last thing the user sees is your conclusion. Finish all work and side effects FIRST (files, remember, final write_todos, show_artifact), THEN respond() once at the end. You MAY respond and then keep working, but you must respond() AGAIN afterward so the turn still ends on a respond() reflecting the latest work. If the user asked for replies in multiple languages, emit those respond() calls together (each = one language) as that closing step. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
+WHEN: your FINAL action — every turn must END on a respond(), so the last thing the user sees is your conclusion. Finish all work and side effects FIRST (files, remember, final write_todos), THEN respond() once at the end. You MAY respond and then keep working, but you must respond() AGAIN afterward so the turn still ends on a respond() reflecting the latest work. If the user asked for replies in multiple languages, emit those respond() calls together (each = one language) as that closing step. Do NOT emit any other prose in the same turn; this tool's argument is your entire visible reply.`,
       parameters: {
         type: 'object',
         properties: {

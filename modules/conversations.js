@@ -376,6 +376,8 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   const todos = s ? s.todos : (prevMeta && prevMeta.todos);
   if (comp) meta.compaction = comp;
   if (todos) meta.todos = todos;
+  const filesT = s ? s.filesTouched : (prevMeta && prevMeta.filesTouched);
+  if (filesT && filesT.length) meta.filesTouched = filesT;
   if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
   // Persist the last-turn timer snapshot so it survives refresh and can be
   // rebuilt by rebuildSettledTimer on cold load.
@@ -745,6 +747,13 @@ function renderConversation(msgs, compaction, host = null) {
   } else {
     markStaleAsks(target);
   }
+  // Touched-files cards (replaces show_artifact): re-render the conversation's
+  // deduped file list at the bottom — newest last, .html/images expanded, the
+  // rest collapsed clickable cards. Cards rendered from legacy persisted
+  // 'artifact:' results earlier in the replay are deduped away here.
+  if (s && Array.isArray(s.filesTouched) && s.filesTouched.length) {
+    try { renderFilesTouched(target, s.filesTouched); } catch (_) {}
+  }
   // A caller that wiped the host (clearActiveConvUI — rewind / compaction
   // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
   // endTotalTimer only fixes the DOM while the tick interval is alive, then nulls
@@ -752,6 +761,39 @@ function renderConversation(msgs, compaction, host = null) {
   // survives on the stream, so rebuild the ~same .done line here. Skip when a
   // timer already exists (live or settled) — it's only ever needed after a wipe.
   rebuildSettledTimer(target, s);
+}
+
+// ── Touched-files surfacing (replaces show_artifact) ───────────────────────
+// The worker emits 'files_touched' at turn end: every file the turn wrote,
+// deduped, oldest-first. One artifact card per file; only .html and images
+// auto-expand inline, everything else starts as the collapsed clickable card.
+// Conversation-wide dedupe: a re-touched file's old card is removed and the
+// fresh one lands at the bottom (most recently edited last).
+const FT_AUTO_EXPAND = new Set(['html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+function mergeFilesTouched(stream, files) {
+  if (!stream || !Array.isArray(files) || !files.length) return [];
+  const cur = new Map((stream.filesTouched || []).map(f => [f.path, f.ts || 0]));
+  for (const f of files) { if (f && f.path) cur.set(f.path, f.ts || Date.now()); }
+  stream.filesTouched = [...cur.entries()].sort((a, b) => a[1] - b[1]).map(([path, ts]) => ({ path, ts }));
+  return files;
+}
+function renderFilesTouched(host, files) {
+  if (!Array.isArray(files) || !files.length) return;
+  const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
+  if (!target) return;
+  tgBreak(target);   // file cards end the current tool-group run
+  for (const f of files) {
+    const clean = String((f && f.path) || '').replace(/^\/+/, '');
+    if (!clean) continue;
+    // Drop any earlier card for this path (this pane only) — the fresh card below
+    // becomes the single, bottom-most occurrence.
+    for (const old of target.querySelectorAll('.artifact-wrap')) {
+      const p = old.dataset && old.dataset.artifactPath;
+      if (p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p)) old.remove();
+    }
+    const ext = clean.split('.').pop().toLowerCase();
+    try { renderArtifact(target, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
+  }
 }
 
 // Rebuild a settled (.done) msg-timer line into `target` from the stream's
@@ -903,6 +945,7 @@ function hydrateStreamFromData(s, data) {
   s.compaction = data.compaction || null;
   s.todos = data.todos || null;
   s.scratchpad = data.scratchpad || '';
+  s.filesTouched = data.filesTouched || null;
   s.lastTurn = data.lastTurn || null;
   // Messages loaded from the new JSONL are already persisted; those from a legacy
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
@@ -1253,6 +1296,7 @@ async function loadConv(id) {
       s.compaction = meta.compaction || null;
       s.todos = meta.todos || null;
       s.scratchpad = meta.scratchpad || '';
+      s.filesTouched = meta.filesTouched || null;
       s.lastTurn = meta.lastTurn || null;
 
       if (!fileSize) {
@@ -1475,6 +1519,7 @@ async function duplicateConv(id, title) {
   };
   if (data.compaction) meta.compaction = data.compaction;
   if (data.todos) meta.todos = data.todos;
+  if (data.filesTouched) meta.filesTouched = data.filesTouched;
   if (data.scratchpad != null) meta.scratchpad = data.scratchpad;
   // Intentionally do NOT copy session_id: the duplicate is a distinct
   // conversation and must get its own cache key (ensureSessionId on first send).
@@ -2165,7 +2210,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=149');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=150');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2551,6 +2596,12 @@ async function sendSingle(text, stream, opts = {}) {
     }
     if (ev.type === 'timing') {
       reportTurnTiming(convId, ev.timing, convMessages.length);
+    }
+    if (ev.type === 'files_touched') {
+      // Turn-end file surfacing (replaces show_artifact): merge into the
+      // conversation's deduped list (persisted via meta) and render the cards.
+      mergeFilesTouched(stream, ev.files);
+      try { renderFilesTouched(host, ev.files); } catch (_) {}
     }
     dispatchAgentEvent(ev, renderer, host);
   };
@@ -5368,8 +5419,8 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     content += "\n\n## Deliver in " + _nm + ", author in English\n"
       + "The user reads chat and deliverables in " + _nm + ". "
       + "You MUST author ALL content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
-      + "The system automatically translates your finished reply (respond) and your delivered deliverables (show_artifact) into " + _nm + " for the user; that is handled downstream and is not your job. "
-      + "On EVERY respond and show_artifact call, set the \"language\" argument to '" + _cd + "' (" + _nm + "); to deliver ONE specific reply or deliverable in a different language, set that language code instead. Never author the target language yourself, announce this rule, or second-guess it."
+      + "The system automatically translates your finished reply (respond) and the deliverable files you write into " + _nm + " for the user; that is handled downstream and is not your job. "
+      + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + "); to deliver ONE specific reply in a different language, set that language code instead. Never author the target language yourself, announce this rule, or second-guess it."
   } catch (_) {}
   return { role: 'system', content };
 }

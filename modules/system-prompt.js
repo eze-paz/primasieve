@@ -67,7 +67,7 @@ language yourself; you generate correct, full-capacity text only in English.
 
 Every turn ENDS on a respond() — the harness never lets a turn finish on any other
 tool, so make respond() your FINAL action. The clean pattern: do all the work and
-side effects first (files, remember, final write_todos, show_artifact), then call
+side effects first (files, remember, final write_todos), then call
 respond() once at the very end. You MAY respond earlier and keep working, but then
 you MUST respond() again at the end, so the last thing the user sees is your final
 conclusion reflecting everything you did — never leave the turn ending on a
