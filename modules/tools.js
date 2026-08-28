@@ -402,6 +402,26 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
       },
     },
 
+    walios: {
+      description: `Run a shell script inside walios — the WALI wasm-OS (a real Linux userland: busybox ash + coreutils, python3, ssh, make — compiled to native wasm) hosted at /walios/. Headless: no terminal UI; you get stdout/stderr plus the exit code.
+BLOB FORM (REQUIRED for the script): do NOT pass the script as a JSON string. Emit it as RAW text between sentinels in your reply:
+<|walios|>
+echo hello
+uname -a
+<|end_walios|>
+The raw text between the sentinels IS the script — newlines, quotes and backslashes need no escaping. Optional per-call timeout: <|walios:90|> (seconds; default 120, max 300).
+ENVIRONMENT: busybox ash (full coreutils), persistent home at /root (files written there survive across calls), real TCP/UDP via the WISP relay (wget, nc, ssh, ping), python3 (stdlib lazy-loads on first use).
+⚠️ /root IS the app's OPFS workspace root (same namespace the file tools see) — rm there deletes REAL files. Use it deliberately.
+USE FOR: quick POSIX shell computation, text processing, tar/gzip/zip work, sandboxed shell logic. NOT a substitute for run_python (no numpy/pandas there) or the shell tool (that runs on the user's real machine — walios is an isolated in-browser OS).`,
+      parameters: {
+        type: 'object',
+        properties: {
+          timeout: { type: 'number', description: 'Max seconds the run may take before it is terminated (default 120, max 300). Usually set via the <|walios:90|> sentinel variant instead.' },
+        },
+        required: [],
+      },
+    },
+
     respond: {
       description: `Deliver your FINAL, user-facing answer. Whatever you pass as "text" is shown to the user as your reply, rendered as Markdown.
 WHY THIS EXISTS: the chat must contain ONLY your finished answer — never your thinking, planning, or scratch narration, and never a mix of languages. Keep reasoning in your reasoning channel (or a scratch file); when you are ready to answer, put ONLY the finished reply here.

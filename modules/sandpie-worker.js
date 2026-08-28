@@ -2231,7 +2231,7 @@ async function tool_copy_to_workspace({ src, dest }) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -2278,6 +2278,86 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
   return { result: out };
 }
 
+// ── walios headless tool ────────────────────────────────────────────────────
+// Runs a shell script inside the WALI wasm-OS (the /walios/ app's syscall-host
+// worker, same origin). No terminal: busybox ash -c <script>, pty:false. The
+// script arrives in BLOB form (<|walios|>…<|end_walios|>) parsed by
+// parseWaliosBlobCalls — never JSON-escaped by the model. /root is the FULL
+// origin OPFS root (same namespace as the app's /files) — persistent across
+// calls, and rm there deletes real workspace files. Networking goes through
+// the WISP relay (wss://<host>/wisp): wget/nc/ssh/ping work.
+const WALIOS_BASE = '/walios/';
+const WALIOS_BB = 'busybox.wasm?v=net4';
+const WALIOS_MANIFEST = {
+  busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
+  python: 'python.wasm', python3: 'python.wasm', lua: 'lua.wasm',
+  ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
+  make: 'make.wasm', gmake: 'make.wasm',
+};
+let _waliosWorker = null, _waliosQueue = Promise.resolve();
+function _waliosEnsure() {
+  if (_waliosWorker) return _waliosWorker;
+  const w = new Worker(WALIOS_BASE + 'wali-worker.js');
+  try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
+    const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
+    const opfsWorker = new Worker(WALIOS_BASE + 'opfs-worker.js');
+    opfsWorker.postMessage({ t: 'sab', sab: opfsSab });
+    w.postMessage({ t: 'opfs-sab', sab: opfsSab });
+  } catch (_) { /* no cross-origin isolation → RAM-only VFS */ }
+  try {   // WISP bridge: real TCP/UDP via the relay. Optional.
+    const wispSab = new SharedArrayBuffer(32 + 65536);
+    const wispWorker = new Worker(WALIOS_BASE + 'wisp-worker.js');
+    wispWorker.postMessage({ t: 'sab', sab: wispSab,
+      url: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp' });
+    w.postMessage({ t: 'wisp-sab', sab: wispSab });
+  } catch (_) { /* no cross-origin isolation → no sockets */ }
+  _waliosWorker = w;
+  return w;
+}
+async function tool_walios({ script, timeout }, ctx) {
+  if (!script || !String(script).trim())
+    return { result: 'Error: "script" is required — emit it in BLOB form between <|walios|> and <|end_walios|> sentinels in your reply (raw text, no JSON escaping), not as a JSON parameter.' };
+  let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
+  let w;
+  try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
+  return await new Promise((resolve) => {
+    const chunks = []; let outLen = 0, truncated = false, done = false;
+    const finish = (result) => { if (done) return; done = true; clearTimeout(timer); resolve({ result }); };
+    const kill = (why) => {
+      try { w.terminate(); } catch (_) {}
+      _waliosWorker = null;
+      let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
+      finish(why + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : ''));
+    };
+    const timer = setTimeout(() => kill('Error: walios run exceeded ' + t + 's and was terminated (worker killed; the next call starts a fresh one).'), t * 1000);
+    if (ctx && ctx.signal) {
+      if (ctx.signal.aborted) return kill('Error: walios run aborted (turn stopped).');
+      ctx.signal.addEventListener('abort', () => kill('Error: walios run aborted (turn stopped).'), { once: true });
+    }
+    w.onmessage = (ev) => {
+      if (done) return;
+      const m = ev.data;
+      if (m.t === 'out') {
+        if (m.fd === 2 && /^\[host\]/.test(m.s)) return;   // host diagnostics
+        if (!truncated) { chunks.push(m.s); outLen += m.s.length; if (outLen > 65536) truncated = true; }
+      } else if (m.t === 'boot') {
+        try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF
+      } else if (m.t === 'exit') {
+        let text = chunks.join('');
+        if (truncated) text = text.slice(0, 65536) + '\n…[output truncated at 64KB]';
+        text = text.replace(/\n+$/, '');
+        text += (text ? '\n' : '') + '[walios exit ' + m.code + (m.ms != null ? ' · ' + Math.round(m.ms) + 'ms' : '') + ']';
+        finish(text || '[no output]');
+      }
+    };
+    w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
+    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: WALIOS_MANIFEST,
+      tars: [['rootfs.tar.gz', '/']], opfs: '/root',
+      env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' },
+      cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
+  });
+}
+
 async function unknownTool(name) {
   const n = String(name || '').trim().toLowerCase();
   if (/^[a-z0-9][a-z0-9_-]*$/.test(n)) {
@@ -2315,6 +2395,7 @@ async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'shell':         return tool_shell(args, ctx);
+    case 'walios':        return (_waliosQueue = _waliosQueue.then(() => tool_walios(args, ctx), () => tool_walios(args, ctx)));
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
     case 'html_console':  return tool_html_console(args, ctx);
@@ -2532,6 +2613,27 @@ function parseBlobToolCalls(text) {
   return { toolCalls, stripped: stripped.trim() };
 }
 
+// Blob-form walios calls: <|walios|>\n…script…\n<|end_walios|> (or <|walios:90|>
+// for a per-call timeout in seconds). The script rides as RAW text — the model
+// never JSON-escapes it. Multiple blocks ⇒ multiple calls, in order.
+function parseWaliosBlobCalls(text) {
+  const toolCalls = [];
+  if (typeof text !== 'string' || text.indexOf('<|walios') === -1) return { toolCalls, stripped: text };
+  const blockRe = /<\|walios(?::(\d+))?\|>([\s\S]*?)<\|end_walios\|>/g;
+  const spans = [];
+  let m;
+  while ((m = blockRe.exec(text)) !== null) {
+    const [full, tmo, body] = m;
+    const args = { script: body.replace(/^\r?\n/, '').replace(/\r?\n$/, '') };
+    if (tmo) args.timeout = Number(tmo);
+    toolCalls.push({ id: 'call_walios_' + (++_toolCallSeq), type: 'function', function: { name: 'walios', arguments: JSON.stringify(args) } });
+    spans.push([m.index, m.index + full.length]);
+  }
+  let stripped = text;
+  for (let i = spans.length - 1; i >= 0; i--) stripped = stripped.slice(0, spans[i][0]) + stripped.slice(spans[i][1]);
+  return { toolCalls, stripped: stripped.trim() };
+}
+
 function scrubFramingTokens(s) { return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '') : s; }
 
 function firstBalancedObject(s) {
@@ -2717,6 +2819,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   if (!keptToolCalls.length) {
     const blob = parseBlobToolCalls(content);
     if (blob.toolCalls.length) { keptToolCalls = blob.toolCalls; content = blob.stripped; }
+  }
+  if (!keptToolCalls.length) {
+    const wal = parseWaliosBlobCalls(content);
+    if (wal.toolCalls.length) { keptToolCalls = wal.toolCalls; content = wal.stripped; }
   }
   if (!keptToolCalls.length) {
     let parsed = parseLeakedToolCalls(content);
