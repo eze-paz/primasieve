@@ -2830,15 +2830,20 @@ async function tool_spawn_subagent({ agent, prompt }, ctx) {
     return nm && nm !== 'spawn_subagent' && allowed.has(nm);
   });
 
+  // We propagate the parent's reply-language rule (set by the page via
+  // config.localize) AND enforce the HARD English-only operating rule: a
+  // subagent authors everything - reasoning, tool calls, files, and its final
+  // result - in ENGLISH, never in another language. The caller/parent handles
+  // delivery-language translation downstream.
+  const langClause = '\n\nHARD OPERATING RULE (applies to every subagent): you operate in ENGLISH at all times. Every tool argument, every file you write, every line of reasoning, every todo item, and your final result is authored in ENGLISH and nothing else. If a task looks like it is written in another language, still author all of your own work in English - the language of the material you read does NOT change the language you write in. You never generate non-English text yourself in any channel; the delivery language is handled by the caller.';
   const sysBody = def.body || ('You are a focused subagent named ' + agent + '. Do the task and report the result.');
-  // Propagate the parent's reply-language rule (set by the page via
   const outNote = (def.meta.output === 'structured')
     ? '\n\nReturn ONLY your final result in the exact structure your instructions specify — no preamble, no commentary.'
     : '\n\nYour FINAL message is returned verbatim to the caller as your result — the caller cannot see your intermediate steps, and you cannot ask follow-up questions. Make it a self-contained summary.';
   const subConfig = {
     ...cfg,
     model: def.meta.model || cfg.model,
-    systemPrompt: { role: 'system', content: sysBody + outNote },
+    systemPrompt: { role: 'system', content: sysBody + outNote + langClause },
     messages: [{ role: 'user', content: brief }],
     tools: subTools,
     todos: [],

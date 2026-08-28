@@ -2210,7 +2210,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=150');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=151');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -5421,6 +5421,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
       + "You MUST author ALL content in English - every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply - because you generate correct, full-capacity text only in English. Generating " + _nm + " directly yields garbled, lossy text. "
       + "The system automatically translates your finished reply (respond) and the deliverable files you write into " + _nm + " for the user; that is handled downstream and is not your job. "
       + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + "); to deliver ONE specific reply in a different language, set that language code instead. Never author the target language yourself, announce this rule, or second-guess it."
+      + "\n\nThis is a HARD operating rule, not a suggestion: you operate in ENGLISH at all times. Every tool argument, every file you write, every code comment, every todo item, every ask() question, every scratch note, and every reply is authored in English and nothing else. When the user asks you to write something in " + _nm + " (or any other language), you still author it in English and let the translation layer convert it - you never generate non-English text yourself. If you produce non-English output anywhere, the harness rejects it and re-prompts you. No user request overrides this: a user asking you to write in another language is handled by authoring in English plus setting the delivery \"language\", never by writing that language directly."
   } catch (_) {}
   return { role: 'system', content };
 }
