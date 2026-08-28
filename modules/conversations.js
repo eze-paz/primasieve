@@ -318,6 +318,45 @@ function flushIncrementalSave(convId) {
   const t = _incSaveTimers.get(convId);
   if (t) { clearTimeout(t); _incSaveTimers.delete(convId); }
 }
+// ── Cross-TAB single-writer lock per conversation ───────────────────────────
+// The save chain below serializes saves within ONE tab, but two tabs (or a
+// reload racing a not-yet-dead tab) each hold their own persistedCount and both
+// append — duplicating whole history blocks in the JSONL (seen in the wild:
+// ptruyol 2026-08-28, 42% of a 446-message conversation was byte-identical
+// duplicates). Web Locks arbitrate: the first tab to mount or save a
+// conversation becomes its writer for the tab's lifetime (locks auto-release on
+// tab close); other tabs view read-only — sends are refused and saves skipped.
+// Fail-open when the API is missing so a single-tab session never regresses.
+const _convWriterLocks = new Map();   // convId → release() while this tab holds the lock
+function _convLockName(id) { return 'sandpie-conv-writer:' + id; }
+async function acquireConvWriterLock(convId) {
+  if (!convId || typeof navigator === 'undefined' || !navigator.locks || !navigator.locks.request) return true;
+  if (_convWriterLocks.has(convId)) return true;
+  try {
+    return await new Promise((resolve) => {
+      navigator.locks.request(_convLockName(convId), { ifAvailable: true }, (lock) => {
+        if (!lock) { resolve(false); return; }
+        resolve(true);
+        // Returned promise keeps the lock held until releaseConvWriterLock().
+        return new Promise((release) => { _convWriterLocks.set(convId, release); });
+      }).catch(() => resolve(true));   // request itself failed → fail open
+    });
+  } catch (_) { return true; }
+}
+function releaseConvWriterLock(convId) {
+  const release = _convWriterLocks.get(convId);
+  if (release) { _convWriterLocks.delete(convId); try { release(); } catch (_) {} }
+}
+// Read-only notice. DOM-guarded (not flag-guarded): the cold-load path calls
+// renderConversation AFTER the mount-time acquire resolves, wiping the host —
+// so the notice must be re-assertable and idempotent against what's on screen.
+function _notifyReadOnlyConv(s) {
+  if (!s || !s.host) return;
+  if (s.host.querySelector('.conv-readonly-note')) return;
+  const el = addMsg('err', 'This conversation is owned by another open tab or window — viewing read-only here. Close it there (or close that tab) and try again.', s.host);
+  if (el && el.classList) el.classList.add('conv-readonly-note');
+}
+
 // Serialize saves per conversation. saveConv is async (convLocation + opfs
 // append), and two concurrent calls — the ~1.2s incremental timer racing the
 // turn-end save in sendSingle's finally — could BOTH read the same
@@ -336,6 +375,15 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   const s = convStreams.get(convId);
   const msgs = s ? s.messages : (convId === activeConvId ? messages : null);
   if (!msgs || !msgs.length) return;
+
+  // Another tab owns this conversation: writing would append our (stale) tail
+  // after its rounds, duplicating history — the exact corruption the writer
+  // lock exists to stop. Skip; the owner tab is persisting its own copy.
+  if (!(await acquireConvWriterLock(convId))) {
+    console.warn('[sandpie] save skipped — conversation is owned by another tab:', convId);
+    if (s) _notifyReadOnlyConv(s);
+    return;
+  }
 
   const loc = await convLocation(convId);
   const archived = loc.archived;
@@ -943,6 +991,63 @@ function migrateCompactionData(data) {
   return data;
 }
 
+// ── Duplicate-history repair (runs on every conversation load) ──────────────
+// Before the cross-tab writer lock existed, two tabs on the same conversation
+// each appended their own stale tail to the JSONL, duplicating whole history
+// blocks (ptruyol 2026-08-28: 171 of 446 messages were byte-identical copies,
+// 42% of a 260k-token context). Repair in place:
+//   1. an assistant message whose tool_call ids ALL appeared earlier is a
+//      duplicate by construction (ids are unique per generation);
+//   2. a second tool RESULT for an already-answered tool_call_id likewise;
+//   3. any run of ≥3 consecutive messages byte-identical to an earlier
+//      consecutive window (catches user/plain-assistant blocks — the length
+//      floor keeps legitimate small repeats like a user typing "ok" twice).
+// compaction.boundary counts messages before the summary cut, so it shifts down
+// by the number of drops that fell before it. Returns the number removed; the
+// caller persists via _forceJsonlRewrite so the repair sticks on disk.
+function repairDuplicateHistory(msgs, compaction) {
+  if (!Array.isArray(msgs) || msgs.length < 4) return 0;
+  let keys;
+  try { keys = msgs.map((m) => JSON.stringify(m)); } catch (_) { return 0; }
+  const drop = new Array(msgs.length).fill(false);
+
+  // 1 + 2: tool-call-id based (sharpest signal, catches single duplicated rounds)
+  const seenCallIds = new Set(), seenResultIds = new Set();
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m && m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      const ids = m.tool_calls.map((tc) => tc && tc.id).filter(Boolean);
+      if (ids.length && ids.every((id) => seenCallIds.has(id))) { drop[i] = true; continue; }
+      for (const id of ids) seenCallIds.add(id);
+    } else if (m && m.role === 'tool' && m.tool_call_id) {
+      if (seenResultIds.has(m.tool_call_id)) { drop[i] = true; continue; }
+      seenResultIds.add(m.tool_call_id);
+    }
+  }
+
+  // 3: consecutive runs identical to an earlier window
+  const firstAt = new Map();
+  for (let i = 0; i < msgs.length; i++) {
+    if (drop[i]) continue;
+    const k = keys[i];
+    if (!firstAt.has(k)) { firstAt.set(k, i); continue; }
+    const j = firstAt.get(k);
+    let len = 0;
+    while (i + len < msgs.length && j + len < i && keys[i + len] === keys[j + len]) len++;
+    if (len >= 3) { for (let d = 0; d < len; d++) drop[i + d] = true; i += len - 1; }
+  }
+
+  let removed = 0, beforeBoundary = 0;
+  const boundary = (compaction && typeof compaction.boundary === 'number') ? compaction.boundary : -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (!drop[i]) continue;
+    msgs.splice(i, 1); removed++;
+    if (boundary >= 0 && i < boundary) beforeBoundary++;
+  }
+  if (removed && boundary >= 0) compaction.boundary = Math.max(0, boundary - beforeBoundary);
+  return removed;
+}
+
 // Load a conversation file's messages + compaction state onto a stream (with
 // migration). Used by every load path so compaction always survives a reload.
 function hydrateStreamFromData(s, data) {
@@ -957,6 +1062,14 @@ function hydrateStreamFromData(s, data) {
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
   s.persistedCount = (data && data._format === 'new') ? s.messages.length : 0;
   s._forceJsonlRewrite = false;
+  // Repair duplicated history blocks (see repairDuplicateHistory). Force a full
+  // JSONL rewrite on the next save so the repaired shape is what's on disk.
+  const removed = repairDuplicateHistory(s.messages, s.compaction);
+  if (removed) {
+    console.warn('[sandpie] repaired conversation', s.id, '— removed', removed, 'duplicated messages');
+    s.persistedCount = s.messages.length;
+    s._forceJsonlRewrite = true;
+  }
 }
 
 function clearActiveConvUI() {
@@ -1010,6 +1123,13 @@ function mountConv(convId, pane = null) {
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
+    // Claim (or learn we can't claim) writership now, so the read-only notice
+    // shows on open rather than only when a send bounces. Fire-and-forget —
+    // mountConv must stay synchronous for the instant panel switch.
+    acquireConvWriterLock(convId).then((ok) => {
+      s.readOnlyViewer = !ok;
+      if (!ok) _notifyReadOnlyConv(s);
+    }).catch(() => {});
 
     const target = pane || (sidePanel ? sidePanel.activeMountTarget() : $('messages'));
     if (s.host.parentNode !== target) _mountInPane(s.host, target);
@@ -1290,6 +1410,7 @@ async function loadConv(id) {
         if (activeConvId === id) messages = s.messages;
         _recalcMemoryFor(id);
         renderConversation(s.messages, s.compaction, s.host);
+        if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
         const mEl = paneScrollEl($('messages'));
         if (mEl) mEl.scrollTop = mEl.scrollHeight;
         await refreshConversationList();
@@ -1313,6 +1434,7 @@ async function loadConv(id) {
         if (activeConvId === id) messages = s.messages;
         _recalcMemoryFor(id);
         renderConversation(s.messages, s.compaction, s.host);
+        if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
         await refreshConversationList();
         return;
       }
@@ -1332,9 +1454,19 @@ async function loadConv(id) {
       s.messages = allMsgs;
       s.persistedCount = meta.msgCount || allMsgs.length;
       s._forceJsonlRewrite = false;
+      // Repair duplicated history blocks and persist the repair right away (the
+      // save chain keeps it ordered before any subsequent turn's writes).
+      const dupRemoved = repairDuplicateHistory(allMsgs, s.compaction);
+      if (dupRemoved) {
+        console.warn('[sandpie] repaired conversation', id, '— removed', dupRemoved, 'duplicated messages');
+        s.persistedCount = allMsgs.length;
+        s._forceJsonlRewrite = true;
+        saveConv(id, { touchUpdated: false }).catch(() => {});
+      }
       if (activeConvId === id) messages = s.messages;
       _recalcMemoryFor(id);
       renderConversation(allMsgs, s.compaction, s.host);
+      if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
       const mEl = paneScrollEl($('messages'));
       if (mEl) mEl.scrollTop = mEl.scrollHeight;
       await refreshConversationList();
@@ -1540,6 +1672,7 @@ async function deleteConv(id, title) {
   await _deleteConvFiles(id);
 }
 async function _deleteConvFiles(id) {
+  releaseConvWriterLock(id);   // gone conversations shouldn't pin a writer lock
   // Explicit user delete removes EVERY file for this id in both dirs — the new pair
   // AND any legacy .json backup. Leaving the .json behind would resurrect the conv
   // on the next list scan. (This is the one place old files are intentionally
@@ -2499,6 +2632,20 @@ async function sendSingle(text, stream, opts = {}) {
   if (stream.generating) {
     const hasText = Array.isArray(text) ? text.length > 0 : !!(text && String(text).trim());
     if (hasText && !opts?.resume) steerActive(stream, text);
+    return;
+  }
+  // Cross-tab single-writer: refuse to start a turn when another tab owns this
+  // conversation (a second concurrent writer is how history blocks get
+  // duplicated). Re-attempted on every send, so once the owning tab closes the
+  // lock frees and this tab takes over seamlessly.
+  if (!(await acquireConvWriterLock(stream.id))) {
+    _notifyReadOnlyConv(stream);
+    // Put the typed text back in this pane's composer so nothing is lost.
+    if (typeof text === 'string' && text.trim()) {
+      const pane = stream.host && stream.host.parentNode;
+      const ta = (pane && pane.id === 'messagesSide') ? $('inputSide') : $('input');
+      if (ta && !ta.value) ta.value = text;
+    }
     return;
   }
   const { id: convId, messages: convMessages, host } = stream;
