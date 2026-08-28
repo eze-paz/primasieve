@@ -18,8 +18,15 @@
 //   [2] total file size (set on every chunk; lets the consumer preallocate)
 //   [3] request signal: 0 idle, 1 request pending (path bytes are in data)
 //   [4] request path byte length
-// One request in flight at a time by construction: the requester is
-// single-threaded and blocked for the whole exchange.
+//   [5] request id: monotonic, set by the consumer per request
+//   [6] response id: the request id THIS response belongs to (echoed per chunk)
+// Normally one request is in flight at a time (the requester is single-threaded
+// and blocked for the whole exchange) — EXCEPT when the consumer's 30s timeout
+// fires: it abandons the read and issues the next one while THIS worker is still
+// finishing the old async OPFS read. The old read's bytes would then land in the
+// SAB and be consumed as the NEW request's file. The request/response id pair
+// (5/6) closes that: this worker latches [5] at dequeue and stamps it into [6]
+// on every chunk; the consumer discards any response whose [6] != its own id.
 
 let ctrl = null;   // Int32Array over the control SAB
 let data = null;   // Uint8Array over the data SAB
@@ -35,7 +42,7 @@ async function readBytes(rel) {
   return new Uint8Array(await file.arrayBuffer());
 }
 
-function feed(bytes) {
+function feed(bytes, reqId) {
   // The consumer set ctrl[0]=0 before signaling the request; after each
   // non-final chunk it copies the bytes, resets ctrl[0]=0 and notifies.
   // Sync Atomics.wait between chunks is fine here — this is a dedicated worker
@@ -47,6 +54,7 @@ function feed(bytes) {
     off += len;
     Atomics.store(ctrl, 1, len);
     Atomics.store(ctrl, 2, bytes.length);
+    Atomics.store(ctrl, 6, reqId);            // stamp response id BEFORE releasing state[0]
     const final = off >= bytes.length;
     Atomics.store(ctrl, 0, final ? 2 : 1);
     Atomics.notify(ctrl, 0);
@@ -63,12 +71,17 @@ async function serveLoop() {
       continue;                                // re-check the signal on every wake
     }
     Atomics.store(ctrl, 3, 0);
+    // Latch the request id NOW: if the consumer times out during the async read
+    // below, it will overwrite ctrl[5] with the next request's id — this exchange
+    // must keep stamping the id that was pending when we dequeued it.
+    const reqId = Atomics.load(ctrl, 5);
     let rel = '';
     try { rel = new TextDecoder().decode(data.slice(0, Atomics.load(ctrl, 4))); } catch (_) {}
     try {
-      feed(await readBytes(rel));
+      feed(await readBytes(rel), reqId);
     } catch (e) {
       iolog('read failed: ' + rel + ' — ' + (e && e.message || e));
+      Atomics.store(ctrl, 6, reqId);          // tag the error with its request id too
       Atomics.store(ctrl, 0, -1);
       Atomics.notify(ctrl, 0);
     }

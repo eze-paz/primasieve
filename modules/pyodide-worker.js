@@ -79,7 +79,7 @@ function _ioEnsure() {
   const dataSab = new SharedArrayBuffer(IO_DATA_BYTES);
   _ioCtrl = new Int32Array(ctrlSab);
   _ioData = new Uint8Array(dataSab);
-  _ioWorker = new Worker('./opfs-io-worker.js?v=1');
+  _ioWorker = new Worker('./opfs-io-worker.js?v=2');
   _ioReadyPromise = new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('opfs-io-worker not ready after 8s')), 8000);
     _ioWorker.addEventListener('message', (ev) => {
@@ -97,14 +97,24 @@ function _ioEnsure() {
   return _ioReadyPromise;
 }
 
+// Monotonic request id (ctrl slot [5]/[6]). Distinguishes the response to THIS
+// read from a late response to a previously timed-out read — without it, an
+// abandoned read's bytes can be consumed as the next read's file. Kept != 0 so
+// the SAB's zero-initialized [6] never accidentally matches an in-flight id.
+let _ioReqSeq = 0;
+function _nextIoReqId() { _ioReqSeq = (_ioReqSeq + 1) | 0; if (_ioReqSeq === 0) _ioReqSeq = 1; return _ioReqSeq; }
+
 // Synchronous OPFS read (lazy-mode byte hydration). Blocks this thread until
 // the IO worker has fed the whole file through the SAB. Throws on error/timeout.
 function _syncOpfsRead(rel) {
   if (!_ioCtrl) throw new Error('OPFS IO bridge not initialized');
   const pathBytes = new TextEncoder().encode(String(rel));
   if (pathBytes.length > _ioData.length) throw new Error('path too long: ' + rel);
+  const myId = _nextIoReqId();
   _ioData.set(pathBytes, 0);
   Atomics.store(_ioCtrl, 4, pathBytes.length);
+  Atomics.store(_ioCtrl, 5, myId);       // our request id — echoed back in [6]
+  Atomics.store(_ioCtrl, 6, 0);          // clear any stale response id
   Atomics.store(_ioCtrl, 0, 0);
   Atomics.store(_ioCtrl, 3, 1);          // request pending — wakes the serve loop
   Atomics.notify(_ioCtrl, 3);
@@ -115,6 +125,15 @@ function _syncOpfsRead(rel) {
       if (r === 'timed-out') { Atomics.store(_ioCtrl, 0, -1); throw new Error('OPFS read timed out: ' + rel); }
     }
     const state = Atomics.load(_ioCtrl, 0);
+    // Discard any response that isn't for our current request: it is a late chunk
+    // from a read we already abandoned on timeout. Consuming it would return
+    // another file's bytes (and its size) as ours. Release the slot and keep
+    // waiting for our own id.
+    if (Atomics.load(_ioCtrl, 6) !== myId) {
+      Atomics.store(_ioCtrl, 0, 0);
+      Atomics.notify(_ioCtrl, 0);
+      continue;
+    }
     if (state === -1) throw new Error('OPFS read failed: ' + rel);
     const len = Atomics.load(_ioCtrl, 1);
     if (!out) out = new Uint8Array(Atomics.load(_ioCtrl, 2));
