@@ -845,27 +845,136 @@ function renderFilesTouched(host, files, opts) {
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   if (!target) return;
   tgBreak(target);   // file cards end the current tool-group run
+  // Separate code/text files (grouped) from others (rendered individually).
+  // Code = extensions in _FT_CODE_EXTS; others = HTML/images (auto-expand) + office/docs (collapsed card).
+  const codeFiles = [];
+  const otherFiles = [];
   for (const f of files) {
+    const clean = String((f && f.path) || '').replace(/^\/+/, '');
+    if (!clean) continue;
+    const ext = clean.split('.').pop().toLowerCase();
+    if (_FT_CODE_EXTS.has(ext)) { codeFiles.push(f); }
+    else { otherFiles.push(f); }
+  }
+  // Render non-code files (HTML/images + office/docs) individually
+  for (const f of otherFiles) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
     const olds = [...target.querySelectorAll('.artifact-wrap')].filter(old => {
       const p = old.dataset && old.dataset.artifactPath;
       return p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p);
     });
-    // Mid-turn (partial): a card that already exists stays where it is — the
-    // artifact auto-reload refreshes its content on every write, and moving it
-    // around while the model works would make the conversation jumpy. Verify its
-    // header survived (see _artifactEnsureHeader — missing-header bug breadcrumb).
     if (partial && olds.length) {
       if (typeof window._artifactEnsureHeader === 'function') for (const o of olds) window._artifactEnsureHeader(o);
       continue;
     }
-    // Fresh render: the earlier card (if any) is dropped so the new one below
-    // becomes the single, bottom-most occurrence (most recently edited last).
     for (const old of olds) old.remove();
     const ext = clean.split('.').pop().toLowerCase();
     try { renderArtifact(target, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
   }
+  // Render code files as a single collapsible group
+  if (codeFiles.length) {
+    if (partial) return;
+    const oldGroup = target.querySelector('.code-group');
+    if (oldGroup) oldGroup.remove();
+    renderCodeGroup(target, codeFiles);
+  }
+}
+
+
+// ── Code-file group card ────────────────────────────────────────────────────────────────
+// Collapses .py/.js/.md and other code/text files into a single expandable
+// card when a turn touches multiple code files. Keeps HTML/images and
+// office/docs as individual artifact cards (unchanged behavior).
+function renderCodeGroup(target, codeFiles) {
+  const count = codeFiles.length;
+  const extMap = {};
+  for (const f of codeFiles) {
+    const clean = String((f && f.path) || '').replace(/^\/+/, '');
+    const ext = clean.split('.').pop().toLowerCase();
+    extMap[ext] = (extMap[ext] || 0) + 1;
+  }
+  const typeLabel = Object.entries(extMap).map(([e, n]) => n + ' ' + _codeFileLabel(e)).join(' · ');
+  const totalSize = codeFiles.reduce((s, f) => s + ((f && f.size) || 0), 0);
+  const totalLabel = totalSize > 0
+    ? (totalSize < 1024 ? totalSize + ' B' : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB' : (totalSize / 1048576).toFixed(1) + ' MB')
+    : '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'code-group';
+  wrap.dataset.codeGroup = '1';
+
+  // Header / toggle
+  const header = document.createElement('div');
+  header.className = 'cg-header';
+  header.innerHTML =
+    '<span class="cg-chevron"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+    '<span class="cg-stack"><span class="cg-stack-lines"><span></span><span></span><span></span></span></span>' +
+    '<span class="cg-label"><span class="cg-title">' + count + ' code file' + (count !== 1 ? 's' : '') + '</span>' +
+    '<span class="cg-types">' + (totalLabel ? '· ' + totalLabel : '') + '</span></span>' +
+    '<span class="cg-detail">' + typeLabel + '</span>';
+  wrap.appendChild(header);
+
+  // File list (hidden by default)
+  const list = document.createElement('div');
+  list.className = 'cg-list';
+  list.style.display = 'none';
+
+  for (const f of codeFiles) {
+    const clean = String((f && f.path) || '').replace(/^\/+/, '');
+    if (!clean) continue;
+    const ext = clean.split('.').pop().toLowerCase();
+    const name = clean.split('/').pop();
+    const labelUC = ext.toUpperCase();
+
+    const row = document.createElement('div');
+    row.className = 'cg-row';
+    row.dataset.artifactPath = clean;
+    row.dataset.artifactCreated = String(f && f.ts ? f.ts : Date.now());
+    row.innerHTML =
+      '<span class="cg-row-icon">' + labelUC + '</span>' +
+      '<span class="cg-row-name">' + name + '</span>' +
+      '<span class="cg-row-size"></span>' +
+      '<button class="cg-row-expand" title="Open">↗</button>';
+    list.appendChild(row);
+
+    // Fetch size asynchronously
+    (async () => {
+      try {
+        const { parts, name: fname } = splitPath(await resolveArtifactPath(clean));
+        const dir = await opfs.resolveDir(parts);
+        const file = await (await dir.getFileHandle(fname)).getFile();
+        const szEl = row.querySelector('.cg-row-size');
+        if (szEl && file.size > 0) szEl.textContent = formatArtifactBytes(file.size);
+      } catch (_) {}
+    })();
+
+    // Open in new tab
+    const expandBtn = row.querySelector('.cg-row-expand');
+    expandBtn.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        const resolved = await resolveArtifactPath(clean);
+        const bytes = await opfs.readBytes(resolved);
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'text/plain' }));
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (_) {}
+    };
+    // Make row clickable
+    row.onclick = (e) => { if (e.target !== expandBtn) expandBtn.click(); };
+    row.style.cursor = 'pointer';
+  }
+  wrap.appendChild(list);
+
+  // Toggle expand/collapse
+  header.onclick = () => {
+    const open = list.style.display !== 'none';
+    list.style.display = open ? 'none' : '';
+    wrap.classList.toggle('cg-open', !open);
+  };
+
+  _append(target, wrap);
 }
 
 // Rebuild a settled (.done) msg-timer line into `target` from the stream's
