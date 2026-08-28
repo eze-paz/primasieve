@@ -495,8 +495,10 @@ function renderHistoricalMessage(m, host = null) {
       // to the English already painted; guard against a conversation switch mid-await.
       const _loc = _currentLocale();
       if (_loc && _loc.code) {
-        renderUserText(contentStr, _loc).then(tr => {
-          if (tr && tr !== contentStr && div.isConnected) { bub.innerHTML = renderMd(tr); hydrateLocalRefs(div); }
+        // Streamed repaint: `full` is translated-head + English-tail, so a long
+        // bubble turns Catalan top-down as blocks finish instead of all at once.
+        renderUserTextStream(contentStr, _loc, (p) => {
+          if (p.full && p.full !== contentStr && div.isConnected) { bub.innerHTML = renderMd(p.full); hydrateLocalRefs(div); }
         }).catch(() => {});
       }
     }
@@ -3477,6 +3479,50 @@ async function renderUserText(text, loc) {
   const [t] = await localize([text], loc.code, loc.name);
   return t || text;
 }
+// Split markdown into blank-line-separated blocks, keeping fenced code whole.
+// Rejoining with '\n\n' collapses runs of 3+ blank lines — invisible after render.
+function _mdBlocks(text) {
+  const lines = text.split('\n');
+  const blocks = []; let cur = []; let inFence = false;
+  for (const l of lines) {
+    if (/^\s*(```|~~~)/.test(l)) inFence = !inFence;
+    if (!inFence && !l.trim()) { if (cur.length) { blocks.push(cur.join('\n')); cur = []; } continue; }
+    cur.push(l);
+  }
+  if (cur.length) blocks.push(cur.join('\n'));
+  return blocks;
+}
+// Streaming localization: translate block-by-block (Bergamot has no intra-sentence
+// streaming, but per-block results paint progressively instead of stalling on the
+// whole reply). onProgress({head, full, done}): head = translated text so far,
+// full = head + the still-English remainder (for repaint-in-place consumers).
+// Fail-open per block; resolves to the final translation. Also caches the WHOLE
+// text so a reload hits in one lookup.
+async function renderUserTextStream(text, loc, onProgress) {
+  const emit = (head, full, done) => { if (onProgress) { try { onProgress({ head, full, done }); } catch (_) {} } };
+  if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) { emit(text, text, true); return text; }
+  await _locStoreLoad(loc.code);
+  const whole = _locGet(loc.code, text);
+  if (typeof whole === 'string') { emit(whole, whole, true); return whole; }
+  const blocks = _mdBlocks(text);
+  if (text.length < 600 || blocks.length < 2) {
+    const t = await renderUserText(text, loc);
+    emit(t, t, true);
+    return t;
+  }
+  const out = [];
+  for (let i = 0; i < blocks.length; i++) {
+    let tr = blocks[i];
+    try { tr = await renderUserText(blocks[i], loc); } catch (_) {}
+    out.push(tr);
+    const done = i === blocks.length - 1;
+    const head = out.join('\n\n');
+    emit(head, done ? head : head + '\n\n' + blocks.slice(i + 1).join('\n\n'), done);
+  }
+  const full = out.join('\n\n');
+  if (full !== text) _locPut(loc.code, text, full);
+  return full;
+}
 // Clone a todos array with DISPLAY text localized (content). Canonical is untouched.
 async function renderUserTodos(todos, loc) {
   if (!loc || !loc.code) return todos;
@@ -4552,9 +4598,15 @@ class RoundRenderer {
       const _loc = _currentLocale(localeOverride);
       if (_loc && _loc.code) {
         this.pending = '';
-        renderUserText(finalContent, _loc)
-          .then(tr => { this.pending = tr || finalContent; this._scheduleDrain(); })
-          .catch(() => { this.pending = finalContent; this._scheduleDrain(); });
+        // Streamed: each translated block is appended to pending as Bergamot (in
+        // its worker) finishes it, so the typewriter starts revealing the reply
+        // after the FIRST block instead of after the whole translation.
+        let fed = 0;
+        renderUserTextStream(finalContent, _loc, (p) => {
+          if (p.head.length > fed) { this.pending += p.head.slice(fed); fed = p.head.length; this._scheduleDrain(); }
+        })
+          .then(tr => { if (!fed) { this.pending = tr || finalContent; this._scheduleDrain(); } })
+          .catch(() => { if (!fed) { this.pending = finalContent; this._scheduleDrain(); } });
         return;
       }
       this.pending = finalContent;

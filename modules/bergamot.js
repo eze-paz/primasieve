@@ -8,6 +8,16 @@
   var S = { wasmUrl: null, runtimeUrl: null, modelBase: null };
   var _svc = null, _M = null, _initP = null;
   var _models = new Map();
+  // Page context: BlockingService compute is SYNCHRONOUS — running it on the UI
+  // thread freezes the page for the whole translation (seconds for a long reply).
+  // On the page, translate()/prefetch()/translateStream() therefore delegate to a
+  // dedicated Worker running this same script (spawned with a '#bergamot' hash so
+  // sandpie-worker's importScripts of this file does NOT install the RPC handler).
+  var IS_PAGE = (typeof document !== 'undefined') && (typeof importScripts !== 'function');
+  var IS_RPC_WORKER = !IS_PAGE && typeof self !== 'undefined' && self.location &&
+    String(self.location.hash || '').indexOf('#bergamot') === 0;
+  // document.currentScript is only live during initial evaluation — capture now.
+  var _selfSrc = IS_PAGE && document.currentScript ? document.currentScript.src : null;
   // en->X packs Firefox/Bergamot publishes (target-language codes).
   var SUPPORTED = new Set(['ca','es','fr','de','it','pt','nl','pl','ru','uk','cs','sv',
     'da','fi','el','ro','bg','hu','et','lt','lv','sl','sk','hr','sq','bs','id','ms',
@@ -199,7 +209,7 @@
       else plan.push({ k: 'raw', line: line });
     }
     if (!frags.length) return text;
-    var tr = await translate(frags, code);
+    var tr = await _xlate(frags, code);   // proxied to the worker on the page
     var out = plan.map(function (p) {
       if (p.k === 'raw') return p.line;
       if (p.k === 'prose') return p.prefix + (tr[p.ref] || frags[p.ref]);
@@ -228,5 +238,102 @@
     } catch (_) { return false; }
   }
 
-  g.Bergamot = { configure: configure, translate: translate, translateMarkdown: translateMarkdown, isStructured: isStructured, prefetch: prefetch, supports: supports, SUPPORTED: SUPPORTED };
+  // Sequentially translate an array of segments, reporting each finished segment
+  // via onPartial(index, translated) — the "streaming" surface: Bergamot has no
+  // intra-sentence streaming, but per-segment results let callers paint
+  // progressively instead of waiting for the whole document.
+  async function translateStreamLocal(texts, code, onPartial) {
+    var res = texts.slice();
+    for (var i = 0; i < texts.length; i++) {
+      var r = await _xlate([texts[i]], code);
+      res[i] = r[0];
+      if (onPartial) { try { onPartial(i, r[0]); } catch (_) {} }
+    }
+    return res;
+  }
+
+  // ── Page → worker RPC ──────────────────────────────────────────────────────
+  var _xlate = translate;                    // what translateMarkdown/stream call
+  var _translateOut = translate, _prefetchOut = prefetch, _streamOut = translateStreamLocal;
+  if (IS_PAGE) {
+    var _wk = null, _rpcId = 0, _pend = new Map();
+    var _spawn = function () {
+      if (_wk) return _wk;
+      if (!_selfSrc) throw new Error('bergamot: script URL unknown (no currentScript)');
+      _wk = new Worker(_selfSrc + '#bergamot');
+      _wk.onmessage = function (ev) {
+        var m = ev.data || {};
+        var p = _pend.get(m.id);
+        if (!p) return;
+        if (m.partial) { if (p.onPartial) { try { p.onPartial(m.partial.i, m.partial.text); } catch (_) {} } return; }
+        _pend.delete(m.id);
+        if (m.ok) p.resolve(m.res); else p.reject(new Error(m.err || 'bergamot worker error'));
+      };
+      _wk.onerror = function (e) {
+        var err = new Error('bergamot worker crashed: ' + ((e && e.message) || 'unknown'));
+        _pend.forEach(function (p) { p.reject(err); });
+        _pend.clear();
+        try { _wk.terminate(); } catch (_) {}
+        _wk = null;                          // next call respawns
+      };
+      return _wk;
+    };
+    var _rpc = function (op, payload, onPartial) {
+      return new Promise(function (resolve, reject) {
+        var w;
+        try { w = _spawn(); } catch (e) { reject(e); return; }
+        var id = ++_rpcId;
+        _pend.set(id, { resolve: resolve, reject: reject, onPartial: onPartial });
+        w.postMessage(Object.assign({ id: id, op: op, cfg: S }, payload));
+      });
+    };
+    _xlate = function (texts, code) {
+      if (!Array.isArray(texts) || !texts.length) return Promise.resolve(texts);
+      var c = baseCode(code);
+      if (!c || c === 'en') return Promise.resolve(texts);      // no-op stays local
+      if (!supports(c)) return Promise.reject(new Error('bergamot: unsupported target ' + c));
+      return _rpc('translate', { texts: texts, code: c });
+    };
+    _translateOut = _xlate;
+    _prefetchOut = function (code) {
+      var c = baseCode(code);
+      if (!c || c === 'en' || !supports(c) || !S.wasmUrl || !S.modelBase) return Promise.resolve(false);
+      return _rpc('prefetch', { code: c }).catch(function () { return false; });
+    };
+    _streamOut = function (texts, code, onPartial) {
+      if (!Array.isArray(texts) || !texts.length) return Promise.resolve(texts);
+      var c = baseCode(code);
+      if (!c || c === 'en') return Promise.resolve(texts);
+      if (!supports(c)) return Promise.reject(new Error('bergamot: unsupported target ' + c));
+      return _rpc('translateStream', { texts: texts, code: c }, onPartial);
+    };
+  }
+  if (IS_RPC_WORKER) {
+    self.onmessage = async function (ev) {
+      var m = ev.data || {};
+      try {
+        if (m.cfg) configure(m.cfg);
+        var res;
+        if (m.op === 'translate') res = await translate(m.texts, m.code);
+        else if (m.op === 'prefetch') res = await prefetch(m.code);
+        else if (m.op === 'translateStream') {
+          res = await translateStreamLocal(m.texts, m.code, function (i, text) {
+            self.postMessage({ id: m.id, partial: { i: i, text: text } });
+          });
+        }
+        else throw new Error('bergamot worker: unknown op ' + m.op);
+        self.postMessage({ id: m.id, ok: true, res: res });
+      } catch (e) { self.postMessage({ id: m.id, ok: false, err: (e && e.message) || String(e) }); }
+    };
+  }
+
+  g.Bergamot = {
+    configure: configure,
+    translate: function (texts, code) { return _translateOut(texts, code); },
+    translateStream: function (texts, code, onPartial) { return _streamOut(texts, code, onPartial); },
+    translateMarkdown: translateMarkdown,
+    isStructured: isStructured,
+    prefetch: function (code) { return _prefetchOut(code); },
+    supports: supports, SUPPORTED: SUPPORTED
+  };
 })(typeof self !== 'undefined' ? self : this);
