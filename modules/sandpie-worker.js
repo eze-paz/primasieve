@@ -943,7 +943,7 @@ function _isNonEnglish(s) {
 let _bergamotLoaded = false;
 function _ensureBergamot() {
   if (_bergamotLoaded) return;
-  importScripts(new URL('bergamot.js?v=7', self.location.href).href);
+  importScripts(new URL('bergamot.js?v=8', self.location.href).href);
   _bergamotLoaded = true;
 }
 
@@ -1039,11 +1039,12 @@ async function _localizeArtifact(path, ctx, target) {
   const enc = new TextEncoder(), dec = new TextDecoder();
   try {
     if (/\.html?$/.test(lower)) {
-      // Whole document through Bergamot's native HTML mode: markup is parsed and
-      // ONLY text nodes are translated — tags, attributes, <style> and <script>
-      // pass through untouched. NEVER feed HTML down the prose path below: the
-      // blank-line splitter hands CSS/markup blocks to the NMT, which "translates"
-      // them and shreds the file (Jordi's 2026-08-28 dashboard).
+      // Whole document through translateHtml — a JS pass that splits on tags and
+      // translates ONLY text nodes (tags, attributes, <style>/<script> subtrees
+      // stay byte-identical; the WASM build has no native HTML mode). NEVER feed
+      // HTML down the prose path below: the blank-line splitter hands CSS/markup
+      // blocks to the NMT, which "translates" them and shreds the file (Jordi's
+      // 2026-08-28 dashboard).
       const text = dec.decode(await opfsReadBytes(path));
       const loc = target || (ctx && ctx._localize) || {};
       const code = String(loc.code || '').split(/[-_]/)[0].toLowerCase();
@@ -1054,7 +1055,7 @@ async function _localizeArtifact(path, ctx, target) {
         wasmUrl:    new URL('bergamot/bergamot-translator-worker.wasm', self.location.href).href,
         modelBase:  new URL('../bergamot-models/', self.location.href).href,
       });
-      const [tr] = await Bergamot.translate([text], code, { html: true });
+      const tr = await Bergamot.translateHtml(text, code);
       if (typeof tr !== 'string' || !tr || tr === text) return;
       // Off-turn safety: skip the write-back if the model edited the file meanwhile.
       try { if (dec.decode(await opfsReadBytes(path)) !== text) return; } catch (_) { return; }

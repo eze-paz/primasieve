@@ -92,12 +92,12 @@
   }
 
   // texts: string[]; code: BCP-47/ISO target. Returns same-length array; blank
-  // and non-string entries pass through untouched. opts.html = true switches the
-  // engine into its native HTML mode (the one Firefox full-page translation uses):
-  // markup is parsed, ONLY text nodes are translated, tags/attributes/<style>/
-  // <script> pass through — REQUIRED for whole HTML documents (feeding markup
-  // through the plain sentence path translates CSS and shreds the file).
-  async function translate(texts, code, opts) {
+  // and non-string entries pass through untouched. NOTE: the ResponseOptions html
+  // flag must stay FALSE — this minimal WASM build ships without the HTML parser
+  // and html:true hard-aborts the runtime on ANY input, poisoning the worker
+  // (verified 2026-08-28, even on '<p>x</p>'). Whole HTML documents go through
+  // translateHtml() below, a JS text-node pass, instead.
+  async function translate(texts, code) {
     if (!Array.isArray(texts) || !texts.length) return texts;
     code = baseCode(code);
     // en->en (or no target): English is canonical — nothing to translate. Return
@@ -106,13 +106,12 @@
     if (!supports(code)) throw new Error('bergamot: unsupported target ' + code);
     await ensureInit();
     if (!_svc) throw new Error('bergamot: runtime unavailable');
-    var asHtml = !!(opts && opts.html);
     var tm = await _model(code);
     var input = new _M.VectorString(), idx = [];
     texts.forEach(function (t, i) { if (typeof t === 'string' && t.trim()) { idx.push(i); input.push_back(t); } });
     if (!idx.length) { input.delete(); return texts; }
     var vo = new _M.VectorResponseOptions();
-    for (var i = 0; i < idx.length; i++) vo.push_back({ qualityScores: false, alignment: false, html: asHtml });
+    for (var i = 0; i < idx.length; i++) vo.push_back({ qualityScores: false, alignment: false, html: false });
     var out = _svc.translate(tm, input, vo);
     var res = texts.slice();
     for (var k = 0; k < idx.length; k++) res[idx[k]] = out.get(k).getTranslatedText().trim();
@@ -229,6 +228,52 @@
     return out.join('\n');
   }
 
+  // Whole-HTML-document translation as a JS pre/post pass (the WASM build has no
+  // native HTML mode — see translate()). Split on tags, translate ONLY text nodes,
+  // and leave every tag, attribute, and <style>/<script>/<code>/<pre>/<svg> subtree
+  // byte-identical. A text node is translated only when it contains a lowercase
+  // letter — numbers ("4,657.10"), tickers ("GC=F", "VIX"), and symbol runs pass
+  // through untouched. Entities are decoded for the NMT and re-encoded after.
+  var _htmlSkipTags = { style: 1, script: 1, code: 1, pre: 1, svg: 1, noscript: 1, textarea: 1 };
+  function _entDec(s) {
+    return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+  }
+  function _entEnc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  async function translateHtml(html, code) {
+    code = baseCode(code);
+    if (!code || code === 'en' || typeof html !== 'string' || !html.trim()) return html;
+    if (!supports(code)) throw new Error('bergamot: unsupported target ' + code);
+    var parts = html.split(/(<[^>]*>)/);
+    var skip = 0;                                  // depth inside skip-tag subtrees
+    var frags = [], refs = [], lead = [], trail = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (!p) continue;
+      if (p.charAt(0) === '<') {
+        var m = p.match(/^<\s*(\/?)([a-zA-Z][a-zA-Z0-9-]*)/);
+        if (m && _htmlSkipTags[m[2].toLowerCase()]) {
+          if (m[1]) skip = Math.max(0, skip - 1);
+          else if (!/\/>\s*$/.test(p)) skip++;
+        }
+        continue;
+      }
+      if (skip) continue;
+      if (!/\p{Ll}/u.test(p)) continue;            // no lowercase letter → not prose
+      frags.push(_entDec(p.trim()));
+      refs.push(i);
+      lead.push((p.match(/^\s*/) || [''])[0]);
+      trail.push((p.match(/\s*$/) || [''])[0]);
+    }
+    if (!frags.length) return html;
+    var tr = await _xlate(frags, code);            // ONE batch (one RPC on the page)
+    for (var k = 0; k < refs.length; k++) {
+      var t = tr[k];
+      if (typeof t === 'string' && t) parts[refs[k]] = lead[k] + _entEnc(t) + trail[k];
+    }
+    return parts.join('');
+  }
+
   // Fully warm a language ahead of first use (call on idle): load the WASM runtime,
   // download the pack (OPFS-cached), AND build the TranslationModel — so the first
   // real translate() is instant (~50ms) and its result lands before a re-render can
@@ -292,12 +337,12 @@
         w.postMessage(Object.assign({ id: id, op: op, cfg: S }, payload));
       });
     };
-    _xlate = function (texts, code, opts) {
+    _xlate = function (texts, code) {
       if (!Array.isArray(texts) || !texts.length) return Promise.resolve(texts);
       var c = baseCode(code);
       if (!c || c === 'en') return Promise.resolve(texts);      // no-op stays local
       if (!supports(c)) return Promise.reject(new Error('bergamot: unsupported target ' + c));
-      return _rpc('translate', { texts: texts, code: c, html: !!(opts && opts.html) });
+      return _rpc('translate', { texts: texts, code: c });
     };
     _translateOut = _xlate;
     _prefetchOut = function (code) {
@@ -319,7 +364,7 @@
       try {
         if (m.cfg) configure(m.cfg);
         var res;
-        if (m.op === 'translate') res = await translate(m.texts, m.code, { html: !!m.html });
+        if (m.op === 'translate') res = await translate(m.texts, m.code);
         else if (m.op === 'prefetch') res = await prefetch(m.code);
         else if (m.op === 'translateStream') {
           res = await translateStreamLocal(m.texts, m.code, function (i, text) {
@@ -334,9 +379,10 @@
 
   g.Bergamot = {
     configure: configure,
-    translate: function (texts, code, opts) { return _translateOut(texts, code, opts); },
+    translate: function (texts, code) { return _translateOut(texts, code); },
     translateStream: function (texts, code, onPartial) { return _streamOut(texts, code, onPartial); },
     translateMarkdown: translateMarkdown,
+    translateHtml: translateHtml,
     isStructured: isStructured,
     prefetch: function (code) { return _prefetchOut(code); },
     supports: supports, SUPPORTED: SUPPORTED
