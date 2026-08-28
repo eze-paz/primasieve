@@ -684,115 +684,196 @@ async function tool_write_todos({ todos }, ctx) {
   const byId = new Map(tree.map(t => [t.id, t]));
   const openCount = () => tree.filter(t => _TODO_OPEN.has(t.status)).length;
   // Change signature (id:status:content of live tasks) — lets us detect a call
-  // that changed NOTHING and answer with a calm "already matches" instead of an
+  // that changed NOTHING and answer with a state-aware reply instead of an
   // error string, so a model doesn't keep retrying an identical no-op forever.
   const _sigOf = () => tree.filter(t => t.status !== 'deleted').map(t => t.id + ':' + t.status + ':' + String(t.content || '').trim().toLowerCase().replace(/\s+/g, ' ')).sort().join('|');
   const _sigBefore = _sigOf();
+  const _norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  // Fuzzy content match (token containment): a REWORDED resend of an existing task
+  // must map to it, not create a duplicate. Measured production failure (2026-08-28):
+  // the model reworded its finished plan -> exact-match missed -> the plan was
+  // resurrected as pending duplicates -> the stop guard + plan-first gate trapped it
+  // in a no-op write_todos loop (7 wasted ~130k-token rounds). Containment
+  // (intersection over the SMALLER token set) so an abbreviated resend still matches.
+  const _toks = s => { const st = new Set(); for (const w of _norm(s).split(' ')) if (w.length > 2) st.add(w); return st; };
+  const _fuzzy = (content, cands) => {
+    const a = _toks(content); if (!a.size) return null;
+    let best = null, bs = 0;
+    for (const t of cands) {
+      const b = _toks(t.content); if (!b.size) continue;
+      let inter = 0; for (const w of a) if (b.has(w)) inter++;
+      const score = inter / Math.min(a.size, b.size);
+      if (score > bs) { bs = score; best = t; }
+    }
+    return bs >= 0.6 ? best : null;
+  };
+  // Auto-advance: if nothing is in_progress, promote the first unblocked pending
+  // task. Kills the mandatory extra bookkeeping round the plan-first gate used to
+  // force after every completion (complete task -> gate hides tools -> model had to
+  // call write_todos AGAIN just to start the next one).
+  const _autoAdvance = () => {
+    if (tree.some(t => t.status === 'in_progress')) return null;
+    const m = new Map(tree.map(t => [t.id, t]));
+    const next = tree.find(t => t.status === 'pending' && !_todoBlockers(t, m).length);
+    if (!next) return null;
+    next.status = 'in_progress'; delete next.completed; delete next.reason;
+    return next;
+  };
+  // Shared closer: single-active rule, auto-advance, then a state-aware result.
+  const _finish = (headline, notes) => {
+    let activeSeen = false;
+    for (const t of tree) { if (t.status === 'in_progress') { if (activeSeen) t.status = 'pending'; else activeSeen = true; } }
+    const adv = _autoAdvance();
+    if (ctx) ctx._todos = _todoFlat(tree);
+    const done = tree.filter(t => t.status === 'completed').length;
+    const live = tree.filter(t => t.status !== 'deleted').length;
+    let out = 'todos:' + JSON.stringify(tree) + '\n' + headline + ' (' + done + ' done, ' + openCount() + ' open, ' + live + ' total):\n' + _todoSummary(tree);
+    if (adv) out += '\n\nAuto-started task ' + adv.id + ' ("' + adv.content + '") — it is in_progress and your full toolset is available. Do the work now; touch the checklist again only when a status actually changes.';
+    if (!openCount()) out += '\n\nChecklist COMPLETE — nothing open. Do NOT call write_todos again: deliver your final answer with respond() now (add tasks only if the user asked for genuinely new work).';
+    for (const n of (notes || [])) out += '\n' + n;
+    return { result: out };
+  };
 
-  // ── Full-list form: an initial plan (empty tree) or a reset (all done/deleted)
-  //    builds fresh. Mid-work, a full list is RECONCILED to the desired state —
-  //    NOT rejected. Models (and every other agent's TodoWrite) naturally re-send
-  //    the whole list; the old hard error made weak models retry the identical
-  //    list forever (a real production loop). We match by id then normalized
-  //    content, update matched tasks through the same state rules, add new ones,
-  //    and KEEP + REPORT open tasks the list omits so in-flight work is never
-  //    silently dropped.
-  if (Array.isArray(todos)) {
-    if (tree.length && openCount() > 0) {
-      const _norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-      const byContent = new Map();
-      for (const t of tree) if (t.status !== 'deleted') { const k = _norm(t.content); if (!byContent.has(k)) byContent.set(k, t); }
-      const matched = new Set(); const order = []; const addedIds = [];
-      for (const inc of todos) {
-        const content = inc && typeof inc.content === 'string' ? inc.content.trim() : '';
-        if (!content) continue;
-        const incStatus = _TODO_ALL.includes(inc && inc.status) ? inc.status : null;
-        let ex = null;
-        if (inc && inc.id != null && byId.has(String(inc.id)) && byId.get(String(inc.id)).status !== 'deleted' && !matched.has(String(inc.id))) ex = byId.get(String(inc.id));
-        if (!ex) { const c = byContent.get(_norm(content)); if (c && !matched.has(c.id)) ex = c; }
-        if (ex) {
+  if (!Array.isArray(todos)) {
+    return { result: 'Error: send {"todos":[…]}. Two forms: (1) FULL LIST — items {"content":"…","status":"pending|in_progress|completed|blocked","activeForm":"…","est":N,"reason":"…"}, reconciled to the existing checklist (matched by id, then content — reworded content still matches; open tasks you omit are dropped and reported); (2) DELTA — items {"id":"…","status":"…"} with NO content flip statuses only and never drop anything (cheapest way to advance). At most ONE task in_progress; when none is, the first unblocked pending task auto-starts.' };
+  }
+
+  // ── DELTA form: every item is {id, status} with no content -> status flips only.
+  //    Nothing is added, dropped, or re-typed — one status change costs ~20 output
+  //    tokens instead of re-generating the whole list (~500+ tokens ≈ 5-8s decode).
+  const isDelta = todos.length > 0 && todos.every(t => t && t.id != null && !(typeof t.content === 'string' && t.content.trim()));
+  if (isDelta) {
+    if (!tree.length) return { result: 'Error: no checklist exists yet — send the full-list form first ({"todos":[{"content":…,"status":…}]}).' };
+    const notes = [];
+    for (const inc of todos) {
+      const ex = byId.get(String(inc.id));
+      if (!ex || ex.status === 'deleted') { notes.push('Unknown id ignored: ' + String(inc.id) + '.'); continue; }
+      const st = _TODO_ALL.includes(inc.status) ? inc.status : null;
+      if (!st) { notes.push('Task ' + ex.id + ': invalid status ignored.'); continue; }
+      if (ex.status === 'completed' && st !== 'completed') { notes.push('Task ' + ex.id + ' is already completed — left completed.'); continue; }
+      ex.status = st;
+      if (st === 'completed') ex.completed = now; else delete ex.completed;
+      if (st === 'blocked') { const r = inc.reason ? String(inc.reason).trim() : ''; if (r) ex.reason = r; else delete ex.reason; } else delete ex.reason;
+    }
+    return _finish('Checklist updated', notes);
+  }
+
+  // ── FULL-LIST form. An existing checklist (even a fully completed one) is
+  //    RECONCILED — never wiped and rebuilt: completed history survives, and a
+  //    resend of finished work maps back to the completed tasks instead of
+  //    resurrecting the plan as pending duplicates.
+  if (tree.length) {
+    const byContent = new Map();
+    for (const t of tree) if (t.status !== 'deleted') { const k = _norm(t.content); if (!byContent.has(k)) byContent.set(k, t); }
+    const matched = new Set(); const order = []; const addedIds = []; const alreadyDone = [];
+    for (const inc of todos) {
+      const content = inc && typeof inc.content === 'string' ? inc.content.trim() : '';
+      const incStatus = _TODO_ALL.includes(inc && inc.status) ? inc.status : null;
+      // A content-less {id,status} item inside a full list = inline delta on that task.
+      if (!content) {
+        if (inc && inc.id != null && byId.has(String(inc.id)) && byId.get(String(inc.id)).status !== 'deleted' && !matched.has(String(inc.id))) {
+          const ex = byId.get(String(inc.id));
           matched.add(ex.id);
-          ex.content = content;
-          if (inc && typeof inc.activeForm === 'string' && inc.activeForm.trim()) ex.activeForm = inc.activeForm.trim();
-          { const e = _todoEst(inc && inc.est); if (e) ex.est = e; }
-          // Apply the incoming status, but NEVER un-complete a completed task.
           if (incStatus && incStatus !== ex.status && !(ex.status === 'completed' && incStatus !== 'completed')) {
             ex.status = incStatus;
             if (incStatus === 'completed') ex.completed = now; else delete ex.completed;
             if (incStatus === 'blocked') { const r = inc.reason ? String(inc.reason).trim() : ''; if (r) ex.reason = r; else delete ex.reason; } else delete ex.reason;
           }
           order.push(ex);
-        } else {
-          const task = { id: _todoNextId(tree), content, status: incStatus || 'pending', created: now };
-          if (inc && typeof inc.activeForm === 'string' && inc.activeForm.trim()) task.activeForm = inc.activeForm.trim();
-          { const e = _todoEst(inc && inc.est); if (e) task.est = e; }
-          if (task.status === 'completed') task.completed = now;
-          if (task.status === 'blocked' && inc && inc.reason) task.reason = String(inc.reason).trim();
-          tree.push(task); byId.set(task.id, task); order.push(task); addedIds.push(task.id);
         }
+        continue;
       }
-      // (FIX 2) A full-list replacement is authoritative: open tasks the new list
-      // omits are DROPPED (marked deleted + detached from blockers) and reported,
-      // so a clobber is never silent, but a full re-type of the list still
-      // replaces the old one. Completed tasks stay on the record.
-      const dropped = [];
-      for (const t of tree) {
-        if (t.status === 'deleted' || matched.has(t.id) || order.includes(t)) continue;
-        if (_TODO_OPEN.has(t.status)) {
-          t.status = 'deleted'; t.deleted = now;
-          for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
-          dropped.push(t.id);
-        } else {
-          order.push(t);
+      let ex = null;
+      if (inc && inc.id != null && byId.has(String(inc.id)) && byId.get(String(inc.id)).status !== 'deleted' && !matched.has(String(inc.id))) ex = byId.get(String(inc.id));
+      if (!ex) { const c = byContent.get(_norm(content)); if (c && !matched.has(c.id)) ex = c; }
+      if (!ex) ex = _fuzzy(content, tree.filter(t => t.status !== 'deleted' && !matched.has(t.id)));
+      if (ex) {
+        matched.add(ex.id);
+        // Keep a completed task's recorded content — a reworded resend must not
+        // rewrite history it merely paraphrased.
+        if (ex.status !== 'completed') ex.content = content;
+        if (inc && typeof inc.activeForm === 'string' && inc.activeForm.trim()) ex.activeForm = inc.activeForm.trim();
+        { const e = _todoEst(inc && inc.est); if (e) ex.est = e; }
+        // Apply the incoming status, but NEVER un-complete a completed task.
+        if (incStatus && incStatus !== ex.status) {
+          if (ex.status === 'completed') { alreadyDone.push(ex.id); }
+          else {
+            ex.status = incStatus;
+            if (incStatus === 'completed') ex.completed = now; else delete ex.completed;
+            if (incStatus === 'blocked') { const r = inc.reason ? String(inc.reason).trim() : ''; if (r) ex.reason = r; else delete ex.reason; } else delete ex.reason;
+          }
         }
+        order.push(ex);
+      } else {
+        const task = { id: _todoNextId(tree), content, status: incStatus || 'pending', created: now };
+        if (inc && typeof inc.activeForm === 'string' && inc.activeForm.trim()) task.activeForm = inc.activeForm.trim();
+        { const e = _todoEst(inc && inc.est); if (e) task.est = e; }
+        if (task.status === 'completed') task.completed = now;
+        if (task.status === 'blocked' && inc && inc.reason) task.reason = String(inc.reason).trim();
+        tree.push(task); byId.set(task.id, task); order.push(task); addedIds.push(task.id);
       }
-      // Rebuild in reconciled order (ids stay stable), deleted tasks kept on record.
-      const deletedTasks = tree.filter(t => t.status === 'deleted');
-      tree.length = 0; tree.push(...order, ...deletedTasks);
-      // Single-active rule: at most one in_progress.
-      let activeSeen = false;
-      for (const t of tree) { if (t.status === 'in_progress') { if (activeSeen) t.status = 'pending'; else activeSeen = true; } }
-      if (!tree.filter(t => t.status !== 'deleted').length) return { result: 'Error: empty checklist — send at least one task.' };
-      if (ctx) ctx._todos = _todoFlat(tree);
-      if (_sigOf() === _sigBefore) {
-        return { result: 'No change — the checklist already matches your list. Nothing to update; go do the actual work (run_python / write_file / read_file), not more todo edits. Repeating this exact call trips the LOOP GUARD.\n' + _todoSummary(tree) };
-      }
-      const doneR = tree.filter(t => t.status === 'completed').length;
-      const liveR = tree.filter(t => t.status !== 'deleted').length;
-      let outR = 'todos:' + JSON.stringify(tree) + '\nChecklist reconciled to your list (' + doneR + ' done, ' + openCount() + ' open, ' + liveR + ' total'
-        + (addedIds.length ? ' · added ' + addedIds.join(', ') : '') + '):\n' + _todoSummary(tree);
-      if (dropped.length) outR += '\n\nDROPPED ' + dropped.length + ' open task(s) this replacement omitted: ' + dropped.join(', ') + ' — send them again (full list) if you meant to keep them.';
-      return { result: outR };
     }
-    tree.length = 0; byId.clear();
-    // Two-pass: assign ids by position first so blockedBy can reference siblings.
-    const ids = todos.map((_, i) => String(i + 1));
-    todos.forEach((t, i) => {
-      const content = t && typeof t.content === 'string' ? t.content.trim() : '';
-      if (!content) return;
-      const status = _TODO_ALL.includes(t.status) ? t.status : 'pending';
-      const task = { id: ids[i], content, status, created: now };
-      if (Array.isArray(t.blockedBy) && t.blockedBy.length) task.blockedBy = t.blockedBy.map(String).filter(x => ids.includes(x) && x !== ids[i]);
-      if (typeof t.activeForm === 'string' && t.activeForm.trim()) task.activeForm = t.activeForm.trim();
-      { const e = _todoEst(t && t.est); if (e) task.est = e; }
-      if (status === 'blocked' && t && typeof t.reason === 'string' && t.reason.trim()) task.reason = t.reason.trim();
-      if (status === 'completed') task.completed = now;
-      tree.push(task);
-    });
-    // Renumber compactly (skipped-empty items leave gaps) and remap blockedBy.
-    const remap = {}; tree.forEach((t, i) => { remap[t.id] = String(i + 1); });
-    tree.forEach(t => { t.id = remap[t.id]; if (t.blockedBy) t.blockedBy = t.blockedBy.map(x => remap[x]).filter(Boolean); });
-    // Single-active rule: at most ONE task may be in_progress at a time. A fresh
-    // list may declare several, but extras are demoted to pending (resume them
-    // with start once the current task is paused/completed/blocked).
-    let activeSeen = false;
-    tree.forEach(t => { if (t.status === 'in_progress') { if (activeSeen) t.status = 'pending'; else activeSeen = true; } });
-    if (!tree.length) return { result: 'Error: empty checklist — send at least one task.' };
-    if (ctx) ctx._todos = _todoFlat(tree);
-    return { result: 'todos:' + JSON.stringify(tree) + '\nNew checklist (' + tree.length + ' tasks):\n' + _todoSummary(tree) };
+    // A full-list replacement is authoritative: open tasks the new list omits are
+    // DROPPED (marked deleted + detached from blockers) and reported, so a clobber
+    // is never silent. Completed tasks stay on the record.
+    const dropped = [];
+    for (const t of tree) {
+      if (t.status === 'deleted' || matched.has(t.id) || order.includes(t)) continue;
+      if (_TODO_OPEN.has(t.status)) {
+        t.status = 'deleted'; t.deleted = now;
+        for (const x of tree) if (Array.isArray(x.blockedBy)) x.blockedBy = x.blockedBy.filter(id => id !== t.id);
+        dropped.push(t.id);
+      } else {
+        order.push(t);
+      }
+    }
+    // Rebuild in reconciled order (ids stay stable), deleted tasks kept on record.
+    const deletedTasks = tree.filter(t => t.status === 'deleted');
+    tree.length = 0; tree.push(...order, ...deletedTasks);
+    if (!tree.filter(t => t.status !== 'deleted').length) return { result: 'Error: empty checklist — send at least one task.' };
+    const notes = [];
+    if (addedIds.length) notes.push('Added task(s): ' + addedIds.join(', ') + '.');
+    if (alreadyDone.length) notes.push('Note: ' + alreadyDone.length + ' task(s) you sent as open are ALREADY COMPLETED (' + alreadyDone.join(', ') + ') — they stay completed; do not resend them.');
+    if (dropped.length) notes.push('DROPPED ' + dropped.length + ' open task(s) this replacement omitted: ' + dropped.join(', ') + ' — send them again (full list) if you meant to keep them.');
+    // State-aware no-op: nothing changed AND auto-advance has nothing to start.
+    // Say precisely what the situation calls for instead of a generic scold — the
+    // old "go do the actual work" reply kept a model grinding when the real state
+    // was "everything is finished, deliver the answer".
+    const _advPossible = !tree.some(t => t.status === 'in_progress') && tree.some(t => t.status === 'pending' && !_todoBlockers(t, new Map(tree.map(x => [x.id, x]))).length);
+    if (_sigOf() === _sigBefore && !_advPossible) {
+      if (ctx) ctx._todos = _todoFlat(tree);
+      const active = tree.find(t => t.status === 'in_progress');
+      let msg;
+      if (!openCount()) msg = 'No change — and the checklist is COMPLETE (nothing open). Do NOT call write_todos again: deliver your final answer with respond() now.';
+      else if (active) msg = 'No change — the checklist already matches your list. Task ' + active.id + ' ("' + active.content + '") is in_progress: do that work with your other tools, or mark it completed/blocked (delta form: {"todos":[{"id":"' + active.id + '","status":"completed"}]}). Do not resend the list.';
+      else msg = 'No change — the checklist already matches your list. Every open task is blocked; unblock one, mark it deleted, or respond() with what is blocking you.';
+      for (const n of notes) msg += '\n' + n;
+      msg += '\nRepeating this exact call trips the LOOP GUARD.\n' + _todoSummary(tree);
+      return { result: msg };
+    }
+    return _finish('Checklist reconciled to your list', notes);
   }
 
-  return { result: 'Error: send {"todos":[\u2026]} with the full list. Each item: {"content":"\u2026","status":"pending|in_progress|completed|blocked","activeForm":"\u2026","est":N,"reason":"\u2026"}. The list is reconciled to the existing checklist (matched by content, ids kept, open tasks you omit are dropped and reported). At most ONE task may be in_progress.' };
+  // ── Fresh build (no checklist yet).
+  // Two-pass: assign ids by position first so blockedBy can reference siblings.
+  const ids = todos.map((_, i) => String(i + 1));
+  todos.forEach((t, i) => {
+    const content = t && typeof t.content === 'string' ? t.content.trim() : '';
+    if (!content) return;
+    const status = _TODO_ALL.includes(t.status) ? t.status : 'pending';
+    const task = { id: ids[i], content, status, created: now };
+    if (Array.isArray(t.blockedBy) && t.blockedBy.length) task.blockedBy = t.blockedBy.map(String).filter(x => ids.includes(x) && x !== ids[i]);
+    if (typeof t.activeForm === 'string' && t.activeForm.trim()) task.activeForm = t.activeForm.trim();
+    { const e = _todoEst(t && t.est); if (e) task.est = e; }
+    if (status === 'blocked' && t && typeof t.reason === 'string' && t.reason.trim()) task.reason = t.reason.trim();
+    if (status === 'completed') task.completed = now;
+    tree.push(task);
+  });
+  // Renumber compactly (skipped-empty items leave gaps) and remap blockedBy.
+  const remap = {}; tree.forEach((t, i) => { remap[t.id] = String(i + 1); });
+  tree.forEach(t => { t.id = remap[t.id]; if (t.blockedBy) t.blockedBy = t.blockedBy.map(x => remap[x]).filter(Boolean); });
+  if (!tree.length) return { result: 'Error: empty checklist — send at least one task.' };
+  return _finish('New checklist', []);
 }
 
 // — Scratchpad (hidden working memory) —————————————————————————————————
@@ -3184,8 +3265,11 @@ async function runAgent(config, ctx) {
       if (config.volatileContext) _vt += '\n\n' + config.volatileContext;
       // Per-round ephemeral injection of the plan + scratchpad (replaces drift guard).
       // Both are rebuilt from ctx state each round — survive compaction, never in messages.
-      const _planLines = (ctx._todos || []).filter(t => t.status !== 'deleted').map(t =>
-        (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]') + ' ' + t.content
+      // Ids are shown so the model can flip a status with the cheap delta form
+      // ({"todos":[{"id":"N","status":"completed"}]}) without re-typing the list.
+      const _planTree = Array.isArray(ctx._todoTree) ? ctx._todoTree : [];
+      const _planLines = _planTree.filter(t => t.status !== 'deleted').map(t =>
+        (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]') + ' ' + t.id + ' ' + t.content
       ).join('\n');
       if (_planLines) _vt += '\n\n[plan]\n' + _planLines;
       if (ctx._scratchpad) _vt += '\n\n[scratch]\n' + ctx._scratchpad;
