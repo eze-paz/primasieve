@@ -2000,6 +2000,7 @@ async function handleSubmit(which = 'main') {
     // No auto-resume on load; the user opts in by pressing Enter / send.
     if (convId && isResumableActive()) {
       const s = ensureStream(convId);
+      if (s.generating) return;   // a turn is already running — never start a second loop
       if (s.host.parentNode !== pane) _mountInPane(s.host, pane);
       await sendSingle('', s, { resume: true });
     }
@@ -2173,7 +2174,11 @@ async function enqueueFor(convId, content, pane) {
   const s = ensureStream(convId);
   if (pane) _mountInPane(s.host, pane);
   // Steer into the active agent loop when generating, otherwise send directly.
-  if (s.generating && s.agentId && _canSteerActive()) {
+  // No agentId requirement: in the pre-send window (compaction/config build)
+  // steerActive buffers, and sendSingle posts the buffer once the loop starts —
+  // falling through to sendSingle here would spawn a second concurrent loop and
+  // orphan the running turn's stop wiring.
+  if (s.generating && _canSteerActive()) {
     steerActive(s, content);
     return;
   }
@@ -2191,6 +2196,10 @@ function steerActive(s, content) {
   // message_added event (RoundRenderer.bindMessage reconciles against this list).
   const el = addMsg('user', content, s.host, true);
   (s._pendingSteer = s._pendingSteer || []).push({ el, content, msg: null });
+  // No agentId yet — the turn is in its pre-send window (compaction / config
+  // build). Buffer the steer; sendSingle posts it the moment the loop starts.
+  // Posting to a null id would silently drop the user's message.
+  if (!s.agentId) { (s._earlySteer = s._earlySteer || []).push(content); return; }
   try { getSandpieWorker().postMessage({ type: 'steer', id: s.agentId, content }); } catch (_) {}
 }
 function handleButtonClick(which = 'main') {
@@ -2198,14 +2207,21 @@ function handleButtonClick(which = 'main') {
   if (!btn) return;
   const convId = _composerConv(which);
   const s = convId ? convStreams.get(convId) : activeStream();
-  if (btn.classList.contains('sending') && s) {
-    // Stop only the message generating right now; queued messages stay and the
-    // next one is sent immediately. To halt everything, press stop once per
-    // in-flight + queued message.
+  // Stop decides on STREAM STATE, not the button's CSS class — the class can go
+  // stale when a pane refresh is missed, and a stale ▶ click while generating
+  // must never fall through to handleSubmit (whose empty-composer resume path
+  // would start a SECOND concurrent loop for this conversation).
+  if (s && s.generating) {
+    // Two stop channels on purpose: the page-side controller (errors the event
+    // bridge → 'Stopped.'), plus a direct worker abort by agent id in case this
+    // turn's bridge was ever orphaned. The worker handler is idempotent, so a
+    // double abort is harmless.
     if (s.abort) s.abort.abort();
-  } else {
-    window.handleSubmit(which);
+    if (s.agentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: s.agentId }); } catch (_) {} }
+    return;
   }
+  if (btn.classList.contains('sending')) { refreshSendButtonFor(which); return; }   // stale ■ with no live turn — resync, don't submit
+  window.handleSubmit(which);
 }
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
 // Created once per page load. Other modules reach it via window._sandpieWorker.
@@ -2474,6 +2490,17 @@ function workerAgentStream(worker, id, signal) {
 }
 
 async function sendSingle(text, stream, opts = {}) {
+  // Single-flight per conversation: starting a second loop while one is
+  // generating would replace stream.abort/stream.agentId and ORPHAN the running
+  // turn's stop wiring — the stop button then aborts only the newest loop and
+  // the old one becomes unstoppable. Reachable via the empty-composer resume,
+  // resolveStoredAsk while a new turn runs, or the pre-agentId window below.
+  // Steer real text into the running loop instead; drop redundant resumes.
+  if (stream.generating) {
+    const hasText = Array.isArray(text) ? text.length > 0 : !!(text && String(text).trim());
+    if (hasText && !opts?.resume) steerActive(stream, text);
+    return;
+  }
   const { id: convId, messages: convMessages, host } = stream;
 
   // Render the user's message FIRST so it can never be lost. Even if the provider
@@ -2621,6 +2648,13 @@ async function sendSingle(text, stream, opts = {}) {
     const _agentId = Math.random().toString(36).slice(2);
     stream.agentId = _agentId;   // steer target: enqueueForActive posts {type:'steer', id} here
     worker.postMessage({ type: 'agent', id: _agentId, config });
+    // Steers buffered during the pre-agentId window (see steerActive) go out now,
+    // after the 'agent' message, so the worker splices them at its first round
+    // boundary. Their bubbles are already on screen via _pendingSteer.
+    if (stream._earlySteer && stream._earlySteer.length) {
+      for (const c of stream._earlySteer) { try { worker.postMessage({ type: 'steer', id: _agentId, content: c }); } catch (_) {} }
+      stream._earlySteer = [];
+    }
     const workerStream = workerAgentStream(worker, _agentId, ctrl.signal);
     await readAgentEvents(workerStream, dispatch);
 
@@ -2668,6 +2702,10 @@ async function sendSingle(text, stream, opts = {}) {
       }
       stream._pendingSteer = [];
     }
+    // Any steer still buffered pre-post (agentId was already null) was just
+    // reconciled into history above — drop the buffer or the NEXT turn's drain
+    // would post it again on top of the history copy.
+    stream._earlySteer = [];
 
     releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
@@ -3494,10 +3532,10 @@ const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
 const _localizeCache = new Map();   // 'code::text' -> translated (in-memory, this page)
 // ---- Persistent display-cache (OPFS 'localize-cache/<code>.json') ----
 // English is canonical and localization is re-applied on EVERY render, so without
-// this a reload re-runs Bergamot NMT over the whole visible transcript. Entries are
-// keyed by a text hash (not the full text) to keep the file small; on a warm cache
-// a conversation open never needs the Bergamot engine at all (its idle prefetch
-// stays lazy). Display-only — never read back into the model's context.
+// this a reload re-translates the whole visible transcript (paid localizer
+// requests). Entries are keyed by a text hash (not the full text) to keep the
+// file small; a warm conversation open never touches the network.
+// Display-only — never read back into the model's context.
 const _locStores = new Map();       // code -> { hash: translation }
 const _locStoreP = new Map();       // code -> one-time load promise
 const _locDirty = new Set();
@@ -3578,59 +3616,46 @@ async function localize(texts, to, toName) {
   });
   if (!miss.length) return out;
   try {
-    // On-device Bergamot only (gemini disabled). en/empty is a no-op inside translate().
-    // Coverage = whichever en->X packs are hosted on the server (fetched on demand,
-    // OPFS-cached). Fail-open to English if a pack is missing or errors.
-    if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
-    Bergamot.configure(_bergamotCfg());
-    const tr = await Bergamot.translate(miss, to);
-    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string') { out[oi] = t; _locPut(to, texts[oi], t); } });
+    // gemini-2.5-flash via the provider's /chat/completions (the managed proxy
+    // injects the upstream key; models.json pins the localizer). Batched JSON
+    // array in/out at temperature 0 — the LLM preserves markdown/code natively,
+    // so no structure-preserving splitter is needed. Fail-open to English.
+    const tr = await _geminiTranslate(miss, to, toName);
+    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string' && t) { out[oi] = t; _locPut(to, texts[oi], t); } });
     return out;
-  } catch (e) { console.warn('[localize] bergamot failed (showing English):', e && e.message || e); return texts; }
+  } catch (e) { console.warn('[localize] failed (showing English):', e && e.message || e); return texts; }
 }
-// Asset config for the on-device Bergamot translator (page context, served same-origin).
-function _bergamotCfg() {
-  return {
-    runtimeUrl: new URL('modules/bergamot/bergamot-translator-worker.js', document.baseURI).href,
-    wasmUrl:    new URL('modules/bergamot/bergamot-translator-worker.wasm', document.baseURI).href,
-    modelBase:  new URL('bergamot-models/', document.baseURI).href,
-  };
+// One localizer round trip: array of strings in -> same-length array out, chunked
+// so each request body stays well under the upstream ~1MB cap. Throws on transport
+// errors (localize() converts that to fail-open English); a chunk whose reply
+// doesn't parse keeps its English strings.
+const _LX_CHUNK = 50;
+function _lxSystemPrompt(tgt) {
+  return 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
 }
-// Prefetch the account's Reply-language pack into OPFS on idle, so the first
-// localization doesn't wait on a ~30MB download. Best-effort; en / unsupported = no-op.
-(function prewarmBergamot() {
-  try {
-    var go = function () {
-      try {
-        if (typeof Bergamot === 'undefined' || typeof _replyLocale !== 'function') return;
-        var loc = _replyLocale();
-        var code = loc && loc.code;
-        if (!code || code === 'en' || !Bergamot.supports(code)) return;
-        Bergamot.configure(_bergamotCfg());
-        Bergamot.prefetch(code);
-      } catch (_) {}
-    };
-    if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 10000 });
-    else setTimeout(go, 5000);
-  } catch (_) {}
-})();
+async function _geminiTranslate(texts, to, toName) {
+  const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
+  const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
+  const sys = _lxSystemPrompt(toName || to);
+  const out = [];
+  for (let i = 0; i < texts.length; i += _LX_CHUNK) {
+    const slice = texts.slice(i, i + _LX_CHUNK);
+    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
+    if (activeConvId) { try { body.session_id = 'Translate:' + (await ensureSessionId(activeConvId)); } catch (_) {} }   // parent-session marker for /admin/transcripts
+    const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('localizer HTTP ' + r.status);
+    const j = await r.json();
+    let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
+    content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+    let arr = null;
+    try { arr = JSON.parse(content); } catch (_) {}
+    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string') ? arr[k] : slice[k]);
+  }
+  return out;
+}
 // Localize a single user-facing string (bubbles/status). Returns English on failure.
 async function renderUserText(text, loc) {
   if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) return text;
-  // Default: whole-string translate (best sentence quality). Only when the text
-  // carries structure the NMT would shred (a markdown table / code fence) switch
-  // to the structure-preserving per-cell translator — keeps sentence quality AND
-  // preserves markdown.
-  if (typeof Bergamot !== 'undefined' && Bergamot.isStructured(text)) {
-    try {
-      await _locStoreLoad(loc.code);
-      const c = _locGet(loc.code, text);
-      if (typeof c === 'string') return c;
-      Bergamot.configure(_bergamotCfg());
-      const r = await Bergamot.translateMarkdown(text, loc.code);
-      if (typeof r === 'string' && r) { _locPut(loc.code, text, r); return r; }
-    } catch (_) {}
-  }
   const [t] = await localize([text], loc.code, loc.name);
   return t || text;
 }
@@ -3647,11 +3672,12 @@ function _mdBlocks(text) {
   if (cur.length) blocks.push(cur.join('\n'));
   return blocks;
 }
-// Streaming localization: translate block-by-block (Bergamot has no intra-sentence
-// streaming, but per-block results paint progressively instead of stalling on the
-// whole reply). onProgress({head, full, done}): head = translated text so far,
+// Streaming localization: translate in block GROUPS (~1500 chars per request) so
+// long replies paint progressively instead of stalling on one big round trip,
+// without paying a full HTTP round trip per paragraph.
+// onProgress({head, full, done}): head = translated text so far,
 // full = head + the still-English remainder (for repaint-in-place consumers).
-// Fail-open per block; resolves to the final translation. Also caches the WHOLE
+// Fail-open per group; resolves to the final translation. Also caches the WHOLE
 // text so a reload hits in one lookup.
 async function renderUserTextStream(text, loc, onProgress) {
   const emit = (head, full, done) => { if (onProgress) { try { onProgress({ head, full, done }); } catch (_) {} } };
@@ -3665,14 +3691,24 @@ async function renderUserTextStream(text, loc, onProgress) {
     emit(t, t, true);
     return t;
   }
+  // Group consecutive blocks up to ~1500 chars: one localizer request per group.
+  const groups = [];
+  let g = [], gLen = 0;
+  for (const b of blocks) {
+    if (g.length && gLen + b.length > 1500) { groups.push(g); g = []; gLen = 0; }
+    g.push(b); gLen += b.length;
+  }
+  if (g.length) groups.push(g);
   const out = [];
-  for (let i = 0; i < blocks.length; i++) {
-    let tr = blocks[i];
-    try { tr = await renderUserText(blocks[i], loc); } catch (_) {}
-    out.push(tr);
-    const done = i === blocks.length - 1;
+  let doneBlocks = 0;
+  for (let i = 0; i < groups.length; i++) {
+    let tr = groups[i];
+    try { tr = await localize(groups[i], loc.code, loc.name); } catch (_) {}
+    out.push(...tr.map((t, k) => (typeof t === 'string' && t) ? t : groups[i][k]));
+    doneBlocks += groups[i].length;
+    const done = i === groups.length - 1;
     const head = out.join('\n\n');
-    emit(head, done ? head : head + '\n\n' + blocks.slice(i + 1).join('\n\n'), done);
+    emit(head, done ? head : head + '\n\n' + blocks.slice(doneBlocks).join('\n\n'), done);
   }
   const full = out.join('\n\n');
   if (full !== text) _locPut(loc.code, text, full);
@@ -4752,9 +4788,9 @@ class RoundRenderer {
       const _loc = _currentLocale(localeOverride);
       if (_loc && _loc.code) {
         this.pending = '';
-        // Streamed: each translated block is appended to pending as Bergamot (in
-        // its worker) finishes it, so the typewriter starts revealing the reply
-        // after the FIRST block instead of after the whole translation.
+        // Streamed: each translated block group is appended to pending as the
+        // localizer finishes it, so the typewriter starts revealing the reply
+        // after the FIRST group instead of after the whole translation.
         let fed = 0;
         renderUserTextStream(finalContent, _loc, (p) => {
           if (p.head.length > fed) { this.pending += p.head.slice(fed); fed = p.head.length; this._scheduleDrain(); }
