@@ -1,0 +1,54 @@
+{
+ "gen9_looped": [
+  {
+   "H": 0.7127,
+   "params": 30011,
+   "energy": 62075,
+   "tasks": {
+    "parity": 0.9422,
+    "reverse": 0.4031,
+    "kvrecall": 0.8638,
+    "dyck": 0.779,
+    "charlm": 0.9692
+   }
+  },
+  {
+   "H": 0.6346,
+   "params": 30011,
+   "energy": 62075,
+   "tasks": {
+    "parity": 1.0,
+    "reverse": 0.2978,
+    "kvrecall": 0.9029,
+    "dyck": 0.7242,
+    "charlm": 0.9688
+   }
+  }
+ ],
+ "gen7_loopless": [
+  {
+   "H": 0.7557,
+   "params": 41339,
+   "energy": 41339,
+   "tasks": {
+    "parity": 1.0,
+    "reverse": 0.4924,
+    "kvrecall": 0.8203,
+    "dyck": 0.7468,
+    "charlm": 0.973
+   }
+  },
+  {
+   "H": 0.7766,
+   "params": 41339,
+   "energy": 41339,
+   "tasks": {
+    "parity": 1.0,
+    "reverse": 0.4883,
+    "kvrecall": 0.8839,
+    "dyck": 0.8112,
+    "charlm": 0.9743
+   }
+  }
+ ]
+}
