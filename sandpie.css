@@ -1521,10 +1521,10 @@ ul.conv-list li.active {
     color: var(--sp-text); font-weight: 600;
     flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
   }
-  /* Untitled register (no active task): taskless calls are blocked by the
-     worker's plan-first gate anyway — hide the whole card. The DOM stays (tool
-     results still need somewhere to land) but the user never sees it. */
-  .msg.tool-group.tg-untitled { display: none; }
+  /* Untitled register (no active task): VISIBLE — Claude-mode todos have no
+     plan-first gate, so real work can run before/without a checklist. The
+     header self-titles from the latest call's own label (tgUpdate). A group
+     holding only planning/bookkeeping still hides whole via .tg-empty. */
 
   /* Local-file references in replies (hydrateLocalRefs): clickable paths open
      the file viewer; OPFS images render inline. */

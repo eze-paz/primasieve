@@ -3315,11 +3315,13 @@ async function runAgent(config, ctx) {
       if (config.volatileContext) _vt += '\n\n' + config.volatileContext;
       // Per-round ephemeral injection of the plan + scratchpad (replaces drift guard).
       // Both are rebuilt from ctx state each round — survive compaction, never in messages.
-      // Ids are shown so the model can flip a status with the cheap delta form
-      // ({"todos":[{"id":"N","status":"completed"}]}) without re-typing the list.
+      // v2 mode shows ids so the model can flip a status with the cheap delta
+      // form ({"todos":[{"id":"N","status":"completed"}]}); claude mode (the
+      // default TodoWrite clone) has no id concept, so the list stays id-less.
       const _planTree = Array.isArray(ctx._todoTree) ? ctx._todoTree : [];
       const _planLines = _planTree.filter(t => t.status !== 'deleted').map(t =>
-        (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]') + ' ' + t.id + ' ' + t.content
+        (t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : t.status === 'blocked' ? '[!]' : '[ ]')
+          + (ctx._todoMode === 'claude' ? '' : ' ' + t.id) + ' ' + t.content
       ).join('\n');
       if (_planLines) _vt += '\n\n[plan]\n' + _planLines;
       if (ctx._scratchpad) _vt += '\n\n[scratch]\n' + ctx._scratchpad;

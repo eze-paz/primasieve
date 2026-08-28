@@ -2654,10 +2654,12 @@ async function resolveFilePart(f) {
   }
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
-// TODO-LAB (window.__todoLab): swap the write_todos definition for a faithful
-// clone of Claude Code's TodoWrite — same name so dispatch/grammar are
-// untouched; the worker pairs it with the blind-replace tool implementation
-// and drops the plan-first gate + open-todos stop guard (config.todoMode).
+// Claude-mode (DEFAULT): swap the write_todos definition for a faithful clone
+// of Claude Code's TodoWrite — same name so dispatch/grammar are untouched;
+// the worker pairs it with the blind-replace tool implementation and drops the
+// plan-first gate + open-todos stop guard (config.todoMode = 'claude').
+// window.__todoV2 = 1 restores the guarded v2 tool (reconcile/delta/gates).
+function _todoV2() { return !!(typeof window !== 'undefined' && window.__todoV2); }
 function _todoLabTools(defs) {
   return (defs || []).map(d => {
     if (!d || !d.function || d.function.name !== 'write_todos') return d;
@@ -2824,11 +2826,13 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     model: (effective && effective.model) || $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages, _loc),
     messages: resolvedMessages,
-    tools: (typeof window !== 'undefined' && window.__todoLab) ? _todoLabTools(toolDefs()) : toolDefs(),
-    // TODO-LAB experiment flag: window.__todoLab = 1 swaps write_todos for a
-    // faithful clone of Claude Code's TodoWrite (blind full replace, no gates)
-    // to measure model compliance with the trust-based contract. Console-only.
-    todoMode: (typeof window !== 'undefined' && window.__todoLab) ? 'claude' : '',
+    tools: _todoV2() ? toolDefs() : _todoLabTools(toolDefs()),
+    // Todos run in CLAUDE MODE by default (2026-08-28 A/B: deepseek fully
+    // complies with the trust-based TodoWrite contract — 5 turns/27s vs
+    // 7/39s under the gated v2): blind full replace, no plan-first gate, no
+    // open-todos stop guard. window.__todoV2 = 1 (console) restores the
+    // guarded v2 tool for comparison/rollback.
+    todoMode: _todoV2() ? '' : 'claude',
     // Rerouted to the vision fallback for this turn (user attached an image to a
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
@@ -4388,11 +4392,10 @@ function tgLogFor(target) {
   const st = _tgState(target);
   // The pane was cleared/re-rendered under us (contains() also works on fragments).
   if (st.group && !target.contains(st.group)) st.group = null;
-  // No checklist item in_progress → an UNTITLED register, and those are HIDDEN
-  // entirely (CSS .tg-untitled): taskless calls are blocked by the worker's
-  // plan-first gate, so what lands here is the blocked attempt's box or a gate
-  // exemption (run-end memory harvest) — bookkeeping the user never sees. The
-  // DOM still exists so tool results always have a box to attach to.
+  // No checklist item in_progress → an UNTITLED register. Visible (Claude-mode
+  // todos have no plan-first gate, so real work can run before/without a
+  // checklist): the header self-titles from the latest call's own label
+  // (tgUpdate). A group holding only planning/bookkeeping hides via .tg-empty.
   const title = tgActiveTitle(st.todos);
   const untitled = !title;
   if (st.group && (st.group.classList.contains('tg-untitled') !== untitled

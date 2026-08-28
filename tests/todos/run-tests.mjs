@@ -43,8 +43,9 @@ const parts = [
   extractFrom(workerSrc, 'async function tool_write_todos({ todos }, ctx) {'),
 ].join('\n');
 
-const factory = new Function(parts + '\nreturn tool_write_todos;');
-const tool_write_todos = factory();
+const parts2 = parts + '\n' + extractFrom(workerSrc, 'async function tool_write_todos_claude({ todos }, ctx) {');
+const factory = new Function(parts2 + '\nreturn { v2: tool_write_todos, claude: tool_write_todos_claude };');
+const { v2: tool_write_todos, claude: tool_write_todos_claude } = factory();
 
 let pass = 0, fail = 0;
 function check(name, cond, detail) {
@@ -202,6 +203,24 @@ const statuses = ctx => live(ctx).map(t => t.status).join(',');
   const ratio = (full.length / delta.length).toFixed(1);
   console.log('  info full-list args ' + full.length + ' chars vs delta ' + delta.length + ' chars = ' + ratio + 'x fewer output chars per status flip');
   check('delta is >=8x cheaper on this real list', full.length / delta.length >= 8);
+}
+
+// ── 10. Claude-mode clone (DEFAULT): blind full replace, verbatim ack ───────
+{
+  console.log('claude clone (default mode)');
+  const ctx = {};
+  const r1 = await tool_write_todos_claude({ todos: [
+    { content: 'First', status: 'in_progress', activeForm: 'Doing first' },
+    { content: 'Second', status: 'pending', activeForm: 'Doing second' },
+  ] }, ctx);
+  check('two tasks, positional ids', ctx._todoTree.length === 2 && ctx._todoTree[0].id === '1');
+  check('verbatim Claude ack', /Todos have been modified successfully/.test(r1.result));
+  check('todos: payload for the page', /^todos:\[/.test(r1.result));
+  // blind replace: the model's list IS the state — omissions and rewords included
+  await tool_write_todos_claude({ todos: [{ content: 'Second reworded', status: 'completed', activeForm: 'Done' }] }, ctx);
+  check('blind replace honored (1 task, completed)', ctx._todoTree.length === 1 && ctx._todoTree[0].status === 'completed');
+  const r3 = await tool_write_todos_claude({ todos: 'nope' }, ctx);
+  check('non-array rejected', /Error/.test(r3.result));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
