@@ -3334,15 +3334,89 @@ function appendToolResult(tcId, result, scopeEl) {
    (stands in for conv.localize until detection is wired). Fail-OPEN (show the
    English on any error). Uses the internal localizer model from models.json. ── */
 const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
-const _localizeCache = new Map();   // 'code::text' -> translated
+const _localizeCache = new Map();   // 'code::text' -> translated (in-memory, this page)
+// ---- Persistent display-cache (OPFS 'localize-cache/<code>.json') ----
+// English is canonical and localization is re-applied on EVERY render, so without
+// this a reload re-runs Bergamot NMT over the whole visible transcript. Entries are
+// keyed by a text hash (not the full text) to keep the file small; on a warm cache
+// a conversation open never needs the Bergamot engine at all (its idle prefetch
+// stays lazy). Display-only — never read back into the model's context.
+const _locStores = new Map();       // code -> { hash: translation }
+const _locStoreP = new Map();       // code -> one-time load promise
+const _locDirty = new Set();
+let _locFlushT = null;
+function _locHash(s) {              // 2x32-bit FNV-1a + length; collision = wrong display string, acceptable for a cache
+  let h1 = 0x811c9dc5, h2 = 0x811c9dc5 ^ 0x5bd1e995;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x85ebca6b) >>> 0;
+  }
+  return h1.toString(36) + '.' + h2.toString(36) + '.' + s.length;
+}
+function _locStoreLoad(code) {
+  if (!code || code === 'en') return Promise.resolve();
+  if (_locStoreP.has(code)) return _locStoreP.get(code);
+  const p = (async () => {
+    let obj = {};
+    try {
+      const root = await navigator.storage.getDirectory();
+      const dir = await root.getDirectoryHandle('localize-cache', { create: true });
+      const fh = await dir.getFileHandle(code + '.json');
+      const parsed = JSON.parse(await (await fh.getFile()).text());
+      if (parsed && typeof parsed === 'object') obj = parsed;
+    } catch (_) {}
+    _locStores.set(code, obj);
+  })();
+  _locStoreP.set(code, p);
+  return p;
+}
+// Sync lookup (call after _locStoreLoad resolves): in-memory first, then persistent.
+function _locGet(code, text) {
+  const key = code + '::' + text;
+  if (_localizeCache.has(key)) return _localizeCache.get(key);
+  const st = _locStores.get(code);
+  if (!st) return undefined;
+  const v = st[_locHash(text)];
+  if (typeof v === 'string') _localizeCache.set(key, v);
+  return v;
+}
+function _locPut(code, text, tr) {
+  _localizeCache.set(code + '::' + text, tr);
+  const st = _locStores.get(code);
+  if (st) { st[_locHash(text)] = tr; _locDirty.add(code); _locFlushSoon(); }
+}
+function _locFlushSoon() {
+  if (_locFlushT) return;
+  _locFlushT = setTimeout(async () => {
+    _locFlushT = null;
+    const codes = [..._locDirty]; _locDirty.clear();
+    for (const c of codes) {
+      try {
+        const st = _locStores.get(c); if (!st) continue;
+        // Cap the file: JSON objects keep insertion order, so dropping the earliest
+        // keys is oldest-first pruning.
+        const keys = Object.keys(st);
+        if (keys.length > 8000) for (const k of keys.slice(0, keys.length - 8000)) delete st[k];
+        const root = await navigator.storage.getDirectory();
+        const dir = await root.getDirectoryHandle('localize-cache', { create: true });
+        const fh = await dir.getFileHandle(c + '.json', { create: true });
+        const w = await fh.createWritable(); await w.write(JSON.stringify(st)); await w.close();
+      } catch (e) { console.warn('[localize] cache flush failed:', e && e.message || e); }
+    }
+  }, 2000);
+}
+// Debug/test handle (console): localization is module-scoped otherwise.
+if (typeof window !== 'undefined') window.__locCache = { localize: (...a) => localize(...a), load: (c) => _locStoreLoad(c), get: (c, t) => _locGet(c, t), stores: _locStores, mem: _localizeCache };
 async function localize(texts, to, toName) {
   if (!Array.isArray(texts) || !texts.length) return texts;
   const out = texts.slice();
   const miss = [], missIdx = [];
+  await _locStoreLoad(to);
   texts.forEach((t, i) => {
     if (typeof t !== 'string' || !t.trim()) return;
-    const key = to + '::' + t;
-    if (_localizeCache.has(key)) { out[i] = _localizeCache.get(key); return; }
+    const c = _locGet(to, t);
+    if (typeof c === 'string') { out[i] = c; return; }
     miss.push(t); missIdx.push(i);
   });
   if (!miss.length) return out;
@@ -3353,7 +3427,7 @@ async function localize(texts, to, toName) {
     if (typeof Bergamot === 'undefined') throw new Error('Bergamot unavailable');
     Bergamot.configure(_bergamotCfg());
     const tr = await Bergamot.translate(miss, to);
-    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string') { out[oi] = t; _localizeCache.set(to + '::' + texts[oi], t); } });
+    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string') { out[oi] = t; _locPut(to, texts[oi], t); } });
     return out;
   } catch (e) { console.warn('[localize] bergamot failed (showing English):', e && e.message || e); return texts; }
 }
@@ -3392,9 +3466,12 @@ async function renderUserText(text, loc) {
   // preserves markdown.
   if (typeof Bergamot !== 'undefined' && Bergamot.isStructured(text)) {
     try {
+      await _locStoreLoad(loc.code);
+      const c = _locGet(loc.code, text);
+      if (typeof c === 'string') return c;
       Bergamot.configure(_bergamotCfg());
       const r = await Bergamot.translateMarkdown(text, loc.code);
-      if (typeof r === 'string' && r) return r;
+      if (typeof r === 'string' && r) { _locPut(loc.code, text, r); return r; }
     } catch (_) {}
   }
   const [t] = await localize([text], loc.code, loc.name);
