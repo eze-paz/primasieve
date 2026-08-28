@@ -876,6 +876,29 @@ async function tool_write_todos({ todos }, ctx) {
   return _finish('New checklist', []);
 }
 
+// ── TODO-LAB (experiment, config.todoMode === 'claude'): faithful clone of
+// Claude Code's TodoWrite — BLIND full replace, no ids, no reconcile, no fuzzy
+// matching, and (in runAgent) no plan-first gate and no open-todos stop guard.
+// Purpose: measure whether a given model complies with the trust-based contract
+// (batch transitions, one in_progress, stop churning when done) before assuming
+// it needs the guarded v2 tool. State still lands on ctx._todoTree (ids
+// synthesized by position) so the page checklist renders unchanged.
+async function tool_write_todos_claude({ todos }, ctx) {
+  if (!Array.isArray(todos)) return { result: 'Error: todos must be an array of {content, status, activeForm}.' };
+  const now = new Date().toISOString();
+  const tree = todos.map((t, i) => ({
+    id: String(i + 1),
+    content: t && typeof t.content === 'string' ? t.content.trim() : '',
+    status: _TODO_ALL.includes(t && t.status) ? t.status : 'pending',
+    activeForm: (t && typeof t.activeForm === 'string' && t.activeForm.trim()) ? t.activeForm.trim() : undefined,
+    created: now,
+    completed: (t && t.status === 'completed') ? now : undefined,
+  })).filter(t => t.content);
+  if (ctx) { ctx._todoTree = tree; ctx._todos = _todoFlat(tree); }
+  // Verbatim Claude Code TodoWrite acknowledgement.
+  return { result: 'todos:' + JSON.stringify(tree) + '\nTodos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable' };
+}
+
 // — Scratchpad (hidden working memory) —————————————————————————————————
 // Free-form text the model writes as its externalized brain: plan hypotheses,
 // blockers, next steps, state that must survive compaction. Overwrite-whole,
@@ -2181,7 +2204,7 @@ async function runTool(name, args, ctx) {
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'delete_file':   return tool_delete_file(args, ctx);
-    case 'write_todos':   return tool_write_todos(args, ctx);
+    case 'write_todos':   return (ctx && ctx._todoMode === 'claude') ? tool_write_todos_claude(args, ctx) : tool_write_todos(args, ctx);
     case 'scratch':       return tool_scratch(args, ctx);
     case 'spawn_subagent': return tool_spawn_subagent(args, ctx);
     case 'remember':      return tool_remember(args, ctx);
@@ -3180,7 +3203,10 @@ async function runAgent(config, ctx) {
   // in_progress task, so the next tool is blocked until a fresh plan starts one.
   // Subagents whose toolset lacks write_todos are unaffected. Surfaces the active
   // item to the user before any work happens.
-  const _planForced = Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'write_todos');
+  // TODO-LAB: 'claude' mode = trust-based TodoWrite clone — no plan-first gate,
+  // no open-todos stop guard (see tool_write_todos_claude).
+  ctx._todoMode = config.todoMode || '';
+  const _planForced = ctx._todoMode !== 'claude' && Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'write_todos');
   const _hasActiveTask = () => Array.isArray(ctx._todos) && ctx._todos.some(t => t && t.status === 'in_progress');
   // "Open" = pending or in_progress. completed AND deleted are both closed.
   const openTodos = () => ctx._todos.filter(t => _TODO_OPEN.has(t.status));
@@ -3510,7 +3536,7 @@ async function runAgent(config, ctx) {
       // Exception: once a reply was delivered (respond() or the synth fallback) the
       // turn is answered — never re-prompt for open todos, that would resume work
       // AFTER the user already got their conclusion (exactly the churn we prevent).
-      if (!ctx.signal?.aborted && !ctx._responded && hasOpenTodos()) {
+      if (!ctx.signal?.aborted && !ctx._responded && hasOpenTodos() && ctx._todoMode !== 'claude') {
         if (ctx._stopBlocks < MAX_STOP_BLOCKS) {
           ctx._stopBlocks++;
           setReminder('stop-block',

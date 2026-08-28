@@ -2654,6 +2654,79 @@ async function resolveFilePart(f) {
   }
   return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
+// TODO-LAB (window.__todoLab): swap the write_todos definition for a faithful
+// clone of Claude Code's TodoWrite — same name so dispatch/grammar are
+// untouched; the worker pairs it with the blind-replace tool implementation
+// and drops the plan-first gate + open-todos stop guard (config.todoMode).
+function _todoLabTools(defs) {
+  return (defs || []).map(d => {
+    if (!d || !d.function || d.function.name !== 'write_todos') return d;
+    return { ...d, function: { ...d.function,
+      description: `Use this tool to create and manage a structured task list for your current session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
+It also helps the user understand the progress of the task and overall progress of their requests.
+
+## When to Use This Tool
+Use this tool proactively in these scenarios:
+1. Complex multi-step tasks - When a task requires 3 or more distinct steps or actions
+2. Non-trivial and complex tasks - Tasks that require careful planning or multiple operations
+3. User explicitly requests todo list - When the user directly asks you to use the todo list
+4. User provides multiple tasks - When users provide a list of things to be done
+5. After receiving new instructions - Immediately capture user requirements as todos
+6. When you start working on a task - Mark it as in_progress BEFORE beginning work. Ideally you should only have one todo as in_progress at a time
+7. After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation
+
+## When NOT to Use This Tool
+Skip using this tool when:
+1. There is only a single, straightforward task
+2. The task is trivial and tracking it provides no organizational benefit
+3. The task can be completed in less than 3 trivial steps
+4. The task is purely conversational or informational
+
+## Task States and Management
+1. Task States: Use these states to track progress:
+   - pending: Task not yet started
+   - in_progress: Currently working on (limit to ONE task at a time)
+   - completed: Task finished successfully
+2. Task Management:
+   - Update task status in real-time as you work
+   - Mark tasks complete IMMEDIATELY after finishing (don't batch completions)
+   - Only have ONE task in_progress at any time
+   - Complete current tasks before starting new ones
+3. Task Completion Requirements:
+   - ONLY mark a task as completed when you have FULLY accomplished it
+   - If you encounter errors, blockers, or cannot finish, keep the task as in_progress
+   - Never mark a task as completed if tests are failing or implementation is partial
+4. Task Breakdown:
+   - Create specific, actionable items
+   - Break complex tasks into smaller, manageable steps
+   - Use clear, descriptive task names
+   - Each task needs both "content" (imperative form, e.g. "Run tests") and "activeForm" (present continuous, e.g. "Running tests")
+
+You send the FULL updated list on every call — it replaces the previous list.
+LANGUAGE: author every "content"/"activeForm" in ENGLISH — the system automatically translates the checklist into the user's language for display.
+When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            description: 'The updated todo list (replaces the previous list entirely).',
+            items: {
+              type: 'object',
+              properties: {
+                content:    { type: 'string', description: 'The task, in imperative form (e.g. "Run tests").' },
+                status:     { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Task state. Only ONE task may be in_progress at a time.' },
+                activeForm: { type: 'string', description: 'Present continuous form shown while in progress (e.g. "Running tests").' },
+              },
+              required: ['content', 'status', 'activeForm'],
+            },
+          },
+        },
+        required: ['todos'],
+      },
+    } };
+  });
+}
 async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   // Non-destructive compaction: send [summary, …in-context tail] in place of the
   // full history so the model's context stays bounded. The full convMessages
@@ -2751,7 +2824,11 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     model: (effective && effective.model) || $('model').value,
     systemPrompt: await buildSystemPrompt(convMessages, _loc),
     messages: resolvedMessages,
-    tools: toolDefs(),
+    tools: (typeof window !== 'undefined' && window.__todoLab) ? _todoLabTools(toolDefs()) : toolDefs(),
+    // TODO-LAB experiment flag: window.__todoLab = 1 swaps write_todos for a
+    // faithful clone of Claude Code's TodoWrite (blind full replace, no gates)
+    // to measure model compliance with the trust-based contract. Console-only.
+    todoMode: (typeof window !== 'undefined' && window.__todoLab) ? 'claude' : '',
     // Rerouted to the vision fallback for this turn (user attached an image to a
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
