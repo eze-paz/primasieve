@@ -2165,7 +2165,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=145');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=146');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
@@ -2206,6 +2206,20 @@ function getSandpieWorker() {
     if (msg.type === 'sandpie-worker-log') {
       const fn = console[msg.level] || console.log;
       fn.call(console, '[worker]', msg.text);
+      return;
+    }
+    if (msg.type === 'artifact-localizing') {
+      // Deliverable localization runs off-turn (worker _lxQueue): the artifact
+      // card shows English first, so surface a "translating…" badge until the
+      // translated file swaps in. Label localized to the user's language (cheap:
+      // one short cached string); fail-open to English.
+      const relay = (label) => {
+        try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('artifact:localizing', { path: msg.path, state: msg.state, label }); } catch (_) {}
+      };
+      const EN = 'Translating…';
+      const loc = _currentLocale();
+      if (msg.state === 'start' && loc && loc.code) renderUserText(EN, loc).then(relay).catch(() => relay(EN));
+      else relay(EN);
       return;
     }
     if (msg.type === 'forward-to-page') {

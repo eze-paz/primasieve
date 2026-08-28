@@ -186,6 +186,10 @@ function renderArtifact(host, path) {
   wrap.dataset.artifactPath = clean;
   wrap.dataset.artifactCreated = String(Date.now());
 
+  // Off-turn localization may have announced BEFORE this card existed (the
+  // worker posts 'start' alongside the tool result) — pick the badge up now.
+  _lxBadgeApply(header, _lxBadgeFor(clean));
+
   const btns = document.createElement('span');
   btns.style.cssText = 'display:flex;gap:5px;align-items:center;';
 
@@ -661,6 +665,43 @@ window.readArtifactConsole = readArtifactConsole;
 // the new bytes. Paths arrive already debounced (conversations.js — max 1 reload
 // per 5s per path, trailing edge). Only frames; V2 cards (panel-only / non-
 // renderable) are static thumbnails and skip.
+// ── Translating badge — deliverable localization runs off-turn, so the card
+// shows the English file first. While a path sits on the worker's localization
+// queue its card(s) carry a small "🌐 Translating…" badge in the header; the
+// 'done' event clears it (the translated file swap follows via artifact:changed).
+// _lxPending survives the start-event-before-card race: renderArtifact consults
+// it when a new card is built.
+const _lxPending = new Map();   // stripped path -> label
+function _lxStrip(p) {
+  const n = String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+  return n.startsWith('sandpie/') ? n.slice('sandpie/'.length) : n;
+}
+function _lxBadgeApply(header, label) {
+  if (!header) return;
+  let b = header.querySelector('.artifact-lx-badge');
+  if (label) {
+    if (!b) {
+      b = document.createElement('span');
+      b.className = 'artifact-lx-badge';
+      b.style.cssText = 'margin-left:8px;font:10px monospace;color:var(--sp-text-dim);font-style:italic;flex:1;';
+      const lbl = header.firstChild;
+      if (lbl && lbl.nextSibling) header.insertBefore(b, lbl.nextSibling); else header.appendChild(b);
+    }
+    b.textContent = '🌐 ' + label;
+  } else if (b) b.remove();
+}
+function _lxBadgeFor(path) { return _lxPending.get(_lxStrip(path)) || null; }
+if (typeof Sandpie !== 'undefined' && Sandpie.events) {
+  Sandpie.events.on('artifact:localizing', (ev) => {
+    if (!ev || !ev.path) return;
+    const key = _lxStrip(ev.path);
+    const label = ev.state === 'start' ? (ev.label || 'Translating…') : null;
+    if (label) _lxPending.set(key, label); else _lxPending.delete(key);
+    for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+      if (_lxStrip(wrap.dataset.artifactPath) === key) _lxBadgeApply(wrap.querySelector('.artifact-header'), label);
+    }
+  });
+}
 if (typeof Sandpie !== 'undefined' && Sandpie.events) {
   Sandpie.events.on('artifact:changed', (path) => {
     if (!path) return;

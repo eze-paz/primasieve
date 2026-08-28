@@ -1001,11 +1001,18 @@ async function _localizeArtifact(path, ctx, target) {
 // any error just leaves the English deliverable.
 let _lxQueue = Promise.resolve();
 function _localizeArtifactOffTurn(path, ctx, target) {
+  // Already translated (re-show)? Skip entirely — no badge flash, no queue slot.
+  // Same key _localizeArtifact uses for its own idempotency guard.
+  const lxKey = (target ? 'x:' + target.code : 'd:') + ':' + path;
+  if (ctx && ctx._localizedArtifacts && ctx._localizedArtifacts.has(lxKey)) return;
+  // Tell the page NOW (queued counts as "in progress" — the user sees the English
+  // version with a translating badge until the swap), and again when finished so
+  // the badge clears even when translation failed (fail-open English stays).
+  self.postMessage({ type: 'artifact-localizing', path, state: 'start' });
   _lxQueue = _lxQueue.then(async () => {
-    try {
-      await _localizeArtifact(path, ctx, target);
-      self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } });
-    } catch (_) {}
+    try { await _localizeArtifact(path, ctx, target); } catch (_) {}
+    try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } }); } catch (_) {}
+    self.postMessage({ type: 'artifact-localizing', path, state: 'done' });
   });
 }
 
