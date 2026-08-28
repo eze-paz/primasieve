@@ -1,0 +1,253 @@
+{
+ "generation": 3,
+ "pop": [
+  {
+   "genome": {
+    "d_model": 48,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": {
+    "fitness": 0.2351,
+    "auc": 0.4642,
+    "gen": 0.0981,
+    "params": 83530,
+    "per_task": {
+     "parity": [
+      0.628,
+      0.183
+     ],
+     "reverse": [
+      0.588,
+      0.032
+     ],
+     "modadd": [
+      0.176,
+      0.079
+     ]
+    }
+   }
+  },
+  {
+   "genome": {
+    "d_model": 64,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": {
+    "fitness": 0.2219,
+    "auc": 0.4606,
+    "gen": 0.0965,
+    "params": 135946,
+    "per_task": {
+     "parity": [
+      0.597,
+      0.197
+     ],
+     "reverse": [
+      0.605,
+      0.016
+     ],
+     "modadd": [
+      0.18,
+      0.076
+     ]
+    }
+   }
+  },
+  {
+   "genome": {
+    "d_model": 64,
+    "n_layers": 3,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "conv",
+    "ffn_ratio": 4,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 48,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 64,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "post"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 48,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 4,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 64,
+    "n_layers": 2,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 64,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 2,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 48,
+    "n_layers": 1,
+    "loops": 2,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 4,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  },
+  {
+   "genome": {
+    "d_model": 48,
+    "n_layers": 3,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "result": null
+  }
+ ],
+ "history": [
+  {
+   "gen": 0,
+   "best_fitness": 0.2106,
+   "best_gen_acc": 0.0993,
+   "best_genome": {
+    "d_model": 48,
+    "n_layers": 2,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 2,
+    "heads": 4,
+    "share_weights": 1,
+    "norm": "pre"
+   },
+   "mean_fitness": 0.1004,
+   "secs": 562.1
+  },
+  {
+   "gen": 1,
+   "best_fitness": 0.2219,
+   "best_gen_acc": 0.0965,
+   "best_genome": {
+    "d_model": 64,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "mean_fitness": 0.1726,
+   "secs": 323.5
+  },
+  {
+   "gen": 2,
+   "best_fitness": 0.2351,
+   "best_gen_acc": 0.0981,
+   "best_genome": {
+    "d_model": 48,
+    "n_layers": 1,
+    "loops": 4,
+    "inject_input": 0,
+    "loop_mod": 0,
+    "mixer": "both",
+    "ffn_ratio": 1,
+    "heads": 4,
+    "share_weights": 0,
+    "norm": "pre"
+   },
+   "mean_fitness": 0.1841,
+   "secs": 222.5
+  }
+ ],
+ "rng_seed": 965186802
+}
