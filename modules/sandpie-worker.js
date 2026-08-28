@@ -2632,12 +2632,26 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     const hermesParsed = parseHermesToolCalls(content);
     if (hermesParsed.toolCalls.length) { keptToolCalls = hermesParsed.toolCalls; content = hermesParsed.stripped; }
   }
+  // Truncation detection: when the provider cut the response at its output-token
+  // cap (finish_reason "length"), a tool call streamed mid-arguments arrives as
+  // unparseable JSON. normalizeToolArgs salvages it (usually to '{}'), which makes
+  // the failure invisible to the model — it sees "missing parameter" errors, blames
+  // its own call, and retries the identical oversized write forever (seen live:
+  // GLM via NPAW, 4000-token default cap, write_file loop). Record which calls
+  // were salvaged under a length-cut so the tool loop can report the REAL cause.
+  const truncatedIds = [];
   for (const tc of keptToolCalls) {
     if (!tc || !tc.function) continue;
     if (typeof tc.function.name === 'string') tc.function.name = scrubFramingTokens(tc.function.name).trim().replace(/^functions\./, '');
-    tc.function.arguments = normalizeToolArgs(tc.function.arguments);
+    const rawArgs = tc.function.arguments;
+    tc.function.arguments = normalizeToolArgs(rawArgs);
+    if (finishReason === 'length') {
+      let rawParses = false;
+      try { JSON.parse(rawArgs == null ? '' : String(rawArgs)); rawParses = true; } catch (_) {}
+      if (!rawParses) truncatedIds.push(tc.id);
+    }
   }
-  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText, finish_reason: finishReason };
+  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText, finish_reason: finishReason, truncated_tool_ids: truncatedIds };
 }
 
 // ============================================================
@@ -3650,6 +3664,27 @@ async function runAgent(config, ctx) {
     for (const tc of round.tool_calls) {
       if (ctx.signal && ctx.signal.aborted) break;
       if (!tc.function?.name) continue;
+      // Truncated-at-cap calls: the arguments never fully arrived — the provider cut
+      // the response at its output-token cap mid-JSON. Running the tool would produce
+      // a misleading "missing parameter" error the model blames on itself and retries
+      // verbatim, looping until interrupted. Name the real cause and demand a smaller
+      // output instead.
+      if (round.truncated_tool_ids && round.truncated_tool_ids.includes(tc.id)) {
+        const _capTok = round.usage && round.usage.completion_tokens ? round.usage.completion_tokens : null;
+        const trunc = 'CALL TRUNCATED: the arguments of this ' + tc.function.name + ' call were CUT OFF mid-stream — '
+          + 'the response hit the provider\'s output-token cap (finish_reason=length'
+          + (_capTok ? ', ' + _capTok + ' completion tokens' : '') + ') before the JSON finished. '
+          + 'What you wrote never arrived; the arguments shown in history ("{}" or partial) are a salvage artifact, not your mistake. '
+          + 'Do NOT retry the same call — it will be truncated at the same point again. '
+          + 'Produce LESS output per call: write a much shorter first version of the file, then grow it with follow-up edit_file calls '
+          + '(e.g. leave a <!-- MORE --> marker and replace it with the next chunk), or simplify the content itself.';
+        ctx.emit({ type: 'tool_started', tc });
+        ctx.emit({ type: 'tool_result', id: tc.id, result: trunc });
+        const tmsg = { role: 'tool', tool_call_id: tc.id, content: trunc };
+        messages.push(tmsg);
+        await emitAdded(tmsg);
+        continue;
+      }
       let parsedArgs = {}; try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
       // Plan-first gate fallback: normally the restricted tool list above means a
       // work tool can't even be called before planning, but a provider that ignores
