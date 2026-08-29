@@ -2634,7 +2634,7 @@ function parseWaliosBlobCalls(text) {
   return { toolCalls, stripped: stripped.trim() };
 }
 
-function scrubFramingTokens(s) { return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '') : s; }
+function scrubFramingTokens(s) { return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '').replace(/<｜[\s\S]*?｜>/g, '') : s; }
 
 function firstBalancedObject(s) {
   const start = s.indexOf('{'); if (start < 0) return null;
@@ -2690,6 +2690,36 @@ function parseHermesToolCalls(text) {
     }
   }
   const stripped = text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').replace(/<tool_call>/g, '').replace(/<\/tool_call>/g, '').trim();
+  return { toolCalls, stripped };
+}
+
+// Recovery parser for Anthropic-style function-call XML that some served models
+// (e.g. GLM / DeepSeek variants) emit as TEXT instead of structured tool_calls,
+// often wrapped in their own special tokens rendered with FULLWIDTH pipes, e.g.
+//   <｜DSML｜tool_calls><｜DSML｜invoke name="walios"><｜DSML｜parameter name="timeout">30</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool_calls>
+// Also matches the plain <function_calls><invoke>…</invoke> shape. Framing-agnostic:
+// keys on `invoke name="…"` / `parameter name="…"`, tolerating any wrapper token
+// (ASCII or fullwidth) around the tag names. An invoke with no parameters yields
+// {} so the call still fires (the empty-invoke leak seen live). Same class as
+// parseLeakedToolCalls / parseHermesToolCalls; only runs when no real tool_calls.
+function parseInvokeToolCalls(text) {
+  const toolCalls = [];
+  if (typeof text !== 'string' || !/\binvoke\s+name\s*=\s*"/i.test(text)) return { toolCalls, stripped: text };
+  const invokeRe = /<[^>]*?\binvoke\s+name\s*=\s*"([^"]+)"[^>]*>([\s\S]*?)<\s*\/[^>]*?\binvoke\b[^>]*>/gi;
+  const paramRe  = /<[^>]*?\bparameter\s+name\s*=\s*"([^"]+)"[^>]*>([\s\S]*?)<\s*\/[^>]*?\bparameter\b[^>]*>/gi;
+  const spans = [];
+  let m;
+  while ((m = invokeRe.exec(text)) !== null) {
+    const name = m[1], body = m[2] || '', args = {};
+    let p; paramRe.lastIndex = 0;
+    while ((p = paramRe.exec(body)) !== null) args[p[1]] = p[2].replace(/^\r?\n/, '').replace(/\r?\n$/, '');
+    toolCalls.push({ id: 'call_invoke_' + (++_toolCallSeq), type: 'function', function: { name: String(name), arguments: JSON.stringify(args) } });
+    spans.push([m.index, m.index + m[0].length]);
+  }
+  let stripped = text;
+  for (let i = spans.length - 1; i >= 0; i--) stripped = stripped.slice(0, spans[i][0]) + stripped.slice(spans[i][1]);
+  // Drop any leftover tool_calls / function_calls wrapper framing.
+  if (spans.length) stripped = stripped.replace(/<\s*\/?\s*[^>]*?(?:tool_calls|function_calls)\b[^>]*>/gi, '').trim();
   return { toolCalls, stripped };
 }
 
@@ -2828,6 +2858,13 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     let parsed = parseLeakedToolCalls(content);
     if (parsed.toolCalls.length) { keptToolCalls = parsed.toolCalls; content = parsed.stripped; }
     else if (!content.trim()) { parsed = parseLeakedToolCalls(reasoningText); if (parsed.toolCalls.length) keptToolCalls = parsed.toolCalls; }
+  }
+  if (!keptToolCalls.length) {
+    // Anthropic-style <invoke name="…"> XML leaked as text (DSML / fullwidth-pipe
+    // framing) — model-agnostic, so not gated on _hermesMode.
+    let inv = parseInvokeToolCalls(content);
+    if (inv.toolCalls.length) { keptToolCalls = inv.toolCalls; content = inv.stripped; }
+    else if (!content.trim()) { inv = parseInvokeToolCalls(reasoningText); if (inv.toolCalls.length) keptToolCalls = inv.toolCalls; }
   }
   if (!keptToolCalls.length && ctx._hermesMode) {
     const hermesParsed = parseHermesToolCalls(content);
