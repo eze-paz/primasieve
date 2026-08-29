@@ -2316,7 +2316,7 @@ function _waliosEnsure() {
 }
 async function tool_walios({ script, timeout }, ctx) {
   if (!script || !String(script).trim())
-    return { result: 'Error: "script" is required — emit it in BLOB form between <|walios|> and <|end_walios|> sentinels in your reply (raw text, no JSON escaping), not as a JSON parameter.' };
+    return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }

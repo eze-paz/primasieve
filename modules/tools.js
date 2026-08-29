@@ -404,21 +404,22 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
 
     walios: {
       description: `Run a shell script inside walios — the WALI wasm-OS (a real Linux userland: busybox ash + coreutils, python3, ssh, make — compiled to native wasm) hosted at /walios/. Headless: no terminal UI; you get stdout/stderr plus the exit code.
-BLOB FORM (REQUIRED for the script): do NOT pass the script as a JSON string. Emit it as RAW text between sentinels in your reply:
+Pass the script in the "script" argument (a normal string; multi-line is fine). For long or heavily-quoted scripts where JSON escaping is error-prone, you MAY instead OMIT "script" and put it in the raw blob form in your reply:
 <|walios|>
 echo hello
 uname -a
 <|end_walios|>
-The raw text between the sentinels IS the script — newlines, quotes and backslashes need no escaping. Optional per-call timeout: <|walios:90|> (seconds; default 120, max 300).
+Everything between the sentinels IS the script — no escaping needed. Either channel works; the blob form is just an escaping-free alternative. Optional per-call timeout on the blob opener: <|walios:90|> (seconds; default 120, max 300).
 ENVIRONMENT: busybox ash (full coreutils), persistent home at /root (files written there survive across calls), real TCP/UDP via the WISP relay (wget, nc, ssh, ping), python3 (stdlib lazy-loads on first use).
 ⚠️ /root IS the app's OPFS workspace root (same namespace the file tools see) — rm there deletes REAL files. Use it deliberately.
 USE FOR: quick POSIX shell computation, text processing, tar/gzip/zip work, sandboxed shell logic. NOT a substitute for run_python (no numpy/pandas there) or the shell tool (that runs on the user's real machine — walios is an isolated in-browser OS).`,
       parameters: {
         type: 'object',
         properties: {
-          timeout: { type: 'number', description: 'Max seconds the run may take before it is terminated (default 120, max 300). Usually set via the <|walios:90|> sentinel variant instead.' },
+          script: { type: 'string', description: 'The shell script to run (busybox ash -c). Multi-line is fine. Omit ONLY when you are supplying the script via the <|walios|>…<|end_walios|> blob form in your reply instead.' },
+          timeout: { type: 'number', description: 'Max seconds the run may take before it is terminated (default 120, max 300). Can also be set via the <|walios:90|> blob opener.' },
         },
-        required: [],
+        required: ['script'],
       },
     },
 
