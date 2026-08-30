@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Small model + system</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1a2230;--mut:#5f6b7a;--line:#e2e6ec;--good:#0b8a4b;--good-bg:#e7f6ee;--bad:#b23b3b;--bad-bg:#fbeaea;--acc:#2563c9;--acc-bg:#e8f0fc}
+@media(prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#171e28;--ink:#dbe3ec;--mut:#8b97a6;--line:#26303c;--good:#4fce8b;--good-bg:#123024;--bad:#e58a8a;--bad-bg:#331a1a;--acc:#5b9bf0;--acc-bg:#132135}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:2rem 1rem}
+main{max-width:720px;margin:0 auto}h1{font-size:1.5rem;margin:0 0 .3rem}p.sub{color:var(--mut);margin:0 0 1.4rem}
+.row{display:flex;gap:.5rem}input{flex:1;padding:.7rem .9rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:1rem}
+button{padding:.7rem 1.1rem;border:0;border-radius:8px;background:var(--acc);color:#fff;font-weight:600;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.7rem 0 1.4rem}.chip{font-size:.82rem;padding:.3rem .6rem;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--mut);cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1rem}
+.q{font-weight:600;margin-bottom:.7rem}
+.lane{display:flex;gap:.7rem;padding:.6rem 0;border-top:1px dashed var(--line)}
+.tag{flex:none;font-size:.72rem;font-weight:700;letter-spacing:.03em;padding:.15rem .45rem;border-radius:5px;height:fit-content;white-space:nowrap}
+.bare{background:var(--bad-bg);color:var(--bad)}.sys{background:var(--good-bg);color:var(--good)}
+.badge{display:inline-block;font-size:.7rem;font-weight:700;background:var(--acc-bg);color:var(--acc);padding:.1rem .4rem;border-radius:5px;margin-right:.4rem}
+.foot{color:var(--mut);font-size:.8rem;margin-top:1.5rem}
+</style></head><body><main>
+<h1>Small model + system</h1>
+<p class="sub">The same tiny model that can't answer "what's Bitcoin worth" answers it perfectly once it's wrapped in a system that knows to <b>fetch</b>, <b>compute</b>, or <b>refuse</b>. Live data: Coinbase.</p>
+<div class="row"><input id="q" placeholder="Ask a financial question…" autocomplete="off"><button onclick="ask()">Ask</button></div>
+<div class="chips" id="chips"></div>
+<div id="out"></div>
+<p class="foot">The "model alone" line is illustrative (no model runs in this page). The <b>system</b> line is real: it routes your question and fetches live from Coinbase. Prices move; predictions are refused on purpose.</p>
+</main>
+<script>
+const PAIR={bitcoin:'BTC',btc:'BTC',ethereum:'ETH',eth:'ETH',ether:'ETH',solana:'SOL',sol:'SOL',dogecoin:'DOGE',doge:'DOGE',cardano:'ADA',ada:'ADA',xrp:'XRP',ripple:'XRP',litecoin:'LTC',ltc:'LTC',euro:'EUR',eur:'EUR',pound:'GBP',sterling:'GBP',gbp:'GBP',yen:'JPY',jpy:'JPY'};
+const GLOSS={cryptocurrency:"a digital currency secured by cryptography and recorded on a decentralized ledger (blockchain), with no central issuer.",bitcoin:"the first and largest cryptocurrency, created in 2009; a decentralized digital money with a fixed supply of 21 million coins.",ethereum:"a blockchain platform whose native coin is Ether (ETH); it runs 'smart contracts' — programs that execute automatically.","exchange rate":"how much of one currency you get for another — e.g. 1 EUR = 1.15 USD.","bull market":"a period when prices are rising and optimism is high."};
+const EX=["what is the price of bitcoin?","how much is 3 ethereum worth right now?","convert 1000 euros to dollars","will solana crash next week?","what is a cryptocurrency?"];
+const chips=document.getElementById('chips');EX.forEach(e=>{const c=document.createElement('span');c.className='chip';c.textContent=e;c.onclick=()=>{document.getElementById('q').value=e;ask()};chips.appendChild(c)});
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')ask()});
+
+function findAsset(ql){const keys=Object.keys(PAIR).sort((a,b)=>b.length-a.length);for(const k of keys){if(new RegExp('\\b'+k+'\\b').test(ql))return PAIR[k]}return null}
+async function spot(sym){const r=await fetch(`https://api.coinbase.com/v2/prices/${sym}-USD/spot`);if(!r.ok)throw 0;return parseFloat((await r.json()).data.amount)}
+
+async function route(q){
+  const ql=q.toLowerCase();
+  if(/\bwill\b|tomorrow|next (week|month|year)|predict|forecast|going to|future|crash/.test(ql))
+    return {tag:'REFUSE',txt:"I can't predict future prices — that isn't knowable. I won't guess."};
+  const a=findAsset(ql), price=/price|worth|trading|exchange rate|value|how much|how many|cost|rate|\$|convert/.test(ql);
+  if(a&&price){
+    let v; try{v=await spot(a)}catch(e){return {tag:'FETCH-FAILED',txt:"Couldn't reach live data (the browser may block the API from a local file — try serving the page)."}}
+    const mm=ql.match(/(\d[\d,]*\.?\d*)\s*(bitcoin|btc|ethereum|eth|euros?|eur|pounds?|gbp|solana|sol|dollars?|ada|xrp|doge)/);
+    if(mm){const qty=parseFloat(mm[1].replace(/,/g,''));return {tag:'FETCH + COMPUTE',txt:`${qty} × ${a} @ live ${v.toLocaleString()} USD = ${(v*qty).toLocaleString(undefined,{maximumFractionDigits:2})} USD`}}
+    return {tag:'FETCH',txt:`Live ${a} = ${v.toLocaleString(undefined,{maximumFractionDigits:4})} USD (Coinbase, just now)`};
+  }
+  if(/what is|what does|explain|define|mean/.test(ql)){
+    for(const k in GLOSS){if(ql.includes(k))return {tag:'ANSWER (no fetch)',txt:`${k[0].toUpperCase()+k.slice(1)} is ${GLOSS[k]}`}}
+    return {tag:'ANSWER (no fetch)',txt:"Your on-device model answers this from its own knowledge — no lookup needed."};
+  }
+  return {tag:'ANSWER (no fetch)',txt:"Your on-device model handles this directly."};
+}
+function bareLine(q){
+  const ql=q.toLowerCase();
+  if(/price|worth|trading|exchange rate|value|how much|convert|rate/.test(ql)&&findAsset(ql))
+    return "“I don't have real-time access to market prices…”  (or it invents a stale, wrong number)";
+  if(/\bwill\b|tomorrow|next (week|month|year)|predict|crash/.test(ql))
+    return "may confidently guess a direction or number it cannot possibly know";
+  return "answers from memory — fine here, since no live data is needed";
+}
+async function ask(){
+  const q=document.getElementById('q').value.trim(); if(!q)return;
+  const out=document.getElementById('out');
+  const card=document.createElement('div');card.className='card';
+  card.innerHTML=`<div class="q">${q}</div>
+    <div class="lane"><span class="tag bare">MODEL ALONE</span><div>${bareLine(q)}</div></div>
+    <div class="lane"><span class="tag sys">SMALL + SYSTEM</span><div id="sysline">…</div></div>`;
+  out.prepend(card);
+  const r=await route(q);
+  card.querySelector('#sysline').innerHTML=`<span class="badge">${r.tag}</span>${r.txt}`;
+}
+</script></body></html>
