@@ -80,6 +80,29 @@ per greedy generation (0.5B fp32). 15 steps = 77 s; 50 steps = 255 s.
 - **Per-request JIT-LoRA is a non-starter on CPU** (minutes for a skill it may
   still not nail). Reserve for GPU + cache-miss only, and cache the adapter.
 
+## Transplant-channel experiment (`distill.py`) — logits vs text
+Question: does distilling the teacher's LOGITS (context distillation, KL vs
+top-64) move knowledge into the student faster than distilling its TEXT (SFT)?
+Teacher = Qwen2.5-1.5B-Instruct WITH the lexmap table in context (verified
+competent; 0.83 on pool incl. one systematic slip). Student = 0.5B, bare
+prompt. Shared tokenizer → no vocab mapping. 3 seeds × 40 steps × 3 arms.
+
+Result: **no measurable channel advantage at this budget/task.**
+- test acc: a_text 0.13 = b_kl 0.13 > c_gold 0.08 (all within noise, n=8).
+- pool acc: b_kl ≥ a_text in every seed (0.38 vs 0.29 mean) — a weak,
+  consistent direction, not a claim. c_gold binds pool best (0.50): gold
+  labels are error-free, teacher text isn't (0.83).
+- Everything is undertrained at 40 steps (binding threshold ~40+, per lexdiag);
+  a definitive test needs longer runs — untested here (5-min cap).
+
+Why the fat pipe didn't pay HERE (the useful insight): the logit channel's
+extra bandwidth is the teacher's *distributional* belief. On a near-
+deterministic 12-entry bijection the teacher's belief is ~one-hot — the label
+already carries almost all the information, so KL degenerates to CE. **Logit
+distillation should win on tasks where the teacher's distribution is rich
+(style, ranking, soft judgments), not on lookup-table skills.** For crystal-
+type narrow deterministic skills, text-SFT from the teacher is enough.
+
 ## Verdict for the pipeline
 - **Head:** ridge (closed-form) as default; prototype as the cheaper near-tie.
   Skip logistic (slow, no gain) and kNN (fragile at low data — the JIT regime).
