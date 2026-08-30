@@ -11,3 +11,5 @@ sample_*.html
 moe_profiles.json
 moe_setup.log
 moe_profile.log
+loop_out/
+bon_out/
