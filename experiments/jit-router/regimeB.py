@@ -59,10 +59,30 @@ def gen_caesar(n, seed):
         out.append((s, _caesar(s, 1)))
     return out
 
+# --- lexmap: arbitrary WORD->WORD substitution table (non-char, learnable) ---
+# The base has never seen this fixed arbitrary bijection, so it fails zero-shot.
+# It operates on whole words (tokenizer-friendly) so a LoRA CAN bind the table.
+# vocab (12) > few-shot budget (4) => ICL structurally cannot cover every entry,
+# but a LoRA trained on the full pool (which covers all 12) can. This isolates
+# "offline LoRA binds a missing-but-learnable skill" from the char-level wall.
+_LM_SRC = "north south east west gold iron oak pine wolf hawk moon star".split()
+_LM_TGT = "apple bread cloud dream eagle flame grape house input joker kite lemon".split()
+def _lexmap_table():
+    perm = _rng(9999).sample(range(len(_LM_TGT)), len(_LM_TGT))  # FIXED arbitrary map
+    return {s: _LM_TGT[perm[i]] for i, s in enumerate(_LM_SRC)}
+
+def gen_lexmap(n, seed):
+    tbl = _lexmap_table(); r = _rng(seed); out = []
+    for _ in range(n):
+        src = r.choices(_LM_SRC, k=r.randint(1, 2))
+        out.append((" ".join(src), " ".join(tbl[w] for w in src)))
+    return out
+
 TASKS = {
     "reverse": ("Reverse the letters of each word, keeping word order.", gen_reverse),
     "domain":  ("Output only the domain part of the email address.", gen_domain),
     "caesar":  ("Shift every lowercase letter forward by 1 in the alphabet (a->b, z->a).", gen_caesar),
+    "lexmap":  ("Replace each input word with its assigned code word using the fixed mapping.", gen_lexmap),
 }
 
 
