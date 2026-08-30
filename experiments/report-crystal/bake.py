@@ -94,10 +94,11 @@ if __name__ == "__main__":
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--eval-only", action="store_true")
     ap.add_argument("--n", type=int, default=3)
+    ap.add_argument("--max-new", type=int, default=300)
     a = ap.parse_args()
     if a.eval_only:
         tok, model = load(resume=True)
-        evaluate(tok, model, a.n)
+        evaluate(tok, model, a.n, max_new=a.max_new)
     else:
         tok, model = train(a.steps, a.resume)
-        evaluate(tok, model, a.n)
+        evaluate(tok, model, a.n, max_new=a.max_new)
