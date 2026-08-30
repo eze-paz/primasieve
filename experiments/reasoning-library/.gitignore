@@ -7,3 +7,7 @@ mockup_out/
 mockup_out2/
 sample_*.html
 *.log
+
+moe_profiles.json
+moe_setup.log
+moe_profile.log
