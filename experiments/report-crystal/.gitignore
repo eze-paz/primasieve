@@ -1,3 +1,6 @@
 *.out
+*.t0
 __pycache__/
 inputs.jsonl
+gold.jsonl
+crystal/
