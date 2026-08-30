@@ -40,6 +40,46 @@ represent XOR, so no per-task head recovers it. Capability lives in the
 feature space; the JIT head can only read out what the frozen encoder exposes.
 (Mirrors the extraction-wall / capability-not-localized results elsewhere.)
 
+## Regime A, real transformer encoder (`--encoder hf`, MiniLM-L6)
+- **The nonlinear ceiling is fundamental, not a bag-of-words artifact.** MiniLM
+  (mean-pooled) *also* leaves `xor_signal` at chance (0.45–0.51). Swapping a
+  real encoder does NOT recover feature interactions the pooling discards.
+- **Routing jumps to near-perfect**: prototype/ridge router = **0.992** (vs 0.87
+  hashing) — real embeddings separate whole tasks cleanly.
+- Cost: **23.7 ms/example** vs hashing's 0.335 ms (~70x), still cheap absolute.
+- Ridge still best/tied; logistic still wasteful; kNN still weakest (0.76 router).
+- Takeaway: use the real encoder for the **router** (huge separability win,
+  70x encode cost is fine — one query); the head choice is unchanged.
+
+## Regime B — generative execution (`regimeB.py`), CPU
+Base = Qwen2.5-0.5B-Instruct (fp32, CPU). Deterministic string-transform tasks,
+exact-match scored. Methods: `zero`/`few` (no train), `jit_lora` (few steps),
+`lora_lib` (more steps, amortized). LoRA r=8 on q,v via peft.
+
+**Cost reality on CPU: JIT-LoRA is NOT near-zero.** ~5 s per LoRA step, ~10 s
+per greedy generation (0.5B fp32). 15 steps = 77 s; 50 steps = 255 s.
+
+**Result depends entirely on whether the task is inside the base's competence:**
+- `domain` (extract email domain): base solves it **zero- AND few-shot = 1.00**,
+  no training. Near-zero generative = **few-shot ICL**, done.
+- `reverse` / `caesar` (novel char-level transforms): base **fails** (0.00);
+  it reverses word order or copies. These need real weight training.
+- `reverse` under LoRA: 15 steps 0.00, 50 steps (255 s) still 0.00 — **but the
+  outputs prove it's learning the skill direction**: "time"→"emit",
+  "wat"→"ret", then garbles multi-word output. Char-level manipulation is
+  unstable in a subword model; cracking it needs far more than a near-zero
+  budget on CPU.
+
+**Regime B verdict:**
+- **Near-zero generative path = few-shot ICL with router-retrieved examples.**
+  Works for anything within the base's existing competence (extract, reformat,
+  classify-then-emit). Zero training, one forward pass.
+- **A precomputed LoRA library (train offline, hotswap) is the only near-zero
+  path for skills the base lacks** — but only if the skill is LoRA-learnable at
+  all (char-level tasks are marginal even offline).
+- **Per-request JIT-LoRA is a non-starter on CPU** (minutes for a skill it may
+  still not nail). Reserve for GPU + cache-miss only, and cache the adapter.
+
 ## Verdict for the pipeline
 - **Head:** ridge (closed-form) as default; prototype as the cheaper near-tie.
   Skip logistic (slow, no gain) and kNN (fragile at low data — the JIT regime).
