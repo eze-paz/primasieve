@@ -13,3 +13,7 @@ moe_setup.log
 moe_profile.log
 loop_out/
 bon_out/
+lora_r*/
+eval_r*/
+eval_full/
+rank_report.json

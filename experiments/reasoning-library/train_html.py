@@ -18,6 +18,8 @@ STEP_CAP = int(os.environ.get("HTML_STEPS", "0"))
 OUT    = os.environ.get("HTML_OUT", "lora_html")
 ACCUM  = 8
 LR     = 2e-4
+RANK   = int(os.environ.get("HTML_RANK", "16"))
+ALPHA  = int(os.environ.get("HTML_ALPHA", str(2*RANK)))  # keep scaling alpha/r = 2 constant
 SYS = ("You are an expert front-end engineer. Given a request, you output ONE complete, "
        "self-contained HTML5 document with all CSS inline in a <style> tag and a full <body>. "
        "Output only HTML, no markdown fences.")
@@ -60,7 +62,8 @@ def collate(batch):
 dl = DataLoader(data, batch_size=1, shuffle=True, collate_fn=collate)
 
 mdl = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.float32, trust_remote_code=True)
-lora = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, bias="none",
+print(f"LoRA rank={RANK} alpha={ALPHA}")
+lora = LoraConfig(r=RANK, lora_alpha=ALPHA, lora_dropout=0.05, bias="none",
                   task_type="CAUSAL_LM", target_modules="all-linear")
 mdl = get_peft_model(mdl, lora)
 mdl.print_trainable_parameters()
