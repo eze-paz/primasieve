@@ -20,21 +20,24 @@ ACCUM  = 8
 LR     = 2e-4
 RANK   = int(os.environ.get("HTML_RANK", "16"))
 ALPHA  = int(os.environ.get("HTML_ALPHA", str(2*RANK)))  # keep scaling alpha/r = 2 constant
-SYS = ("You are an expert front-end engineer. Given a request, you output ONE complete, "
+SYS = os.environ.get("HTML_SYS",
+      ("You are an expert front-end engineer. Given a request, you output ONE complete, "
        "self-contained HTML5 document with all CSS inline in a <style> tag and a full <body>. "
-       "Output only HTML, no markdown fences.")
+       "Output only HTML, no markdown fences."))
+FIELD = os.environ.get("HTML_FIELD", "html")
 
 tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
 if tok.pad_token is None: tok.pad_token = tok.eos_token
 
-rows = [json.loads(l) for l in open("html_data.jsonl", encoding="utf-8")]
+DATA = os.environ.get("HTML_DATA", "html_data.jsonl")
+rows = [json.loads(l) for l in open(DATA, encoding="utf-8")]
 random.shuffle(rows)
 if N: rows = rows[:N]
 
 def encode(r):
     full = tok.apply_chat_template(
         [{"role":"system","content":SYS},{"role":"user","content":r["instruction"]},
-         {"role":"assistant","content":r["html"]}], tokenize=False, add_generation_prompt=False)
+         {"role":"assistant","content":r[FIELD]}], tokenize=False, add_generation_prompt=False)
     prompt = tok.apply_chat_template(
         [{"role":"system","content":SYS},{"role":"user","content":r["instruction"]}],
         tokenize=False, add_generation_prompt=True)
