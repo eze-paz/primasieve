@@ -27,6 +27,8 @@ BATCH, STEPS, LR = 256, 1500, 3e-3
 MAXIT, TOL, PRUNE = 8, 0.15, 0.04
 DIM = int(sys.argv[1]) if len(sys.argv) > 1 else 128
 HIER = (sys.argv[2] if len(sys.argv) > 2 else "hier") == "hier"
+INIT = sys.argv[3] if len(sys.argv) > 3 else "near"      # near|rand : dictionary init
+CODES = sys.argv[4] if len(sys.argv) > 4 else "sup"      # sup|unsup : are training codes known?
 
 NODES = 2 * N
 if HIER:
@@ -57,21 +59,41 @@ def subtree_max(s):
 # --- params: shared feature map, per-node value regressor, learned dictionary ---
 W1 = torch.nn.Parameter(torch.randn(DIM, H) / math.sqrt(DIM)); b1 = torch.nn.Parameter(torch.zeros(H))
 Wg = torch.nn.Parameter(torch.zeros(H, NODES)); bg = torch.nn.Parameter(torch.zeros(NODES))
-Dp = torch.nn.Parameter(E.clone() + 0.01 * torch.randn(N, DIM))   # dictionary init near true E
+if INIT == "near":
+    Dp = torch.nn.Parameter(E.clone() + 0.01 * torch.randn(N, DIM))    # cheat: init near truth
+else:
+    Dp = torch.nn.Parameter(torch.randn(N, DIM) / math.sqrt(DIM))      # honest: learn from scratch
 opt = torch.optim.Adam([W1, b1, Wg, bg, Dp], lr=LR)
 
 for step in range(STEPS):
     s, x = sample(BATCH)
-    tv = subtree_max(s)                                   # regression target, all nodes
+    if CODES == "sup":
+        codes = s                                         # known which crystals fired (labeled data)
+    else:
+        # unsupervised: infer codes from current dictionary (matched filter + threshold), detached
+        with torch.no_grad():
+            corr = x @ Dp.detach().T                      # (bs, N)
+            top = corr.topk(K, dim=1)
+            codes = torch.zeros_like(s)
+            codes.scatter_(1, top.indices, top.values.clamp(min=0))
+    tv = subtree_max(s if CODES == "sup" else codes)
     phi = torch.relu(x @ W1 + b1)
-    pv = phi @ Wg + bg                                    # predicted node values
-    # train internal + leaf nodes (indices 1..2N-1)
+    pv = phi @ Wg + bg
     gate_loss = ((pv[:, 1:] - tv[:, 1:]) ** 2).mean()
-    recon = ((s @ Dp - x) ** 2).mean()                    # dictionary must explain input
+    recon = ((codes @ Dp - x) ** 2).mean()                # explain input via (known|inferred) codes
     (gate_loss + recon).backward()
     opt.step(); opt.zero_grad()
     if step % 400 == 0:
-        print(f"DIM={DIM} step {step}: gate={gate_loss.item():.4f} recon={recon.item():.5f}", flush=True)
+        print(f"DIM={DIM} init={INIT} codes={CODES} step {step}: gate={gate_loss.item():.4f} recon={recon.item():.5f}", flush=True)
+
+# dictionary-recovery diagnostic: does learned atom i align to TRUE concept i's direction?
+with torch.no_grad():
+    cos_slot = torch.nn.functional.cosine_similarity(Dp, E, dim=1)     # per-slot alignment to truth
+    # best-match cosine (recovery up to permutation): for each true atom, nearest learned atom
+    Dn = torch.nn.functional.normalize(Dp, dim=1); En = torch.nn.functional.normalize(E, dim=1)
+    bestmatch = (En @ Dn.T).max(1).values
+    print(f"DICT-RECOVERY  per-slot cos(D_i,E_i) mean={cos_slot.mean():.3f}  "
+          f"best-match cos mean={bestmatch.mean():.3f}")
 
 def gate_val(phi, nodes):        # predicted subtree value for given node indices (per-sample)
     return (phi * Wg[:, nodes].T).sum(1) + bg[nodes]
