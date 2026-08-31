@@ -21,3 +21,4 @@ pyhard_out/
 lora_py_*/
 reps_lfm.npy
 reps_qwen.npy
+reps_big.npz
