@@ -18,6 +18,7 @@
 window.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'sandpie-artifact-resize') return;
   for (const f of document.querySelectorAll('iframe.artifact-frame')) {
+    if (f.dataset.consoleOnly === '1') continue;   // hidden console frame — never resize
     if (f.contentWindow === e.source) {
       const maxH = window.innerHeight * 0.5;
       f.style.height = Math.min(Math.max(60, e.data.h | 0), maxH) + 'px';
@@ -74,6 +75,11 @@ const RENDERABLE_EXTS = new Set([
 // (opfs.openFile), where the lazy-loaded docx-preview / SheetJS / pptx-viewer run.
 const PANEL_ONLY_EXTS = new Set(['pptx', 'docx', 'xlsx', 'xls', 'ods']);
 
+// Visual deliverables the browser renders natively in a tab. These get the tall
+// preview card (faux-page thumb) AND the ↗ open-in-new-tab mini-button. Other
+// renderable-but-textual types (csv/json/txt) stay slim strips → side panel.
+const TAB_VIEWABLE_EXTS = new Set(['html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+
 // V2 "preview thumbnail" artifact card — the body for panel-only office files and
 // the collapsed representation of every artifact type: a faux-page preview banner
 // on top, a footer with a type-tinted icon, a human label, and the file size.
@@ -128,7 +134,15 @@ async function resolveArtifactPath(clean) {
   return clean;
 }
 
-function buildArtifactCard(clean, ext, onOpen) {
+// The V2 artifact card. opts:
+//   onOpen    — primary action (whole-card click / Enter / Space)
+//   onNewTab  — optional secondary action; renders a small ↗ button that does NOT
+//               trigger onOpen (stopPropagation). This is the ONLY inline control
+//               now — pin / share / download / collapse live in the side panel.
+//   showThumb — include the faux-page preview banner (the tall card). Omitted for
+//               the slim strip used by non-renderable files.
+function buildArtifactCard(clean, ext, opts) {
+  opts = opts || {};
   const kind = _ARTIFACT_KIND[ext] || 'generic';
   const label = _ARTIFACT_LABEL[ext] || (ext ? ext.toUpperCase() : 'File');
   const el = document.createElement('div');
@@ -136,14 +150,22 @@ function buildArtifactCard(clean, ext, onOpen) {
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
   el.title = 'Open ' + clean.split('/').pop();
-  el.innerHTML =
-    '<div class="ac-thumb"><div class="ac-page"><i class="t"></i><i class="m"></i><i class="s"></i><i class="m"></i><i class="s"></i></div></div>' +
+  const ntBtn = opts.onNewTab
+    ? '<button class="ac-newtab" title="Open in new tab" aria-label="Open in new tab" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg></button>'
+    : '';
+  const thumb = opts.showThumb
+    ? '<div class="ac-thumb"><div class="ac-page"><i class="t"></i><i class="m"></i><i class="s"></i><i class="m"></i><i class="s"></i></div>' +
+      '<span class="ac-lx" hidden></span>' + ntBtn + '</div>'
+    : '';
+  el.innerHTML = thumb +
     '<div class="ac-ft"><div class="ac-ic ac-t-' + kind + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + _ARTIFACT_ICON[kind] + '</svg></div>' +
-    '<span class="ac-sub"></span><span class="ac-go">›</span></div>';
+    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '<span class="ac-go">›</span></div>';
   el.querySelector('.ac-sub').textContent = label;
-  const open = (e) => { if (e) e.preventDefault(); onOpen(); };
+  const open = (e) => { if (e) e.preventDefault(); if (opts.onOpen) opts.onOpen(); };
   el.onclick = open;
   el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
+  const nt = el.querySelector('.ac-newtab');
+  if (nt && opts.onNewTab) nt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); opts.onNewTab(); };
   (async () => {
     try {
       const { parts, name } = splitPath(await resolveArtifactPath(clean));
@@ -157,10 +179,12 @@ function buildArtifactCard(clean, ext, onOpen) {
 }
 
 function renderArtifact(host, path, opts) {
-  // opts.collapsed: start as the V2 card only — the iframe is created but left
-  // frozen (never loaded), so a collapsed card costs nothing until expanded.
-  // Used by the touched-files surfacing (only .html/images auto-expand).
-  const _startCollapsed = !!(opts && opts.collapsed);
+  // V3 (2026-08): artifacts NEVER render an inline iframe in the conversation.
+  // Every artifact is a single clickable card; the whole card opens the SIDE
+  // PANEL (the rich view — pin / share / download / open-in-new-tab all live
+  // there), and a small ↗ on the card opens a new tab directly. This strips the
+  // old six-icon header bar (⊞ ↗ ⬇ − 📌 🔗) that made the stream feel loaded.
+  // (opts.collapsed is now a no-op — kept so old callers don't break.)
   const target = host || (_activeStream() && _activeStream().host) || _paneScrollEl(_$('messages'));
   const clean = path ? String(path).replace(/^\/+/, '') : '';
   // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
@@ -168,15 +192,7 @@ function renderArtifact(host, path, opts) {
 
   const wrap = document.createElement('div');
   wrap.className = 'artifact-wrap';
-  wrap.style.cssText = 'position:relative;margin-top:0.5rem;min-width:200px;min-height:250px;border:1px solid var(--sp-border);border-radius:4px;overflow:hidden;max-width:100%;';
-
-  const header = document.createElement('div');
-  header.className = 'artifact-header';
-  header.style.cssText = 'padding:2px 8px;font:11px monospace;color:var(--sp-text-dim);background:var(--sp-panel);border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;';
-
-  const label = document.createElement('span');
-  label.textContent = '📎 Artifact' + (clean ? ' — ' + clean.split('/').pop() : '');
-  header.appendChild(label);
+  wrap.style.cssText = 'position:relative;margin-top:0.5rem;border:1px solid var(--sp-border);border-radius:8px;overflow:hidden;max-width:100%;flex:none;align-self:stretch;';
 
   if (!target) {
     console.error('[artifact] renderArtifact: no target for path', path);
@@ -187,7 +203,6 @@ function renderArtifact(host, path, opts) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'padding:10px 12px;font:12px monospace;color:#f85149;';
     errEl.textContent = '⚠ Artifact error: no file path provided.';
-    wrap.appendChild(header);
     wrap.appendChild(errEl);
     _append(target, wrap);
     return;
@@ -195,157 +210,48 @@ function renderArtifact(host, path, opts) {
 
   const ext = clean.split('.').pop().toLowerCase();
   const renderable = RENDERABLE_EXTS.has(ext);
+  const viewable = TAB_VIEWABLE_EXTS.has(ext);      // browser can render it in a tab
+  const showThumb = viewable || PANEL_ONLY_EXTS.has(ext);   // tall preview card
 
   wrap.dataset.artifactPath = clean;
   wrap.dataset.artifactCreated = String(Date.now());
 
-  // Off-turn localization may have announced BEFORE this card existed (the
-  // worker posts 'start' alongside the tool result) — pick the badge up now.
-  _lxBadgeApply(header, _lxBadgeFor(clean));
-
-  const btns = document.createElement('span');
-  btns.style.cssText = 'display:flex;gap:5px;align-items:center;';
-
-  if (renderable) {
-    const panelBtn = document.createElement('button');
-    panelBtn.className = 'artifact-icon-btn artifact-panel-btn';
-    panelBtn.title = 'Open in side panel';
-    panelBtn.textContent = '⊞';
-    panelBtn.onclick = async () => { collapseArtifact(wrap); openArtifactPanel(await resolvedP); };
-    btns.appendChild(panelBtn);
-
-    const openLink = document.createElement('a');
-    openLink.href = '#';
-    openLink.target = '_blank';
-    openLink.title = 'Open in new tab';
-    openLink.textContent = '↗';
-    openLink.className = 'artifact-icon-btn';
-    // Point the anchor at the file's real /files/ URL (served out of OPFS by
-    // sw.js) as soon as the path resolves: a genuine href means the browser
-    // handles the click — middle-click, ctrl-click and "Copy link address" all
-    // work, and the new tab shows a readable URL instead of blob:…
-    Promise.resolve(resolvedP).then(rp => { if (rp) openLink.href = opfs.filesUrl(rp); });
-    openLink.onclick = async (e) => {
-      if (opfs.filesUrlReady() && openLink.href && !openLink.href.endsWith('#')) return;   // let the real link through
-      e.preventDefault();
-      try {
-        const url = await opfs.toUrl(await resolvedP);
-        window.open(url, '_blank');
-        // Revoke after a minute — enough for the new tab to finish loading.
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } catch (err) { console.error('[artifact] open in tab failed:', err); }
-    };
-    btns.appendChild(openLink);
-  }
-
-  const dlBtn = document.createElement('span');
-  dlBtn.title = 'Download';
-  dlBtn.textContent = '⬇';
-  dlBtn.className = 'artifact-icon-btn';
-  dlBtn.onclick = async () => {
-    try {
-      const p = await resolvedP;
-      const bytes = await opfs.readBytes(p);
-      const ext2 = p.split('.').pop().toLowerCase();
-      const mime = ({html:'text/html',htm:'text/html',svg:'image/svg+xml',png:'image/png',
-        jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',
-        csv:'text/csv',json:'application/json',txt:'text/plain'})[ext2] || 'application/octet-stream';
-      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-      const a = document.createElement('a');
-      a.href = url; a.download = clean.split('/').pop(); a.style.display = 'none';
-      document.body.appendChild(a); a.click();
-      requestAnimationFrame(() => { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
-    } catch (e) { console.error('[artifact] download failed:', e); }
+  const openNewTab = async () => {
+    try { await opfs.openInNewTab(await resolvedP); }
+    catch (e) { console.error('[artifact] open in tab failed:', e); }
   };
-  btns.appendChild(dlBtn);
+  // Renderable files (html/svg/image/office/csv/json/txt) open the SIDE PANEL — the
+  // rich view where pin/share/download/new-tab live. Everything else opens a new tab
+  // (the browser renders it if it can, otherwise downloads).
+  const openPanel = async () => openArtifactPanel(await resolvedP);
+  const onOpen = renderable ? openPanel : openNewTab;
+  // The ↗ mini-button (new tab) only makes sense for browser-viewable files.
+  const onNewTab = viewable ? openNewTab : null;
 
-  if (renderable) {
-    const collapseBtn = document.createElement('button');
-    collapseBtn.className = 'artifact-icon-btn artifact-collapse-btn';
-    collapseBtn.title = 'Collapse';
-    collapseBtn.textContent = '−';
-    collapseBtn.onclick = () => toggleArtifactCollapse(wrap);
-    btns.appendChild(collapseBtn);
-  }
-
-  const pinBtn = document.createElement('button');
-  pinBtn.className = 'artifact-icon-btn artifact-pin-btn';
-  pinBtn.textContent = '📌';
-  pinBtn.title = 'Pin file';
-  // Pin the RESOLVED path (legacy artifacts/ → sandpie/artifacts/), so the
-  // home-screen shortcut opens the file that actually exists on disk.
-  Promise.resolve(resolvedP).then(rp => { if (window.SandpiePins) SandpiePins.bindButton(pinBtn, rp || clean); });
-  btns.appendChild(pinBtn);
-
-  const shareBtn = document.createElement('button');
-  shareBtn.className = 'artifact-icon-btn artifact-share-btn';
-  shareBtn.textContent = '🔗';
-  shareBtn.title = 'Share';
-  shareBtn.onclick = async () => { if (window.SandpieSharing) SandpieSharing.shareDialog((await resolvedP) || clean, 'artifact'); };
-  btns.appendChild(shareBtn);
-
-  header.appendChild(btns);
-  wrap.appendChild(header);
-
-  // File type never blocks showing an artifact: types we can't preview inline
-  // still get the same clickable V2 card, which opens the file in a new tab (the
-  // browser renders it if it can, otherwise downloads) — a link is always useful.
-  if (!renderable) {
-    const cb = wrap.querySelector('.artifact-collapse-btn');
-    if (cb) cb.remove();
-    wrap.classList.add('artifact-compact');   // card-only: always the slim strip
-    wrap.appendChild(buildArtifactCard(clean, ext, async () => {
-      try { await opfs.openInNewTab(await resolvedP); }
-      catch (e) { console.error('[artifact] open failed:', e); }
-    }));
-    _append(target, wrap);
-    return;
-  }
-
-  // Office zips (pptx/docx/xlsx/…) can't render in a bare iframe — the V2 card is
-  // their whole body; clicking it opens the side-panel viewer. No inline body to
-  // collapse, so drop the collapse toggle (the ⊞ header button also opens it).
-  if (PANEL_ONLY_EXTS.has(ext)) {
-    const cb = wrap.querySelector('.artifact-collapse-btn');
-    if (cb) cb.remove();
-    wrap.classList.add('artifact-compact');   // card-only: always the slim strip
-    wrap.appendChild(buildArtifactCard(clean, ext, async () => openArtifactPanel(await resolvedP)));
-    _append(target, wrap);
-    return;
-  }
-
-  // Collapsed representation: the same V2 card (click to expand the inline view).
-  const metaRow = document.createElement('div');
-  metaRow.className = 'artifact-meta-row';
-  metaRow.style.display = 'none';
-  metaRow.appendChild(buildArtifactCard(clean, ext, () => toggleArtifactCollapse(wrap)));
-  wrap.appendChild(metaRow);
-
-  const frame = document.createElement('iframe');
-  frame.className = 'artifact-frame';
-  frame.style.cssText = 'width:100%;min-height:250px;border:0;background:transparent;display:block;';
-  wrap.appendChild(frame);
+  wrap.appendChild(buildArtifactCard(clean, ext, { onOpen, onNewTab, showThumb }));
+  if (!showThumb) wrap.classList.add('artifact-compact');   // slim strip for data/text/code
+  // Off-turn localization may have announced BEFORE this card existed (the worker
+  // posts 'start' alongside the tool result) — pick the badge up now.
+  _lxBadgeApply(wrap, _lxBadgeFor(clean));
   _append(target, wrap);
-  if (_startCollapsed) {
-    // Card-only start: mark the frame frozen WITHOUT ever loading it — expanding
-    // thaws it from OPFS (thawFrame resolves the path again). No renderer, no
-    // blob URL, no console instrumentation until the user asks for the preview.
-    frame.dataset.frozen = '1';
-    collapseArtifact(wrap);
-    observeArtifactVisibility(wrap);
-    return;
+
+  // HTML tooling needs a live frame that the conversation no longer shows: the
+  // html_console tool (readArtifactConsole) and the metacog console-note both read
+  // window.__sandpieConsole from a loaded frame. Keep ONE hidden, offscreen frame
+  // per HTML card — never visible, marked consoleOnly so the screenshot capture and
+  // resize handler skip it. The per-pane cap freezes older ones for memory.
+  if (ext === 'html' || ext === 'htm') {
+    const frame = document.createElement('iframe');
+    frame.className = 'artifact-frame';
+    frame.dataset.consoleOnly = '1';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;border:0;visibility:hidden;pointer-events:none;';
+    wrap.appendChild(frame);
+    armConsoleNoteCheck(wrap, frame, clean);
+    loadArtifactFrame(wrap, frame, resolvedP, clean);
+    enforceArtifactCap(artifactPane(wrap), wrap);
   }
-  // METACOG: if the NEWEST HTML artifact logs to the console, tell the worker
-  // so it can inject a metacog note for the model (newest artifact only — a
-  // superseded check is skipped by the seq guard).
-  armConsoleNoteCheck(wrap, frame, clean);
-  loadArtifactFrame(wrap, frame, resolvedP, clean);
-  // New artifact just rendered: enforce the per-pane open cap. When another
-  // expanded artifact lands (or replaying a long conversation), the OLDEST open
-  // artifact collapses to its V2 card so only the newest 3 stay unminimized.
-  enforceArtifactCap(artifactPane(wrap), wrap);
-  // Low-end devices: also freeze this frame while it's scrolled far off-screen.
-  observeArtifactVisibility(wrap);
 }
 
 // (Re)load an artifact's iframe from a fresh OPFS blob URL. Used both for the
@@ -509,17 +415,21 @@ function artifactPane(wrap) {
   return (wrap.closest && wrap.closest('#messagesSide')) ? 'side' : 'main';
 }
 
+// Wraps with a LIVE (non-frozen) .artifact-frame in this pane. These are the
+// hidden HTML console frames — the only frames the conversation creates now.
 function openArtifactFramesInPane(pane) {
-  return Array.from(document.querySelectorAll('.artifact-wrap')).filter(w =>
-    artifactPane(w) === pane &&
-    w.querySelector('.artifact-frame') &&
-    w.dataset.artifactCollapsed !== '1'
-  );
+  return Array.from(document.querySelectorAll('.artifact-wrap')).filter(w => {
+    if (artifactPane(w) !== pane) return false;
+    const f = w.querySelector('.artifact-frame');
+    return f && f.dataset.frozen !== '1';
+  });
 }
 
-// Enforce the cap for a pane. keepWrap (the artifact just rendered/expanded) is
-// never a victim — it stays open, and the oldest OTHER open artifacts collapse
-// until only MAX_OPEN_ARTIFACTS_PER_PANE remain. No-op when under the cap.
+// Enforce the cap for a pane. keepWrap (the artifact just rendered) is never a
+// victim; the oldest OTHER live frames are FROZEN (src→about:blank, blob revoked)
+// until only MAX_OPEN_ARTIFACTS_PER_PANE remain. Frozen frames self-heal: the
+// html_console tool reloads them on demand. Purely a memory lever — the visible
+// card is untouched. No-op when under the cap.
 function enforceArtifactCap(pane, keepWrap) {
   const open = openArtifactFramesInPane(pane);
   if (open.length <= MAX_OPEN_ARTIFACTS_PER_PANE) return;
@@ -529,7 +439,8 @@ function enforceArtifactCap(pane, keepWrap) {
   for (const wrap of ordered) {
     if (count <= MAX_OPEN_ARTIFACTS_PER_PANE) break;
     if (wrap === keepWrap) continue;
-    collapseArtifact(wrap);
+    const frame = wrap.querySelector('.artifact-frame');
+    if (frame) freezeFrame(frame);
     count--;
   }
 }
@@ -731,19 +642,14 @@ function _lxStrip(p) {
   const n = String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
   return n.startsWith('sandpie/') ? n.slice('sandpie/'.length) : n;
 }
-function _lxBadgeApply(header, label) {
-  if (!header) return;
-  let b = header.querySelector('.artifact-lx-badge');
-  if (label) {
-    if (!b) {
-      b = document.createElement('span');
-      b.className = 'artifact-lx-badge';
-      b.style.cssText = 'margin-left:8px;font:10px monospace;color:var(--sp-text-dim);font-style:italic;flex:1;';
-      const lbl = header.firstChild;
-      if (lbl && lbl.nextSibling) header.insertBefore(b, lbl.nextSibling); else header.appendChild(b);
-    }
-    b.textContent = '🌐 ' + label;
-  } else if (b) b.remove();
+// The "🌐 Translating…" badge now lives as an overlay on the card thumb (.ac-lx),
+// built hidden by buildArtifactCard. Toggle its text/visibility per wrap.
+function _lxBadgeApply(wrap, label) {
+  if (!wrap) return;
+  const b = wrap.querySelector('.ac-lx');
+  if (!b) return;
+  if (label) { b.textContent = '🌐 ' + label; b.hidden = false; }
+  else { b.textContent = ''; b.hidden = true; }
 }
 function _lxBadgeFor(path) { return _lxPending.get(_lxStrip(path)) || null; }
 if (typeof Sandpie !== 'undefined' && Sandpie.events) {
@@ -753,26 +659,22 @@ if (typeof Sandpie !== 'undefined' && Sandpie.events) {
     const label = ev.state === 'start' ? (ev.label || 'Translating…') : null;
     if (label) _lxPending.set(key, label); else _lxPending.delete(key);
     for (const wrap of document.querySelectorAll('.artifact-wrap')) {
-      if (_lxStrip(wrap.dataset.artifactPath) === key) _lxBadgeApply(wrap.querySelector('.artifact-header'), label);
+      if (_lxStrip(wrap.dataset.artifactPath) === key) _lxBadgeApply(wrap, label);
     }
   });
 }
-// Header-integrity self-heal (2026-08-28): a live report showed an expanded
-// artifact losing its .artifact-header after a later turn edited the same file
-// (not yet reproduced synthetically — every known code path preserves it).
-// Rather than leave a chrome-less frame, rebuild the card in place and log a
-// loud breadcrumb so the real trigger can be identified from the console.
+// Card-integrity self-heal: if a wrap ever loses its card body (historically the
+// missing-header bug after a same-file edit), rebuild it in place. Named
+// _artifactEnsureHeader for back-compat with conversations.js callers.
 function _artifactEnsureHeader(wrap) {
   try {
-    if (!wrap || !wrap.isConnected || wrap.querySelector(':scope > .artifact-header')) return;
+    if (!wrap || !wrap.isConnected || wrap.querySelector(':scope > .artifact-card-body')) return;
     const path = wrap.dataset.artifactPath;
-    console.warn('[artifact] header missing on "' + path + '" — rebuilding card. Please report what the turn was doing (breadcrumb for the missing-header bug).');
     const target = wrap.parentElement;
-    const collapsed = wrap.dataset.artifactCollapsed === '1';
     const next = wrap.nextSibling;
     wrap.remove();
     if (!path || !target) return;
-    renderArtifact(null, path, { collapsed });
+    renderArtifact(null, path);
     const fresh = [...document.querySelectorAll('.artifact-wrap')].reverse().find(w => w.dataset.artifactPath === path);
     if (fresh) target.insertBefore(fresh, next);
   } catch (_) {}

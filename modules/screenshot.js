@@ -473,6 +473,10 @@
       if (want && norm(wrap.dataset.artifactPath) !== want) continue;
       const frame = wrap.querySelector('.artifact-frame');
       if (!frame || !frame.contentWindow) continue;
+      // The conversation no longer shows inline frames — the only .artifact-frame
+      // is the hidden 1px console frame (consoleOnly). It has no real layout, so
+      // skip it and let capture() fall through to the deterministic offscreen render.
+      if (frame.dataset.consoleOnly === '1') continue;
       // A collapsed frame is display:none — no layout, nothing to serialise. Expand
       // for the duration, then put it back exactly as the user left it.
       const wasCollapsed = wrap.dataset.artifactCollapsed === '1';
