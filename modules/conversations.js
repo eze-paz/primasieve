@@ -832,17 +832,13 @@ function renderConversation(msgs, compaction, host = null) {
 // Conversation-wide dedupe: a re-touched file's old card is removed and the
 // fresh one lands at the bottom (most recently edited last).
 const FT_AUTO_EXPAND = new Set(['html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
-// Code/text files collapse into a single group card (renderCodeGroup); anything
-// not listed here renders as its own artifact card (HTML/images auto-expand,
-// office/docs stay collapsed). Keep in sync with _codeFileLabel below.
-const _FT_CODE_EXTS = new Set([
-  'py', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'json', 'jsonl',
-  'md', 'markdown', 'txt', 'csv', 'tsv', 'yaml', 'yml', 'toml', 'ini', 'cfg',
-  'sh', 'bash', 'zsh', 'ps1', 'bat',
-  'css', 'scss', 'less', 'xml',
-  'c', 'h', 'cpp', 'cc', 'hpp', 'rs', 'go', 'java', 'rb', 'php', 'lua', 'sql', 'r',
-]);
-// Human-readable label for a code/text extension in the group card's type line.
+// Files that stay as their own artifact card — the "interesting" deliverables:
+// HTML + images auto-expand inline, office/docs render as a collapsed card.
+// EVERYTHING ELSE (code, data, csv, json, logs, …) folds into ONE shared bundle
+// card (renderFileBundle), from the very first file — see _ftIndividual.
+const FT_OFFICE = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf']);
+const _ftIndividual = ext => FT_AUTO_EXPAND.has(ext) || FT_OFFICE.has(ext);
+// Human-readable label for a bundled file's extension in the bundle's type line.
 const _CODE_FILE_LABELS = {
   py: 'Python', js: 'JavaScript', mjs: 'JavaScript', cjs: 'JavaScript',
   ts: 'TypeScript', tsx: 'TypeScript', jsx: 'JavaScript',
@@ -871,19 +867,19 @@ function renderFilesTouched(host, files, opts) {
   const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
   if (!target) return;
   tgBreak(target);   // file cards end the current tool-group run
-  // Separate code/text files (grouped) from others (rendered individually).
-  // Code = extensions in _FT_CODE_EXTS; others = HTML/images (auto-expand) + office/docs (collapsed card).
-  const codeFiles = [];
-  const otherFiles = [];
+  // Individual cards = HTML / images / office (the deliverables). Everything else
+  // (code, data, csv, json, logs, …) folds into ONE shared bundle card.
+  const bundleFiles = [];
+  const individualFiles = [];
   for (const f of files) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
     const ext = clean.split('.').pop().toLowerCase();
-    if (_FT_CODE_EXTS.has(ext)) { codeFiles.push(f); }
-    else { otherFiles.push(f); }
+    if (_ftIndividual(ext)) { individualFiles.push(f); }
+    else { bundleFiles.push(f); }
   }
-  // Render non-code files (HTML/images + office/docs) individually
-  for (const f of otherFiles) {
+  // Render the individual deliverable cards (HTML/images expand, office collapses)
+  for (const f of individualFiles) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
     const olds = [...target.querySelectorAll('.artifact-wrap')].filter(old => {
@@ -898,85 +894,95 @@ function renderFilesTouched(host, files, opts) {
     const ext = clean.split('.').pop().toLowerCase();
     try { renderArtifact(target, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
   }
-  // Render code files as a single collapsible group
-  if (codeFiles.length) {
+  // Fold code + data + everything else into ONE shared bundle (from the 1st file).
+  // Rebuilt only on the final (non-partial) emit so it doesn't churn mid-turn.
+  if (bundleFiles.length) {
     if (partial) return;
-    const oldGroup = target.querySelector('.code-group');
+    const oldGroup = target.querySelector('.file-bundle');
     if (oldGroup) oldGroup.remove();
-    renderCodeGroup(target, codeFiles);
+    renderFileBundle(target, bundleFiles);
   }
 }
 
 
-// ── Code-file group card ────────────────────────────────────────────────────────────────
-// Collapses .py/.js/.md and other code/text files into a single expandable
-// card when a turn touches multiple code files. Keeps HTML/images and
-// office/docs as individual artifact cards (unchanged behavior).
-function renderCodeGroup(target, codeFiles) {
-  const count = codeFiles.length;
+// ── Shared file bundle card (Option C: stacked pile + count badge) ──────────────
+// Every touched file that ISN'T a standalone deliverable (HTML/images/office) —
+// i.e. all code + data + logs + everything else — folds into ONE collapsible
+// "N other files" pile, from the first file. Keeps the boring stuff out of the
+// transcript while one click reveals the full list (name · size · open).
+function renderFileBundle(target, bundleFiles) {
+  const count = bundleFiles.length;
   const extMap = {};
-  for (const f of codeFiles) {
+  for (const f of bundleFiles) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     const ext = clean.split('.').pop().toLowerCase();
     extMap[ext] = (extMap[ext] || 0) + 1;
   }
-  const typeLabel = Object.entries(extMap).map(([e, n]) => n + ' ' + _codeFileLabel(e)).join(' · ');
-  const totalSize = codeFiles.reduce((s, f) => s + ((f && f.size) || 0), 0);
-  const totalLabel = totalSize > 0
-    ? (totalSize < 1024 ? totalSize + ' B' : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB' : (totalSize / 1048576).toFixed(1) + ' MB')
-    : '';
+  // Distinct human type labels for the subtitle, most-common first, capped at 4.
+  const seen = new Set(); const distinct = [];
+  for (const [e] of Object.entries(extMap).sort((a, b) => b[1] - a[1])) {
+    const label = _codeFileLabel(e);
+    if (!seen.has(label)) { seen.add(label); distinct.push(label); }
+  }
+  const typeLabel = distinct.slice(0, 4).join(', ') + (distinct.length > 4 ? ', +' + (distinct.length - 4) + ' more' : '');
+  const badge = count > 99 ? '99+' : String(count);
 
   const wrap = document.createElement('div');
-  wrap.className = 'code-group';
-  wrap.dataset.codeGroup = '1';
+  wrap.className = 'file-bundle';
+  wrap.dataset.fileBundle = '1';
 
-  // Header / toggle
+  // Header / toggle — layered pile + count badge, title, size·types, Show all
   const header = document.createElement('div');
-  header.className = 'cg-header';
+  header.className = 'fb-head';
   header.innerHTML =
-    '<span class="cg-chevron"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-    '<span class="cg-stack"><span class="cg-stack-lines"><span></span><span></span><span></span></span></span>' +
-    '<span class="cg-label"><span class="cg-title">' + count + ' code file' + (count !== 1 ? 's' : '') + '</span>' +
-    '<span class="cg-types">' + (totalLabel ? '· ' + totalLabel : '') + '</span></span>' +
-    '<span class="cg-detail">' + typeLabel + '</span>';
+    '<span class="fb-pile"><b></b><b></b><b><span class="fb-num">' + badge + '</span></b></span>' +
+    '<span class="fb-body">' +
+      '<span class="fb-title"><b>' + count + ' other file' + (count !== 1 ? 's' : '') + '</b> created or edited</span>' +
+      '<span class="fb-sub"><span class="fb-size"></span>' + (typeLabel ? '<span class="fb-types">' + typeLabel + '</span>' : '') + '</span>' +
+    '</span>' +
+    '<span class="fb-cta"><span class="fb-lbl-show">Show all</span><span class="fb-lbl-hide">Hide</span>' +
+      '<span class="fb-chevron"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>';
   wrap.appendChild(header);
 
   // File list (hidden by default)
   const list = document.createElement('div');
-  list.className = 'cg-list';
+  list.className = 'fb-list';
   list.style.display = 'none';
 
-  for (const f of codeFiles) {
+  let totalBytes = 0, sizedCount = 0;
+  const sizeEl = header.querySelector('.fb-size');
+  for (const f of bundleFiles) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
     const ext = clean.split('.').pop().toLowerCase();
     const name = clean.split('/').pop();
-    const labelUC = ext.toUpperCase();
+    const labelUC = ext.toUpperCase().slice(0, 4);
 
     const row = document.createElement('div');
-    row.className = 'cg-row';
+    row.className = 'fb-row';
     row.dataset.artifactPath = clean;
     row.dataset.artifactCreated = String(f && f.ts ? f.ts : Date.now());
     row.innerHTML =
-      '<span class="cg-row-icon">' + labelUC + '</span>' +
-      '<span class="cg-row-name">' + name + '</span>' +
-      '<span class="cg-row-size"></span>' +
-      '<button class="cg-row-expand" title="Open">↗</button>';
+      '<span class="fb-row-icon">' + labelUC + '</span>' +
+      '<span class="fb-row-name">' + name + '</span>' +
+      '<span class="fb-row-size"></span>' +
+      '<button class="fb-row-expand" title="Open">↗</button>';
     list.appendChild(row);
 
-    // Fetch size asynchronously
+    // Fetch size asynchronously; accumulate into the header total as sizes land.
     (async () => {
       try {
         const { parts, name: fname } = splitPath(await resolveArtifactPath(clean));
         const dir = await opfs.resolveDir(parts);
         const file = await (await dir.getFileHandle(fname)).getFile();
-        const szEl = row.querySelector('.cg-row-size');
+        const szEl = row.querySelector('.fb-row-size');
         if (szEl && file.size > 0) szEl.textContent = formatArtifactBytes(file.size);
+        if (file.size > 0) { totalBytes += file.size; sizedCount++; if (sizeEl) sizeEl.textContent = formatArtifactBytes(totalBytes) + ' · '; }
       } catch (_) {}
     })();
 
     // Open in new tab
-    const expandBtn = row.querySelector('.cg-row-expand');
+    const expandBtn = row.querySelector('.fb-row-expand');
     expandBtn.onclick = async (e) => {
       e.stopPropagation();
       try {
@@ -997,7 +1003,7 @@ function renderCodeGroup(target, codeFiles) {
   header.onclick = () => {
     const open = list.style.display !== 'none';
     list.style.display = open ? 'none' : '';
-    wrap.classList.toggle('cg-open', !open);
+    wrap.classList.toggle('fb-open', !open);
   };
 
   _append(target, wrap);
