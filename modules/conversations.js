@@ -935,6 +935,8 @@ function reflectFileDeletes(paths) {
   if (!wants.size) return;
   const match = (p) => wants.has(norm(p));
   try { if (typeof window.removeArtifactByPath === 'function') window.removeArtifactByPath(paths); } catch (_) {}
+  // A deletion changed grid membership — recompute the +N overflow on any grid.
+  try { for (const g of document.querySelectorAll('.artifact-grid')) applyGridOverflow(g); } catch (_) {}
   try {
     for (const [cid, stream] of convStreams) {
       if (!stream) continue;
@@ -962,6 +964,39 @@ function _ftOpenGrid(target) {
   g.dataset.ftOpen = '1';
   appendContent(target, g);
   return g;
+}
+
+// Overflow cap: a turn that drops a flood of deliverables would otherwise fill the
+// transcript with cards. Show the first GRID_CAP and fold the rest behind a "+N"
+// tile in the next cell; clicking it expands (and offers "Show less"). State lives
+// on grid.dataset.expanded so re-renders/deletes preserve it. Re-run after any
+// change to a grid's membership.
+const GRID_CAP = 7;
+function applyGridOverflow(grid) {
+  if (!grid || !grid.isConnected) return;
+  const cards = [...grid.querySelectorAll(':scope > .artifact-wrap')];
+  let more = grid.querySelector(':scope > .ac-more');
+  const expanded = grid.dataset.expanded === '1';
+  const overflow = cards.length > GRID_CAP;
+  cards.forEach((c, i) => c.classList.toggle('ac-hidden', overflow && !expanded && i >= GRID_CAP));
+  if (!overflow) { if (more) more.remove(); return; }
+  if (!more) {
+    more = document.createElement('div');
+    more.className = 'ac-more';
+    more.tabIndex = 0;
+    more.setAttribute('role', 'button');
+    more.addEventListener('click', () => {
+      grid.dataset.expanded = grid.dataset.expanded === '1' ? '' : '1';
+      applyGridOverflow(grid);
+    });
+    more.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); more.click(); } });
+  }
+  grid.appendChild(more);   // always the last cell (after the visible cards)
+  const hidden = cards.length - GRID_CAP;
+  more.innerHTML = expanded
+    ? '<span class="ac-more-n">‹</span><span class="ac-more-lbl">Show less</span>'
+    : '<span class="ac-more-n">+' + hidden + '</span><span class="ac-more-lbl">more</span>';
+  more.title = expanded ? 'Show fewer' : hidden + ' more file' + (hidden !== 1 ? 's' : '');
 }
 function renderFilesTouched(host, files, opts) {
   if (!Array.isArray(files) || !files.length) return;
@@ -1003,6 +1038,7 @@ function renderFilesTouched(host, files, opts) {
   }
   if (!partial && grid) grid.removeAttribute('data-ft-open');
   if (grid && !grid.querySelector('.artifact-wrap')) grid.remove();
+  else if (grid) applyGridOverflow(grid);
   // Fold code + data + everything else into ONE shared bundle (from the 1st file).
   // Rebuilt only on the final (non-partial) emit so it doesn't churn mid-turn.
   if (bundleFiles.length) {

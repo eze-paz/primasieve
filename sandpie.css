@@ -1985,6 +1985,18 @@ ul.conv-list li.active {
      card fills the row (auto-fit collapses the empty tracks). */
   .artifact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 0.5rem; align-self: stretch; }
   .artifact-grid > .artifact-wrap { margin-top: 0 !important; min-width: 0; }
+  .artifact-grid > .artifact-wrap.ac-hidden { display: none !important; }
+  /* "+N more" overflow tile — folds a flood of cards behind one cell (GRID_CAP). */
+  .artifact-grid > .ac-more {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 140px; border: 1px dashed var(--sp-border-bright, #484f58); border-radius: 10px;
+    background: var(--sp-panel); color: var(--sp-text-dim); cursor: pointer;
+    transition: border-color 0.12s, color 0.12s, background 0.12s; outline: none;
+  }
+  .artifact-grid > .ac-more:hover { border-color: var(--sp-accent); color: var(--sp-accent); background: color-mix(in srgb, var(--sp-accent) 8%, transparent); }
+  .artifact-grid > .ac-more:focus-visible { box-shadow: 0 0 0 2px var(--sp-accent); }
+  .ac-more .ac-more-n { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 600; line-height: 1; }
+  .ac-more .ac-more-lbl { font: 11px 'JetBrains Mono', ui-monospace, monospace; }
   /* Shared file-bundle card (Option C): code + data + everything that isn't a
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
   /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,
