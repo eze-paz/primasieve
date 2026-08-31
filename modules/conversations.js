@@ -832,6 +832,32 @@ function renderConversation(msgs, compaction, host = null) {
 // Conversation-wide dedupe: a re-touched file's old card is removed and the
 // fresh one lands at the bottom (most recently edited last).
 const FT_AUTO_EXPAND = new Set(['html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+// Code/text files collapse into a single group card (renderCodeGroup); anything
+// not listed here renders as its own artifact card (HTML/images auto-expand,
+// office/docs stay collapsed). Keep in sync with _codeFileLabel below.
+const _FT_CODE_EXTS = new Set([
+  'py', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'json', 'jsonl',
+  'md', 'markdown', 'txt', 'csv', 'tsv', 'yaml', 'yml', 'toml', 'ini', 'cfg',
+  'sh', 'bash', 'zsh', 'ps1', 'bat',
+  'css', 'scss', 'less', 'xml',
+  'c', 'h', 'cpp', 'cc', 'hpp', 'rs', 'go', 'java', 'rb', 'php', 'lua', 'sql', 'r',
+]);
+// Human-readable label for a code/text extension in the group card's type line.
+const _CODE_FILE_LABELS = {
+  py: 'Python', js: 'JavaScript', mjs: 'JavaScript', cjs: 'JavaScript',
+  ts: 'TypeScript', tsx: 'TypeScript', jsx: 'JavaScript',
+  json: 'JSON', jsonl: 'JSONL', md: 'Markdown', markdown: 'Markdown',
+  txt: 'text', csv: 'CSV', tsv: 'TSV', yaml: 'YAML', yml: 'YAML',
+  toml: 'TOML', ini: 'INI', cfg: 'config', sh: 'shell', bash: 'shell',
+  zsh: 'shell', ps1: 'PowerShell', bat: 'batch', css: 'CSS', scss: 'SCSS',
+  less: 'LESS', xml: 'XML', c: 'C', h: 'C header', cpp: 'C++', cc: 'C++',
+  hpp: 'C++ header', rs: 'Rust', go: 'Go', java: 'Java', rb: 'Ruby',
+  php: 'PHP', lua: 'Lua', sql: 'SQL', r: 'R',
+};
+function _codeFileLabel(ext) {
+  const e = String(ext || '').toLowerCase();
+  return _CODE_FILE_LABELS[e] || (e ? e.toUpperCase() + ' file' : 'file');
+}
 function mergeFilesTouched(stream, files) {
   if (!stream || !Array.isArray(files) || !files.length) return [];
   const cur = new Map((stream.filesTouched || []).map(f => [f.path, f.ts || 0]));
