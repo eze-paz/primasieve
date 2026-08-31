@@ -3,11 +3,11 @@
 # Yes/No for answerable/unanswerable questions (the uncertainty capability, whose
 # READ crystal peaks at layer 8). Sweep the injection layer; if install accuracy
 # peaks near 8 (or just before), crystal-localization tells you where to inject.
-import torch, torch.nn as nn, torch.nn.functional as F
+import torch, torch.nn as nn, torch.nn.functional as F, sys
 from transformers import AutoTokenizer, AutoModelForCausalLM
 torch.set_num_threads(10); torch.manual_seed(0)
 
-MID = "LiquidAI/LFM2.5-350M"
+MID = sys.argv[1] if len(sys.argv) > 1 else "LiquidAI/LFM2.5-350M"
 tok = AutoTokenizer.from_pretrained(MID, trust_remote_code=True)
 if tok.pad_token is None: tok.pad_token = tok.eos_token
 model = AutoModelForCausalLM.from_pretrained(MID, dtype=torch.float32, trust_remote_code=True).eval()
@@ -69,7 +69,9 @@ def run_layer(j, steps=25):
 with torch.no_grad():
     sel = model(**te_enc).logits[torch.arange(len(te_p)), te_last]
     base = (sel[:, [no_id, yes_id]].argmax(1) == (te_y == yes_id).long()).float().mean().item()
-print(f"cold baseline acc = {base:.2f}  (uncertainty READ-crystal peaks at layer 8/16)")
+print(f"{MID}: cold baseline acc = {base:.2f}  (layers={nL}; LFM crystal~L8 broad, Qwen crystal~L27 sharp)")
 print("inject_layer  install_acc")
-for j in range(0, nL):
-    print(f"  {j:2d}          {run_layer(j):.2f}", flush=True)
+stride = 1 if nL <= 16 else 2
+sweep = sorted(set(list(range(0, nL, stride)) + [nL - 1, nL - 2, 3 * nL // 4]))
+for j in sweep:
+    print(f"  {j:2d}/{nL}        {run_layer(j, steps=20):.2f}", flush=True)
