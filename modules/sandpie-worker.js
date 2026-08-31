@@ -360,6 +360,13 @@ self.addEventListener('message', async (event) => {
   if (data.type === 'abort') {
     const ctl = _agentAborts.get(data.id);
     if (ctl) { try { ctl.abort(); } catch (_) {} }
+    // Unblock the one page round-trip that isn't itself abort-aware and takes no
+    // ctx: the lazy Dropbox-token wait (_ensureDbxCtx). A tool parked on it would
+    // otherwise stall until the setTimeout fires — and that timeout is throttled
+    // to ~1/min while the tab is hidden — before the loop could see the abort.
+    // Resolving false = "not connected", so the tool returns at once and the loop
+    // hits its signal check and stops.
+    if (_dbxTokenReq) { try { clearTimeout(_dbxTokenReq.timer); _dbxTokenReq.resolve(false); } catch (_) {} _dbxTokenReq = null; }
     return;
   }
 });
