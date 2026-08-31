@@ -2492,8 +2492,23 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=157');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=158');
   window._sandpieWorker = _sandpieWorker;
+
+  /* ---- Suspension labeling: forward page visibility to the worker. The worker's
+     per-turn heartbeat measures HOW LONG the turn was frozen; this tells it WHY —
+     hidden (tab backgrounded / Chrome froze it) vs a foreground stall. Both
+     visibilitychange and the Page-Lifecycle freeze/resume events feed one flag;
+     freeze always implies hidden, resume restores the true visibility state. ---- */
+  {
+    const postVis = (hidden) => {
+      try { _sandpieWorker.postMessage({ type: 'visibility', hidden: !!hidden }); } catch (_) {}
+    };
+    postVis(document.hidden);   // seed initial state
+    document.addEventListener('visibilitychange', () => postVis(document.hidden));
+    document.addEventListener('freeze', () => postVis(true));
+    document.addEventListener('resume', () => postVis(document.hidden));
+  }
 
   /* ---- Artifact auto-reload (rendered mode) — per-path trailing-edge debounce.
      Worker writes (edit_file / write_file / run_python / copy_to_workspace /

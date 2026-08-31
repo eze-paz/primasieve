@@ -151,6 +151,13 @@ function _metacogReminder(s, cfg) {
 const WORKER_VERSION = '2.22.0-sandbox-allowlist';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
+// Page-visibility mirror. The worker can't read `document`, so the page forwards
+// visibilitychange / Page-Lifecycle freeze into this flag. The per-turn heartbeat
+// (see runAgent → _prof) reads it to split a suspension gap into "hidden" (tab
+// backgrounded/frozen — the suspicion we're measuring) vs "visible" (foreground
+// stall: OS sleep, GC, heavy sync compute).
+let _pageHidden = false;
+
 // ---- message protocol entry point ------------------------------------------
 self.addEventListener('message', async (event) => {
   const data = event.data;
@@ -206,6 +213,14 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Page → worker visibility mirror. Fed by visibilitychange + Page-Lifecycle
+  // freeze/resume on the main thread; read by the per-turn heartbeat to label
+  // suspension gaps as hidden (backgrounded) vs visible.
+  if (data.type === 'visibility') {
+    _pageHidden = !!data.hidden;
+    return;
+  }
+
   if (data.type === 'agent') {
     const { id, config } = data;
     const abortCtl = new AbortController();
@@ -223,6 +238,9 @@ self.addEventListener('message', async (event) => {
     } finally {
       _agentAborts.delete(id);
       _agentSteers.delete(id);
+      // Heartbeat safety net: if runAgent threw before its own clearInterval, the
+      // suspension timer would otherwise keep ticking after the turn.
+      try { if (ctx._prof && ctx._prof._hbTimer) { clearInterval(ctx._prof._hbTimer); ctx._prof._hbTimer = 0; } } catch (_) {}
     }
     return;
   }
@@ -3543,8 +3561,35 @@ async function runAgent(config, ctx) {
     completionMs: 0, completionCalls: 0, compactionMs: 0,
     toolMs: 0, toolCalls: 0, tools: Object.create(null),
     wallStart: _profNow(),
+    // Suspension accounting (see heartbeat below). suspendMs = total wall time the
+    // turn was frozen; suspendHiddenMs = the slice of that while the tab was hidden.
+    suspendMs: 0, suspendHiddenMs: 0, suspendEvents: 0, suspendMaxMs: 0,
+    _hbTimer: 0,
   };
   ctx._prof = _prof;
+  // ---- Suspension heartbeat --------------------------------------------------
+  // performance.now()-based timers can't reliably see a suspended tab (the clock
+  // may pause or the whole context freezes), so suspension hides inside wall_ms.
+  // A plain wall-clock (Date.now) tick measures it directly: when the tab is
+  // throttled or frozen the interval can't fire on schedule, so the next callback
+  // observes a gap far larger than HB_MS — that overshoot IS the suspended time.
+  // Main loop only (subagents fold into the parent's tool time). Cleared before
+  // the timing emit below.
+  const HB_MS = 2000, HB_FLOOR = 1000;   // ignore <1s of ordinary timer jitter
+  if (!maxRounds) {
+    let _hbLast = Date.now();
+    _prof._hbTimer = setInterval(() => {
+      const now = Date.now();
+      const drift = now - _hbLast - HB_MS;
+      _hbLast = now;
+      if (drift > HB_FLOOR) {
+        _prof.suspendMs += drift;
+        _prof.suspendEvents++;
+        if (drift > _prof.suspendMaxMs) _prof.suspendMaxMs = drift;
+        if (_pageHidden) _prof.suspendHiddenMs += drift;
+      }
+    }, HB_MS);
+  }
   const _profTool = (name, ms, isErr) => {
     const t = _prof.tools[name] || (_prof.tools[name] = { ms: 0, calls: 0, errors: 0 });
     t.ms += ms; t.calls++; if (isErr) t.errors++;
@@ -4150,6 +4195,7 @@ async function runAgent(config, ctx) {
   }
   // Per-turn profiling report (main loop only — see the _prof note above). Wall
   // time that isn't completion/tool/compaction is loop overhead + any idle gaps.
+  if (_prof._hbTimer) { try { clearInterval(_prof._hbTimer); } catch (_) {} _prof._hbTimer = 0; }
   if (!maxRounds) {
     ctx.emit({ type: 'timing', timing: {
       session_id: ctx._sessionId || null,
@@ -4159,6 +4205,11 @@ async function runAgent(config, ctx) {
       tool_ms: Math.round(_prof.toolMs),
       tool_calls: _prof.toolCalls,
       wall_ms: Math.round(_profNow() - _prof.wallStart),
+      // Suspension: total frozen ms, the hidden-tab slice, event count, worst gap.
+      suspend_ms: Math.round(_prof.suspendMs),
+      suspend_hidden_ms: Math.round(_prof.suspendHiddenMs),
+      suspend_events: _prof.suspendEvents,
+      suspend_max_ms: Math.round(_prof.suspendMaxMs),
       rounds: _roundNo,
       tools: Object.fromEntries(Object.entries(_prof.tools).map(
         ([k, v]) => [k, { ms: Math.round(v.ms), calls: v.calls, errors: v.errors }])),
