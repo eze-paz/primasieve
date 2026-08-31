@@ -454,7 +454,7 @@
     color: var(--sp-text-dim); cursor: pointer; margin-top: 6px; font-style: normal;
     transition: color 0.1s, background 0.1s, border-color 0.1s;
   }
-  .msg > .act-copy.act-report svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .msg > .act-copy.act-report svg { width: 14px; height: 14px; fill: currentColor; }
   .msg > .act-copy.act-report:hover { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-border-bright); }
   .msg > .act-copy.act-report.done { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-accent); }
   .err { align-self: center; color: var(--sp-danger); font-style: italic; }
