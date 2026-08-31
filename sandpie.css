@@ -1941,7 +1941,9 @@ ul.conv-list li.active {
   .ac-t-generic { background: var(--sp-border); color: var(--sp-text-dim); }
   /* Shared file-bundle card (Option C): code + data + everything that isn't a
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
-  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; }
+  /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,
+     so without them this card gets squeezed to ~1px (same gotcha as .artifact-compact). */
+  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; flex: none; align-self: stretch; }
   .file-bundle .fb-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; user-select: none; transition: background 0.12s; }
   .file-bundle .fb-head:hover { background: color-mix(in srgb, var(--sp-accent) 6%, transparent); }
   /* Layered pile of file edges with a count badge on the top card */
