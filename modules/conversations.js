@@ -5762,35 +5762,48 @@ const NN_SVG_INLINE = '<svg viewBox="0 0 24 24" class="ripple"><circle cx="12" c
 
 let thoughtsVisible = false;
 function toggleThoughts() {
-  // The class flip makes every hidden .msg.think take real space. Most of those
-  // boxes sit ABOVE the current view, so the transcript grows upward — with
-  // overflow-anchor active the browser pins the viewport itself, but anchoring
-  // is OFF while a turn streams (.sp-streaming) and never exists in Safari.
+  // The class flip makes every hidden .msg.think take real space. Most boxes sit
+  // ABOVE the current view, so the transcript grows upward.
   //
-  // Two intents, one click:
-  //  - reading at the bottom (no active thinking) → STAY at the bottom, waiting
-  //    for the next turn; never jump up into the expanded boxes.
-  //  - reading history (scrolled up, or the pane is scroll-locked while a turn
-  //    streams) → pin the viewport exactly like native anchoring would.
-  // The correction is applied SYNCHRONOUSLY (same task, after the layout reads
-  // above force the pre-flip reflow) — a rAF would race the browser's own
-  // anchor pass and could land AFTER it, double-shifting the view.
-  const pins = [];
-  const follows = [];
+  // Anchoring is handled by ONE of two paths, chosen per pane:
+  //  - NATIVE: browsers with overflow-anchor support and a host not mid-stream
+  //    (.sp-streaming) let the BROWSER pin the viewport (measured 0px drift).
+  //    Any manual correction here DOUBLES the shift — trust it, touch nothing.
+  //  - MANUAL: Safari (no overflow-anchor) and streaming hosts (overflow-anchor:
+  //    none) get a synchronous pin of the first visible non-think message, PLUS
+  //    a settle window that re-applies the same deltas while async content
+  //    (artifact iframes, KaTeX, images) finishes growing — cancelled at the
+  //    instant the user scrolls.
+  // A host at the bottom (or scroll-locked while a turn streams) always STAYS at
+  // the bottom, waiting for the next turn.
+  const _nativeOK = (() => { try { return typeof CSS !== 'undefined' && CSS.supports('overflow-anchor', 'auto'); } catch (_) { return false; } })();
+  const atBottom = h => h.scrollHeight - h.scrollTop - h.clientHeight <= 2;
+  const pins = [];          // {host, anchor|null, anchorTop, scrollTop} — manual re-anchor
+  const follows = [];       // hosts that must stay at the bottom
   for (const pane of [$('#messages'), $('#messagesSide')]) {
     if (!pane) continue;
     const h = pane.querySelector(':scope > .conv-host');
-    if (!h) continue;
-    if (h.scrollHeight - h.scrollTop - h.clientHeight <= 2 || shouldAutoScroll(h)) {
-      follows.push(h);
-      continue;
-    }
+    if (!h || !h.isConnected || h.clientHeight === 0) continue;   // hidden pane: skip
+    let nativeHere = _nativeOK;
+    if (nativeHere) { try { nativeHere = getComputedStyle(h).overflowAnchor !== 'none'; } catch (_) {} }
+    if (nativeHere) continue;   // the browser already pins this host
+    if (atBottom(h) || shouldAutoScroll(h)) { follows.push(h); continue; }
     const hr = h.getBoundingClientRect();
+    let anchor = null, anchorTop = 0;
     for (const c of h.children) {
       if (c.classList && c.classList.contains('think')) continue;
       const r = c.getBoundingClientRect();
-      if (r.bottom > hr.top + 1 && r.top < hr.bottom - 1) { pins.push({ host: h, anchor: c, top: r.top }); break; }
+      if (r.bottom > hr.top + 1 && r.top < hr.bottom - 1) { anchor = c; anchorTop = r.top; break; }
     }
+    pins.push({ host: h, anchor, anchorTop, scrollTop: h.scrollTop });
+  }
+
+  // Turning thoughts ON re-opens every FINISHED box the user had expanded before
+  // hiding — their full old bodies would flash for a frame on this very event.
+  // Collapse them pre-flip (one click re-expands); the live box keeps its state.
+  // Measured BEFORE the flip so the deltas below also absorb the collapse shrink.
+  if (!thoughtsVisible) {
+    document.querySelectorAll('.msg.think[open].done').forEach(b => { b.open = false; });
   }
 
   thoughtsVisible = !thoughtsVisible;
@@ -5800,12 +5813,46 @@ function toggleThoughts() {
     el.title = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   });
 
-  // Synchronous re-anchor: exact even when native anchoring is off (Safari).
+  // Synchronous re-anchor in the SAME task (exact even without native anchoring).
+  let needSettle = false;
   for (const p of pins) {
-    const delta = p.anchor.getBoundingClientRect().top - p.top;
-    if (Math.abs(delta) > 0.5) p.host.scrollTop += delta;
+    if (p.anchor) {
+      const d = p.anchor.getBoundingClientRect().top - p.anchorTop;
+      if (Math.abs(d) > 0.5) { p.host.scrollTop += d; needSettle = true; }
+    } else {
+      p.host.scrollTop = p.scrollTop;   // nothing visible to anchor to — hold the offset
+      needSettle = true;
+    }
   }
-  for (const h of follows) h.scrollTop = h.scrollHeight;
+  for (const h of follows) if (!atBottom(h)) h.scrollTop = h.scrollHeight;
+
+  // Settle window: async layout (iframes/images/KaTeX) can keep growing the
+  // transcript AFTER the flip. Re-apply the same deltas until stable; cancel at
+  // the first USER scroll. Listeners attach after the writes above, so our own
+  // scrollTop changes don't cancel it.
+  if (needSettle || follows.length) {
+    let own = false, cancelled = false;
+    const cbs = [];
+    for (const h of [...pins.map(p => p.host), ...follows]) {
+      const f = () => { if (!own) cancelled = true; };
+      h.addEventListener('scroll', f, { passive: true });
+      cbs.push([h, f]);
+    }
+    const done = () => { for (const [h, f] of cbs) h.removeEventListener('scroll', f); };
+    const step = d => setTimeout(() => {
+      if (cancelled) { done(); return; }
+      own = true;
+      let still = false;
+      for (const p of pins) {
+        if (p.anchor) { const dd = p.anchor.getBoundingClientRect().top - p.anchorTop; if (Math.abs(dd) > 0.5) { p.host.scrollTop += dd; still = true; } }
+        else { p.host.scrollTop = p.scrollTop; still = true; }
+      }
+      for (const h of follows) if (!atBottom(h)) { h.scrollTop = h.scrollHeight; still = true; }
+      own = false;
+      if (still) step(Math.min(d * 2, 400)); else done();
+    }, d);
+    step(32);
+  }
 }
 
 /* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
