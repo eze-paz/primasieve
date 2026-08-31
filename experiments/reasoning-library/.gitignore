@@ -22,3 +22,6 @@ lora_py_*/
 reps_lfm.npy
 reps_qwen.npy
 reps_big.npz
+_experts/
+_experts.pack
+_disktest.bin
