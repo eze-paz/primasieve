@@ -3464,6 +3464,9 @@ function addReportAction(container, reason) {
 function reportTurnTiming(convId, timing, turnIndex) {
   try {
     if (!convId || !timing || typeof timing.wall_ms !== 'number') return;
+    // Stash the current session id so the always-on suspension monitor can label
+    // its gaps with the conversation they happened in (best-effort — last known).
+    if (timing.session_id) window.__sandpieActiveSessionId = timing.session_id;
     const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
     const body = {
       conversation_id: convId,
@@ -3498,6 +3501,50 @@ function reportTurnTiming(convId, timing, turnIndex) {
     }).catch(() => {});
   } catch (_) { /* analytics must never break the chat */ }
 }
+
+// ── Always-on browser-suspension monitor ────────────────────────────────────
+// The real problem with turn-scoped detection: a suspended tab's turn often
+// dies (stream lost) and its data with it, and the data only ships at turn end.
+// This runs from page load, independent of any turn: the MAIN thread's own timer
+// drift IS the suspension (background throttle, Chrome tab freeze, OS sleep), and
+// each gap is beaconed IMMEDIATELY so it survives a tab close. Mild background
+// throttling (timers clamped to ~1/s) stays under the 2s interval and does NOT
+// register — only genuine freezes/suspends produce >1s of drift. `hidden` records
+// whether the tab was backgrounded at any point across the gap (on resume the tab
+// is usually focused again, so document.hidden alone would miss it).
+// Validate from the DevTools console (freezes the main thread ~6s):
+//     { const e = Date.now() + 6000; while (Date.now() < e) {} }
+(function suspensionMonitor() {
+  try {
+    if (typeof window === 'undefined' || window.__sandpieSuspendMon) return;
+    window.__sandpieSuspendMon = true;
+    const HB = 2000, FLOOR = 1000;
+    let last = Date.now();
+    let sawHidden = (typeof document !== 'undefined') && document.hidden;
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => { if (document.hidden) sawHidden = true; });
+    }
+    setInterval(() => {
+      const now = Date.now();
+      const drift = now - last - HB;
+      const hiddenDuringGap = sawHidden || (typeof document !== 'undefined' && document.hidden);
+      last = now;
+      sawHidden = (typeof document !== 'undefined') && document.hidden;
+      if (drift <= FLOOR) return;
+      try {
+        const sid = (typeof window.__sandpieActiveSessionId === 'string') ? window.__sandpieActiveSessionId : null;
+        fetch(new URL('/api/usage/suspend', location.href).href, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gap_ms: Math.round(drift), hidden: !!hiddenDuringGap, session_id: sid }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch (_) {}
+    }, HB);
+    console.log('[sandpie] suspension monitor active (main-thread heartbeat, ' + HB + 'ms)');
+  } catch (_) {}
+})();
 
 async function readAgentEvents(body, onEvent) {
   const reader = body.getReader();
