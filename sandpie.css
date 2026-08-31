@@ -3440,8 +3440,6 @@ body.sp-decoding *::after {
 }
 .share-banner:hover { filter: brightness(1.06); }
 
-/* HIDE the write_todos checklist UI (display only) — logic untouched. 2026-08-27.
-   The checklist card inside each tool box and the progress badge in the timer
-   line are invisible to the user; the worker still builds/tracks the todos. */
-.tool-box .tool-todos { display: none !important; }
-.msg-timer .mt-todos { display: none !important; }
+/* write_todos renders as a normal tool again (2026-08-31): the checklist card
+   inside its tool box and the progress badge in the timer line are visible, like
+   any other tool's result. (Un-hidden — was display:none from 2026-08-27.) */

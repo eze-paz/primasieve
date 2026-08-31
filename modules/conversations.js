@@ -4697,11 +4697,12 @@ function buildToolBox(args, toolName) {
 // thinking box. Styled by .repl-loader / @keyframes repl-sweep in sandpie.css.
 const REPL_LOADER = (cls) => `<span class="repl-loader${cls ? ' ' + cls : ''}"><i>&gt;</i><i>&gt;</i><i>&gt;</i></span>`;
 
-// Planning (write_todos) never renders — inside a register OR loose (the
-// pre-plan call under the plan-first gate lands ungrouped). Marked at every
-// render phase so no path can miss it; hidden by .msg.tool-call.tc-plan.
+// write_todos renders as a normal tool call again (2026-08-31) — no longer
+// suppressed as a hidden "plan" bookkeeping row. Kept as a no-op that clears any
+// stale tc-plan class so existing callers (renderTcPreparing/Running/Done) are
+// undisturbed.
 function tcMarkPlan(div, fname) {
-  if (div && div.classList && fname) div.classList.toggle('tc-plan', fname === 'write_todos');
+  if (div && div.classList) div.classList.remove('tc-plan');
 }
 
 function renderTcPreparing(div, fname, args) {
@@ -4917,15 +4918,13 @@ function tgUpdate(group) {
     group.remove();
     return;
   }
-  // Planning (write_todos) is bookkeeping, not work: it NEVER renders — not in
-  // the log (any state), the count, or the cell strip. Its checklist card stays
-  // reachable via the timer badge. A group holding ONLY planning hides whole,
-  // even while the plan call runs.
+  // write_todos is a normal tool call again (2026-08-31): it renders in the log,
+  // counts, and appears in the cell strip like any other tool. (Previously it was
+  // suppressed as bookkeeping via tc-plan.)
   const calls = [];
   for (const el of all) {
-    const plan = el.dataset.fname === 'write_todos';
-    el.classList.toggle('tc-plan', plan);
-    if (!plan) calls.push(el);
+    el.classList.remove('tc-plan');
+    calls.push(el);
   }
   group.classList.toggle('tg-empty', !calls.length);
   // Untitled register: the header mirrors the LATEST call's own label ("Saving
