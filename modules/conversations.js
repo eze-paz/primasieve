@@ -5762,12 +5762,38 @@ const NN_SVG_INLINE = '<svg viewBox="0 0 24 24" class="ripple"><circle cx="12" c
 
 let thoughtsVisible = false;
 function toggleThoughts() {
+  // The class flip makes every hidden .msg.think take real space. Most of those
+  // boxes sit ABOVE the current view, so the transcript grows upward — with
+  // overflow-anchor active the browser pins the viewport itself, but anchoring
+  // is OFF while a turn streams (.sp-streaming) and never exists in Safari.
+  // Pin the viewport manually: record the first visible non-think message's top
+  // before the flip, then after reflow add the delta back to scrollTop. Mirrors
+  // native anchoring and is idempotent for the hide direction.
+  const pins = [$('#messages'), $('#messagesSide')].filter(Boolean).map(pane => {
+    const h = pane.querySelector(':scope > .conv-host');
+    if (!h) return null;
+    const hr = h.getBoundingClientRect();
+    let anchor = null;
+    for (const c of h.children) {
+      if (c.classList && c.classList.contains('think')) continue;
+      const r = c.getBoundingClientRect();
+      if (r.bottom > hr.top + 1 && r.top < hr.bottom - 1) { anchor = c; break; }
+    }
+    return anchor ? { host: h, anchor, top: anchor.getBoundingClientRect().top } : null;
+  }).filter(Boolean);
+
   thoughtsVisible = !thoughtsVisible;
   document.body.classList.toggle('thoughts-visible', thoughtsVisible);
   document.querySelectorAll('.msg-timer .mt-nn').forEach(el => {
     el.classList.toggle('on', thoughtsVisible);
     el.title = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   });
+
+  for (const p of pins) {
+    const top = p.anchor.getBoundingClientRect().top;
+    const delta = top - p.top;
+    if (Math.abs(delta) > 0.5) requestAnimationFrame(() => { p.host.scrollTop += delta; });
+  }
 }
 
 /* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
