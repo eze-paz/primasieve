@@ -79,15 +79,17 @@ def acc(m,ds):
               for i in range(0,len(t),512))
     m.train(); return round(c/len(t),3)
 
-def train(name, m, TR, EV, steps=30000, bs=256, lr=1e-3, wd=0.5):
-    m=m.to(DEV); opt=torch.optim.AdamW(m.parameters(),lr=lr,weight_decay=wd)  # wd aids grokking
+def train(name, m, TR, EV, steps=15000, bs=256, lr=1.5e-3, wd=0.01, warmup=800):
+    m=m.to(DEV); opt=torch.optim.AdamW(m.parameters(),lr=lr,weight_decay=wd)  # low wd: FIT first
     Nn=len(TR[0]); t0=time.time()
     print(f"[{name}] {sum(p.numel() for p in m.parameters())/1e6:.2f}M params on {DEV}", flush=True)
     for step in range(1,steps+1):
+        for g in opt.param_groups: g['lr']=lr*min(1.0, step/warmup)   # linear warmup (transformer stability)
         idx=torch.randint(0,Nn,(bs,),device=DEV)
         loss=nn.functional.cross_entropy(m.logits(TR[0][idx],TR[1][idx],TR[2][idx]),TR[3][idx])
-        opt.zero_grad(); loss.backward(); opt.step()
-        if step%2000==0 or step==steps:
+        opt.zero_grad(); loss.backward()
+        torch.nn.utils.clip_grad_norm_(m.parameters(),1.0); opt.step()
+        if step%1000==0 or step==steps:
             a={k:acc(m,EV[k]) for k in range(1,9)}
             print(f"[{name}] step {step} loss {loss.item():.3f} {time.time()-t0:.0f}s | acc-by-k {a}", flush=True)
 
