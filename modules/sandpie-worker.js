@@ -221,6 +221,26 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // DEBUG/VALIDATION: synchronously block THIS (agent) worker's event loop for
+  // `ms` (capped 15s) — the same thing a throttled/frozen tab does to it, so the
+  // per-turn heartbeat records a real suspension gap. Only reachable via
+  // postMessage (never model-triggerable). Run it DURING an active turn:
+  //   window._sandpieWorker.postMessage({type:'__debugBlock', ms:6000})
+  // Pass {hidden:true} to have the gap counted as hidden-tab instead of a
+  // foreground stall (it forces _pageHidden across the next heartbeat tick).
+  if (data.type === '__debugBlock') {
+    const ms = Math.min(Math.max((+data.ms) || 0, 0), 15000);
+    const prevHidden = _pageHidden;
+    if (data.hidden) _pageHidden = true;          // count the gap as hidden-tab
+    const end = Date.now() + ms;
+    while (Date.now() < end) { /* busy-block the event loop */ }
+    // Let the next heartbeat tick (≤2s away) consume the forced flag, then restore
+    // the real visibility so later gaps aren't mislabeled.
+    if (data.hidden) setTimeout(() => { _pageHidden = prevHidden; }, 3000);
+    console.warn('[sandpie-worker] __debugBlock: stalled event loop ' + ms + 'ms (hidden=' + !!data.hidden + ')');
+    return;
+  }
+
   if (data.type === 'agent') {
     const { id, config } = data;
     const abortCtl = new AbortController();
@@ -238,8 +258,12 @@ self.addEventListener('message', async (event) => {
     } finally {
       _agentAborts.delete(id);
       _agentSteers.delete(id);
-      // Heartbeat safety net: if runAgent threw before its own clearInterval, the
-      // suspension timer would otherwise keep ticking after the turn.
+      // Terminal-path safety net: if runAgent THREW (e.g. a suspended tab's stream
+      // died and exhausted retries), emit the profiling report now so the turn's
+      // suspend_ms still reaches the panel instead of dying with the failed turn.
+      // Idempotent — a no-op if runAgent already emitted on its normal path. Also
+      // stops the heartbeat interval.
+      try { if (ctx._reportTiming) ctx._reportTiming(); } catch (_) {}
       try { if (ctx._prof && ctx._prof._hbTimer) { clearInterval(ctx._prof._hbTimer); ctx._prof._hbTimer = 0; } } catch (_) {}
     }
     return;
@@ -3595,6 +3619,36 @@ async function runAgent(config, ctx) {
     t.ms += ms; t.calls++; if (isErr) t.errors++;
     _prof.toolMs += ms; _prof.toolCalls++;
   };
+  // Emit the per-turn profiling report exactly once, on ANY terminal path. The
+  // message handler's finally calls this too, so a turn that THROWS (e.g. a
+  // suspended tab whose model stream died and exhausted retries) still reports
+  // its suspend_ms — otherwise the very suspensions we care about are discarded
+  // with the failed turn and never reach the panel. Idempotent + subagent-safe.
+  let _timingEmitted = false;
+  const _emitTiming = () => {
+    if (_timingEmitted) return;
+    _timingEmitted = true;
+    if (_prof._hbTimer) { try { clearInterval(_prof._hbTimer); } catch (_) {} _prof._hbTimer = 0; }
+    if (maxRounds) return;   // subagents fold into the parent's spawn_subagent time
+    ctx.emit({ type: 'timing', timing: {
+      session_id: ctx._sessionId || null,
+      completion_ms: Math.round(_prof.completionMs),
+      completion_calls: _prof.completionCalls,
+      compaction_ms: Math.round(_prof.compactionMs),
+      tool_ms: Math.round(_prof.toolMs),
+      tool_calls: _prof.toolCalls,
+      wall_ms: Math.round(_profNow() - _prof.wallStart),
+      // Suspension: total frozen ms, the hidden-tab slice, event count, worst gap.
+      suspend_ms: Math.round(_prof.suspendMs),
+      suspend_hidden_ms: Math.round(_prof.suspendHiddenMs),
+      suspend_events: _prof.suspendEvents,
+      suspend_max_ms: Math.round(_prof.suspendMaxMs),
+      rounds: _roundNo,
+      tools: Object.fromEntries(Object.entries(_prof.tools).map(
+        ([k, v]) => [k, { ms: Math.round(v.ms), calls: v.calls, errors: v.errors }])),
+    } });
+  };
+  ctx._reportTiming = _emitTiming;
 
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
@@ -4193,28 +4247,9 @@ async function runAgent(config, ctx) {
       }
     } catch (_) {}
   }
-  // Per-turn profiling report (main loop only — see the _prof note above). Wall
-  // time that isn't completion/tool/compaction is loop overhead + any idle gaps.
-  if (_prof._hbTimer) { try { clearInterval(_prof._hbTimer); } catch (_) {} _prof._hbTimer = 0; }
-  if (!maxRounds) {
-    ctx.emit({ type: 'timing', timing: {
-      session_id: ctx._sessionId || null,
-      completion_ms: Math.round(_prof.completionMs),
-      completion_calls: _prof.completionCalls,
-      compaction_ms: Math.round(_prof.compactionMs),
-      tool_ms: Math.round(_prof.toolMs),
-      tool_calls: _prof.toolCalls,
-      wall_ms: Math.round(_profNow() - _prof.wallStart),
-      // Suspension: total frozen ms, the hidden-tab slice, event count, worst gap.
-      suspend_ms: Math.round(_prof.suspendMs),
-      suspend_hidden_ms: Math.round(_prof.suspendHiddenMs),
-      suspend_events: _prof.suspendEvents,
-      suspend_max_ms: Math.round(_prof.suspendMaxMs),
-      rounds: _roundNo,
-      tools: Object.fromEntries(Object.entries(_prof.tools).map(
-        ([k, v]) => [k, { ms: Math.round(v.ms), calls: v.calls, errors: v.errors }])),
-    } });
-  }
+  // Per-turn profiling report (main loop only — see _emitTiming above). Also
+  // called from the message handler's finally so a thrown turn still reports.
+  _emitTiming();
   ctx.emit({ type: 'agent_done', persistedCount: ctx._persistCount });
 }
 
