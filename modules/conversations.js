@@ -5766,21 +5766,32 @@ function toggleThoughts() {
   // boxes sit ABOVE the current view, so the transcript grows upward — with
   // overflow-anchor active the browser pins the viewport itself, but anchoring
   // is OFF while a turn streams (.sp-streaming) and never exists in Safari.
-  // Pin the viewport manually: record the first visible non-think message's top
-  // before the flip, then after reflow add the delta back to scrollTop. Mirrors
-  // native anchoring and is idempotent for the hide direction.
-  const pins = [$('#messages'), $('#messagesSide')].filter(Boolean).map(pane => {
+  //
+  // Two intents, one click:
+  //  - reading at the bottom (no active thinking) → STAY at the bottom, waiting
+  //    for the next turn; never jump up into the expanded boxes.
+  //  - reading history (scrolled up, or the pane is scroll-locked while a turn
+  //    streams) → pin the viewport exactly like native anchoring would.
+  // The correction is applied SYNCHRONOUSLY (same task, after the layout reads
+  // above force the pre-flip reflow) — a rAF would race the browser's own
+  // anchor pass and could land AFTER it, double-shifting the view.
+  const pins = [];
+  const follows = [];
+  for (const pane of [$('#messages'), $('#messagesSide')]) {
+    if (!pane) continue;
     const h = pane.querySelector(':scope > .conv-host');
-    if (!h) return null;
+    if (!h) continue;
+    if (h.scrollHeight - h.scrollTop - h.clientHeight <= 2 || shouldAutoScroll(h)) {
+      follows.push(h);
+      continue;
+    }
     const hr = h.getBoundingClientRect();
-    let anchor = null;
     for (const c of h.children) {
       if (c.classList && c.classList.contains('think')) continue;
       const r = c.getBoundingClientRect();
-      if (r.bottom > hr.top + 1 && r.top < hr.bottom - 1) { anchor = c; break; }
+      if (r.bottom > hr.top + 1 && r.top < hr.bottom - 1) { pins.push({ host: h, anchor: c, top: r.top }); break; }
     }
-    return anchor ? { host: h, anchor, top: anchor.getBoundingClientRect().top } : null;
-  }).filter(Boolean);
+  }
 
   thoughtsVisible = !thoughtsVisible;
   document.body.classList.toggle('thoughts-visible', thoughtsVisible);
@@ -5789,11 +5800,12 @@ function toggleThoughts() {
     el.title = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   });
 
+  // Synchronous re-anchor: exact even when native anchoring is off (Safari).
   for (const p of pins) {
-    const top = p.anchor.getBoundingClientRect().top;
-    const delta = top - p.top;
-    if (Math.abs(delta) > 0.5) requestAnimationFrame(() => { p.host.scrollTop += delta; });
+    const delta = p.anchor.getBoundingClientRect().top - p.top;
+    if (Math.abs(delta) > 0.5) p.host.scrollTop += delta;
   }
+  for (const h of follows) h.scrollTop = h.scrollHeight;
 }
 
 /* ---- system prompt (editable, localStorage-cached; + optional skills block) ---- */
