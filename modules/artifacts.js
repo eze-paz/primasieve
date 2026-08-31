@@ -116,7 +116,16 @@ async function resolveArtifactPath(clean) {
       return p;
     } catch (_) {}
   }
-  return candidates[0].startsWith('sandpie/') ? candidates[0] : candidates[1] || candidates[0];
+  // Not found locally (e.g. dehydrated). The sandpie/ prefix guess applies ONLY to
+  // the app dirs that were actually migrated under sandpie/ — an old bare path like
+  // "artifacts/x.html" should hydrate from "sandpie/artifacts/x.html". For EVERY
+  // other path (real workspace files like "projects/foo/x.html") return it exactly
+  // as stored: blindly prepending sandpie/ corrupts the path and 404s (the file it
+  // asks for does not exist). This was returning "sandpie/<anything>" for all bare
+  // paths — the reported "it appends sandpie/ to everything" bug.
+  const LEGACY_MOVED = /^(?:artifacts|scripts|agents|skills|memory|_conversations)\//;
+  if (!clean.startsWith('sandpie/') && LEGACY_MOVED.test(clean)) return 'sandpie/' + clean;
+  return clean;
 }
 
 function buildArtifactCard(clean, ext, onOpen) {
