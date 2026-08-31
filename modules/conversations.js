@@ -1017,7 +1017,7 @@ function renderFileBundle(target, bundleFiles) {
     wrap.classList.toggle('fb-open', !open);
   };
 
-  _append(target, wrap);
+  appendContent(target, wrap);
 }
 
 // Rebuild a settled (.done) msg-timer line into `target` from the stream's
