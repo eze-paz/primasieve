@@ -898,6 +898,17 @@ function renderFilesTouched(host, files, opts) {
   // Rebuilt only on the final (non-partial) emit so it doesn't churn mid-turn.
   if (bundleFiles.length) {
     if (partial) return;
+    // Dedupe any legacy individual card for a now-bundled path (a pre-bundle
+    // conversation that surfaced a data/code file as its own `artifact:` card on
+    // replay) so it doesn't double-render alongside its bundle row.
+    for (const f of bundleFiles) {
+      const clean = String((f && f.path) || '').replace(/^\/+/, '');
+      if (!clean) continue;
+      for (const old of [...target.querySelectorAll('.artifact-wrap')]) {
+        const p = old.dataset && old.dataset.artifactPath;
+        if (p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p)) old.remove();
+      }
+    }
     const oldGroup = target.querySelector('.file-bundle');
     if (oldGroup) oldGroup.remove();
     renderFileBundle(target, bundleFiles);
