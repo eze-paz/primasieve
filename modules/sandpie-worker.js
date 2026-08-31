@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.22.0-sandbox-allowlist';
+const WORKER_VERSION = '2.23.0-owner-keyed-touch-attribution';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -157,6 +157,10 @@ console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 // backgrounded/frozen — the suspicion we're measuring) vs "visible" (foreground
 // stall: OS sleep, GC, heavy sync compute).
 let _pageHidden = false;
+// Points at the CURRENT main-loop turn's _prof while a turn is running (null
+// otherwise). Lets the debug ping/block handlers report whether a suspension
+// heartbeat is actually live and how much it has recorded — see __ping/__debugBlock.
+let _activeProf = null;
 
 // ---- message protocol entry point ------------------------------------------
 self.addEventListener('message', async (event) => {
@@ -230,14 +234,27 @@ self.addEventListener('message', async (event) => {
   // foreground stall (it forces _pageHidden across the next heartbeat tick).
   if (data.type === '__debugBlock') {
     const ms = Math.min(Math.max((+data.ms) || 0, 0), 15000);
+    const hadTurn = !!_activeProf;
+    const before = _activeProf ? _activeProf.suspendMs : 0;
     const prevHidden = _pageHidden;
     if (data.hidden) _pageHidden = true;          // count the gap as hidden-tab
     const end = Date.now() + ms;
     while (Date.now() < end) { /* busy-block the event loop */ }
-    // Let the next heartbeat tick (≤2s away) consume the forced flag, then restore
-    // the real visibility so later gaps aren't mislabeled.
-    if (data.hidden) setTimeout(() => { _pageHidden = prevHidden; }, 3000);
-    console.warn('[sandpie-worker] __debugBlock: stalled event loop ' + ms + 'ms (hidden=' + !!data.hidden + ')');
+    console.warn('[sandpie-worker] __debugBlock: stalled event loop ' + ms + 'ms (hidden=' + !!data.hidden + ', activeTurn=' + hadTurn + ')');
+    // Wait past the next heartbeat tick (fires ≤2s after unblock) so it records the
+    // gap, then report back what got captured + restore the real visibility.
+    setTimeout(() => {
+      if (data.hidden) _pageHidden = prevHidden;
+      const recorded = _activeProf ? (_activeProf.suspendMs - before) : null;
+      try { self.postMessage({ type: 'debug-block-result', version: WORKER_VERSION, ms, hadActiveTurn: hadTurn, stillActive: !!_activeProf, suspendMsRecorded: recorded }); } catch (_) {}
+    }, 2600);
+    return;
+  }
+
+  // DEBUG: report which worker build is live and whether a suspension heartbeat is
+  // currently running. window._sandpieWorker.postMessage({type:'__ping'})
+  if (data.type === '__ping') {
+    try { self.postMessage({ type: 'debug-pong', version: WORKER_VERSION, activeTurn: !!_activeProf, suspendMsSoFar: _activeProf ? Math.round(_activeProf.suspendMs) : null, pageHidden: _pageHidden }); } catch (_) {}
     return;
   }
 
@@ -258,6 +275,7 @@ self.addEventListener('message', async (event) => {
     } finally {
       _agentAborts.delete(id);
       _agentSteers.delete(id);
+      _touchSinks.delete(id);   // stop routing writes to a finished run's sink
       // Terminal-path safety net: if runAgent THREW (e.g. a suspended tab's stream
       // died and exhausted retries), emit the profiling report now so the turn's
       // suspend_ms still reaches the panel instead of dying with the failed turn.
@@ -376,15 +394,22 @@ function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessa
 // ── Touched-file tracking (replaces show_artifact) ─────────────────────────
 // Every OPFS write in this worker — direct file tools, copy, python writes
 // relayed from the pool — announces itself to the page as a
-// forward-to-page/sw-opfs-changed post. Intercept postMessage ONCE so any tool
-// call executed while a sink is armed records its writes with zero per-site
-// wiring; deletions drop the path. runAgent arms the sink around each tool call
-// (ctx._filesTouched) and emits the deduped, most-recent-last list as a
-// 'files_touched' event at turn end — the page renders the file cards from it.
-// NOTE: with two agent loops interleaving (main + side panel), a python write
-// relayed mid-await lands in the MOST RECENTLY ARMED sink — right in practice,
-// as the sink is armed only for the duration of that conversation's tool call.
-let _touchSink = null;
+// forward-to-page/sw-opfs-changed post, STAMPED with the owning run's id
+// (`payload.owner` = ctx.agentId). Intercept postMessage ONCE and route each
+// write STRICTLY to the sink registered under that owner id — never a global
+// "currently-armed" sink. runAgent registers ctx._filesTouched under ctx.agentId
+// while it runs and emits the deduped, most-recent-last list at turn end.
+//
+// WHY owner-keyed, not a shared armed pointer: two conversations run concurrently
+// in this single worker (main + side panel, or two open chats). A run_python
+// write is relayed from the pool LONG after the tool call returned — by then a
+// different conversation's tool may be executing. A shared "currently-armed"
+// pointer therefore misattributed that write to whichever chat happened to be
+// active (confirmed in Jordi's transcripts: two chats writing files in the same
+// <15s windows). Owner-keying makes misattribution IMPOSSIBLE: a path can only
+// ever land in the sink whose agentId matches the stamp. An unknown/missing owner
+// is dropped (the file just doesn't surface) — it can never reach the wrong chat.
+const _touchSinks = new Map();   // agentId → ctx._filesTouched (registered while the run is live)
 // System paths never surface: everything under sandpie/ (conversations, memory,
 // skills, helper scripts) EXCEPT the user-visible legacy sandpie/artifacts/,
 // plus lab/infra trees.
@@ -394,9 +419,13 @@ const _postRaw = self.postMessage.bind(self);
 self.postMessage = function (msg, ...rest) {
   try {
     const p = msg && msg.type === 'forward-to-page' ? msg.payload : null;
-    if (_touchSink && p && Array.isArray(p.paths)) {
-      if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) _touchSink.set(String(x).replace(/^\/+/, ''), t); }
-      else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) _touchSink.delete(String(x).replace(/^\/+/, '')); }
+    // Strict owner routing — no path is ever recorded without a matching owner.
+    if (p && p.owner != null && Array.isArray(p.paths)) {
+      const sink = _touchSinks.get(p.owner);
+      if (sink) {
+        if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) sink.set(String(x).replace(/^\/+/, ''), t); }
+        else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) sink.delete(String(x).replace(/^\/+/, '')); }
+      }
     }
   } catch (_) {}
   return _postRaw(msg, ...rest);
@@ -436,6 +465,17 @@ function _spawnPyWorker() {
     // Relay the pool worker's page-bound messages (opfs-deleted-by-python /
     // sw-opfs-changed / worker-hydrated) and console logs on to the page.
     if (msg.type === 'forward-to-page' || msg.type === 'sandpie-worker-log') {
+      // Stamp the launching run's owner on this script's file writes so the
+      // interceptor attributes them to the RIGHT conversation. slot.job is the
+      // ONE job running on this slot, and its writes arrive before python-result
+      // frees the slot — so slot.job.owner is unambiguously this write's owner.
+      try {
+        const p = msg.type === 'forward-to-page' ? msg.payload : null;
+        if (p && (p.type === 'sw-opfs-changed' || p.type === 'opfs-deleted-by-python')
+            && p.owner == null && slot.job && slot.job.owner != null) {
+          p.owner = slot.job.owner;
+        }
+      } catch (_) {}
       try { self.postMessage(msg); } catch (_) {}
     }
   });
@@ -476,12 +516,16 @@ function _pyDrainQueue() {
 // Run a script on the pool; resolves with { result } (raw/untruncated, as the
 // old in-process tool_run_python did — callers truncate). A run that overruns
 // its deadline is killed so it can never hang the conversation.
-function dispatchPython({ path, args, timeout, signal }) {
+function dispatchPython({ path, args, timeout, signal, owner }) {
   let timeoutMs = PY_DEFAULT_TIMEOUT_MS;
   const t = Number(timeout);
   if (isFinite(t) && t > 0) timeoutMs = Math.min(PY_MAX_TIMEOUT_MS, Math.round(t * 1000));
   return new Promise((resolve) => {
-    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null };
+    // owner = the agentId of the run that launched this script. The pool relays
+    // this script's file writes back asynchronously; the pool-message handler
+    // stamps this owner on them so they attribute to the RIGHT conversation even
+    // if another chat's tool is executing by the time the write lands.
+    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null, owner: owner != null ? owner : null };
     // Turn stopped → abandon the run. Pyodide can't be interrupted mid-execution,
     // so a job already running in a slot has its interpreter TERMINATED (same as a
     // deadline overrun); a still-queued job is just dropped. Either way the tool
@@ -713,7 +757,7 @@ async function tool_run_python({ path, args, timeout }, ctx) {
   // deleted is exactly what sent an earlier session into a rebuild loop. The cache
   // is tiny; over-clearing only costs one honest re-emit on the next read.
   _emittedFileHashes.clear();
-  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal });
+  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId });
 }
 
 // ============================================================
@@ -1305,7 +1349,7 @@ function _localizeArtifactOffTurn(path, ctx, target) {
   self.postMessage({ type: 'artifact-localizing', path, state: 'start' });
   _lxQueue = _lxQueue.then(async () => {
     try { await _localizeArtifact(path, ctx, target); } catch (_) {}
-    try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } }); } catch (_) {}
+    try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path], owner: ctx && ctx.agentId } }); } catch (_) {}
     self.postMessage({ type: 'artifact-localizing', path, state: 'done' });
   });
 }
@@ -2193,7 +2237,7 @@ async function _forkLocal(src, dest) {
   destRel = await _opfsAutorename(destRel);
   try {
     await opfsWriteBytes(destRel, bytes);
-    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [destRel] } });
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [destRel], owner: ctx && ctx.agentId } });
     _pyBroadcast({ type: 'fs-changed', rel: destRel });
     return { result: `Forked ${srcRel} → ${destRel} — your editable copy. Edit "${destRel}"; the shared original stays managed and keeps auto-updating.` };
   } catch (e) { return { result: `Fork failed: ${(e && e.message) || e}` }; }
@@ -2212,7 +2256,7 @@ async function _forkLocal(src, dest) {
 // Folders still use copy_v2, with the destination written as a namespace-relative
 // "ns:<home_namespace_id>/…" path so the copy can cross namespaces server-side.
 // Only offered when Dropbox is connected (gated in tools.js toolDefs).
-async function tool_copy_to_workspace({ src, dest }) {
+async function tool_copy_to_workspace({ src, dest }, ctx) {
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (cloud import)
   const from = (src == null ? '' : String(src)).trim();
   if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
@@ -3174,6 +3218,8 @@ async function tool_spawn_subagent({ agent, prompt }, ctx) {
   } catch (e) {
     if (ctx.signal && ctx.signal.aborted) return { result: 'Error: aborted.' };
     return { result: 'Error: subagent "' + agent + '" failed: ' + ((e && e.message) || e) };
+  } finally {
+    _touchSinks.delete(subId);   // subrun done — stop routing writes to its sink
   }
   let out = String(subCtx._finalText || '').trim();
   if (!out) out = '(subagent "' + agent + '" produced no final text)';
@@ -3351,7 +3397,7 @@ async function tool_remember({ name, description, type, body, links, project, su
   // Notify the page so sync-state marks this file dirty — otherwise the next
   // Dropbox reconciliation deletes it as an orphan (not in cloud, not dirty)
   // BEFORE it's ever pushed. Same mechanism tool_write_file uses.
-  self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path] } });
+  self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [path], owner: ctx && ctx.agentId } });
   return { result: verb + ' "' + slug + '" (' + t + ').' };
 }
 
@@ -3424,7 +3470,7 @@ async function runAgent(config, ctx) {
       ctx._persistCount++;
       // Mark the file dirty for the Dropbox cursor-delta sync (same relay the
       // write_file tool uses) so the turn-end sync pushes the new lines.
-      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [ctx._persistPath] } }); } catch (_) {}
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [ctx._persistPath], owner: ctx && ctx.agentId } }); } catch (_) {}
       return true;
     } catch (e) {
       // Append failed (e.g. exclusive lock) — do NOT advance the counter, and do
@@ -3505,6 +3551,10 @@ async function runAgent(config, ctx) {
   // list → authoritative order + deliverable localization).
   ctx._filesTouched = new Map();
   ctx._ftAnnounced = new Map();   // path → last ts already announced mid-turn
+  // Register this run's sink under its agentId so owner-stamped writes (direct
+  // tools + pool-relayed python writes) route here and NOWHERE else. Unregistered
+  // in the agent-message finally (top-level) and tool_spawn_subagent (subruns).
+  if (ctx.agentId != null) _touchSinks.set(ctx.agentId, ctx._filesTouched);
   // Citable result ids (F1): every tool result is prefixed "[rN]" so the model
   // can cite it as evidence when closing a claim-todo. Recover the counter and
   // the set of already-issued ids from the persisted transcript, so claims can
@@ -4136,13 +4186,13 @@ async function runAgent(config, ctx) {
       let toolOut;
       const _toolStart = _profNow();
       let _toolErr = false;
-      // Arm the touched-file sink for this call: every OPFS write the tool makes
-      // (directly or via a python job) lands in ctx._filesTouched (see the
-      // postMessage interceptor by _pyBroadcast).
-      _touchSink = ctx._filesTouched || null;
+      // Touched-file attribution is by OWNER STAMP (ctx.agentId on each write's
+      // forward-to-page payload), routed by the postMessage interceptor to this
+      // run's registered sink — not a shared armed pointer. So a python write
+      // relayed after this call returns still lands in the RIGHT conversation
+      // even while another chat's tool is mid-flight.
       try { toolOut = await runToolGuarded(tc.function.name, parsedArgs, ctx); }
       catch (e) { toolOut = { result: 'Error: ' + (e && e.message || e) }; _toolErr = true; }
-      finally { _touchSink = null; }
       // Profiling: per-tool wall time (run_python == pyodide). Count as an error
       // when the call threw or the tool returned an "Error:" result.
       _profTool(tc.function.name, _profNow() - _toolStart,
@@ -4256,7 +4306,7 @@ async function runAgent(config, ctx) {
 // ============================================================
 // write_file / edit_file
 // ============================================================
-async function tool_write_file({ path, content, overwrite, _conv }) {
+async function tool_write_file({ path, content, overwrite, _conv }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   let existed = false;
@@ -4296,7 +4346,7 @@ async function tool_write_file({ path, content, overwrite, _conv }) {
     await opfsWriteBytes(norm, new TextEncoder().encode(content || ''));
     _invalidateFileCache(norm);   // content changed → a re-read must re-emit, not stub
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
-    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm], owner: ctx && ctx.agentId } });
     // Keep the Pyodide pool's MEMFS coherent with this OPFS write so a following
     // run_python sees it (per-worker FIFO ⇒ this lands before any later run).
     _pyBroadcast({ type: 'fs-changed', rel: norm });
@@ -4314,7 +4364,7 @@ async function tool_write_file({ path, content, overwrite, _conv }) {
 // fans `opfs-removed` out to the Pyodide pool so sibling interpreters drop
 // their MEMFS copies. sandpie/ is refused: it holds system state (memories,
 // skills, conversation JSONL) that has its own flows.
-async function tool_delete_file({ path, recursive }) {
+async function tool_delete_file({ path, recursive }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   if (!norm) return { result: 'Refused: cannot delete the /files/ root.' };
@@ -4328,7 +4378,7 @@ async function tool_delete_file({ path, recursive }) {
     for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: false });
     await dir.removeEntry(name, { recursive: !!recursive });
     _invalidateFileCache(norm);   // gone → a re-read must NOT claim "unchanged, in your context"
-    self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [norm] } });
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [norm], owner: ctx && ctx.agentId } });
     return { result: `Deleted: ${norm}` };
   } catch (e) {
     if (e && e.name === 'NotFoundError') return { result: `Not found: ${norm} — nothing to delete.` };
@@ -4447,7 +4497,7 @@ function _editReport(oldText, newText, ctx = 3) {
   return { added, removed, diff: out.join('\n') };
 }
 
-async function tool_edit_file({ path, old_str, new_str = '' }) {
+async function tool_edit_file({ path, old_str, new_str = '' }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
@@ -4466,7 +4516,7 @@ async function tool_edit_file({ path, old_str, new_str = '' }) {
     await opfsWriteBytes(norm, new TextEncoder().encode(res.updated));
     _invalidateFileCache(norm);   // content changed → a re-read must re-emit, not stub
     // Notify the page so sync state marks this file dirty (prevents sync deletion).
-    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm] } });
+    self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [norm], owner: ctx && ctx.agentId } });
     _pyBroadcast({ type: 'fs-changed', rel: norm });
     const head = `Edited ${norm}${res.note ? ' (' + res.note + ')' : ''}`;
     const rep = _editReport(current, res.updated);

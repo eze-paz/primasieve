@@ -2539,7 +2539,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=159');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=160');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3479,6 +3479,13 @@ function reportTurnTiming(convId, timing, turnIndex) {
         tool_calls: timing.tool_calls | 0,
         wall_ms: timing.wall_ms | 0,
         rounds: timing.rounds | 0,
+        // Suspension (throttled/frozen-tab) fields — MUST be forwarded or the
+        // server stores 0. This passthrough was the reason the panel never showed
+        // a suspension despite the worker heartbeat measuring them correctly.
+        suspend_ms: timing.suspend_ms | 0,
+        suspend_hidden_ms: timing.suspend_hidden_ms | 0,
+        suspend_events: timing.suspend_events | 0,
+        suspend_max_ms: timing.suspend_max_ms | 0,
         tools: timing.tools && typeof timing.tools === 'object' ? timing.tools : {},
       },
     };
