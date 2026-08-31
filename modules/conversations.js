@@ -849,6 +849,9 @@ const _CODE_FILE_LABELS = {
   less: 'LESS', xml: 'XML', c: 'C', h: 'C header', cpp: 'C++', cc: 'C++',
   hpp: 'C++ header', rs: 'Rust', go: 'Go', java: 'Java', rb: 'Ruby',
   php: 'PHP', lua: 'Lua', sql: 'SQL', r: 'R',
+  gz: 'gzip', zip: 'zip', tar: 'tar', parquet: 'Parquet', log: 'log',
+  bin: 'binary', npy: 'NumPy', npz: 'NumPy', pkl: 'pickle', pickle: 'pickle',
+  ipynb: 'notebook', xml2: 'XML',
 };
 function _codeFileLabel(ext) {
   const e = String(ext || '').toLowerCase();
