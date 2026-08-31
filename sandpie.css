@@ -1976,6 +1976,15 @@ ul.conv-list li.active {
   .ac-t-code { background: rgba(163,113,247,0.16); color: #a371f7; }
   .ac-t-img { background: rgba(88,166,255,0.14); color: #58a6ff; }
   .ac-t-generic { background: var(--sp-border); color: var(--sp-text-dim); }
+  /* Real preview image (captured HTML thumbnail, or the image file itself) layered
+     over the faux-page placeholder; fades in on load, leaving the placeholder as a
+     fallback if capture fails. */
+  .artifact-card-body .ac-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; background: var(--sp-bg); opacity: 0; transition: opacity 0.25s; }
+  .artifact-card-body .ac-shot.ready { opacity: 1; }
+  /* Per-turn wrapping grid: several deliverable cards flow side by side; a single
+     card fills the row (auto-fit collapses the empty tracks). */
+  .artifact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 0.5rem; align-self: stretch; }
+  .artifact-grid > .artifact-wrap { margin-top: 0 !important; min-width: 0; }
   /* Shared file-bundle card (Option C): code + data + everything that isn't a
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
   /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,

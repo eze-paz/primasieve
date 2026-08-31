@@ -155,6 +155,7 @@ function buildArtifactCard(clean, ext, opts) {
     : '';
   const thumb = opts.showThumb
     ? '<div class="ac-thumb"><div class="ac-page"><i class="t"></i><i class="m"></i><i class="s"></i><i class="m"></i><i class="s"></i></div>' +
+      '<img class="ac-shot" alt="" aria-hidden="true" hidden>' +
       '<span class="ac-lx" hidden></span>' + ntBtn + '</div>'
     : '';
   el.innerHTML = thumb +
@@ -166,6 +167,7 @@ function buildArtifactCard(clean, ext, opts) {
   el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
   const nt = el.querySelector('.ac-newtab');
   if (nt && opts.onNewTab) nt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); opts.onNewTab(); };
+  if (opts.showThumb) _fillArtifactThumb(el, clean, ext);
   (async () => {
     try {
       const { parts, name } = splitPath(await resolveArtifactPath(clean));
@@ -177,6 +179,38 @@ function buildArtifactCard(clean, ext, opts) {
   })();
   return el;
 }
+
+// Fill a card's .ac-thumb with a real preview image, replacing the faux-page
+// placeholder. Images/SVG ARE their own thumbnail (point straight at the file, no
+// capture). HTML is rasterized + cached in the CONVERSATION metadata by the
+// conversations.js provider (SandpieArtifactThumbs) so it travels with the conv and
+// replays without re-capturing. No provider (or capture unavailable) → faux page.
+function _fillArtifactThumb(el, clean, ext) {
+  const img = el.querySelector('.ac-shot');
+  if (!img) return;
+  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'webp' || ext === 'svg') {
+    (async () => {
+      try {
+        const p = await resolveArtifactPath(clean);
+        const url = (opfs.filesUrlReady && opfs.filesUrlReady()) ? opfs.filesUrl(p) : await opfs.toUrl(p);
+        _applyArtifactShot(img, url);
+      } catch (_) {}
+    })();
+    return;
+  }
+  if (ext === 'html' || ext === 'htm') {
+    if (window.SandpieArtifactThumbs && SandpieArtifactThumbs.hydrate) SandpieArtifactThumbs.hydrate(img, clean);
+  }
+}
+
+// Fade a captured/loaded image into a card thumb; on error leave the faux page.
+function _applyArtifactShot(img, url) {
+  if (!img || !url) return;
+  img.onload = () => { img.hidden = false; img.classList.add('ready'); };
+  img.onerror = () => { img.hidden = true; img.classList.remove('ready'); };
+  img.src = url;
+}
+window._applyArtifactShot = _applyArtifactShot;
 
 function renderArtifact(host, path, opts) {
   // V3 (2026-08): artifacts NEVER render an inline iframe in the conversation.
@@ -280,6 +314,10 @@ async function loadArtifactFrame(wrap, frame, resolvedP, clean) {
     // Mark it so the sync:done / account:signedin handler retries the load once a
     // provider is available, instead of leaving a permanent "file not found".
     wrap.dataset.hydrateFailed = '1';
+    // Hidden console-only frame: NEVER surface a red 404 strip on the card. The
+    // frame isn't shown, and a genuinely-deleted file is reflected by removing the
+    // card (reflectFileDeletes), not by decorating it with an error.
+    if (frame && frame.dataset.consoleOnly === '1') return;
     showArtifactError(wrap, frame, 'failed to load: ' + (clean || p || '') + ' — ' + (e && e.message || e));
   }
 }
@@ -508,6 +546,32 @@ function closeArtifactPanel() {
   if (typeof opfs !== 'undefined' && opfs.closeFile) opfs.closeFile();
 }
 
+// Remove every artifact card for the given path(s) — used when a file is deleted so
+// the conversation reflects the deletion instead of leaving a card that 404s. Also
+// drops the card's grid wrapper if it becomes empty. Matches with the usual
+// sandpie/-prefix + files/ aliasing. Returns the number of cards removed.
+function removeArtifactByPath(input) {
+  const list = Array.isArray(input) ? input : [input];
+  const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '');
+  const strip = (p) => p.replace(/^sandpie\//, '');
+  const wants = new Set();
+  for (const p of list) { const n = norm(p); if (n) { wants.add(n); wants.add(strip(n)); } }
+  if (!wants.size) return 0;
+  let removed = 0;
+  for (const wrap of document.querySelectorAll('.artifact-wrap')) {
+    const c = norm(wrap.dataset.artifactPath || '');
+    if (!c) continue;
+    if (wants.has(c) || wants.has(strip(c))) {
+      const grid = wrap.closest('.artifact-grid');
+      wrap.remove();
+      if (grid && !grid.querySelector('.artifact-wrap')) grid.remove();
+      removed++;
+    }
+  }
+  return removed;
+}
+window.removeArtifactByPath = removeArtifactByPath;
+
 /* -------------------------------------------------------------------------- */
 /*  Expose globals (expected by sandpie.html inline scripts)                  */
 /* -------------------------------------------------------------------------- */
@@ -696,6 +760,15 @@ if (typeof Sandpie !== 'undefined' && Sandpie.events) {
         if (!wrap.isConnected) continue;   // self-heal replaced it; the fresh card just loaded
         const frame = wrap.querySelector('.artifact-frame');
         if (frame) loadArtifactFrame(wrap, frame, Promise.resolve(resolved), resolved);
+        // Bytes changed → the cached thumbnail is stale. Invalidate + re-capture
+        // (new file size misses the size-keyed cache) so the card preview refreshes.
+        const shot = wrap.querySelector('.ac-shot');
+        if (shot) {
+          try { if (window.SandpieArtifactThumbs && SandpieArtifactThumbs.invalidate) SandpieArtifactThumbs.invalidate(cur); } catch (_) {}
+          const ext = (cur.split('.').pop() || '').toLowerCase();
+          shot.classList.remove('ready'); shot.hidden = true;
+          _fillArtifactThumb(wrap.querySelector('.artifact-card-body') || wrap, cur, ext);
+        }
       }
     }).catch(() => {});
   });

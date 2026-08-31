@@ -440,6 +440,10 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   if (todos) meta.todos = todos;
   const filesT = s ? s.filesTouched : (prevMeta && prevMeta.filesTouched);
   if (filesT && filesT.length) meta.filesTouched = filesT;
+  // Artifact thumbnails (captured HTML previews) live in the conv meta so they
+  // travel/sync with the conversation and replay without re-capturing.
+  const thumbs = s ? s.artifactThumbs : (prevMeta && prevMeta.artifactThumbs);
+  if (thumbs && Object.keys(thumbs).length) meta.artifactThumbs = thumbs;
   if (prevMeta && prevMeta.usage) meta.usage = prevMeta.usage;
   // Persist the last-turn timer snapshot so it survives refresh and can be
   // rebuilt by rebuildSettledTimer on cold load.
@@ -864,6 +868,101 @@ function mergeFilesTouched(stream, files) {
   stream.filesTouched = [...cur.entries()].sort((a, b) => a[1] - b[1]).map(([path, ts]) => ({ path, ts }));
   return files;
 }
+// ── Artifact thumbnail provider ────────────────────────────────────────────
+// Captured HTML previews cached in the CONVERSATION metadata (stream.artifactThumbs
+// → meta.artifactThumbs), keyed by path and file size so a byte change misses and
+// re-captures. artifacts.js cards call SandpieArtifactThumbs.hydrate(img, path);
+// images/SVG never reach here (they point straight at the file). Captures are
+// serialized (one offscreen render at a time) and a debounced meta save persists
+// them so they survive reload + sync with the conversation.
+const _thumbNorm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '').replace(/^sandpie\//, '');
+let _thumbQueue = Promise.resolve();
+function _enqueueThumbCapture(fn) { const r = _thumbQueue.then(fn, fn); _thumbQueue = r.catch(() => {}); return r; }
+let _thumbSaveT = null;
+function _scheduleThumbSave() { clearTimeout(_thumbSaveT); _thumbSaveT = setTimeout(() => { try { saveActiveConv(); } catch (_) {} }, 1500); }
+function _downscaleDataUrl(dataUrl, maxW) {
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const iw = im.naturalWidth || maxW, ih = im.naturalHeight || maxW;
+        const scale = Math.min(1, maxW / iw);
+        const w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(im, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.72));
+      } catch (_) { resolve(dataUrl); }
+    };
+    im.onerror = () => resolve(dataUrl);
+    im.src = dataUrl;
+  });
+}
+window.SandpieArtifactThumbs = {
+  async hydrate(img, path) {
+    try {
+      const stream = activeStream(); if (!stream) return;
+      const key = _thumbNorm(path);
+      let size = -1;
+      try { const rp = window.resolveArtifactPath ? await window.resolveArtifactPath(key) : key; size = await opfs.getFileSize(rp); } catch (_) {}
+      const store = stream.artifactThumbs || (stream.artifactThumbs = {});
+      const hit = store[key];
+      if (hit && hit.d && (size < 0 || hit.s === size)) { window._applyArtifactShot(img, hit.d); return; }
+      if (!(window.SandpieScreenshot && window.SandpieScreenshot.capture)) return;
+      await _enqueueThumbCapture(async () => {
+        const st = activeStream(); const cur = (st && st.artifactThumbs && st.artifactThumbs[key]);
+        if (cur && cur.d && (size < 0 || cur.s === size)) { window._applyArtifactShot(img, cur.d); return; }
+        let shot = null;
+        try { shot = await window.SandpieScreenshot.capture(key, { width: 1200, height: 800, wait_ms: 500, exact_width: true }); } catch (_) {}
+        if (shot && shot.dataUrl) {
+          const small = await _downscaleDataUrl(shot.dataUrl, 600);
+          const s2 = activeStream();
+          if (s2) { (s2.artifactThumbs || (s2.artifactThumbs = {}))[key] = { s: size, d: small }; _scheduleThumbSave(); }
+          window._applyArtifactShot(img, small);
+        }
+      });
+    } catch (_) {}
+  },
+  invalidate(path) { try { const st = activeStream(); if (st && st.artifactThumbs) delete st.artifactThumbs[_thumbNorm(path)]; } catch (_) {} },
+};
+
+// A file was deleted (delete_file tool or python os.remove): reflect it everywhere
+// so nothing 404s — remove its card(s) and drop it from the conversation's tracking
+// (filesTouched) + cached thumbnail, persisting affected conversations.
+function reflectFileDeletes(paths) {
+  if (!Array.isArray(paths) || !paths.length) return;
+  const norm = (p) => String(p || '').replace(/^\/+/, '').replace(/^files\//, '').replace(/^sandpie\//, '');
+  const wants = new Set(paths.map(norm).filter(Boolean));
+  if (!wants.size) return;
+  const match = (p) => wants.has(norm(p));
+  try { if (typeof window.removeArtifactByPath === 'function') window.removeArtifactByPath(paths); } catch (_) {}
+  try {
+    for (const [cid, stream] of convStreams) {
+      if (!stream) continue;
+      let changed = false;
+      if (Array.isArray(stream.filesTouched)) {
+        const before = stream.filesTouched.length;
+        stream.filesTouched = stream.filesTouched.filter(f => !match(f && f.path));
+        if (stream.filesTouched.length !== before) changed = true;
+      }
+      if (stream.artifactThumbs) {
+        for (const k of Object.keys(stream.artifactThumbs)) { if (match(k)) { delete stream.artifactThumbs[k]; changed = true; } }
+      }
+      if (changed) saveConv(cid, { touchUpdated: false });
+    }
+  } catch (_) {}
+}
+
+// The single "open" per-turn artifact grid in a pane (create if absent, placed
+// composer-safe). Closed by clearing data-ft-open at the turn's final emit.
+function _ftOpenGrid(target) {
+  let g = target.querySelector('.artifact-grid[data-ft-open="1"]');
+  if (g) return g;
+  g = document.createElement('div');
+  g.className = 'artifact-grid';
+  g.dataset.ftOpen = '1';
+  appendContent(target, g);
+  return g;
+}
 function renderFilesTouched(host, files, opts) {
   if (!Array.isArray(files) || !files.length) return;
   const partial = !!(opts && opts.partial);
@@ -881,7 +980,11 @@ function renderFilesTouched(host, files, opts) {
     if (_ftIndividual(ext)) { individualFiles.push(f); }
     else { bundleFiles.push(f); }
   }
-  // Render the individual deliverable cards (HTML/images expand, office collapses)
+  // Render the individual deliverable cards into a per-turn WRAPPING grid: several
+  // HTML/image cards flow side by side instead of a tall column. One grid stays
+  // "open" across this turn's partial emits; the final (non-partial) emit closes it
+  // so the next turn starts fresh. A single card fills the row (auto-fit 1fr).
+  let grid = individualFiles.length ? _ftOpenGrid(target) : null;
   for (const f of individualFiles) {
     const clean = String((f && f.path) || '').replace(/^\/+/, '');
     if (!clean) continue;
@@ -893,10 +996,13 @@ function renderFilesTouched(host, files, opts) {
       if (typeof window._artifactEnsureHeader === 'function') for (const o of olds) window._artifactEnsureHeader(o);
       continue;
     }
-    for (const old of olds) old.remove();
+    for (const old of olds) { const g = old.closest('.artifact-grid'); old.remove(); if (g && g !== grid && !g.querySelector('.artifact-wrap')) g.remove(); }
     const ext = clean.split('.').pop().toLowerCase();
-    try { renderArtifact(target, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
+    if (!grid) grid = _ftOpenGrid(target);
+    try { renderArtifact(grid, clean, { collapsed: !FT_AUTO_EXPAND.has(ext) }); } catch (_) {}
   }
+  if (!partial && grid) grid.removeAttribute('data-ft-open');
+  if (grid && !grid.querySelector('.artifact-wrap')) grid.remove();
   // Fold code + data + everything else into ONE shared bundle (from the 1st file).
   // Rebuilt only on the final (non-partial) emit so it doesn't churn mid-turn.
   if (bundleFiles.length) {
@@ -1231,6 +1337,7 @@ function hydrateStreamFromData(s, data) {
   s.todos = data.todos || null;
   s.scratchpad = data.scratchpad || '';
   s.filesTouched = data.filesTouched || null;
+  s.artifactThumbs = data.artifactThumbs || null;
   s.lastTurn = data.lastTurn || null;
   // Messages loaded from the new JSONL are already persisted; those from a legacy
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
@@ -1598,6 +1705,7 @@ async function loadConv(id) {
       s.todos = meta.todos || null;
       s.scratchpad = meta.scratchpad || '';
       s.filesTouched = meta.filesTouched || null;
+      s.artifactThumbs = meta.artifactThumbs || null;
       s.lastTurn = meta.lastTurn || null;
 
       if (!fileSize) {
@@ -1832,6 +1940,7 @@ async function duplicateConv(id, title) {
   if (data.compaction) meta.compaction = data.compaction;
   if (data.todos) meta.todos = data.todos;
   if (data.filesTouched) meta.filesTouched = data.filesTouched;
+  if (data.artifactThumbs) meta.artifactThumbs = data.artifactThumbs;
   if (data.scratchpad != null) meta.scratchpad = data.scratchpad;
   // Intentionally do NOT copy session_id: the duplicate is a distinct
   // conversation and must get its own cache key (ensureSessionId on first send).
@@ -2635,6 +2744,12 @@ function getSandpieWorker() {
         // Artifact auto-reload: forward worker writes to the open viewers,
         // debounced per path (leading edge now, trailing edge after the window).
         for (const p of paths) artifactChanged(p);
+        // File deletion (delete_file tool OR python os.remove, relayed as the
+        // historically-named opfs-deleted-by-python): reflect it — drop the card(s)
+        // and the tracking entry so no 404 lingers.
+        if (msg.payload.type === 'opfs-deleted-by-python' && Array.isArray(msg.payload.paths)) {
+          reflectFileDeletes(msg.payload.paths);
+        }
       } catch (_) {}
       // share() tool: the worker posts a share-request; perform it here (the page
       // owns Dropbox + sharing.js) and reply with the publish result.
