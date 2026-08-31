@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.23.0-owner-keyed-touch-attribution';
+const WORKER_VERSION = '2.24.0-prefill-decode-split';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -2851,6 +2851,12 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   if (ctx && ctx._attemptStreamed) { ctx.emit({ type: 'round_retry' }); ctx._attemptStreamed = false; }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  // TTFT split: mark when the FIRST generated token (content/reasoning/tool-call)
+  // arrives; everything after it is decode. The wait before it (already inside the
+  // caller's completion_ms window) is prefill. A leading role-only delta doesn't
+  // count — only actual generated output starts the decode clock.
+  const _pnow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let _firstTokAt = 0;
   let buffer = '', content = '', reasoningText = '';
   const toolCalls = []; let usage = null, sawDone = false;
   let finishReason = null, streamErr = null;
@@ -2887,6 +2893,9 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         if (finishReason === 'error') { streamErr = _sseErrorToThrow(null); break; }
         const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
         if (!delta) continue;
+        if (!_firstTokAt && (delta.content || typeof delta.reasoning_content === 'string' || typeof delta.reasoning === 'string' || (delta.tool_calls && delta.tool_calls.length))) {
+          _firstTokAt = _pnow();
+        }
         if (delta.content) content += delta.content;
         if (typeof delta.reasoning_content === 'string') reasoningText += delta.reasoning_content;
         else if (typeof delta.reasoning === 'string') reasoningText += delta.reasoning;
@@ -2912,6 +2921,11 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     }
   }
   try { reader.cancel(); } catch (_) {}
+  // Accumulate this attempt's decode span (first token → stream end) onto the
+  // turn's _prof. prefill is derived as completion_ms - decode_ms at emit, so an
+  // attempt that never produced a token contributes nothing here and its whole
+  // wait correctly lands in prefill.
+  if (_firstTokAt && ctx && ctx._prof) ctx._prof.decodeMs += (_pnow() - _firstTokAt);
   if (streamErr) throw streamErr;
   // A 200 response whose body was a bare JSON error (not SSE-framed) never matches
   // the `data: ` prefix, so the loop drains it into `buffer` and we'd return an
@@ -3633,6 +3647,11 @@ async function runAgent(config, ctx) {
   const _profNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const _prof = {
     completionMs: 0, completionCalls: 0, compactionMs: 0,
+    // decodeMs = time from the first generated token to end-of-stream, summed over
+    // every attempt that reached a first token (see streamOneRound). prefill is
+    // derived at emit as completionMs - decodeMs (the wait before the 1st token:
+    // queue + connect + prompt prefill, plus any pre-token retry/backoff wait).
+    decodeMs: 0,
     toolMs: 0, toolCalls: 0, tools: Object.create(null),
     wallStart: _profNow(),
     // Suspension accounting (see heartbeat below). suspendMs = total wall time the
@@ -3684,6 +3703,11 @@ async function runAgent(config, ctx) {
       session_id: ctx._sessionId || null,
       completion_ms: Math.round(_prof.completionMs),
       completion_calls: _prof.completionCalls,
+      // Split of completion_ms: decode = streaming tokens; prefill = the wait
+      // before the first token (queue/connect/prompt-prefill). prefill+decode
+      // ~= completion_ms (clamped ≥0; old clients report 0/0 → panel falls back).
+      decode_ms: Math.round(_prof.decodeMs),
+      prefill_ms: Math.max(0, Math.round(_prof.completionMs - _prof.decodeMs)),
       compaction_ms: Math.round(_prof.compactionMs),
       tool_ms: Math.round(_prof.toolMs),
       tool_calls: _prof.toolCalls,

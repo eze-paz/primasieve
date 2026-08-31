@@ -2539,7 +2539,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=160');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=161');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3477,6 +3477,11 @@ function reportTurnTiming(convId, timing, turnIndex) {
       timing: {
         completion_ms: timing.completion_ms | 0,
         completion_calls: timing.completion_calls | 0,
+        // Split of completion_ms into prefill (wait for 1st token) vs decode
+        // (streaming). MUST be forwarded or the server stores 0 and the panel
+        // can't split the green completion bar.
+        prefill_ms: timing.prefill_ms | 0,
+        decode_ms: timing.decode_ms | 0,
         compaction_ms: timing.compaction_ms | 0,
         tool_ms: timing.tool_ms | 0,
         tool_calls: timing.tool_calls | 0,
