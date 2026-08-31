@@ -1759,16 +1759,21 @@ async function tool_ask({ questions }, ctx) {
     if (!q.question || !Array.isArray(q.options) || q.options.length < 2) {
       return { result: 'Error: each question needs "question" (string) and "options" (array of 2-5 strings).' };
     }
-    if (q.default && !q.options.includes(q.default)) {
-      return { result: 'Error: default "' + q.default + '" is not in options for question: ' + q.question };
-    }
   }
-  // Sanitize: ensure each question has a default set (first option if none given)
-  const sanitized = questions.map(q => ({
-    ...q,
-    default: q.default || q.options[0],
-    allow_freeform: !!q.allow_freeform,
-  }));
+  // Sanitize. A default that isn't verbatim in options used to be a hard error,
+  // which sent weaker models into a retry loop (they'd re-issue the call with a
+  // slightly-reworded default and fail again). Instead COERCE: keep the model's
+  // intended default by appending it as a real option when there's room (≤5),
+  // otherwise fall back to the first option. Never error on a default mismatch.
+  const sanitized = questions.map(q => {
+    let options = q.options.slice(0, 5);
+    let def = q.default;
+    if (def && !options.includes(def)) {
+      if (options.length < 5) options = options.concat([def]);
+      else def = options[0];
+    }
+    return { ...q, options, default: def || options[0], allow_freeform: !!q.allow_freeform };
+  });
   const id = 'ask_' + Math.random().toString(36).slice(2);
   return new Promise((resolve) => {
     // No timeout — the user can take as long as they need. But wire to abort.
