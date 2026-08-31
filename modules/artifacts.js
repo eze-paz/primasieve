@@ -344,6 +344,10 @@ function renderArtifact(host, path, opts) {
 // URL is a snapshot of the bytes at creation — a new one is required for refresh).
 async function loadArtifactFrame(wrap, frame, resolvedP, clean) {
   let p = null;
+  // Clear any prior load-error strip so a retry (e.g. once the Dropbox sync
+  // provider finally connects — see the sync:done handler) can succeed cleanly
+  // instead of stacking error rows under the frame.
+  for (const el of wrap.querySelectorAll(':scope > [data-artifact-error]')) el.remove();
   try {
     p = await resolvedP;
     wrap.dataset.artifactPath = p;
@@ -351,8 +355,16 @@ async function loadArtifactFrame(wrap, frame, resolvedP, clean) {
     if (frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
     frame._blobUrl = url;
     frame.src = url;
+    frame.style.display = 'block';
     delete frame.dataset.frozen;   // any load makes the frame live again (also self-heals readArtifactConsole)
+    delete wrap.dataset.hydrateFailed;
+    wrap.style.borderColor = '';
   } catch (e) {
+    // A dehydrated (cloud-only) file that couldn't hydrate — most often because
+    // the conversation loaded from history BEFORE the sync provider connected.
+    // Mark it so the sync:done / account:signedin handler retries the load once a
+    // provider is available, instead of leaving a permanent "file not found".
+    wrap.dataset.hydrateFailed = '1';
     showArtifactError(wrap, frame, 'failed to load: ' + (clean || p || '') + ' — ' + (e && e.message || e));
   }
 }
@@ -549,6 +561,7 @@ function observeArtifactVisibility(wrap) {
 function showArtifactError(wrap, frame, msg) {
   if (frame) frame.style.display = 'none';
   const errEl = document.createElement('div');
+  errEl.dataset.artifactError = '1';   // so loadArtifactFrame can clear it on retry
   errEl.style.cssText = 'padding:10px 12px;font:12px monospace;color:#f85149;';
   errEl.textContent = '⚠ Artifact error: ' + msg;
   wrap.appendChild(errEl);
@@ -775,6 +788,22 @@ if (typeof Sandpie !== 'undefined' && Sandpie.events) {
       }
     }).catch(() => {});
   });
+  // Retry artifacts that failed to hydrate because no sync provider was connected
+  // yet (the classic symptom: open a conversation from history before Dropbox
+  // finishes connecting → the .html artifact 404s / "file not found" forever).
+  // Once a provider connects (account:signedin) or a sync completes (sync:done),
+  // re-run the load for every frame still marked hydrate-failed. Bounded work
+  // (only failed frames), idempotent (success clears the marker).
+  const _retryFailedArtifacts = () => {
+    for (const wrap of document.querySelectorAll('.artifact-wrap[data-hydrate-failed]')) {
+      if (!wrap.isConnected) continue;
+      const frame = wrap.querySelector('.artifact-frame');
+      const p = wrap.dataset.artifactPath;
+      if (frame && p) loadArtifactFrame(wrap, frame, resolveArtifactPath(p), p).catch(() => {});
+    }
+  };
+  Sandpie.events.on('sync:done', _retryFailedArtifacts);
+  Sandpie.events.on('account:signedin', _retryFailedArtifacts);
 }
 window.formatArtifactBytes = formatArtifactBytes;
 window.formatArtifactAge = formatArtifactAge;

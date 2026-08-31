@@ -1534,16 +1534,27 @@ async function tool_share(args, ctx) {
   }
   const id = 'share_' + Math.random().toString(36).slice(2);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      _shareReqs.delete(id);
-      resolve({ result: 'Error: share request timed out after ' + (SHARE_TIMEOUT / 1000) + 's (the page did not reply).' });
-    }, SHARE_TIMEOUT);
-    _shareReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
+    // Single settle point: page reply, timeout, OR abort — whichever first. Wiring
+    // abort (like tool_ask) is what lets Stop unwind the turn mid-share instead of
+    // hanging until the timeout (which is throttled to ~1/min while the tab is hidden).
+    let settled = false;
+    const finish = (out) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer); _shareReqs.delete(id);
+      if (ctx && ctx.signal) ctx.signal.removeEventListener('abort', onAbort);
+      resolve(out);
+    };
+    const onAbort = () => finish({ result: 'Error: share aborted (turn stopped).' });
+    const timer = setTimeout(() => finish({ result: 'Error: share request timed out after ' + (SHARE_TIMEOUT / 1000) + 's (the page did not reply).' }), SHARE_TIMEOUT);
+    if (ctx && ctx.signal) {
+      if (ctx.signal.aborted) { finish({ result: 'Error: share aborted (turn stopped).' }); return; }
+      ctx.signal.addEventListener('abort', onAbort, { once: true });
+    }
+    _shareReqs.set(id, { resolve: finish });
     try {
       self.postMessage({ type: 'forward-to-page', payload: { type: 'share-request', id, args: { path, type, recipients: recips, pinFile: args.pinFile || undefined } } });
     } catch (e) {
-      clearTimeout(timer); _shareReqs.delete(id);
-      resolve({ result: 'Error: could not reach the page to perform the share (' + ((e && e.message) || e) + ').' });
+      finish({ result: 'Error: could not reach the page to perform the share (' + ((e && e.message) || e) + ').' });
     }
   });
 }
@@ -1560,16 +1571,25 @@ const _askReqs = new Map();   // ask tool — pending user-clarification promise
 async function tool_html_console({ path }, ctx) {
   const id = 'console_' + Math.random().toString(36).slice(2);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      _consoleReqs.delete(id);
-      resolve({ result: 'Error: html_console request timed out after ' + (CONSOLE_TIMEOUT / 1000) + 's (the page did not reply).' });
-    }, CONSOLE_TIMEOUT);
-    _consoleReqs.set(id, { resolve: (out) => { clearTimeout(timer); resolve(out); } });
+    // Settle on page reply, timeout, OR abort — see tool_share for why abort is wired.
+    let settled = false;
+    const finish = (out) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer); _consoleReqs.delete(id);
+      if (ctx && ctx.signal) ctx.signal.removeEventListener('abort', onAbort);
+      resolve(out);
+    };
+    const onAbort = () => finish({ result: 'Error: html_console aborted (turn stopped).' });
+    const timer = setTimeout(() => finish({ result: 'Error: html_console request timed out after ' + (CONSOLE_TIMEOUT / 1000) + 's (the page did not reply).' }), CONSOLE_TIMEOUT);
+    if (ctx && ctx.signal) {
+      if (ctx.signal.aborted) { finish({ result: 'Error: html_console aborted (turn stopped).' }); return; }
+      ctx.signal.addEventListener('abort', onAbort, { once: true });
+    }
+    _consoleReqs.set(id, { resolve: finish });
     try {
       self.postMessage({ type: 'forward-to-page', payload: { type: 'console-request', id, args: { path: String(path || '') } } });
     } catch (e) {
-      clearTimeout(timer); _consoleReqs.delete(id);
-      resolve({ result: 'Error: could not reach the page to read the console (' + ((e && e.message) || e) + ').' });
+      finish({ result: 'Error: could not reach the page to read the console (' + ((e && e.message) || e) + ').' });
     }
   });
 }
@@ -1639,21 +1659,30 @@ async function tool_screenshot(args, ctx) {
 
   const id = 'shot_' + Math.random().toString(36).slice(2);
   const out = await new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      _shotReqs.delete(id);
-      resolve({ ok: false, error: 'the page did not answer within ' + (SHOT_TIMEOUT / 1000) + 's. '
+    // Settle on page reply, timeout, OR abort — see tool_share for why abort is wired.
+    let settled = false;
+    const finish = (d) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer); _shotReqs.delete(id);
+      if (ctx && ctx.signal) ctx.signal.removeEventListener('abort', onAbort);
+      resolve(d);
+    };
+    const onAbort = () => finish({ ok: false, error: 'screenshot aborted (turn stopped).' });
+    const timer = setTimeout(() => finish({ ok: false, error: 'the page did not answer within ' + (SHOT_TIMEOUT / 1000) + 's. '
         + 'Total silence (rather than an error) almost always means sandpie.html is running cached assets older than this worker, '
         + 'so the page-side screenshot handler is missing — ask the user to hard-reload the page. '
-        + 'It is NOT caused by the tab being unfocused: capture runs in an offscreen frame and works with the tab hidden.' });
-    }, SHOT_TIMEOUT);
-    _shotReqs.set(id, { resolve: (d) => { clearTimeout(timer); resolve(d); } });
+        + 'It is NOT caused by the tab being unfocused: capture runs in an offscreen frame and works with the tab hidden.' }), SHOT_TIMEOUT);
+    if (ctx && ctx.signal) {
+      if (ctx.signal.aborted) { finish({ ok: false, error: 'screenshot aborted (turn stopped).' }); return; }
+      ctx.signal.addEventListener('abort', onAbort, { once: true });
+    }
+    _shotReqs.set(id, { resolve: finish });
     try {
       // replyType lets a page that lacks this handler fail fast and explain itself
       // instead of leaving the tool to time out in silence.
       self.postMessage({ type: 'forward-to-page', payload: { type: 'screenshot-request', replyType: 'screenshot-result', id, args: { path, opts } } });
     } catch (e) {
-      clearTimeout(timer); _shotReqs.delete(id);
-      resolve({ ok: false, error: 'could not reach the page (' + ((e && e.message) || e) + ')' });
+      finish({ ok: false, error: 'could not reach the page (' + ((e && e.message) || e) + ')' });
     }
   });
 
