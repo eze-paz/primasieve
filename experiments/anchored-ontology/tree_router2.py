@@ -173,3 +173,46 @@ with torch.no_grad():
     for iters in (5, 8, 12):
         pursuit(lin_col, DIM, iters, f"pursuit-lin x{iters}")
     pursuit(quad_col, 3 * DIM, 8, "pursuit-quad x8")
+
+    # ---- beam pursuit: keep BW candidate paths, subtract best leaf, repeat ----
+    def beam_pursuit(gate_cols, gate_unit, iters=8, BW=3, tag=""):
+        bs = x.shape[0]
+        r = x.clone()
+        pred = torch.zeros(bs, N)
+        visited = torch.zeros(bs, N, dtype=torch.bool)
+        rows = torch.arange(bs)
+        for _ in range(iters):
+            nodes = torch.ones(bs, 1, dtype=torch.long)
+            for depth in range(DEPTH):
+                cand = torch.cat([2 * nodes, 2 * nodes + 1], dim=1)      # (bs, 2W)
+                if depth < DEPTH - 1:
+                    sc = torch.stack([gate_cols(r, cand[:, j]) for j in range(cand.shape[1])], dim=1)
+                else:                                                     # leaf level: readout score
+                    sc = torch.stack([(r * Wr[:, cand[:, j] - N].T).sum(1) + br[cand[:, j] - N]
+                                      for j in range(cand.shape[1])], dim=1)
+                keep = min(BW, cand.shape[1])
+                top = sc.topk(keep, dim=1).indices
+                nodes = cand.gather(1, top)
+            leaves = nodes - N                                            # (bs, W) final beam
+            vals = torch.stack([((r * Wr[:, leaves[:, j]].T).sum(1) + br[leaves[:, j]])
+                                for j in range(leaves.shape[1])], dim=1)
+            best = vals.argmax(1)
+            leaf = leaves[rows, best]
+            vhat = vals[rows, best].clamp(0, 1)
+            r = r - vhat.unsqueeze(1) * D[leaf]
+            pred[rows, leaf] += vhat
+            visited[rows, leaf] = True
+            for j in range(leaves.shape[1]):                              # beam runners-up count as visited
+                visited[rows, leaves[:, j]] = True
+        missed = truth & ~visited
+        miss = missed.float().sum() / truth.float().sum()
+        vmiss = (s * missed.float()).sum() / s.sum()
+        mse = ((pred - s) ** 2).mean()
+        flops = iters * (DEPTH * 2 * BW * gate_unit + 2 * BW * DIM + DIM)
+        print(f"{tag:22s} miss={miss:.3f} vmiss={vmiss:.3f} iters={iters} "
+              f"MSE={mse:.6f} saving={dense_flops/flops:5.1f}x")
+    print("--- beam pursuit ---")
+    for BW in (3, 6):
+        for iters in (8, 12):
+            beam_pursuit(lin_col, DIM, iters, BW, f"beam-lin W{BW} x{iters}")
+    beam_pursuit(quad_col, 3 * DIM, 8, 3, "beam-quad W3 x8")
