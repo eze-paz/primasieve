@@ -2522,12 +2522,23 @@ function handleButtonClick(which = 'main') {
     // Two stop channels on purpose: the page-side controller (errors the event
     // bridge → 'Stopped.'), plus a direct worker abort by agent id in case this
     // turn's bridge was ever orphaned. The worker handler is idempotent, so a
-    // double abort is harmless.
+    // double abort is harmless. Fall back to the last known id if agentId was
+    // cleared out from under a still-live loop.
     if (s.abort) s.abort.abort();
-    if (s.agentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: s.agentId }); } catch (_) {} }
+    const aid = s.agentId || s._lastAgentId;
+    if (aid) { try { getSandpieWorker().postMessage({ type: 'abort', id: aid }); } catch (_) {} }
     return;
   }
-  if (btn.classList.contains('sending')) { refreshSendButtonFor(which); return; }   // stale ■ with no live turn — resync, don't submit
+  // Stale ■ with no live turn: usually just a missed UI resync — but it's also the
+  // signature of an ORPHANED worker loop (the page finalized the turn while the
+  // worker kept running, e.g. after a tab freeze). An explicit stop click must
+  // still reach it, so fire a best-effort abort at the last known agent id before
+  // resyncing the button. Idempotent on the worker.
+  if (btn.classList.contains('sending')) {
+    if (s && s._lastAgentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: s._lastAgentId }); } catch (_) {} }
+    refreshSendButtonFor(which);
+    return;
+  }
   window.handleSubmit(which);
 }
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
@@ -2843,6 +2854,9 @@ async function sendSingle(text, stream, opts = {}) {
   // config turns out to be incomplete, the message stays in the conversation and
   // the error appears after it — never in place of it.
   let wasAborted = false;
+  let turnAgentId = null;   // this turn's worker agent id — used to guarantee the
+                            // worker loop is aborted on EVERY exit path (see finally),
+                            // so a finalized turn can never leave an orphaned loop.
   let userBubbleEl = null;
   if (!opts?.resume) {
     const userMsg = { role: 'user', content: text };
@@ -2983,6 +2997,8 @@ async function sendSingle(text, stream, opts = {}) {
     const worker = getSandpieWorker();
     const _agentId = Math.random().toString(36).slice(2);
     stream.agentId = _agentId;   // steer target: enqueueForActive posts {type:'steer', id} here
+    turnAgentId = _agentId;      // for the finally-abort safety net (survives agentId=null)
+    stream._lastAgentId = _agentId;  // for the stop button to reach a loop even after finalize
     worker.postMessage({ type: 'agent', id: _agentId, config });
     // Steers buffered during the pre-agentId window (see steerActive) go out now,
     // after the 'agent' message, so the worker splices them at its first round
@@ -3017,6 +3033,15 @@ async function sendSingle(text, stream, opts = {}) {
 
     // local-LLM removed
     stream.agentId = null;   // no longer steerable once the loop has ended
+    // Safety net: unconditionally tell the worker to abort THIS turn's loop on
+    // every exit path (natural end, error, abort, or a "worker died mid-stream"
+    // false positive after a tab freeze). The worker's abort handler is idempotent
+    // — a no-op if the loop already finished — so this can only ever STOP a loop
+    // the page has stopped tracking, never kill a live turn. Without it, a worker
+    // loop that outlives its page-side stream (e.g. still retrying a connection
+    // dropped while the tab was frozen) becomes an orphan the stop button can't
+    // reach, because `generating` is already false.
+    if (turnAgentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: turnAgentId }); } catch (_) {} }
     renderer.finalize();
     // A surviving ask card (turn aborted mid-question): keep it ANSWERABLE.
     // Answering appends the tool result and resumes the turn via resolveStoredAsk.
