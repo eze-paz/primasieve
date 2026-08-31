@@ -3,4 +3,6 @@
 __pycache__/
 inputs.jsonl
 gold.jsonl
+gold2.jsonl
 crystal/
+crystal2/
