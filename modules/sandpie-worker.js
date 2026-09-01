@@ -3548,6 +3548,196 @@ function normalizeToolArgs(raw) {
   return '{}';
 }
 
+// ── DegenerationDetector (streaming repetition-degeneration detector) ──────
+// Cheap O(1)/token signals evaluated incrementally as deltas stream in, valid
+// for ANY provider (every stream funnels through streamOneRound):
+//   1. sliding-window DISTINCT-TRIGRAM ratio over word trigrams — healthy
+//      prose/code stays >= ~0.5; a loop ("de de de de…") collapses toward 0.
+//   2. consecutive IDENTICAL-LINE counter (>= 5 identical non-trivial lines).
+//   3. LONG-TOKEN repeat counter (same >=20-char token 5x in a row — base64 /
+//      hex / URL garbage loops).
+// Validated offline against real /admin transcripts: the one real degeneration
+// case (uv1hzwjo turn 15373, "de de de…" loop) trips 17% into the stream;
+// 1,197 healthy texts from 14 sessions produced 0 false positives; repeated
+// code blocks, numbered lists, tables, hashes and base64 blobs do NOT trip.
+// Bounded window (400 trigram keys) => constant memory, ~µs per word.
+class DegenerationDetector {
+  constructor(opts = {}) {
+    this.win = opts.window ?? 400;        // trigrams kept in the sliding window
+    this.checkEvery = opts.checkEvery ?? 25; // evaluate ratio every N new trigrams
+    this.ratioTrip = opts.ratioTrip ?? 0.20; // distinct-trigram ratio below this = bad
+    this.lineTrip = opts.lineTrip ?? 5;      // consecutive identical non-trivial lines to trip
+    this.tokTrip = opts.tokTrip ?? 5;        // same long token repeated N times in a row
+    this.tokMinLen = opts.tokMinLen ?? 20;   // ...and the token must be at least this long
+    this.maxPending = opts.maxPending ?? 64; // flush a pending partial word at this length
+    this.minWords = opts.minWords ?? 120;    // arm the ratio check after this many words
+    this.sustain = opts.sustain ?? 2;        // consecutive bad ratio-checks required to trip
+    this.reset();
+  }
+
+  reset() {
+    this.words = 0;            // total words seen
+    this._wbuf = [];           // last 2 words (to form trigrams)
+    this._tris = [];           // sliding window of trigram keys
+    this._counts = new Map();  // trigram key -> count in window
+    this._sinceCheck = 0;
+    this._badChecks = 0;
+    this._lastRatio = 1;
+    this._minRatio = 1;
+    this._curLine = null;      // normalized current line
+    this._lineRun = 0;
+    this._maxLineRun = 0;
+    this._lastTok = null;      // last long token (for token-repeat counter)
+    this._tokRun = 0;
+    this._pending = '';        // partial word held across deltas
+    this.tripped = false;
+    this.reason = null;
+  }
+
+  _normLine(s) {
+    return s.replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  push(delta) {
+    if (this.tripped || !delta) return;
+    // Split keeping line structure: process line fragments so the line-repeat
+    // counter works incrementally across deltas.
+    const parts = String(delta).split('\n');
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0) this._endLine();
+      this._pushFragment(parts[i]);
+    }
+  }
+
+  _endLine() {
+    const l = this._normLine(this._curLine ?? '');
+    if (l.length >= 3) {
+      if (l === this._curNorm) {
+        this._lineRun++;
+      } else {
+        this._curNorm = l;
+        this._lineRun = 1;
+      }
+      if (this._lineRun > this._maxLineRun) this._maxLineRun = this._lineRun;
+      if (this._lineRun >= this.lineTrip && !this.tripped) {
+        this.tripped = true;
+        this.reason = `line repeated ${this._lineRun}x: "${l.slice(0, 60)}"`;
+      }
+    } else {
+      this._curNorm = null;
+      this._lineRun = 0;
+    }
+    this._curLine = null;
+  }
+
+  _pushFragment(frag) {
+    if (!frag) return;
+    if (this._curLine === null) this._curLine = '';
+    this._curLine += frag;
+    // Tokenize with a pending-partial-word buffer so tokenization is
+    // IDENTICAL no matter where stream deltas split words (live SSE deltas
+    // arrive mid-token). A pending token is flushed early once it exceeds
+    // maxPending chars — that is how no-whitespace loops (minified JSON,
+    // base64) still get counted instead of buffering forever.
+    let buf = this._pending + frag;
+    const endsWS = /\s$/.test(buf);
+    const toks = buf.split(/\s+/).filter(Boolean);
+    this._pending = '';
+    if (!endsWS && toks.length) {
+      const last = toks.pop();
+      if (last.length >= this.maxPending) {
+        // Giant token (minified JSON / base64 / no-space loop): split into
+        // single CHARACTERS so repetition inside it is visible to the trigram
+        // window regardless of where the loop period falls.
+        for (const ch of last) toks.push(ch);
+      } else {
+        this._pending = last; // hold back the incomplete word
+      }
+    }
+    for (const t of toks) {
+      this._tok(t);
+      if (this.tripped) return;
+    }
+  }
+
+  _tok(t) {
+    const w = t.toLowerCase();
+    // Long-token repeat counter: the same long token many times in a row
+    // (base64/hex/URL garbage loops). Short words are exempt — natural
+    // prose repeats them constantly.
+    if (w.length >= this.tokMinLen) {
+      if (w === this._lastTok) {
+        this._tokRun++;
+        if (this._tokRun >= this.tokTrip && !this.tripped) {
+          this.tripped = true;
+          this.reason = `token repeated ${this._tokRun}x: "${w.slice(0, 40)}…"`;
+          return;
+        }
+      } else {
+        this._lastTok = w;
+        this._tokRun = 1;
+      }
+    } else {
+      this._lastTok = null;
+      this._tokRun = 0;
+    }
+    this.words++;
+    this._wbuf.push(w);
+    if (this._wbuf.length === 3) {
+      const key = this._wbuf.join(' ');
+      this._tris.push(key);
+      this._counts.set(key, (this._counts.get(key) || 0) + 1);
+      if (this._tris.length > this.win) {
+        const old = this._tris.shift();
+        const c = this._counts.get(old) - 1;
+        if (c <= 0) this._counts.delete(old); else this._counts.set(old, c);
+      }
+      this._wbuf.shift(); // keep last 2 words so the next trigram slides
+      this._sinceCheck++;
+      if (this._sinceCheck >= this.checkEvery) {
+        this._sinceCheck = 0;
+        this._evalRatio();
+      }
+    }
+  }
+
+  _evalRatio() {
+    const n = this._tris.length;
+    if (!n || this.words < this.minWords) return;
+    const ratio = this._counts.size / n;
+    this._lastRatio = ratio;
+    if (ratio < this._minRatio) this._minRatio = ratio;
+    if (ratio < this.ratioTrip) {
+      this._badChecks++;
+      if (this._badChecks >= this.sustain && !this.tripped) {
+        this.tripped = true;
+        this.reason = `distinct-trigram ratio ${ratio.toFixed(3)} < ${this.ratioTrip} for ${this._badChecks} checks (window ${n})`;
+      }
+    } else {
+      this._badChecks = 0;
+    }
+  }
+
+  // Flush any pending partial line/word (call before final check()).
+  flush() {
+    if (this._pending) { const p = this._pending; this._pending = ''; this._tok(p); }
+    if (this._curLine !== null) this._endLine();
+  }
+
+  // Snapshot: { tripped, reason, ratio, minRatio, maxLineRepeat, words }
+  check() {
+    this.flush();
+    return {
+      tripped: this.tripped,
+      reason: this.reason,
+      ratio: this._lastRatio,
+      minRatio: this._minRatio,
+      maxLineRepeat: this._maxLineRun,
+      words: this.words,
+    };
+  }
+}
+
 async function streamOneRound(reqUrl, headers, body, ctx) {
   // OpenRouter prompt-cache grouping: pin a stable per-conversation session id
   // (set once in runAgent) so the re-sent prefix across tool rounds caches.
@@ -3582,6 +3772,8 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   const _pnow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   let _firstTokAt = 0;
   let buffer = '', content = '', reasoningText = '';
+  // Degeneration detector: fresh per attempt, O(1)/token, bounded window.
+  const _degen = new DegenerationDetector();
   const toolCalls = []; let usage = null, sawDone = false;
   let finishReason = null, streamErr = null;
   // Stall watchdog: a dead upstream connection can leave reader.read() pending
@@ -3620,9 +3812,19 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         if (!_firstTokAt && (delta.content || typeof delta.reasoning_content === 'string' || typeof delta.reasoning === 'string' || (delta.tool_calls && delta.tool_calls.length))) {
           _firstTokAt = _pnow();
         }
-        if (delta.content) content += delta.content;
-        if (typeof delta.reasoning_content === 'string') reasoningText += delta.reasoning_content;
-        else if (typeof delta.reasoning === 'string') reasoningText += delta.reasoning;
+        if (delta.content) { content += delta.content; _degen.push(delta.content); }
+        if (typeof delta.reasoning_content === 'string') { reasoningText += delta.reasoning_content; _degen.push(delta.reasoning_content); }
+        else if (typeof delta.reasoning === 'string') { reasoningText += delta.reasoning; _degen.push(delta.reasoning); }
+        if (_degen.tripped) {
+          // Degeneration: the provider is looping ("de de de…", repeated lines,
+          // garbage-token runs). Abort the attempt as a RETRYABLE error so
+          // _withProviderRetry re-issues it (round_retry resets the partial
+          // render), and tell the page so it reports the trip to the server
+          // for provider attribution in /admin.
+          ctx.emit({ type: 'degeneration', session_id: ctx._sessionId || null, model: body.model || null, reason: _degen.reason, words: _degen.words, ratio: _degen._minRatio });
+          ctx.emit({ type: 'info', message: 'Output degeneration detected — retrying…' });
+          throw Object.assign(new Error('Provider output degeneration: ' + _degen.reason), { status: 502, degeneration: true });
+        }
         if (delta.tool_calls) {
           for (const tc of delta.tool_calls) {
             const i = tc.index || 0;

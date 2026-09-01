@@ -2837,7 +2837,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=173');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=174');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3269,6 +3269,9 @@ async function sendSingle(text, stream, opts = {}) {
       // Round boundary: recordUsage just wrote the fresh reported size, so repaint
       // the live ctx counter now instead of waiting for the whole turn to end.
       if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
+    }
+    if (ev.type === 'degeneration') {
+      reportDegeneration(ev);
     }
     if (ev.type === 'timing') {
       reportTurnTiming(convId, ev.timing, convMessages.length);
@@ -3737,6 +3740,28 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
 // → the server 401s and we silently ignore it. The server derives the per-turn
 // *incremental* prompt cost from these rows (LAG over turn_index), so we just
 // forward the raw provider usage as reported.
+// ── Report provider degeneration (client → /api/usage/degeneration) ────────
+// The worker's degeneration detector tripped mid-stream (looping output) and
+// aborted the attempt. Reported out-of-band so the server can reclassify the
+// captured transcript turn as an error and attribute it to the upstream
+// provider (see /admin → Degenerations by provider). Best-effort.
+function reportDegeneration(ev) {
+  try {
+    if (!ev || !ev.session_id) return;
+    fetch(new URL('/api/usage/degeneration', location.href).href, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: ev.session_id, model: ev.model || null,
+        reason: ev.reason || null, words: ev.words || 0,
+        ratio: ev.ratio != null ? ev.ratio : null,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) { /* analytics must never break the chat */ }
+}
+
 function reportTurnUsage(convId, usage, turnIndex) {
   try {
     if (!convId || !usage || typeof usage.prompt_tokens !== 'number') return;
