@@ -35,33 +35,52 @@ def ucb_select(forms, stats, total_picks, c=1.2):
 
 st_holder=[None]   # ucb_select needs applicability of the live state (v0 simplification)
 
+EPIST_EVERY = 2     # after K consecutive zero-movement ENUMERATE picks, force the epistemic move
+
 def solve_task_meta(name, budget=BUDGET, verbose=False, episode:Episode=None):
+    """v1: bandit over ENUMERATE strata only; epistemic forms are forced moves, not arms.
+    Sequence credit: a solve credits the last K stratum-picks (eligibility trace)."""
     tests=load_tests(name)
     src=open(f"{QB}/python_programs/{name}.py").read()
     st=TaskState(name,src,tests); st_holder[0]=st
-    forms=[ENUMERATE(0),ENUMERATE(1),ENUMERATE(2),LOCALIZE(),RESET(),DEEPEN()]
-    stats={}; total=0
+    arms=[ENUMERATE(0),ENUMERATE(1),ENUMERATE(2)]
+    stats={}; total=0; stuck=0; trace=[]   # trace: recent (form_name, energy, movement) for credit
     while not st.solved and st.tried<budget and time.time()<st.deadline:
-        f=ucb_select(forms,stats,total)
+        f=ucb_select(arms,stats,total)
         before=st.nfail
         delta=f.run(st,budget)
-        # reward: verifier-gradient movement per unit energy; DEEPEN/RESET get the
-        # movement they enable later via the next form's reward (credit assigned
-        # locally in v0 — a known limitation, logged as such)
         energy=max(delta["candidates"],1)
+        moved = delta["score_after"]<before
         r=(before-delta["score_after"])/energy
         pulls,mean=stats.get(f.name,(0,0.0))
         stats[f.name]=(pulls+1, mean+(r-mean)/(pulls+1))
         total+=1
+        trace.append((f.name,energy,r))
         if episode: episode.add(dict(form=f.name,candidates=delta["candidates"],
                                      before=before,after=delta["score_after"],reward=r,
                                      stratum=st.stratum,tried=st.tried))
-        if verbose: print(f"  [{st.tried}] {f.name}: {before}->{delta['score_after']} r={r:.4g} {delta['notes']}",flush=True)
-        # stuck detection: if the last 3 picks produced zero movement and no form
-        # improved anything, force the epistemic move (deepen) if available
-        if total>=3 and all(abs(v[1])<1e-12 for v in stats.values()):
-            if DEEPEN().applicable(st):
-                DEEPEN().run(st,budget); RESET().run(st,budget)
+        if verbose: print(f"  [{st.tried}] {f.name}: {before}->{delta['score_after']} r={r:.4g}",flush=True)
+        if st.solved:
+            # sequence credit: the winning pick shares its reward with the previous picks
+            K=3
+            for i,(fn,en,_r) in enumerate(trace[-K-1:-1]):
+                pl,mn=stats.get(fn,(0,0.0))
+                if pl: stats[fn]=(pl, mn+(_r if en==0 else (before-0)/max(en,1))*0.5/(pl))  # bounded nudge
+            break
+        stuck = stuck+1 if not moved else 0
+        if stuck>=EPIST_EVERY:
+            stuck=0
+            if st.stratum<2:
+                DEEPEN().run(st,budget)          # stratum += 1
+                RESET().run(st,budget)           # reset-to-pristine + re-localize
+                if episode: episode.add(dict(form="DEEPEN+RESET",candidates=0,
+                                             before=before,after=st.nfail,reward=0.0,
+                                             stratum=st.stratum,tried=st.tried))
+            else:
+                LOCALIZE().run(st,budget)        # refresh evidence at max stratum
+                if episode: episode.add(dict(form="LOCALIZE",candidates=len(st.tests),
+                                             before=before,after=st.nfail,reward=0.0,
+                                             stratum=st.stratum,tried=st.tried))
     return st
 
 if __name__=="__main__":
