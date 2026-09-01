@@ -498,18 +498,61 @@ function _lrNorm(p) {
   try { p = decodeURIComponent(p); } catch (_) {}
   return p.replace(/^\.\//, '').replace(/^\/?files\//, '').replace(/^opfs:\/\//, '').replace(/^\/+/, '');
 }
-async function _lrBlobUrl(path) {
-  if (_lrBlobUrls.has(path)) return _lrBlobUrls.get(path);
-  try {
-    const bytes = await opfs.readBytes(path);
-    const mime = _LR_IMG_MIME[path.split('.').pop().toLowerCase()];
-    if (!mime) return null;
-    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-    _lrBlobUrls.set(path, url);
-    return url;
-  } catch (_) { return null; }
+// BETA: a file ref in a chat message is a Dropbox path, not an OPFS path. Resolve
+// it against the active conversation's project folder (absolute /path stays as-is;
+// otherwise it's project-relative) and fetch it into the OPFS render cache so the
+// viewer / <img> / SW /files/ URL can display it. `raw` is the ORIGINAL ref text
+// (before _lrNorm strips the leading slash — we need that to tell absolute apart).
+function _lrBetaResolve(raw) {
+  let p = String(raw || '').trim();
+  try { p = decodeURIComponent(p); } catch (_) {}
+  p = p.replace(/^\.\//, '').replace(/^opfs:\/\//, '');
+  const s = activeStream();
+  const proj = (s && s.projectRoot) ? String(s.projectRoot).replace(/\/+$/, '') : '';
+  const team = !!(s && s.projectNs === 'team');
+  let abs;
+  if (p.startsWith('/')) abs = p.replace(/\/+$/, '');
+  else { p = p.replace(/^files\//, ''); if (!proj) return null; abs = proj + '/' + p; }
+  // Cache rel: the project-relative subpath when the file is inside the project
+  // (clean + reused by the viewer), else a flattened name under _betaview/.
+  const cacheRel = (proj && abs.toLowerCase().startsWith(proj.toLowerCase() + '/'))
+    ? abs.slice(proj.length + 1)
+    : ('_betaview/' + abs.replace(/^\/+/, '').replace(/[^\w.\- ]+/g, '_'));
+  return { abs, team, cacheRel };
 }
-function _lrOpen(path) {
+async function _betaHydrateForView(raw) {
+  const r = _lrBetaResolve(raw);
+  if (!r) return null;
+  const prov = (typeof Sandpie !== 'undefined' && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+  if (!prov || !prov.cloudDownload) return null;
+  let bytes = null;
+  for (const team of [r.team, !r.team]) {   // reads work anywhere: try the project ns, then the other
+    try { bytes = await prov.cloudDownload(r.abs, { team }); if (bytes) break; } catch (_) {}
+  }
+  if (!bytes) return null;
+  try { await opfs.write(r.cacheRel, bytes); } catch (_) {}   // render cache (beta ignores it for sync)
+  return { cacheRel: r.cacheRel, bytes };
+}
+async function _lrBlobUrl(path, raw) {
+  if (_lrBlobUrls.has(path)) return _lrBlobUrls.get(path);
+  const mime = _LR_IMG_MIME[path.split('.').pop().toLowerCase()];
+  if (!mime) return null;
+  const cache = (bytes) => { const url = URL.createObjectURL(new Blob([bytes], { type: mime })); _lrBlobUrls.set(path, url); return url; };
+  try { return cache(await opfs.readBytes(path)); } catch (_) {}
+  if (window.SANDPIE_BETA) {   // not in OPFS → fetch from the Dropbox project
+    try { const h = await _betaHydrateForView(raw != null ? raw : path); if (h && h.bytes) return cache(h.bytes); } catch (_) {}
+  }
+  return null;
+}
+async function _lrOpen(path, raw) {
+  if (window.SANDPIE_BETA) {
+    try {
+      const h = await _betaHydrateForView(raw != null ? raw : path);
+      if (h && typeof SandpieFileViewer !== 'undefined') { SandpieFileViewer.open(h.cacheRel); return; }
+      console.warn('[beta] could not fetch for view:', raw || path);
+    } catch (e) { console.warn('[beta] view fetch failed:', (e && e.message) || e); }
+    return;
+  }
   try { if (typeof SandpieFileViewer !== 'undefined' && _LR_PATHISH.test(path)) SandpieFileViewer.open(path); } catch (_) {}
 }
 function hydrateLocalRefs(root) {
@@ -523,10 +566,10 @@ function hydrateLocalRefs(root) {
     img.dataset.lrDone = '1';
     img.style.maxWidth = 'min(320px, 100%)';
     img.style.maxHeight = '240px';
-    _lrBlobUrl(path).then(u => {
+    _lrBlobUrl(path, raw).then(u => {
       if (u) {
         img.src = u; img.title = path; img.style.cursor = 'pointer';
-        img.onclick = () => _lrOpen(path);
+        img.onclick = () => _lrOpen(path, raw);
       } else {
         img.alt = '(image not found: ' + path + ')';
       }
@@ -546,7 +589,8 @@ function hydrateLocalRefs(root) {
     // be growing when this handler is attached.
     el.addEventListener('click', (ev) => {
       ev.preventDefault(); ev.stopPropagation();
-      _lrOpen(_lrNorm(isA ? (el.getAttribute('href') || '') : (el.textContent || '')));
+      const rawNow = isA ? (el.getAttribute('href') || '') : (el.textContent || '');
+      _lrOpen(_lrNorm(rawNow), rawNow);
     });
   }
 }
