@@ -16,13 +16,40 @@
   if (!window.Sandpie) { console.warn('[projects] no Sandpie host'); return; }
 
   const REG_PATH = 'sandpie/config/projects.json';
+  const ACTIVE_KEY = 'sandpie-beta-active-project';   // localStorage: active project root ('' = Personal)
   const O = () => Sandpie.opfs;
   const P = () => (Sandpie.syncProvider && Sandpie.syncProvider()) || null;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const norm = (s) => String(s || '').replace(/\/+$/, '').toLowerCase();
 
-  // The project to stamp onto the NEXT conversation created (set when the user
-  // clicks "+ chat" on a project row, consumed by newConversation()).
-  let _pending = null;
+  // ---- "Personal" project: the user's own Dropbox workspace folder -----------
+  // A built-in, always-present project so a conversation always has somewhere to
+  // write. Legacy conversations with no projectRoot map here. Its folder is the
+  // sync workspace root (e.g. /sandpie); app metadata lives in its sandpie/
+  // subfolder, so user files sit alongside without collision.
+  function personalRoot() { const p = P(); return (p && p.workingRoot && p.workingRoot()) || '/sandpie'; }
+  function personalProject() { return { name: 'Personal', root: personalRoot(), ns: 'home', personal: true }; }
+  // Does a conversation belong to a given project? Personal also claims the
+  // projectless (legacy) conversations.
+  function convInProject(conv, project) {
+    if (!project) return false;
+    if (project.personal) return !conv.projectRoot || norm(conv.projectRoot) === norm(project.root);
+    return norm(conv.projectRoot) === norm(project.root);
+  }
+
+  // ---- active project (per-device selection) --------------------------------
+  function activeRoot() { try { return localStorage.getItem(ACTIVE_KEY) || ''; } catch { return ''; } }
+  function setActiveRoot(root) { try { localStorage.setItem(ACTIVE_KEY, root || ''); } catch (_) {} }
+  async function activeProject() {
+    const root = activeRoot();
+    if (!root) return personalProject();
+    const reg = await loadRegistry();
+    const p = reg.find(x => norm(x.root) === norm(root));
+    return p || personalProject();
+  }
+  function setActiveProject(project) { setActiveRoot(project && !project.personal ? project.root : ''); }
+  // All projects for the dropdown: Personal first, then the registry (newest-used).
+  async function allProjects() { return [personalProject(), ...(await projectsForSidebar())]; }
 
   // ---- registry ------------------------------------------------------------
   async function loadRegistry() {
@@ -55,16 +82,12 @@
   }
 
   // ---- new-conversation stamping ------------------------------------------
-  // Called by projects UI: remember which project the next new chat belongs to.
-  function startChatIn(project) {
-    _pending = project ? { root: project.root, ns: project.ns || 'home' } : null;
-    if (typeof window.newConversation === 'function') window.newConversation();
+  // newConversation() (conversations.js) calls this to learn which project a new
+  // chat belongs to: the currently-selected project.
+  async function projectForNewChat() {
+    const p = await activeProject();
+    return { root: p.root, ns: p.ns || 'home' };
   }
-  // Consumed by newConversation() (conversations.js) to stamp the stream. Falls
-  // back to the currently-active conversation's project so a plain "+ New chat"
-  // stays in the same project the user is already working in.
-  function consumePending() { const p = _pending; _pending = null; return p; }
-  function hasPending() { return !!_pending; }
 
   // ---- folder picker -------------------------------------------------------
   // A modal that browses the user's Dropbox (home namespace + team folders) and
@@ -179,18 +202,26 @@
     });
   }
 
-  // New-project flow: pick a folder, register it, and open a first chat in it.
+  // New-project flow: pick a folder, name it, register it, select it as active.
+  // Returns the created project (or null if cancelled). Does NOT start a chat —
+  // the user creates one with "+ New chat" once the project is selected.
   async function newProjectFlow() {
     const picked = await pickFolder();
-    if (!picked) return;
+    if (!picked) return null;
+    let name = (prompt('Project name:', picked.name) || '').trim();
+    if (!name) name = picked.name;
     const now = new Date().toISOString();
-    await addProject({ name: picked.name, root: picked.root, ns: picked.ns, created: now, lastUsed: now });
+    const proj = { name, root: picked.root, ns: picked.ns, created: now, lastUsed: now };
+    await addProject(proj);
+    setActiveProject(proj);
     if (typeof Sandpie.refreshConversations === 'function') await Sandpie.refreshConversations();
-    startChatIn(picked);
+    return proj;
   }
 
   window.SandpieProjects = {
     loadRegistry, saveRegistry, addProject, removeProject, touchProject,
-    projectsForSidebar, pickFolder, newProjectFlow, startChatIn, consumePending, hasPending,
+    projectsForSidebar, allProjects, personalProject, convInProject,
+    activeProject, setActiveProject, projectForNewChat,
+    pickFolder, newProjectFlow,
   };
 })();
