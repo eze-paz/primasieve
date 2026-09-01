@@ -5563,6 +5563,7 @@ class RoundRenderer {
     this.thinkEl = null;
     this.thinkBody = null;
     this.thinkSummary = null;
+    this._thinkNode = null;
     this.thinkStart = 0;
     this._thinkDone = false;
     this._streamReveal = false;
@@ -5607,33 +5608,36 @@ class RoundRenderer {
     this._finishThinking();
     // CASE A - the reply from a respond()/cloud turn. The worker delivers the whole
     // ready answer in ONE hunk (cloud deltas go to the reasoning box, never into
-    // this.content), so nothing was live-typed. Don't paint the monolith at once:
-    // enqueue it as pending and let the typewriter drain reveal it, so the reply
-    // visibly streams into conv-host instead of popping in whole.
+    // this.content), so nothing was live-typed. Paint it ONCE, synchronously —
+    // no typewriter reveal (removed 2026-09-02: the reveal re-ran the full
+    // marked+DOMPurify render every drain tick, O(n²) on long replies).
     if (typeof finalContent === 'string' && finalContent && !(this.content && this.content.trim())) {
-      this._streamReveal = true;
+      // ONE-SHOT paint (2026-09-02): the reply arrives complete at round end, so
+      // render it once — no typewriter reveal, no pending/drain churn. The old
+      // reveal re-ran renderMd (marked+DOMPurify over ALL text) every 16-400ms
+      // tick, O(n²) across the reveal; the full render now happens exactly once.
+      this._streamReveal = false;
       this.content = finalContent;   // CANONICAL (English) — persisted/re-sent; never localized
-      this.displayed = '';
+      this.displayed = finalContent;
+      this.pending = '';
       this.toolsShouldClose = true;
       // Localization: the user sees the reply in their language. We reveal the
       // localized text (display only); this.content stays English so the model's
       // own context is never poisoned. Fail-open to English.
       const _loc = _currentLocale(localeOverride);
       if (_loc && _loc.code) {
-        this.pending = '';
-        // Streamed: each translated block group is appended to pending as the
-        // localizer finishes it, so the typewriter starts revealing the reply
-        // after the FIRST group instead of after the whole translation.
-        let fed = 0;
-        renderUserTextStream(finalContent, _loc, (p) => {
-          if (p.head.length > fed) { this.pending += p.head.slice(fed); fed = p.head.length; this._scheduleDrain(); }
-        })
-          .then(tr => { if (!fed) { this.pending = tr || finalContent; this._scheduleDrain(); } })
-          .catch(() => { if (!fed) { this.pending = finalContent; this._scheduleDrain(); } });
+        // Paint the English canonical immediately (one render), then swap the
+        // bubble once the full localized text is ready. No progressive reveal.
+        this._paintContent();
+        renderUserTextStream(finalContent, _loc)
+          .then(tr => {
+            const t = tr || finalContent;
+            if (t !== this.displayed && this.reply && this.reply.isConnected) { this.displayed = t; this._paintContent(); }
+          })
+          .catch(() => {});
         return;
       }
-      this.pending = finalContent;
-      this._scheduleDrain();
+      this._paintContent();
       return;
     }
     // CASE B - anything already live-typed (local models, or completions that leaked
@@ -5852,7 +5856,15 @@ class RoundRenderer {
   _appendReasoning(chunk) {
     if (!this.thinkEl) this._createThinkBox();
     this.reasoning += chunk;
-    if (this.thinkBody.textContent !== this.reasoning) this.thinkBody.textContent = this.reasoning;
+    // Append-only paint: keep ONE text node and appendData each chunk. The old
+    // `thinkBody.textContent = this.reasoning` re-serialized the WHOLE reasoning
+    // on every delta — O(n) per delta = O(n²) per stream, the main-thread bottleneck
+    // at high token rates. Plain text node: no markdown/KaTeX by design.
+    if (!this._thinkNode || this._thinkNode.parentNode !== this.thinkBody) {
+      this._thinkNode = document.createTextNode('');
+      this.thinkBody.appendChild(this._thinkNode);
+    }
+    this._thinkNode.appendData(chunk);
     const sh = this._scrollHost();
     if (sh && shouldAutoScroll(sh)) sh.scrollTop = sh.scrollHeight;
   }
@@ -5878,6 +5890,7 @@ class RoundRenderer {
     this.thinkEl = det;
     this.thinkBody = body;
     this.thinkSummary = sum;
+    this._thinkNode = null;
   }
   _finishThinking() {
     if (!this.thinkEl || this._thinkDone) return;
@@ -5980,14 +5993,11 @@ class RoundRenderer {
   }
   _scheduleDrain() {
     if (this.drainTimer != null) return;
-    // Each drain re-renders the WHOLE message — _extractMath + marked.parse +
-    // DOMPurify.sanitize over all accumulated text (see renderMd). At a fixed 16ms
-    // that is O(n²) across a long stream and burns a core on large responses.
-    // Stretch the interval as the message grows so the expensive full re-render
-    // (esp. the DOMPurify pass) runs far less often once content is big; the final
-    // clean render still happens once at endRound, and streamDiff preserves the
-    // user's text selection at any cadence. Cloud only — local defers markdown to
-    // finalize (_paintContent), so its drains are already cheap.
+    // Cloud replies are painted ONE-SHOT at endRound (no typewriter), so on cloud
+    // the drain only trickles tool-call args into their boxes (cheap: JSON.parse +
+    // escape, no marked/DOMPurify). Local inference still streams content through
+    // here and defers markdown to finalize (_paintContent), so its drains are cheap
+    // too. The growth-stretched interval stays as a safety valve for long arg streams.
     const n = this.isLocal ? 0 : this.displayed.length;
     const delay = n > 120000 ? 400 : n > 40000 ? 200 : n > 12000 ? 80 : 16;
     this.drainTimer = setTimeout(() => this._drainTick(), delay);
