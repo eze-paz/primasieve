@@ -121,6 +121,31 @@ IMAGES, PDFs and other binaries: their CONTENTS aren't searchable — find them 
       required: ['pattern'],
     }
   },
+  web_search: {
+    description: `Search the WEB and get back a ranked list of results (title, URL, snippet). Use whenever the user asks to search the web / look something up online / find current or recent information, or when you need facts beyond your knowledge or a source to cite.
+Give plain keywords (not a regex). Robust by design: results come from a real search backend (OpenRouter web search / Exa) when available, and it transparently falls back to scraping several public engines (DuckDuckGo, Brave, Bing, Mojeek) otherwise — the backend actually used is reported.
+This searches the public web — it is NOT for the user's files (use search / list_files for those). To read a result's full page text, follow up with read_url on its URL.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query:       { type: 'string', description: 'Plain-keyword search query, e.g. "python asyncio tutorial" or "Reixach compressor datasheet".' },
+        num_results: { type: 'integer', description: 'Max results to return (default 8, max 20).' },
+      },
+      required: ['query'],
+    },
+  },
+  read_url: {
+    description: `Fetch a web page and return its main readable text (nav/scripts/ads/boilerplate stripped) plus the page title. Use it to READ a result from web_search, or any URL the user gives you, when you need the actual content rather than just the snippet.
+Returns up to max_chars characters and reports the total length; if the page is longer than you got, call again with a larger max_chars.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        url:       { type: 'string', description: 'Full URL to fetch, e.g. "https://example.com/article".' },
+        max_chars: { type: 'integer', description: 'Max characters of text to return (default 8000, max 40000).' },
+      },
+      required: ['url'],
+    },
+  },
   // show_artifact REMOVED (2026-08-28): every file a turn touches is surfaced to
   // the user automatically at turn end (worker 'files_touched' event → one card
   // per file, .html/images expanded, the rest collapsed clickable cards), and

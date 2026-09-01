@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.24.0-prefill-decode-split';
+const WORKER_VERSION = '2.25.0-web-search-openrouter';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -765,6 +765,317 @@ async function tool_run_python({ path, args, timeout }, ctx) {
   // is tiny; over-clearing only costs one honest re-emit on the next read.
   _emittedFileHashes.clear();
   return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId });
+}
+
+// ============================================================
+// web_search / read_url — public-web access for the model (agentic: the model
+// calls these as ordinary tools whenever it wants current information).
+// web_search is two-tier:
+//   1) PRIMARY — OpenRouter web search (Exa): config.webSearch carries
+//      endpoint+key whenever any configured provider is OpenRouter. One cheap
+//      non-streaming completion with the `web` plugin; the plugin's search
+//      results come back as url_citation annotations and THOSE are returned
+//      (title/url/snippet) — the helper model's own text is discarded, so this
+//      is a pure search backend for the calling model, not RAG.
+//   2) FALLBACK — the multi-engine scrape (DuckDuckGo → DDG-Lite → Brave →
+//      Bing → Mojeek) through the user's own /proxy/ route, parsed with bs4 on
+//      the Pyodide pool. Used when no OpenRouter key is configured, or the
+//      OpenRouter call fails / returns nothing.
+// read_url fetches ANY page via /proxy/ and returns its readable text.
+// ============================================================
+const _WEB_SEARCH_PY = `import json, re, sys, urllib.parse, asyncio
+from pyodide.http import pyfetch
+from bs4 import BeautifulSoup
+
+_a = json.loads(sys.argv[1])
+_QUERY = (_a.get("query") or "").strip()
+_N = max(1, min(int(_a.get("n") or 8), 20))
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+def _txt(el, limit=320):
+    if not el: return ""
+    return " ".join(el.get_text(" ", strip=True).split())[:limit]
+
+def _unwrap(href):
+    if not href: return ""
+    if href.startswith("//"): href = "https:" + href
+    m = re.search(r"[?&](?:uddg|u)=([^&]+)", href)
+    if m:
+        try: return urllib.parse.unquote(m.group(1))
+        except Exception: pass
+    return href
+
+def _looks_blocked(html):
+    low = html[:5000].lower()
+    return any(s in low for s in ("captcha", "challenge-form", "unusual traffic",
+                                  "are you a robot", "/sorry/", "detected unusual"))
+
+async def _fetch(url):
+    resp = await asyncio.wait_for(
+        pyfetch(url, headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"}),
+        timeout=12)
+    if resp.status != 200: return None
+    return await resp.string()
+
+def _p_ddg_html(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for r in s.find_all("div", class_="result"):
+        a = r.find("a", class_="result__a")
+        if not a: continue
+        out.append({"title": _txt(a, 200), "url": _unwrap(a.get("href", "")),
+                    "snippet": _txt(r.find("a", class_="result__snippet"))})
+    return out
+
+def _p_ddg_lite(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    links = s.select("a.result-link")
+    snips = [_txt(td) for td in s.select("td.result-snippet")]
+    for i, a in enumerate(links):
+        out.append({"title": _txt(a, 200), "url": _unwrap(a.get("href", "")),
+                    "snippet": snips[i] if i < len(snips) else ""})
+    return out
+
+def _p_brave(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for d in s.select("div[data-pos], div.snippet"):
+        a = d.find("a", href=True)
+        if not a: continue
+        t = d.select_one(".title, .snippet-title, .url") or a
+        out.append({"title": _txt(t, 200), "url": a.get("href", ""),
+                    "snippet": _txt(d.select_one(".snippet-description, .snippet-content, p"))})
+    return out
+
+def _unwrap_bing(href):
+    # bing.com/ck/a?...&u=a1<base64url>... redirect -> the real URL
+    m = re.search(r"bing\\.com/ck/.*[?&]u=a1([A-Za-z0-9_-]+)", href or "")
+    if not m: return href
+    try:
+        import base64
+        raw = m.group(1); raw += "=" * (-len(raw) % 4)
+        u = base64.urlsafe_b64decode(raw).decode("utf-8", "replace")
+        return u if u.startswith("http") else href
+    except Exception:
+        return href
+
+def _p_bing(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for li in s.select("li.b_algo"):
+        a = li.select_one("h2 a") or li.find("a", href=True)
+        if not a: continue
+        out.append({"title": _txt(a, 200), "url": _unwrap_bing(a.get("href", "")),
+                    "snippet": _txt(li.select_one(".b_caption p") or li.find("p"))})
+    return out
+
+def _p_mojeek(html):
+    s = BeautifulSoup(html, "html.parser"); out = []
+    for li in s.select("ul.results-standard li"):
+        a = li.select_one("h2 a") or li.find("a", href=True)
+        if not a: continue
+        out.append({"title": _txt(a, 200), "url": a.get("href", ""),
+                    "snippet": _txt(li.select_one("p.s") or li.find("p"))})
+    return out
+
+_ENGINES = [
+    ("duckduckgo",      "/proxy/html.duckduckgo.com/html/?q={q}",      _p_ddg_html),
+    ("duckduckgo-lite", "/proxy/lite.duckduckgo.com/lite/?q={q}",      _p_ddg_lite),
+    ("brave",           "/proxy/search.brave.com/search?q={q}",        _p_brave),
+    ("bing",            "/proxy/www.bing.com/search?q={q}&setlang=en", _p_bing),
+    ("mojeek",          "/proxy/www.mojeek.com/search?q={q}",          _p_mojeek),
+]
+
+def _valid(r):
+    u = r.get("url", "")
+    return bool(r.get("title")) and u.startswith("http") and "duckduckgo.com/l/" not in u
+
+def _dedupe(rows):
+    seen = set(); out = []
+    for r in rows:
+        k = re.sub(r"#.*$", "", r["url"]).rstrip("/")
+        if k in seen: continue
+        seen.add(k); out.append(r)
+    return out
+
+async def _run():
+    if not _QUERY:
+        return {"error": "empty query", "results": [], "tried": []}
+    q = urllib.parse.quote(_QUERY)
+    tried = []
+    for name, tmpl, parse in _ENGINES:
+        try:
+            html = await _fetch(tmpl.format(q=q))
+        except Exception as e:
+            tried.append("%s: fetch error (%s)" % (name, type(e).__name__)); continue
+        if not html:
+            tried.append("%s: no/non-200 response" % name); continue
+        if _looks_blocked(html):
+            tried.append("%s: blocked/captcha page" % name); continue
+        try:
+            rows = _dedupe([r for r in parse(html) if _valid(r)])
+        except Exception as e:
+            tried.append("%s: parse error (%s)" % (name, type(e).__name__)); continue
+        if rows:
+            return {"engine": name, "query": _QUERY, "results": rows[:_N], "tried": tried}
+        tried.append("%s: 0 results" % name)
+    return {"engine": None, "query": _QUERY, "results": [], "tried": tried}
+
+_out = await _run()
+print("<<<WSJSON>>>" + json.dumps(_out))
+`;
+
+const _READ_URL_PY = `import json, re, sys
+from pyodide.http import pyfetch
+from bs4 import BeautifulSoup
+
+_a = json.loads(sys.argv[1])
+_URL = (_a.get("url") or "").strip()
+_CAP = max(500, min(int(_a.get("cap") or 8000), 40000))
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+async def _run():
+    if not _URL:
+        return {"error": "empty url"}
+    proxied = "/proxy/" + re.sub(r"^https?://", "", _URL)
+    try:
+        resp = await pyfetch(proxied, headers={"User-Agent": _UA, "Accept-Language": "en-US,en;q=0.9"})
+    except Exception as e:
+        return {"error": "fetch error (%s)" % type(e).__name__}
+    if resp.status != 200:
+        return {"error": "HTTP %s" % resp.status}
+    ctype = ""
+    try: ctype = (resp.headers.get("content-type") or "").lower()
+    except Exception: pass
+    html = await resp.string()
+    if "html" in ctype or "<html" in html[:2000].lower():
+        soup = BeautifulSoup(html, "html.parser")
+        for t in soup(["script", "style", "noscript", "header", "footer", "nav",
+                       "aside", "form", "svg", "iframe"]):
+            t.decompose()
+        main = soup.find("article") or soup.find("main") or soup.body or soup
+        body = re.sub(r"\\n{3,}", "\\n\\n", main.get_text("\\n", strip=True))
+        title = soup.title.get_text(strip=True) if soup.title else _URL
+    else:
+        body = html
+        title = _URL
+    return {"url": _URL, "title": title, "text": body[:_CAP], "total": len(body)}
+
+_r = await _run()
+print("<<<WSJSON>>>" + json.dumps(_r))
+`;
+
+// Run one of the embedded web scripts on the Pyodide pool: write it under
+// sandpie/scripts/ (same convention as the docx-localization helpers), dispatch
+// with the JSON args as argv[1], and parse the <<<WSJSON>>> marker line out of
+// the captured stdout (stderr noise like pyfetch HTTP logs may precede it).
+async function _webPyRun(fileName, code, argsObj, timeoutS, ctx) {
+  const path = 'sandpie/scripts/' + fileName;
+  await opfsWriteBytes(path, new TextEncoder().encode(code));
+  const ex = await dispatchPython({ path, args: [JSON.stringify(argsObj)], timeout: timeoutS,
+                                    signal: ctx && ctx.signal, owner: ctx && ctx.agentId });
+  const raw = String((ex && ex.result) || '');
+  const m = raw.lastIndexOf('<<<WSJSON>>>');
+  if (m < 0) throw new Error(raw.slice(0, 300) || 'no output');
+  const line = raw.slice(m + 12);
+  const nl = line.indexOf('\n');
+  return JSON.parse(nl >= 0 ? line.slice(0, nl) : line);
+}
+
+// PRIMARY backend: OpenRouter's Exa-backed `web` plugin. One non-streaming
+// completion on a cheap helper model; the plugin attaches the raw search
+// results as url_citation annotations, which are returned as {title,url,
+// snippet} — the helper's answer text is ignored. Returns null when no
+// OpenRouter provider is configured; throws on any request failure so the
+// caller can fall back to the scrape chain.
+async function _webSearchOpenRouter(query, n, ctx) {
+  const ws = ctx && ctx._agentConfig && ctx._agentConfig.webSearch;
+  if (!ws || !ws.url || !ws.apiKey) return null;
+  let signal = ctx && ctx.signal;
+  try {   // cap the search call at 30s without detaching from the turn's abort
+    const t = AbortSignal.timeout(30000);
+    signal = signal ? AbortSignal.any([signal, t]) : t;
+  } catch (_) {}
+  const body = {
+    model: ws.model,
+    messages: [{ role: 'user', content: String(query) }],
+    plugins: [{ id: 'web', max_results: n }],
+    max_tokens: 64, stream: false,
+    session_id: 'WebSearch:' + (ctx && ctx._sessionId),   // parent-session marker (same convention as the localizer)
+  };
+  const r = await fetch(ws.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ws.apiKey },
+    body: JSON.stringify(body), signal,
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error('HTTP ' + r.status + (txt ? ' — ' + txt.replace(/\s+/g, ' ').slice(0, 200) : ''));
+  }
+  const j = await r.json();
+  if (j && j.error) throw new Error(String((j.error && j.error.message) || JSON.stringify(j.error)).slice(0, 200));
+  const msg = j && j.choices && j.choices[0] && j.choices[0].message;
+  const anns = (msg && Array.isArray(msg.annotations)) ? msg.annotations : [];
+  const seen = new Set(); const out = [];
+  for (const a of anns) {
+    const c = a && a.type === 'url_citation' && a.url_citation;
+    if (!c || !c.url || !/^https?:/i.test(String(c.url))) continue;
+    const k = String(c.url).replace(/#.*$/, '').replace(/\/$/, '');
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ title: String(c.title || c.url).slice(0, 200), url: String(c.url),
+               snippet: String(c.content || '').replace(/\s+/g, ' ').trim().slice(0, 320) });
+  }
+  return out.slice(0, n);
+}
+
+function _wsFormat(query, engine, results, notes) {
+  const lines = results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}${r.snippet ? '\n   ' + r.snippet : ''}`);
+  return `Web results for "${query}" (via ${engine}):\n\n${lines.join('\n\n')}`
+    + (notes ? '\n\n' + notes : '')
+    + `\n\nTo read a result's full page text, call read_url with its URL.`;
+}
+
+async function tool_web_search({ query, num_results }, ctx) {
+  const q = String(query || '').trim();
+  if (!q) return { result: 'Error: "query" is required (plain keywords).' };
+  const n = Math.max(1, Math.min(parseInt(num_results, 10) || 8, 20));
+  // 1) OpenRouter (Exa) — grounded results, immune to engine blocking/captchas.
+  let orNote = '';
+  try {
+    const or = await _webSearchOpenRouter(q, n, ctx);
+    if (or && or.length) return { result: _wsFormat(q, 'OpenRouter web search / Exa', or) };
+    if (or) orNote = 'OpenRouter web search returned no results; fell back to direct engine scraping.';
+  } catch (e) {
+    if (ctx && ctx.signal && ctx.signal.aborted) return { result: 'Error: web_search aborted — the turn was stopped.' };
+    orNote = 'OpenRouter web search failed (' + (((e && e.message) || String(e)).slice(0, 200)) + '); fell back to direct engine scraping.';
+    try { console.warn('[web_search] ' + orNote); } catch (_) {}
+  }
+  // 2) Fallback: multi-engine /proxy/ scrape on the Pyodide pool.
+  try {
+    const data = await _webPyRun('_web_search.py', _WEB_SEARCH_PY, { query: q, n }, 75, ctx);
+    if (!data.results || !data.results.length) {
+      const why = (data.tried && data.tried.length) ? '\nEngines tried:\n- ' + data.tried.join('\n- ') : '';
+      return { result: `No web results for "${q}".${orNote ? '\n' + orNote : ''}${why}\n(If every engine was blocked or unreachable, the /proxy/ route may be unavailable in this deployment.)` };
+    }
+    return { result: _wsFormat(q, data.engine, data.results, orNote) };
+  } catch (e) {
+    const msg = ((e && e.message) || String(e)).slice(0, 300);
+    return { result: 'Error during web_search: ' + msg + (orNote ? '\n(' + orNote + ')' : '') };
+  }
+}
+
+async function tool_read_url({ url, max_chars }, ctx) {
+  if (!url || !String(url).trim()) return { result: 'Error: "url" is required.' };
+  try {
+    const data = await _webPyRun('_read_url.py', _READ_URL_PY, { url: String(url).trim(), cap: max_chars }, 60, ctx);
+    if (data.error) return { result: `Could not read ${url}: ${data.error}.\n(The page is fetched via /proxy/; it may be unavailable, blocked, or non-HTML.)` };
+    const head = data.title ? `# ${data.title}\n${data.url}\n\n` : `${data.url}\n\n`;
+    const more = (data.total > (data.text || '').length)
+      ? `\n\n…(showing ${(data.text || '').length} of ${data.total} chars; call read_url again with a larger max_chars to read more)` : '';
+    return { result: head + (data.text || '') + more };
+  } catch (e) {
+    return { result: 'Error during read_url: ' + (((e && e.message) || String(e)).slice(0, 300)) };
+  }
 }
 
 // ============================================================
@@ -2358,7 +2669,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -2534,6 +2845,8 @@ async function runTool(name, args, ctx) {
     case 'list_files':    return tool_list_files(args, ctx);
     case 'search':        return tool_search(args, ctx);
     case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
+    case 'web_search':    return tool_web_search(args, ctx);
+    case 'read_url':      return tool_read_url(args, ctx);
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);

@@ -2695,7 +2695,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=164');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=165');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3454,6 +3454,28 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
     routedViaVision: !!routedViaVision,
+    // web_search primary backend: the first configured OpenRouter provider's
+    // endpoint+key (active provider preferred), so the tool gets real Exa-backed
+    // results even when the active model is NOT on OpenRouter. The worker calls
+    // OpenRouter DIRECTLY (CORS-open, no proxy hop) with a cheap helper model —
+    // override it via localStorage 'sandpie-web-search-model'. null → the worker
+    // uses only the /proxy/ multi-engine scrape fallback.
+    webSearch: (() => {
+      try {
+        const cands = [effective, active,
+                       ...((typeof SandpieProviders !== 'undefined' && SandpieProviders.list) ? SandpieProviders.list() : [])].filter(Boolean);
+        const or = cands.find(p => /(^https?:\/\/|\.)openrouter\.ai(\/|$)/i.test(String(p.endpoint || '').trim() + '/')
+                                   && String(p.apiKey || '').trim());
+        if (!or) return null;
+        let model = '';
+        try { model = (localStorage.getItem('sandpie-web-search-model') || '').trim(); } catch (_) {}
+        return {
+          url: String(or.endpoint).trim().replace(/\/$/, '') + '/chat/completions',
+          apiKey: String(or.apiKey).trim(),
+          model: model || 'openai/gpt-4o-mini',
+        };
+      } catch (_) { return null; }
+    })(),
     // Vision facts for the worker's tools: can the active model see, and where can
     // a caption be requested from when it can't (tool_load_image uses this).
     vision: {

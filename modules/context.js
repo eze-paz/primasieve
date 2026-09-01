@@ -229,6 +229,20 @@ const SandpieContext = (() => {
     for (const e of (entries || [])) {
       if (e.kind !== 'directory') continue; // stray files under skills/ are ignored
       const folder = e.name;                // the folder name IS the skill name
+      // web_search was promoted from a skill to a built-in worker TOOL
+      // (2026-09-01: OpenRouter/Exa primary + multi-engine scrape fallback). A
+      // leftover skill by that name would only shadow the tool with the old
+      // flaky instructions, so it is retired on sight — deleted locally and in
+      // the workspace cloud (same 'file:deleted' handshake sharing.js uses).
+      if (/^(web[-_]?search)$/i.test(folder)) {
+        const dir = `${SKILLS_DIR}/${folder}`;
+        try {
+          await opfs.remove(dir);
+          try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:deleted', dir); } catch (_) {}
+          console.info('[skills] "' + folder + '" skill removed — web_search is now a built-in tool');
+        } catch (_) {}
+        continue;
+      }
       const path = `${SKILLS_DIR}/${folder}`;
       const file = `${path}/${SKILL_FILE}`;
       let text;
