@@ -272,19 +272,24 @@ function renderArtifact(host, path, opts) {
   // HTML tooling needs a live frame that the conversation no longer shows: the
   // html_console tool (readArtifactConsole) and the metacog console-note both read
   // window.__sandpieConsole from a loaded frame. Keep ONE hidden, offscreen frame
-  // per HTML card — never visible, marked consoleOnly so the screenshot capture and
-  // resize handler skip it. The per-pane cap freezes older ones for memory.
+  // per HTML card — marked consoleOnly (screenshot capture + resize handler skip it).
+  //
+  // CRITICAL: it starts FROZEN and is NEVER auto-loaded. Auto-loading it here made
+  // every HTML artifact EXECUTE TWICE at render — once in this frame and once in the
+  // thumbnail capture (captureOffscreen) — so the page's external requests fired
+  // twice and the second (single-use tokens / auth nonces / rate limits) came back
+  // 401. The thumbnail capture is now the SINGLE render (one execution, same blob
+  // context as the old inline view). readArtifactConsole self-heals by loading this
+  // frame on demand only when the html_console tool is actually used.
   if (ext === 'html' || ext === 'htm') {
     const frame = document.createElement('iframe');
     frame.className = 'artifact-frame';
     frame.dataset.consoleOnly = '1';
+    frame.dataset.frozen = '1';
     frame.setAttribute('aria-hidden', 'true');
     frame.tabIndex = -1;
     frame.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;border:0;visibility:hidden;pointer-events:none;';
     wrap.appendChild(frame);
-    armConsoleNoteCheck(wrap, frame, clean);
-    loadArtifactFrame(wrap, frame, resolvedP, clean);
-    enforceArtifactCap(artifactPane(wrap), wrap);
   }
 }
 
