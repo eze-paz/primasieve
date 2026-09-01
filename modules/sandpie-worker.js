@@ -870,12 +870,19 @@ function _betaWriteGuard(absPath, ctx) {
   if (!_betaUnderProject(absPath, ctx)) return 'Refused: writes are limited to this conversation\'s project folder "' + proj + '". "' + absPath + '" is outside it. You can READ anywhere, but to write it elsewhere, copy it into the project first.';
   return null;
 }
-// Record a beta write/delete as a touched file (turn-end card) and ping the page
-// to refresh its live Dropbox file view. No OPFS write happened, so nothing to
+// Record a beta WRITE as a touched file (turn-end "created/edited" card) and ping
+// the page to refresh its live Dropbox view. No OPFS write happened, so nothing to
 // invalidate in the render cache here.
 function _betaTouch(ctx, absPath) {
   try { if (ctx && ctx._filesTouched) ctx._filesTouched.set(absPath, Date.now()); } catch (_) {}
   try { self.postMessage({ type: 'forward-to-page', payload: { type: 'beta-fs-changed', paths: [absPath], owner: ctx && ctx.agentId } }); } catch (_) {}
+}
+// A beta DELETE is NOT a "created/edited" file: drop it from the touched set (in
+// case it was created earlier this turn) and signal a deletion so any card is
+// removed — never let a delete surface as an edit.
+function _betaUntouch(ctx, absPath) {
+  try { if (ctx && ctx._filesTouched) ctx._filesTouched.delete(absPath); } catch (_) {}
+  try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: [absPath], owner: ctx && ctx.agentId } }); } catch (_) {}
 }
 
 // Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
@@ -5133,7 +5140,7 @@ async function tool_delete_file({ path, recursive }, ctx) {
     try {
       const res = await _dbxDelete(r.path, r.team);
       if (res && res['.tag'] === 'not_found') return { result: `Nothing to delete: ${r.path} does not exist.` };
-      _betaTouch(ctx, r.path);
+      _betaUntouch(ctx, r.path);   // a delete is not a create/edit — never surface it as a touched file
       return { result: `Deleted: ${r.path}` };
     } catch (e) { return { result: `Delete failed: ${(e && e.message) || e}` }; }
   }
