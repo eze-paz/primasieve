@@ -1420,6 +1420,7 @@
       homeNs: localStorage.getItem(HOMENS_KEY) || '',    // for cross-namespace copy_to_workspace
       workingRoot: localStorage.getItem(ROOT_KEY) || '',
       dehydrated: dehydrated(),
+      beta: BETA,                                        // Dropbox-direct projects fork
     });
   }
   // Push the cloud INDEX to the worker so dehydrated mode can list/hydrate from

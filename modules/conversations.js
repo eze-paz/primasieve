@@ -272,12 +272,12 @@ async function readConvMetaRow(id, archived, format, wantSearch) {
   try {
     if (format === 'new') {
       const meta = JSON.parse(await opfs.read(metaPath(id, archived)));
-      const row = { id: meta.id || id, title: meta.title || '(no title)', updated: meta.updated || '', pinned: !!meta.pinned, archived };
+      const row = { id: meta.id || id, title: meta.title || '(no title)', updated: meta.updated || '', pinned: !!meta.pinned, archived, projectRoot: meta.projectRoot || null };
       if (wantSearch) { try { row.messageContent = _parseJsonl(await opfs.read(jsonlPath(id, archived))).map(m => _convText(m.content)).join(' ').toLowerCase(); } catch {} }
       return row;
     }
     const data = JSON.parse(await opfs.read(convPath(id, archived)));
-    const row = { id: data.id || id, title: data.title || '(no title)', updated: data.updated || '', pinned: !!data.pinned, archived };
+    const row = { id: data.id || id, title: data.title || '(no title)', updated: data.updated || '', pinned: !!data.pinned, archived, projectRoot: data.projectRoot || null };
     if (wantSearch) row.messageContent = (data.messages || []).map(m => _convText(m.content)).join(' ').toLowerCase();
     return row;
   } catch { return null; }
@@ -456,6 +456,15 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   // carried forward — otherwise every save would make the conversation eligible
   // for auto-titling again.
   if (prevMeta && prevMeta.titleLocked) meta.titleLocked = true;
+  // BETA projects fork: the conversation's project folder (absolute Dropbox path
+  // + namespace). Rebuilt-from-scratch meta means this must be carried forward,
+  // preferring a warm stream's value (set by the project picker at new-chat) over
+  // the prior meta. A conversation with no project (legacy / Unsorted) omits both.
+  const projRoot = (s && s.projectRoot) || (prevMeta && prevMeta.projectRoot);
+  if (projRoot) {
+    meta.projectRoot = projRoot;
+    meta.projectNs = (s && s.projectNs) || (prevMeta && prevMeta.projectNs) || 'home';
+  }
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -1375,6 +1384,8 @@ function hydrateStreamFromData(s, data) {
   s.filesTouched = data.filesTouched || null;
   s.artifactThumbs = data.artifactThumbs || null;
   s.lastTurn = data.lastTurn || null;
+  if ('projectRoot' in data) s.projectRoot = data.projectRoot || null;
+  if ('projectNs' in data) s.projectNs = data.projectNs || null;
   // Messages loaded from the new JSONL are already persisted; those from a legacy
   // .json are NOT in a .jsonl yet (persistedCount 0 → first save migrates them).
   s.persistedCount = (data && data._format === 'new') ? s.messages.length : 0;
@@ -1743,6 +1754,8 @@ async function loadConv(id) {
       s.filesTouched = meta.filesTouched || null;
       s.artifactThumbs = meta.artifactThumbs || null;
       s.lastTurn = meta.lastTurn || null;
+      s.projectRoot = meta.projectRoot || null;
+      s.projectNs = meta.projectNs || null;
 
       if (!fileSize) {
         // Empty conversation (no messages yet)
@@ -1978,6 +1991,8 @@ async function duplicateConv(id, title) {
   if (data.filesTouched) meta.filesTouched = data.filesTouched;
   if (data.artifactThumbs) meta.artifactThumbs = data.artifactThumbs;
   if (data.scratchpad != null) meta.scratchpad = data.scratchpad;
+  // A duplicate stays in the same project as its original.
+  if (data.projectRoot) { meta.projectRoot = data.projectRoot; meta.projectNs = data.projectNs || 'home'; }
   // Intentionally do NOT copy session_id: the duplicate is a distinct
   // conversation and must get its own cache key (ensureSessionId on first send).
   const mp = metaPath(newId, false);
@@ -2695,7 +2710,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=166');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=167');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3425,6 +3440,25 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   // language => null: the model authors it directly, no translation layer.
   const _loc = _localizeTarget();
   _activeLocalize = _loc;
+  // BETA projects fork: resolve the conversation's project once (stream first, then
+  // persisted meta) — reused for both the system-prompt block and the worker config.
+  let _projRoot = null, _projNs = null;
+  if (window.SANDPIE_BETA) {
+    try {
+      const cid = convId || activeConvId;
+      const s = convStreams.get(cid);
+      if (s && s.projectRoot) { _projRoot = s.projectRoot; _projNs = s.projectNs || 'home'; }
+      else { const m = await readConvMeta(cid); if (m && m.projectRoot) { _projRoot = m.projectRoot; _projNs = m.projectNs || 'home'; } }
+    } catch (_) {}
+  }
+  // The project rule, appended to the system prompt so the model knows where it
+  // can write and that reads are unrestricted.
+  const _sysPrompt = await buildSystemPrompt(convMessages, _loc);
+  if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
+    _sysPrompt.content += _projRoot
+      ? `\n\n## Project folder\nThis conversation's project folder is "${_projRoot}" in the user's Dropbox. Write files with plain relative paths (they land inside the project); you may also read ANY file anywhere in the user's Dropbox by absolute path (e.g. read_file("/R+D+I/spec.pdf")). Writes, edits and deletes are limited to the project folder — to change a file elsewhere, copy() it into the project first. Artifacts and generated files belong in the project.`
+      : `\n\n## No project folder\nThis conversation has no project folder yet, so file writes will be refused. You can still read files anywhere in Dropbox by absolute path. Ask the user to start the conversation inside a project to enable writing.`;
+  }
   return {
     url: new URL(api(_ep + '/chat/completions'), location.href).href,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
@@ -3441,7 +3475,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     authRefreshUrl: (effective && effective.managed) ? new URL('/auth/token', location.href).href : null,
     _hermesMode: !!(effective && effective.type === 'hermes'),
     model: (effective && effective.model) || $('model').value,
-    systemPrompt: await buildSystemPrompt(convMessages, _loc),
+    systemPrompt: _sysPrompt,
     messages: resolvedMessages,
     tools: _todoV2() ? toolDefs() : _todoLabTools(toolDefs()),
     // Todos run in CLAUDE MODE by default (2026-08-28 A/B: deepseek fully
@@ -3517,6 +3551,12 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
     session_id: await ensureSessionId(convId || activeConvId),
+    // BETA projects fork: the conversation's project folder (absolute Dropbox
+    // path + namespace), resolved above. The worker resolves relative tool paths
+    // against it and guards all writes/deletes to stay inside it. null on /app
+    // and for legacy/Unsorted conversations.
+    projectRoot: _projRoot,
+    projectNs: _projNs,
     // Volatile context (currently the Recent-paths block) for the worker to
     // inject as an ephemeral reminder at the END of each request. Kept OUT of
     // the system prompt on purpose: it changes with every tool call, and any
@@ -3902,6 +3942,8 @@ function ensureStream(id) {
       // JSONL persistence: how many messages are already on disk, and a flag that
       // forces a full rewrite (rewind/edit) instead of an append on the next save.
       persistedCount: 0, _forceJsonlRewrite: false,
+      // BETA projects fork: the conversation's project folder (null until picked).
+      projectRoot: null, projectNs: null,
     };
     convStreams.set(id, s);
   }

@@ -559,7 +559,10 @@ const toolDefs = () => Object.entries(tools)
     // OWN Dropbox and the shared area is in the team space — two different places,
     // so the shared path is asked for directly rather than derived from the
     // workspace path. Only when Dropbox is connected + the working root resolved.
-    if (name === 'search') {
+    // BETA: there is no single "workspace" — each conversation has its own project
+    // folder, surfaced per-turn in the system prompt (which has conversation
+    // context; tool descriptions are static + provider-cached). Skip the injection.
+    if (name === 'search' && !window.SANDPIE_BETA) {
       try {
         const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
         const wr = p && p.workingRoot && p.workingRoot();
@@ -570,6 +573,23 @@ const toolDefs = () => Object.entries(tools)
                     : ` To search elsewhere in Dropbox, use scope:"dropbox" with an absolute folder path.`);
         }
       } catch (_) {}
+    }
+    // BETA: expose copy_to_workspace as `copy` with a project-oriented description
+    // (the worker dispatches both names to the same handler). The project path +
+    // read-anywhere/write-in-project rule live in the system prompt.
+    if (window.SANDPIE_BETA && name === 'copy_to_workspace') {
+      return { type: 'function', function: {
+        name: 'copy',
+        description: `Copy a file (or folder) from ANYWHERE in the user's Dropbox INTO this conversation's project folder, so you can edit or run it. src = the source path (absolute like "/R+D+I/reports/q1.pdf", or a path relative to the project); dest = optional destination inside the project (default: the source filename). The source is never modified. Writes land in the project only.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            src:  { type: 'string', description: 'Source path — absolute (anywhere in Dropbox) or relative to the project.' },
+            dest: { type: 'string', description: 'Optional destination inside the project (default: the source filename).' },
+          },
+          required: ['src'],
+        },
+      } };
     }
     return { type: 'function', function: { name, description, parameters: tools[name].parameters } };
   });

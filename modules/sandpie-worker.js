@@ -178,7 +178,7 @@ self.addEventListener('message', async (event) => {
     // teamRoot  = the team-space root namespace, used ONLY to browse/search team
     // folders (e.g. /R+D+I) — a different namespace from the workspace, hence the
     // split. homeNs lets copy_to_workspace pull a team file across into it.
-    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, homeNs: data.homeNs || '', workingRoot: data.workingRoot || '' };
+    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, homeNs: data.homeNs || '', workingRoot: data.workingRoot || '', beta: !!data.beta };
     _dehydrated = !!data.dehydrated;
     _pyBroadcast(data);   // keep the Pyodide pool's sync-hydrate context in step
     return;
@@ -688,6 +688,182 @@ function _dbxHeaders(json, team) {
   if (ns) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: ns });
   return h;
 }
+// ============================================================
+// BETA dbxfs — Dropbox IS the filesystem (/app-beta projects fork)
+// ============================================================
+// In beta the file tools operate DIRECTLY on Dropbox instead of the OPFS
+// workspace: reads from anywhere in the user's Dropbox, writes/deletes limited
+// by the harness to the conversation's project folder (ctx._projectRoot). OPFS
+// keeps ONLY the sandpie/ app metadata (memory, skills, conversation JSONL) —
+// those paths never enter this layer. Everything here uses the same CORS-open
+// endpoints and the same ascii-safe Dropbox-API-Arg encoding as dropbox.js.
+function _betaOn() { return !!(_dbxCtx && _dbxCtx.beta); }
+// Dropbox-API-Arg is an HTTP header ⇒ must be ASCII. Escape non-ASCII as \uXXXX
+// (Dropbox un-escapes server-side) or a path with accents 401s. See dropbox.js.
+function _apiArg(obj) {
+  return JSON.stringify(obj).replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+// Auth + path-root headers for a beta call. `team` selects the namespace: the
+// team-space root (so /R+D+I etc. are reachable) or the user's home namespace
+// (no header). `json` adds the RPC Content-Type; content endpoints set their own.
+function _betaHeaders(team, json) {
+  const h = { Authorization: 'Bearer ' + (_dbxCtx && _dbxCtx.token) };
+  if (json) h['Content-Type'] = 'application/json';
+  const ns = team ? (_dbxCtx && _dbxCtx.teamRoot) : null;
+  if (ns) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: ns });
+  return h;
+}
+// fetch with pacing-lite: retry 429/5xx (and fetch-throws, which include
+// CORS-masked 429s) with exponential backoff. Dropbox rate-limits hard and a
+// 429 comes back WITHOUT CORS headers, surfacing as a network error.
+async function _dbxFetch(url, opts, tries = 4) {
+  let delay = 500;
+  for (let i = 0; ; i++) {
+    let res;
+    try { res = await fetch(url, opts); }
+    catch (e) { if (i >= tries) throw e; await new Promise(r => setTimeout(r, delay)); delay = Math.min(delay * 1.8, 8000); continue; }
+    if ((res.status === 429 || res.status >= 500 || res.status === 408) && i < tries) {
+      await new Promise(r => setTimeout(r, delay)); delay = Math.min(delay * 1.8, 8000); continue;
+    }
+    return res;
+  }
+}
+// Metadata for an absolute Dropbox path, or null on not_found. Throws on other errors.
+async function _dbxMeta(absPath, team) {
+  const res = await _dbxFetch('https://api.dropboxapi.com/2/files/get_metadata', {
+    method: 'POST', headers: _betaHeaders(team, true), body: JSON.stringify({ path: absPath }),
+  });
+  if (res.status === 409) return null;   // path/not_found
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('get_metadata ' + res.status + ': ' + t.slice(0, 200)); }
+  return await res.json();
+}
+// Read-anywhere namespace fallback: try the project's namespace first, then the
+// other on not_found. Returns { meta, team } or { meta: null } if truly absent.
+async function _dbxMetaAnyNs(absPath, preferTeam) {
+  let m = await _dbxMeta(absPath, preferTeam);
+  if (m) return { meta: m, team: preferTeam };
+  m = await _dbxMeta(absPath, !preferTeam);
+  if (m) return { meta: m, team: !preferTeam };
+  return { meta: null, team: preferTeam };
+}
+// Download bytes for an absolute Dropbox path (get_temporary_link → GET — the
+// proven CORS path, same as hydrateAsync). `team` picks the namespace.
+async function _dbxDownloadBytes(absPath, team) {
+  const tl = await _dbxFetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
+    method: 'POST', headers: _betaHeaders(team, true), body: JSON.stringify({ path: absPath }),
+  });
+  if (!tl.ok) { const t = await tl.text().catch(() => ''); throw new Error('get_temporary_link ' + tl.status + ': ' + t.slice(0, 200)); }
+  const link = (await tl.json()).link;
+  const dl = await _dbxFetch(link, { method: 'GET' });
+  if (!dl.ok) throw new Error('download ' + dl.status);
+  return new Uint8Array(await dl.arrayBuffer());
+}
+// Upload bytes to an absolute Dropbox path (overwrite). `team` picks the namespace.
+async function _dbxUpload(absPath, bytes, team) {
+  const res = await _dbxFetch('https://content.dropboxapi.com/2/files/upload', {
+    method: 'POST',
+    headers: { ..._betaHeaders(team, false), 'Content-Type': 'application/octet-stream',
+               'Dropbox-API-Arg': _apiArg({ path: absPath, mode: 'overwrite', mute: true, autorename: false }) },
+    body: bytes,
+  });
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('upload ' + res.status + ': ' + t.slice(0, 200)); }
+  return await res.json();
+}
+// Delete an absolute Dropbox path (delete_v2, recursive for folders). not_found = no-op.
+async function _dbxDelete(absPath, team) {
+  const res = await _dbxFetch('https://api.dropboxapi.com/2/files/delete_v2', {
+    method: 'POST', headers: _betaHeaders(team, true), body: JSON.stringify({ path: absPath }),
+  });
+  if (res.status === 409) return { ['.tag']: 'not_found' };
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('delete_v2 ' + res.status + ': ' + t.slice(0, 200)); }
+  return await res.json();
+}
+// Create a folder (and parents implicitly via Dropbox). Ignores an existing folder.
+async function _dbxMkdir(absPath, team) {
+  const res = await _dbxFetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
+    method: 'POST', headers: _betaHeaders(team, true), body: JSON.stringify({ path: absPath, autorename: false }),
+  });
+  if (res.status === 409) return null;   // already exists
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('create_folder ' + res.status + ': ' + t.slice(0, 200)); }
+  return await res.json();
+}
+// list_folder for an absolute Dropbox path, paginated + capped. Returns rows
+// {path, kind:'file'|'directory', size, cloudMtime} with .capped. `team` picks ns.
+async function _dbxListFolder(absPath, recursive, team) {
+  const headers = _betaHeaders(team, true);
+  const body = JSON.stringify({ path: absPath || '', recursive: !!recursive, include_mounted_folders: false, include_deleted: false, limit: 999 });
+  let res = await _dbxFetch('https://api.dropboxapi.com/2/files/list_folder', { method: 'POST', headers, body });
+  if (res.status === 409) { const rows = []; rows.notFound = true; return rows; }
+  if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('list_folder ' + res.status + ': ' + t.slice(0, 200)); }
+  let data = await res.json();
+  let entries = data.entries || [];
+  const LIST_CAP = recursive ? 1500 : 6000;
+  while (data.has_more && entries.length < LIST_CAP) {
+    res = await _dbxFetch('https://api.dropboxapi.com/2/files/list_folder/continue', { method: 'POST', headers, body: JSON.stringify({ cursor: data.cursor }) });
+    if (!res.ok) break;
+    data = await res.json();
+    entries = entries.concat(data.entries || []);
+  }
+  const capped = !!data.has_more;
+  if (entries.length > LIST_CAP) entries = entries.slice(0, LIST_CAP);
+  const rows = entries.map(e => ({ path: e.path_display || e.path_lower, kind: e['.tag'] === 'folder' ? 'directory' : 'file', size: e.size, cloudMtime: e.client_modified }));
+  rows.capped = capped;
+  return rows;
+}
+// Copy src → dest. Same namespace: copy_v2 (cheap, server-side). Cross namespace:
+// download the bytes then upload into dest (a folder-copy across namespaces is
+// refused; the tool reports that).
+async function _dbxCopy(srcAbs, srcTeam, destAbs, destTeam, isFolder) {
+  if (srcTeam === destTeam) {
+    const res = await _dbxFetch('https://api.dropboxapi.com/2/files/copy_v2', {
+      method: 'POST', headers: _betaHeaders(srcTeam, true), body: JSON.stringify({ from_path: srcAbs, to_path: destAbs, autorename: true }),
+    });
+    if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error('copy_v2 ' + res.status + ': ' + t.slice(0, 200)); }
+    return (await res.json()).metadata || {};
+  }
+  if (isFolder) throw new Error('cross-namespace folder copy is not supported — copy individual files.');
+  const bytes = await _dbxDownloadBytes(srcAbs, srcTeam);
+  await _dbxUpload(destAbs, bytes, destTeam);
+  return { path_display: destAbs, size: bytes.byteLength };
+}
+// ---- beta path resolution + write guard ----
+// Resolve a raw tool path arg for beta. Returns one of:
+//   { kind:'opfs', rel }               → sandpie/ app metadata (unchanged OPFS path)
+//   { kind:'dbx', path, team, abs }     → an absolute Dropbox path (read anywhere)
+//   { kind:'noproject' }               → relative path but no project set
+function _betaResolve(raw, ctx) {
+  const s = String(raw == null ? '' : raw).trim();
+  const relForm = s.replace(/^\/+/, '').replace(/^files\//, '');
+  if (relForm === 'sandpie' || relForm.startsWith('sandpie/')) return { kind: 'opfs', rel: relForm };
+  const projTeam = !!(ctx && ctx._projectNs === 'team');
+  if (s.startsWith('/')) return { kind: 'dbx', path: s.replace(/\/+$/, ''), team: projTeam, abs: true };
+  const proj = (ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '') : '';
+  if (!proj) return { kind: 'noproject' };
+  const clean = relForm.replace(/\/+$/, '');
+  return { kind: 'dbx', path: clean ? proj + '/' + clean : proj, team: projTeam, abs: false, rel: clean };
+}
+// Is an absolute Dropbox path inside the conversation's project folder?
+function _betaUnderProject(absPath, ctx) {
+  const proj = (ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '').toLowerCase() : '';
+  if (!proj) return false;
+  const p = String(absPath).replace(/\/+$/, '').toLowerCase();
+  return p === proj || p.startsWith(proj + '/');
+}
+// The harness write boundary (requirement 6): writes/deletes must stay inside the
+// project folder. Returns an error string to hand back to the model, or null if ok.
+function _betaWriteGuard(absPath, ctx) {
+  if (!ctx || !ctx._projectRoot) return 'This conversation has no project folder — start one (or pick a project) before writing files.';
+  if (!_betaUnderProject(absPath, ctx)) return 'Refused: writes are limited to this conversation\'s project folder "' + ctx._projectRoot + '". "' + absPath + '" is outside it. You can READ anywhere, but to write it elsewhere, copy it into the project first.';
+  return null;
+}
+// Record a beta write/delete as a touched file (turn-end card) and ping the page
+// to refresh its live Dropbox file view. No OPFS write happened, so nothing to
+// invalidate in the render cache here.
+function _betaTouch(ctx, absPath) {
+  try { if (ctx && ctx._filesTouched) ctx._filesTouched.set(absPath, Date.now()); } catch (_) {}
+  try { self.postMessage({ type: 'forward-to-page', payload: { type: 'beta-fs-changed', paths: [absPath], owner: ctx && ctx.agentId } }); } catch (_) {}
+}
+
 // Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
 // Mirrors dropbox.js download() — the documented CORS-enabled browser path.
 async function hydrateAsync(rel) {
@@ -1754,13 +1930,30 @@ async function _compressImageToFit(rawBytes, srcMime, targetB64) {
 
 async function tool_load_image({ path }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
-  const clean = String(path).replace(/^\/+/, '');
+  let clean = String(path).replace(/^\/+/, '');
   try {
     let bytes;
-    try { bytes = await opfsReadBytes(clean); }
-    catch (miss) {
-      if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
-      else throw miss;
+    if (_betaOn()) {
+      const r = _betaResolve(path, ctx);
+      if (r.kind === 'noproject') return { result: 'Error: "' + path + '" is project-relative but this conversation has no project folder. Use an absolute /Dropbox/path.' };
+      if (r.kind === 'dbx') {
+        clean = r.path;
+        let ok = false;
+        for (const team of (r.abs ? [r.team, !r.team] : [r.team])) {
+          try { bytes = await _dbxDownloadBytes(r.path, team); ok = true; break; } catch (_) {}
+        }
+        if (!ok) return { result: 'Error: image not found in Dropbox: ' + r.path };
+      } else {
+        clean = r.rel;   // sandpie/ metadata — OPFS read below
+        try { bytes = await opfsReadBytes(clean); }
+        catch (miss) { if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); } else throw miss; }
+      }
+    } else {
+      try { bytes = await opfsReadBytes(clean); }
+      catch (miss) {
+        if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
+        else throw miss;
+      }
     }
     const ext = (clean.split('.').pop() || '').toLowerCase();
     let mime = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' }[ext] || 'application/octet-stream';
@@ -2197,17 +2390,39 @@ function _fnv1a(s) {
   return h >>> 0;
 }
 
-async function tool_read_file({ path, offset, limit, force, _conv }) {
+async function tool_read_file({ path, offset, limit, force, _conv }, ctx) {
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (hydration)
-  const norm = normFilesPath(path);
-  if (!norm) return { result: 'Error: path is required.' };
-  let file;
-  try { file = await _opfsGetFile(norm); }
-  catch {
-    if (_indexEntry(norm)) {
-      try { await hydrateAsync(norm); file = await _opfsGetFile(norm); }
-      catch (e) { return { result: `Error: ${norm} is in Dropbox but could not be fetched: ${(e && e.message) || e}` }; }
-    } else { return { result: 'Error: file not found: ' + norm }; }
+  let norm, file;
+  if (_betaOn()) {
+    // BETA: read directly from Dropbox — anywhere (absolute) or project-relative.
+    if (!String(path || '').trim()) return { result: 'Error: path is required.' };
+    const r = _betaResolve(path, ctx);
+    if (r.kind === 'noproject') return { result: 'Error: "' + path + '" is a project-relative path but this conversation has no project folder. Use an absolute /Dropbox/path, or start a conversation in a project.' };
+    if (r.kind === 'dbx') {
+      // Reads work anywhere; for an absolute path try the project's namespace then
+      // the other, so a home-ns file is reachable from a team-ns project and vice versa.
+      let bytes, found = false;
+      for (const team of (r.abs ? [r.team, !r.team] : [r.team])) {
+        try { bytes = await _dbxDownloadBytes(r.path, team); found = true; break; } catch (_) {}
+      }
+      if (!found) return { result: 'Error: file not found in Dropbox: ' + r.path };
+      norm = r.path;
+      const decoded = new TextDecoder().decode(bytes);
+      file = { size: bytes.byteLength, text: async () => decoded };
+    } else {
+      norm = r.rel;   // sandpie/ app metadata — falls through to OPFS below
+    }
+  }
+  if (file === undefined) {
+    norm = norm != null ? norm : normFilesPath(path);
+    if (!norm) return { result: 'Error: path is required.' };
+    try { file = await _opfsGetFile(norm); }
+    catch {
+      if (_indexEntry(norm)) {
+        try { await hydrateAsync(norm); file = await _opfsGetFile(norm); }
+        catch (e) { return { result: `Error: ${norm} is in Dropbox but could not be fetched: ${(e && e.message) || e}` }; }
+      } else { return { result: 'Error: file not found: ' + norm }; }
+    }
   }
   if (file.size > FILE_TEXT_MAX) return { result: `Error: ${norm} is ${file.size} bytes — too large to read as text. Process it with run_python instead.` };
   const text = await file.text();
@@ -2237,11 +2452,50 @@ async function tool_read_file({ path, offset, limit, force, _conv }) {
   return { result: payload };
 }
 
-async function tool_list_files({ path, pattern, recursive, scope }) {
+async function tool_list_files({ path, pattern, recursive, scope }, ctx) {
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet
   const rx = pattern ? globToRegExp(pattern) : null;
   const raw = (path == null) ? '' : String(path).trim();
   const connected = !!(_dbxCtx && _dbxCtx.token);
+
+  // BETA: list directly from Dropbox. Default (no path) = the project root;
+  // an absolute /path lists anywhere; sandpie/ falls through to the OPFS view.
+  if (_betaOn() && scope !== 'workspace') {
+    const r = _betaResolve(raw || (ctx && ctx._projectRoot) || '', ctx);
+    if (r.kind === 'noproject') return { result: 'Error: no project folder for this conversation. Give an absolute /Dropbox/path, or start a conversation in a project.' };
+    if (r.kind === 'dbx') {
+      if (!connected) return { result: 'Error: Dropbox is not connected.' };
+      let entries = null;
+      for (const team of (r.abs ? [r.team, !r.team] : [r.team])) {
+        try { const e = await _dbxListFolder(r.path, recursive, team); if (!e.notFound) { entries = e; break; } }
+        catch (err) { return { result: (err && err.message) || String(err) }; }
+      }
+      if (entries === null) return { result: `Not found (or empty): ${r.path}` };
+      const projBase = (!r.abs && ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '') : '';
+      const disp = (p) => (projBase && p.toLowerCase().startsWith(projBase.toLowerCase() + '/')) ? p.slice(projBase.length + 1) : p;
+      const capped = !!entries.capped;
+      const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
+      const label = r.abs ? (r.path || 'Dropbox root') : (r.rel ? r.rel + '/ (project)' : 'the project folder');
+      if (!rows.length) return { result: `No ${pattern ? 'files matching "' + pattern + '"' : 'entries'} in ${label}.` };
+      let buf = `${rows.length}${capped ? '+' : ''} entr${rows.length === 1 ? 'y' : 'ies'} in ${label}${pattern ? ' matching "' + pattern + '"' : ''}:\n`;
+      let shown = 0, truncated = false;
+      for (const e of rows) {
+        let line;
+        if (e.kind === 'directory') { line = disp(e.path) + '/\n'; }
+        else {
+          const size = e.size != null ? e.size + 'b' : '?';
+          const mtime = e.cloudMtime ? '  ' + new Date(e.cloudMtime).toISOString().slice(0, 16).replace('T', ' ') : '';
+          line = `${disp(e.path)}\t${size}${mtime}\n`;
+        }
+        if (buf.length + line.length > FILE_TOOL_CAP) { truncated = true; break; }
+        buf += line; shown++;
+      }
+      if (truncated) buf += `…[${rows.length - shown} more not shown; narrow with path/pattern]`;
+      if (capped) buf += `\n⚠ "${label}" is very large — stopped early; list a subfolder with recursive:false and drill down.`;
+      return { result: buf.replace(/\n$/, '') };
+    }
+    // r.kind === 'opfs' → fall through to the OPFS listing below (sandpie/ view).
+  }
 
   // `scope` decides workspace-vs-cloud (mirrors search):
   //  - 'dropbox' (or 'cloud') → list the connected Dropbox; `path` is an absolute
@@ -2382,14 +2636,17 @@ function _formatCloudPage(r, query, scope, offset) {
   const totalStr = r.hasMore ? `${total}+` : String(total);
   const off = Math.max(0, parseInt(offset, 10) || 0);
   const page = r.paths.slice(off, off + PAGE);
+  // In beta, read_file works on any Dropbox path directly (no copy-in step), so the
+  // "outside your workspace" note is dropped.
+  const note = _betaOn() ? '' : ' (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it)';
   if (!page.length) return `No more cloud matches for "${query}" in ${scope} — ${totalStr} total; offset ${off} is past the end.`;
-  if (total <= PAGE && off === 0) return `${total} cloud file(s) matching "${query}" in ${scope} (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it):\n` + page.join('\n');
+  if (total <= PAGE && off === 0) return `${total} file(s) matching "${query}" in ${scope}${note}:\n` + page.join('\n');
   const end = off + page.length;
   const hints = [];
   if (end < total) hints.push(`call search again with offset:${end} for the next ${Math.min(PAGE, total - end)}`);
   if (r.hasMore && end >= total) hints.push(`>${total} matches total — narrow the path/term to reach the rest`);
   hints.push('or narrow the path/term for fewer, more relevant matches');
-  return `${totalStr} cloud files match "${query}" in ${scope} — showing ${off + 1}-${end} (outside your workspace — copy one in with copy_to_workspace("<path>"), then read_file/load_image it):\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
+  return `${totalStr} files match "${query}" in ${scope} — showing ${off + 1}-${end}${note}:\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
 }
 async function _dropboxListFolder(folderPath, recursive) {
   const headers = _dbxHeaders(true, true);   // team namespace — cloud browse
@@ -2467,13 +2724,40 @@ async function _ensureDbxCtx(timeoutMs = 4000) {
 // Unified search. Path-aware: inside the working root it greps local files and
 // (when dehydrated) merges Dropbox content-search hits for un-downloaded files;
 // an absolute Dropbox path OUTSIDE the working root does a pure cloud search.
-async function tool_search({ pattern, path, include, files_only, ignore_case, offset, scope }) {
+async function tool_search({ pattern, path, include, files_only, ignore_case, offset, scope }, ctx) {
   if (!pattern) return { result: 'Error: pattern (a regular expression) is required.' };
   let rx; try { rx = new RegExp(pattern, ignore_case === false ? '' : 'i'); }
   catch (e) { return { result: 'Error: invalid regex: ' + (e && e.message || e) }; }
 
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet
   const connected = !!(_dbxCtx && _dbxCtx.token);
+
+  // BETA: there is no OPFS workspace to grep. A default (non-cloud) search runs a
+  // Dropbox content search scoped to the project folder; scope:"dropbox" with an
+  // absolute path still searches anywhere (handled by the shared cloud leg below).
+  if (_betaOn() && scope !== 'dropbox' && scope !== 'cloud') {
+    const rawB = (path == null) ? '' : String(path).trim();
+    if (!rawB.startsWith('/')) {   // project-scoped search
+      if (!connected) return { result: 'Error: Dropbox is not connected.' };
+      const proj = (ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '') : '';
+      if (!proj) return { result: 'This conversation has no project folder. Use scope:"dropbox" with an absolute folder path to search Dropbox.' };
+      const team = !!(ctx && ctx._projectNs === 'team');
+      const lits = _searchLiterals(pattern);
+      if (!lits.length) return { result: 'To search, give a keyword (≥3 chars). Dropbox search matches file NAMES + text contents by keyword (regex is reduced to its literal words).' };
+      const scopePath = proj + (rawB ? '/' + rawB.replace(/^files\//, '').replace(/\/+$/, '') : '');
+      const exts = _globExtensions(include);
+      let r; try { r = await _dropboxSearchPaths(lits.join(' '), scopePath, false, exts, team); }
+      catch (e) { return { result: (e && e.message) || String(e) }; }
+      let paths = r.paths;
+      if (include) { const ig = globToRegExp(include); paths = paths.filter(p => ig.test(p) || ig.test(p.split('/').pop())); }
+      const projLc = proj.toLowerCase();
+      paths = paths.map(p => p.toLowerCase().startsWith(projLc + '/') ? p.slice(proj.length + 1) : p);
+      const label = rawB ? rawB + '/ (project)' : 'the project folder';
+      if (!paths.length) return { result: `No files found for "${lits.join(' ')}" in ${label}.` };
+      return { result: _formatCloudPage({ paths, hasMore: r.hasMore }, lits.join(' '), label, offset) };
+    }
+    // absolute path in beta → fall through to the shared cloud leg (read-anywhere).
+  }
   const wr = ((_dbxCtx && _dbxCtx.workingRoot) || '').replace(/\/+$/, '');
   const raw = (path == null) ? '' : String(path).trim();
   const relIfAbs = raw.startsWith('/') ? _relUnderRoot(raw) : undefined;
@@ -2611,7 +2895,35 @@ async function _forkLocal(src, dest, ctx) {
 async function tool_copy_to_workspace({ src, dest }, ctx) {
   await _ensureDbxCtx();   // first-login race: token may not have reached the worker yet (cloud import)
   const from = (src == null ? '' : String(src)).trim();
-  if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
+  if (!from) return { result: 'Error: "src" is required (a source path — anywhere in Dropbox — to copy into the project).' };
+  // BETA: copy(src, dest) — src from anywhere in Dropbox, dest into the project
+  // folder (harness-guarded). Server-side copy_v2 within a namespace, else
+  // download+upload across namespaces.
+  if (_betaOn()) {
+    if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };
+    const sres = _betaResolve(from, ctx);
+    if (sres.kind === 'noproject') return { result: 'Error: "' + from + '" is project-relative but this conversation has no project folder. Give an absolute source path.' };
+    if (sres.kind === 'opfs') return { result: 'Error: sandpie/ is app metadata, not a copy source. Copy a Dropbox file instead.' };
+    const srcPath = sres.path;
+    // Find the source and its namespace (read-anywhere: try project ns then the other).
+    const sm = await _dbxMetaAnyNs(srcPath, sres.team);
+    if (!sm.meta) return { result: 'Copy failed — source not found: ' + srcPath };
+    const isFolder = sm.meta['.tag'] === 'folder';
+    // Dest defaults to the source basename, placed in the project root.
+    const destRaw = (dest != null && String(dest).trim()) ? String(dest).trim() : srcPath.split('/').filter(Boolean).pop();
+    const dres = _betaResolve(destRaw, ctx);
+    if (dres.kind === 'noproject') return { result: 'Error: no project folder to copy into.' };
+    if (dres.kind === 'opfs') return { result: 'Error: cannot copy into sandpie/ (app metadata).' };
+    const destPath = dres.path;
+    const err = _betaWriteGuard(destPath, ctx);
+    if (err) return { result: err };
+    try {
+      const meta = await _dbxCopy(srcPath, sm.team, destPath, dres.team, isFolder);
+      _betaTouch(ctx, destPath);
+      const finalPath = meta.path_display || destPath;
+      return { result: `Copied ${isFolder ? 'folder ' : ''}into your project as ${finalPath}${(!isFolder && meta.size != null) ? ' (' + meta.size + ' bytes)' : ''}. Use read_file / run_python on it.` };
+    } catch (e) { return { result: 'Copy failed: ' + ((e && e.message) || e) }; }
+  }
   // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared-installed/…): fork in OPFS, no Dropbox needed.
   if (!from.startsWith('/')) return _forkLocal(from, dest, ctx);
   // Absolute path → import from elsewhere in the user's Dropbox (needs Dropbox connected).
@@ -2673,7 +2985,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','copy','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -2852,6 +3164,7 @@ async function runTool(name, args, ctx) {
     case 'web_search':    return tool_web_search(args, ctx);
     case 'read_url':      return tool_read_url(args, ctx);
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
+    case 'copy':          return tool_copy_to_workspace(args, ctx);   // BETA name for copy_to_workspace
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'delete_file':   return tool_delete_file(args, ctx);
@@ -3825,6 +4138,11 @@ async function runAgent(config, ctx) {
   // (e.g. spawn_subagent builds the child's config from it).
   ctx._agentConfig = config;
   ctx._messages = messages;
+  // BETA projects fork: the conversation's project folder (absolute Dropbox path
+  // + namespace). Relative tool paths resolve against it; all writes/deletes are
+  // guarded to stay inside it. null on /app and for legacy/Unsorted conversations.
+  ctx._projectRoot = config.projectRoot || null;
+  ctx._projectNs = config.projectNs || 'home';
   // ---- Worker-side JSONL persistence -------------------------------------
   // The page passes where to append (config.jsonl_path) and how many messages
   // are already on disk (config.persisted_count). Every committed message is
@@ -4690,6 +5008,36 @@ async function runAgent(config, ctx) {
 // ============================================================
 async function tool_write_file({ path, content, overwrite, _conv }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
+  if (_betaOn()) {
+    const r = _betaResolve(path, ctx);
+    if (r.kind === 'dbx') {
+      const err = _betaWriteGuard(r.path, ctx);
+      if (err) return { result: err };
+      const bytes = new TextEncoder().encode(content || '');
+      // overwrite:false conflict check via Dropbox metadata (no OPFS to probe).
+      if (!overwrite) {
+        let meta = null; try { meta = await _dbxMeta(r.path, r.team); } catch (_) {}
+        if (meta && meta['.tag'] === 'file') {
+          let existing = ''; try { existing = new TextDecoder().decode(await _dbxDownloadBytes(r.path, r.team)); } catch (_) {}
+          if ((content || '') === existing) return { result: `${r.path} already contains exactly this content (${existing.length} bytes) — no write needed.` };
+          const nm = r.path.split('/').pop();
+          const hint = `Pick ONE: (a) small change → edit_file it in place; (b) full replacement intended → call write_file again with overwrite:true. NEVER save a renamed copy like ${nm.replace(/(\.[^.]*)?$/, '_v2$1')}.`;
+          const CAP = 2000;
+          const shown = existing.length > CAP ? existing.slice(0, CAP) + `\n…(truncated; ${existing.length} bytes total — read_file to see the rest)` : existing;
+          return { result: `${r.path} already exists (${existing.length} bytes) — NOT overwritten. ${hint} Current content (head):\n\n${shown}` };
+        }
+      }
+      let existed = false;
+      try { const m = await _dbxMeta(r.path, r.team); existed = !!(m && m['.tag'] === 'file'); } catch (_) {}
+      try {
+        await _dbxUpload(r.path, bytes, r.team);
+        _betaTouch(ctx, r.path);
+        return { result: `${existed ? 'Overwrote' : 'Created'}: ${r.path} (${bytes.byteLength} bytes)` };
+      } catch (e) { return { result: `Write failed: ${(e && e.message) || e}` }; }
+    }
+    if (r.kind === 'noproject') return { result: 'Error: "' + path + '" is a project-relative path but this conversation has no project folder to write into.' };
+    // r.kind === 'opfs' → sandpie/ metadata: fall through to the OPFS path below.
+  }
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   let existed = false;
   if (!overwrite) try {
@@ -4748,6 +5096,19 @@ async function tool_write_file({ path, content, overwrite, _conv }, ctx) {
 // skills, conversation JSONL) that has its own flows.
 async function tool_delete_file({ path, recursive }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
+  if (_betaOn()) {
+    const r = _betaResolve(path, ctx);
+    if (r.kind === 'opfs') return { result: `Refused: ${r.rel} is under sandpie/ — system data (memories, skills, conversations). Not deletable with this tool.` };
+    if (r.kind === 'noproject') return { result: 'Error: "' + path + '" is a project-relative path but this conversation has no project folder.' };
+    const err = _betaWriteGuard(r.path, ctx);   // delete is a write — must stay in-project
+    if (err) return { result: err };
+    try {
+      const res = await _dbxDelete(r.path, r.team);
+      if (res && res['.tag'] === 'not_found') return { result: `Nothing to delete: ${r.path} does not exist.` };
+      _betaTouch(ctx, r.path);
+      return { result: `Deleted: ${r.path}` };
+    } catch (e) { return { result: `Delete failed: ${(e && e.message) || e}` }; }
+  }
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   if (!norm) return { result: 'Refused: cannot delete the /files/ root.' };
   if (norm === 'sandpie' || norm.startsWith('sandpie/')) {
@@ -4882,6 +5243,29 @@ function _editReport(oldText, newText, ctx = 3) {
 async function tool_edit_file({ path, old_str, new_str = '' }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   if (!old_str) return { result: 'Error: old_str is required.' };
+  if (_betaOn()) {
+    const r = _betaResolve(path, ctx);
+    if (r.kind === 'noproject') return { result: 'Error: "' + path + '" is a project-relative path but this conversation has no project folder.' };
+    if (r.kind === 'dbx') {
+      const err = _betaWriteGuard(r.path, ctx);   // editing writes back — must stay in-project
+      if (err) return { result: err };
+      let current;
+      try { current = new TextDecoder().decode(await _dbxDownloadBytes(r.path, r.team)); }
+      catch { return { result: `File not found: ${r.path}. Use write_file to create it.` }; }
+      const res = applyEdit(current, old_str, new_str);
+      if (res.error) return { result: res.error };
+      try {
+        await _dbxUpload(r.path, new TextEncoder().encode(res.updated), r.team);
+        _betaTouch(ctx, r.path);
+        const head = `Edited ${r.path}${res.note ? ' (' + res.note + ')' : ''}`;
+        const rep = _editReport(current, res.updated);
+        if (rep.added === 0 && rep.removed === 0) return { result: `${head} — no line changes (content is identical).` };
+        if (rep.diff) return { result: `${head} (+${rep.added} -${rep.removed})\n${rep.diff}` };
+        return { result: `${head} — +${rep.added} -${rep.removed} line(s); diff too large to show inline.` };
+      } catch (e) { return { result: `Edit failed: ${(e && e.message) || e}` }; }
+    }
+    // r.kind === 'opfs' → sandpie/ metadata: fall through to OPFS below.
+  }
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   let current;
   try { current = new TextDecoder().decode(await opfsReadBytes(norm)); }
