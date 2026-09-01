@@ -39,7 +39,12 @@
   const PKG_STATE_KEY = 'sandpie-pkg-state';     // localStorage: { [id]: {team,title,pin,kind,revs,dirty} }
   const HUB_CURSOR_KEY = 'sandpie-share-cursor'; // localStorage: { [teamRoot]: cursor } — per device, like dbxfull-cursor
   const ID_OVERRIDE_KEY = 'sandpie-share-identity';
-  const META = '.sandpie.json';                  // hub metadata: {pin,title}
+  const META = '.sandpie.json';                  // hub metadata: {pin,title,owner}
+  // Default owner stamped onto legacy shares that predate the owner field (their
+  // real sharer is unrecorded). Set to the admin who originally shared them so they
+  // can manage/delete them from the sharing settings. New shares record the actual
+  // sharer via me().user, not this.
+  const DEFAULT_OWNER = 'aezequiel@gasn2.com';
   // Files that live on the hub but are never installed: leftovers from older
   // builds, and dotfiles generally. Excluded from install, from publish uploads
   // and from the "delete local strays" pass.
@@ -51,12 +56,16 @@
   // every file, which every other member then re-downloads for nothing.
   const SKIP = (rel) => rel === 'package.json' || rel === 'manifest.json' || (rel !== META && /(^|\/)\./.test(rel));
   const parseMeta = (bytes) => {
-    const out = { pin: null, title: null };
+    const out = { pin: null, title: null, owner: null };
     if (!bytes) return out;
     try {
       const j = JSON.parse(new TextDecoder().decode(bytes));
       if (j && typeof j.pin === 'string') out.pin = j.pin;
       if (j && typeof j.title === 'string') out.title = j.title;
+      // owner: the identifier/email of the teammate who shared this artifact. Only
+      // present on artifacts published after this field was added; legacy shares
+      // (and retroactively-synthesized META) carry no owner.
+      if (j && typeof j.owner === 'string') out.owner = j.owner;
     } catch (_) {}
     return out;
   };
@@ -189,6 +198,7 @@
   }
 
   /* ── mirror one artifact into the workspace ───────────────────────────── */
+  const _metaRepairTried = new Set();   // ids we've attempted a retroactive META upload for this session
   const dbxContentHash = async (bytes) => {          // sha256 over each 4 MiB block's sha256
     const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     const B = 4 * 1024 * 1024, parts = [];
@@ -205,7 +215,29 @@
     const dirty = (prev && prev.dirty) || {};
     const local = new Set(await listOpfs(dst, '', []));
     const revs = {};
-    let changed = 0, pin = null, title = null;
+    let changed = 0, pin = null, title = null, owner = null;
+
+    // Retroactive repair: ensure .sandpie.json exists AND records an owner. Legacy
+    // artifacts predate the file entirely (no META), or predate the owner field
+    // (META with pin/title but no owner). Both get owner defaulted to DEFAULT_OWNER
+    // so the sharing settings can offer their owner a delete control. One attempt
+    // per id per session; idempotent (once META has an owner this branch is a no-op).
+    if (cloudOn() && !_metaRepairTried.has(a.id)) {
+      _metaRepairTried.add(a.id);
+      const hasMeta = (META in a.files);
+      const cur = hasMeta ? parseMeta(await hubRead(a, META)) : { pin: null, title: null, owner: null };
+      if (!cur.owner) {
+        const cand = Object.keys(a.files).filter(f => !SKIP(f) && f !== META);
+        const synthPin = cur.pin || (cand.includes('index.html') ? 'index.html'
+                       : cand.includes('SKILL.md') ? 'SKILL.md'
+                       : cand.slice().sort()[0] || null);
+        try {
+          await hubUpload(hubPath(a.dept, a.id, META), new TextEncoder().encode(JSON.stringify({ pin: synthPin, title: cur.title || a.id, owner: DEFAULT_OWNER })));
+          a.files[META] = '__repaired__';   // sentinel rev → the download loop re-installs the updated META this pass
+          console.info('[sharing] repaired .sandpie.json for "' + a.id + '" (owner=' + DEFAULT_OWNER + (hasMeta ? '' : ', created') + ')');
+        } catch (e) { console.warn('[sharing] could not repair .sandpie.json for "' + a.id + '":', (e && e.message) || e); }
+      }
+    }
 
     for (const rel of Object.keys(a.files)) {
       if (SKIP(rel)) continue;
@@ -214,7 +246,7 @@
         // A pending edit to META is the user's new pin/title: read it from the
         // local copy so the home row follows the edit now, not one poll after the
         // hub echoes it back.
-        if (rel === META) { const m = parseMeta(await readLocal(dst + '/' + rel)); if (m.pin) pin = m.pin; if (m.title) title = m.title; }
+        if (rel === META) { const m = parseMeta(await readLocal(dst + '/' + rel)); if (m.pin) pin = m.pin; if (m.title) title = m.title; if (m.owner) owner = m.owner; }
         continue;
       }
       if (local.has(rel) && prevRevs[rel] === a.files[rel]) { revs[rel] = a.files[rel]; continue; }   // already current (state already holds META's pin/title)
@@ -222,7 +254,7 @@
       if (!bytes) { _forceNext = true; if (local.has(rel)) revs[rel] = prevRevs[rel] || ''; continue; }   // transient failure — keep what we have; _forceNext forces a retry pass
       await write(dst + '/' + rel, bytes);
       revs[rel] = a.files[rel];
-      if (rel === META) { const m = parseMeta(bytes); pin = m.pin; title = m.title; }
+      if (rel === META) { const m = parseMeta(bytes); pin = m.pin; title = m.title; owner = m.owner; }
       changed++;
     }
     // the hub is the authority on what belongs here
@@ -243,6 +275,7 @@
       id: a.id, team: a.dept, from: 'team', kind, revs, dirty,
       title: title || (prev && prev.title) || a.id,
       pin: pin || (!fresh && prev && prev.pin) || null,
+      owner: owner || (prev && prev.owner) || null,
     };
     saveState(a.id, mk);
     // Pin the main file on first install; afterwards follow the publisher only if
@@ -477,7 +510,10 @@
     const pin = (opts.pinFile && sent.includes(opts.pinFile)) ? opts.pinFile
               : sent.includes('SKILL.md') ? 'SKILL.md'
               : sent.includes('index.html') ? 'index.html' : sent.slice().sort()[0];
-    try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: name }))); }
+    // owner records WHO shared this, so the sharing settings can offer them (and
+    // only them) a delete-from-hub control. me().user is their email/identifier.
+    const owner = (me().user) || '';
+    try { await hubUpload(hubPath(dept, id, META), new TextEncoder().encode(JSON.stringify({ pin, title: name, owner }))); }
     catch (e) { console.warn('[sharing] main-file marker failed:', (e && e.message) || e); }
     _forceNext = true;      // we just changed the hub — next pass reads the listing, doorbell or not
     fire();
@@ -504,7 +540,7 @@
       const files = t.kind === 'directory' ? await listOpfs(INSTALL_ROOT + '/' + t.name, '', []) : [];
       const entry = mainFile(mk, files);
       if (!entry) continue;
-      out.push({ id: t.name, title: mk.title || t.name, team: mk.team, kind: mk.kind || 'folder', entry });
+      out.push({ id: t.name, title: mk.title || t.name, team: mk.team, kind: mk.kind || 'folder', entry, owner: mk.owner || null });
     }
     return out.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -514,16 +550,19 @@
     try {
       const box = _shareListEl;
       const list = await acceptedList();
+      const myId = (me().user || '').toLowerCase();
       if (_shareTotalEl) _shareTotalEl.textContent = list.length + ' app' + (list.length === 1 ? '' : 's') + ' from the team hub';
       if (_shareEmptyEl) _shareEmptyEl.style.display = list.length ? 'none' : '';
       if (!list.length) { box.innerHTML = ''; return; }
-      // No remove button: an artifact leaves this list by leaving the hub.
-      // Skills carry an "installed skill" badge instead of a pin button — they
-      // live in the model's skill index, not on the home screen.
+      // No remove button by default: an artifact leaves this list by leaving the
+      // hub. Skills carry an "installed skill" badge instead of a pin button.
+      // The OWNER (the teammate who shared it) also gets a 🗑 that deletes the
+      // whole folder from the hub — which removes it for everyone on next sync.
       box.innerHTML = list.map((g, i) =>
         '<div class="shared-file" data-i="' + i + '">' +
           '<button class="shared-file-open">' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title) + '</button>' +
           '<span class="shared-by">from ' + esc(g.team) + '</span>' +
+          (g.owner && g.owner.toLowerCase() === myId ? '<button class="shared-delete" title="Delete this shared folder for everyone">🗑</button>' : '') +
           (g.kind === 'skill' ? '<span class="shared-skill-badge">installed skill</span>' : '<button class="shared-pin"></button>') +
         '</div>').join('');
       for (const row of box.querySelectorAll('.shared-file')) {
@@ -532,8 +571,35 @@
         row.querySelector('.shared-file-open').onclick = () => { try { opfs.openFile(full, g.entry.split('/').pop()); } catch (_) {} };
         const pb = row.querySelector('.shared-pin');
         if (pb) { if (window.SandpiePins) { try { SandpiePins.bindButton(pb, full); } catch (_) { pb.remove(); } } else pb.remove(); }
+        const db = row.querySelector('.shared-delete');
+        if (db) db.onclick = () => deleteShared(g, db);
       }
     } catch (e) { console.warn('[sharing] renderHome failed', e); } finally { homeBusy = false; if (homePending) { homePending = false; renderHome(); } }
+  }
+
+  // Owner-only: delete the whole artifact folder from the hub. Because "deletion is
+  // ABSENCE from the live listing" (see top-of-file), removing the hub folder makes
+  // every device (this one included) uninstall it on the next poll. Confirmed first
+  // — it affects everyone on the team, and it's irreversible.
+  async function deleteShared(g, btn) {
+    if (!g || !g.team || !g.id) return;
+    if (!window.confirm('Delete "' + g.title + '" from the ' + g.team + ' hub?\n\nThis removes it for everyone on the team and cannot be undone.')) return;
+    const p = prov();
+    if (!(cloudOn() && p && p.cloudDelete)) { wbNotify('err', '⚠ Cannot reach the hub — the shared folder was not deleted.'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      await p.cloudDelete(hubPath(g.team, g.id, ''), { team: true });   // delete_v2, recursive
+      await uninstall(g.id);            // drop the local copy now, don't wait for the poll
+      _forceNext = true;                // next poll reads the real listing
+      _metaRepairTried.delete(g.id);
+      wbNotify('info', '✓ "' + g.title + '" deleted from the ' + g.team + ' hub.');
+      fire();
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (btn) { btn.disabled = false; btn.textContent = '🗑'; }
+      if (/403|no_permission|insufficient_permissions|access_denied/i.test(msg)) wbNotify('err', '⚠ No permission to delete "' + g.title + '" on the hub.');
+      else wbNotify('err', '⚠ Delete failed: ' + msg);
+    }
   }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 

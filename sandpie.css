@@ -3443,6 +3443,10 @@ body.sp-decoding *::after {
 .shared-count { margin-left: auto; font-size: 0.64rem; font-weight: 600; font-family: ui-monospace, monospace; color: var(--sp-text-dim); background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 12px; padding: 0.14rem 0.46rem; }
 .shared-list { display: flex; flex-direction: column; padding-bottom: 0.3rem; }
 .shared-pin { flex: none; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px 4px; }
+/* Owner-only delete (removes the shared folder from the hub for everyone). */
+.shared-delete { flex: none; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px 4px; opacity: 0.6; transition: opacity 0.12s, filter 0.12s; }
+.shared-delete:hover { opacity: 1; filter: drop-shadow(0 0 3px rgba(248,81,73,0.6)); }
+.shared-delete:disabled { opacity: 0.4; cursor: default; }
 .shared-skill-badge { flex: none; font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sp-accent); border: 1px solid var(--sp-accent); border-radius: 8px; padding: 0.12rem 0.42rem; }
   /* Settings → Sharing tab (shared/team lists moved off the home screen) */
   .share-head { display: flex; align-items: baseline; gap: 0.55rem; margin-bottom: 0.9rem; }
