@@ -164,11 +164,9 @@
         catch (e) { msg.textContent = 'Error: ' + ((e && e.message) || e); return; }
         msg.textContent = '';
         browser.replaceChildren();
-        // Up / back — at the root, "back" reveals the roots menu (home / team switch).
+        // "up" walks to the parent folder; at the root there is nowhere up to go.
         if (next.path) {
           browser.appendChild(rowEl('‹ up', () => navigate({ team: next.team, path: next.path.replace(/\/[^/]+$/, '') }), false));
-        } else {
-          browser.appendChild(rowEl('⋯ switch (home / team folders)', renderRoots, false));
         }
         const dirs = entries.filter(e => (e.kind === 'folder' || e['.tag'] === 'folder'));
         dirs.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));

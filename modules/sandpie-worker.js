@@ -460,7 +460,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=11', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=12', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -494,7 +494,7 @@ function _spawnPyWorker() {
     _pyDrainQueue();
   });
   // Bring the fresh worker up to date with current Dropbox context/index.
-  if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, teamRoot: _dbxCtx.teamRoot, homeNs: _dbxCtx.homeNs, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated }); } catch (_) {} }
+  if (_dbxCtx) { try { worker.postMessage({ type: 'dbx-token', token: _dbxCtx.token, pathRoot: _dbxCtx.pathRoot, teamRoot: _dbxCtx.teamRoot, homeNs: _dbxCtx.homeNs, workingRoot: _dbxCtx.workingRoot, dehydrated: _dehydrated, beta: _dbxCtx.beta }); } catch (_) {} }
   if (_dbxIndex) { try { worker.postMessage({ type: 'dbx-index', index: _dbxIndex, exempt: _dbxExempt }); } catch (_) {} }
   _pyPool.push(slot);
   return slot;
@@ -515,7 +515,7 @@ function _pyDrainQueue() {
       _pySettle(null, job, `Error: run_python timed out after ${Math.round(job.timeoutMs / 1000)}s and was killed. Its interpreter (globals, imports) is gone. If the script is genuinely long-running, pass a larger "timeout" (max ${PY_MAX_TIMEOUT_MS / 1000}s); otherwise it likely has an infinite loop or a blocking call.`);
       _pyDrainQueue();
     }, job.timeoutMs);
-    try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, args: job.args }); }
+    try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, args: job.args, betaProject: job.betaProject }); }
     catch (e) { _pySettle(slot, job, 'Error dispatching run_python: ' + (e && e.message || e)); }
   }
 }
@@ -523,7 +523,7 @@ function _pyDrainQueue() {
 // Run a script on the pool; resolves with { result } (raw/untruncated, as the
 // old in-process tool_run_python did — callers truncate). A run that overruns
 // its deadline is killed so it can never hang the conversation.
-function dispatchPython({ path, args, timeout, signal, owner }) {
+function dispatchPython({ path, args, timeout, signal, owner, betaProject }) {
   let timeoutMs = PY_DEFAULT_TIMEOUT_MS;
   const t = Number(timeout);
   if (isFinite(t) && t > 0) timeoutMs = Math.min(PY_MAX_TIMEOUT_MS, Math.round(t * 1000));
@@ -532,7 +532,7 @@ function dispatchPython({ path, args, timeout, signal, owner }) {
     // this script's file writes back asynchronously; the pool-message handler
     // stamps this owner on them so they attribute to the RIGHT conversation even
     // if another chat's tool is executing by the time the write lands.
-    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null, owner: owner != null ? owner : null };
+    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null, owner: owner != null ? owner : null, betaProject: betaProject || null };
     // Turn stopped → abandon the run. Pyodide can't be interrupted mid-execution,
     // so a job already running in a slot has its interpreter TERMINATED (same as a
     // deadline overrun); a still-queued job is just dropped. Either way the tool
@@ -940,7 +940,13 @@ async function tool_run_python({ path, args, timeout }, ctx) {
   // deleted is exactly what sent an earlier session into a rebuild loop. The cache
   // is tiny; over-clearing only costs one honest re-emit on the next read.
   _emittedFileHashes.clear();
-  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId });
+  // BETA: the script + its data live in the project folder on Dropbox, not OPFS.
+  // Pass the project so the Pyodide runner reads the entry script, faults in
+  // reads, and writes outputs against <projectRoot>/… instead of the OPFS mount.
+  const betaProject = (_betaOn() && ctx && ctx._projectRoot)
+    ? { root: String(ctx._projectRoot).replace(/\/+$/, ''), team: ctx._projectNs === 'team' } : null;
+  if (_betaOn() && !betaProject) return { result: 'Error: run_python needs a project folder — this conversation has none. Start it in a project.' };
+  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId, betaProject });
 }
 
 // ============================================================
