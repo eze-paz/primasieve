@@ -25,7 +25,7 @@ def put(src):
         f.write(src); tp = f.name
     wp = subprocess.run(["wslpath","-a",tp], capture_output=True, text=True).stdout.strip() if False else tp
     subprocess.run(["wsl.exe","-e","bash","-lc",
-                    f"docker cp $(wslpath -a '{tp}') {CONT}:/testbed/{FILEPATH}"], capture_output=True, text=True)
+                    f"docker cp {shq(tp)} {CONT}:/testbed/{FILEPATH}"], capture_output=True, text=True)
     os.unlink(tp)
 
 def runtests(src):
@@ -59,7 +59,9 @@ def verify(src):
     return passed(runtests(src))                          # full-suite confirm
 
 # sanity: gold-less baseline must FAIL, and capture the traceback for localization
-base_out = runtests(orig)
+# (with a fast oracle configured, the baseline check uses it too — the full suite
+#  can take >15 min in-container, which would blow the budget before any search)
+base_out = runtests_fast(orig) if FASTCMD else runtests(orig)
 assert not passed(base_out), "baseline unexpectedly passes"
 print("baseline FAILS (as expected)", flush=True)
 
