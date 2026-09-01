@@ -1,0 +1,25 @@
+{
+  "method": "decision-point replay against ground truth; real transcript 400budnp ('Analyse the data of ReixachGCO', 188 tool-call turns). At 12 sampled turns, feed the model the real recorded context (bounded to system+first-user+last-28-msgs, each truncated) and force its next tool (tool_choice:required), once with the shipped MEGA tool descriptions, once with MINIMAL (first sentence, ~140 chars each). Model deepseek/deepseek-v4-flash-0731.",
+  "toolDescChars": { "mega": 27542, "minimal": 2014, "reductionPct": 93 },
+  "summary": {
+    "points": 12,
+    "megaVsMinimalAgree": "8/12",
+    "megaMatchesGroundTruth": "7/12",
+    "minimalMatchesGroundTruth": "7/12",
+    "note": "Minimal matches ground truth EXACTLY as often as mega (7/12). 7/12 is roughly this method's ceiling — even mega (same descriptions as the real run) only hits 7/12, because forced tool_choice + a truncated window + temperature can't reproduce the real thinking-then-act trajectory. So both regimes hit the ceiling; cutting descriptions 93% did not lower tool-selection accuracy."
+  },
+  "rows": [
+    {"turn":0,  "truth":"load_skill", "mega":"recall",     "minimal":"recall",     "agree":true,  "megaOK":false,"minOK":false},
+    {"turn":15, "truth":"search",     "mega":"search",     "minimal":"read_file",  "agree":false, "megaOK":true, "minOK":false},
+    {"turn":30, "truth":"edit_file",  "mega":"edit_file",  "minimal":"edit_file",  "agree":true,  "megaOK":true, "minOK":true},
+    {"turn":45, "truth":"run_python", "mega":"run_python", "minimal":"run_python", "agree":true,  "megaOK":true, "minOK":true},
+    {"turn":60, "truth":"run_python", "mega":"run_python", "minimal":"run_python", "agree":true,  "megaOK":true, "minOK":true},
+    {"turn":75, "truth":"write_file", "mega":"write_file", "minimal":"write_file", "agree":true,  "megaOK":true, "minOK":true},
+    {"turn":90, "truth":"edit_file",  "mega":"write_todos","minimal":"list_files", "agree":false, "megaOK":false,"minOK":false},
+    {"turn":105,"truth":"write_file", "mega":"list_files", "minimal":"write_file", "agree":false, "megaOK":false,"minOK":true},
+    {"turn":120,"truth":"write_file", "mega":"write_file", "minimal":"write_file", "agree":true,  "megaOK":true, "minOK":true},
+    {"turn":135,"truth":"read_file",  "mega":"run_python", "minimal":"write_file", "agree":false, "megaOK":false,"minOK":false},
+    {"turn":150,"truth":"write_todos","mega":"list_files", "minimal":"list_files", "agree":true,  "megaOK":false,"minOK":false},
+    {"turn":165,"truth":"run_python", "mega":"run_python", "minimal":"run_python", "agree":true,  "megaOK":true, "minOK":true}
+  ]
+}
