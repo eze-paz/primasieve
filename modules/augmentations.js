@@ -147,6 +147,14 @@
   /* ── system prompt injection block ─────────────────────────────────── */
   async function systemBlock() {
     let block = '';
+    // BETA: the "Recent paths" list is a SINGLE GLOBAL list across all
+    // conversations + projects, and its existence filter checks OPFS — both wrong
+    // for the beta projects fork, where each conversation has its own Dropbox
+    // project folder and files don't live in OPFS. Injecting another project's
+    // recent paths here made the model adopt a stale "projects/<x>/…" working
+    // folder and nest files under it. Suppress it in beta; the model orients with
+    // list_files against its own project root instead.
+    if (window.SANDPIE_BETA) return block;
     // Recent paths: always on when memory is enabled — the separate enable lever
     // was removed 2026-08-07; the single "Enable automatic memory" checkbox gates
     // both the memory facts (memory.js systemBlock) and this recent-paths block.

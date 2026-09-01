@@ -2782,7 +2782,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=170');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=171');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3528,7 +3528,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   const _sysPrompt = await buildSystemPrompt(convMessages, _loc);
   if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
     _sysPrompt.content += _projRoot
-      ? `\n\n## Project folder\nThis conversation's project folder is "${_projRoot}" in the user's Dropbox. Write files with plain relative paths (they land inside the project); you may also read ANY file anywhere in the user's Dropbox by absolute path (e.g. read_file("/R+D+I/spec.pdf")). Writes, edits and deletes are limited to the project folder — to change a file elsewhere, copy() it into the project first. Artifacts and generated files belong in the project.`
+      ? `\n\n## Project folder\nThis conversation's project folder is your working directory:\n  ${_projRoot}\nThat folder IS your workspace root. To write a file, use a BARE name or a path relative to that root — e.g. write_file("rand10.txt") creates ${_projRoot}/rand10.txt. Every tool result echoes the FULL absolute path it acted on; trust that echo, not your memory of earlier paths.\nHARD RULES:\n- Do NOT invent nested folders like "projects/<name>/…" — there is no such structure here; the project folder is the root, so put files directly in it (or in a subfolder only if the user asks). A path you saw in another conversation or in a "recent paths" list does NOT apply here.\n- Writes, edits and deletes are limited to this project folder. Reads work ANYWHERE in the user's Dropbox by absolute path (e.g. read_file("/R+D+I/spec.pdf")). To change a file outside the project, copy() it in first.\n- If you're unsure what already exists, list_files (no path) shows the project root — orient with that instead of guessing a path.`
       : `\n\n## No project folder\nThis conversation has no project folder yet, so file writes will be refused. You can still read files anywhere in Dropbox by absolute path. Ask the user to start the conversation inside a project to enable writing.`;
   }
   return {

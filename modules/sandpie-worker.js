@@ -2498,8 +2498,9 @@ async function tool_list_files({ path, pattern, recursive, scope }, ctx) {
         catch (err) { return { result: (err && err.message) || String(err) }; }
       }
       if (entries === null) return { result: `Not found (or empty): ${r.path}` };
-      const projBase = (!r.abs && ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '') : '';
-      const disp = (p) => (projBase && p.toLowerCase().startsWith(projBase.toLowerCase() + '/')) ? p.slice(projBase.length + 1) : p;
+      // Show FULL ABSOLUTE Dropbox paths — one unambiguous path model everywhere,
+      // so the model never has to guess what a relative path is relative to.
+      const disp = (p) => p;
       const capped = !!entries.capped;
       const rows = rx ? entries.filter(e => rx.test(e.path) || rx.test(e.path.split('/').pop())) : entries;
       const label = r.abs ? (r.path || 'Dropbox root') : (r.rel ? r.rel + '/ (project)' : 'the project folder');
@@ -2777,8 +2778,7 @@ async function tool_search({ pattern, path, include, files_only, ignore_case, of
       catch (e) { return { result: (e && e.message) || String(e) }; }
       let paths = r.paths;
       if (include) { const ig = globToRegExp(include); paths = paths.filter(p => ig.test(p) || ig.test(p.split('/').pop())); }
-      const projLc = proj.toLowerCase();
-      paths = paths.map(p => p.toLowerCase().startsWith(projLc + '/') ? p.slice(proj.length + 1) : p);
+      // Full absolute paths (see list_files) — no relative-vs-absolute ambiguity.
       const label = rawB ? rawB + '/ (project)' : 'the project folder';
       if (!paths.length) return { result: `No files found for "${lits.join(' ')}" in ${label}.` };
       return { result: _formatCloudPage({ paths, hasMore: r.hasMore }, lits.join(' '), label, offset) };
