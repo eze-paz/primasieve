@@ -100,7 +100,11 @@ def similarity(buggy_src, analog_src):
 def extract_relation(analog_src):
     """Parse the analog, extract its RELATIONAL answer template with two holes:
        <R> = recursive-result var, <C> = the comprehension over it. Returns ('R+C'|'C+R') or None."""
-    t = ast.parse(analog_src); f = func_of(t); rv = rec_result_var(t, f.name)
+    try: t = ast.parse(analog_src)
+    except Exception: return None
+    f = func_of(t)
+    if f is None: return None
+    rv = rec_result_var(t, f.name)
     if rv is None: return None
     ans = _has_union_schema(t, f.name, rv)
     if ans is None: return None
