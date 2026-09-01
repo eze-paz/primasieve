@@ -460,7 +460,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=13', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=14', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -515,7 +515,7 @@ function _pyDrainQueue() {
       _pySettle(null, job, `Error: run_python timed out after ${Math.round(job.timeoutMs / 1000)}s and was killed. Its interpreter (globals, imports) is gone. If the script is genuinely long-running, pass a larger "timeout" (max ${PY_MAX_TIMEOUT_MS / 1000}s); otherwise it likely has an infinite loop or a blocking call.`);
       _pyDrainQueue();
     }, job.timeoutMs);
-    try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, args: job.args, betaProject: job.betaProject }); }
+    try { slot.worker.postMessage({ type: 'run-python', id: job.id, path: job.path, code: job.code, args: job.args, betaProject: job.betaProject }); }
     catch (e) { _pySettle(slot, job, 'Error dispatching run_python: ' + (e && e.message || e)); }
   }
 }
@@ -523,7 +523,7 @@ function _pyDrainQueue() {
 // Run a script on the pool; resolves with { result } (raw/untruncated, as the
 // old in-process tool_run_python did — callers truncate). A run that overruns
 // its deadline is killed so it can never hang the conversation.
-function dispatchPython({ path, args, timeout, signal, owner, betaProject }) {
+function dispatchPython({ path, code, args, timeout, signal, owner, betaProject }) {
   let timeoutMs = PY_DEFAULT_TIMEOUT_MS;
   const t = Number(timeout);
   if (isFinite(t) && t > 0) timeoutMs = Math.min(PY_MAX_TIMEOUT_MS, Math.round(t * 1000));
@@ -532,7 +532,7 @@ function dispatchPython({ path, args, timeout, signal, owner, betaProject }) {
     // this script's file writes back asynchronously; the pool-message handler
     // stamps this owner on them so they attribute to the RIGHT conversation even
     // if another chat's tool is executing by the time the write lands.
-    const job = { id: 'py' + (++_pyRunSeq), path, args, timeoutMs, resolve, timer: null, done: false, cleanup: null, owner: owner != null ? owner : null, betaProject: betaProject || null };
+    const job = { id: 'py' + (++_pyRunSeq), path, code: code || null, args, timeoutMs, resolve, timer: null, done: false, cleanup: null, owner: owner != null ? owner : null, betaProject: betaProject || null };
     // Turn stopped → abandon the run. Pyodide can't be interrupted mid-execution,
     // so a job already running in a slot has its interpreter TERMINATED (same as a
     // deadline overrun); a still-queued job is just dropped. Either way the tool
@@ -946,8 +946,11 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
-async function tool_run_python({ path, args, timeout }, ctx) {
-  if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
+async function tool_run_python({ path, code, args, timeout }, ctx) {
+  // BETA REPL: `code` runs directly (no saved script). Falls back to `path` for a
+  // real saved script. On /app, only `path` is offered (code is ignored).
+  const hasCode = _betaOn() && typeof code === 'string' && code.trim() !== '';
+  if (!path && !hasCode) return { result: _betaOn() ? 'Error: pass `code` to run Python directly, or `path` to run a saved script.' : 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
   // A script can write or delete any files (os.remove, doc.save, _cleanup.py, …)
   // that the worker never sees individually, so drop the whole read/refusal cache:
   // a stale "unchanged, work from your copy" stub for a file Python just rewrote or
@@ -964,7 +967,7 @@ async function tool_run_python({ path, args, timeout }, ctx) {
     if (!root) return { result: 'Error: Dropbox is still connecting — try run_python again in a moment.' };
     betaProject = { root, team: _projectTeamFor(ctx) };
   }
-  return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId, betaProject });
+  return dispatchPython({ path, code: hasCode ? code : null, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId, betaProject });
 }
 
 // ============================================================
@@ -3009,7 +3012,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','copy','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','pyodide','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','copy','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -3189,6 +3192,7 @@ async function runTool(name, args, ctx) {
     case 'read_url':      return tool_read_url(args, ctx);
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'copy':          return tool_copy_to_workspace(args, ctx);   // BETA name for copy_to_workspace
+    case 'pyodide':       return tool_run_python(args, ctx);          // BETA name for run_python
     case 'write_file':    return tool_write_file({...args, _conv: convFileName}, ctx);
     case 'edit_file':     return tool_edit_file(args, ctx);
     case 'delete_file':   return tool_delete_file(args, ctx);

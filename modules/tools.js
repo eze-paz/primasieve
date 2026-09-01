@@ -574,6 +574,25 @@ const toolDefs = () => Object.entries(tools)
         }
       } catch (_) {}
     }
+    // BETA: run_python accepts `code` directly (REPL) — the A/B (64ae9dd) showed
+    // this eliminates the write-a-throwaway-script antipattern (0 vs 4 garbage
+    // files) at ~22% fewer tokens. `path` stays for running a real saved script.
+    if (window.SANDPIE_BETA && name === 'run_python') {
+      return { type: 'function', function: {
+        name: 'pyodide',
+        description: `Run Python and get its stdout/stderr. Pass \`code\` to run a snippet DIRECTLY — no need to save a script first (preferred for one-off computation, data inspection, quick transforms). Pass \`path\` instead to run a .py script that already exists in your project. Files the code reads/writes resolve inside this conversation's project folder (relative paths), and reads may also use absolute Dropbox paths. Don't write a script file just to run it once — use \`code\`.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'Python code to run directly (preferred for one-off work).' },
+            path: { type: 'string', description: 'Path to an existing .py script in the project to run instead of code.' },
+            args: { type: 'array', items: { type: 'string' }, description: 'sys.argv[1:] passed to the script/code.' },
+            timeout: { type: 'number', description: 'Seconds before the run is killed.' },
+          },
+          required: [],
+        },
+      } };
+    }
     // BETA: expose copy_to_workspace as `copy` with a project-oriented description
     // (the worker dispatches both names to the same handler). The project path +
     // read-anywhere/write-in-project rule live in the system prompt.

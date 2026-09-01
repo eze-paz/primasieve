@@ -326,10 +326,10 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'run-python') {
-    const { id, path, args, betaProject } = data;
+    const { id, path, code, args, betaProject } = data;
     let out;
     _betaProject = betaProject || null;   // project context for THIS run (beta)
-    try { out = await tool_run_python({ path, args }); }
+    try { out = await tool_run_python({ path, code, args }); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
     finally { _betaProject = null; }
     try { self.postMessage({ type: 'python-result', id, result: (out && out.result) || '' }); } catch (_) {}
@@ -1515,11 +1515,16 @@ function sourceFromTraceback(tb, code) {
   return out.join('\n');
 }
 
-async function tool_run_python({ path, args }) {
-  if (!path) return { result: 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
+async function tool_run_python({ path, code: inlineCode, args }) {
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
-  const normPath = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+  // BETA REPL: `code` runs directly — no file to read, cwd is the project root.
+  const repl = typeof inlineCode === 'string' && inlineCode.trim() !== '';
+  const normPath = repl ? '' : String(path || '').replace(/^\/+/, '').replace(/^files\//, '');
+  if (!repl && !normPath) return { result: 'Error: pass `code` to run Python directly, or `path` to run a saved script.' };
   let code;
+  if (repl) {
+    code = inlineCode;
+  } else {
   // The audit hook only hydrates files the script open()s at RUNTIME; the entry
   // script itself is read here before Python starts, so it needs the same
   // try-OPFS-then-hydrate-on-miss dance as read_file/load_image.
@@ -1542,6 +1547,7 @@ async function tool_run_python({ path, args }) {
   }
   catch (e) { return { result: `Error: could not read /files/${normPath}: ${e.message}.` }; }
   }
+  }
   return withPy(async () => {
     let p;
     try { p = await initPyodide(); }
@@ -1561,6 +1567,13 @@ async function tool_run_python({ path, args }) {
         const _scriptDir = '/files' + (_slash > 0 ? '/' + normPath.slice(0, _slash) : '');
         try { p.FS.mkdirTree(_scriptDir); } catch (_) {}
         try { p.runPython('import os; os.chdir(' + JSON.stringify(_scriptDir) + ')'); } catch (_) {}
+      } else if (repl) {
+        // REPL: cwd is the project root (/files); relative reads/writes resolve
+        // there and fault-in / write-back against <projectRoot>/…. argv[0] marks a
+        // REPL run so a script that inspects sys.argv[0] doesn't see a stale path.
+        self._sandpie_argv = ['<pyodide>', ...scriptArgs];
+        try { p.runPython('import sys\nfrom js import _sandpie_argv\nsys.argv = list(_sandpie_argv.to_py())'); } catch (_) {}
+        try { p.runPython('import os; os.chdir("/files")'); } catch (_) {}
       }
       try { await p.loadPackagesFromImports(code); } catch (_) {}
       _capReset(); _capActive = true;
