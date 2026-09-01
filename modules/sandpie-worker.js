@@ -460,7 +460,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=12', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=13', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -827,24 +827,37 @@ async function _dbxCopy(srcAbs, srcTeam, destAbs, destTeam, isFolder) {
   return { path_display: destAbs, size: bytes.byteLength };
 }
 // ---- beta path resolution + write guard ----
+// The conversation's project folder, with a fallback to the personal workspace
+// (workingRoot) so a chat that was never assigned a project (a legacy chat, the
+// "Personal" default) still works instead of hard-erroring. Returns '' only if
+// Dropbox isn't resolved yet.
+function _projectRootFor(ctx) {
+  if (ctx && ctx._projectRoot) return String(ctx._projectRoot).replace(/\/+$/, '');
+  const wr = (_dbxCtx && _dbxCtx.workingRoot) ? String(_dbxCtx.workingRoot).replace(/\/+$/, '') : '';
+  return wr;
+}
+function _projectTeamFor(ctx) {
+  // An explicit project carries its own namespace; the workspace fallback is home.
+  return !!(ctx && ctx._projectRoot && ctx._projectNs === 'team');
+}
 // Resolve a raw tool path arg for beta. Returns one of:
 //   { kind:'opfs', rel }               → sandpie/ app metadata (unchanged OPFS path)
 //   { kind:'dbx', path, team, abs }     → an absolute Dropbox path (read anywhere)
-//   { kind:'noproject' }               → relative path but no project set
+//   { kind:'noproject' }               → relative path but no project AND no workspace
 function _betaResolve(raw, ctx) {
   const s = String(raw == null ? '' : raw).trim();
   const relForm = s.replace(/^\/+/, '').replace(/^files\//, '');
   if (relForm === 'sandpie' || relForm.startsWith('sandpie/')) return { kind: 'opfs', rel: relForm };
-  const projTeam = !!(ctx && ctx._projectNs === 'team');
+  const projTeam = _projectTeamFor(ctx);
   if (s.startsWith('/')) return { kind: 'dbx', path: s.replace(/\/+$/, ''), team: projTeam, abs: true };
-  const proj = (ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '') : '';
+  const proj = _projectRootFor(ctx);
   if (!proj) return { kind: 'noproject' };
   const clean = relForm.replace(/\/+$/, '');
   return { kind: 'dbx', path: clean ? proj + '/' + clean : proj, team: projTeam, abs: false, rel: clean };
 }
 // Is an absolute Dropbox path inside the conversation's project folder?
 function _betaUnderProject(absPath, ctx) {
-  const proj = (ctx && ctx._projectRoot) ? String(ctx._projectRoot).replace(/\/+$/, '').toLowerCase() : '';
+  const proj = _projectRootFor(ctx).toLowerCase();
   if (!proj) return false;
   const p = String(absPath).replace(/\/+$/, '').toLowerCase();
   return p === proj || p.startsWith(proj + '/');
@@ -852,8 +865,9 @@ function _betaUnderProject(absPath, ctx) {
 // The harness write boundary (requirement 6): writes/deletes must stay inside the
 // project folder. Returns an error string to hand back to the model, or null if ok.
 function _betaWriteGuard(absPath, ctx) {
-  if (!ctx || !ctx._projectRoot) return 'This conversation has no project folder — start one (or pick a project) before writing files.';
-  if (!_betaUnderProject(absPath, ctx)) return 'Refused: writes are limited to this conversation\'s project folder "' + ctx._projectRoot + '". "' + absPath + '" is outside it. You can READ anywhere, but to write it elsewhere, copy it into the project first.';
+  const proj = _projectRootFor(ctx);
+  if (!proj) return 'Dropbox is still connecting — try again in a moment.';
+  if (!_betaUnderProject(absPath, ctx)) return 'Refused: writes are limited to this conversation\'s project folder "' + proj + '". "' + absPath + '" is outside it. You can READ anywhere, but to write it elsewhere, copy it into the project first.';
   return null;
 }
 // Record a beta write/delete as a touched file (turn-end card) and ping the page
@@ -941,11 +955,15 @@ async function tool_run_python({ path, args, timeout }, ctx) {
   // is tiny; over-clearing only costs one honest re-emit on the next read.
   _emittedFileHashes.clear();
   // BETA: the script + its data live in the project folder on Dropbox, not OPFS.
-  // Pass the project so the Pyodide runner reads the entry script, faults in
-  // reads, and writes outputs against <projectRoot>/… instead of the OPFS mount.
-  const betaProject = (_betaOn() && ctx && ctx._projectRoot)
-    ? { root: String(ctx._projectRoot).replace(/\/+$/, ''), team: ctx._projectNs === 'team' } : null;
-  if (_betaOn() && !betaProject) return { result: 'Error: run_python needs a project folder — this conversation has none. Start it in a project.' };
+  // Pass the project (falling back to the personal workspace for an unassigned
+  // chat) so the Pyodide runner reads the entry script, faults in reads, and
+  // writes outputs against <projectRoot>/… instead of the empty OPFS mount.
+  let betaProject = null;
+  if (_betaOn()) {
+    const root = _projectRootFor(ctx);
+    if (!root) return { result: 'Error: Dropbox is still connecting — try run_python again in a moment.' };
+    betaProject = { root, team: _projectTeamFor(ctx) };
+  }
   return dispatchPython({ path, args, timeout, signal: ctx && ctx.signal, owner: ctx && ctx.agentId, betaProject });
 }
 

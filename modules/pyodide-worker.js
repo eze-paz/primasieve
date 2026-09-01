@@ -605,7 +605,10 @@ function _syncDownloadBytes(cloudPath) {
 // runner reads the entry script, faults in reads, and writes outputs against
 // <root>/… on Dropbox instead of the OPFS mount. sandpie/ paths still go to OPFS.
 let _betaProject = null;   // { root, team }
-function _betaOn() { return !!(_dbxCtx && _dbxCtx.beta && _betaProject && _betaProject.root); }
+// The manager sends a per-run project context ONLY in beta, so its presence IS
+// the beta signal — don't also gate on _dbxCtx.beta, which can be stale if the
+// pool worker cached a dbx-token pushed before the beta flag was set.
+function _betaOn() { return !!(_betaProject && _betaProject.root && _dbxCtx && _dbxCtx.token); }
 function _betaMapped(rel) {
   // A /files rel that maps to the project folder (i.e. NOT sandpie/ app metadata).
   const r = String(rel).replace(/^\/+/, '');
