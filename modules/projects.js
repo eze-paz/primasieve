@@ -133,7 +133,7 @@
 
       async function navigate(next) {
         loc = next;
-        crumbs.textContent = (next.team ? 'Team' : 'My Dropbox') + ' : ' + (next.path || '/');
+        crumbs.textContent = (next.team ? 'Team ' : '') + (next.path || '/');
         useBtn.style.visibility = 'visible'; newBtn.style.visibility = 'visible';
         msg.textContent = 'Loading…';
         let entries = [];
@@ -141,12 +141,12 @@
         catch (e) { msg.textContent = 'Error: ' + ((e && e.message) || e); return; }
         msg.textContent = '';
         browser.replaceChildren();
-        // Up / back
-        browser.appendChild(rowEl('‹ back', () => {
-          if (!next.path) { renderRoots(); return; }
-          const parent = next.path.replace(/\/[^/]+$/, '');
-          navigate({ team: next.team, path: parent });
-        }, false));
+        // Up / back — at the root, "back" reveals the roots menu (home / team switch).
+        if (next.path) {
+          browser.appendChild(rowEl('‹ up', () => navigate({ team: next.team, path: next.path.replace(/\/[^/]+$/, '') }), false));
+        } else {
+          browser.appendChild(rowEl('⋯ switch (home / team folders)', renderRoots, false));
+        }
         const dirs = entries.filter(e => (e.kind === 'folder' || e['.tag'] === 'folder'));
         dirs.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
         if (!dirs.length) browser.appendChild(rowEl('(no subfolders — you can Use this folder or make a New folder here)', () => {}, false));
@@ -157,7 +157,7 @@
       }
 
       useBtn.onclick = () => {
-        if (!loc || !loc.path) { msg.textContent = 'Open a folder first (the root itself can\'t be a project).'; return; }
+        if (!loc || !loc.path) { msg.textContent = 'Open a folder first (the Dropbox root itself can\'t be a project).'; return; }
         close({ name: loc.path.split('/').filter(Boolean).pop(), root: loc.path, ns: loc.team ? 'team' : 'home' });
       };
       newBtn.onclick = async () => {
@@ -173,7 +173,9 @@
         } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
       };
 
-      renderRoots();
+      // Start at the plain Dropbox root (home namespace); the roots menu (home/team
+      // switch) is one click away via "switch" at the root level.
+      navigate({ team: false, path: '' });
     });
   }
 
