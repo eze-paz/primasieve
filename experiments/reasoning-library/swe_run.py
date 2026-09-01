@@ -100,8 +100,15 @@ for s, ln, desc, idx, ka in edits:
     except Exception: continue
     tried += 1
     if verify(src):
-        solved = desc; print(f"  SOLVED [{tried}] {desc}  [{time.time()-t0:.0f}s]", flush=True); break
+        solved = desc; solved_src = src
+        print(f"  SOLVED [{tried}] {desc}  [{time.time()-t0:.0f}s]", flush=True); break
     if tried % 25 == 0: print(f"  ...{tried} tried, {time.time()-t0:.0f}s", flush=True)
 
-put(orig)  # restore
+if solved:
+    put(solved_src)   # leave the fix in place and emit the patch for official verification
+    diff = subprocess.run(["wsl.exe","-e","bash","-lc",
+        f"docker exec {CONT} bash -lc 'cd /testbed && git diff'"], capture_output=True, text=True).stdout
+    print("PATCH_START\n" + diff + "PATCH_END", flush=True)
+else:
+    put(orig)
 print(f"\n=== {'SOLVED: '+solved if solved else 'UNSOLVED'} — {tried} candidates, {time.time()-t0:.0f}s ===")
