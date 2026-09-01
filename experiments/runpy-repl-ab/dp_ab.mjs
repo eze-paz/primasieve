@@ -35,8 +35,10 @@ const OUT = process.env.DP_OUT || path.join(HERE, 'dp_results.json');
 const transcript = JSON.parse(fs.readFileSync(TRANSCRIPT, 'utf8'));
 const megaTools = JSON.parse(fs.readFileSync(TOOLS_MEGA, 'utf8'));
 
-// MINIMAL = the tool's first sentence, capped ~140 chars. Reproducible, and a
-// genuine ~90% size cut. Same tool names + params → isolates the description.
+// The B arm's descriptions, controlled by DESC_MODE:
+//   'firstsent' (default) — the tool's first sentence, ~140 chars (reproducible ~90% cut)
+//   'empty'               — NO description at all (field omitted): tool name + params only
+const DESC_MODE = process.env.DESC_MODE || 'firstsent';
 const firstSentence = (d) => {
   const s = String(d || '').replace(/\s+/g, ' ').trim();
   const m = s.match(/^.*?[.!](\s|$)/);
@@ -44,9 +46,13 @@ const firstSentence = (d) => {
   if (out.length > 150) out = out.slice(0, 147) + '…';
   return out;
 };
-const minTools = megaTools.map(t => ({ type: 'function', function: { name: t.function.name, description: firstSentence(t.function.description), parameters: t.function.parameters } }));
+const minTools = megaTools.map(t => {
+  const f = { name: t.function.name, parameters: t.function.parameters };
+  if (DESC_MODE !== 'empty') f.description = firstSentence(t.function.description);   // omit entirely when empty
+  return { type: 'function', function: f };
+});
 const megaChars = megaTools.reduce((a, t) => a + t.function.description.length, 0);
-const minChars = minTools.reduce((a, t) => a + t.function.description.length, 0);
+const minChars = minTools.reduce((a, t) => a + (t.function.description || '').length, 0);
 
 // Truncate a message's content for the replay prefix (applied equally to both arms).
 function trunc(msg) {
@@ -71,9 +77,11 @@ function pointAt(idx) {
   return { prefix: [...head, ...tail], truth };
 }
 
-// The indices of assistant messages that issued tool_calls.
+// The indices of assistant messages that issued tool_calls. DP_MAXIDX bounds the
+// sample to a single-prompt segment (decision points before the 2nd user turn).
+const MAXIDX = parseInt(process.env.DP_MAXIDX || String(transcript.length), 10);
 const dpIdx = [];
-for (let i = 0; i < transcript.length; i++) if (transcript[i].role === 'assistant' && Array.isArray(transcript[i].tool_calls) && transcript[i].tool_calls.length) dpIdx.push(i);
+for (let i = 0; i < transcript.length && i < MAXIDX; i++) if (transcript[i].role === 'assistant' && Array.isArray(transcript[i].tool_calls) && transcript[i].tool_calls.length) dpIdx.push(i);
 // Sample ~12 spread across the run (env override: DP_POINTS = comma indices into dpIdx).
 let picks;
 if (process.env.DP_POINTS) picks = process.env.DP_POINTS.split(',').map(n => parseInt(n, 10));
@@ -92,8 +100,8 @@ async function chat(messages, tools) {
 const pickName = (resp) => { const tc = resp?.choices?.[0]?.message?.tool_calls?.[0]; return tc ? tc.function.name : (resp?.error ? 'ERR:' + resp.error.slice(0, 40) : '(none)'); };
 
 (async () => {
-  console.log(`Decision-point A/B — ${TRANSCRIPT.split(/[\\/]/).pop()}, ${picks.length} points, model=${MODEL}`);
-  console.log(`tool desc chars: mega=${megaChars} minimal=${minChars} (${Math.round(100 - 100 * minChars / megaChars)}% smaller)\n`);
+  console.log(`Decision-point A/B — ${TRANSCRIPT.split(/[\\/]/).pop()}, ${picks.length} points (single-prompt≤${MAXIDX}), model=${MODEL}`);
+  console.log(`B arm = ${DESC_MODE.toUpperCase()} descriptions. tool desc chars: full=${megaChars} B=${minChars} (${Math.round(100 - 100 * minChars / megaChars)}% smaller)\n`);
   const rows = [];
   let megaHit = 0, minHit = 0, agree = 0, tokMega = 0, tokMin = 0;
   for (const k of picks) {
