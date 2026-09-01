@@ -1167,7 +1167,22 @@
       for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
         if (isNoSyncRel(path)) continue;                    // hub-managed — never pull the stale mirror
-        if (dehydrated() && !isExemptRel(path)) continue;   // on-demand: skip eager download; worker hydrates on touch
+        if (dehydrated() && !isExemptRel(path)) {
+          // On-demand: never download eagerly — but a hydrated local copy whose
+          // cloud rev moved on is STALE, and hydrate() serves whatever exists
+          // locally without a rev check. Drop the clean stale copy (OPFS-only —
+          // opfs.remove never emits file:deleted, Dropbox untouched) so the next
+          // touch re-hydrates fresh. Keep the open file and any unsynced edit.
+          const s = state[path];
+          if (s && s.rev !== e.rev && s.syncedMtime !== 0 && path !== openFilePath
+              && !p[path] && await opfs.exists(path)) {
+            const lm = await Sandpie.opfsMtime(path);
+            if (lm <= s.syncedMtime) {
+              try { await opfs.remove(path); delete state[path]; } catch (_) {}
+            }
+          }
+          continue;
+        }
         const s = state[path];
         const localExists = await opfs.exists(path);
         if (!s) {
