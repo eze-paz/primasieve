@@ -1854,7 +1854,16 @@ async function newConversation() {
   const main = $('messages');
   parkPaneConv(main);
   const id = newConvId();
-  ensureStream(id);
+  const s = ensureStream(id);
+  // BETA: stamp the new conversation's project. Prefer an explicit pick (the
+  // "+ chat" button on a project row), else inherit the project of the chat the
+  // user was just in, so a plain "+ New chat" stays in the same project.
+  if (window.SANDPIE_BETA && s) {
+    let proj = null;
+    try { proj = window.SandpieProjects && SandpieProjects.consumePending(); } catch (_) {}
+    if (!proj && activeConvId) { const a = convStreams.get(activeConvId); if (a && a.projectRoot) proj = { root: a.projectRoot, ns: a.projectNs || 'home' }; }
+    if (proj) { s.projectRoot = proj.root; s.projectNs = proj.ns || 'home'; try { SandpieProjects.touchProject(proj.root); } catch (_) {} }
+  }
   mountConv(id, main);
   if (sidePanel?.isOpen && sidePanel.activeIsRight) sidePanel.focusPane(false);
   convLastViewed.set(id, new Date().toISOString());
@@ -2309,6 +2318,15 @@ async function refreshConversationList() {
 
   const visible = pinned.length + regular.length;
   $('convCount').textContent = visible ? `${visible}` : '';
+
+  // BETA: group the sidebar by project. Each project is a header with a "+ chat"
+  // button; conversations without a project fall under "Unsorted". A "New project"
+  // button sits at the top. When there are no projects at all, prompt to create one.
+  if (window.SANDPIE_BETA && window.SandpieProjects) {
+    await _renderBetaConvList(ul, [...pinned, ...regular]);
+    return;
+  }
+
   const frag = document.createDocumentFragment();
   if (!list.length) {
     const li = document.createElement('li');
@@ -2328,6 +2346,81 @@ async function refreshConversationList() {
   regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
   // Archive management lives ONLY in the Settings → Archive tab (modal); the
   // sidebar deliberately shows no archived row.
+  ul.replaceChildren(frag);
+}
+// BETA sidebar: conversations grouped by project. `rows` = visible (pinned +
+// regular) conv rows, each carrying projectRoot. Projects come from the registry
+// so an empty project still shows a "+ chat" affordance.
+async function _renderBetaConvList(ul, rows) {
+  const frag = document.createDocumentFragment();
+  const projects = await SandpieProjects.projectsForSidebar();
+
+  const newProjBtn = document.createElement('li');
+  newProjBtn.className = 'proj-newbtn';
+  newProjBtn.style.cssText = 'list-style:none;margin:.2rem 0';
+  const b = document.createElement('button');
+  b.className = 'ghost'; b.textContent = '+ New project';
+  b.style.cssText = 'width:100%;text-align:left';
+  b.onclick = () => { try { SandpieProjects.newProjectFlow(); } catch (e) { console.warn(e); } };
+  newProjBtn.appendChild(b);
+  frag.appendChild(newProjBtn);
+
+  if (!projects.length && !rows.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = Sandpie.initialSyncDone() ? 'No projects yet — create one to start.' : 'Loading…';
+    frag.appendChild(li);
+    ul.replaceChildren(frag);
+    return;
+  }
+
+  const norm = (s) => String(s || '').replace(/\/+$/, '').toLowerCase();
+  const byProject = new Map();          // normRoot -> rows[]
+  const unsorted = [];
+  for (const c of rows) {
+    if (c.projectRoot) { const k = norm(c.projectRoot); if (!byProject.has(k)) byProject.set(k, []); byProject.get(k).push(c); }
+    else unsorted.push(c);
+  }
+
+  let idx = 0;
+  const header = (label, onPlus) => {
+    const li = document.createElement('li');
+    li.className = 'proj-header';
+    li.style.cssText = 'list-style:none;display:flex;align-items:center;gap:.4rem;margin:.5rem 0 .1rem;font-size:.72rem;font-weight:600;opacity:.85';
+    const name = document.createElement('span');
+    name.textContent = label; name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    li.appendChild(name);
+    if (onPlus) {
+      const plus = document.createElement('button');
+      plus.className = 'ghost'; plus.textContent = '+ chat'; plus.title = 'New chat in ' + label;
+      plus.style.cssText = 'font-size:.68rem;padding:.05rem .35rem';
+      plus.onclick = onPlus;
+      li.appendChild(plus);
+    }
+    return li;
+  };
+
+  for (const p of projects) {
+    frag.appendChild(header(p.name || p.root, () => SandpieProjects.startChatIn(p)));
+    const cs = byProject.get(norm(p.root)) || [];
+    if (!cs.length) {
+      const li = document.createElement('li'); li.className = 'empty'; li.style.cssText = 'opacity:.5;font-size:.7rem;padding:.15rem .4rem';
+      li.textContent = '(no chats)'; frag.appendChild(li);
+    } else {
+      cs.forEach(c => frag.appendChild(buildConvLi(c, idx++)));
+    }
+    byProject.delete(norm(p.root));
+  }
+  // Any project referenced by a conversation but not in the registry (e.g. a
+  // conv created before the project was removed) — show it so its chats aren't lost.
+  for (const [k, cs] of byProject) {
+    frag.appendChild(header(cs[0].projectRoot, () => SandpieProjects.startChatIn({ root: cs[0].projectRoot, ns: 'home' })));
+    cs.forEach(c => frag.appendChild(buildConvLi(c, idx++)));
+  }
+  if (unsorted.length) {
+    frag.appendChild(header('Unsorted', null));
+    unsorted.forEach(c => frag.appendChild(buildConvLi(c, idx++)));
+  }
   ul.replaceChildren(frag);
 }
 function refreshSendButtonForActive() {

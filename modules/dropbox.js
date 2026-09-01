@@ -2118,6 +2118,8 @@
       },
       cloudDownload: (absPath, { team = true, ns = '' } = {}) => download(absPath, undefined, { team, ns }),
       cloudDelete: (absPath, { team = true, ns = '' } = {}) => del(absPath, { team, ns }),   // delete_v2 (recursive for folders); no-op on not_found
+      // BETA project picker: create a folder (for a new project). team:false = home.
+      cloudMkdir: (absPath, { team = false, ns = '' } = {}) => api('/2/files/create_folder_v2', { path: absPath, autorename: false }, { team, ns }).catch(e => { if (String((e && e.message) || e).includes('conflict')) return null; throw e; }),
       async cloudList(absPath, recursive = false, { team = true, ns = '' } = {}) {
         try { return (await listFolder(absPath, { recursive, team, ns })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
