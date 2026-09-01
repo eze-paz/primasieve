@@ -196,9 +196,9 @@
         } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
       };
 
-      // Start at the plain Dropbox root (home namespace); the roots menu (home/team
-      // switch) is one click away via "switch" at the root level.
-      navigate({ team: false, path: '' });
+      // Start at the Team root (the shared team space — where most projects live);
+      // the home/team switch is one click away via "switch" at the root level.
+      navigate({ team: true, path: '' });
     });
   }
 
