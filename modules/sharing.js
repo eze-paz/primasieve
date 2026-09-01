@@ -563,7 +563,7 @@
           '<button class="shared-file-open">' + (g.kind === 'skill' ? '🧩' : '📁') + ' ' + esc(g.title) + '</button>' +
           '<span class="shared-by">from ' + esc(g.team) + '</span>' +
           (g.owner && g.owner.toLowerCase() === myId ? '<button class="shared-delete" title="Delete this shared folder for everyone">🗑</button>' : '') +
-          (g.kind === 'skill' ? '<span class="shared-skill-badge">installed skill</span>' : '<button class="shared-pin"></button>') +
+          (g.kind === 'skill' ? '<span class="shared-skill-badge">skill</span>' : '<button class="shared-pin"></button>') +
         '</div>').join('');
       for (const row of box.querySelectorAll('.shared-file')) {
         const g = list[+row.getAttribute('data-i')];
