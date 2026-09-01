@@ -10,7 +10,7 @@
     "id": "mean_std",
     "prompt": "For the numbers 4, 8, 15, 16, 23, 42, compute the mean and the population standard deviation. Report both, rounded to 2 decimals.",
     "kind": "compute",
-    "check": {"type": "answer_contains_all", "value": ["18", "13.4"]},
+    "check": {"type": "answer_contains_all", "value": ["18", "12.3"]},
     "deliverables": []
   },
   {
