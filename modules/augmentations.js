@@ -39,6 +39,10 @@
   // each other (only the last write survives → paths get lost).
   let _rpChain = Promise.resolve();
   function trackRecentPath(convId, path) {
+    // BETA: recent-paths is removed (not injected — see systemBlock). Don't write
+    // to the shared global recent-paths.json either, or beta's absolute Dropbox
+    // paths would pollute /app's recent-paths block on the same device.
+    if (window.SANDPIE_BETA) return _rpChain;
     if (!path) return _rpChain;
     _rpChain = _rpChain.then(() => _trackRecentPathInner(path)).catch(() => {});
     return _rpChain;
