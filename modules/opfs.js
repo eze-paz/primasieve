@@ -1919,7 +1919,9 @@ function initFileBrowser() {
   // sandpie/scripts/ at 100 files and keep it flat. dropbox.js loads before
   // opfs.js, so by this point its boot() has attached the file:deleted listener
   // and every deletion below propagates to Dropbox (delete_v2 + index trim).
-  try { if (window.opfs && opfs.pruneScriptsDir) opfs.pruneScriptsDir().catch((e) => console.warn('[opfs] scripts prune:', e)); } catch (_) {}
+  // BETA: no scripts folder exists in the fork — nothing to prune (and the prune
+  // propagates deletes to Dropbox, which beta must not do outside its own writes).
+  try { if (!window.SANDPIE_BETA && window.opfs && opfs.pruneScriptsDir) opfs.pruneScriptsDir().catch((e) => console.warn('[opfs] scripts prune:', e)); } catch (_) {}
 
   // Boot-time sandbox allowlist (system-only folders under sandpie/). Deleting a stray
   // folder propagates to Dropbox via the delete handshake.

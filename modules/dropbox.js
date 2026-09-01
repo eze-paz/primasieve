@@ -38,7 +38,14 @@
   const ROOT_KEY   = 'dbxfull-working-root';
   const STATE_KEY  = 'dbxfull-sync-state';
   const INDEX_KEY  = 'dbxfull-cloud-index';
-  const CURSOR_KEY = 'dbxfull-cursor';
+  // BETA (/app-beta fork): Dropbox IS the filesystem; the page sync engine runs
+  // exempt-only (sandpie/* app metadata) and OPFS is demoted to a render cache.
+  // Beta keeps its OWN cursor + cloud index (they cover only sandpie/) so
+  // switching between /app and /app-beta on one browser profile never corrupts
+  // the stable shell's full-tree cursor/index. Sync STATE is shared on purpose:
+  // beta only ever touches exempt entries, which behave identically in both.
+  const BETA = !!window.SANDPIE_BETA;
+  const CURSOR_KEY = BETA ? 'dbxfull-cursor-beta' : 'dbxfull-cursor';
   const APPKEY_CFG = 'dbxfull-appkey';
   // LEGACY (pre-home-namespace): the team parent the workspace used to hang off,
   // with <email-local> appended. Still read — by legacyTeamRoot(), to locate the
@@ -443,7 +450,7 @@
   let _idxCache = null;   // null = not yet loaded; {} = loaded (possibly empty)
   const IDB_NAME = 'sandpie-dbxfull';
   const IDB_STORE = 'cloudIndex';
-  const IDB_KEY = 'index';   // single-record store; the whole index is one value
+  const IDB_KEY = BETA ? 'index-beta' : 'index';   // single-record store; beta keeps its own (sandpie-only) index
   function _idbOpen() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(IDB_NAME, 1);
@@ -527,6 +534,10 @@
   function cloudIndex() { return _idxCache || {}; }   // synchronous — populated by loadCloudIndex() at boot
   function setCloudIndex(i) { _idxCache = i; _idbPutIndex(i); }   // write-through to IndexedDB
   function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
+  // BETA: a rel the sync engine must not manage — everything except the exempt
+  // sandpie/* app metadata. Beta never pulls, pushes, orphan-cleans, or
+  // remote-deletes these; the worker's Dropbox-direct tools own them.
+  const isBetaIgnored = (rel) => BETA && !isExemptRel(rel);
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
     return EXEMPT_PREFIXES.some(p => {
@@ -564,6 +575,29 @@
     setSyncState(st);
     return { purged, kept };
   }
+  // BETA boot wipe: OPFS is a render-only cache outside sandpie/*, valid for one
+  // session. Wipe it at boot — connected only (an unconnected OPFS may hold a
+  // user's only copy), and NEVER a file with unsynced edits (a dirty leftover
+  // from a stable session still needs stable's push). opfs.remove() only —
+  // never emits file:deleted, so Dropbox is untouched.
+  async function betaBootWipe() {
+    if (!BETA || !tokens()) return;
+    const opfs = Sandpie.opfs;
+    const st = syncState();
+    const openFilePath = Sandpie.openFilePath ? Sandpie.openFilePath() : null;
+    let wiped = 0;
+    let all = []; try { all = await opfs.list(); } catch (_) { return; }
+    for (const rel of all) {
+      if (!isBetaIgnored(rel) || isNoSyncRel(rel) || rel === openFilePath) continue;
+      const s = st[rel];
+      if (s && s.syncedMtime === 0) continue;                       // dirty — stable's push owns it
+      if (s) { const lm = await Sandpie.opfsMtime(rel); if (lm > s.syncedMtime) continue; }
+      try { await opfs.remove(rel); delete st[rel]; wiped++; } catch (_) {}
+    }
+    setSyncState(st);
+    if (wiped) console.info('[dropbox] beta boot wipe: ' + wiped + ' cached file(s) removed');
+  }
+
   // One-time: stage 1 wrote a worker manifest (_dehydrated_cache.json) at the OPFS
   // root which the push could leak to Dropbox. We no longer create it — remove any
   // leftover copy locally and remotely (best-effort, guarded once; it's our own
@@ -751,7 +785,10 @@
     }
     let result;
     try {
-      result = await listFolder(workingRoot(), { recursive: true });
+      // BETA: only the sandpie/ app-metadata subtree is synced — list just it.
+      // cloudToRel still maps entries to 'sandpie/...' rels (paths are under
+      // workingRoot), and the beta-scoped cursor keeps deltas to this subtree.
+      result = await listFolder(workingRoot() + (BETA ? '/sandpie' : ''), { recursive: true });
     } catch (e) {
       if (String(e.message).includes('not_found')) {   // working folder doesn't exist yet (or was deleted)
         // A not_found AFTER ensureWorkingRoot() is anomalous (transient namespace
@@ -952,6 +989,7 @@
     const opfs = Sandpie.opfs;
     const dirty = [];
     for (const rel of Object.keys(state)) {
+      if (isBetaIgnored(rel)) continue;   // beta: never push to <workingRoot>/<rel> outside sandpie/*
       if (state[rel].syncedMtime !== 0) continue;
       if (!(await opfs.exists(rel))) continue;
       dirty.push({ rel, lm: await Sandpie.opfsMtime(rel), s: state[rel] });
@@ -1112,6 +1150,7 @@
 
       // ── Pass 1: entries still in sync-state ──
       for (const path of Object.keys(state)) {
+        if (isBetaIgnored(path)) continue;   // beta: sync engine only manages sandpie/*
         if (cloudSet.has(path)) continue;
         if (state[path].syncedMtime === 0) {
           if (isConv(path)) console.log('[dropbox] PASS1 KEEP (dirty):', path, 'syncedMtime=0');
@@ -1139,6 +1178,7 @@
       let removedCount = 0, keptCount = 0;
       for (const path of allLocal) {
         if (isNoSyncRel(path)) { keptCount++; continue; }   // hub-managed — never delete locally
+        if (isBetaIgnored(path)) { keptCount++; continue; } // beta: render-cache files are not orphans
         if (cloudSet.has(path)) { keptCount++; continue; }
         if (state[path] && state[path].syncedMtime === 0) {
           if (isConv(path)) console.log('[dropbox] PASS2 KEEP (dirty-state):', path);
@@ -1167,6 +1207,7 @@
       for (const [path, e] of toConsider) {
         if (e.kind !== 'file') continue;
         if (isNoSyncRel(path)) continue;                    // hub-managed — never pull the stale mirror
+        if (isBetaIgnored(path)) continue;                  // beta: never pull/evict outside sandpie/*
         if (dehydrated() && !isExemptRel(path)) {
           // On-demand: never download eagerly — but a hydrated local copy whose
           // cloud rev moved on is STALE, and hydrate() serves whatever exists
@@ -1228,8 +1269,9 @@
       // they closed the file.
       const dirtyCount = await pushDirty(state);
 
-      // Dehydrate files not modified in the last 24h
-      if (dehydrated()) await dehydratePurge();
+      // Dehydrate files not modified in the last 24h. BETA skips this: the
+      // render cache is wiped once at boot (betaBootWipe), not on every sync.
+      if (dehydrated() && !BETA) await dehydratePurge();
 
       // Any cursor-delta activity should refresh the viewer, which renders the
       // cloud index in dehydrated mode. Adds of cloud-only files skip download
@@ -1276,6 +1318,7 @@
     const rel = String(path).replace(/^\/+/, '');
     if (!rel) return;
     if (isNoSyncRel(rel)) return;   // hub-managed — sharing.js owns its cloud side
+    if (isBetaIgnored(rel)) return; // beta: render-cache writes must not become dirty pushes
     if (_pulling.has(rel)) return;  // a file WE just downloaded, not a user edit
     const st = syncState();
     if (st[rel]) st[rel].syncedMtime = 0; else st[rel] = { rev: '', size: 0, syncedMtime: 0 };
@@ -1310,6 +1353,7 @@
   function onFileDeleted(path) {
     const rel = String(path).replace(/^\/+/, '');
     if (isNoSyncRel(rel)) { forgetFromStateAndIndex(rel); return; }   // hub-managed: tidy local bookkeeping, never touch the personal cloud
+    if (isBetaIgnored(rel)) { forgetFromStateAndIndex(rel); return; } // beta: dropping a cache copy must NEVER delete from Dropbox
     // Handshake: keep the ledger entry until the remote delete is confirmed.
     const pend = pendingDeletes();
     if (!pend.includes(rel)) { pend.push(rel); setPendingDeletes(pend); }
@@ -2117,6 +2161,7 @@
     Sandpie.events.on('account:signedin', maybeAutoConnect);   // managed login → auto-connect Dropbox
     wireTokenRequestListener();
     wireServiceWorker();
+    if (BETA) betaBootWipe();   // render cache is one-session — clear last session's
     setInterval(() => { if (!document.hidden) sync(); }, 60000);
 
     const code = new URLSearchParams(location.search).get('code');

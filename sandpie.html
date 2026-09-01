@@ -26,6 +26,13 @@ if("serviceWorker"in navigator){
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    // BETA fork flag — one shell, two endpoints. /app-beta (server route serving
+    // this same file) or ?beta=1 (local dev) turn on the Dropbox-direct projects
+    // fork; every module gates its beta behavior on window.SANDPIE_BETA so /app
+    // stays byte-identical in behavior. Must run before any module loads.
+    window.SANDPIE_BETA = /\/app-beta$/.test(location.pathname) || new URLSearchParams(location.search).has('beta');
+  </script>
   <script src="modules/core.js?v=10"></script>
   <script src="modules/config.js?v=2"></script>
   <script src="modules/languages.js?v=4"></script>
@@ -35,12 +42,12 @@ if("serviceWorker"in navigator){
   <script src="modules/themes.js"></script>
   <script type="module" src="modules/providers.js?v=45"></script>
   <script src="modules/console.js?v=3"></script>
-  <script src="modules/dropbox.js?v=81"></script>
+  <script src="modules/dropbox.js?v=82"></script>
   <script src="modules/images.js?v=10"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=76"></script>
   <script src="modules/screenshot.js?v=6"></script>
-  <script src="modules/opfs.js?v=50"></script>
+  <script src="modules/opfs.js?v=51"></script>
   <script src="modules/html-editor.js?v=20"></script>
   <script src="modules/file-viewer.js?v=26"></script>
   <script src="modules/univer.js?v=1"></script>
