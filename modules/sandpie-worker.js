@@ -2572,7 +2572,7 @@ async function _opfsAutorename(rel) {
 // Fork a LOCAL workspace file (e.g. a read-only shared package) into an editable
 // location. No Dropbox needed. Files only for now — folder forking arrives with
 // the package registry.
-async function _forkLocal(src, dest) {
+async function _forkLocal(src, dest, ctx) {
   const srcRel = src.replace(/^\/+/, '').replace(/^files\//, '');
   let destRel;
   if (dest != null && String(dest).trim()) {
@@ -2613,7 +2613,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   const from = (src == null ? '' : String(src)).trim();
   if (!from) return { result: 'Error: "src" is required (a workspace path to fork, or an absolute Dropbox path from search).' };
   // Non-absolute path → a LOCAL workspace file (e.g. sandpie/shared-installed/…): fork in OPFS, no Dropbox needed.
-  if (!from.startsWith('/')) return _forkLocal(from, dest);
+  if (!from.startsWith('/')) return _forkLocal(from, dest, ctx);
   // Absolute path → import from elsewhere in the user's Dropbox (needs Dropbox connected).
   if (!_dbxCtx || !_dbxCtx.token) return { result: 'Error: Dropbox is not connected.' };
   const wr = (_dbxCtx.workingRoot || '').replace(/\/+$/, '');
@@ -2663,8 +2663,12 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   } catch (e) { return { result: 'Copy failed: ' + ((e && e.message) || e) }; }
 
   // Deliberately NOT _reportHydrated(): that would record the file as an already-
-  // synced cloud copy. It's a brand-new local file with no sync state, which is
-  // exactly what makes the next sync upload it into the workspace.
+  // synced cloud copy. It must be marked DIRTY (sw-opfs-changed → syncedMtime:0),
+  // like every other file writer: that is what makes the next sync UPLOAD it into
+  // the workspace. Without the post the page had no sync-state entry at all, and
+  // the sync's orphan cleanup (a local file absent from the cloud, no state, not
+  // pending) DELETED the copy within a minute of the tool reporting success.
+  try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [finalRel], owner: ctx && ctx.agentId } }); } catch (_) {}
   _pyBroadcast({ type: 'fs-changed', rel: finalRel });   // run_python sees it now
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
