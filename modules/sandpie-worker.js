@@ -3083,6 +3083,23 @@ const WALIOS_MANIFEST = {
   make: 'make.wasm', gmake: 'make.wasm',
 };
 let _waliosWorker = null, _waliosQueue = Promise.resolve();
+
+// pkgcache: binaries other users compiled in-tab (e.g. git) live on the server
+// (/walios/pkgcache/<name>.wasm + index.json). The terminal.html page folds them
+// into its manifest; the headless tool must do the same or `git` is missing.
+// Cached once per worker lifetime; built-in WALIOS_MANIFEST entries always win.
+let _waliosPkgM = null;
+async function _waliosPkgManifest() {
+  if (_waliosPkgM) return _waliosPkgM;
+  try {
+    const r = await fetch(WALIOS_BASE + 'pkgcache/index.json');
+    const idx = r.ok ? await r.json() : null;
+    const m = {};
+    if (idx && Array.isArray(idx.packages))
+      for (const n of idx.packages) if (!WALIOS_MANIFEST[n]) m[n] = 'pkgcache/' + n + '.wasm';
+    return (_waliosPkgM = m);
+  } catch (_) { return (_waliosPkgM = {}); }
+}
 function _waliosEnsure() {
   if (_waliosWorker) return _waliosWorker;
   const w = new Worker(WALIOS_BASE + 'wali-worker.js');
@@ -3108,6 +3125,7 @@ async function tool_walios({ script, timeout }, ctx) {
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
+  const pkgM = await _waliosPkgManifest();
   return await new Promise((resolve) => {
     const chunks = []; let outLen = 0, truncated = false, done = false;
     const finish = (result) => { if (done) return; done = true; clearTimeout(timer); resolve({ result }); };
@@ -3139,7 +3157,7 @@ async function tool_walios({ script, timeout }, ctx) {
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
-    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: WALIOS_MANIFEST,
+    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
       tars: [['rootfs.tar.gz', '/']], opfs: '/root',
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
