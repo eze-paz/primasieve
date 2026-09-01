@@ -6,7 +6,7 @@ import reasoner_code as rc
 
 CONT = os.environ["SWE_CONT"]; FILEPATH = os.environ["SWE_FILE"]; F2P = os.environ["SWE_F2P"]
 P2P = os.environ.get("SWE_P2P", "").split()      # previously-passing tests; a real fix keeps them GREEN
-TIMECAP = float(os.environ.get("SWE_TIMECAP", "240")); STRATA = int(os.environ.get("SWE_STRATA", "1"))
+TIMECAP = float(os.environ.get("SWE_TIMECAP", "240")); STRATA = int(os.environ.get("SWE_STRATA", "2"))  # MAX stratum; search escalates 0->..->STRATA (P0.5)
 MODE = os.environ.get("SWE_MODE", "pytest")      # 'pytest' | 'sympy' (bin/test, count-parsed)
 ALLTESTS = " ".join([F2P] + P2P)
 # full in-container test command (a real fix must pass F2P AND leave every co-located test green)
@@ -32,7 +32,7 @@ def runtests(src):
     put(src)
     r = subprocess.run(["wsl.exe","-e","bash","-lc",
         f"docker exec {CONT} bash -lc {shq('cd /testbed && ' + TESTCMD + ' 2>&1; echo EXIT=$?')}"],
-        capture_output=True, text=True, timeout=300)
+        capture_output=True, text=True, timeout=int(os.environ.get("SWE_TESTTIMEOUT","900")))
     return r.stdout
 
 def passed(out):
@@ -44,7 +44,19 @@ def passed(out):
         return npass > 0 and nbad == 0
     return "EXIT=0" in out
 
-def verify(src): return passed(runtests(src))
+FASTCMD = os.environ.get("SWE_FASTCMD")   # cheap F2P-only oracle for the search sweep
+
+def runtests_fast(src):
+    put(src)
+    r = subprocess.run(["wsl.exe","-e","bash","-lc",
+        f"docker exec {CONT} bash -lc {shq('cd /testbed && ' + FASTCMD + ' 2>&1; echo EXIT=0')}"],
+        capture_output=True, text=True, timeout=int(os.environ.get("SWE_TESTTIMEOUT","900")))
+    return r.stdout
+
+def verify(src):
+    if FASTCMD:
+        if not passed(runtests_fast(src)): return False   # cheap reject
+    return passed(runtests(src))                          # full-suite confirm
 
 # sanity: gold-less baseline must FAIL, and capture the traceback for localization
 base_out = runtests(orig)
@@ -70,12 +82,6 @@ if suspects:
 else:
     print("no traceback localization (searching whole file)", flush=True)
 
-t0 = time.time(); tried = 0; solved = None
-edits = rc.enumerate_edits(tree, STRATA)
-if allowed:
-    edits = [e for e in edits if e[1] in allowed]
-# order: NameError culprit-swaps FIRST, and among them the CLOSEST name by edit distance
-# (an undefined name is a typo -> its fix is the most similar in-scope name; cotm->cothm = 1 edit)
 def lev(a, b):
     if a == b: return 0
     d = list(range(len(b) + 1))
@@ -88,21 +94,34 @@ def cprior(e):
     if culprit and e[4][0] == "name" and f"name {culprit}->" in e[2]:
         return (0, lev(culprit, e[2].split("->")[-1].strip()))
     return (1, 0)
-edits.sort(key=lambda e: (cprior(e), e[0], {"cmp":0,"bool":1,"binop":2,"name":3}.get(e[4][0], 5)))
-if culprit:
-    print(f"prioritizing name-swaps of '{culprit}' by edit-distance ({sum(1 for e in edits if cprior(e)[0]==0)} candidates)", flush=True)
-print(f"{len(edits)} candidate edits at strata<= {STRATA}", flush=True)
-for s, ln, desc, idx, ka in edits:
-    if time.time() - t0 > TIMECAP: print("TIME CAP", flush=True); break
-    t2 = rc.apply_edit(tree, idx, ka)
-    if t2 is None: continue
-    try: src = ast.unparse(ast.fix_missing_locations(t2))
-    except Exception: continue
-    tried += 1
-    if verify(src):
-        solved = desc; solved_src = src
-        print(f"  SOLVED [{tried}] {desc}  [{time.time()-t0:.0f}s]", flush=True); break
-    if tried % 25 == 0: print(f"  ...{tried} tried, {time.time()-t0:.0f}s", flush=True)
+t0 = time.time(); tried = 0; solved = None
+# pseudo-susp from traceback localization: gates stratum-2 insert/delete to suspect blocks
+susp = {ln: 1.0 for ln in allowed} if allowed else {}
+stratum = 0
+while stratum <= STRATA and solved is None and time.time() - t0 <= TIMECAP:
+    edits = rc.enumerate_edits(tree, stratum)
+    if stratum >= 2:
+        edits += rc.enumerate_stmt_moves(tree, susp)
+    if allowed:
+        edits = [e for e in edits if e[1] in allowed]
+    edits.sort(key=lambda e: (cprior(e), e[0], {"cmp":0,"bool":1,"binop":2,"name":3}.get(e[4][0], 5)))
+    if culprit and stratum == 0:
+        print(f"prioritizing name-swaps of '{culprit}' by edit-distance ({sum(1 for e in edits if cprior(e)[0]==0)} candidates)", flush=True)
+    print(f"{len(edits)} candidate edits at stratum {stratum}", flush=True)
+    for s, ln, desc, idx, ka in edits:
+        if time.time() - t0 > TIMECAP: print("TIME CAP", flush=True); break
+        t2 = rc.apply_edit(tree, idx, ka)
+        if t2 is None: continue
+        try: cand_src = ast.unparse(ast.fix_missing_locations(t2))
+        except Exception: continue
+        tried += 1
+        if verify(cand_src):
+            solved = desc; solved_src = cand_src
+            print(f"  SOLVED [{tried}] {desc}  [{time.time()-t0:.0f}s]", flush=True); break
+        if tried % 25 == 0: print(f"  ...{tried} tried, {time.time()-t0:.0f}s", flush=True)
+    if solved is None and stratum < STRATA:
+        stratum += 1
+        print(f"--- escalate -> stratum {stratum} (reset to pristine; tree never mutated)", flush=True)
 
 if solved:
     put(solved_src)   # leave the fix in place and emit the patch for official verification
