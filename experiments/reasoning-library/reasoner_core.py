@@ -43,10 +43,11 @@ def reason(domain, budget=100000, verbose=False):
         if not improved:                       # stuck: spend an EPISTEMIC move
             got=domain.acquire(state,div) if hasattr(domain,"acquire") else None
             if got:
+                if isinstance(got,tuple): got,state=got   # acquire may also RESET the state
                 acquired+=1
                 trace.append((f"ACQUIRE: {got}",score,score))
                 if verbose: print(f"  ACQUIRE: {got}",flush=True)
-                score,div=domain.diff(domain.simulate(state))   # constraints may have changed
+                score,div=domain.diff(domain.simulate(state))   # constraints/state may have changed
                 continue
             break                              # truly out of moves and out of experience
     return state,score,{"trace":trace,"tried":tried,"acquired":acquired,"secs":time.time()-t0}
