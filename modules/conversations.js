@@ -555,6 +555,14 @@ async function _lrOpen(path, raw) {
   }
   try { if (typeof SandpieFileViewer !== 'undefined' && _LR_PATHISH.test(path)) SandpieFileViewer.open(path); } catch (_) {}
 }
+// BETA: expose the active conversation's project (for the Files sidebar) and the
+// Dropbox-fetch-into-render-cache helper (so the sidebar opens project files the
+// same way chat links do). opfs.js reads these; both are no-ops on /app.
+window.sandpieActiveProject = function () {
+  try { const s = activeStream(); return (s && s.projectRoot) ? { root: s.projectRoot, ns: s.projectNs || 'home' } : null; }
+  catch (_) { return null; }
+};
+window.__betaHydrateForView = _betaHydrateForView;
 function hydrateLocalRefs(root) {
   if (!root || !root.querySelectorAll) return;
   for (const img of root.querySelectorAll('img[src]')) {
@@ -1523,6 +1531,9 @@ function mountConv(convId, pane = null) {
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
   // Active conversation changed → re-colour the memory bank immediately.
   if (convId) _recalcMemoryFor(convId);
+  // BETA: the Files sidebar shows the ACTIVE conversation's project — refresh it
+  // on every switch so it tracks the conversation now on screen.
+  if (window.SANDPIE_BETA && window.opfs && opfs.refreshFileList) { try { opfs.refreshFileList(); } catch (_) {} }
 }
 /* ---- harness-reminder note visibility (drift / no-plan / stop guard) ----- */
 // The agentic loop emits `reminder` events when its guards fire. They are never

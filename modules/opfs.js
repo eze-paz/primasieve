@@ -1272,6 +1272,61 @@ opfs.refreshFileList = async function() {
   const path = opfs.currentPath();
   const frag = document.createDocumentFragment();
 
+  // BETA: the Files sidebar shows the ACTIVE CONVERSATION'S project folder, listed
+  // live from Dropbox (OPFS is just a render cache here). #opfsPath is a path
+  // relative to the project root; folders drill in, files open via the same
+  // Dropbox-fetch-into-render-cache path the chat links use.
+  if (window.SANDPIE_BETA) {
+    const setEmpty = (msg) => { const li = document.createElement('li'); li.className = 'empty'; li.textContent = msg; ul.replaceChildren(li); const fc = document.getElementById('fileCount'); if (fc) fc.textContent = ''; };
+    const proj = (typeof window.sandpieActiveProject === 'function') ? window.sandpieActiveProject() : null;
+    const prov = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+    if (!proj || !proj.root) { setEmpty('Open a conversation in a project to see its files.'); return; }
+    if (!prov || (prov.cloudConnected && !prov.cloudConnected())) { setEmpty('Connect Dropbox to see project files.'); return; }
+    const team = proj.ns === 'team';
+    const base = String(proj.root).replace(/\/+$/, '');
+    // Switching to a conversation in a DIFFERENT project resets the path bar to that
+    // project's root — a subpath from the previous project doesn't carry over.
+    let rel = path;                                     // project-relative subpath ('' = project root)
+    if (opfs._betaLastProject !== base.toLowerCase()) {
+      opfs._betaLastProject = base.toLowerCase();
+      if (rel) { rel = ''; const pb = document.getElementById('opfsPath'); if (pb) pb.value = '/'; }
+    }
+    const absDir = base + (rel ? '/' + rel : '');
+    let entries;
+    try { entries = await prov.cloudList(absDir, false, { team }); }
+    catch (e) { setEmpty('Error listing project: ' + ((e && e.message) || e)); return; }
+    const items = (entries || []).map(e => ({
+      name: e.name, kind: e.kind === 'folder' ? 'folder' : 'file', path: e.path,
+      size: e.size, mtime: e.cloudMtime ? (Date.parse(e.cloudMtime) || 0) : 0,
+    })).sort((a, b) => a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
+    const fc = document.getElementById('fileCount'); if (fc) fc.textContent = items.length ? String(items.length) : '';
+    if (!items.length) { setEmpty(rel ? '(empty)' : '(project folder is empty)'); return; }
+    for (const it of items) {
+      const li = document.createElement('li');
+      const btn = document.createElement('span');
+      btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
+      btn.textContent = (it.kind === 'folder' ? '📁 ' : '📄 ') + it.name;
+      btn.title = it.path;
+      if (it.kind === 'folder') {
+        btn.onclick = () => { document.getElementById('opfsPath').value = '/' + (rel ? rel + '/' : '') + it.name; opfs.refreshFileList(); };
+      } else {
+        btn.onclick = async () => {
+          try {
+            const h = window.__betaHydrateForView ? await window.__betaHydrateForView(it.path) : null;
+            if (h && h.cacheRel && opfs.openFile) opfs.openFile(h.cacheRel, it.name);
+            else if (window.Sandpie && Sandpie.addMsg) Sandpie.addMsg('err', 'Could not open ' + it.path);
+          } catch (e) { console.warn('[beta] file open failed:', (e && e.message) || e); }
+        };
+      }
+      li.append(btn);
+      if (it.kind === 'file') { const ss = document.createElement('span'); ss.className = 'file-size'; ss.textContent = opfs.formatSize(it.size); li.append(ss); }
+      li.addEventListener('contextmenu', (ev) => { ev.preventDefault(); try { navigator.clipboard.writeText(it.path).catch(() => {}); } catch (_) {} });
+      frag.appendChild(li);
+    }
+    ul.replaceChildren(frag);
+    return;
+  }
+
   const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
   const state = (_sp && _sp.getState) ? (_sp.getState() || {}) : {};
   const cidx = (_sp && _sp.cloudIndex) ? _sp.cloudIndex() : null;   // full Dropbox tree in dehydrated mode; null otherwise
