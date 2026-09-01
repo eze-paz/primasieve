@@ -45,10 +45,23 @@ const T_RESPOND = { type: 'function', function: { name: 'respond', description: 
 const T_RUN_PATH = { type: 'function', function: { name: 'run_python', description: 'Run a Python script that already exists in your working folder. Save it with write_file first, then pass its path here.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } };
 const T_RUN_CODE = { type: 'function', function: { name: 'run_python', description: 'Run Python code directly and get its stdout/stderr. Pass the code as a string — no need to save a script first. (write_file is only for producing real output files the user asked for.)', parameters: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] } } };
 
-const ARMS = {
-  write_exec: { tools: [T_WRITE, T_RUN_PATH, T_RESPOND] },
-  repl: { tools: [T_RUN_CODE, T_WRITE, T_RESPOND] },
-};
+// Description A/B (AB_MODE=desc): both arms are REPL `pyodide{code}`; the ONLY
+// difference is the tool description — the shipped "mega" text vs a bare minimum.
+const DESC_MEGA = `Run Python and get its stdout/stderr. Pass \`code\` to run a snippet DIRECTLY — no need to save a script first (preferred for one-off computation, data inspection, quick transforms). Pass \`path\` instead to run a .py script that already exists in your project. Files the code reads/writes resolve inside this conversation's project folder (relative paths), and reads may also use absolute Dropbox paths. Don't write a script file just to run it once — use \`code\`.`;
+const DESC_MIN = `Run Python code.`;
+const pyodideTool = (desc) => ({ type: 'function', function: { name: 'pyodide', description: desc, parameters: { type: 'object', properties: { code: { type: 'string' }, path: { type: 'string' }, args: { type: 'array', items: { type: 'string' } } }, required: [] } } });
+
+const MODE = process.env.AB_MODE || 'repl';
+const ARMS = MODE === 'desc'
+  ? {
+      mega:    { tools: [pyodideTool(DESC_MEGA), T_WRITE, T_RESPOND], exec: 'code', pyName: 'pyodide' },
+      minimal: { tools: [pyodideTool(DESC_MIN),  T_WRITE, T_RESPOND], exec: 'code', pyName: 'pyodide' },
+    }
+  : {
+      write_exec: { tools: [T_WRITE, T_RUN_PATH, T_RESPOND], exec: 'path', pyName: 'run_python' },
+      repl:       { tools: [T_RUN_CODE, T_WRITE, T_RESPOND], exec: 'code', pyName: 'run_python' },
+    };
+const ARM_NAMES = Object.keys(ARMS);
 
 const SYS = `You are a coding assistant with a Python sandbox. Your working directory already contains any files the user mentions. Use your tools to do the task, then call respond() with the final answer. Be efficient — use as few tool calls as possible. Do not write files unless the task asks you to produce a file.`;
 
@@ -114,11 +127,14 @@ async function runOne(task, armName) {
         let result = '';
         if (name === 'respond') { answer = String(args.text || ''); done = true; result = 'Delivered.'; }
         else if (name === 'write_file') { writes++; try { const fp = path.join(dir, String(args.path || 'file.txt').replace(/^\/+/, '')); fs.mkdirSync(path.dirname(fp), { recursive: true }); fs.writeFileSync(fp, args.content || ''); result = 'Created ' + args.path + ' (' + Buffer.byteLength(args.content || '') + ' bytes)'; } catch (e) { result = 'Write failed: ' + e.message; } }
-        else if (name === 'run_python') {
+        else if (name === 'run_python' || name === 'pyodide') {
           pyRuns++;
           let code = '';
-          if (armName === 'repl') { code = String(args.code || ''); }
-          else { const fp = path.join(dir, String(args.path || '').replace(/^\/+/, '')); if (!fs.existsSync(fp)) { result = 'Error: could not read ' + args.path + ' — write it with write_file first.'; messages.push({ role: 'tool', tool_call_id: call.id, content: result }); continue; } code = fs.readFileSync(fp, 'utf8'); }
+          // Prefer inline code when the arm/tool supports it and the model sent it;
+          // else run the named script file (write-then-exec arm).
+          if (arm.exec === 'code' && String(args.code || '').trim()) { code = String(args.code); }
+          else if (args.path) { const fp = path.join(dir, String(args.path).replace(/^\/+/, '')); if (!fs.existsSync(fp)) { result = 'Error: could not read ' + args.path + ' — write it with write_file first.'; messages.push({ role: 'tool', tool_call_id: call.id, content: result }); continue; } code = fs.readFileSync(fp, 'utf8'); }
+          else { result = 'Error: pass `code` to run directly, or `path` to run a saved script.'; messages.push({ role: 'tool', tool_call_id: call.id, content: result }); continue; }
           const r = runPy(code, dir);
           result = (r.out || (r.ok ? '(no output)' : 'error')).slice(0, 4000);
         } else { result = 'Unknown tool ' + name; }
@@ -137,10 +153,10 @@ async function runOne(task, armName) {
 
 // ---- main -------------------------------------------------------------------
 (async () => {
-  console.log(`A/B: ${TASKS.length} tasks x 2 arms, model=${MODEL}`);
+  console.log(`A/B [${MODE}]: ${TASKS.length} tasks x ${ARM_NAMES.length} arms (${ARM_NAMES.join(', ')}), model=${MODEL}`);
   const results = [];
   for (const task of TASKS) {
-    for (const arm of ['write_exec', 'repl']) {
+    for (const arm of ARM_NAMES) {
       process.stdout.write(`  ${task.id} / ${arm} … `);
       const r = await runOne(task, arm);
       results.push(r);
@@ -150,7 +166,7 @@ async function runOne(task, armName) {
   fs.writeFileSync(OUT, JSON.stringify(results, null, 2));
   // Aggregate
   const agg = {};
-  for (const arm of ['write_exec', 'repl']) {
+  for (const arm of ARM_NAMES) {
     const rs = results.filter(r => r.arm === arm);
     agg[arm] = {
       success: rs.filter(r => r.success).length + '/' + rs.length,
