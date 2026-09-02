@@ -2811,14 +2811,20 @@ function handleButtonClick(which = 'main') {
   // must never fall through to handleSubmit (whose empty-composer resume path
   // would start a SECOND concurrent loop for this conversation).
   if (s && s.generating) {
-    // Two stop channels on purpose: the page-side controller (errors the event
-    // bridge → 'Stopped.'), plus a direct worker abort by agent id in case this
-    // turn's bridge was ever orphaned. The worker handler is idempotent, so a
-    // double abort is harmless. Fall back to the last known id if agentId was
-    // cleared out from under a still-live loop.
-    if (s.abort) s.abort.abort();
-    const aid = s.agentId || s._lastAgentId;
-    if (aid) { try { getSandpieWorker().postMessage({ type: 'abort', id: aid }); } catch (_) {} }
+    stopStream(s);
+    return;
+  }
+  // GLOBAL STOP: this pane's conversation is idle, but some OTHER conversation
+  // (the other pane, or a background one whose host pane was unmounted) may
+  // still be generating. The click must reach it — a Stop press must never fall
+  // through to handleSubmit while ANY turn is live, because the empty-composer
+  // resume path would start a SECOND loop. Stop every live background turn.
+  let stoppedBackground = false;
+  for (const st of convStreams.values()) {
+    if (st !== s && st.generating) { stopStream(st); stoppedBackground = true; }
+  }
+  if (stoppedBackground) {
+    refreshSendButtonFor(which);
     return;
   }
   // Stale ■ with no live turn: usually just a missed UI resync — but it's also the
@@ -2832,6 +2838,17 @@ function handleButtonClick(which = 'main') {
     return;
   }
   window.handleSubmit(which);
+}
+
+// One stop channel helper shared by the pane-local and the global stop path: the
+// page-side controller (errors the event bridge → 'Stopped.'), plus a direct
+// worker abort by agent id in case this turn's bridge was ever orphaned. The
+// worker handler is idempotent, so a double abort is harmless. Falls back to the
+// last known id if agentId was cleared out from under a still-live loop.
+function stopStream(s) {
+  if (s.abort) s.abort.abort();
+  const aid = s.agentId || s._lastAgentId;
+  if (aid) { try { getSandpieWorker().postMessage({ type: 'abort', id: aid }); } catch (_) {} }
 }
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
 // Created once per page load. Other modules reach it via window._sandpieWorker.
