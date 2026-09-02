@@ -1581,46 +1581,6 @@ function _locFromOverride(code){
   if (!cc) return null;
   return { code: cc, name: _langName(cc) };
 }
-// Language guard. The model MUST author replies in English (the translator localizes
-// them). Some models ignore that and write the target language directly, which the
-// en->X translator then mangles (double-translation → "d'd'" artifacts). Detect a
-// non-English reply with the bundled franc langid (statistical trigram model — NOT a
-// hardcoded word list) so we can reject it and make the model re-author in English.
-let _francLoaded = false;
-function _ensureFranc() {
-  if (_francLoaded) return;
-  importScripts(new URL('franc.js?v=1', self.location.href).href);
-  _francLoaded = true;
-}
-// Does delivering in `locale` require machine translation (i.e. the model was
-// required to author ENGLISH for it)? One predicate drives BOTH the English-
-// authoring guard and the translate decision, and it mirrors the page's
-// _currentLocale override rule exactly:
-// - author-in-English regime (ctx._localize set — the session language is not
-//   fluent): EVERY non-English delivery is authored English and translated,
-//   including one-offs in languages the model could otherwise write.
-// - native regime: only targets outside the model's `fluent` set translate;
-//   fluent ones are authored directly. Unknown fluency (null — personal
-//   providers) = the safe historical default: everything non-English translates.
-function _needsTx(locale, ctx) {
-  if (!locale || !locale.code) return false;
-  const c = String(locale.code).split(/[-_]/)[0].toLowerCase();
-  if (!c || c === 'en') return false;
-  if (ctx && ctx._localize && ctx._localize.code) return true;
-  return !(ctx && ctx._fluent && ctx._fluent.includes(c));
-}
-function _isNonEnglish(s) {
-  // Guard on length: statistical langid is unreliable on short text, so don't judge
-  // (and never block) replies below ~40 non-space chars. Fail-open on any error.
-  if (typeof s !== 'string' || s.replace(/\s+/g, '').length < 40) return false;
-  try {
-    _ensureFranc();
-    if (!self.Franc || !self.Franc.franc) return false;
-    const lang = self.Franc.franc(s);
-    return lang !== 'eng' && lang !== 'und';
-  } catch (_) { return false; }
-}
-
 async function _wLocalize(texts, ctx, target) {
   if (!Array.isArray(texts) || !texts.length) return texts;
   const cfg = ctx && ctx._agentConfig;
@@ -4901,14 +4861,6 @@ async function runAgent(config, ctx) {
       _stashAside(round.content);                        // keep any non-respond prose as thinking
       if (_rejectRespondLang) {
         round.content = '';                              // rejected — don't deliver
-      } else if (_needsTx(respondLocaleOverride, ctx) && _isNonEnglish(respondText)) {
-        // The target language needs machine translation (not in the model's fluent
-        // set), so the text MUST be authored in English — a non-English reply here
-        // is the model writing the target language itself (garbled). Nuke it
-        // (don't deliver) and re-prompt to author in English. Fluent targets skip
-        // this guard entirely: the model authors them directly.
-        _rejectRespondLang = true; _rejectReason = 'nonenglish';
-        round.content = '';
       } else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) {
         _rejectRespondLang = true; _rejectReason = 'cap';
         round.content = '';
@@ -5116,7 +5068,6 @@ async function runAgent(config, ctx) {
             _tcText = String(_a2.text ?? '');
             _tcLocale = _locFromOverride(_a2.language);
             if (!_tcLocale) { _tcReject = true; _tcReason = 'missing'; }
-            else if (_needsTx(_tcLocale, ctx) && _isNonEnglish(_tcText)) { _tcReject = true; _tcReason = 'nonenglish'; }
             else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) { _tcReject = true; _tcReason = 'cap'; }
             else if (ctx._respondLangs.has(_tcLocale.code)) { _tcReject = true; _tcReason = 'duplicate'; }
           } catch (_) { _tcText = ''; _tcReject = true; _tcReason = 'missing'; }
@@ -5135,23 +5086,6 @@ async function runAgent(config, ctx) {
             _endTurnAfterRound = true;
             _rejMsg = 'TURN ENDED: a reply was already delivered in this language ('
               + (_tcLocale ? _tcLocale.code : '?') + '). The turn is now complete — no further action needed.';
-          } else if (_tcReason === 'nonenglish') {
-            ctx._nonEngRejectCount = (ctx._nonEngRejectCount || 0) + 1;
-            if (ctx._nonEngRejectCount > 3) {
-              // Model refuses to author English after repeated prompts — deliver as-is
-              // to avoid an infinite loop / blank turn (last resort). Mark the turn
-              // answered (like the missing-lang escape below) so the closing-respond
-              // force doesn't then re-prompt a reply we already delivered.
-              ctx._responded = true; ctx._respondIsLatest = true;
-              if (_tcLocale && _tcLocale.code) ctx._respondLangs.add(_tcLocale.code);
-              ctx.emit({ type: 'tool_result', id: tc.id, result: 'respond:' + _tcText });
-              const rmsg = { role: 'tool', tool_call_id: tc.id, content: '[respond delivered]' };
-              messages.push(rmsg); await emitAdded(rmsg); continue;
-            }
-            _rejMsg = 'REJECTED: your reply was NOT written in English. You MUST author "text" in ENGLISH — '
-              + 'the system automatically translates it into the user\'s language for delivery (keep the "language" '
-              + 'argument set to their language). Writing the target language yourself produces garbled, lossy output. '
-              + 'Re-call respond() with the SAME content, authored in English.';
           } else {
             ctx._langRejectCount = (ctx._langRejectCount || 0) + 1;
             if (ctx._langRejectCount > 3) {
