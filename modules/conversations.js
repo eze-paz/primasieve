@@ -2866,7 +2866,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=179');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=180');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -5226,6 +5226,7 @@ class RoundRenderer {
     this.thinkStart = 0;
     this._thinkDone = false;
     this._streamReveal = false;
+    this._liveT0 = 0;   // live render-rate window — reset per round (see _trackLiveRate)
     const nnEl = document.querySelector('.msg-timer:not(.done) .mt-nn');
     if (nnEl) nnEl.classList.remove('thinking');
   }
@@ -5244,6 +5245,7 @@ class RoundRenderer {
   }
   applyDelta(delta) {
     if (!delta) return;
+    this._trackLiveRate(delta);
     // Intrinsic reasoners (DeepSeek/Kimi/GLM via OpenRouter) stream their chain
     // of thought as reasoning_content (or reasoning). Render it live, but never
     // fold it into this.content — it must not be replayed back to the model.
@@ -5262,6 +5264,31 @@ class RoundRenderer {
     if (delta.tool_calls) {
       for (const tc of delta.tool_calls) this._applyToolCallDelta(tc);
     }
+  }
+  // Live streaming tok/s — the REAL page-side ingest/render rate, measured from
+  // the deltas actually applied on the main thread (est. chars/4 tokens over
+  // wall time since the round's first delta). Unlike the per-round `rate` event
+  // (worker: completion_tokens/decode_ms, gated <400 tok/s for batch-report
+  // artifacts, and only at round END) this updates continuously — so a stream
+  // that never ends a round (e.g. the bench plain/reason providers) still shows
+  // a number, and it is NOT capped, so a true high rate is visible. Written into
+  // stream.lastRate so the existing timer tick paints it; the round/settled paths
+  // still overwrite it at their boundaries.
+  _trackLiveRate(delta) {
+    const n = (typeof delta.content === 'string' ? delta.content.length : 0)
+            + (typeof delta.reasoning_content === 'string' ? delta.reasoning_content.length : 0)
+            + (typeof delta.reasoning === 'string' ? delta.reasoning.length : 0);
+    if (n <= 0) return;
+    const now = performance.now();
+    if (!this._liveT0) { this._liveT0 = now; this._liveChars = n; this._liveLastPaint = now; return; }
+    this._liveChars += n;
+    if (now - this._liveLastPaint < 250) return;   // repaint at most ~4x/s
+    this._liveLastPaint = now;
+    const secs = (now - this._liveT0) / 1000;
+    if (secs < 0.25) return;
+    const rate = (this._liveChars / 4) / secs;     // ~tokens/s, UNCAPPED (real render rate)
+    const s = convStreams.get(this.convId);
+    if (s) { s.lastRate = rate; if (s.timerEl) _paintRate(s.timerEl, rate, this.convId); }
   }
   endRound(finalContent, localeOverride) {
     this._finishThinking();

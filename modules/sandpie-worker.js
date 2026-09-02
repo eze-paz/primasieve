@@ -3750,6 +3750,11 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   // client render/loop paths — that would trip the detector on every run. Bypass
   // it (only) for them, matched by model id or endpoint URL containing "bench".
   const _benchMode = /bench/i.test(String(body && body.model || '')) || /bench/i.test(String(reqUrl || ''));
+  // Bench-only: measure the SSE RECEIVE rate here in the worker (how fast tokens
+  // arrive off the wire, before postMessage to the page). Compare against the
+  // page's on-screen live render rate: worker >> page ⇒ the main-thread render
+  // loop is the bottleneck; worker ≈ page ⇒ it's the network / server pacing.
+  let _benchRecvChars = 0, _benchRecvT0 = 0, _benchRecvLast = 0;
   const toolCalls = []; let usage = null, sawDone = false;
   let finishReason = null, streamErr = null;
   // Stall watchdog: a dead upstream connection can leave reader.read() pending
@@ -3791,6 +3796,23 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         if (delta.content) { content += delta.content; if (!_benchMode) _degen.push(delta.content); }
         if (typeof delta.reasoning_content === 'string') { reasoningText += delta.reasoning_content; if (!_benchMode) _degen.push(delta.reasoning_content); }
         else if (typeof delta.reasoning === 'string') { reasoningText += delta.reasoning; if (!_benchMode) _degen.push(delta.reasoning); }
+        if (_benchMode) {
+          const _n = (delta.content ? delta.content.length : 0)
+                   + (typeof delta.reasoning_content === 'string' ? delta.reasoning_content.length : 0)
+                   + (typeof delta.reasoning === 'string' ? delta.reasoning.length : 0);
+          if (_n > 0) {
+            const _now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+            if (!_benchRecvT0) { _benchRecvT0 = _now; _benchRecvChars = _n; _benchRecvLast = _now; }
+            else {
+              _benchRecvChars += _n;
+              if (_now - _benchRecvLast >= 1000) {
+                const _s = (_now - _benchRecvT0) / 1000;
+                console.log('[bench] worker SSE receive ~' + Math.round((_benchRecvChars / 4) / _s) + ' tok/s (chars/4 over ' + _s.toFixed(1) + 's)');
+                _benchRecvLast = _now;
+              }
+            }
+          }
+        }
         if (!_benchMode && _degen.tripped) {
           // Degeneration: the provider is looping ("de de de…", repeated lines,
           // garbage-token runs). Abort the attempt as a RETRYABLE error so
