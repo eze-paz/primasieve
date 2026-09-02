@@ -3851,7 +3851,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   // turn's _prof. prefill is derived as completion_ms - decode_ms at emit, so an
   // attempt that never produced a token contributes nothing here and its whole
   // wait correctly lands in prefill.
-  if (_firstTokAt && ctx && ctx._prof) ctx._prof.decodeMs += (_pnow() - _firstTokAt);
+  if (_firstTokAt && ctx && ctx._prof) {
+    ctx._prof.decodeMs += (_pnow() - _firstTokAt);
+    if (usage) ctx._prof.completionTokens += (usage.completion_tokens | 0);   // for the page's rate popup
+  }
   if (streamErr) throw streamErr;
   // A 200 response whose body was a bare JSON error (not SSE-framed) never matches
   // the `data: ` prefix, so the loop drains it into `buffer` and we'd return an
@@ -4585,7 +4588,7 @@ async function runAgent(config, ctx) {
     // every attempt that reached a first token (see streamOneRound). prefill is
     // derived at emit as completionMs - decodeMs (the wait before the 1st token:
     // queue + connect + prompt prefill, plus any pre-token retry/backoff wait).
-    decodeMs: 0,
+    decodeMs: 0, completionTokens: 0,
     toolMs: 0, toolCalls: 0, tools: Object.create(null),
     wallStart: _profNow(),
     // Suspension accounting (see heartbeat below). suspendMs = total wall time the
@@ -4641,6 +4644,7 @@ async function runAgent(config, ctx) {
       // before the first token (queue/connect/prompt-prefill). prefill+decode
       // ~= completion_ms (clamped ≥0; old clients report 0/0 → panel falls back).
       decode_ms: Math.round(_prof.decodeMs),
+      completion_tokens: Math.round(_prof.completionTokens),
       prefill_ms: Math.max(0, Math.round(_prof.completionMs - _prof.decodeMs)),
       compaction_ms: Math.round(_prof.compactionMs),
       tool_ms: Math.round(_prof.toolMs),

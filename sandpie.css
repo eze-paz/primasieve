@@ -622,6 +622,8 @@
   .msg-timer .mt-ctx { color: var(--sp-text-dim); }
   .msg-timer .mt-ctx { cursor: pointer; }
   .msg-timer .mt-ctx:hover { color: var(--sp-accent); }
+  .msg-timer .mt-rate { cursor: pointer; }
+  .msg-timer .mt-rate:hover { color: var(--sp-accent); }
   .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }
   /* once settled, the whole line dims to one tone */
@@ -725,6 +727,11 @@
     margin: 0.35rem 0;
   }
   .ctx-popup-bar > div { height: 100%; background: var(--sp-accent); }
+  /* turn-profile popup: colour-coded time bands */
+  .ctx-popup .rp-prefill { color: var(--sp-warn); }
+  .ctx-popup .rp-decode { color: var(--sp-success); }
+  .ctx-popup .rp-tool { color: var(--sp-accent); }
+  .ctx-popup .rp-cx { color: var(--sp-text); }
 
   aside details.service {
     border: none;

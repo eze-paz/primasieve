@@ -2838,7 +2838,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=175');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=176');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3277,17 +3277,23 @@ async function sendSingle(text, stream, opts = {}) {
       // (real model speed) instead of completion tokens over whole-turn wall time
       // (which dilutes the number with tool + queue time).
       const _ms = ev.decode_ms | 0;
-      if (_ms > 0 && (ev.completion_tokens | 0) > 0) {
-        stream.lastRate = ev.completion_tokens / (_ms / 1000);
-        stream._turnToks = (stream._turnToks || 0) + ev.completion_tokens;
+      const _tk = ev.completion_tokens | 0;
+      // Plausibility gate: some providers batch-report usage (or count cached
+      // prefill as completion), yielding absurd burst rates (seen live: ~22k
+      // tok/s). A round only counts when it streamed a plausible token count
+      // over a plausible decode span; otherwise the previous rate is kept.
+      if (_ms >= 250 && _tk >= 16 && _tk / (_ms / 1000) < 400) {
+        stream.lastRate = _tk / (_ms / 1000);
+        stream._turnToks = (stream._turnToks || 0) + _tk;
         stream._turnDecodeMs = (stream._turnDecodeMs || 0) + _ms;
-        if (stream.timerEl) _paintRate(stream.timerEl, stream.lastRate);
+        if (stream.timerEl) _paintRate(stream.timerEl, stream.lastRate, convId);
       }
     }
     if (ev.type === 'degeneration') {
       reportDegeneration(ev);
     }
     if (ev.type === 'timing') {
+      stream._turnProfile = ev.timing || null;   // kept for the rate popup (turn-time breakdown)
       reportTurnTiming(convId, ev.timing, convMessages.length);
     }
     if (ev.type === 'files_touched') {
@@ -7506,15 +7512,24 @@ function _paintCtxCounter(el, convId) {
 // Live per-round tok/s: painted from the worker's `rate` event (exact
 // completion_tokens over the round's decode span). Hidden until the first round
 // of the turn reports; re-asserted by the tick paint so it survives the slot
-// rebuilds a conversation switch triggers.
-function _paintRate(el, rate) {
+// rebuilds a conversation switch triggers. Clicking it opens the turn-time
+// profile popup (prefill / decode / tools / compaction split of the wall time).
+function _paintRate(el, rate, convId) {
   const sep = el && el.querySelector('.mt-rate-sep');
   const c = el && el.querySelector('.mt-rate');
   if (!c) return;
   const show = !!(rate && rate > 0);
   if (sep) sep.hidden = !show;
   c.hidden = !show;
-  if (show) c.textContent = RATE_FMT(rate);
+  if (show) {
+    c.textContent = RATE_FMT(rate);
+    if (convId != null && !c._rateWired) {
+      c._rateWired = true;
+      c.style.cursor = 'pointer';
+      c.title = 'Decode-only speed — click for the turn-time profile';
+      c.addEventListener('click', (e) => { e.stopPropagation(); openRatePopup(convId, c); });
+    }
+  }
 }
 function _wireCtxCounter(el, convId) {
   const c = el && el.querySelector('.mt-ctx');
@@ -7560,6 +7575,7 @@ function startTotalTimer(stream) {
   if (!el) return;
   stream.timerStart = Date.now();
   stream.lastRate = null; stream._turnToks = 0; stream._turnDecodeMs = 0;   // fresh per-turn rate accumulators
+  stream._turnProfile = null;   // timing payload arrives at turn end (rate popup)
   stream.timerEl = el;
   // Do NOT reset stream.todos here. It is the persistent checklist (task tree),
   // carried across turns + reloads (meta.todos → hydrate → s.todos) and seeded
@@ -7596,7 +7612,7 @@ function startTotalTimer(stream) {
     const _snn = slot.querySelector('.mt-nn');
     if (_snn) _snn.classList.toggle('streaming', !!stream.generating);
     set(slot.querySelector('.mt-time'), fmtElapsed((Date.now() - stream.timerStart) / 1000));
-    _paintRate(slot, stream.lastRate);
+    _paintRate(slot, stream.lastRate, stream.id);
     const todosEl = slot.querySelector('.mt-todos');
     if (todosEl) {
       const t = stream.todos;
@@ -7752,6 +7768,55 @@ async function openContextPopup(convId, anchorEl) {
   pop.style.top = top + 'px';
   pop.style.left = left + 'px';
 
+  const onDocClick = (e) => { if (_ctxPopupEl && !_ctxPopupEl.contains(e.target) && e.target !== anchorEl) _closeContextPopup(); };
+  const onKey = (e) => { if (e.key === 'Escape') _closeContextPopup(); };
+  setTimeout(() => document.addEventListener('mousedown', onDocClick), 0);
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('scroll', _closeContextPopup, { capture: true, once: true });
+  _ctxPopupCleanup = () => { document.removeEventListener('mousedown', onDocClick); document.removeEventListener('keydown', onKey); };
+}
+
+// Turn-time profile popup — where the turn's wall time went, from the worker's
+// `timing` event (the same payload the admin panel consumes): prefill (queue +
+// connect + prompt processing) vs decode (token generation) vs tool execution
+// vs mid-turn compaction, plus the residual (steer waits, suspension, gaps).
+// Anchored to the clicked tok/s readout; shares the ctx-popup chrome/dismissal.
+function _rateRows(p) {
+  const P = v => Math.max(0, Math.round(v || 0));
+  const wall = P(p.wall_ms), comp = P(p.completion_ms), dec = P(p.decode_ms);
+  const pre = Math.max(0, comp - dec);   // same derivation as the admin panel
+  const tool = P(p.tool_ms), cx = P(p.compaction_ms);
+  const idle = Math.max(0, wall - comp - tool - cx);
+  const pct = ms => wall > 0 ? ((ms / wall) * 100).toFixed(ms / wall < 0.1 ? 1 : 0) + '%' : '–';
+  const fmt = ms => ms >= 10000 ? (ms / 1000).toFixed(1) + 's' : Math.round(ms) + 'ms';
+  const row = (label, ms, cls) => `<div class="ctx-popup-row"><span>${label}</span><b class="${cls || ''}">${fmt(ms)} · ${pct(ms)}</b></div>`;
+  const rows = [];
+  rows.push(`<div class="ctx-popup-row"><span>Turn wall time</span><b>${fmt(wall)}</b></div>`);
+  rows.push(row('Prefill (queue + prompt)', pre, 'rp-prefill'));
+  rows.push(row('Decode (generation)', dec, 'rp-decode'));
+  rows.push(row('Tool execution', tool, 'rp-tool'));
+  if (cx > 0) rows.push(row('Compaction', cx, 'rp-cx'));
+  rows.push(row('Other / idle', idle));
+  if (p.completion_tokens > 0 && dec > 0) rows.push(`<div class="ctx-popup-note">Decode rate ${RATE_FMT(p.completion_tokens / (dec / 1000))} · ${p.completion_tokens.toLocaleString('en-US')} tokens over ${p.rounds || '?'} round(s)</div>`);
+  return rows.join('');
+}
+function openRatePopup(convId, anchorEl) {
+  if (_ctxPopupEl) { _closeContextPopup(); return; }   // toggle off if already open
+  const s = convStreams.get(convId);
+  const p = s && s._turnProfile;
+  const pop = document.createElement('div');
+  pop.className = 'ctx-popup';
+  pop.innerHTML = '<div class="ctx-popup-title">Turn profile</div>' +
+    (p ? _rateRows(p) : '<div class="ctx-popup-note">No turn profile yet — it appears once the current turn finishes.</div>');
+  document.body.appendChild(pop);
+  _ctxPopupEl = pop;
+  const r = anchorEl.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let top = r.top - pr.height - 8;
+  if (top < 8) top = r.bottom + 8;                         // flip below if no room above
+  let left = Math.min(Math.max(8, r.left), window.innerWidth - pr.width - 8);
+  pop.style.top = top + 'px';
+  pop.style.left = left + 'px';
   const onDocClick = (e) => { if (_ctxPopupEl && !_ctxPopupEl.contains(e.target) && e.target !== anchorEl) _closeContextPopup(); };
   const onKey = (e) => { if (e.key === 'Escape') _closeContextPopup(); };
   setTimeout(() => document.addEventListener('mousedown', onDocClick), 0);
