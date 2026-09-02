@@ -4195,6 +4195,33 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
     if (pct < (cmp.pct || 70)) return;
   }
 
+  // ---- DEBUG provenance log -------------------------------------------------
+  // Every mid-turn compaction logs WHY it fired: session id, conversation id,
+  // title, measured context vs window, provider endpoint, and (on failure) the
+  // summarizer error + HTTP status. Worker console is relayed to the page as
+  // '[worker] ...', so these land in the tab's devtools console. Best-effort:
+  // logging must never break compaction.
+  const _cmpBase = (() => {
+    let host = '';
+    try { host = new URL(config.url).host; } catch (_) {}
+    return {
+      src: 'worker-midturn',
+      session_id: ctx._sessionId || config.session_id || null,
+      conv: config.conversation_file_name || null,
+      title: config.conversationTitle || null,
+      provider: (config.model || '?') + (host ? ' @ ' + host : ''),
+      window: cmp.window,
+    };
+  })();
+  const _cmpPct = promptTokens != null ? Math.round((promptTokens / cmp.window) * 100) : null;
+  const _cmpReason = (promptTokens == null)
+    ? 'forced: context-overflow error (413/400) - safety-net compact+retry'
+    : 'threshold: reported prompt_tokens ' + promptTokens + ' >= ' + Math.round(cmp.pct || 70) + '% of window';
+  const _cmpLog = (ev, extra) => {
+    try { console.log('[compaction] ' + ev + ' ' + JSON.stringify({ ..._cmpBase, reason: _cmpReason, prompt_tokens: promptTokens != null ? promptTokens : null, pct: _cmpPct, ...(extra || {}) })); } catch (_) {}
+  };
+  _cmpLog('trigger');
+
   const marker = cmp.marker || SP_SUMMARY_MARKER;
   const m0 = messages[0];
   const hasSummary = !!(m0 && m0.role === 'user' && typeof m0.content === 'string' && m0.content.startsWith(marker));
@@ -4219,6 +4246,7 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
     summary = await _summarizeForCompaction(config, transcript, ctx);
   } catch (e) {
     ctx.emit({ type: 'compaction_end' });
+    _cmpLog('failed', { error: (e && e.message) || String(e), status: (e && e.status) || null });
     throw new CompactionFailure('Context is over ' + Math.round(cmp.pct) + '% and must be compacted to continue, but summarizing the earlier turns failed: ' + ((e && e.message) || e) + '. Generation stopped.');
   }
   if (summary) {
@@ -4234,6 +4262,7 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
     // send re-ships everything this turn accumulated (the "sends way more than the
     // active context" bug). `summary` is the raw folded text (no marker).
     ctx.emit({ type: 'message_compacted', kept: messages.length - 1, summary });
+    _cmpLog('done', { removed: split, kept: messages.length - 1 });
   }
   ctx.emit({ type: 'compaction_end' });
 }
