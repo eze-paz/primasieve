@@ -1290,6 +1290,9 @@ function rebuildSettledTimer(target, s) {
   }
   const rate = (s.lastTurn && s.lastTurn.rate > 0) ? s.lastTurn.rate
     : ((comp > 0 && sec > 0.05) ? comp / sec : 0);
+  // Cold rebuild: the live stream's _turnProfile is gone, but the profile was
+  // persisted inside lastTurn — restore it so the popup works after a reload.
+  if (!s._turnProfile && s.lastTurn && s.lastTurn.profile) s._turnProfile = s.lastTurn.profile;
   const parts = [
     _timerNnBtn(),
     `<span class="mt-label">${label}</span>`,
@@ -1306,6 +1309,7 @@ function rebuildSettledTimer(target, s) {
   slot.dataset.convId = '' + s.id;
   slot.innerHTML = parts.join('');
   _wireCtxCounter(slot, s.id);
+  _wireRateClick(slot, s.id);
   if (s.todos && s.todos.length) {
     const badge = slot.querySelector('.mt-todos');
     if (badge) {
@@ -7497,6 +7501,17 @@ function _paintRate(el, rate, convId) {
     }
   }
 }
+// Wire a SETTLED .mt-rate span (endTotalTimer / rebuildSettledTimer rebuild the
+// slot HTML from scratch, so the live line's wiring is lost) to open the same
+// turn-profile popup as the live readout.
+function _wireRateClick(el, convId) {
+  const c = el && el.querySelector('.mt-rate');
+  if (!c || c._rateWired) return;
+  c._rateWired = true;
+  c.style.cursor = 'pointer';
+  c.title = 'Decode-only speed — click for the turn-time profile';
+  c.addEventListener('click', (e) => { e.stopPropagation(); openRatePopup(convId, c); });
+}
 function _wireCtxCounter(el, convId) {
   const c = el && el.querySelector('.mt-ctx');
   if (!c) return;
@@ -7621,7 +7636,7 @@ function endTotalTimer(stream, label) {
   const rate = (stream._turnToks > 0 && stream._turnDecodeMs > 0)
     ? stream._turnToks / (stream._turnDecodeMs / 1000)
     : ((comp > 0 && sec > 0.05) ? comp / sec : 0);
-  if (label !== null) stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp, rate };
+  if (label !== null) stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp, rate, profile: stream._turnProfile || null };
   // Only touch the shared per-pane slot if THIS conversation is the one on screen;
   // a backgrounded turn finishing must not overwrite the viewed conversation's bar.
   // When it isn't viewed, rebuildSettledTimer paints the settled line from lastTurn
@@ -7652,6 +7667,7 @@ function endTotalTimer(stream, label) {
   slot.classList.add('done');
   slot.dataset.convId = '' + (stream.id || '');
   _wireCtxCounter(slot, stream.id);
+  _wireRateClick(slot, stream.id);
   if (stream.todos && stream.todos.length) {
     const badge = slot.querySelector('.mt-todos');
     if (badge) {
@@ -7772,7 +7788,9 @@ function openRatePopup(convId, anchorEl) {
   const pop = document.createElement('div');
   pop.className = 'ctx-popup';
   pop.innerHTML = '<div class="ctx-popup-title">Turn profile</div>' +
-    (p ? _rateRows(p) : '<div class="ctx-popup-note">No turn profile yet — it appears once the current turn finishes.</div>');
+    (p ? _rateRows(p) : '<div class="ctx-popup-note">' + (s && s.generating
+      ? 'No turn profile yet — it appears once the current turn finishes.'
+      : 'No turn profile recorded for this turn.') + '</div>');
   document.body.appendChild(pop);
   _ctxPopupEl = pop;
   const r = anchorEl.getBoundingClientRect();
