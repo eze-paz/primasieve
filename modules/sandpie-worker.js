@@ -3746,6 +3746,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   let buffer = '', content = '', reasoningText = '';
   // Degeneration detector: fresh per attempt, O(1)/token, bounded window.
   const _degen = new DegenerationDetector();
+  // Benchmark providers stream deliberately repetitive lorem to stress the
+  // client render/loop paths — that would trip the detector on every run. Bypass
+  // it (only) for them, matched by model id or endpoint URL containing "bench".
+  const _benchMode = /bench/i.test(String(body && body.model || '')) || /bench/i.test(String(reqUrl || ''));
   const toolCalls = []; let usage = null, sawDone = false;
   let finishReason = null, streamErr = null;
   // Stall watchdog: a dead upstream connection can leave reader.read() pending
@@ -3784,10 +3788,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         if (!_firstTokAt && (delta.content || typeof delta.reasoning_content === 'string' || typeof delta.reasoning === 'string' || (delta.tool_calls && delta.tool_calls.length))) {
           _firstTokAt = _pnow();
         }
-        if (delta.content) { content += delta.content; _degen.push(delta.content); }
-        if (typeof delta.reasoning_content === 'string') { reasoningText += delta.reasoning_content; _degen.push(delta.reasoning_content); }
-        else if (typeof delta.reasoning === 'string') { reasoningText += delta.reasoning; _degen.push(delta.reasoning); }
-        if (_degen.tripped) {
+        if (delta.content) { content += delta.content; if (!_benchMode) _degen.push(delta.content); }
+        if (typeof delta.reasoning_content === 'string') { reasoningText += delta.reasoning_content; if (!_benchMode) _degen.push(delta.reasoning_content); }
+        else if (typeof delta.reasoning === 'string') { reasoningText += delta.reasoning; if (!_benchMode) _degen.push(delta.reasoning); }
+        if (!_benchMode && _degen.tripped) {
           // Degeneration: the provider is looping ("de de de…", repeated lines,
           // garbage-token runs). Abort the attempt as a RETRYABLE error so
           // _withProviderRetry re-issues it (round_retry resets the partial
