@@ -57,7 +57,7 @@ const SandpieAutoTitle = (function () {
       const fl = (p && Array.isArray(p.fluent)) ? p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase()) : null;
       if (fl && fl.includes(code)) return { line: '- Write it in the same language the user wrote in.', tx: null };
       const name = (SL && SL.name && SL.name(code)) || code;
-      return { line: '- Write it in English.', tx: { code, name } };
+      return { line: '- Write it in English.', tx: null };
     } catch (_) { return { line: '- Write it in the same language the user wrote in.', tx: null }; }
   }
 
@@ -127,14 +127,6 @@ const SandpieAutoTitle = (function () {
     // Don't fail silently: a model that answered but whose answer was unusable is
     // indistinguishable from "no provider" at the call site otherwise.
     if (!title && out && out.trim()) console.warn('[sandpie] auto-title: unusable answer, keeping the derived title:', JSON.stringify(out.slice(0, 200)));
-    // Non-fluent reply language: the title was authored in English — translate it
-    // through the shared localizer (display-cached). Fail-open to the English title.
-    if (title && lang.tx && window.__locCache && window.__locCache.localize) {
-      try {
-        const [tr] = await window.__locCache.localize([title], lang.tx.code, lang.tx.name);
-        if (typeof tr === 'string' && tr.trim()) title = tr.trim();
-      } catch (_) {}
-    }
     return title;
   }
 

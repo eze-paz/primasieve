@@ -3602,13 +3602,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     }
   }
   const _ep = (effective && effective.endpoint) ? String(effective.endpoint).replace(/\/$/, '') : $('endpoint').value.replace(/\/$/, '');
-  // Localization target for this turn: the Reply language ONLY when the active
-  // model can't generate it fluently (models.json `fluent`). Drives the
-  // author-in-English directive, the display-side render hooks
-  // (_activeLocalize), and the worker's deliverable localization. A fluent
-  // language => null: the model authors it directly, no translation layer.
-  const _loc = _localizeTarget();
-  _activeLocalize = _loc;
   // BETA projects fork: resolve the conversation's project once (stream first, then
   // persisted meta) — reused for both the system-prompt block and the worker config.
   let _projRoot = null, _projNs = null;
@@ -3622,7 +3615,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   }
   // The project rule, appended to the system prompt so the model knows where it
   // can write and that reads are unrestricted.
-  const _sysPrompt = await buildSystemPrompt(convMessages, _loc);
+  const _sysPrompt = await buildSystemPrompt(convMessages, null);
   if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
     _sysPrompt.content += _projRoot
       ? `\n\n## Project folder\nThis conversation's project folder is your working directory:\n  ${_projRoot}\nThat folder IS your workspace root. To write a file, use a BARE name or a path relative to that root — e.g. write_file("rand10.txt") creates ${_projRoot}/rand10.txt. Every tool result echoes the FULL absolute path it acted on; trust that echo, not your memory of earlier paths.\nHARD RULES:\n- Do NOT invent nested folders like "projects/<name>/…" — there is no such structure here; the project folder is the root, so put files directly in it (or in a subfolder only if the user asks). A path you saw in another conversation or in a "recent paths" list does NOT apply here.\n- Writes, edits and deletes are limited to this project folder. Reads work ANYWHERE in the user's Dropbox by absolute path (e.g. read_file("/R+D+I/spec.pdf")). To change a file outside the project, copy() it in first.\n- If you're unsure what already exists, list_files (no path) shows the project root — orient with that instead of guessing a path.`
@@ -3631,7 +3624,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   return {
     url: new URL(api(_ep + '/chat/completions'), location.href).href,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
-    localize: _loc,
+    localize: null,   // display-side translation layer removed; language = system-prompt directive
     // Session reply language + the model's fluent set, for the worker's
     // per-call language rules (respond guard, subagent clause, deliverable
     // localization gate) — needed even when localize is null.
@@ -4345,60 +4338,6 @@ function _replyLocale() {
     return { code: code, name: nm };
   } catch (_) { return { code: 'en', name: 'English' }; }
 }
-// Languages the ACTIVE model generates reliably (models.json `fluent`, carried
-// onto the managed provider def by account.js). null = unknown (personal
-// providers, old servers) — treated as English-only, the historically safe
-// default: everything non-English gets localized.
-function _modelFluent() {
-  try {
-    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive && SandpieProviders.getActive()) || null;
-    if (!p || !Array.isArray(p.fluent) || !p.fluent.length) return null;
-    return p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase());
-  } catch (_) { return null; }
-}
-function _isFluentCode(code) {
-  const c = String(code || '').split(/[-_]/)[0].toLowerCase();
-  if (!c || c === 'en') return true;   // English is every model's native register
-  const fl = _modelFluent();
-  return !!(fl && fl.includes(c));
-}
-// The turn's LOCALIZATION target: the Reply language when the ACTIVE model can
-// NOT generate it fluently (then the model authors English and the gemini
-// localizer translates delivery), else null (a fluent language — Spanish,
-// French, … — is authored by the model directly, no translation layer).
-function _localizeTarget() {
-  const rl = _replyLocale();
-  if (!rl || !rl.code || rl.code === 'en') return null;
-  return _isFluentCode(rl.code) ? null : rl;
-}
-
-// The active conversation's locale, for the display-side render hooks. Set by
-// buildAgentConfig at send; window override wins for manual testing.
-let _activeLocalize = null;
-// window.__localizeTo is an optional manual override (testing / forcing a locale).
-// Fallback to _replyLocale(): _activeLocalize is ONLY set at send, so on a fresh
-// reload it is null and history would re-render in English. The Reply selector is
-// the sole language authority and is available immediately, so resolve from it —
-// this is what re-localizes a reloaded transcript (checklist, questions, bubbles).
-// Normalize English (or no target) to null so the many `if (_loc && _loc.code)`
-// guards skip the transform entirely instead of doing an en->en no-op.
-function _currentLocale(override) {
-  // A per-delivery override (respond's `language` arg, relayed by the worker):
-  // in the author-in-English regime (_activeLocalize set) EVERY non-English
-  // delivery is translated (the model authored English, per the hard rule); in
-  // the native regime only NON-fluent targets translate — fluent ones were
-  // authored directly by the model, and re-translating them wastes a localizer
-  // call and risks mangling correct text. `window.__localizeTo` (manual
-  // testing) deliberately bypasses the fluency gate.
-  if (override) {
-    if (!override.code || override.code === 'en') return null;
-    if (_activeLocalize && _activeLocalize.code) return override;
-    return _isFluentCode(override.code) ? null : override;
-  }
-  const loc = (typeof window !== 'undefined' && window.__localizeTo) || _activeLocalize || _localizeTarget();
-  return (loc && loc.code && loc.code !== 'en') ? loc : null;
-}
-
 function renderTodos(tcId, todos, scopeEl) {
   const toolCallDiv = _toolBoxEl(tcId, scopeEl);
   if (!toolCallDiv) return;
@@ -6085,7 +6024,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     const _rl = _replyLocale();
     const _nm = (_rl && _rl.name) || 'English';
     const _cd = (_rl && _rl.code) || 'en';
-    const _lx = localizeTarget || _localizeTarget();
+    const _lx = localizeTarget || null;
     // One-off other-language deliveries. In the localize regime the hard rule
     // stays absolute (author English, ALWAYS — the system translates every
     // delivery); in the native/English regimes fluent languages are authored
