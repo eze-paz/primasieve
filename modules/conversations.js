@@ -618,18 +618,6 @@ function renderHistoricalMessage(m, host = null) {
       bub.innerHTML = renderMd(contentStr);
       hydrateLocalRefs(div);
       bindBubble(div, m);
-      // Localization (display-only): persisted content is English canonical; on
-      // reload re-localize the bubble to the current Reply language, exactly as the
-      // live endRound does — otherwise a reloaded reply reverts to English. Fail-open
-      // to the English already painted; guard against a conversation switch mid-await.
-      const _loc = _currentLocale();
-      if (_loc && _loc.code) {
-        // Streamed repaint: `full` is translated-head + English-tail, so a long
-        // bubble turns Catalan top-down as blocks finish instead of all at once.
-        renderUserTextStream(contentStr, _loc, (p) => {
-          if (p.full && p.full !== contentStr && div.isConnected) { bub.innerHTML = renderMd(p.full); hydrateLocalRefs(div); }
-        }).catch(() => {});
-      }
     }
     // Saved reasoning (chain of thought) — cloud tool-call turns persist it as
     // m.reasoning. Render it as a collapsed thinking block matching the live
@@ -2939,15 +2927,8 @@ function getSandpieWorker() {
     if (msg.type === 'artifact-localizing') {
       // Deliverable localization runs off-turn (worker _lxQueue): the artifact
       // card shows English first, so surface a "translating…" badge until the
-      // translated file swaps in. Label localized to the user's language (cheap:
-      // one short cached string); fail-open to English.
-      const relay = (label) => {
-        try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('artifact:localizing', { path: msg.path, state: msg.state, label }); } catch (_) {}
-      };
-      const EN = 'Translating…';
-      const loc = _currentLocale();
-      if (msg.state === 'start' && loc && loc.code) renderUserText(EN, loc).then(relay).catch(() => relay(EN));
-      else relay(EN);
+      // translated file swaps in.
+      try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('artifact:localizing', { path: msg.path, state: msg.state, label: 'Translating…' }); } catch (_) {}
       return;
     }
     if (msg.type === 'forward-to-page') {
@@ -4346,241 +4327,6 @@ function appendToolResult(tcId, result, scopeEl) {
 // result. Each write_todos call gets its own card attached to that call, so the
 // history reads as a running log of the plan; replay rebuilds each from the tool
 // message content.
-/* ── Localization (prototype): English is canonical — the model's context, the
-   stored todos, and file content stay English. User-facing text is localized on
-   DISPLAY ONLY and NEVER written back. Gated by window.__localizeTo={code,name}
-   (stands in for conv.localize until detection is wired). Fail-OPEN (show the
-   English on any error). Uses the internal localizer model from models.json. ── */
-const _LOCALIZER_MODEL = 'google/gemini-2.5-flash';
-const _localizeCache = new Map();   // 'code::text' -> translated (in-memory, this page)
-// ---- Persistent display-cache (OPFS 'localize-cache/<code>.json') ----
-// English is canonical and localization is re-applied on EVERY render, so without
-// this a reload re-translates the whole visible transcript (paid localizer
-// requests). Entries are keyed by a text hash (not the full text) to keep the
-// file small; a warm conversation open never touches the network.
-// Display-only — never read back into the model's context.
-const _locStores = new Map();       // code -> { hash: translation }
-const _locStoreP = new Map();       // code -> one-time load promise
-const _locDirty = new Set();
-let _locFlushT = null;
-function _locHash(s) {              // 2x32-bit FNV-1a + length; collision = wrong display string, acceptable for a cache
-  let h1 = 0x811c9dc5, h2 = 0x811c9dc5 ^ 0x5bd1e995;
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
-    h2 = Math.imul(h2 ^ c, 0x85ebca6b) >>> 0;
-  }
-  return h1.toString(36) + '.' + h2.toString(36) + '.' + s.length;
-}
-function _locStoreLoad(code) {
-  if (!code || code === 'en') return Promise.resolve();
-  if (_locStoreP.has(code)) return _locStoreP.get(code);
-  const p = (async () => {
-    let obj = {};
-    try {
-      const root = await navigator.storage.getDirectory();
-      const dir = await root.getDirectoryHandle('localize-cache', { create: true });
-      const fh = await dir.getFileHandle(code + '.json');
-      const parsed = JSON.parse(await (await fh.getFile()).text());
-      if (parsed && typeof parsed === 'object') obj = parsed;
-    } catch (_) {}
-    _locStores.set(code, obj);
-  })();
-  _locStoreP.set(code, p);
-  return p;
-}
-// Sync lookup (call after _locStoreLoad resolves): in-memory first, then persistent.
-function _locGet(code, text) {
-  const key = code + '::' + text;
-  if (_localizeCache.has(key)) return _localizeCache.get(key);
-  const st = _locStores.get(code);
-  if (!st) return undefined;
-  const v = st[_locHash(text)];
-  if (typeof v === 'string') _localizeCache.set(key, v);
-  return v;
-}
-function _locPut(code, text, tr) {
-  _localizeCache.set(code + '::' + text, tr);
-  const st = _locStores.get(code);
-  if (st) { st[_locHash(text)] = tr; _locDirty.add(code); _locFlushSoon(); }
-}
-function _locFlushSoon() {
-  if (_locFlushT) return;
-  _locFlushT = setTimeout(async () => {
-    _locFlushT = null;
-    const codes = [..._locDirty]; _locDirty.clear();
-    for (const c of codes) {
-      try {
-        const st = _locStores.get(c); if (!st) continue;
-        // Cap the file: JSON objects keep insertion order, so dropping the earliest
-        // keys is oldest-first pruning.
-        const keys = Object.keys(st);
-        if (keys.length > 8000) for (const k of keys.slice(0, keys.length - 8000)) delete st[k];
-        const root = await navigator.storage.getDirectory();
-        const dir = await root.getDirectoryHandle('localize-cache', { create: true });
-        const fh = await dir.getFileHandle(c + '.json', { create: true });
-        const w = await fh.createWritable(); await w.write(JSON.stringify(st)); await w.close();
-      } catch (e) { console.warn('[localize] cache flush failed:', e && e.message || e); }
-    }
-  }, 2000);
-}
-// Debug/test handle (console): localization is module-scoped otherwise.
-if (typeof window !== 'undefined') window.__locCache = { localize: (...a) => localize(...a), load: (c) => _locStoreLoad(c), get: (c, t) => _locGet(c, t), stores: _locStores, mem: _localizeCache };
-async function localize(texts, to, toName) {
-  if (!Array.isArray(texts) || !texts.length) return texts;
-  const out = texts.slice();
-  const miss = [], missIdx = [];
-  await _locStoreLoad(to);
-  texts.forEach((t, i) => {
-    if (typeof t !== 'string' || !t.trim()) return;
-    const c = _locGet(to, t);
-    if (typeof c === 'string') { out[i] = c; return; }
-    miss.push(t); missIdx.push(i);
-  });
-  if (!miss.length) return out;
-  try {
-    // gemini-2.5-flash via the provider's /chat/completions (the managed proxy
-    // injects the upstream key; models.json pins the localizer). Batched JSON
-    // array in/out at temperature 0 — the LLM preserves markdown/code natively,
-    // so no structure-preserving splitter is needed. Fail-open to English.
-    const tr = await _geminiTranslate(miss, to, toName);
-    missIdx.forEach((oi, k) => { const t = tr[k]; if (typeof t === 'string' && t) { out[oi] = t; _locPut(to, texts[oi], t); } });
-    return out;
-  } catch (e) { console.warn('[localize] failed (showing English):', e && e.message || e); return texts; }
-}
-// One localizer round trip: array of strings in -> same-length array out, chunked
-// so each request body stays well under the upstream ~1MB cap. Throws on transport
-// errors (localize() converts that to fail-open English); a chunk whose reply
-// doesn't parse keeps its English strings.
-const _LX_CHUNK = 50;
-function _lxSystemPrompt(tgt) {
-  return 'You are a professional translator. Rewrite each string in the input JSON array in fluent, correct ' + tgt + ', whatever language the input is in (translate it if it is another language; fix and clean it if it is already ' + tgt + '). Preserve meaning, tone, markdown/markup, numbers, and code verbatim. Return ONLY a JSON array of the same length and order — no prose, no code fences.';
-}
-async function _geminiTranslate(texts, to, toName) {
-  const prov = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive()) || {};
-  const url = ((prov.endpoint || location.origin).replace(/\/+$/, '')) + '/chat/completions';
-  const sys = _lxSystemPrompt(toName || to);
-  const out = [];
-  for (let i = 0; i < texts.length; i += _LX_CHUNK) {
-    const slice = texts.slice(i, i + _LX_CHUNK);
-    const body = { model: _LOCALIZER_MODEL, messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(slice) }], stream: false, temperature: 0 };
-    if (activeConvId) { try { body.session_id = 'Translate:' + (await ensureSessionId(activeConvId)); } catch (_) {} }   // parent-session marker for /admin/transcripts
-    const r = await fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (prov.apiKey || 'x') }, body: JSON.stringify(body) });
-    if (!r.ok) throw new Error('localizer HTTP ' + r.status);
-    const j = await r.json();
-    let content = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '[]';
-    content = content.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
-    let arr = null;
-    try { arr = JSON.parse(content); } catch (_) {}
-    // Failed slots push null (NOT the English source) so localize() shows the
-    // English fail-open WITHOUT caching it as a "translation".
-    for (let k = 0; k < slice.length; k++) out.push((arr && typeof arr[k] === 'string' && arr[k]) ? arr[k] : null);
-  }
-  return out;
-}
-// Localize a single user-facing string (bubbles/status). Returns English on failure.
-async function renderUserText(text, loc) {
-  if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) return text;
-  const [t] = await localize([text], loc.code, loc.name);
-  return t || text;
-}
-// Split markdown into blank-line-separated blocks, keeping fenced code whole.
-// Rejoining with '\n\n' collapses runs of 3+ blank lines — invisible after render.
-function _mdBlocks(text) {
-  const lines = text.split('\n');
-  const blocks = []; let cur = []; let inFence = false;
-  for (const l of lines) {
-    if (/^\s*(```|~~~)/.test(l)) inFence = !inFence;
-    if (!inFence && !l.trim()) { if (cur.length) { blocks.push(cur.join('\n')); cur = []; } continue; }
-    cur.push(l);
-  }
-  if (cur.length) blocks.push(cur.join('\n'));
-  return blocks;
-}
-// Streaming localization: translate in block GROUPS (~1500 chars per request) so
-// long replies paint progressively instead of stalling on one big round trip,
-// without paying a full HTTP round trip per paragraph.
-// onProgress({head, full, done}): head = translated text so far,
-// full = head + the still-English remainder (for repaint-in-place consumers).
-// Fail-open per group; resolves to the final translation. Also caches the WHOLE
-// text so a reload hits in one lookup.
-async function renderUserTextStream(text, loc, onProgress) {
-  const emit = (head, full, done) => { if (onProgress) { try { onProgress({ head, full, done }); } catch (_) {} } };
-  if (!loc || !loc.code || typeof text !== 'string' || !text.trim()) { emit(text, text, true); return text; }
-  await _locStoreLoad(loc.code);
-  const whole = _locGet(loc.code, text);
-  if (typeof whole === 'string') { emit(whole, whole, true); return whole; }
-  const blocks = _mdBlocks(text);
-  if (text.length < 600 || blocks.length < 2) {
-    const t = await renderUserText(text, loc);
-    emit(t, t, true);
-    return t;
-  }
-  // Group consecutive blocks up to ~1500 chars: one localizer request per group.
-  const groups = [];
-  let g = [], gLen = 0;
-  for (const b of blocks) {
-    if (g.length && gLen + b.length > 1500) { groups.push(g); g = []; gLen = 0; }
-    g.push(b); gLen += b.length;
-  }
-  if (g.length) groups.push(g);
-  const out = [];
-  let doneBlocks = 0;
-  for (let i = 0; i < groups.length; i++) {
-    let tr = groups[i];
-    try { tr = await localize(groups[i], loc.code, loc.name); } catch (_) {}
-    out.push(...tr.map((t, k) => (typeof t === 'string' && t) ? t : groups[i][k]));
-    doneBlocks += groups[i].length;
-    const done = i === groups.length - 1;
-    const head = out.join('\n\n');
-    emit(head, done ? head : head + '\n\n' + blocks.slice(doneBlocks).join('\n\n'), done);
-  }
-  const full = out.join('\n\n');
-  if (full !== text) _locPut(loc.code, text, full);
-  return full;
-}
-// Clone a todos array with DISPLAY text localized (content). Canonical is untouched.
-async function renderUserTodos(todos, loc) {
-  if (!loc || !loc.code) return todos;
-  try {
-    const arr = todos || [];
-    // Localize content + activeForm together (one call), then re-split.
-    const contents = arr.map(t => (t && t.content) || '');
-    const actives = arr.map(t => (t && t.activeForm) || '');
-    const tr = await localize(contents.concat(actives), loc.code, loc.name);
-    const n = arr.length;
-    return arr.map((t, i) => Object.assign({}, t, {
-      content: tr[i] || t.content,
-      activeForm: t.activeForm ? (tr[n + i] || t.activeForm) : t.activeForm,
-    }));
-  } catch (_) { return todos; }
-}
-// Clone an ask() questions array with DISPLAY strings localized (question text,
-// option labels, default). Canonical English is untouched — the caller maps the
-// picked answer back to the English option before replying to the model.
-async function renderUserQuestions(questions, loc) {
-  if (!loc || !loc.code) return questions;
-  try {
-    const qs = questions || [];
-    const strs = [], refs = [];   // refs: ['q',i] | ['o',i,j] | ['d',i]
-    qs.forEach((q, i) => {
-      if (q && typeof q.question === 'string' && q.question.trim()) { strs.push(q.question); refs.push(['q', i]); }
-      ((q && q.options) || []).forEach((o, j) => { if (typeof o === 'string' && o.trim()) { strs.push(o); refs.push(['o', i, j]); } });
-      if (q && typeof q.default === 'string' && q.default.trim()) { strs.push(q.default); refs.push(['d', i]); }
-    });
-    if (!strs.length) return questions;
-    const tr = await localize(strs, loc.code, loc.name);
-    const out = qs.map(q => Object.assign({}, q, { options: (q && Array.isArray(q.options)) ? q.options.slice() : (q && q.options) }));
-    refs.forEach((r, k) => {
-      const v = tr[k]; if (typeof v !== 'string' || !v) return;
-      if (r[0] === 'q') out[r[1]].question = v;
-      else if (r[0] === 'o') { if (Array.isArray(out[r[1]].options)) out[r[1]].options[r[2]] = v; }
-      else if (r[0] === 'd') out[r[1]].default = v;
-    });
-    return out;
-  } catch (_) { return questions; }
-}
-
 /* == Reply-language resolution ================================================
    The Reply language is the SOLE authority for the language sandpie replies in and
    delivers files in. It comes from the Account-picker selector (SandpieLanguage: an
@@ -4678,25 +4424,6 @@ function renderTodos(tcId, todos, scopeEl) {
   box.appendChild(sep);
   box.appendChild(list);
 
-  // Localization (display-only): re-render the checklist in the user's language.
-  // The canonical `todos` (what the model re-reads each turn) stays English.
-  const _loc = _currentLocale();
-  if (_loc && _loc.code && (todos || []).length) {
-    renderUserTodos(todos, _loc).then(loc => {
-      try {
-        if (!loc) return;
-        // Re-query the CURRENT checklist in the box: a later write_todos render may
-        // have replaced `list` while the (async) translation was in flight, so
-        // binding to the stale ref would silently drop the localized result.
-        const cur = box.querySelector('.tool-todos') || (box.contains(list) ? list : null);
-        if (!cur) return;
-        const l2 = buildTodosView(loc);
-        l2.className = cur.className;
-        box.replaceChild(l2, cur);
-      } catch (_) {}
-    });
-  }
-
   // Live timer badge: show current checklist progress in the active timer.
   const ip = (todos || []).findIndex(t => t && t.status === 'in_progress');
   const liveTimer = (scopeEl || document).querySelector('.msg-timer:not(.done)');
@@ -4737,32 +4464,6 @@ function renderQuestions(tcId, questions, reply, convId) {
   });
   if (tcId) card.dataset.askTcId = tcId;
   host.appendChild(card);
-  // Display-only localization: re-render the card in the user's language, but map
-  // each picked answer back to the English canonical option before replying, so
-  // the model always receives the English choice it offered (free text passes
-  // through as typed). Same-order arrays → map by index.
-  const _loc = _currentLocale();
-  if (_loc && _loc.code && qs.length) {
-    renderUserQuestions(qs, _loc).then(qLoc => {
-      try {
-        if (!qLoc || !host.contains(card)) return;
-        const mapReply = (answers) => {
-          const eng = (answers || []).map(a => {
-            const i = qLoc.findIndex(q => q && q.question === a.question);
-            if (i < 0) return a;
-            const en = qs[i] || {};
-            const oj = Array.isArray(qLoc[i].options) ? qLoc[i].options.indexOf(a.answer) : -1;
-            const answer = (oj >= 0 && Array.isArray(en.options) && en.options[oj] != null) ? en.options[oj] : a.answer;
-            return { question: en.question || a.question, answer };
-          });
-          try { reply('answers:' + JSON.stringify(eng)); } catch (_) {}
-        };
-        const l2 = buildQuestionsView(qLoc, mapReply);
-        if (tcId) l2.dataset.askTcId = tcId;
-        host.replaceChild(l2, card);
-      } catch (_) {}
-    });
-  }
   return card;
 }
 
@@ -5386,13 +5087,11 @@ function tgLogFor(target) {
       st.title = untitled ? '' : title;
       prev.dataset.tgEn = st.title;
       prev._tgSt = st;
-      if (!untitled) _tgLocalizeTitle(prev, title);
     } else {
       st.title = untitled ? '' : title;
       st.group = _tgBuild(st.title, st);
       if (untitled) st.group.classList.add('tg-untitled');
       appendContent(target, st.group);
-      if (!untitled) _tgLocalizeTitle(st.group, st.title);
     }
   } else {
     // Something (thinking box, artifact, ask card) rendered below the group —
@@ -5402,25 +5101,6 @@ function tgLogFor(target) {
     if (n) appendContent(target, st.group);
   }
   return st.group.querySelector(':scope > .tg-log') || target;
-}
-// Localize a titled register header (display-only). The .tg-title is built from the
-// in_progress todo's activeForm (English canonical); translate it to the user's
-// language and patch the DOM async. dataset.tgEn holds the English title as the
-// stale-guard AND the key the group-merge/adoption logic compares against (so a
-// localized visible title never defeats the merge).
-function _tgLocalizeTitle(group, englishTitle) {
-  try {
-    if (!group || !englishTitle) return;
-    const loc = _currentLocale();
-    if (!loc || !loc.code) return;
-    renderUserText(englishTitle, loc).then(tr => {
-      try {
-        if (!tr || group.dataset.tgEn !== englishTitle) return;   // title changed meanwhile
-        const el = group.querySelector('.tg-title');
-        if (el) { el.textContent = tr; el.title = tr; }
-      } catch (_) {}
-    });
-  } catch (_) {}
 }
 function _tgBuild(title, st) {
   const g = document.createElement('div');
