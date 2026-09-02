@@ -1,0 +1,1412 @@
+[
+ {
+  "name": "bitcount",
+  "handcoded": {
+   "solved": true,
+   "energy": 12
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 12
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 9,
+    "after": 0,
+    "spent": 12,
+    "reward": 23.75,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "bucketsort",
+  "handcoded": {
+   "solved": true,
+   "energy": 97
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 97
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 0,
+    "spent": 97,
+    "reward": 6.933,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "find_first_in_sorted",
+  "handcoded": {
+   "solved": true,
+   "energy": 9
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 9
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 0,
+    "spent": 9,
+    "reward": 15.4167,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "find_in_sorted",
+  "handcoded": {
+   "solved": true,
+   "energy": 484
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 799
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 1,
+    "spent": 173,
+    "reward": 0.1806,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 1,
+    "after": 1,
+    "spent": 221,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 2,
+    "spent": 1,
+    "reward": -31.25,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 0,
+    "spent": 155,
+    "reward": 5.4032,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "flatten",
+  "handcoded": {
+   "solved": true,
+   "energy": 1
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 1
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 0,
+    "spent": 1,
+    "reward": 192.5,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "gcd",
+  "handcoded": {
+   "solved": true,
+   "energy": 1
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 1
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 0,
+    "spent": 1,
+    "reward": 183.5714,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "get_factors",
+  "handcoded": {
+   "solved": true,
+   "energy": 25
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 25
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 10,
+    "after": 0,
+    "spent": 25,
+    "reward": 13.3333,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "hanoi",
+  "handcoded": {
+   "solved": true,
+   "energy": 53
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 53
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 7,
+    "after": 0,
+    "spent": 53,
+    "reward": 8.6688,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "is_valid_parenthesization",
+  "handcoded": {
+   "solved": true,
+   "energy": 23
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 23
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 22,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 0,
+    "spent": 1,
+    "reward": 67.5,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "kheapsort",
+  "handcoded": {
+   "solved": true,
+   "energy": 366
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 616
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 45,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 0,
+    "spent": 71,
+    "reward": 7.1127,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "kth",
+  "handcoded": {
+   "solved": false,
+   "energy": 5190
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 2635
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.25,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 2,
+    "after": 2,
+    "spent": 246,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 2,
+    "after": 4,
+    "spent": 1,
+    "reward": -62.5,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 12,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.125,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.125,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 2,
+    "after": 2,
+    "spent": 92,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 2,
+    "spent": 31,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 0,
+    "spent": 4,
+    "reward": 20.625,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "lcs_length",
+  "handcoded": {
+   "solved": false,
+   "energy": 4502
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 9333
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 8,
+    "after": 5,
+    "spent": 178,
+    "reward": 0.4213,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 5,
+    "after": 8,
+    "spent": 1,
+    "reward": -75.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 8,
+    "after": 8,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 8,
+    "after": 8,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 8,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.3,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 190,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 120,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 76,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 5,
+    "after": 8,
+    "spent": 1,
+    "reward": -75.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 8,
+    "after": 5,
+    "spent": 178,
+    "reward": 0.4213,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 178,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 70,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.1,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 3,
+    "spent": 195,
+    "reward": 0.1282,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 169,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 157,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.2,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 0,
+    "spent": 72,
+    "reward": 5.3472,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "lis",
+  "handcoded": {
+   "solved": true,
+   "energy": 5128
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 1106
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.1538,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 2,
+    "after": 4,
+    "spent": 1,
+    "reward": -38.4615,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 32,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 74,
+    "reward": 6.0395,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "max_sublist_sum",
+  "handcoded": {
+   "solved": true,
+   "energy": 756
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 326
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 3,
+    "spent": 38,
+    "reward": 0.9398,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 1,
+    "spent": 30,
+    "reward": 2.381,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 4,
+    "spent": 1,
+    "reward": -107.1429,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 8,
+    "reward": 22.8571,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "mergesort",
+  "handcoded": {
+   "solved": true,
+   "energy": 124
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 3374
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 13,
+    "after": 1,
+    "spent": 122,
+    "reward": 1.6393,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 13,
+    "spent": 1,
+    "reward": -200.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 13,
+    "after": 13,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 13,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.8,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 0,
+    "spent": 2,
+    "reward": 13.3333,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "next_palindrome",
+  "handcoded": {
+   "solved": true,
+   "energy": 174
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 174
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 170,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 0,
+    "spent": 4,
+    "reward": 15.4167,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "next_permutation",
+  "handcoded": {
+   "solved": true,
+   "energy": 102
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 102
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 8,
+    "after": 0,
+    "spent": 102,
+    "reward": 7.1786,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "pascal",
+  "handcoded": {
+   "solved": true,
+   "energy": 670
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 1100
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 3,
+    "spent": 203,
+    "reward": 0.2053,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 3,
+    "after": 4,
+    "spent": 1,
+    "reward": -41.6667,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 147,
+    "reward": 6.1338,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "powerset",
+  "handcoded": {
+   "solved": false,
+   "energy": 585
+  },
+  "ucb": {
+   "solved": false,
+   "energy": 585
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 46,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 4,
+    "spent": 51,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 238,
+    "reward": 0.0,
+    "solved": false
+   }
+  ]
+ },
+ {
+  "name": "quicksort",
+  "handcoded": {
+   "solved": true,
+   "energy": 66
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 66
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 0,
+    "spent": 66,
+    "reward": 5.2706,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "rpn_eval",
+  "handcoded": {
+   "solved": true,
+   "energy": 9
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 9
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 0,
+    "spent": 9,
+    "reward": 16.9048,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "shunting_yard",
+  "handcoded": {
+   "solved": true,
+   "energy": 1496
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 446
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 95,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 101,
+    "reward": 6.4144,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "sieve",
+  "handcoded": {
+   "solved": true,
+   "energy": 2
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 2
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 0,
+    "spent": 2,
+    "reward": 94.2857,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "sqrt",
+  "handcoded": {
+   "solved": true,
+   "energy": 549
+  },
+  "ucb": {
+   "solved": false,
+   "energy": 689
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 6,
+    "spent": 82,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 6,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.625,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 1,
+    "after": 1,
+    "spent": 129,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 6,
+    "spent": 1,
+    "reward": -156.25,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 6,
+    "after": 6,
+    "spent": 118,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 6,
+    "after": 6,
+    "spent": 110,
+    "reward": 0.0,
+    "solved": false
+   }
+  ]
+ },
+ {
+  "name": "to_base",
+  "handcoded": {
+   "solved": true,
+   "energy": 57
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 57
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 7,
+    "after": 0,
+    "spent": 57,
+    "reward": 7.7911,
+    "solved": true
+   }
+  ]
+ },
+ {
+  "name": "wrap",
+  "handcoded": {
+   "solved": true,
+   "energy": 1358
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 488
+  },
+  "trace": [
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 93,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 0,
+    "spent": 145,
+    "reward": 6.4368,
+    "solved": true
+   }
+  ]
+ }
+]
