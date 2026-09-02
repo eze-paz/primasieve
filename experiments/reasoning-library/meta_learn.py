@@ -29,19 +29,19 @@ if __name__ == "__main__":
     casebase = []
     for b in train:
         ep = []
-        ok, en, _ = solve_ucb(b["id"], b["src"], b["tests"], ep, held_back=HELD_BACK)
+        ok, en, _ = solve_ucb(b["fn"], b["src"], b["tests"], ep, held_back=HELD_BACK)
         if ok:
-            casebase.append((signature(b["id"], b["src"], b["tests"]), winning_forms(ep)))
+            casebase.append((signature(b["fn"], b["src"], b["tests"]), winning_forms(ep)))
     print(f"casebase: {len(casebase)} solved-synthetic strategies mined\n")
 
     # HOLDOUT: cold vs warm (k-NN from the big synthetic casebase)
     print(f"{'real bug':26s} {'cold':>12s} {'warm':>12s}")
     ce = we = cs = ws = 0; wins = 0; losses = 0
     for b in holdout:
-        sig = signature(b["id"], b["src"], b["tests"])
-        ep = []; cok, cen, _ = solve_ucb(b["id"], b["src"], b["tests"], ep, held_back=HELD_BACK)
+        sig = signature(b["fn"], b["src"], b["tests"])
+        ep = []; cok, cen, _ = solve_ucb(b["fn"], b["src"], b["tests"], ep, held_back=HELD_BACK)
         wp = warm_prior(sig, casebase)
-        ep2 = []; wok, wen, _ = solve_ucb(b["id"], b["src"], b["tests"], ep2, warm=wp, held_back=HELD_BACK)
+        ep2 = []; wok, wen, _ = solve_ucb(b["fn"], b["src"], b["tests"], ep2, warm=wp, held_back=HELD_BACK)
         cs += cok; ws += wok; ce += cen; we += wen
         if wen < cen: wins += 1
         elif wen > cen: losses += 1

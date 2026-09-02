@@ -64,7 +64,7 @@ def synth_bugs(name, correct_src, tests, rng, per_program=9):
         nf = _nfail(src2, name, tests)
         if nf is None or nf == 0 or nf == len(tests):   # must break SOME (not none, not all)
             continue
-        bugs.append({"id": f"{name}#{tag}{i}", "src": src2, "tests": tests,
+        bugs.append({"id": f"{name}#{tag}{i}", "fn": name, "src": src2, "tests": tests,
                      "class": tag, "mut_kind": cls, "nfail0": nf})
     return bugs
 
@@ -81,7 +81,7 @@ def build_pool(rng, per_program=9):
         train += synth_bugs(name, csrc, tests, rng, per_program)
         # HOLDOUT = the REAL seeded QuixBugs bug (different distribution, never used for training)
         bsrc = open(f"{QB}/python_programs/{name}.py").read()
-        holdout.append({"id": name, "src": bsrc, "tests": tests, "class": "real", "mut_kind": "real"})
+        holdout.append({"id": name, "fn": name, "src": bsrc, "tests": tests, "class": "real", "mut_kind": "real"})
     return train, holdout
 
 if __name__ == "__main__":
