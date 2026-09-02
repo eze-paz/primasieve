@@ -8163,18 +8163,12 @@ function bootConversations() {
     await refreshConversationList();
     refreshPaneBars();   // bar always shows on desktop from first paint — 'New chat' when no conversation is mounted
     _ensureTimerPlaceholders();   // resting timer bar present in the DOM from first paint, even with no conversation mounted
-    if (activeConvId) {
-      const restoreId = activeConvId;
-      activeConvId = null;
-      const s = ensureStream(restoreId);
-      try {
-        const data = await readConvData(restoreId);
-        if (data) hydrateStreamFromData(s, data);
-      } catch {  }
-      mountConv(restoreId);
-      renderConversation(s.messages, s.compaction);
-      refreshPaneBars();
-    }
+    // Boot starts on a FRESH conversation (home screen, ctx 0). The last-open
+    // chat is NOT auto-restored anymore (2026-09-02: opening the app used to
+    // remount the previous conversation and show its ctx counter instead of 0).
+    // The stored active-conv pointer is cleared so nothing stale lingers; the
+    // sidebar still lists every conversation and any of them can be reopened.
+    try { localStorage.removeItem('sandpie-active-conv'); } catch (_) {}
     const scrollEnd = () => { const m = paneScrollEl($('messages')); if (m) m.scrollTop = m.scrollHeight; };
     requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
     document.querySelectorAll('#messages img').forEach(img => {
