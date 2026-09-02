@@ -102,5 +102,37 @@ class Reset:
         return {"form": self.name, "tried": 0, "before": before, "after": st.best,
                 "improved": False, "solved": st.best == 0, "exhausted": False, "fix": None}
 
+class Interpolate:
+    """Structure-mapping form: fetch an analog, extract its relational frame, project onto the
+    current tree (fills the frame's hole with the target's own material). Solves the powerset-class
+    'missing relation' bugs no single edit reaches. One-shot per state (analogs tried once)."""
+    name = "INTERPOLATE"; cost_hint = 6.0
+    def __init__(self):
+        import reasoner_interp as ri
+        self.ri = ri
+        self.analogs = [("get_class_members", ri.get_stdlib_func("rlcompleter.py", "get_class_members"))]
+    def _key(self, st): return ("INTERP", st._th())
+    def applicable(self, st):
+        return not st.solved() and st._cache.get(self._key(st)) is None
+    def run(self, st, budget):
+        import ast as _ast
+        before = st.best; src = _ast.unparse(st.tree)
+        for aname, asrc in self.analogs:
+            try: cands = list(self.ri.interpolate(src, asrc))
+            except Exception: cands = []
+            for desc, cand in cands:
+                st.units += 1
+                nf, susp2 = st._score(cand)
+                if nf < before:
+                    st.tree, st.susp, st.best = cand, susp2, nf
+                    st.log.append((self.name, before, nf))
+                    st._cache[self._key(st)] = True   # (new tree -> new key; old marked below too)
+                    return {"form": self.name, "tried": 1, "before": before, "after": nf,
+                            "improved": True, "solved": nf == 0, "exhausted": False,
+                            "fix": f"interp[{aname}]:{desc[:24]}"}
+        st._cache[self._key(st)] = True               # exhausted on this tree
+        return {"form": self.name, "tried": 1, "before": before, "after": before,
+                "improved": False, "solved": False, "exhausted": True, "fix": None}
+
 def default_forms():
-    return [Enumerate(0), Enumerate(1), Enumerate(2), Reset()]
+    return [Enumerate(0), Enumerate(1), Enumerate(2), Interpolate(), Reset()]
