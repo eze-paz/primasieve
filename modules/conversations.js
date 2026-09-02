@@ -1288,7 +1288,8 @@ function rebuildSettledTimer(target, s) {
     const u = s.lastUsage;
     comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
   }
-  const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
+  const rate = (s.lastTurn && s.lastTurn.rate > 0) ? s.lastTurn.rate
+    : ((comp > 0 && sec > 0.05) ? comp / sec : 0);
   const parts = [
     _timerNnBtn(),
     `<span class="mt-label">${label}</span>`,
@@ -2837,7 +2838,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=174');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=175');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3269,6 +3270,19 @@ async function sendSingle(text, stream, opts = {}) {
       // Round boundary: recordUsage just wrote the fresh reported size, so repaint
       // the live ctx counter now instead of waiting for the whole turn to end.
       if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
+    }
+    if (ev.type === 'rate') {
+      // Per-round live tok/s (exact completion tokens / decode span). Accumulated
+      // across the turn's rounds so the settled line shows the decode-only rate
+      // (real model speed) instead of completion tokens over whole-turn wall time
+      // (which dilutes the number with tool + queue time).
+      const _ms = ev.decode_ms | 0;
+      if (_ms > 0 && (ev.completion_tokens | 0) > 0) {
+        stream.lastRate = ev.completion_tokens / (_ms / 1000);
+        stream._turnToks = (stream._turnToks || 0) + ev.completion_tokens;
+        stream._turnDecodeMs = (stream._turnDecodeMs || 0) + _ms;
+        if (stream.timerEl) _paintRate(stream.timerEl, stream.lastRate);
+      }
     }
     if (ev.type === 'degeneration') {
       reportDegeneration(ev);
@@ -7489,6 +7503,19 @@ function _paintCtxCounter(el, convId) {
       ? SandpieTokens.conversationTokens(convId) : 0,
   ).then(t => { if (c.isConnected) c.textContent = t ? (TOK_FMT(t) + ' ctx') : '– ctx'; }).catch(() => {});
 }
+// Live per-round tok/s: painted from the worker's `rate` event (exact
+// completion_tokens over the round's decode span). Hidden until the first round
+// of the turn reports; re-asserted by the tick paint so it survives the slot
+// rebuilds a conversation switch triggers.
+function _paintRate(el, rate) {
+  const sep = el && el.querySelector('.mt-rate-sep');
+  const c = el && el.querySelector('.mt-rate');
+  if (!c) return;
+  const show = !!(rate && rate > 0);
+  if (sep) sep.hidden = !show;
+  c.hidden = !show;
+  if (show) c.textContent = RATE_FMT(rate);
+}
 function _wireCtxCounter(el, convId) {
   const c = el && el.querySelector('.mt-ctx');
   if (!c) return;
@@ -7523,6 +7550,7 @@ function _streamViewed(s) { return !!(s && s.host && s.host.isConnected); }
 const _LIVE_TIMER_HTML = () =>
   _timerNnBtn() +
   '<span class="mt-time">0s</span>' +
+  '<span class="mt-sep mt-rate-sep" hidden>·</span><span class="mt-rate" hidden></span>' +
   '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' + _timerReportBtn() +
   '<span class="mt-todos"></span>';
 
@@ -7531,6 +7559,7 @@ function startTotalTimer(stream) {
   const el = _timerSlotFor(stream);
   if (!el) return;
   stream.timerStart = Date.now();
+  stream.lastRate = null; stream._turnToks = 0; stream._turnDecodeMs = 0;   // fresh per-turn rate accumulators
   stream.timerEl = el;
   // Do NOT reset stream.todos here. It is the persistent checklist (task tree),
   // carried across turns + reloads (meta.todos → hydrate → s.todos) and seeded
@@ -7567,6 +7596,7 @@ function startTotalTimer(stream) {
     const _snn = slot.querySelector('.mt-nn');
     if (_snn) _snn.classList.toggle('streaming', !!stream.generating);
     set(slot.querySelector('.mt-time'), fmtElapsed((Date.now() - stream.timerStart) / 1000));
+    _paintRate(slot, stream.lastRate);
     const todosEl = slot.querySelector('.mt-todos');
     if (todosEl) {
       const t = stream.todos;
@@ -7603,7 +7633,13 @@ function endTotalTimer(stream, label) {
   // Always persist the finished turn so the settled line can be rebuilt later
   // (cold load, or switching back to this conversation) — even if this turn
   // finished while another conversation was on screen.
-  if (label !== null) stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp };
+  // Settled rate prefers the turn's accumulated decode-only tok/s (exact tokens
+  // over decode spans = real model speed); falls back to completion/wall when a
+  // provider never reported per-round usage.
+  const rate = (stream._turnToks > 0 && stream._turnDecodeMs > 0)
+    ? stream._turnToks / (stream._turnDecodeMs / 1000)
+    : ((comp > 0 && sec > 0.05) ? comp / sec : 0);
+  if (label !== null) stream.lastTurn = { sec, label: typeof label === 'string' ? label : 'done', completionTokens: comp, rate };
   // Only touch the shared per-pane slot if THIS conversation is the one on screen;
   // a backgrounded turn finishing must not overwrite the viewed conversation's bar.
   // When it isn't viewed, rebuildSettledTimer paints the settled line from lastTurn
@@ -7616,10 +7652,9 @@ function endTotalTimer(stream, label) {
     stream.timerEl = null;
     return;
   }
-  // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. tok/s comes
-  // ONLY from the provider's reported completion_tokens (no estimate); omitted
-  // when the provider reported no usage (e.g. some local paths).
-  const rate = (comp > 0 && sec > 0.05) ? comp / sec : 0;
+  // Settled line: label · elapsed · [tok/s] · ctx, dimmed via .done. `rate` was
+  // computed above (decode-only when available, else completion/wall fallback).
+
   const parts = [
     _timerNnBtn(),
     `<span class="mt-label">${label}</span>`,

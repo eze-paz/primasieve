@@ -3915,7 +3915,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
       if (!rawParses) truncatedIds.push(tc.id);
     }
   }
-  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText, finish_reason: finishReason, truncated_tool_ids: truncatedIds };
+  // Per-round decode span (first generated token -> end of stream) for the live
+  // tok/s readout: exact completion_tokens over decode-only time, emitted by the
+  // agent loop right after this round's usage event.
+  return { content, tool_calls: keptToolCalls, usage, reasoning_content: reasoningText, finish_reason: finishReason, decode_ms: _firstTokAt ? (_pnow() - _firstTokAt) : 0, truncated_tool_ids: truncatedIds };
 }
 
 // ============================================================
@@ -4911,6 +4914,12 @@ async function runAgent(config, ctx) {
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls, locale: respondLocaleOverride || undefined });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
     if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
+    // Per-round live rate: exact completion_tokens over this round's decode span
+    // (first token -> stream end). The page paints it into the live msg-timer so
+    // tok/s updates at every ROUND boundary, not only when the whole turn ends.
+    if (round.usage && (round.usage.completion_tokens | 0) > 0 && round.decode_ms > 0) {
+      ctx.emit({ type: 'rate', completion_tokens: round.usage.completion_tokens, decode_ms: Math.round(round.decode_ms) });
+    }
     if (!round.tool_calls.length) {
       // The model tried to answer in plain text without respond(). It was hidden
       // (round.content blanked above); reject it and force a respond() call so the
