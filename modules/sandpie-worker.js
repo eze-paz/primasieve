@@ -3744,6 +3744,8 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
   // Applied here — the single funnel for every generation request, including the
   // 413-compaction retry — rather than only on the first-round body.
   if (ctx && ctx._sessionId) body.session_id = ctx._sessionId;
+  // Conversation title for the server-side transcript capture (/admin).
+  if (ctx && ctx._conversationTitle) body.conversation_title = ctx._conversationTitle;
   const payload = JSON.stringify(body);
   // We deliberately do NOT pre-block oversized bodies here: some providers cap the
   // request body (~1 MB) and reply 413, others don't. So let the provider decide and
@@ -4443,6 +4445,7 @@ async function runAgent(config, ctx) {
   // devices. The page always supplies config.session_id; the fallback (file
   // name) only protects non-conversation callers and stays unique per file.
   ctx._sessionId = config.session_id || (config.conversation_file_name || 'unknown');
+  ctx._conversationTitle = String(config.conversation_title || '').slice(0, 300);
   // Managed provider only: URL to silently re-mint an expired session token on a
   // 401 (see streamOneRoundWithRetry). null/absent for personal providers.
   ctx._authRefreshUrl = config.authRefreshUrl || null;
