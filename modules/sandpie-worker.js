@@ -4208,7 +4208,7 @@ async function maybeCompactMidTurn(config, messages, ctx, promptTokens) {
       src: 'worker-midturn',
       session_id: ctx._sessionId || config.session_id || null,
       conv: config.conversation_file_name || null,
-      title: config.conversationTitle || null,
+      title: ctx._conversationTitle || config.conversation_title || null,
       provider: (config.model || '?') + (host ? ' @ ' + host : ''),
       window: cmp.window,
     };

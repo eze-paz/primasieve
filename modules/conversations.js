@@ -3708,8 +3708,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
     session_id: await ensureSessionId(convId || activeConvId),
-    // Conversation title for the worker's compaction debug log (provenance).
-    conversationTitle: await (async () => { try { return await convTitle(convId || activeConvId); } catch (_) { return ''; } })(),
     // BETA projects fork: the conversation's project folder (absolute Dropbox
     // path + namespace), resolved above. The worker resolves relative tool paths
     // against it and guards all writes/deletes to stay inside it. null on /app
