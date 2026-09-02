@@ -4328,6 +4328,17 @@ function appendToolResult(tcId, result, scopeEl) {
    mentions another language must NEVER change it. The only per-deliverable override is
    an explicit 'language' argument on a respond / show_artifact call, applied at delivery.
    ---------------------------------------------------------------------------------- */
+// Languages the ACTIVE model generates reliably (models.json `fluent`, carried
+// onto the managed provider def by account.js). null = unknown (personal
+// providers, old servers) — treated as English-only, the historically safe
+// default: everything non-English gets localized.
+function _modelFluent() {
+  try {
+    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive && SandpieProviders.getActive()) || null;
+    if (!p || !Array.isArray(p.fluent) || !p.fluent.length) return null;
+    return p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase());
+  } catch (_) { return null; }
+}
 function _replyLocale() {
   try {
     if (typeof window === 'undefined') return { code: 'en', name: 'English' };
