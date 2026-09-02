@@ -36,9 +36,18 @@ def mutate(tree, k, rng):
         if t2 is not None: return t2, ka[0]
     return None, None
 
+def _clean(src):
+    """Drop module-level docstrings/string-literal statements (QuixBugs files trail example code
+    in a triple-quoted string; round-tripping them mangles the module). Keep real code only."""
+    t = ast.parse(src)
+    t.body = [n for n in t.body
+              if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)
+                      and isinstance(n.value.value, str))]
+    return t
+
 def synth_bugs(name, correct_src, tests, rng, per_program=9):
     """Difficulty spectrum: single stratum-0 (easy), single stratum-1 (medium), double (compose)."""
-    base = ast.parse(correct_src); bugs = []
+    base = _clean(correct_src); bugs = []
     plan = [(0, "s0"), (0, "s0"), (0, "s0"), (1, "s1"), (1, "s1"),
             (1, "s1"), ("dd", "compose"), ("dd", "compose"), ("dd", "compose")]
     for i, (kind, tag) in enumerate(plan[:per_program]):
