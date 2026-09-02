@@ -11,14 +11,28 @@ from meta_pool import build_pool
 
 HELD_BACK = 0.25
 
-def warm_prior(sig, casebase, k=5):
+def warm_prior(sig, casebase, k=7):
+    """LIFT-normalized prior (base-rate corrected): weight each form by how much MORE likely it is
+    for THIS signature's neighbours than overall. Raw frequency is swamped by the base rate (50/57
+    solves are ENUMERATE(0)), which just re-learns cheapest-first; lift surfaces a rare-but-
+    predictive deep form."""
+    if not casebase: return None
+    N = len(casebase)
+    base = {}                                       # P(form) over the whole casebase
+    for _, forms in casebase:
+        for f in set(forms): base[f] = base.get(f, 0) + 1
     near = sorted(casebase, key=lambda cs: sig_dist(sig, cs[0]))[:k]
-    cnt = {}
+    nc = {}
     for _, forms in near:
-        for f in set(forms): cnt[f] = cnt.get(f, 0) + 1
-    if not cnt: return None
-    m = max(cnt.values())
-    return {f: 2.0 * c / m for f, c in cnt.items()}
+        for f in set(forms): nc[f] = nc.get(f, 0) + 1
+    if not nc: return None
+    lift = {}
+    for f, c in nc.items():
+        p_near = c / len(near); p_base = base.get(f, 1) / N
+        lift[f] = (p_near / p_base) if p_base > 0 else 0.0
+    m = max(lift.values()) or 1.0
+    # scale to ~[0,2]; a form only gets weight if it's OVER-represented for this signature (lift>1)
+    return {f: 2.0 * (v / m) for f, v in lift.items() if v > 1.0}
 
 if __name__ == "__main__":
     rng = random.Random(0)
