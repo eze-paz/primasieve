@@ -63,16 +63,27 @@ print('__R__'+json.dumps({{'res':_res,'fail':_fail}}))
     if d['fail']: inp,exp,got=d['fail']; fb=f"on input {inp} expected {exp} but got {got}"
     return npass,len(d['res']),fb
 
-print(f"loading {MODEL} ...", flush=True)
-tok=AutoTokenizer.from_pretrained(MODEL)
-if tok.pad_token is None: tok.pad_token=tok.eos_token
-model=AutoModelForCausalLM.from_pretrained(MODEL,dtype=torch.float32,low_cpu_mem_usage=True).eval()
-@torch.no_grad()
-def gen(msgs,n=256,temp=0.0):
-    txt=tok.apply_chat_template(msgs,tokenize=False,add_generation_prompt=True)
-    ids=tok(txt,return_tensors="pt")
-    o=model.generate(**ids,max_new_tokens=n,do_sample=temp>0,temperature=max(temp,1e-5),top_p=0.95,pad_token_id=tok.eos_token_id)
-    return tok.decode(o[0][ids.input_ids.shape[1]:],skip_special_tokens=True)
+BACKEND=os.environ.get("BUGFIX_BACKEND","hf")   # 'hf' = transformers | 'llama' = local llama-server HTTP
+if BACKEND=="llama":
+    import urllib.request
+    URL=os.environ.get("LLAMA_URL","http://127.0.0.1:8080/v1/chat/completions")
+    print(f"backend=llama-server {URL}", flush=True)
+    def gen(msgs,n=256,temp=0.0):
+        body=json.dumps({"messages":msgs,"max_tokens":n,"temperature":temp,"top_p":0.95}).encode()
+        req=urllib.request.Request(URL,data=body,headers={"Content-Type":"application/json"})
+        with urllib.request.urlopen(req,timeout=180) as r:
+            return json.loads(r.read())["choices"][0]["message"]["content"]
+else:
+    print(f"loading {MODEL} ...", flush=True)
+    tok=AutoTokenizer.from_pretrained(MODEL)
+    if tok.pad_token is None: tok.pad_token=tok.eos_token
+    model=AutoModelForCausalLM.from_pretrained(MODEL,dtype=torch.float32,low_cpu_mem_usage=True).eval()
+    @torch.no_grad()
+    def gen(msgs,n=256,temp=0.0):
+        txt=tok.apply_chat_template(msgs,tokenize=False,add_generation_prompt=True)
+        ids=tok(txt,return_tensors="pt")
+        o=model.generate(**ids,max_new_tokens=n,do_sample=temp>0,temperature=max(temp,1e-5),top_p=0.95,pad_token_id=tok.eos_token_id)
+        return tok.decode(o[0][ids.input_ids.shape[1]:],skip_special_tokens=True)
 def extract(text,name):
     b=re.findall(r"```(?:python)?\s*(.*?)```",text,re.S)
     code=(b[0] if b else text)

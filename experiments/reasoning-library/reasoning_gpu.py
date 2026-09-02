@@ -23,7 +23,7 @@ torch.manual_seed(0); random.seed(0); np.random.seed(0)
 DEV='cuda' if torch.cuda.is_available() else 'cpu'
 if DEV=='cpu': torch.set_num_threads(10)
 
-N=20                              # symbols
+N=12                              # symbols
 QRY=N; CLS=N+1; PAD=N+2; STEPBASE=N+3     # step tokens: STEPBASE+(k-1)
 VOCAB=STEPBASE+8
 SEQ=2*N+4
@@ -79,7 +79,7 @@ def acc(m,ds):
               for i in range(0,len(t),512))
     m.train(); return round(c/len(t),3)
 
-def train(name, m, TR, EV, steps=15000, bs=256, lr=1.5e-3, wd=0.01, warmup=800):
+def train(name, m, TR, EV, steps=25000, bs=256, lr=3e-3, wd=0.2, warmup=500):
     m=m.to(DEV); opt=torch.optim.AdamW(m.parameters(),lr=lr,weight_decay=wd)  # low wd: FIT first
     Nn=len(TR[0]); t0=time.time()
     print(f"[{name}] {sum(p.numel() for p in m.parameters())/1e6:.2f}M params on {DEV}", flush=True)
@@ -89,14 +89,14 @@ def train(name, m, TR, EV, steps=15000, bs=256, lr=1.5e-3, wd=0.01, warmup=800):
         loss=nn.functional.cross_entropy(m.logits(TR[0][idx],TR[1][idx],TR[2][idx]),TR[3][idx])
         opt.zero_grad(); loss.backward()
         torch.nn.utils.clip_grad_norm_(m.parameters(),1.0); opt.step()
-        if step%1000==0 or step==steps:
+        if step%2500==0 or step==steps:
             a={k:acc(m,EV[k]) for k in range(1,9)}
             print(f"[{name}] step {step} loss {loss.item():.3f} {time.time()-t0:.0f}s | acc-by-k {a}", flush=True)
 
 if __name__=="__main__":
     which=sys.argv[1] if len(sys.argv)>1 else "both"
     print(f"device={DEV}; task=pointer-chase; train k=1..3, test k=1..8; chance={1/N:.3f}", flush=True)
-    TR=gen([1,2,3], 40000); EV={k:gen([k],1000) for k in range(1,9)}
+    TR=gen([1,2,3], 15000); EV={k:gen([k],300) for k in range(1,9)}
     if which in ("both","ff"):  train("FEEDFORWARD(L=8)", FF(L=8), TR, EV)
     if which in ("both","rec"): train("RECURRENT(shared x8)", REC(T=8), TR, EV)
     print("\nVERDICT: FF holds k<=~L then cliffs (bounded feedforward reasoning).")

@@ -12,26 +12,31 @@ ALLTESTS = " ".join([F2P] + P2P)
 # full in-container test command (a real fix must pass F2P AND leave every co-located test green)
 TESTCMD = os.environ.get("SWE_TESTCMD", f"python -m pytest -q {ALLTESTS}")
 
-def dexec(cmd):
-    return subprocess.run(["wsl.exe","-e","bash","-lc", f"docker exec {CONT} bash -lc {shq(cmd)}"],
-                          capture_output=True, text=True, timeout=120)
+def dexec(cmd, timeout=900):
+    return subprocess.run(["docker","exec",CONT,"bash","-lc", f"cd /testbed && {cmd}"],
+                          capture_output=True, text=True, timeout=timeout)
 def shq(s): return "'" + s.replace("'", "'\\''") + "'"
 
 orig = dexec(f"cat /testbed/{FILEPATH}").stdout
 print(f"file {FILEPATH}: {len(orig.splitlines())} lines", flush=True)
 
 def put(src):
-    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
-        f.write(src); tp = f.name
-    wp = subprocess.run(["wslpath","-a",tp], capture_output=True, text=True).stdout.strip() if False else tp
-    subprocess.run(["wsl.exe","-e","bash","-lc",
-                    f"docker cp {shq(tp)} {CONT}:/testbed/{FILEPATH}"], capture_output=True, text=True)
-    os.unlink(tp)
+    # reliable write into the container: pipe stdin through docker exec -i, and clear the
+    # module's bytecode so the next oracle compiles the MUTATED source (stale __pycache__
+    # silently shadows edits when mtimes collide or an old run left a pyc).
+    import glob as _glob
+    pyc_dir = "/testbed/" + posix_path_dirname(FILEPATH) + "/__pycache__"
+    subprocess.run(["docker","exec","-i",CONT,"bash","-lc",
+                    f"cat > /testbed/{FILEPATH} && rm -f {pyc_dir}/{posix_basename(FILEPATH)}*.pyc"],
+                   input=src, capture_output=True, text=True, timeout=120)
+
+def posix_path_dirname(p): return p.rsplit("/",1)[0] if "/" in p else "."
+def posix_basename(p): return p.rsplit("/",1)[-1]
 
 def runtests(src):
     put(src)
-    r = subprocess.run(["wsl.exe","-e","bash","-lc",
-        f"docker exec {CONT} bash -lc {shq('cd /testbed && ' + TESTCMD + ' 2>&1; echo EXIT=$?')}"],
+    r = subprocess.run(["docker","exec",CONT,"bash","-lc",
+        shq('cd /testbed && ' + TESTCMD + ' 2>&1; echo EXIT=$?')],
         capture_output=True, text=True, timeout=int(os.environ.get("SWE_TESTTIMEOUT","900")))
     return r.stdout
 
@@ -48,14 +53,15 @@ FASTCMD = os.environ.get("SWE_FASTCMD")   # cheap F2P-only oracle for the search
 
 def runtests_fast(src):
     put(src)
-    r = subprocess.run(["wsl.exe","-e","bash","-lc",
-        f"docker exec {CONT} bash -lc {shq('cd /testbed && ' + FASTCMD + ' 2>&1; echo EXIT=0')}"],
+    r = subprocess.run(["docker","exec",CONT,"bash","-lc",
+        shq('cd /testbed && ' + FASTCMD + ' 2>&1; echo EXIT=0')],
         capture_output=True, text=True, timeout=int(os.environ.get("SWE_TESTTIMEOUT","900")))
     return r.stdout
 
 def verify(src):
     if FASTCMD:
         if not passed(runtests_fast(src)): return False   # cheap reject
+        if os.environ.get("SWE_FASTONLY"): return True    # full P2P gate = official run_evaluation
     return passed(runtests(src))                          # full-suite confirm
 
 # sanity: gold-less baseline must FAIL, and capture the traceback for localization
@@ -127,8 +133,8 @@ while stratum <= STRATA and solved is None and time.time() - t0 <= TIMECAP:
 
 if solved:
     put(solved_src)   # leave the fix in place and emit the patch for official verification
-    diff = subprocess.run(["wsl.exe","-e","bash","-lc",
-        f"docker exec {CONT} bash -lc 'cd /testbed && git diff'"], capture_output=True, text=True).stdout
+    diff = subprocess.run(["docker","exec",CONT,"bash","-lc", "cd /testbed && git diff"],
+                           capture_output=True, text=True, timeout=120).stdout
     print("PATCH_START\n" + diff + "PATCH_END", flush=True)
 else:
     put(orig)
