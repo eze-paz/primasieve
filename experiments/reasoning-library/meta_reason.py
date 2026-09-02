@@ -33,23 +33,40 @@ def solve_handcoded(name, src, tests):
     return st.solved(), st.units, st.stratum_seen
 
 # ---------------- controller B: UCB bandit over forms (learned selection) ----------------------
-def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0):
+def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None, qfn=None):
     st = MetaState(name, src, tests, held_back=held_back)
     forms = default_forms()
     warm = warm or {}                      # {form_name: pseudo_reward in ~[0,2]}
+    tried_forms = set()
+    err0 = None
+    if feat_log is not None or qfn is not None:
+        import meta_features as mf
+        err0 = mf.baseline_error(st)       # cache baseline error class once (used by features)
     n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0
     while not st.solved() and st.units < GLOBAL:
         avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
-        def ucb(f):                            # COST-AWARE UCB + WARM prior modulating exploration
+        def bonus(fn):                         # learned Q overrides warm prior when provided
+            if qfn is not None:
+                import meta_features as mf
+                return qfn(st, fn, tried_forms, err0)
+            return warm.get(fn, 0.0)
+        def ucb(f):                            # COST-AWARE UCB + (warm|learned) prior on exploration
             ch = getattr(f, "cost_hint", 1.0)
-            if n[f.name] == 0:                 # unexplored: cheap-first (Occam) BIASED by the learned
-                return 100.0 / ch + 55.0 * warm.get(f.name, 0.0)   # prior (lets a predicted deep form leapfrog)
+            if n[f.name] == 0:                 # unexplored: cheap-first (Occam) biased by the prior
+                return 100.0 / ch + 55.0 * bonus(f.name)
             return q[f.name] + 1.5 * math.sqrt(math.log(total + 1) / n[f.name]) / ch
         f = max(avail, key=ucb)
+        row_before = None
+        if feat_log is not None:
+            import meta_features as mf
+            row_before = mf.feature_row(st, f.name, tried_forms, err0)   # features at DECISION time
         before = st.best; u0 = st.units
         d = f.run(st, SLICE)
         spent = max(1, st.units - u0)
+        if feat_log is not None:
+            feat_log.append((row_before, 1 if (d["improved"] or d["solved"]) else 0))
+        tried_forms.add(f.name)
         gain = (before - st.best) / (len(tests) + 1)     # normalized score improvement
         r = gain / (spent / SLICE) + (5.0 if d["solved"] else 0.0)
         n[f.name] += 1; total += 1; q[f.name] += (r - q[f.name]) / n[f.name]
