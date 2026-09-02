@@ -40,9 +40,10 @@ def solve_ucb(name, src, tests, ep_log):
     while not st.solved() and st.units < GLOBAL:
         avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
-        def ucb(f):                            # UCB1 (optimistic; unexplored arms first)
-            if n[f.name] == 0: return 1e9
-            return q[f.name] + 1.5 * math.sqrt(math.log(total + 1) / n[f.name])
+        def ucb(f):                            # COST-AWARE UCB: Occam prior in the exploration term
+            ch = getattr(f, "cost_hint", 1.0)
+            if n[f.name] == 0: return 100.0 / ch          # try CHEAP forms first (not blind 1e9)
+            return q[f.name] + 1.5 * math.sqrt(math.log(total + 1) / n[f.name]) / ch
         f = max(avail, key=ucb)
         before = st.best; u0 = st.units
         d = f.run(st, SLICE)

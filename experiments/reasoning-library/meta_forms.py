@@ -47,7 +47,9 @@ class Enumerate:
     """Try edits at a fixed stratum, RESUMING across calls via a per-stratum cursor. Accepts the
     first STRICT improvement in this slice (steepest scan continues next call). 'exhausted' means
     the whole stratum was scanned with no improvement (only then is the form truly done)."""
-    def __init__(self, k): self.k = k; self.name = f"ENUMERATE({k})"
+    def __init__(self, k):
+        self.k = k; self.name = f"ENUMERATE({k})"
+        self.cost_hint = (1.0, 2.5, 8.0)[k] if k < 3 else 12.0   # Occam prior: deeper = pricier
     def applicable(self, st):
         return not st.solved() and not self._exhausted(st)
     def _edits(self, st):
@@ -88,7 +90,7 @@ def desc_of(ka, ln): return f"L{ln}:{ka[0]}"
 
 class Reset:
     """Return to the pristine program (undo a stranding partial improvement)."""
-    name = "RESET"
+    name = "RESET"; cost_hint = 0.5
     def applicable(self, st): return not st.solved()
     def applicable(self, st):
         # only useful to UNDO a partial improvement (return to pristine); not when already pristine
