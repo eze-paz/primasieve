@@ -36,16 +36,15 @@ def solve_handcoded(name, src, tests):
 def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0):
     st = MetaState(name, src, tests, held_back=held_back)
     forms = default_forms()
-    # warm = {form_name: prior_pseudo_reward}; seeds q with n=1 so a mined strategy biases early picks
-    n = {f.name: (1 if warm and f.name in warm else 0) for f in forms}
-    q = {f.name: (warm[f.name] if warm and f.name in warm else 0.0) for f in forms}
-    total = sum(n.values())
+    warm = warm or {}                      # {form_name: pseudo_reward in ~[0,2]}
+    n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0
     while not st.solved() and st.units < GLOBAL:
         avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
-        def ucb(f):                            # COST-AWARE UCB: Occam prior in the exploration term
+        def ucb(f):                            # COST-AWARE UCB + WARM prior modulating exploration
             ch = getattr(f, "cost_hint", 1.0)
-            if n[f.name] == 0: return 100.0 / ch          # try CHEAP forms first (not blind 1e9)
+            if n[f.name] == 0:                 # unexplored: cheap-first (Occam) BIASED by the learned
+                return 100.0 / ch + 55.0 * warm.get(f.name, 0.0)   # prior (lets a predicted deep form leapfrog)
             return q[f.name] + 1.5 * math.sqrt(math.log(total + 1) / n[f.name]) / ch
         f = max(avail, key=ucb)
         before = st.best; u0 = st.units
