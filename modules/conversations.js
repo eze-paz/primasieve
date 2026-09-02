@@ -3748,19 +3748,8 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // and for legacy/Unsorted conversations.
     projectRoot: _projRoot,
     projectNs: _projNs,
-    // Volatile context (currently the Recent-paths block) for the worker to
-    // inject as an ephemeral reminder at the END of each request. Kept OUT of
-    // the system prompt on purpose: it changes with every tool call, and any
-    // change near the top of the request invalidates the provider's cached
-    // prefix for the whole conversation. The worker adds the minute-level clock.
-    volatileContext: await (async () => {
-      try {
-        if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.systemBlock) {
-          return String(await SandpieAugmentations.systemBlock() || '').trim();
-        }
-      } catch (_) {}
-      return '';
-    })(),
+    // (volatileContext removed 2026-09-02: the Recent-paths block is no longer
+    // injected anywhere. The worker still adds the minute-level clock.)
     // Current checklist (task tree) so the worker can apply write_todos ops to it
     // instead of the model resending/overwriting the whole list.
     todos: Array.isArray(curTodos) ? curTodos : [],

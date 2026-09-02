@@ -4728,7 +4728,7 @@ async function runAgent(config, ctx) {
       const _now = new Date();
       const _tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
       let _vt = 'Current local date and time: ' + _now.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + (_tz ? ' (' + _tz + ')' : '') + '. Treat this as "now".';
-      if (config.volatileContext) _vt += '\n\n' + config.volatileContext;
+      // (config.volatileContext / Recent paths removed 2026-09-02)
       // Per-round ephemeral injection of the plan + scratchpad (replaces drift guard).
       // Both are rebuilt from ctx state each round — survive compaction, never in messages.
       // v2 mode shows ids so the model can flip a status with the cheap delta
