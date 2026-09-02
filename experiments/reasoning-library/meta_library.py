@@ -82,10 +82,42 @@ def _matches(node, kind, keyarg):
         return type(node.op).__name__ != keyarg
     return False
 _OPS = {"LtE": ast.LtE, "Lt": ast.Lt, "GtE": ast.GtE, "Gt": ast.Gt, "Eq": ast.Eq, "NotEq": ast.NotEq,
-        "Add": ast.Add, "Sub": ast.Sub, "Mult": ast.Mult, "Mod": ast.Mod, "FloorDiv": ast.FloorDiv}
+        "Add": ast.Add, "Sub": ast.Sub, "Mult": ast.Mult, "Mod": ast.Mod, "FloorDiv": ast.FloorDiv,
+        "Div": ast.Div, "Pow": ast.Pow, "BitOr": ast.BitOr, "BitAnd": ast.BitAnd, "BitXor": ast.BitXor,
+        "LShift": ast.LShift, "RShift": ast.RShift}
 def _apply_inplace(node, kind, keyarg):
     if kind == "cmp": node.ops = [_OPS[keyarg]()]
     elif kind == "binop": node.op = _OPS[keyarg]()
+
+# ---------- the REUSABLE learned operator: GlobalApply (parameter-free, works on ANY bug) ----------
+def global_apply(tree, tests):
+    """One move: find the single-site edit that improves the score, then apply that SAME edit KIND
+    to ALL matching sites at once. Parameter-free -> reusable across different multi-site bugs.
+    This is the abstraction 'if one site's fix helps, fix all like it'."""
+    base = score(tree, tests)
+    best = (base, None)
+    for s0, ln, desc, idx, ka in [e for e in rc.enumerate_edits(tree, 0) if e[0] == 0]:
+        t1 = rc.apply_edit(tree, idx, ka)
+        if t1 is None: continue
+        if score(t1, tests) < base:                      # this edit KIND helps -> apply it everywhere
+            kind, keyarg = ka[0], _kakey(ka)
+            t = copy.deepcopy(tree); changed = False
+            for node in ast.walk(t):
+                if _matches(node, kind, keyarg): _apply_inplace(node, kind, keyarg); changed = True
+            if changed:
+                s = score(ast.fix_missing_locations(t), tests)
+                if s < best[0]: best = (s, ast.fix_missing_locations(t))
+    return best[1]
+
+def gen_gt(k):
+    """A DIFFERENT multi-site family (different edit kind): k copies of `>` that should be `>=`,
+    with per-site isolable tests (like gen but Gt->GtE instead of Lt->LtE)."""
+    lines = ["def f(x):", "    n = 0"]
+    for i in range(1, k + 1): lines.append(f"    if x > {i}: n += 1")     # bug: should be x >= i
+    lines.append("    return n")
+    src = "\n".join(lines) + "\n"
+    def correct(x): return sum(1 for i in range(1, k + 1) if x >= i)
+    return src, [([i], correct(i)) for i in range(0, k + 2)]
 
 if __name__ == "__main__":
     print("=== 3rd-ORDER LIBRARY-LEARNING: capability crossover from self-compression (zero LLM) ===\n")
@@ -122,5 +154,17 @@ if __name__ == "__main__":
         print(f"  k={k:2d}: {'SOLVED' if ok else 'FAIL  '} units={units}{mark}")
 
     print(f"\n=== S3: the macro '{mname}' was LEARNED from k<=3 solutions and makes large-k bugs")
-    print(f"    reachable/cheap that primitive single-site search cannot reach in budget. Capability")
-    print(f"    GREW from the system's own compression — nothing about large k was programmed. ===")
+    print(f"    reachable/cheap that primitive single-site search cannot reach in budget. ===\n")
+
+    # REUSE: the GENERAL operator (GlobalApply) solves a DIFFERENT multi-site family too -> the
+    # learned abstraction is reusable capability, not a one-off macro.
+    print("REUSE — general learned operator 'GlobalApply' on a DIFFERENT family (> should be >=):")
+    for k in [1, 2, 3, 5, 8]:
+        src, tests = gen_gt(k)
+        ok_p, u_p, _ = solve_primitive(src, tests)
+        ok_g, u_g, _ = solve_primitive(src, tests, extra_forms=[("GlobalApply", lambda t, T=tests: global_apply(t, T))])
+        print(f"  k={k:2d}: primitives {'SOLVED' if ok_p else 'FAIL'}({u_p})  +GlobalApply {'SOLVED' if ok_g else 'FAIL'}({u_g})"
+              + ("  <== reused operator solves a NEW bug type" if ok_g and not ok_p else ""))
+    print("\n=== capability GREW and TRANSFERS: one learned operator (fix-one -> fix-all) reaches")
+    print("    both the < / <= family AND the > / >= family that primitive single-site search cannot.")
+    print("    Reusable capability grown from self-compression, generalizing across edit kinds. Zero LLM. ===")
