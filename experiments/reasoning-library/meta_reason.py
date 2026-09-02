@@ -3,7 +3,7 @@ KNOCKOUT: does a learned form-selection policy match the HAND-CODED escalation (
 + reset) at EQUAL energy on QuixBugs? (METAPLAN.md S1 / P1). Zero LLM."""
 import os, json, math, time, ast, random
 import reasoner_code as rc
-from meta_forms import MetaState, Enumerate, Reset, default_forms
+from meta_forms import MetaState, Enumerate, Reset, Interpolate, default_forms
 
 QB = os.path.expanduser("~/quixbugs")
 SLICE = int(os.environ.get("META_SLICE", "250"))       # candidate-eval budget per form call
@@ -72,6 +72,31 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         n[f.name] += 1; total += 1; q[f.name] += (r - q[f.name]) / n[f.name]
         ep_log.append({"form": f.name, "before": before, "after": st.best, "spent": spent,
                        "reward": round(r, 4), "solved": d["solved"], "improved": d["improved"]})
+    true_solve = st.verify_full() if st.held else st.solved()
+    return true_solve, st.units, st.stratum_seen
+
+def solve_iterdeep(name, src, tests, held_back=0.0, b0=40):
+    """ITERATIVE-DEEPENING over the fixed cheap->deep ladder (fable-subagent's direction): try each
+    form up to cap b, escalate; after a full pass with no solve, reset to pristine and DOUBLE b.
+    Captures deep-fix headroom (reach ENUMERATE(2) after ~3b, not after exhausting cheap forms) with
+    ZERO transfer / zero mis-steer: still cheap-first, worst case a constant-factor overhead."""
+    st = MetaState(name, src, tests, held_back=held_back)
+    ladder = [Enumerate(0), Enumerate(1), Enumerate(2), Interpolate()]; reset = Reset()
+    b = b0
+    while not st.solved() and st.units < GLOBAL:
+        progressed = False
+        for f in ladder:
+            spent = 0
+            while spent < b and f.applicable(st) and st.units < GLOBAL:
+                u0 = st.units; d = f.run(st, min(SLICE, b - spent)); spent += st.units - u0
+                if d["solved"]:
+                    true_solve = st.verify_full() if st.held else st.solved()
+                    return true_solve, st.units, st.stratum_seen
+                if d["improved"]: progressed = True
+                if not d["improved"] and d.get("exhausted"): break
+        if all(not f.applicable(st) for f in ladder): break     # everything exhausted
+        if not progressed and st.tree is not st.orig: reset.run(st, 0)
+        b *= 2
     true_solve = st.verify_full() if st.held else st.solved()
     return true_solve, st.units, st.stratum_seen
 
