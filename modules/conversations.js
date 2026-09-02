@@ -3687,6 +3687,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     reasoning: (effective && effective.reasoning) || null,
     origin: location.origin,
     conversation_file_name: convId || activeConvId,
+    // Conversation title for the /admin/transcripts Sessions table (server
+    // stores it per session; best-effort, absent on brand-new untitled convs).
+    conversation_title: (typeof convTitle === 'function') ? await convTitle(convId || activeConvId) : '',
     // Worker-side JSONL persistence: the completions worker appends each
     // committed message to the conversation file itself (O(1) SyncAccessHandle
     // at EOF) as it streams — no throttled page timer to starve while hidden,
