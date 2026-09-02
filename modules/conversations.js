@@ -6570,7 +6570,7 @@ function _estimateContextPct(messages) {
 // the pre-send auto path (gated on %) and the manual `>>> compact` command
 // (no gate). Building on any prior summary so old context isn't lost when only
 // newly-aged turns are re-summarized. Returns {ok, reason?, removed?, kept?}.
-async function _performCompaction(convId, cfg) {
+async function _performCompaction(convId, cfg, triggerReason = 'native compaction') {
   const res = await _resolveConvForCompaction(convId);
   if (!res) return { ok: false, reason: 'conversation not found' };
   const msgs = res.msgs;
@@ -6582,16 +6582,46 @@ async function _performCompaction(convId, cfg) {
   if (comp && comp.summary) transcript = '[Summary of the conversation so far]\n' + comp.summary + '\n\n[New turns to fold into the summary]\n' + transcript;
   if (!transcript.trim()) return { ok: false, reason: 'nothing to summarize' };
   const emit = (type) => { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit(type, { convId }); } catch (_) {} };
+  // Native/pre-send, resume, and manual compactions do not pass through the
+  // worker's mid-turn logger. Log here instead: this is the common engine for
+  // every page-side compaction trigger, including the first send after resume.
+  const cmpLog = async (event, extra = {}) => {
+    try {
+      const provider = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+      const sid = (typeof ensureSessionId === 'function') ? await ensureSessionId(convId) : null;
+      const title = (typeof convTitle === 'function') ? await convTitle(convId) : null;
+      console.log('[compaction] ' + event + ' ' + JSON.stringify({
+        src: 'page-native', conv: convId, session_id: sid, title: title || null,
+        reason: triggerReason, provider: provider ? (provider.model || provider.name || provider.id || null) : null,
+        context_pct: await _cmpContextPct(convId), ...extra,
+      }));
+    } catch (_) {}
+  };
   _compacting.add(convId);
+  await cmpLog('trigger', { from_boundary: from, to_boundary: to, transcript_chars: transcript.length });
   emit('compaction:start');
   try {
-    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return { ok: false, reason: 'no completion provider available' };
+    if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) {
+      await cmpLog('failed', { error: 'no completion provider available' });
+      return { ok: false, reason: 'no completion provider available' };
+    }
     const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined });
-    if (!out || !out.trim()) return { ok: false, reason: 'summarizer returned empty' };
+    if (!out || !out.trim()) {
+      await cmpLog('failed', { error: 'summarizer returned empty' });
+      return { ok: false, reason: 'summarizer returned empty' };
+    }
     const r = await compactConversation(convId, { keepTail: cfg.keepTail, summary: out });
-    return (r && r.ok) ? { ok: true, removed: r.removed, kept: r.kept } : { ok: false, reason: (r && r.reason) || 'compaction failed' };
+    if (r && r.ok) {
+      await cmpLog('done', { removed: r.removed, kept: r.kept });
+      return { ok: true, removed: r.removed, kept: r.kept };
+    }
+    const reason = (r && r.reason) || 'compaction failed';
+    await cmpLog('failed', { error: reason });
+    return { ok: false, reason };
   } catch (e) {
-    return { ok: false, reason: (e && e.message) || String(e) };
+    const reason = (e && e.message) || String(e);
+    await cmpLog('failed', { error: reason, status: (e && e.status) || null });
+    return { ok: false, reason };
   } finally {
     emit('compaction:end');
     _compacting.delete(convId);
@@ -6622,7 +6652,7 @@ async function maybeAutoCompact(convId, estimateMessages) {
   } catch {}
   if (pct == null || pct < cfg.pct) return { triggered: false, ok: true };
   try {
-    const r = await _performCompaction(convId, cfg);
+    const r = await _performCompaction(convId, cfg, 'threshold: pre-send context usage');
     // "nothing new to compact" means the aged span is already summarized — the
     // threshold is met but there's nothing left to do, so don't block the send.
     if (r && !r.ok && r.reason && /nothing (new to compact|to summarize)/.test(r.reason)) return { triggered: false, ok: true };
@@ -6790,7 +6820,7 @@ function registerCompactCommand() {
       if (_compacting.has(convId)) return 'A compaction is already in progress for that conversation — try again in a moment.';
 
       let before = null; try { before = await _cmpContextPct(convId); } catch {}
-      const r = await _performCompaction(convId, cfg);
+      const r = await _performCompaction(convId, cfg, 'manual: compact command');
       if (!r || !r.ok) return 'Nothing compacted: ' + ((r && r.reason) || 'unknown reason') + '.';
       let after = null; try { after = await _cmpContextPct(convId); } catch {}
       const delta = (before != null && after != null) ? ` Context ${Math.round(before)}% → ${Math.round(after)}%.` : '';
