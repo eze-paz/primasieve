@@ -1,7 +1,7 @@
 """P0 — reasoning FORMS as first-class moves over a shared MetaState (METAPLAN.md).
 Wraps the existing stratified engine (reasoner_code) behind one interface so an outer controller
 can CHOOSE and CHAIN forms. Energy = candidate evaluations (deterministic, wall-clock-free)."""
-import ast, math, time
+import ast, math, time, copy
 import reasoner_code as rc
 
 class MetaState:
@@ -144,5 +144,52 @@ class Interpolate:
         return {"form": self.name, "tried": 1, "before": before, "after": before,
                 "improved": False, "solved": False, "exhausted": True, "fix": None}
 
+class GlobalApply:
+    """3rd-order LEARNED operator wired live: 'if fixing one site helps, fix ALL matching sites in
+    ONE move'. Reshapes the landscape for multi-site bugs (no per-site local optima) that primitive
+    single-site search stalls on. Parameter-free / generic over edit kind (cmp & binop swaps)."""
+    # cheap probe (~a few dozen evals) that SUBSUMES single-site operator swaps and solves multi-site
+    # operator bugs in one move -> tried first; on non-operator bugs it no-ops fast and cedes to edits.
+    name = "GLOBAL_APPLY"; cost_hint = 1.0
+    def _key(self, st): return ("GLOBAL", st._th())
+    def applicable(self, st):
+        return not st.solved() and st._cache.get(self._key(st)) is None
+    def run(self, st, budget):
+        before = st.best; best = (before, None, None, None); seen = set(); tried = 0
+        for node in ast.walk(st.tree):
+            if isinstance(node, ast.Compare) and len(node.ops) == 1:
+                cur = type(node.ops[0]).__name__; kind = "cmp"; opts = rc.CMP_OPS
+            elif isinstance(node, ast.BinOp):
+                cur = type(node.op).__name__; kind = "binop"; opts = rc.BIN_OPS
+            else:
+                continue
+            for op in opts:
+                if op.__name__ == cur or (kind, op.__name__) in seen or tried >= budget: continue
+                seen.add((kind, op.__name__))
+                t2 = _apply_global(st.tree, kind, op)
+                if t2 is None: continue
+                tried += 1; st.units += 1
+                nf, susp2 = st._score(t2)
+                if nf < best[0]: best = (nf, t2, susp2, f"GLOBAL {kind}->{op.__name__}")
+                if nf == 0: break
+        st._cache[self._key(st)] = True
+        if best[1] is not None:
+            st.tree, st.susp, st.best = best[1], best[2], best[0]
+            st.log.append((self.name, before, best[0]))
+            return {"form": self.name, "tried": tried, "before": before, "after": best[0],
+                    "improved": True, "solved": best[0] == 0, "exhausted": False, "fix": best[3]}
+        return {"form": self.name, "tried": tried, "before": before, "after": before,
+                "improved": False, "solved": False, "exhausted": True, "fix": None}
+
+def _apply_global(tree, kind, op):
+    t = copy.deepcopy(tree); changed = False
+    for node in ast.walk(t):
+        if kind == "cmp" and isinstance(node, ast.Compare) and len(node.ops) == 1 \
+           and type(node.ops[0]).__name__ != op.__name__:
+            node.ops = [op()]; changed = True
+        elif kind == "binop" and isinstance(node, ast.BinOp) and type(node.op).__name__ != op.__name__:
+            node.op = op(); changed = True
+    return ast.fix_missing_locations(t) if changed else None
+
 def default_forms():
-    return [Enumerate(0), Enumerate(1), Enumerate(2), Interpolate(), Reset()]
+    return [GlobalApply(), Enumerate(0), Enumerate(1), Enumerate(2), Interpolate(), Reset()]
