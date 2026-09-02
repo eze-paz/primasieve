@@ -3197,7 +3197,7 @@ async function sendSingle(text, stream, opts = {}) {
   // conversation host, which would otherwise drop a timer added first.
   // Compaction is NEVER skipped: if it was triggered but failed, halt the send with
   // a visible error rather than silently shipping an over-limit request.
-  const _cmp = await maybeAutoCompact(convId);
+  const _cmp = await maybeAutoCompact(convId, convMessages);
   if (_cmp && _cmp.triggered && !_cmp.ok) {
     addMsg('err', 'Context is over the compaction threshold but summarizing the earlier turns failed (' + (_cmp.reason || 'unknown error') + '). The message was not sent — try again, or shorten the conversation.', host);
     setStreamSending(stream, false);
@@ -3216,8 +3216,9 @@ async function sendSingle(text, stream, opts = {}) {
     userBubbleEl.appendChild(mk);
   }
   // Context limits are guarded three ways: maybeAutoCompact above (reported
-  // provider usage), maybeCompactMidTurn in the worker (per-round reported
-  // tokens), and the worker's reactive
+  // tokens OR a live char/4 estimate of this very send, whichever is higher, so
+  // growth since the last measured turn can't slip through), maybeCompactMidTurn
+  // in the worker (per-round reported tokens), and the worker's reactive
   // compact-and-retry on any over-context rejection (413 or a 400 "maximum
   // context length…").
 
@@ -6548,6 +6549,22 @@ async function _cmpContextPct(convId) {
   if (typeof SandpieTokens === 'undefined' || !SandpieTokens.contextPct) return null;
   try { return await SandpieTokens.contextPct(convId); } catch { return null; }
 }
+// Coarse "% of window this message list will occupy if sent now" estimate,
+// independent of any reported usage — the pre-send gate's defence against a
+// context that grew since the last measured turn. ~4 chars/token over the
+// JSON-serialized messages (framing over-counts slightly ⇒ errs toward
+// compacting, the safe direction; catches inline base64 images too). Returns
+// null when the active window is unknown (then the reported pct alone gates).
+function _estimateContextPct(messages) {
+  if (!Array.isArray(messages) || !messages.length) return null;
+  let win = null;
+  try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.contextWindow) win = SandpieTokens.contextWindow(); } catch {}
+  if (!win || win <= 0) return null;
+  let chars = 0;
+  try { chars = JSON.stringify(messages).length; } catch { return null; }
+  const estTokens = chars / 4;
+  return (estTokens / win) * 100;
+}
 // Summarize the span between the current boundary and the protected tail and
 // advance the compaction boundary — regardless of the % threshold. Shared by
 // the pre-send auto path (gated on %) and the manual `>>> compact` command
@@ -6614,7 +6631,7 @@ async function _performCompaction(convId, cfg, triggerReason = 'native compactio
 // met (no compaction attempted). triggered=true + ok=false means it WAS needed but
 // failed — the caller must not ship the over-limit turn. NOTE: no active-conv gate
 // — any conversation compacts when it crosses the threshold, foreground or not.
-async function maybeAutoCompact(convId) {
+async function maybeAutoCompact(convId, estimateMessages) {
   if (!convId || _compacting.has(convId)) return { triggered: false, ok: true };
   if (typeof SandpieCompactor === 'undefined') return { triggered: false, ok: true };
   const cfg = SandpieCompactor.config();
@@ -6625,6 +6642,14 @@ async function maybeAutoCompact(convId) {
   // before recording usage), which is exactly how a send silently overflows.
   let pct = null;
   try { pct = await _cmpContextPct(convId); } catch {}
+  // Live estimate of what's ABOUT to be sent, so the gate isn't blind between
+  // turns. char/4 over the messages is a coarse upper-ish bound (JSON framing
+  // over-counts slightly, which is the safe direction) and — importantly —
+  // includes inline base64 images and large pastes the reported count predates.
+  try {
+    const est = _estimateContextPct(estimateMessages);
+    if (est != null) pct = (pct == null) ? est : Math.max(pct, est);
+  } catch {}
   if (pct == null || pct < cfg.pct) return { triggered: false, ok: true };
   try {
     const r = await _performCompaction(convId, cfg, 'threshold: pre-send context usage');
@@ -7493,6 +7518,11 @@ const RATE_FMT = r => (r >= 10 ? String(Math.round(r)) : r.toFixed(1)) + ' tok/s
 function _paintCtxCounter(el, convId) {
   const c = el && el.querySelector('.mt-ctx');
   if (!c) return;
+  // convId == null (resting placeholder / no conversation mounted) must stay
+  // "– ctx": conversationTokens(null) would fall back to the STALE
+  // sandpie-active-conv id in localStorage and paint the previous session's
+  // context size on the home screen (2026-09-02 boot-ctx bug).
+  if (convId == null) { c.textContent = '– ctx'; return; }
   Promise.resolve(
     (typeof SandpieTokens !== 'undefined' && SandpieTokens.conversationTokens)
       ? SandpieTokens.conversationTokens(convId) : 0,
@@ -8177,16 +8207,16 @@ function bootConversations() {
     Sandpie.events.on('sync:done', () => autoArchiveStale());
     _installConvListGestures();
   }
+  // Boot starts on a FRESH conversation (home screen, ctx 0). The last-open
+  // chat is NOT auto-restored anymore (2026-09-02: opening the app used to
+  // remount the previous conversation and show its ctx counter instead of 0).
+  // The stale pointer is cleared BEFORE anything paints (the resting timer
+  // placeholder reads it as a fallback), so the home screen always shows "– ctx".
+  try { localStorage.removeItem('sandpie-active-conv'); } catch (_) {}
   (async () => {
     await refreshConversationList();
     refreshPaneBars();   // bar always shows on desktop from first paint — 'New chat' when no conversation is mounted
     _ensureTimerPlaceholders();   // resting timer bar present in the DOM from first paint, even with no conversation mounted
-    // Boot starts on a FRESH conversation (home screen, ctx 0). The last-open
-    // chat is NOT auto-restored anymore (2026-09-02: opening the app used to
-    // remount the previous conversation and show its ctx counter instead of 0).
-    // The stored active-conv pointer is cleared so nothing stale lingers; the
-    // sidebar still lists every conversation and any of them can be reopened.
-    try { localStorage.removeItem('sandpie-active-conv'); } catch (_) {}
     const scrollEnd = () => { const m = paneScrollEl($('messages')); if (m) m.scrollTop = m.scrollHeight; };
     requestAnimationFrame(() => requestAnimationFrame(scrollEnd));
     document.querySelectorAll('#messages img').forEach(img => {
