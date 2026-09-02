@@ -5650,26 +5650,9 @@ class RoundRenderer {
       this.displayed = finalContent;
       this.pending = '';
       this.toolsShouldClose = true;
-      // Localization: the user sees the reply in their language. We reveal the
-      // localized text (display only); this.content stays English so the model's
-      // own context is never poisoned. Fail-open to English.
-      const _loc = _currentLocale(localeOverride);
-      if (_loc && _loc.code) {
-        // Paint the English canonical immediately (one render), then swap the
-        // bubble once the full localized text is ready. No progressive reveal.
-        // HOLD-DONE: while this swap is in flight the timer must NOT settle to
-        // "done" — a done line over a bubble that is about to change reads as
-        // "it broke". finalize() hands the promise to endTotalTimer, which
-        // defers the settled paint until it resolves (10s safety cap there).
-        this._paintContent();
-        this._finalPaint = renderUserTextStream(finalContent, _loc)
-          .then(tr => {
-            const t = tr || finalContent;
-            if (t !== this.displayed && this.reply && this.reply.isConnected) { this.displayed = t; this._paintContent(); }
-          })
-          .catch(() => {});
-        return;
-      }
+      // Language behavior is carried by the system-prompt directive only
+      // (author-in-English / native regimes): the reply is painted as authored,
+      // once. No display-side translation layer.
       this._paintContent();
       return;
     }
@@ -5870,13 +5853,6 @@ class RoundRenderer {
       this._streamReveal = false;
       this._scheduleDrain();
       return;
-    }
-    // HOLD-DONE: a localized final bubble is still swapping in (endRound CASE A).
-    // Hand the promise to endTotalTimer so the settled "done" line waits until
-    // the bubble shows its final text.
-    if (this._finalPaint && typeof window !== 'undefined') {
-      window._mtHoldDoneFor = window._mtHoldDoneFor || {};
-      window._mtHoldDoneFor[this.convId] = this._finalPaint;
     }
     if (this.drainTimer) { clearTimeout(this.drainTimer); this.drainTimer = null; }
     this.toolsShouldClose = true;
@@ -7691,22 +7667,6 @@ function startTotalTimer(stream) {
 }
 
 function endTotalTimer(stream, label) {
-  // HOLD-DONE: when the final bubble is still being localized/swapped, defer the
-  // settled "done" paint until it lands. A 10s safety cap means a hung
-  // localizer can never leave the timer ticking forever — it then settles as
-  // usual, and a late bubble swap still repaints on top. 'stopped' and error
-  // paths are never held.
-  if (label === 'done' && typeof window !== 'undefined' && window._mtHoldDoneFor) {
-    const p = window._mtHoldDoneFor[stream.id];
-    if (p && typeof p.finally === 'function') {
-      let settled = false;
-      const finish = () => { if (!settled) { settled = true; delete window._mtHoldDoneFor[stream.id]; endTotalTimer(stream, label); } };
-      p.then(finish, finish);
-      setTimeout(finish, 10000);
-      return;
-    }
-    delete window._mtHoldDoneFor[stream.id];
-  }
   if (!stream || !stream.timerEl) return;
   clearInterval(stream.timerInterval);
   stream.timerInterval = null;
