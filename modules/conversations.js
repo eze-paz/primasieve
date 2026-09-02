@@ -3837,33 +3837,6 @@ async function reportConversation(reason) {
   } catch (_) { return false; }
 }
 
-// Append a small "Report conversation" action to a bubble/div. `reason` is
-// embedded so the panel can tell "flagged at end of turn" vs "flagged on error".
-function addReportAction(container, reason) {
-  try {
-    if (!container || container._reportAdded) return;
-    container._reportAdded = true;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'act-copy act-report';
-    btn.title = 'Report this conversation for developer review';
-    btn.setAttribute('aria-label', 'Report this conversation');
-    btn.innerHTML = '<svg viewBox="0 -960 960 960"><path d="M242-840h444v512L408-40l-39-31q-6-5-9-14t-3-22v-10l45-211H103q-24 0-42-18t-18-42v-81.84q0-7.16-1.5-14.66T43-499l126-290q8.88-21.25 29.59-36.13Q219.31-840 242-840Zm384 60H229L103-481v93h373l-53 249 203-214v-427Zm0 427v-427 427Zm60 25v-60h133v-392H686v-60h193v512H686Z"/></svg>';
-    btn.addEventListener('click', async () => {
-      const prev = btn.innerHTML;
-      btn.disabled = true;
-      btn.classList.add('done');
-      const ok = await reportConversation(reason);
-      btn.innerHTML = ok
-        ? '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
-        : '<span style="font-size:11px">✗</span>';
-      btn.title = ok ? 'Reported — thank you' : 'Report failed (not signed in?)';
-      setTimeout(() => { btn.disabled = false; btn.innerHTML = prev; btn.classList.remove('done'); }, 1300);
-    });
-    container.appendChild(btn);
-  } catch (_) {}
-}
-
 // Report per-turn PROFILING to the server for the admin panel. The worker splits
 // the turn's wall time into completion (waiting on the model stream), tool compute
 // (per tool — run_python is the pyodide cost), and mid-turn compaction, and emits
@@ -4245,16 +4218,9 @@ function addMsg(role, text = '', host = null, animate = false) {
           setTimeout(() => { copy.innerHTML = prev; copy.classList.remove('done'); }, 1300);
         }).catch(() => {});
       });
-      // Report action: flagged a completed turn for developer review.
-      addReportAction(acts, 'turn-end');
       acts.appendChild(copy);
       div.appendChild(acts);
     }
-  }
-  if (role === 'err' || role === 'info') {
-    // Error/status bubbles: append a Report action so a failed turn can be
-    // flagged right where it surfaced (the model/context is captured server-side).
-    addReportAction(div, role === 'err' ? 'error' : 'status');
   }
   if (role === 'user' && animate) {
     // LIVE user bubble (Enter-to-send only — load replays pass animate=false):
@@ -7701,10 +7667,9 @@ function endTotalTimer(stream, label) {
 }
 
 // ---- report-conversation button in the idle timer bar (next to ctx) ----
-// A permanent escape hatch for flagging the current conversation, because the built-in
-// report action only lives inside assistant/err/status bubbles — if no such bubble is on
-// screen (idle bar, blank/absent reply), users would have no way to report. Same transport
-// as addReportAction: best-effort POST via reportConversation, never breaks the chat.
+// A permanent escape hatch for flagging the current conversation, because the bubble-embedded
+// report action was removed (2026-09-02) — the idle-bar flag is now the ONLY report entry point.
+// Same transport as the old bubble action: best-effort POST via reportConversation, never breaks the chat.
 const REPORT_SVG_INLINE = '<svg viewBox="0 -960 960 960"><path d="M242-840h444v512L408-40l-39-31q-6-5-9-14t-3-22v-10l45-211H103q-24 0-42-18t-18-42v-81.84q0-7.16-1.5-14.66T43-499l126-290q8.88-21.25 29.59-36.13Q219.31-840 242-840Zm384 60H229L103-481v93h373l-53 249 203-214v-427Zm0 427v-427 427Zm60 25v-60h133v-392H686v-60h193v512H686Z"/></svg>';
 function _timerReportBtn() {
   return '<button type="button" class="mt-report" title="Report this conversation for developer review">' + REPORT_SVG_INLINE + '</button>';
