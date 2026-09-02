@@ -240,6 +240,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 3,
     "after": 3,
@@ -290,6 +298,14 @@
     "after": 3,
     "spent": 250,
     "reward": 0.125,
+    "solved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
     "solved": false
    },
    {
@@ -386,6 +402,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 8,
+    "after": 8,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 8,
     "after": 8,
@@ -454,6 +478,14 @@
     "before": 5,
     "after": 5,
     "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 5,
+    "after": 5,
+    "spent": 1,
     "reward": 0.0,
     "solved": false
    },
@@ -570,6 +602,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 5,
+    "after": 5,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(1)",
     "before": 5,
     "after": 5,
@@ -663,6 +703,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 4,
     "after": 0,
@@ -708,6 +756,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 4,
     "after": 0,
@@ -725,7 +781,7 @@
   },
   "ucb": {
    "solved": true,
-   "energy": 1874
+   "energy": 1894
   },
   "trace": [
    {
@@ -749,6 +805,14 @@
     "before": 13,
     "after": 13,
     "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 13,
+    "after": 13,
+    "spent": 20,
     "reward": 0.0,
     "solved": false
    },
@@ -896,6 +960,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 4,
     "after": 0,
@@ -912,8 +984,8 @@
    "energy": 585
   },
   "ucb": {
-   "solved": false,
-   "energy": 585
+   "solved": true,
+   "energy": 297
   },
   "trace": [
    {
@@ -933,20 +1005,12 @@
     "solved": false
    },
    {
-    "form": "ENUMERATE(2)",
+    "form": "INTERPOLATE",
     "before": 4,
-    "after": 4,
-    "spent": 51,
-    "reward": 0.0,
-    "solved": false
-   },
-   {
-    "form": "ENUMERATE(1)",
-    "before": 4,
-    "after": 4,
-    "spent": 238,
-    "reward": 0.0,
-    "solved": false
+    "after": 0,
+    "spent": 1,
+    "reward": 171.6667,
+    "solved": true
    }
   ]
  },
@@ -1020,6 +1084,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 4,
     "after": 0,
@@ -1086,6 +1158,14 @@
     "solved": false
    },
    {
+    "form": "INTERPOLATE",
+    "before": 6,
+    "after": 6,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
     "form": "ENUMERATE(2)",
     "before": 6,
     "after": 6,
@@ -1148,6 +1228,14 @@
     "before": 5,
     "after": 5,
     "spent": 250,
+    "reward": 0.0,
+    "solved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 5,
+    "after": 5,
+    "spent": 1,
     "reward": 0.0,
     "solved": false
    },
