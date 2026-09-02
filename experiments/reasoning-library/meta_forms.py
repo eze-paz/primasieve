@@ -5,8 +5,13 @@ import ast, math, time
 import reasoner_code as rc
 
 class MetaState:
-    def __init__(self, name, src, tests):
-        self.name = name; self.tests = tests
+    def __init__(self, name, src, tests, held_back=0.0):
+        # ANTI-CHEAT: the search only SEES `tests` (a subset when held_back>0); a true solve must
+        # also pass the held-back assertions (checked by verify_full). Catches test-adequate cheats.
+        self.name = name; self.all_tests = tests
+        k = int(round(len(tests) * (1 - held_back))) if held_back else len(tests)
+        self.tests = tests[:max(1, k)] if held_back else tests
+        self.held = tests[max(1, k):] if held_back else []
         self.orig = ast.parse(src)
         self.tree = self.orig
         self.units = 0                       # total candidate evaluations spent
@@ -31,7 +36,12 @@ class MetaState:
             ep = sum(1 for ok, c in zip(res, covs) if ok and ln in c)
             susp[ln] = ef / math.sqrt(nfail * (ef + ep)) if ef else 0.0
         return nfail, susp
-    def solved(self): return self.best == 0
+    def solved(self): return self.best == 0            # passes the SHOWN tests (search target)
+    def verify_full(self):
+        """True solve = passes ALL assertions incl. held-back (anti-cheat gate)."""
+        try: code = compile(ast.fix_missing_locations(self.tree), "<cand>", "exec")
+        except Exception: return False
+        return all(rc.run_one(code, self.name, i, e)[0] for i, e in self.all_tests)
 
 # ---------- forms: each is applicable()/cost()/run(state, budget) -> EvidenceDelta ----------
 def _stratum_edits(tree, k, susp):

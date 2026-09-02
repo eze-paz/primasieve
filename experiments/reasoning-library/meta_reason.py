@@ -33,10 +33,13 @@ def solve_handcoded(name, src, tests):
     return st.solved(), st.units, st.stratum_seen
 
 # ---------------- controller B: UCB bandit over forms (learned selection) ----------------------
-def solve_ucb(name, src, tests, ep_log):
-    st = MetaState(name, src, tests)
+def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0):
+    st = MetaState(name, src, tests, held_back=held_back)
     forms = default_forms()
-    n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0
+    # warm = {form_name: prior_pseudo_reward}; seeds q with n=1 so a mined strategy biases early picks
+    n = {f.name: (1 if warm and f.name in warm else 0) for f in forms}
+    q = {f.name: (warm[f.name] if warm and f.name in warm else 0.0) for f in forms}
+    total = sum(n.values())
     while not st.solved() and st.units < GLOBAL:
         avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
@@ -52,8 +55,9 @@ def solve_ucb(name, src, tests, ep_log):
         r = gain / (spent / SLICE) + (5.0 if d["solved"] else 0.0)
         n[f.name] += 1; total += 1; q[f.name] += (r - q[f.name]) / n[f.name]
         ep_log.append({"form": f.name, "before": before, "after": st.best, "spent": spent,
-                       "reward": round(r, 4), "solved": d["solved"]})
-    return st.solved(), st.units, st.stratum_seen
+                       "reward": round(r, 4), "solved": d["solved"], "improved": d["improved"]})
+    true_solve = st.verify_full() if st.held else st.solved()
+    return true_solve, st.units, st.stratum_seen
 
 if __name__ == "__main__":
     names = sorted(f[:-5] for f in os.listdir(f"{QB}/json_testcases") if f.endswith(".json"))
