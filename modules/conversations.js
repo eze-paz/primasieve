@@ -2811,7 +2811,7 @@ function handleButtonClick(which = 'main') {
   // must never fall through to handleSubmit (whose empty-composer resume path
   // would start a SECOND concurrent loop for this conversation).
   if (s && s.generating) {
-    stopStream(s);
+    stopEverything(s);
     return;
   }
   // GLOBAL STOP: this pane's conversation is idle, but some OTHER conversation
@@ -2824,6 +2824,7 @@ function handleButtonClick(which = 'main') {
     if (st !== s && st.generating) { stopStream(st); stoppedBackground = true; }
   }
   if (stoppedBackground) {
+    stopEverything(null);
     refreshSendButtonFor(which);
     return;
   }
@@ -2833,7 +2834,7 @@ function handleButtonClick(which = 'main') {
   // still reach it, so fire a best-effort abort at the last known agent id before
   // resyncing the button. Idempotent on the worker.
   if (btn.classList.contains('sending')) {
-    if (s && s._lastAgentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: s._lastAgentId }); } catch (_) {} }
+    stopEverything(s);
     refreshSendButtonFor(which);
     return;
   }
@@ -2850,6 +2851,24 @@ function stopStream(s) {
   const aid = s.agentId || s._lastAgentId;
   if (aid) { try { getSandpieWorker().postMessage({ type: 'abort', id: aid }); } catch (_) {} }
 }
+
+// Page-side pre-send fetches (compaction summary, auto-title) run BEFORE the
+// turn has a worker agent id, so a worker abort cannot reach them. They register
+// their AbortController here so a Stop click can cancel them directly.
+const _pageAbortPool = new Set();
+
+// The one true "stop everything" used by every stop path: kill page-side
+// pre-send fetches, the pane's own stream, any OTHER generating stream, and
+// (belt-and-braces) post abort-all so the worker kills every live agent even if
+// an id was lost. Every post is idempotent on the worker.
+function stopEverything(s) {
+  for (const c of Array.from(_pageAbortPool)) { try { c.abort(); } catch (_) {} }
+  if (s) stopStream(s);
+  for (const st of convStreams.values()) {
+    if (st !== s && st.generating) stopStream(st);
+  }
+  try { getSandpieWorker().postMessage({ type: 'abort-all' }); } catch (_) {}
+}
 // ---- Sandpie Web Worker — Pyodide + tools + agent loop ----------------------
 // Created once per page load. Other modules reach it via window._sandpieWorker.
 let _askingConvs = new Set();    // conversation ids with a pending ask( ) question
@@ -2859,7 +2878,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=177');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=178');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -6610,6 +6629,11 @@ async function _performCompaction(convId, cfg, triggerReason = 'native compactio
     } catch (_) {}
   };
   _compacting.add(convId);
+  // Abortable summarizer fetch: registered in _pageAbortPool so a Stop click
+  // kills this pre-send request too (it runs before the turn has an agent id,
+  // so a worker abort can't reach it).
+  const _cmpAbort = new AbortController();
+  _pageAbortPool.add(_cmpAbort);
   await cmpLog('trigger', { from_boundary: from, to_boundary: to, transcript_chars: transcript.length });
   emit('compaction:start');
   try {
@@ -6617,7 +6641,7 @@ async function _performCompaction(convId, cfg, triggerReason = 'native compactio
       await cmpLog('failed', { error: 'no completion provider available' });
       return { ok: false, reason: 'no completion provider available' };
     }
-    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined });
+    const out = await SandpieProviders.complete({ system: cfg.prompt, user: transcript, model: cfg.model || undefined, signal: _cmpAbort.signal });
     if (!out || !out.trim()) {
       await cmpLog('failed', { error: 'summarizer returned empty' });
       return { ok: false, reason: 'summarizer returned empty' };
@@ -6635,6 +6659,7 @@ async function _performCompaction(convId, cfg, triggerReason = 'native compactio
     await cmpLog('failed', { error: reason, status: (e && e.status) || null });
     return { ok: false, reason };
   } finally {
+    _pageAbortPool.delete(_cmpAbort);
     emit('compaction:end');
     _compacting.delete(convId);
   }
@@ -6686,6 +6711,10 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
   if (typeof SandpieAutoTitle === 'undefined' || !SandpieAutoTitle.generate) return '';
   if (!force && !SandpieAutoTitle.isEnabled()) return '';
   _titling.add(convId);
+  // Abortable title fetch: registered in _pageAbortPool so a Stop click kills
+  // this pre-send request too (no agent id exists yet at this point).
+  const _titleAbort = new AbortController();
+  _pageAbortPool.add(_titleAbort);
   try {
     // Warm stream or cold conv on disk — same resolver the compactor uses.
     const res = await _resolveConvForCompaction(convId);
@@ -6706,6 +6735,7 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
       userText: _convText(firstUser.content),
       assistantText: firstAsst ? _convText(firstAsst.content) : '',
       sessionId: 'Retitle:' + (await ensureSessionId(convId)),   // parent-session marker for /admin/transcripts
+      signal: _titleAbort.signal,
     });
     if (!title || title === stored) return '';
     await updateConvFile(convId, { title, titleLocked: true });
@@ -6721,6 +6751,7 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
     console.warn('[sandpie] auto-title failed:', e);
     return '';
   } finally {
+    _pageAbortPool.delete(_titleAbort);
     _titling.delete(convId);
   }
 }

@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.25.0-web-search-openrouter';
+const WORKER_VERSION = '2.26.0-abort-all';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -366,6 +366,16 @@ self.addEventListener('message', async (event) => {
     // to ~1/min while the tab is hidden — before the loop could see the abort.
     // Resolving false = "not connected", so the tool returns at once and the loop
     // hits its signal check and stops.
+    if (_dbxTokenReq) { try { clearTimeout(_dbxTokenReq.timer); _dbxTokenReq.resolve(false); } catch (_) {} _dbxTokenReq = null; }
+    return;
+  }
+
+  if (data.type === 'abort-all') {
+    // Global kill switch (page Stop button): abort EVERY live agent, not just
+    // one id. Covers lost/stale ids and any stray loop. Idempotent + cheap:
+    // aborting an already-finished ctl is a no-op, and the Map empties itself
+    // through each run's normal finally.
+    for (const ctl of _agentAborts.values()) { try { ctl.abort(); } catch (_) {} }
     if (_dbxTokenReq) { try { clearTimeout(_dbxTokenReq.timer); _dbxTokenReq.resolve(false); } catch (_) {} _dbxTokenReq = null; }
     return;
   }
