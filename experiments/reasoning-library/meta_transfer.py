@@ -42,8 +42,14 @@ def sig_dist(a, b):
     return d
 
 def winning_forms(ep):
-    """Forms that produced improvement in a solved episode -> the strategy that worked."""
-    return [e["form"] for e in ep if e.get("improved")]
+    """The DECISIVE form(s): the one that reached the solve. Crediting every improver makes
+    ENUMERATE(0) dominate every prior (it's tried first + partially improves everything), so warm
+    == cold. The solving form is what distinguishes an s0-solved bug from an s1/interp-solved one."""
+    solv = [e["form"] for e in ep if e.get("solved")]
+    if solv: return solv
+    # unsolved-but-progressed: credit the form of the deepest improvement (largest score drop)
+    imp = [(e["before"] - e["after"], e["form"]) for e in ep if e.get("improved")]
+    return [max(imp)[1]] if imp else []
 
 if __name__ == "__main__":
     names = sorted(f[:-5] for f in os.listdir(f"{QB}/json_testcases") if f.endswith(".json"))
