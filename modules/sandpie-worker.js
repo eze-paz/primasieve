@@ -3048,7 +3048,11 @@ const WALIOS_BASE = '/walios/';
 const WALIOS_BB = 'busybox.wasm?v=net4';
 const WALIOS_MANIFEST = {
   busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
-  python: 'python.wasm', python3: 'python.wasm', lua: 'lua.wasm',
+  // python → python_cxx: the dynamic-linking CPython that dlopen()s PIC-wasm
+  // C-extension .so, so `import numpy/lxml/PIL/docx…` works seamlessly (the
+  // packages are lazy-mounted into /site-packages when python_cxx first runs —
+  // see the tool_walios run message). Plain python.wasm can't dlopen.
+  python: 'python_cxx.wasm', python3: 'python_cxx.wasm', pydl: 'python_cxx.wasm', lua: 'lua.wasm',
   ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
 };
@@ -3129,7 +3133,16 @@ async function tool_walios({ script, timeout }, ctx) {
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
     w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
       tars: [['rootfs.tar.gz', '/']], opfs: '/root',
-      env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' },
+      // Lazy per-binary mounts: only fetched/extracted when that wasm is first
+      // exec'd. python_cxx (which `python` now maps to) pulls the stdlib + the
+      // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
+      // `import` just works without the model running any install step.
+      lazyTars: {
+        'python.wasm':     [['pylib.tar.gz', '/py']],
+        'python_cxx.wasm': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz', '/site-packages'], ['walios-docs.tar.gz', '/site-packages']],
+      },
+      env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
+             PYTHONHOME: '/py', PYTHONPATH: '/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
