@@ -3858,6 +3858,14 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     }
   }
   try { reader.cancel(); } catch (_) {}
+  // Bench-only: also report the SSE receive rate at STREAM END, so short rounds
+  // (< 1s each, e.g. 1s-rounds / tool-loop bench) — which never cross the 1000ms
+  // in-loop log threshold, and whose counters reset per stream — still emit one
+  // true per-round decode figure to compare against the page's painted rate.
+  if (_benchMode && _benchRecvT0) {
+    const _s = ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _benchRecvT0) / 1000;
+    if (_s > 0) console.log('[bench] worker SSE receive (round end) ~' + Math.round((_benchRecvChars / 4) / _s) + ' tok/s (chars/4 over ' + _s.toFixed(2) + 's)');
+  }
   // Accumulate this attempt's decode span (first token → stream end) onto the
   // turn's _prof. prefill is derived as completion_ms - decode_ms at emit, so an
   // attempt that never produced a token contributes nothing here and its whole
@@ -4955,7 +4963,7 @@ async function runAgent(config, ctx) {
     // (first token -> stream end). The page paints it into the live msg-timer so
     // tok/s updates at every ROUND boundary, not only when the whole turn ends.
     if (round.usage && (round.usage.completion_tokens | 0) > 0 && round.decode_ms > 0) {
-      ctx.emit({ type: 'rate', completion_tokens: round.usage.completion_tokens, decode_ms: Math.round(round.decode_ms) });
+      ctx.emit({ type: 'rate', completion_tokens: round.usage.completion_tokens, decode_ms: Math.round(round.decode_ms), bench: /bench/i.test(String(config.model || '')) });
     }
     if (!round.tool_calls.length) {
       // The model tried to answer in plain text without respond(). It was hidden

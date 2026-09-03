@@ -2866,7 +2866,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=187');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=188');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3301,7 +3301,7 @@ async function sendSingle(text, stream, opts = {}) {
       // prefill as completion), yielding absurd burst rates (seen live: ~22k
       // tok/s). A round only counts when it streamed a plausible token count
       // over a plausible decode span; otherwise the previous rate is kept.
-      if (_ms >= 250 && _tk >= 16 && _tk / (_ms / 1000) < 400) {
+      if (_ms >= 250 && _tk >= 16 && (ev.bench || _tk / (_ms / 1000) < 400)) {
         stream.lastRate = _tk / (_ms / 1000);
         stream._turnToks = (stream._turnToks || 0) + _tk;
         stream._turnDecodeMs = (stream._turnDecodeMs || 0) + _ms;
