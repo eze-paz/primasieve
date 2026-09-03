@@ -549,52 +549,71 @@ const SandpieTools = {
 };
 window.SandpieTools = SandpieTools;
 
-// ---- BETA: trimmed tool descriptions -------------------------------------
+// ---- Trimmed tool descriptions -------------------------------------------
 // The A/Bs (synthetic tie; real multi-turn 7/12=7/12; single-prompt empty 2/8 <
 // first-sentence 4/8) showed the description's FIRST SENTENCE carries tool
-// selection and the ~90% beyond it is situational execution nuance. So beta keeps
-// a one/two-line "what it does" plus ONLY the few nudges that prevent expensive,
+// selection and the ~90% beyond it is situational execution nuance. So we keep a
+// one/two-line "what it does" plus ONLY the few nudges that prevent expensive,
 // non-self-correcting mistakes (asyncio.run raises, shell-is-a-different-machine,
 // image-already-attached, the plan-first gate). Everything else — repetition,
-// when/when-not trees, examples, schema restatement, OPFS/files framing that is
-// wrong for beta anyway — is cut. The project path + read-anywhere/write-in-project
-// rule lives in the system prompt, so these stay path-agnostic. Keyed by the
-// tool's ORIGINAL name; BETA_NAME/BETA_PARAMS handle the pyodide/copy renames.
-const BETA_DESC = {
-  run_python: 'Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script); or `path` to run a saved .py script in the project. Async: top-level `await` works — end with `await main()`, never asyncio.run() or time.sleep() (use `await asyncio.sleep`). No sockets — for HTTP use `pyodide.http.pyfetch` and check `r.ok`. ~100 packages prebuilt (numpy, pandas, matplotlib, bs4…); others via `await micropip.install(...)`. Files resolve in the project folder.',
-  write_file: 'Create or overwrite a text file in the project. Creates by default; if it already exists nothing is written unless you pass overwrite:true. For a small change to an existing file, use edit_file instead of rewriting it — never save a renamed copy (foo_v2).',
+// when/when-not trees, examples, schema restatement — is cut.
+//
+// SHORT_DESC is the /app (OPFS workspace) wording; BETA_DESC layers the Dropbox-
+// project overrides on top for the fork. run_python→pyodide and the inline-`code`
+// param graduated to BOTH modes (NAME / PARAMS); copy_to_workspace→copy stays
+// beta-only (BETA_NAME / BETA_PARAMS).
+const SHORT_DESC = {
+  run_python: 'Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py file under /files. Async: top-level `await` works — end with `await main()`, never asyncio.run() or time.sleep() (use `await asyncio.sleep`). No sockets — for HTTP use `pyodide.http.pyfetch` and check `r.ok`. ~100 packages prebuilt (numpy, pandas, matplotlib, bs4…); others via `await micropip.install(...)`. A relative save lands next to the script; inline `code` runs in /files.',
+  write_file: 'Create or overwrite a text file under /files. Creates by default; if it already exists nothing is written unless you pass overwrite:true. For a small change to an existing file, use edit_file instead of rewriting it — never save a renamed copy (foo_v2).',
   edit_file: 'Replace an exact string in an existing file — the preferred way to change one. Fails if old_str is missing or not unique; include enough surrounding text to make it unique.',
-  read_file: 'Read a UTF-8 text file (use offset/limit for a line range). You can read ANY file in the user\'s Dropbox by absolute path, not just the project.',
-  delete_file: 'Delete a file or folder in the project.',
-  list_files: 'List files and folders (with size + modified time). Use it to see what exists and to verify a write. An absolute path lists anywhere in Dropbox.',
-  search: 'Find files by content or name (regex) in the project. scope:"dropbox" runs a keyword search over file names + contents across all of the user\'s Dropbox; an absolute `path` scopes it.',
+  read_file: 'Read a UTF-8 text file under /files (use offset/limit for a line range).',
+  delete_file: 'Delete a file or folder under /files.',
+  list_files: 'List files and folders (with size + modified time) under /files. Use it to see what exists and to verify a write. scope:"dropbox" lists the connected Dropbox by absolute path.',
+  search: 'Find files by content or name (regex) in your workspace. scope:"dropbox" runs a keyword search over file names + contents across the connected Dropbox; an absolute `path` scopes it.',
   web_search: 'Search the web; returns a ranked list of {title, url, snippet}.',
   read_url: 'Fetch a web page and return its main readable text plus the title.',
   load_skill: 'Load a skill\'s full instructions by name (skills and when to use each are listed in the Skills section).',
-  load_image: 'Load an image so you can see its pixels — it\'s visible on your next step. Do NOT call it if the image is already attached to the user\'s message (you already see it). You can only see it during this turn; reload the same path in a later turn if you need it again. JPEG/PNG/GIF/WEBP; images over ~5 MB are refused — downscale first (run_python + Pillow).',
-  copy_to_workspace: 'Copy a file or folder from anywhere in the user\'s Dropbox INTO this conversation\'s project folder so you can edit or run it. The source is never modified.',
+  load_image: 'Load an image under /files so you can see its pixels — it\'s visible on your next step. Do NOT call it if the image is already attached to the user\'s message (you already see it). You can only see it during this turn; reload the same path in a later turn if you need it again. JPEG/PNG/GIF/WEBP; images over ~5 MB are refused — downscale first (pyodide + Pillow).',
+  copy_to_workspace: 'Copy a file from elsewhere in the user\'s Dropbox INTO your editable workspace (/files) so you can read or run it — pass an absolute Dropbox path (from search). The source is never modified.',
   share: 'Share a file or folder with a team department or specific people — published to Dropbox; returns once done.',
   html_console: 'Read the browser console output (log/warn/error, uncaught errors) of an HTML artifact shown in the conversation, to debug it.',
   screenshot: 'Render an HTML artifact and see it as an image — check the layout actually looks right (overlaps, clipping, empty charts, low-contrast text) before telling the user it\'s done.',
   write_todos: 'Track a multi-step task as a flat checklist (skip it for trivial work). Delta form {"todos":[{"id","status"}]} flips status; full list to plan or restructure. At most one task in_progress. While nothing is in_progress the harness offers only planning tools — start a task to unlock the rest; never tell the user a tool is unavailable. Author content in English.',
   scratch: 'Set your working notes for this conversation (plan, hypotheses, blockers, next steps). Survives compaction and is shown to you each round.',
   spawn_subagent: 'Delegate a well-scoped subtask to a fresh subagent that runs its own loop in an isolated context (it does NOT see this conversation) and returns only its final result. Use it to keep your own context clean.',
-  shell: 'Run a command on the REMOTE relay host (stdout/stderr/exit code). The relay is a SEPARATE machine — NOT your project files: verify project files with list_files, never `ls`/`cat` here. Use it only for the relay itself (builds, ssh/scp to other hosts). Write a relay file by piping content through stdin. Long jobs (>~120s) are killed — launch detached (nohup … & echo $!) and poll a log.',
+  shell: 'Run a command on the REMOTE relay host (stdout/stderr/exit code). The relay is a SEPARATE machine — NOT your /files workspace: verify workspace files with list_files, never `ls`/`cat` here. Use it only for the relay itself (builds, ssh/scp to other hosts). Write a relay file by piping content through stdin. Long jobs (>~120s) are killed — launch detached (nohup … & echo $!) and poll a log.',
   walios: 'Run a shell script inside walios — a wasm Linux userland (busybox ash, coreutils, python3, ssh, make). Headless: returns stdout/stderr + exit code. Pass the script in "script".',
   remember: 'Save a durable, non-obvious fact across conversations: a user preference → "user"; a correction on how to work, with the why → "feedback"; lasting project context/decision → "project"; an external pointer or gotcha → "reference". Skip task-local details and anything recoverable from the code/files/git.',
   recall: 'Load memories not currently shown in full, by name or topic.',
   ask: 'Ask the user to choose between options to resolve a genuine ambiguity that would waste real work if guessed wrong — ask early, before doing the work. Batch all questions in ONE call (≤4), each with 2-5 mutually exclusive options and a default. Author in English.',
   respond: 'Deliver your final, user-facing answer (rendered as Markdown). Put ONLY the finished reply here — never thinking, planning, or scratch narration.',
 };
-const BETA_NAME = { run_python: 'pyodide', copy_to_workspace: 'copy' };
-const BETA_PARAMS = {
-  // pyodide: `code` (REPL) is the headline; `path` runs a saved script.
+// Beta (Dropbox-project) overrides: only the tools whose path model differs from
+// /app. Everything else is inherited from SHORT_DESC.
+const BETA_DESC = { ...SHORT_DESC,
+  run_python: 'Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py script in the project. Async: top-level `await` works — end with `await main()`, never asyncio.run() or time.sleep() (use `await asyncio.sleep`). No sockets — for HTTP use `pyodide.http.pyfetch` and check `r.ok`. ~100 packages prebuilt (numpy, pandas, matplotlib, bs4…); others via `await micropip.install(...)`. Files resolve in the project folder.',
+  write_file: 'Create or overwrite a text file in the project. Creates by default; if it already exists nothing is written unless you pass overwrite:true. For a small change to an existing file, use edit_file instead of rewriting it — never save a renamed copy (foo_v2).',
+  read_file: 'Read a UTF-8 text file (use offset/limit for a line range). You can read ANY file in the user\'s Dropbox by absolute path, not just the project.',
+  delete_file: 'Delete a file or folder in the project.',
+  list_files: 'List files and folders (with size + modified time). Use it to see what exists and to verify a write. An absolute path lists anywhere in Dropbox.',
+  search: 'Find files by content or name (regex) in the project. scope:"dropbox" runs a keyword search over file names + contents across all of the user\'s Dropbox; an absolute `path` scopes it.',
+  load_image: 'Load an image so you can see its pixels — it\'s visible on your next step. Do NOT call it if the image is already attached to the user\'s message (you already see it). You can only see it during this turn; reload the same path in a later turn if you need it again. JPEG/PNG/GIF/WEBP; images over ~5 MB are refused — downscale first (pyodide + Pillow).',
+  copy_to_workspace: 'Copy a file or folder from anywhere in the user\'s Dropbox INTO this conversation\'s project folder so you can edit or run it. The source is never modified.',
+  shell: 'Run a command on the REMOTE relay host (stdout/stderr/exit code). The relay is a SEPARATE machine — NOT your project files: verify project files with list_files, never `ls`/`cat` here. Use it only for the relay itself (builds, ssh/scp to other hosts). Write a relay file by piping content through stdin. Long jobs (>~120s) are killed — launch detached (nohup … & echo $!) and poll a log.',
+};
+// BOTH modes: run_python is renamed pyodide() and takes `code` directly (REPL).
+const NAME = { run_python: 'pyodide' };
+const PARAMS = {
   run_python: { type: 'object', properties: {
     code: { type: 'string', description: 'Python code to run directly (preferred for one-off work).' },
-    path: { type: 'string', description: 'Path to an existing .py script in the project to run instead of code.' },
+    path: { type: 'string', description: 'Path to an existing .py script to run instead of code.' },
     args: { type: 'array', items: { type: 'string' }, description: 'sys.argv[1:].' },
     timeout: { type: 'number', description: 'Seconds before the run is killed.' },
   }, required: [] },
+};
+// Beta-only: copy_to_workspace is exposed as copy() with a project-shaped schema.
+const BETA_NAME = { copy_to_workspace: 'copy' };
+const BETA_PARAMS = {
   copy_to_workspace: { type: 'object', properties: {
     src:  { type: 'string', description: 'Source path — absolute (anywhere in Dropbox) or relative to the project.' },
     dest: { type: 'string', description: 'Optional destination inside the project (default: the source filename).' },
@@ -604,19 +623,15 @@ const BETA_PARAMS = {
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
   .map(([name]) => {
-    // BETA: swap in the trimmed description (+ rename/param overrides where set).
-    if (window.SANDPIE_BETA) {
-      const description = (BETA_DESC[name] != null) ? BETA_DESC[name] : SandpieTools.description(name);
-      const outName = BETA_NAME[name] || name;
-      const params = BETA_PARAMS[name] || tools[name].parameters;
-      return { type: 'function', function: { name: outName, description, parameters: params } };
-    }
-    let description = SandpieTools.description(name);
-    // /app: tell the model WHERE its workspace sits in Dropbox + the team shared
-    // area, so a scope:"dropbox" search can target the shared folder precisely.
-    // (Beta returns above — each conversation has its own project folder, carried
-    // in the system prompt.)
-    if (name === 'search') {
+    const beta = !!window.SANDPIE_BETA;
+    const descMap = beta ? BETA_DESC : SHORT_DESC;
+    let description = (descMap[name] != null) ? descMap[name] : SandpieTools.description(name);
+    const outName = (beta && BETA_NAME[name]) || NAME[name] || name;
+    const params = (beta && BETA_PARAMS[name]) || PARAMS[name] || tools[name].parameters;
+    // /app search: append WHERE the workspace + team shared area sit in Dropbox, so
+    // a scope:"dropbox" search can target the shared folder precisely. (Beta carries
+    // its per-conversation project path in the system prompt instead.)
+    if (!beta && name === 'search') {
       try {
         const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
         const wr = p && p.workingRoot && p.workingRoot();
@@ -628,6 +643,6 @@ const toolDefs = () => Object.entries(tools)
         }
       } catch (_) {}
     }
-    return { type: 'function', function: { name, description, parameters: tools[name].parameters } };
+    return { type: 'function', function: { name: outName, description, parameters: params } };
   });
 

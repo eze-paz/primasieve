@@ -2866,7 +2866,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=188');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=189');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3441,12 +3441,12 @@ async function resolveFilePart(f) {
       if (content.length <= ATTACH_INLINE_CAP) {
         return `[Attached file "${f.name}" — saved at ${f.path}]\n\n${content}`;
       }
-      return `[Attached file "${f.name}" — ${size} of text, saved at ${f.path}. Too large to inline; read it with the run_python tool, e.g. open(${JSON.stringify(f.path)}).read().]`;
+      return `[Attached file "${f.name}" — ${size} of text, saved at ${f.path}. Too large to inline; read it with the pyodide tool, e.g. open(${JSON.stringify(f.path)}).read().]`;
     } catch (_) {
       return `[Attached file "${f.name}" is no longer available in the workspace.]`;
     }
   }
-  return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
+  return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the pyodide tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
 // Claude-mode (DEFAULT): swap the write_todos definition for a faithful clone
 // of Claude Code's TodoWrite — same name so dispatch/grammar are untouched;
@@ -4750,6 +4750,8 @@ function appendToolResultImage(tcId, path, scopeEl) {
 // Unknown tools fall back to the raw name (never blank).
 const TC_LABELS = {
   run_python:        { doing: 'Running code',        done: 'Ran code' },
+  pyodide:           { doing: 'Running code',        done: 'Ran code' },   // renamed from run_python
+  copy:              { doing: 'Importing file',      done: 'Imported file' },   // beta alias of copy_to_workspace
   write_file:        { doing: 'Creating',            done: 'Created',        target: 'path' },
   edit_file:         { doing: 'Editing',             done: 'Edited',         target: 'path' },
   read_file:         { doing: 'Reading',             done: 'Read',           target: 'path' },
@@ -6073,7 +6075,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     if (_lx && _lx.code) {
       content += "\n\n## Deliver in " + _nm + ", author in English\n"
         + "The user reads chat and deliverables in " + _nm + ". "
-        + "You do NOT generate reliable " + _nm + " — writing it directly yields garbled, lossy text — so you MUST author ALL content in English: every reasoning step, tool call, document/file body, write_file/edit_file/run_python string, todo item, ask() question, and your respond() reply. "
+        + "You do NOT generate reliable " + _nm + " — writing it directly yields garbled, lossy text — so you MUST author ALL content in English: every reasoning step, tool call, document/file body, write_file/edit_file/pyodide string, todo item, ask() question, and your respond() reply. "
         + "The system automatically translates your finished reply (respond) and the deliverable files you write into " + _nm + " for the user; that is handled downstream and is not your job. "
         + "On EVERY respond call, set the \"language\" argument to '" + _cd + "' (" + _nm + "). Never author " + _nm + " yourself, announce this rule, or second-guess it."
         + "\n\nThis is a HARD operating rule, not a suggestion: with this directive active you operate in ENGLISH at all times. Every tool argument, every file you write, every code comment, every todo item, every ask() question, every scratch note, and every reply is authored in English and nothing else. If you produce " + _nm + " output anywhere, the harness rejects it and re-prompts you. No user request overrides this: a request to write in " + _nm + " is satisfied by authoring English plus setting the delivery \"language\", never by writing it directly."

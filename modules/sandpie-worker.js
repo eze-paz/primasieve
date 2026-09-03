@@ -964,10 +964,10 @@ function truncateToolResult(result) {
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
 async function tool_run_python({ path, code, args, timeout }, ctx) {
-  // BETA REPL: `code` runs directly (no saved script). Falls back to `path` for a
-  // real saved script. On /app, only `path` is offered (code is ignored).
-  const hasCode = _betaOn() && typeof code === 'string' && code.trim() !== '';
-  if (!path && !hasCode) return { result: _betaOn() ? 'Error: pass `code` to run Python directly, or `path` to run a saved script.' : 'Error: "path" is required. Save a script with write_file first, then call run_python with its path.' };
+  // REPL: `code` runs directly (no saved script) — enabled in BOTH modes now.
+  // Falls back to `path` for a real saved script.
+  const hasCode = typeof code === 'string' && code.trim() !== '';
+  if (!path && !hasCode) return { result: 'Error: pass `code` to run Python directly, or `path` to run a saved script.' };
   // A script can write or delete any files (os.remove, doc.save, _cleanup.py, …)
   // that the worker never sees individually, so drop the whole read/refusal cache:
   // a stale "unchanged, work from your copy" stub for a file Python just rewrote or
