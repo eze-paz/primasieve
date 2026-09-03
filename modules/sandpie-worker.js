@@ -3052,7 +3052,7 @@ const WALIOS_MANIFEST = {
   // C-extension .so, so `import numpy/lxml/PIL/docx…` works seamlessly (the
   // packages are lazy-mounted into /site-packages when python_cxx first runs —
   // see the tool_walios run message). Plain python.wasm can't dlopen.
-  python: 'python_cxx.wasm?v=2', python3: 'python_cxx.wasm?v=2', pydl: 'python_cxx.wasm?v=2', lua: 'lua.wasm',
+  python: 'python_cxx.wasm?v=3', python3: 'python_cxx.wasm?v=3', pydl: 'python_cxx.wasm?v=3', lua: 'lua.wasm',
   ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
 };
@@ -3139,7 +3139,7 @@ async function tool_walios({ script, timeout }, ctx) {
       // `import` just works without the model running any install step.
       lazyTars: {
         'python.wasm':     [['pylib.tar.gz', '/py']],
-        'python_cxx.wasm?v=2': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz', '/site-packages'], ['walios-docs.tar.gz?v=2', '/site-packages']],
+        'python_cxx.wasm?v=3': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz', '/site-packages'], ['walios-docs.tar.gz?v=2', '/site-packages']],
       },
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
              PYTHONHOME: '/py', PYTHONPATH: '/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
