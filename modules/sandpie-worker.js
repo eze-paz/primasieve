@@ -3139,10 +3139,10 @@ async function tool_walios({ script, timeout }, ctx) {
       // `import` just works without the model running any install step.
       lazyTars: {
         'python.wasm':     [['pylib.tar.gz', '/py']],
-        'python_cxx.wasm?v=3': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz', '/site-packages'], ['walios-docs.tar.gz?v=2', '/site-packages']],
+        'python_cxx.wasm?v=3': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz', '/site-packages'], ['walios-docs.tar.gz?v=3', '/site-packages']],
       },
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-             PYTHONHOME: '/py', PYTHONPATH: '/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
+             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
