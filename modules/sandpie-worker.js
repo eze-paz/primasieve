@@ -3165,6 +3165,13 @@ async function unknownTool(name) {
 // Poll-style repeats (same command, growing log output) never match on result
 // TEXT, so they are never punished. Pure read-only tools never trip it.
 const _REP_LIMIT = 3;
+// Second guard (added 2026-09-03, session 1swasevb): the SAME tool failing over
+// and over with DIFFERENT arguments (read_file on paths that do not exist, one
+// guess per round) never matches the identical-result guard above because both
+// the args key and the error text change. Guard: N consecutive calls of the same
+// tool that ALL return an error = the approach is dead. Applies to ALL tools,
+// including read-only ones (read_file was exactly the degenerating tool).
+const _ERR_LIMIT = 4;
 const _REP_NEVER = new Set(['read_file', 'list_files', 'search', 'search_dropbox', 'recall', 'load_image']);
 function _repGuardState(ctx) { return ctx._repGuard || (ctx._repGuard = { key: '', res: '', n: 0, fired: false }); }
 function _todoBlockForLoop(ctx) {
@@ -3217,12 +3224,36 @@ async function runTool(name, args, ctx) {
   }
 }
 
+function _errGuardState(ctx) { return ctx._errGuard || (ctx._errGuard = { tool: '', n: 0, fired: false }); }
+function _errGuardReset(ctx) { const eg = ctx && ctx._errGuard; if (eg) { eg.tool = ''; eg.n = 0; eg.fired = false; } }
+
 async function runToolGuarded(name, args, ctx) {
-  if (!ctx || _REP_NEVER.has(String(name))) return runTool(name, args, ctx);
+  if (!ctx) return runTool(name, args, ctx);
   const rg = _repGuardState(ctx);
   const key = String(name) + '\u0000' + JSON.stringify(args == null ? {} : args);
   const out = await runTool(name, args, ctx);
   const res = out && typeof out.result === 'string' ? out.result : JSON.stringify(out == null ? {} : out);
+  // Guard 2: error streak - same tool, N consecutive failures, args may vary
+  if (/^Error[: ]/.test(res)) {
+    const eg = _errGuardState(ctx);
+    if (eg.tool === String(name)) {
+      eg.n++;
+      if (!eg.fired && eg.n >= _ERR_LIMIT - 1) {
+        eg.fired = true;
+        const bid = _todoBlockForLoop(ctx);
+        return { result: 'LOOP GUARD (error streak): "' + name + '" has now failed ' + _ERR_LIMIT
+          + ' times IN A ROW with different arguments - whatever it targets does not exist or this approach cannot work. Stop retrying it.'
+          + (bid ? (' Active task #' + bid + ' is now BLOCKED ("loop guard: repeated tool errors"), which releases the stop-guard.') : '')
+          + ' Verify the real path/state with a different tool (list_files, search, run_python), fix the root cause, or finish your reply and ask the user.' };
+      }
+      if (eg.fired) return { result: 'LOOP GUARD active: "' + name + '" keeps failing (' + eg.n + ' in a row). Change approach - do not call it again until something else changed.' };
+    } else { eg.tool = String(name); eg.n = 0; eg.fired = false; }
+  } else {
+    // A success (or any non-error result) proves progress: clear the streak.
+    _errGuardReset(ctx);
+  }
+  // Guard 1: identical call+result repetition (read-only tools exempt)
+  if (_REP_NEVER.has(String(name))) return out;
   if (key === rg.key && res === rg.res) {
     rg.n++;
     if (!rg.fired && rg.n >= _REP_LIMIT - 1) {
