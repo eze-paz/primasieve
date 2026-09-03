@@ -40,7 +40,7 @@ if("serviceWorker"in navigator){
   <script src="modules/settings.js?v=1"></script>
   <script src="modules/account.js?v=7"></script>
   <script src="modules/themes.js?v=2"></script>
-  <script type="module" src="modules/providers.js?v=46"></script>
+  <script type="module" src="modules/providers.js?v=47"></script>
   <script src="modules/console.js?v=3"></script>
   <script src="modules/dropbox.js?v=83"></script>
   <script src="modules/images.js?v=10"></script>
@@ -58,7 +58,7 @@ if("serviceWorker"in navigator){
   <script type="module" src="modules/mobile.js?v=1"></script>
   <script src="modules/augmentations.js?v=22"></script>
   <script src="modules/projects.js?v=5"></script>
-  <script type="module" src="modules/conversations.js?v=388"></script>
+  <script type="module" src="modules/conversations.js?v=387"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -262,6 +262,7 @@ if("serviceWorker"in navigator){
           <textarea id="inputSide" placeholder=">>> type to chat…" rows="1" autocomplete="off"></textarea>
           <div class="input-bar">
             <button type="button" id="attachBtnSide" class="attach-btn" onclick="$('imageInputSide').click()" title="Attach file">+</button>
+            <div id="modelPickerSide" class="model-picker"></div>
             <button type="button" id="sendBtnSide" class="send-btn" onclick="handleButtonClick('side')" title="Send">▶</button>
           </div>
         </div>
