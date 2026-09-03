@@ -116,6 +116,10 @@ const SandpieAccount = (() => {
         // translated. Omitted => undefined => localize everything non-English.
         fluent: Array.isArray(m.fluent) ? m.fluent : undefined,
         visionFallbackId: m.visionFallback ? '__managed:' + m.visionFallback : undefined,
+        // Internal models (models.json `internal:true`) are kept as providers so a
+        // visible model's visionFallback can resolve to them, but providers.js hides
+        // them from the picker. e.g. an image-only model used only as a fallback.
+        internal: !!m.internal,
       })), cat.defaultModel);
     } else {
       SandpieProviders.setManaged({ name: 'Company AI', endpoint: location.origin, model: '(managed)', apiKey: token, proxyUrl: '' });

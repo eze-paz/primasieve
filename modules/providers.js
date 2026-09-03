@@ -22,6 +22,11 @@ let _activeProviderId = null;
 let _managed = [];              // company providers injected by account.js (one read-only chip per managed model); in-memory only, never persisted
 const MANAGED_ID = '__managed'; // id prefix — each managed provider's id is `__managed:<model>`
 function isManagedId(id) { return typeof id === 'string' && id.indexOf(MANAGED_ID + ':') === 0; }
+// Managed models the user can actively pick. INTERNAL models (models.json
+// internal:true) stay in _managed so a visible model's visionFallback can resolve
+// to them (getProviderById searches _managed), but they never show in the picker
+// or get auto-selected — e.g. an image-only model used solely as a fallback.
+function selectableManaged() { return _managed.filter(p => !p.internal); }
 
 const AI_HTML = `
       <div id="providerChips"></div>
@@ -318,7 +323,7 @@ function ensureUsable() {
     if (modelSet()) return true;
   }
   // Otherwise pick the first configured provider that actually has a model.
-  const candidate = [..._managed, ..._providers].find(p => (p.model || '').trim() && (p.endpoint || '').trim());
+  const candidate = [...selectableManaged(), ..._providers].find(p => (p.model || '').trim() && (p.endpoint || '').trim());
   if (candidate) selectProvider(candidate.id);
   return modelSet();
 }
@@ -359,9 +364,10 @@ function renderChips() {
   addChip.onclick = () => addProvider();
   // Two labeled sections only when there are company-managed providers to
   // separate; otherwise a single flat row (unchanged for anonymous users).
-  if (_managed.length) {
+  const shownManaged = selectableManaged();   // hide internal (fallback-only) models
+  if (shownManaged.length) {
     row.appendChild(label('Company', false));
-    row.appendChild(groupOf(_managed.map(makeChip)));
+    row.appendChild(groupOf(shownManaged.map(makeChip)));
     row.appendChild(label('Your providers', true));
     row.appendChild(groupOf(_providers.map(makeChip).concat(addChip)));
   } else {
@@ -411,9 +417,10 @@ function renderModelPicker() {
   const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
   const empty = (t) => { const d = document.createElement('div'); d.className = 'mp-empty'; d.textContent = t; return d; };
 
-  if (_managed.length) {
+  const shownManaged = selectableManaged();   // hide internal (fallback-only) models
+  if (shownManaged.length) {
     panel.appendChild(hdr('Company'));
-    _managed.forEach(p => panel.appendChild(item(p)));
+    shownManaged.forEach(p => panel.appendChild(item(p)));
     panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
     panel.appendChild(hdr('Your models'));
     if (_providers.length) _providers.forEach(p => panel.appendChild(item(p)));
@@ -520,7 +527,9 @@ function renderVisionFallbackOptions(activeId) {
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   // Only vision-capable providers make sense as a fallback (a text-only model
   // can't see the rerouted images either).
-  const opts = [..._managed, ..._providers].filter(p => p.id !== activeId && providerCanSee(p));
+  // Internal (picker-hidden) managed models are excluded from the user-facing
+  // fallback dropdown too — they're wired as fallbacks via models.json, not here.
+  const opts = [...selectableManaged(), ..._providers].filter(p => p.id !== activeId && providerCanSee(p));
   sel.innerHTML = '<option value="">— no vision fallback —</option>'
     + opts.map(p => {
       const name = (p.name && p.name !== p.model) ? p.name + ' (' + p.model + ')' : (p.name || p.model || 'Unnamed');
@@ -622,7 +631,9 @@ function managedDefault(defaultModel) {
     if (byField) return byField;
     console.warn('[SandpieProviders] managed defaultModel ' + JSON.stringify(defaultModel) + ' matched no model — using the first. Available models:', _managed.map(p => p.model));
   }
-  return _managed[0];
+  // Never default to an internal (picker-hidden) model; fall back to the first
+  // selectable one, and only to _managed[0] if every model is internal.
+  return selectableManaged()[0] || _managed[0];
 }
 
 // Surface read-only company providers as chips (one per managed model). NOT
