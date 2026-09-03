@@ -1,4 +1,7 @@
-# Reasoning-first core — consolidation (E1–E8)
+# Primasieve Engine — consolidation (E1–E8)
+
+*Primasieve* — a rejection-first reasoning engine: it sieves a hypothesis space down to the *prime*
+(essential, verified) relations and keeps only those. The core is exactly as wide as its oracles.
 
 A single falsifiable claim, the evidence, and the same mapped-limits list every time. Zero LLM, pure-Python
 stdlib, deterministic verification throughout. Designed adversarially with a fable subagent; every null is
