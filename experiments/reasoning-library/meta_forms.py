@@ -167,13 +167,15 @@ class GlobalApply:
             else:
                 continue
             for op in opts:
-                if op.__name__ == cur or (kind, op.__name__) in seen or tried >= budget: continue
-                seen.add((kind, op.__name__))
-                t2 = _apply_global(st.tree, kind, op)
+                # swap all nodes whose op == cur (the SOURCE) to op (the TARGET) -> leaves other ops
+                # untouched (e.g. Add->Sub must NOT also turn Mult into Sub). Keyed by (kind,cur,tgt).
+                if op.__name__ == cur or (kind, cur, op.__name__) in seen or tried >= budget: continue
+                seen.add((kind, cur, op.__name__))
+                t2 = _apply_global(st.tree, kind, cur, op)
                 if t2 is None: continue
                 tried += 1; st.units += 1
                 nf, susp2 = st._score(t2)
-                if nf < best[0]: best = (nf, t2, susp2, f"GLOBAL {kind}->{op.__name__}")
+                if nf < best[0]: best = (nf, t2, susp2, f"GLOBAL {kind} {cur}->{op.__name__}")
                 if nf == 0: break
         st._cache[self._key(st)] = True
         # accept ONLY a full solve: a uniform global swap that merely PARTIALLY improves is almost
@@ -186,13 +188,14 @@ class GlobalApply:
         return {"form": self.name, "tried": tried, "before": before, "after": before,
                 "improved": False, "solved": False, "exhausted": True, "fix": None}
 
-def _apply_global(tree, kind, op):
+def _apply_global(tree, kind, source, op):
+    """Swap all nodes whose current op == `source` to `op` (leaves other op kinds untouched)."""
     t = copy.deepcopy(tree); changed = False
     for node in ast.walk(t):
         if kind == "cmp" and isinstance(node, ast.Compare) and len(node.ops) == 1 \
-           and type(node.ops[0]).__name__ != op.__name__:
+           and type(node.ops[0]).__name__ == source:
             node.ops = [op()]; changed = True
-        elif kind == "binop" and isinstance(node, ast.BinOp) and type(node.op).__name__ != op.__name__:
+        elif kind == "binop" and isinstance(node, ast.BinOp) and type(node.op).__name__ == source:
             node.op = op(); changed = True
     return ast.fix_missing_locations(t) if changed else None
 
