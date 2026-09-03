@@ -79,6 +79,29 @@ def discover(grid):
         return surv[0][0], surv[0][1], [n for n, _ in surv]        # unique law -> identify
     return "abstain", None, [n for n, _ in surv]                   # 0 or >=2 -> abstain (can't tell the law)
 
+def brute_survivors(grid):
+    """COMPLETENESS ORACLE (fable audit): exhaustive JOINT search over the bbox+-S window (which provably contains
+    every exact inverse, since any match shares the pixel bbox) for each law -> the ground-truth survivor set."""
+    bb = _bbox(grid)
+    if bb is None: return []
+    w = max(max(r) for r in grid) // S2 or 1                        # full-coverage interior pixel = 16w -> w known
+    rng4 = [range(max(0, a * S - S), min(W * S, a * S + S) + 1) for a in bb]
+    out = []
+    for name, fn in LAWS:
+        hit = False
+        for x0 in rng4[0]:
+            for x1 in rng4[2]:
+                if x1 <= x0: continue
+                for y0 in rng4[1]:
+                    for y1 in rng4[3]:
+                        if y1 > y0 and _resid(fn, (x0, y0, x1, y1, w), grid) == 0:
+                            hit = True; break
+                    if hit: break
+                if hit: break
+            if hit: break
+        if hit: out.append(name)
+    return out
+
 def rand_rect(rng):
     def redge(bp): return bp * S + (0 if rng.random() < 0.5 else rng.choice([1, 2, 3]))
     x0p = rng.randint(1, 6); x1p = x0p + rng.randint(3, 6); y0p = rng.randint(1, 6); y1p = y0p + rng.randint(3, 6)
@@ -122,7 +145,29 @@ if __name__ == "__main__":
     print(f"  K-CONF confabulation (wrong/invalid law when distinguishable): {conf}/{N}  (must be 0)")
     print(f"  K-ABST abstained on {abstain} scenes; analytic coincidence (>=2 co-invert) = {coincidence} "
           f"-> abstain rate {100*abstain//N}% vs coincidence {100*coincidence//N}%")
-    passK = (conf == 0 and truth_found == N and correct == distinguishable and abstain == coincidence)
+    # --- fable AUDIT 1: search completeness for RIVALS (coord-descent survivor set == exhaustive brute oracle) ---
+    audit_n = 18; audit_mismatch = 0
+    for s in range(audit_n):
+        rng = random.Random(13000 + s)
+        grid = LFN[("area", "gamma", "sqrt")[s % 3]](rand_rect(rng))
+        cd = set(discover(grid)[2]); bf = set(brute_survivors(grid))
+        if cd != bf: audit_mismatch += 1
+    # --- fable AUDIT 2: are the >=2-survivor coincidences exactly the structurally-ambiguous (few partial levels)? ---
+    strat = {}
+    for s in range(N):
+        rng = random.Random(13000 + s)
+        grid = LFN[("area", "gamma", "sqrt")[s % 3]](rand_rect(rng))
+        w = max(max(r) for r in grid) // S2 or 1
+        levels = len({v for row in grid for v in row if v not in (0, w * S2)})   # # distinct PARTIAL gray levels
+        nsurv = len(discover(grid)[2])
+        strat.setdefault(levels, [0, 0]); strat[levels][0] += 1; strat[levels][1] += (nsurv >= 2)
+    print(f"  AUDIT-1 search completeness (coord-descent survivor set == brute oracle): "
+          f"{audit_n-audit_mismatch}/{audit_n} match  (mismatch {audit_mismatch} -> must be 0)")
+    print(f"  AUDIT-2 coincidences by #distinct partial gray levels (levels: total, #>=2-surv): "
+          f"{ {k: tuple(v) for k, v in sorted(strat.items())} }")
+
+    passK = (conf == 0 and truth_found == N and correct == distinguishable and abstain == coincidence
+             and audit_mismatch == 0)
     print(f"\n  RESULT: {'PASS' if passK else 'CHECK'}. The world uses a DIFFERENT non-nested law per scene; the engine")
     print("  identifies WHICH generative law (+latent) by generic search + sound residual rejection, commits the true")
     print("  law whenever residual distinguishes it, and abstains exactly on genuine coincidences -> law-discrimination")
