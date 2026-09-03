@@ -43,7 +43,9 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
 3. **Invention is bounded by the grammar.** New primitives are compositions within the object grammar's deeper
    space (E5), and while that space is *reducible* to object node types (E8, not a hidden authored vocabulary),
    naive search over it costs a large constant factor **k** — the frontier is now *guided* search, and truly
-   open-ended (out-of-grammar) invention is unshown.
+   open-ended (out-of-grammar) invention is unshown. **(k revised: E10's witness synthesizer brings trunc/signmod
+   — invertible-top-op targets — down from the E8 blind ~10⁴–10⁵× to ~10³×; still above the menu index, and not
+   yet shown for non-invertible top-ops.)**
 4. **Three real *implementers* across two *problem classes*, symbolic only.** E7 (SQLite) + v2 (decimal/libmpdec)
    are numeric-C-library boundary semantics; v3 (json/_json) is a **different class** — string serialization /
    escaping + structural inversion. All three are genuinely separate C binaries, so the cross-implementation
@@ -83,6 +85,21 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     match-count guidance is deceptive for compositional targets, NOT a verdict. 0 confabulation throughout;
     knockouts abstained. Limit #10 STANDS unweakened. A clean re-test must graft gradient-ordering onto E8's
     efficient layered generator so size-only reproduces ~109203.
+    **E10 (meta_e10.py, meta_e10_prereg.md) then WEAKENED it (not closed) for the arithmetic basis:** trunc is
+    SYNTHESIZED live from object atoms by a target-agnostic BUS+witness synthesizer on E7's row budget at
+    k'=3570 (worst of 3 seeds; 633 materialized + 2937 witness queries), 30.6x below blind (109203) and ~10^3x
+    above the menu index; signmod only via trunc-reuse (atoms-only ABSTAIN); //-topped same-size targets mostly
+    unreachable (witness covers invertible ops only); 0 confab, verified on disjoint+fresh sqlite probes;
+    label-shuffle/half_even/abs-sign-ablation ABSTAIN; decoys show no target favoring. n=2 targets, one basis,
+    invertible top-ops. Mechanism: bottom-up obs-equiv bank + order-independent WATCH table (invertible ops
+    {+,-,*} register required-partner-sig → O(1) fire); forward-composition control (no witness) did NOT
+    materialize trunc in 130k ⇒ witness causal. **Two honesty notes (logged, not silently fixed):** (1) E10
+    prereg's genericity kill said "within 3x of decoy median" (two-sided) but E9 §5's intent was one-sided
+    ("not >3x CHEAPER" = target-favoring); trunc is 16x ABOVE median (harder, not favored) ⇒ intent satisfied,
+    but the prereg WORDING is a logged defect. (2) shape-matched decoys collapse to realized K=3 so the
+    energy-median is uninformative — genericity rests on the UNIFORM-top-op result (18/18 invertible found:
+    + 6/6, − 9/9, * 3/3), not the median. So limit #10 is now: *invention is live synthesis at ~10^3× for
+    invertible-top-op targets in one basis, still menu-selection-cheaper and unshown for non-invertible tops.*
 
 ## What it is / isn't
 
