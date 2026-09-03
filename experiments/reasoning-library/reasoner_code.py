@@ -71,7 +71,12 @@ def run_one(src_code, name, inp, exp, cap=STEP_CAP):
         sys.settrace(tr)
         r=fn(*copy.deepcopy(inp))
         if isinstance(r,types.GeneratorType): r=list(r)
-        ok = abs(r-exp)<1e-4 if name=="sqrt" else (_norm(r)==_norm(exp))
+        # float-valued tasks (e.g. math on non-integer points) use epsilon; also makes bitwise/shift
+        # ops on floats RAISE -> candidate dies (kills integer-coincidence poisoning in the math domain)
+        if name=="sqrt" or isinstance(exp,float):
+            ok = abs(r-exp)<1e-6
+        else:
+            ok = _norm(r)==_norm(exp)
     except Exception:
         ok=False
     finally:

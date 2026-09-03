@@ -21,10 +21,14 @@ def poly_str(coeffs):
         else: terms.append(f"{c}*x**{p}")
     return " + ".join(terms)
 
+# NON-INTEGER points (fable Step 0): floats pin the polynomial exactly AND make bitwise/shift ops
+# RAISE (they need ints) -> spurious bitwise 'improvements' that coincidentally matched integer
+# points are eliminated at zero cost, so the stuck-signal downstream is REAL not poisoned.
+_XS = [-2.3, -1.5, -0.5, 0.5, 1.0, 1.7, 2.4, 3.1, 4.2]
 def _tests(coeffs):
     def val(x):
-        return sum(c * x**(len(coeffs)-1-i) for i, c in enumerate(coeffs))
-    return [([x], val(x)) for x in range(-3, 6)]      # 9 integer points pin any deg<=8 poly
+        return float(sum(c * x**(len(coeffs)-1-i) for i, c in enumerate(coeffs)))
+    return [([x], val(x)) for x in _XS]               # 9 float points pin any deg<=8 poly
 
 def gen_poly_bug(rng, degree=2, kind=None):
     """A correct polynomial + a single-mistake buggy variant. kind: coeff/sign/op."""
@@ -53,9 +57,9 @@ def gen_polysign(k, rng=None):
         return " ".join(terms)
     buggy, correct = build("+"), build("-")
     def val(x):
-        return coeffs[0]*x**k + sum((-1)*coeffs[i]*x**(k-i) for i in range(1, k+1))
+        return float(coeffs[0]*x**k + sum((-1)*coeffs[i]*x**(k-i) for i in range(1, k+1)))
     src = f"def f(x):\n    return {buggy}\n"
-    tests = [([x], val(x)) for x in range(-3, 6)]
+    tests = [([x], val(x)) for x in _XS]
     return {"src": src, "tests": tests, "correct": correct}
 
 def _discovery_test():
