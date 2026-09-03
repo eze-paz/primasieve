@@ -378,17 +378,28 @@ function renderChips() {
 // Compact model selector for the composer — a "dropup" chip. Mirrors renderChips'
 // Company / Your-models split (a clean separator line between them, only when there
 // ARE company models, i.e. not anonymous). Lives in the input bar so the model is
-// switchable without opening Settings. No-op if #modelPicker isn't on the page.
+// switchable without opening Settings. Painted into EVERY .model-picker host
+// (main pane + side pane); no-op when none exist on the page.
 function renderModelPicker() {
-  const host = document.getElementById('modelPicker');
-  if (!host) return;
-  const wasOpen = host.classList.contains('open');
+  // Paint the picker into EVERY composer host (main pane + side pane). Each host
+  // gets its own trigger; the dropup panel is per-host too (moved to <body> only
+  // while open, so position:fixed can escape overflow/backdrop-filter clipping).
+  const hosts = Array.from(document.querySelectorAll('.model-picker'));
+  if (!hosts.length) return;
   const active = getActiveProvider();
   // Clean up any panel previously moved to <body>.
   const oldPanel = document.querySelector('.mp-panel');
   if (oldPanel) oldPanel.remove();
-  host.innerHTML = '';
-  host.classList.toggle('open', wasOpen);   // preserve open state across a re-render
+  for (const host of hosts) {
+    const wasOpen = host.classList.contains('open');
+    host.innerHTML = '';
+    host.classList.toggle('open', wasOpen);   // preserve open state across a re-render
+    buildModelPickerInto(host, active);
+  }
+}
+
+// Build one picker (trigger + dropup panel) inside `host`.
+function buildModelPickerInto(host, active) {
 
   const trigger = document.createElement('button');
   trigger.type = 'button';
@@ -432,7 +443,7 @@ function renderModelPicker() {
   }
 
   host.append(trigger, panel);
-  if (wasOpen) positionModelPickerPanel(host);
+  if (host.classList.contains('open')) positionModelPickerPanel(host);
 }
 
 // The dropup panel is appended to <body> and position:fixed so it escapes both
@@ -731,18 +742,23 @@ function bootProviders() {
   try { if (window.SandpieAccount && SandpieAccount.ensureManaged) SandpieAccount.ensureManaged(); } catch (_) {}
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
-    const h = document.getElementById('modelPicker');
-    if (h && h.classList.contains('open') && !h.contains(e.target)) {
-      const p = document.querySelector('.mp-panel');
-      if (p && p.contains(e.target)) return;
-      h.classList.remove('open');
-      if (p) p.classList.remove('visible');
+    let stillOpen = false;
+    for (const h of document.querySelectorAll('.model-picker')) {
+      if (h.classList.contains('open') && !h.contains(e.target)) {
+        const p = h.querySelector('.mp-panel') || document.querySelector('.mp-panel');
+        if (p && p.contains(e.target)) { stillOpen = true; continue; }
+        h.classList.remove('open');
+        if (p) p.classList.remove('visible');
+      }
+      if (h.classList.contains('open')) stillOpen = true;
     }
+    void stillOpen;
   });
   // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
   window.addEventListener('resize', () => {
-    const h = document.getElementById('modelPicker');
-    if (h && h.classList.contains('open')) positionModelPickerPanel(h);
+    for (const h of document.querySelectorAll('.model-picker')) {
+      if (h.classList.contains('open')) positionModelPickerPanel(h);
+    }
   });
 }
 if (document.readyState === 'loading') {
