@@ -234,6 +234,36 @@ class Repeat:
         return {"form": self.name, "tried": tried, "before": before, "after": before,
                 "improved": False, "solved": False, "exhausted": True, "fix": None}
 
+class Negate:
+    """DISCOVERED operator (NOT in default_forms; crystallized by sleep from REPEAT-solved sign-flip
+    traces via the relational frame new==-old). Negates a suspicious integer constant in ONE move ->
+    makes escalation unnecessary on re-run (the emergence payoff)."""
+    name = "NEGATE"; cost_hint = 1.2
+    def _key(self, st): return ("NEGATE", st._th())
+    def applicable(self, st):
+        return not st.solved() and st._cache.get(self._key(st)) is None
+    def run(self, st, budget):
+        before = st.best; best = (before, None, None, None); tried = 0
+        for idx, node in [(i, n) for i, n in enumerate(ast.walk(st.tree))
+                          if isinstance(n, ast.Constant) and isinstance(n.value, int) and not isinstance(n.value, bool)]:
+            ln = getattr(node, "lineno", None)
+            if st.susp and st.susp.get(ln, 0.0) == 0.0: continue
+            if tried >= budget or node.value == 0: continue
+            t2 = _apply_const(st.tree, idx, -node.value)
+            if t2 is None: continue
+            tried += 1; st.units += 1
+            nf, susp2 = st._score(t2)
+            if nf < best[0]: best = (nf, t2, susp2, f"NEGATE {node.value}->{-node.value}")
+            if nf == 0: break
+        st._cache[self._key(st)] = True
+        if best[1] is not None:
+            st.tree, st.susp, st.best = best[1], best[2], best[0]
+            st.log.append((self.name, before, best[0]))
+            return {"form": self.name, "tried": tried, "before": before, "after": best[0],
+                    "improved": True, "solved": best[0] == 0, "exhausted": False, "fix": best[3]}
+        return {"form": self.name, "tried": tried, "before": before, "after": before,
+                "improved": False, "solved": False, "exhausted": True, "fix": None}
+
 def _apply_const(tree, idx, newval):
     t = copy.deepcopy(tree)
     for i, node in enumerate(ast.walk(t)):
