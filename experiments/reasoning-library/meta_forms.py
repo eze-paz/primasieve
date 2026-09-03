@@ -5,13 +5,21 @@ import ast, math, time, copy
 import reasoner_code as rc
 
 class MetaState:
-    def __init__(self, name, src, tests, held_back=0.0):
+    def __init__(self, name, src, tests, held_back=0.0, oracle=None):
         # ANTI-CHEAT: the search only SEES `tests` (a subset when held_back>0); a true solve must
         # also pass the held-back assertions (checked by verify_full). Catches test-adequate cheats.
         self.name = name; self.all_tests = tests
         k = int(round(len(tests) * (1 - held_back))) if held_back else len(tests)
         self.tests = tests[:max(1, k)] if held_back else tests
         self.held = tests[max(1, k):] if held_back else []
+        # E1 NOISE ORACLE (meta_e1): degrade the rejection channel. subset=verify on a fixed random
+        # k-fraction of points (SOUND rejection, INCOMPLETE acceptance -> false-accepts only); flip=
+        # symmetric verdict flip prob p per candidate (UNSOUND). Fixed subset per state (per solve).
+        self.oracle = oracle or {"mode": "clean"}
+        if self.oracle["mode"] == "subset":
+            rng = self.oracle["rng"]; n = len(self.tests)
+            kk = max(1, int(round(n * self.oracle["k_frac"])))
+            self._subset = sorted(rng.sample(range(n), kk))
         self.orig = ast.parse(src)
         self.tree = self.orig
         self.units = 0                       # total candidate evaluations spent
@@ -28,9 +36,18 @@ class MetaState:
         res, covs = [], []
         for inp, exp in self.tests:
             ok, cov = rc.run_one(code, self.name, inp, exp); res.append(ok); covs.append(cov)
-        nfail = sum(1 for x in res if not x)
-        self.last_fail = frozenset(i for i, ok in enumerate(res) if not ok)   # plateau fingerprint
-        if nfail == 0: return 0, {}
+        om = self.oracle["mode"]
+        if om == "subset":                   # judge only the fixed subset -> false-accepts, no false-rejects
+            sub = self._subset
+            nfail = sum(1 for i in sub if not res[i])
+            self.last_fail = frozenset(i for i in sub if not res[i])
+            if nfail == 0: return 0, {}
+        else:
+            nfail = sum(1 for x in res if not x)
+            self.last_fail = frozenset(i for i, ok in enumerate(res) if not ok)   # plateau fingerprint
+            if om == "flip" and self.oracle["rng"].random() < self.oracle["p"]:   # flip the verdict's zeroness
+                return (max(nfail, 1), {}) if nfail == 0 else (0, {})             # false-reject / false-accept
+            if nfail == 0: return 0, {}
         susp = {}; allln = set().union(*covs) if covs else set()
         for ln in allln:
             ef = sum(1 for ok, c in zip(res, covs) if not ok and ln in c)
