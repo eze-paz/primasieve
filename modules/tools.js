@@ -531,7 +531,7 @@ const SandpieTools = {
     localStorage.setItem(TOOLS_DESC_KEY, JSON.stringify(o));
   },
   resetDescription(name) { const o = _toolsDescMap(); delete o[name]; localStorage.setItem(TOOLS_DESC_KEY, JSON.stringify(o)); },
-  // Everything the settings UI needs to render a row, in catalog order.
+  // Raw catalog rows (source name + shipped description), in catalog order.
   list() {
     return Object.keys(tools).map(name => ({
       name,
@@ -541,6 +541,15 @@ const SandpieTools = {
       enabled: SandpieTools.isEnabled(name),
       available: _toolAvailable(name),
     }));
+  },
+  // What the model ACTUALLY receives — effective name + trimmed description per the
+  // current mode. The Settings → Tools inspector renders this so it matches the wire
+  // schema (pyodide, short descriptions), not the raw source catalog.
+  effectiveList() {
+    return Object.keys(tools).filter(name => SandpieTools.isEnabled(name)).map(name => {
+      const e = _effectiveTool(name);
+      return { name: e.name, description: e.description, available: _toolAvailable(name) };
+    });
   },
   shellRelayUrl() { return shellRelayUrl(); },
   setShellRelayUrl(url) { try { localStorage.setItem(SHELL_RELAY_URL_KEY, String(url || '').trim()); } catch (_) {} },
@@ -620,29 +629,35 @@ const BETA_PARAMS = {
   }, required: ['src'] },
 };
 
+// Resolve one tool to the EFFECTIVE {name, description, parameters} actually sent
+// to the model — applying the mode's rename, param, and trimmed-description maps.
+// Shared by toolDefs() (the wire schema) and SandpieTools.effectiveList() (the
+// Settings → Tools inspector), so the panel always shows exactly what's sent.
+function _effectiveTool(name) {
+  const beta = !!window.SANDPIE_BETA;
+  const descMap = beta ? BETA_DESC : SHORT_DESC;
+  let description = (descMap[name] != null) ? descMap[name] : SandpieTools.description(name);
+  const outName = (beta && BETA_NAME[name]) || NAME[name] || name;
+  const params = (beta && BETA_PARAMS[name]) || PARAMS[name] || tools[name].parameters;
+  // /app search: append WHERE the workspace + team shared area sit in Dropbox, so
+  // a scope:"dropbox" search can target the shared folder precisely. (Beta carries
+  // its per-conversation project path in the system prompt instead.)
+  if (!beta && name === 'search') {
+    try {
+      const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
+      const wr = p && p.workingRoot && p.workingRoot();
+      if (wr) {
+        const team = (p.teamParent && p.teamParent()) || '';
+        description += `\nYour workspace is the Dropbox folder "${wr}", in the user's own Dropbox.`
+          + (team ? ` The team's shared area is "${team}" — to search it, use scope:"dropbox" with path:"${team}" (or another absolute folder).`
+                  : ` To search elsewhere in Dropbox, use scope:"dropbox" with an absolute folder path.`);
+      }
+    } catch (_) {}
+  }
+  return { name: outName, description, parameters: params };
+}
+
 const toolDefs = () => Object.entries(tools)
   .filter(([name]) => SandpieTools.isEnabled(name) && _toolAvailable(name))
-  .map(([name]) => {
-    const beta = !!window.SANDPIE_BETA;
-    const descMap = beta ? BETA_DESC : SHORT_DESC;
-    let description = (descMap[name] != null) ? descMap[name] : SandpieTools.description(name);
-    const outName = (beta && BETA_NAME[name]) || NAME[name] || name;
-    const params = (beta && BETA_PARAMS[name]) || PARAMS[name] || tools[name].parameters;
-    // /app search: append WHERE the workspace + team shared area sit in Dropbox, so
-    // a scope:"dropbox" search can target the shared folder precisely. (Beta carries
-    // its per-conversation project path in the system prompt instead.)
-    if (!beta && name === 'search') {
-      try {
-        const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
-        const wr = p && p.workingRoot && p.workingRoot();
-        if (wr) {
-          const team = (p.teamParent && p.teamParent()) || '';
-          description += `\nYour workspace is the Dropbox folder "${wr}", in the user's own Dropbox.`
-            + (team ? ` The team's shared area is "${team}" — to search it, use scope:"dropbox" with path:"${team}" (or another absolute folder).`
-                    : ` To search elsewhere in Dropbox, use scope:"dropbox" with an absolute folder path.`);
-        }
-      } catch (_) {}
-    }
-    return { type: 'function', function: { name: outName, description, parameters: params } };
-  });
+  .map(([name]) => ({ type: 'function', function: _effectiveTool(name) }));
 

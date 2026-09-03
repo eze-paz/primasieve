@@ -269,7 +269,10 @@ those respond() calls together (one per language) as that final step.`;
     const listEl = panel.querySelector('#spToolsList');
     const countEl = panel.querySelector('#spToolsCount');
     if (!listEl || typeof SandpieTools === 'undefined') return;
-    const items = SandpieTools.list();
+    // Show the EFFECTIVE definitions the model receives (pyodide, trimmed
+    // descriptions) rather than the raw source catalog — the panel is an inspector
+    // of what's actually sent. Falls back to list() on an older tools.js.
+    const items = (typeof SandpieTools.effectiveList === 'function') ? SandpieTools.effectiveList() : SandpieTools.list();
     if (countEl) countEl.textContent = String(items.length);
     listEl.innerHTML = '';
     for (const t of items) {
