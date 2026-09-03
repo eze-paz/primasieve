@@ -29,6 +29,7 @@ class MetaState:
         for inp, exp in self.tests:
             ok, cov = rc.run_one(code, self.name, inp, exp); res.append(ok); covs.append(cov)
         nfail = sum(1 for x in res if not x)
+        self.last_fail = frozenset(i for i, ok in enumerate(res) if not ok)   # plateau fingerprint
         if nfail == 0: return 0, {}
         susp = {}; allln = set().union(*covs) if covs else set()
         for ln in allln:
@@ -199,5 +200,46 @@ def _apply_global(tree, kind, source, op):
             node.op = op(); changed = True
     return ast.fix_missing_locations(t) if changed else None
 
+class Repeat:
+    """ESCALATION rung (fable): LOCKED until the controller is STUCK, then unlocks. Clears a FLAT
+    fitness landscape that gradient search (momentum) can't climb: applies a const edit MANY times
+    to one node at once (const +/- d, d=2..8) and evaluates the ENDPOINT. Solves sign-flips/negations
+    (coeff 3 -> 3-6 = -3) where every intermediate value fails identically (no pass-count gradient)."""
+    name = "REPEAT"; cost_hint = 4.0; locked = True
+    def _key(self, st): return ("REPEAT", st._th())
+    def applicable(self, st):
+        return not st.solved() and getattr(st, "stuck", False) and st._cache.get(self._key(st)) is None
+    def run(self, st, budget):
+        before = st.best; best = (before, None, None, None); tried = 0
+        consts = [(i, n) for i, n in enumerate(ast.walk(st.tree))
+                  if isinstance(n, ast.Constant) and isinstance(n.value, int) and not isinstance(n.value, bool)]
+        for idx, node in consts:
+            ln = getattr(node, "lineno", None)
+            if st.susp and st.susp.get(ln, 0.0) == 0.0: continue
+            for d in (2, 3, 4, 5, 6, 7, 8, -2, -3, -4, -5, -6, -7, -8):
+                if tried >= budget: break
+                t2 = _apply_const(st.tree, idx, node.value + d)
+                if t2 is None: continue
+                tried += 1; st.units += 1
+                nf, susp2 = st._score(t2)
+                if nf < best[0]: best = (nf, t2, susp2, f"REPEAT const{'+' if d>0 else ''}{d}")
+                if nf == 0: break
+            if best[0] == 0: break
+        st._cache[self._key(st)] = True
+        if best[1] is not None:
+            st.tree, st.susp, st.best = best[1], best[2], best[0]
+            st.log.append((self.name, before, best[0]))
+            return {"form": self.name, "tried": tried, "before": before, "after": best[0],
+                    "improved": True, "solved": best[0] == 0, "exhausted": False, "fix": best[3]}
+        return {"form": self.name, "tried": tried, "before": before, "after": before,
+                "improved": False, "solved": False, "exhausted": True, "fix": None}
+
+def _apply_const(tree, idx, newval):
+    t = copy.deepcopy(tree)
+    for i, node in enumerate(ast.walk(t)):
+        if i == idx and isinstance(node, ast.Constant):
+            node.value = newval; return ast.fix_missing_locations(t)
+    return None
+
 def default_forms():
-    return [GlobalApply(), Enumerate(0), Enumerate(1), Enumerate(2), Interpolate(), Reset()]
+    return [GlobalApply(), Enumerate(0), Enumerate(1), Enumerate(2), Interpolate(), Repeat(), Reset()]

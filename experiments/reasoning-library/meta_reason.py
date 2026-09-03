@@ -43,6 +43,7 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         import meta_features as mf
         err0 = mf.baseline_error(st)       # cache baseline error class once (used by features)
     n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0; momentum = None
+    st.stuck = False; best_ever = st.best; units_at_best = 0; seen_fp = set()   # STUCK detector state
     while not st.solved() and st.units < GLOBAL:
         avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
@@ -74,6 +75,16 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         r = gain / (spent / SLICE) + (5.0 if d["solved"] else 0.0)
         n[f.name] += 1; total += 1; q[f.name] += (r - q[f.name]) / n[f.name]
         momentum = f.name if (d["improved"] and not d["solved"]) else None   # re-run a winning form
+        # STUCK detector (fable): progress clears it; else a re-seen plateau after RESET or 25% of
+        # remaining budget spent since the last verified new-best -> unlock escalation rungs (REPEAT).
+        fp = getattr(st, "last_fail", None)
+        if st.best < best_ever:
+            best_ever = st.best; units_at_best = st.units; st.stuck = False
+        else:
+            reset_cycle = (f.name == "RESET" and fp in seen_fp)
+            budget_stall = (st.units - units_at_best) > 0.25 * max(1, GLOBAL - units_at_best)
+            if reset_cycle or budget_stall: st.stuck = True
+        if fp is not None: seen_fp.add(fp)
         ep_log.append({"form": f.name, "before": before, "after": st.best, "spent": spent,
                        "reward": round(r, 4), "solved": d["solved"], "improved": d["improved"]})
     true_solve = st.verify_full() if st.held else st.solved()
