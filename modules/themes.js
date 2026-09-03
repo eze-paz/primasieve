@@ -125,6 +125,21 @@ function setTheme(name) {
   if (!_themePalettes[resolved]) resolved = 'electric';
   setThemeName(resolved);
   applyTheme(resolved);
+  _reportTheme(resolved);
+}
+
+// _reportTheme — fire-and-forget push of the chosen theme to the server's
+// per-user prefs (PATCH /prefs), so /admin "Others" can show which appearance
+// each user runs. Never blocks or breaks the theme change.
+function _reportTheme(name) {
+  try {
+    fetch('/prefs', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appearance: { theme: name, updated_at: Math.floor(Date.now() / 1000) } })
+    }).catch(function () {});
+  } catch (e) {}
 }
 
 function applyThemePalette(name) {
@@ -258,6 +273,7 @@ function applySavedCustom() {
   } else {
     applyTheme('electric');
   }
+  _reportTheme(getThemeName() || 'electric');   // also report users who never change theme
 }
 
 function rgbaToHex(rgba) {
