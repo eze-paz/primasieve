@@ -3805,6 +3805,15 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
         if (!delta) continue;
         if (!_firstTokAt && (delta.content || typeof delta.reasoning_content === 'string' || typeof delta.reasoning === 'string' || (delta.tool_calls && delta.tool_calls.length))) {
           _firstTokAt = _pnow();
+          // Bench-only: inter-round gap = previous round's stream end → this round's
+          // first token. Captures everything sandpie does BETWEEN rounds that the
+          // in-stream receive rate can't see: tool execution + request assembly +
+          // full-history re-serialization (fixToolPairing) + fetch TTFT. This is the
+          // real per-round-boundary cost, independent of the server's round pacing.
+          if (_benchMode && ctx && ctx._benchLastStreamEndAt) {
+            console.log('[bench] round gap ~' + Math.round(_firstTokAt - ctx._benchLastStreamEndAt) + 'ms (prev round end → this round first token)');
+            ctx._benchLastStreamEndAt = 0;
+          }
         }
         if (delta.content) { content += delta.content; if (!_benchMode) _degen.push(delta.content); }
         if (typeof delta.reasoning_content === 'string') { reasoningText += delta.reasoning_content; if (!_benchMode) _degen.push(delta.reasoning_content); }
@@ -3866,6 +3875,10 @@ async function streamOneRound(reqUrl, headers, body, ctx) {
     const _s = ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _benchRecvT0) / 1000;
     if (_s > 0) console.log('[bench] worker SSE receive (round end) ~' + Math.round((_benchRecvChars / 4) / _s) + ' tok/s (chars/4 over ' + _s.toFixed(2) + 's)');
   }
+  // Bench-only: stamp this round's stream end so the NEXT round can measure the
+  // inter-round gap (see the first-token site above). Set even when no content
+  // arrived so a tool-only round still anchors the following gap.
+  if (_benchMode && ctx) ctx._benchLastStreamEndAt = _pnow();
   // Accumulate this attempt's decode span (first token → stream end) onto the
   // turn's _prof. prefill is derived as completion_ms - decode_ms at emit, so an
   // attempt that never produced a token contributes nothing here and its whole
