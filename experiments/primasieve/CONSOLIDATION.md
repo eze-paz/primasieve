@@ -100,6 +100,14 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     energy-median is uninformative — genericity rests on the UNIFORM-top-op result (18/18 invertible found:
     + 6/6, − 9/9, * 3/3), not the median. So limit #10 is now: *invention is live synthesis at ~10^3× for
     invertible-top-op targets in one basis, still menu-selection-cheaper and unshown for non-invertible tops.*
+    **E11 (meta_e11.py, meta_e11_prereg.md) extends the witness to // via a pivot-row RANGE witness:** //-topped
+    targets now SYNTHESIZE + verify (0 confab, shuffle ABSTAIN), softening "invertible top-ops only" to "all four
+    top-ops synthesize." Floor division is non-invertible (partner is a per-row RANGE not a point), so // gains a
+    speedup only on genuinely-deep targets (e.g. (a*a)//(abs(b)+1) at 39.5x, and it succeeds where blind exhausts
+    the 120k budget); observationally-shallow //-targets collapse to K<=3 and match blind (~0.7x median). Additive
+    — E9 NULL and E10's invertible results unchanged. Net limit #10: *all four top-ops synthesize live; the ~10^3x
+    win holds only where the target is deep enough that the witness pivot is selective — shallow targets match
+    blind, and menu-selection is still cheaper.*
 
 ## What it is / isn't
 
