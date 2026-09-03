@@ -1,0 +1,27 @@
+{
+ "ENUMERATE(0)": {
+  "uses": 43,
+  "wins": 38,
+  "eval_sum": 2213
+ },
+ "REPEAT": {
+  "uses": 3,
+  "wins": 3,
+  "eval_sum": 1065
+ },
+ "GLOBAL_APPLY": {
+  "uses": 8,
+  "wins": 8,
+  "eval_sum": 271
+ },
+ "ENUMERATE(1)": {
+  "uses": 4,
+  "wins": 0,
+  "eval_sum": 0
+ },
+ "ENUMERATE(2)": {
+  "uses": 1,
+  "wins": 1,
+  "eval_sum": 160
+ }
+}

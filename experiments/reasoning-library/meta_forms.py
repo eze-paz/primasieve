@@ -206,9 +206,11 @@ class Repeat:
     to one node at once (const +/- d, d=2..8) and evaluates the ENDPOINT. Solves sign-flips/negations
     (coeff 3 -> 3-6 = -3) where every intermediate value fails identically (no pass-count gradient)."""
     name = "REPEAT"; cost_hint = 4.0; locked = True
+    def __init__(self, promoted=False): self.promoted = promoted   # ledger can PROMOTE it to unlocked
     def _key(self, st): return ("REPEAT", st._th())
     def applicable(self, st):
-        return not st.solved() and getattr(st, "stuck", False) and st._cache.get(self._key(st)) is None
+        return not st.solved() and (self.promoted or getattr(st, "stuck", False)) \
+               and st._cache.get(self._key(st)) is None
     def run(self, st, budget):
         before = st.best; best = (before, None, None, None); tried = 0
         consts = [(i, n) for i, n in enumerate(ast.walk(st.tree))
