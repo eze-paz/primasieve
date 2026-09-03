@@ -3076,7 +3076,7 @@ async function _waliosPkgManifest() {
 }
 function _waliosEnsure() {
   if (_waliosWorker) return _waliosWorker;
-  const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=dlopen5');
+  const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=dlopen6');
   try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
     const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
     const opfsWorker = new Worker(WALIOS_BASE + 'opfs-worker.js');
