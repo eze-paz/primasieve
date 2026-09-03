@@ -435,6 +435,54 @@ const Sandpie = (() => {
 })();
 window.Sandpie = Sandpie;
 
+/* =============================================================================
+   SandpieActivity — non-LLM usage beacons (best-effort, never breaks the UI).
+   Queues client actions (artifact open/edit/share, file open/edit, run_python,
+   chat send) and flushes them to POST /api/usage/activity in batches (≤50),
+   every 30s and on pagehide via sendBeacon. Auth is the same-origin session
+   cookie; the server resolves the user from the JWT. A failure just drops the
+   batch — analytics must never affect the chat.
+   ============================================================================= */
+const SandpieActivity = (() => {
+  const Q = [];
+  const MAX = 50;
+  const FLUSH_MS = 30000;
+  let timer = null;
+  function fire(event, kind, path, session_id) {
+    try {
+      Q.push({ event, kind: kind || undefined, path: path || undefined, session_id: session_id || undefined, ts: Date.now() });
+      if (!timer) timer = setTimeout(flush, FLUSH_MS);
+    } catch (_) {}
+  }
+  async function flush() {
+    timer = null;
+    if (!Q.length) return;
+    const batch = Q.splice(0, MAX);
+    try {
+      const r = await fetch(new URL('/api/usage/activity', location.href).href, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: batch }),
+        keepalive: true,
+      });
+      if (!r.ok) { if (r.status === 401) return; }   // unauthenticated: drop (never retry-loop)
+    } catch (_) {}
+    if (Q.length) setTimeout(flush, FLUSH_MS);
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pagehide', () => {
+      if (!Q.length) return;
+      try {
+        navigator.sendBeacon(new URL('/api/usage/activity', location.href).href,
+          new Blob([JSON.stringify({ events: Q.splice(0, MAX) })], { type: 'application/json' }));
+      } catch (_) {}
+    });
+  }
+  return { fire };
+})();
+window.SandpieActivity = SandpieActivity;
+
+
 window._sandpieBootDone = true;
 
 /* =============================================================================

@@ -126,7 +126,7 @@
     const saveBtn = addHeaderButton(header, 'Save', 'Save to OPFS (Ctrl+S)', async () => {
       if (!ta) return;
       saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
-      try { await opfs.write(fullKey, ta.value); text = ta.value; dirty = false; setTitle(false); saveBtn.textContent = 'Saved ✓'; }
+      try { await opfs.write(fullKey, ta.value); text = ta.value; dirty = false; setTitle(false); if (window.SandpieActivity) SandpieActivity.fire('file_edit', 'edit', fullKey); saveBtn.textContent = 'Saved ✓'; }
       catch (e) { saveBtn.textContent = 'Save failed'; console.error(e); }
       finally { setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1200); }
     });
@@ -201,7 +201,7 @@
     function showPage() {
       teardown(); _renderedMode = false; _renderedFrame = null; modeSel.value = 'page'; body.style.padding = '0';
       if (window.SandpieHtmlEditor) {
-        active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; savedHtml = out; return opfs.write(fullKey, out); } });
+        active = SandpieHtmlEditor.mount(body, { html, onSave: (out) => { html = out; savedHtml = out; if (window.SandpieActivity) SandpieActivity.fire('file_edit', 'edit', fullKey); return opfs.write(fullKey, out); } });
       } else {
         body.innerHTML = loading('Editor module not loaded.');
       }
@@ -215,7 +215,7 @@
         + 'font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--sp-bg,#0d1117);color:var(--sp-text,#e6edf3);';
       const save = async () => {
         textSave.textContent = 'Saving…'; textSave.disabled = true;
-        try { html = ta.value; await opfs.write(fullKey, html); savedHtml = html; textSave.textContent = 'Saved ✓'; }
+        try { html = ta.value; await opfs.write(fullKey, html); savedHtml = html; if (window.SandpieActivity) SandpieActivity.fire('file_edit', 'edit', fullKey); textSave.textContent = 'Saved ✓'; }
         catch (e) { textSave.textContent = 'Save failed'; console.error(e); }
         finally { setTimeout(() => { textSave.textContent = 'Save'; textSave.disabled = false; }, 1200); }
       };
@@ -282,6 +282,7 @@
 
     opfs.closeFile();                       // single viewer instance
     window._openFilePath = fullKey;
+    if (window.SandpieActivity) SandpieActivity.fire('file_open', 'view', fullKey);
     _openKey = fullKey; _renderedMode = false; _renderedFrame = null;
     const ext = (name.split('.').pop() || '').toLowerCase();
     const { pane, header, body } = buildPane(fullKey);

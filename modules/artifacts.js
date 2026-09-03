@@ -541,6 +541,8 @@ function showArtifactError(wrap, frame, msg) {
 // iframe, so artifacts look the same as the old dedicated panel.
 function openArtifactPanel(path) {
   const clean = String(path).replace(/^\/+/, '');
+  if (window.SandpieActivity) SandpieActivity.fire('artifact_open', 'view', clean);
+
   if (typeof sidePanel !== 'undefined' && sidePanel?.isOpen) sidePanel.close();
   if (typeof opfs !== 'undefined' && opfs.openFile) {
     opfs.openFile(clean, clean.split('/').pop(), { prefer: 'side' });

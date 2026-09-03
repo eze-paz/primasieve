@@ -432,6 +432,7 @@
       const known = (mk.revs || {})[rel] || '';
       if (hub && hub.rev && known && hub.rev !== known) { await keepCopy(id, rel, hub.rev); return; }
       const resp = await hubUpload(abs, bytes);
+      if (window.SandpieActivity) SandpieActivity.fire('artifact_edit', 'edit', INSTALL_ROOT + '/' + id + '/' + rel);
       clean(id, rel, (resp && resp.rev) || '');
     } catch (err) {
       const msg = String((err && err.message) || err);
@@ -636,6 +637,7 @@
       try {
         const pinFile = skill ? 'SKILL.md' : dir ? (back.querySelector('[data-k="pinfile"]').value || '') : src.split('/').pop();
         const out = await publish(src, dept, { pinFile });
+        if (window.SandpieActivity) SandpieActivity.fire('artifact_share', 'share', src);
         msg.textContent = '✓ Shared to ' + dept + (out.id ? ' (' + out.id + ')' : '') + '.';
         await autoSync({ full: true });
         setTimeout(close, 900);

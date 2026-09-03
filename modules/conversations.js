@@ -2621,6 +2621,7 @@ async function handleSubmit(which = 'main') {
   // Attachments are per-composer: build and clear THIS pane's, or submitting in
   // one pane would consume (and wipe) whatever the other pane had staged.
   const content = await SandpieImages.buildContent(text, which);
+  if (window.SandpieActivity) SandpieActivity.fire('chat_send', 'chat', null, convId);
 
   if (SandpieImages.hasAttachment(which)) {
     SandpieImages.clear(which);
@@ -3275,6 +3276,7 @@ async function sendSingle(text, stream, opts = {}) {
     }
     if (ev.type === 'tool_started') {
       lastInFlightTool = ev.tc?.function?.name || 'unknown';
+      if (lastInFlightTool === 'run_python' && window.SandpieActivity) SandpieActivity.fire('run_python', 'run', null, convId);
       if (typeof SandpieAugmentations !== 'undefined') SandpieAugmentations.logToolStarted(activeConvId, ev.tc);
     }
     if (ev.type === 'scratchpad') { stream.scratchpad = ev.text || ''; }
