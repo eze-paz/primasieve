@@ -3,7 +3,7 @@
 **One line:** a zero-LLM, verifier-gated bug-fix/feature reasoning engine — *reasoning lives in the search*, the LLM is demoted to a narrow, checkable slot-filler at the edges (language→spec) or removed entirely.
 
 This doc lets a new session/engineer continue without re-deriving anything. All work is in
-`experiments/reasoning-library/`. Everything is committed + pushed. CPU-only, ≤16 GB RAM.
+`experiments/primasieve/`. Everything is committed + pushed. CPU-only, ≤16 GB RAM.
 
 ---
 

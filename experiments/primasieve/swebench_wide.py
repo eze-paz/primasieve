@@ -15,7 +15,7 @@ NCAND=int(os.environ.get("BUGFIX_N","24"))
 INSTANCE="mwaskom__seaborn-3010"; FILEPATH="seaborn/_stats/regression.py"
 SCRATCH=r"C:\Users\AEZEQU~1\AppData\Local\Temp\claude\C--Users-aezequiel-Desktop-AI-Projects-sandpie\d5d1888d-139b-46ad-bce8-2136577e64c7\scratchpad\seaborn_regression.py"
 PREDS=os.path.join(os.path.dirname(__file__),"swebench_preds.jsonl")
-WSL_PREDS="/mnt/c/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/reasoning-library/swebench_preds.jsonl"
+WSL_PREDS="/mnt/c/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/primasieve/swebench_preds.jsonl"
 orig=open(SCRATCH,encoding="utf-8").read()
 PROBLEM=("PolyFit is not robust to missing data: so.Plot([1,2,3,None,4],[1,2,3,4,5]).add(so.Line(), so.PolyFit()) "
          "raises LinAlgError because the data contains missing (NaN/None) values. It should handle missing data gracefully "

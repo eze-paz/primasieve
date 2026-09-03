@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 H=1024; I=2560; L=16; E=32; TOPK=4
 EXPERT_BYTES=H*I*3
-PACK="C:/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/reasoning-library/_experts.pack"
+PACK="C:/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/primasieve/_experts.pack"
 NEXP=L*E
 def off(l,e): return (l*E+e)*EXPERT_BYTES
 

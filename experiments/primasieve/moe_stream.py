@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # --- config: sized so active-per-token ~0.5GB (int8), total experts ~4GB on disk ---
 H=1024; I=2560; L=16; E=32; TOPK=4
-DIR="C:/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/reasoning-library/_experts"
+DIR="C:/Users/aezequiel/Desktop/AI_Projects/sandpie/experiments/primasieve/_experts"
 EXPERT_PARAMS=H*I*3                      # w1,w3 (H->I) + w2 (I->H) ~ 3*H*I
 EXPERT_BYTES=EXPERT_PARAMS               # int8 = 1 byte/param
 print(f"expert={EXPERT_BYTES/1e6:.1f}MB  active/token={TOPK*L*EXPERT_BYTES/1e6:.0f}MB  "
