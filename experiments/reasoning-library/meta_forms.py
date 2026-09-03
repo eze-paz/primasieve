@@ -177,11 +177,13 @@ class GlobalApply:
                 if nf < best[0]: best = (nf, t2, susp2, f"GLOBAL {kind}->{op.__name__}")
                 if nf == 0: break
         st._cache[self._key(st)] = True
-        if best[1] is not None:
+        # accept ONLY a full solve: a uniform global swap that merely PARTIALLY improves is almost
+        # always a wrong strand (right for some sites, wrong for others) -> would strand the search.
+        if best[1] is not None and best[0] == 0:
             st.tree, st.susp, st.best = best[1], best[2], best[0]
             st.log.append((self.name, before, best[0]))
             return {"form": self.name, "tried": tried, "before": before, "after": best[0],
-                    "improved": True, "solved": best[0] == 0, "exhausted": False, "fix": best[3]}
+                    "improved": True, "solved": True, "exhausted": False, "fix": best[3]}
         return {"form": self.name, "tried": tried, "before": before, "after": before,
                 "improved": False, "solved": False, "exhausted": True, "fix": None}
 
