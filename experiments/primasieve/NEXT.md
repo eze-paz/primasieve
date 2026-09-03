@@ -1,24 +1,26 @@
 # Primasieve — next stage (ready to execute)
 
-State: E1–E8 done, `CONSOLIDATION.md` written (one falsifiable claim + mapped limits), engine proven once
-in a real symbolic environment (SQLite, E7: ACTIVE 0/504 confabulation). Standing discipline (do not drop):
-pure-Python stdlib, deterministic **sound** oracle, ≤5-min tests, **pre-register the surface before writing
-learning code**, report nulls (never tune to green), name kill-condition + partial-success up front.
+State: E1–E8 **and v2 DONE**, `CONSOLIDATION.md` written (one falsifiable claim + mapped limits), engine proven
+in **two** real symbolic implementers (SQLite E7: ACTIVE 0/504; decimal/libmpdec v2: ACTIVE 0/2800). Standing
+discipline (do not drop): pure-Python stdlib, deterministic **sound** oracle, ≤5-min tests, **pre-register the
+surface before writing learning code**, report nulls (never tune to green), name kill-condition +
+partial-success up front, keep the adversarial fable subagent setting objectives + kill-conditions.
 
-Fable's ordered roadmap:
-
-## 1. v2 — second real symbolic environment (recommended first: cheap, moves n=1 → 2)
-Repeat E7 on `datetime`/`calendar` (stdlib, a *different implementer* than SQLite). Real leap-year and
-weekday rules are legitimate composition targets over `+ % ==`; timezone/string-formatting are out-of-grammar.
-- **Goal:** confirm E7 generalizes across real systems, not just SQLite.
-- **Design:** mirror `meta_e7.py` — pre-register the operator surface + in/edge/out labels *first*
-  (`meta_v2_prereg.md`), agent actively probes (e.g. "weekday of date+n days", "is-leap(y)"), evaluates
-  hypotheses in Python composed from stdlib primitives, abstains on out-of-grammar, invents from residuals.
-- **Metric:** coverage + abstention-correctness + **confabulation = 0** + primitives-invented, ACTIVE vs
-  RANDOM-MATCHED, in-grammar control, K1 shuffle / K3 ablation.
-- **KILL:** confabulation > 0 under ACTIVE at 2× budget, or ACTIVE ≈ RANDOM on the real edges.
-- **PARTIAL WIN:** coverage in the pre-registered in/edge categories, 0 confabulation, correct abstention on
-  out, ≥1 real invented primitive. Same sentence as E7: "grounds by coverage with honest abstention."
+## 1. v2 — second real environment — ✅ DONE (see `meta_v2.py`, `meta_v2_prereg.md`)
+World = **decimal/libmpdec** (a genuinely separate C binary), convention = banker's rounding ROUND_HALF_EVEN
+(the trunc-toward-zero analog). ACTIVE confab 0/2800 vs RANDOM 936/2800; coverage 14/14; invented `half_even`
+from real p=8% sparse residuals; K1/K3 pass; K-INV shows `half_even` is UNREACHABLE in E7-trunc's arithmetic
+basis (different basis, needs generic `%2`+branch). **Two big lessons carried forward:**
+- **datetime was BANNED** (fable): `isleap` is a tautology (CPython `%` == the hypothesis, no separate binary;
+  the Gregorian correction is planted `{100,400}` = depth not invention). Any second-env world must be a
+  genuinely separate implementer whose convention diverges from the naive hypothesis **by default**.
+- **n=2 is now implementers, not problem classes.** Both E7 and v2 are numeric-C-library boundary semantics.
+  The NEXT real environment must be a **DIFFERENT PROBLEM CLASS** (not another rounding/arithmetic library),
+  or it is "the same class dressed twice" (CONSOLIDATION limit #4). Candidate classes: a parsing/grammar engine
+  (`re`/`json` acceptance boundaries), a graph/ordering algorithm (`heapq`/`bisect` tie-break conventions), or
+  a text-collation/normalization convention (`unicodedata`) — pick one where a naive hypothesis diverges from a
+  separate implementer on genuinely sparse edges, and pre-register `p` analytically BEFORE running (v2's lesson:
+  predict the RANDOM curve from the actual hypothesis set, not a one-line `(1-p)^B` guess — see limit #9).
 
 ## 2. Close k — guided search over the DERIVED space (E8's open frontier)
 E8 showed the frame grammar is REDUCIBLE (inventions are object-grammar exprs) but naive derivation costs

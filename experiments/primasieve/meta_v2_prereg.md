@@ -60,7 +60,18 @@ are a **separately-labeled edge** with their own prediction (world rounds symmet
 ## OUT cases (must ABSTAIN — fail-closed on unobserved input classes)
 - `rnd` on `None`, string, or float inputs → abstain (input class never observed in learning).
 - `rnd` evaluated under a **different decimal context precision** than the one observed → abstain.
-- **≥2 surviving hypotheses disagree on a held-out point → abstain** (no coin-flip commit). Scored, not optional.
+- **Novel input CLASS where survivors are undefined/disagree → abstain** (no coin-flip commit). Scored.
+
+### AMENDMENT (logged before running, not tuned): scope of the "≥2-survivor abstention"
+An earlier draft said "≥2 survivors disagree on *any* held-out point → abstain." That is **inconsistent with
+E7's validated mechanism** and is corrected here. E7 commits the **simplest** surviving hypothesis (Occam);
+that commit is precisely the confabulation surface active probing must protect, and an Occam learner that
+abstained on *every* in-class survivor disagreement would never generalize (there is always a consistent
+stranger hypothesis). So: **in-class** points → commit the simplest survivor (the measured confab surface,
+faithful to E7); the ≥2-survivor / consensus abstention applies at the **input-CLASS** level only — novel
+classes (None/str/float/other-context) where survivors are undefined or wildly disagree → fail-closed abstain
+(= E7's `_guard`). This keeps v2 a faithful replication of E7's *"active buys 0-confabulation"* thesis rather
+than silently switching it to *"active buys coverage."*
 
 ## Metric (identical shape to E7)
 coverage (identify ∧ exactly correct on the adversarial held-out) + abstention-correctness + **CONFABULATION =
