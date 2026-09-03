@@ -1,44 +1,38 @@
 # Primasieve — next stage (ready to execute)
 
-State: E1–E8 **and v2 DONE**, `CONSOLIDATION.md` written (one falsifiable claim + mapped limits), engine proven
-in **two** real symbolic implementers (SQLite E7: ACTIVE 0/504; decimal/libmpdec v2: ACTIVE 0/2800). Standing
-discipline (do not drop): pure-Python stdlib, deterministic **sound** oracle, ≤5-min tests, **pre-register the
-surface before writing learning code**, report nulls (never tune to green), name kill-condition +
-partial-success up front, keep the adversarial fable subagent setting objectives + kill-conditions.
+State: E1–E8, **v2, and v3 DONE**, `CONSOLIDATION.md` current. Engine proven across **three real implementers over
+two problem classes** (SQLite E7: ACTIVE 0/504; decimal/libmpdec v2: 0/2800; json/_json v3: 0/3000). Fable's
+verdict: **"same engine mechanism, new domain"** — budgeted rejection-with-abstention generalizes across domains.
+Standing discipline (do not drop): pure-Python stdlib, deterministic **sound** oracle, ≤5-min tests, **pre-register
+before writing learning code**, report nulls (never tune to green), name kill + partial up front, keep the
+adversarial fable subagent setting objectives + kill-conditions.
 
-## 1. v2 — second real environment — ✅ DONE (see `meta_v2.py`, `meta_v2_prereg.md`)
-World = **decimal/libmpdec** (a genuinely separate C binary), convention = banker's rounding ROUND_HALF_EVEN
-(the trunc-toward-zero analog). ACTIVE confab 0/2800 vs RANDOM 936/2800; coverage 14/14; invented `half_even`
-from real p=8% sparse residuals; K1/K3 pass; K-INV shows `half_even` is UNREACHABLE in E7-trunc's arithmetic
-basis (different basis, needs generic `%2`+branch). **Two big lessons carried forward:**
-- **datetime was BANNED** (fable): `isleap` is a tautology (CPython `%` == the hypothesis, no separate binary;
-  the Gregorian correction is planted `{100,400}` = depth not invention). Any second-env world must be a
-  genuinely separate implementer whose convention diverges from the naive hypothesis **by default**.
-- **n=2 is now implementers, not problem classes.** Both E7 and v2 are numeric-C-library boundary semantics.
-  The NEXT real environment must be a **DIFFERENT PROBLEM CLASS** (not another rounding/arithmetic library),
-  or it is "the same class dressed twice" (CONSOLIDATION limit #4). Candidate classes: a parsing/grammar engine
-  (`re`/`json` acceptance boundaries), a graph/ordering algorithm (`heapq`/`bisect` tie-break conventions), or
-  a text-collation/normalization convention (`unicodedata`) — pick one where a naive hypothesis diverges from a
-  separate implementer on genuinely sparse edges, and pre-register `p` analytically BEFORE running (v2's lesson:
-  predict the RANDOM curve from the actual hypothesis set, not a one-line `(1-p)^B` guess — see limit #9).
+## Symbolic environments — ✅ DONE, and now STOP (diminishing returns)
+- **v2** (`meta_v2.py`): decimal/libmpdec, banker's rounding — ACTIVE 0/2800, invented `half_even`.
+- **v3** (`meta_v3.py`): json/_json inverse-map (string escaping + structural inversion, a *different problem
+  class*) — ACTIVE 0/3000, selected the astral→UTF-16 surrogate rule, 100% injectivity abstention.
+- **Lesson:** the mechanism generalizes across problem classes (CONSOLIDATION limit #4). A fourth symbolic env
+  buys almost nothing — **do not add more.** The real move is perception.
 
-## 2. Close k — guided search over the DERIVED space (E8's open frontier)
-E8 showed the frame grammar is REDUCIBLE (inventions are object-grammar exprs) but naive derivation costs
-k ≈ 10⁴–10⁵×. Make discovery over the derived space *guided* (not blind BFS) so invention is cheap without an
-authored shortlist — e.g. residual-directed composition, type/attribute-guided enumeration, or reuse of
-already-crystallized sub-expressions (E2/E3 hierarchy) as building blocks.
-- **Metric:** energy-to-invention for trunc/signmod, DERIVED-guided / AUTHORED = k'. Target k' ≤ 3.
-- **KILL:** guided ≈ blind (no better than BFS) → the shortlist was buying something structural, not just order.
-- **WIN:** k' ≤ ~10 → the caveat in CONSOLIDATION.md limit #3 can be dropped/weakened.
+## 1. THE BIG STEP — Perception rung 1 (pre-registered: `perception_p1_prereg.md`) ← START HERE
+The one true step-change: an observation that is **not already a token**. A sealed exact **rasterizer** renders
+hidden rectangles (+ painter's z-order + sub-pixel edge-coverage → gray levels) to a 24×24 pixel grid; the agent
+infers the latent scene; correctness is checked by **pixel-exact re-render** (oracle stays SOUND). Invention target
+= the area-coverage law from intensity residuals; abstain on occluded / order-undecidable scenes.
+- **THE decisive KILL ("tokens smuggled back in"):** if the E8 grammar over the raw pixel string, OR any
+  fixed-index positional lookup, matches the perception path's accuracy → it was still tokenized, NOT perception.
+- Fable's hard gate: **exact renderer only** at rung 1; noise/quantization is rung 2, a separate pre-registration,
+  gated on a mechanism for E1's unsound-oracle cliff. This is a project, not an afternoon — time-box it.
+- First build: the ~60-line sealed rasterizer + scene grammar + re-render oracle; then the COLLECT active loop.
 
-## 3. Perception v3 — ONLY as latent-variable discovery under an EXACT renderer
-The one true step-change (observations that aren't already tokens). Fable's hard gate: **never a noisy
-channel** until E1's unsound-oracle gap has a mechanism. v3 must keep a *sound* oracle: a deterministic
-renderer maps a hidden latent (symbolic scene) → observation; the agent infers the latent; correctness is
-checked by re-rendering (exact). No probabilistic perception until then.
-- This is a project, not an afternoon; scope it explicitly and pre-register before building.
+## 2. Close k (secondary) — synthesis instead of menu-selection
+CONSOLIDATION limit #10: the "invented" primitives (`trunc`/`half_even`/`surrogate`) are *pre-listed* deeper
+hypotheses the loop SELECTS, not composes. Build a live E8-style enumerator that RECOMPOSES the primitive from
+atoms inside the loop (E8 showed reducibility at k≈10⁴–10⁵×; make it guided so k′≤~10). Then selection = synthesis.
+- **KILL:** guided ≈ blind BFS → the shortlist was buying structure, not order. **WIN:** k′≤~10 → limits #3/#10 weaken.
 
 ## Files / entry points
-Engine: `meta_forms.py` (MetaState + forms + noise oracle), `meta_reason.py` (UCB controller). Domains/exps:
-`meta_param.py` `meta_struct.py` `meta_codeparam.py` `meta_bench.py` `meta_e1..e8.py`, `meta_e7_prereg.md`.
-Consult pattern: an adversarial fable subagent set every objective and every kill-condition — keep using it.
+Engine: `meta_forms.py` (MetaState + forms + noise oracle), `meta_reason.py` (UCB controller). Real-env exps:
+`meta_e7.py`+`meta_e7_prereg.md`, `meta_v2.py`+prereg, `meta_v3.py`+prereg. Perception: `perception_p1_prereg.md`
+(next to build). Domains: `meta_param/struct/codeparam/bench.py`, `meta_e1..e8.py`.
+Consult pattern: the adversarial fable subagent sets every objective and every kill-condition — keep using it.
