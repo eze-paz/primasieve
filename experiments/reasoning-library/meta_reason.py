@@ -33,9 +33,9 @@ def solve_handcoded(name, src, tests):
     return st.solved(), st.units, st.stratum_seen
 
 # ---------------- controller B: UCB bandit over forms (learned selection) ----------------------
-def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None, qfn=None):
+def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None, qfn=None, extra_forms=()):
     st = MetaState(name, src, tests, held_back=held_back)
-    forms = default_forms()
+    forms = list(extra_forms) + default_forms()   # discovered operators (extra_forms) get first pick
     warm = warm or {}                      # {form_name: pseudo_reward in ~[0,2]}
     tried_forms = set()
     err0 = None
