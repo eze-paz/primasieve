@@ -32,11 +32,20 @@ CLOSED for single rects (audited):**
   concentrate at low partial-level counts (structural, not a dodge). **Fable: CLOSED for single rects.**
 - **THE decisive KILL ("tokens smuggled back in"):** fixed-index positional lookup already fails (percept_p1);
   the E8-grammar-over-the-raw-pixel-string half is **still to run** (cheap; does not gate gap a).
-- **NEXT hills (fable order):** (1) a **NON-MONOTONE law (outline/ring)** — attacks the search's soundness
-  assumption (the actual engine claim); kill = engine abstains/commits-wrong where the brute oracle finds a unique
-  inverse. (2) multi-rect **OCCLUSION** (combinatorial, non-analytic search + version-space over scenes). (3)
-  **ACTIVE(COLLECT)** scene selection. Then rung 2 = noise/quantization (separate prereg, gated on E1's cliff).
+- `percept_p5.py` (non-monotone) + `percept_p6.py` (fable-tightening) — **DONE:** the ring did NOT trip
+  coordinate descent, but a genuinely-trapping FOLDED/TENT law did (CD false-rejects 10/16) → **sound rejection
+  requires a COMPLETE search** (CONSOLIDATION limit #11). p6 closed fable's 3 holes: per-law **window self-test**
+  (bounded-visibility PROVEN complete, K-TRUTH 80/80, 0 confab; tent = unbounded → **abstain 24/24**), all-zero →
+  abstain (infinitely ambiguous), and **uniqueness** → return the SET (the honest "not 100% sure"; fires on
+  occlusion next). Twice caught my own w-shortcut re-introducing incompleteness — completeness is a claim to VERIFY.
+- **NEXT hills (fable order):** (1) ~~non-monotone law~~ **DONE** (p5/p6). (2) multi-rect **OCCLUSION**
+  (combinatorial, non-analytic search + version-space over scenes; where the latent-SET return actually fires and
+  the tractability boundary bites). (3) **ACTIVE(COLLECT)** scene selection. (4) the E8-over-pixel-string kill
+  baseline. Then rung 2 = noise/quantization (separate prereg, gated on E1's cliff).
 - Fable's hard gate holds: **exact renderer only** at rung 1; no noise until E1's unsound-oracle gap has a mechanism.
+- **Design note (probabilistic output):** the engine returns exact-consistent-or-abstain and, when unsure, the SET
+  of all exactly-consistent latents — never an "X% sure" score. A confidence number needs a PRIOR = the
+  amortized/LLM corner the project keeps separate; that is rung-2 territory, gated on E1's unsound-oracle cliff.
 
 ## 2. Close k (secondary) — synthesis instead of menu-selection — E9 ATTEMPTED, honest NULL
 CONSOLIDATION limit #10: the "invented" primitives are *pre-listed* deeper hypotheses the loop SELECTS, not

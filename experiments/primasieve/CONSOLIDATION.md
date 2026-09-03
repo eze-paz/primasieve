@@ -108,6 +108,19 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     — E9 NULL and E10's invertible results unchanged. Net limit #10: *all four top-ops synthesize live; the ~10^3x
     win holds only where the target is deep enough that the witness pivot is selective — shallow targets match
     blind, and menu-selection is still cheaper.*
+11. **Sound rejection requires a COMPLETE search, and completeness has a tractability boundary (perception p5/p6).**
+    "Sound rejection" is not a property of the framework alone: on a *trapping* landscape a heuristic search
+    (coordinate descent) makes FALSE rejections (percept_p5: the folded/tent law → CD false-rejects 10/16 where
+    exhaustive finds them), which would break soundness. A complete search over the observation-DEDUCED bounded
+    window restores it — but only for laws whose object always leaves a **bounded-support signature** (the window
+    self-test in percept_p6: area/gamma/sqrt/ring pass, tight window PROVEN == wide, K-TRUTH 80/80, 0 confab). A
+    law that can hide its object (tent: an aligned edge renders fully dark) has *unbounded* visibility → no
+    bounded window is complete → the engine **abstains from ruling it in/out** (24/24) rather than falsely reject.
+    So: perception soundness is tractable exactly when the observation carries a bounded-support signature of the
+    latent; beyond that the honest move is abstention, and "not 100% sure" is a returned SET of exactly-consistent
+    latents (uniqueness check), never a probability — uncertainty is resolved by ACTIVE probing. (Twice caught a
+    w-from-full-coverage-pixel shortcut silently re-introducing incompleteness — logged: completeness is a claim
+    to VERIFY, not assert.)
 
 ## What it is / isn't
 
