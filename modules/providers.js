@@ -387,9 +387,8 @@ function renderModelPicker() {
   const hosts = Array.from(document.querySelectorAll('.model-picker'));
   if (!hosts.length) return;
   const active = getActiveProvider();
-  // Clean up any panel previously moved to <body>.
-  const oldPanel = document.querySelector('.mp-panel');
-  if (oldPanel) oldPanel.remove();
+  // Clean up any panel previously moved to <body> (per-host panels are wiped by innerHTML below).
+  document.querySelectorAll('body > .mp-panel').forEach(p => p.remove());
   for (const host of hosts) {
     const wasOpen = host.classList.contains('open');
     host.innerHTML = '';
@@ -412,7 +411,11 @@ function buildModelPickerInto(host, active) {
   caret.className = 'mp-caret';
   caret.textContent = '▴';
   trigger.append(lbl, caret);
-  trigger.addEventListener('click', (e) => { e.stopPropagation(); host.classList.toggle('open'); if (host.classList.contains('open')) positionModelPickerPanel(host); else { const p = document.querySelector('.mp-panel'); if (p) p.classList.remove('visible'); } });
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (host.classList.contains('open')) hideModelPickerPanel(host);
+    else { host.classList.add('open'); positionModelPickerPanel(host); }
+  });
 
   const panel = document.createElement('div');
   panel.className = 'mp-panel';
@@ -422,7 +425,7 @@ function buildModelPickerInto(host, active) {
     b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
     b.textContent = p.name || p.model || 'Unnamed';
     if (p.model) b.title = p.model;
-    b.addEventListener('click', () => { host.classList.remove('open'); const mp = document.querySelector('.mp-panel'); if (mp) mp.classList.remove('visible'); selectProvider(p.id); });
+    b.addEventListener('click', () => { hideModelPickerPanel(host); selectProvider(p.id); });
     return b;
   };
   const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
@@ -452,15 +455,31 @@ function buildModelPickerInto(host, active) {
 // clamped so a wide panel never spills off the screen edge.
 function positionModelPickerPanel(host) {
   const trig = host.querySelector('.mp-trigger');
-  let panel = host.querySelector('.mp-panel') || document.querySelector('.mp-panel');
+  const panel = host.querySelector('.mp-panel');
   if (!trig || !panel) return;
   // Move panel to <body> so it's not trapped in a backdrop-filter containing block.
-  if (panel.parentNode !== document.body) document.body.appendChild(panel);
+  // Tag it with its host id so hideModelPickerPanel can find the RIGHT panel even
+  // when another host's idle panel also exists in the document.
+  document.body.appendChild(panel);
+  if (host.id) panel.dataset.mpHost = host.id;
   const r = trig.getBoundingClientRect();
   panel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
   const pw = panel.offsetWidth || 220;
   panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
   panel.classList.add('visible');
+}
+
+// Close one host's picker: drop 'open' and hide/return THAT host's panel (which
+// may currently live in <body> while shown). Never touches the other host's panel.
+function hideModelPickerPanel(host) {
+  host.classList.remove('open');
+  let panel = host.querySelector('.mp-panel');
+  if (!panel && host.id) panel = document.querySelector('.mp-panel[data-mp-host="' + host.id + '"]');
+  if (!panel) panel = document.querySelector('body > .mp-panel');
+  if (panel) {
+    panel.classList.remove('visible');
+    host.appendChild(panel);   // return it so host.querySelector('.mp-panel') works next time
+  }
 }
 
 // ============================================================
@@ -742,17 +761,12 @@ function bootProviders() {
   try { if (window.SandpieAccount && SandpieAccount.ensureManaged) SandpieAccount.ensureManaged(); } catch (_) {}
   // Close the dropup on any click outside it.
   document.addEventListener('click', (e) => {
-    let stillOpen = false;
-    for (const h of document.querySelectorAll('.model-picker')) {
-      if (h.classList.contains('open') && !h.contains(e.target)) {
-        const p = h.querySelector('.mp-panel') || document.querySelector('.mp-panel');
-        if (p && p.contains(e.target)) { stillOpen = true; continue; }
-        h.classList.remove('open');
-        if (p) p.classList.remove('visible');
-      }
-      if (h.classList.contains('open')) stillOpen = true;
+    for (const h of document.querySelectorAll('.model-picker.open')) {
+      if (h.contains(e.target)) continue;
+      const p = h.querySelector('.mp-panel') || document.querySelector('body > .mp-panel[data-mp-host="' + (h.id || '') + '"]');
+      if (p && p.contains(e.target)) continue;   // click on the open dropup itself
+      hideModelPickerPanel(h);
     }
-    void stillOpen;
   });
   // Re-anchor the fixed-positioned dropup to its trigger when the viewport changes.
   window.addEventListener('resize', () => {
