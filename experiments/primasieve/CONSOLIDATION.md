@@ -77,6 +77,12 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     *which* known-reducible primitive a real environment needs — a real, non-trivial result — **not** unbounded
     functional invention. Open tightening: a live E8-enumerator that RECOMPOSES the primitive from atoms inside
     the loop, so selection and synthesis coincide. Also: v3's astral-edge n=4 and abstain-OUT n=3 are small.
+    **E9 (meta_e9.py, meta_e9_prereg.md) attempted the live close and returned NULL:** a generic verifier-gradient
+    did not recompose trunc/signmod from atoms, and the best-first harness was itself less efficient than E8's
+    layered BFS (size-only control did not reach trunc), so the attempt is harness-confounded — a SUSPECT that
+    match-count guidance is deceptive for compositional targets, NOT a verdict. 0 confabulation throughout;
+    knockouts abstained. Limit #10 STANDS unweakened. A clean re-test must graft gradient-ordering onto E8's
+    efficient layered generator so size-only reproduces ~109203.
 
 ## What it is / isn't
 
@@ -94,13 +100,18 @@ new domain,"** nothing broader.
 1. ~~v2 — second real symbolic environment~~ **DONE** (decimal/libmpdec). ~~v3 — third, different problem
    class~~ **DONE** (json/_json inverse-map). n = 3 implementers, n = 2 classes. Further symbolic environments
    have diminishing returns — the mechanism generalizes across domains (limit #4); stop adding same-shaped tests.
-2. **Perception rung 1 — the real step-change (`perception_p1_prereg.md`).** Latent-variable discovery where the
-   observation is NOT already a token: a sealed exact **rasterizer** renders hidden rectangles (+ z-order, sub-pixel
-   edge-coverage → gray levels) to a pixel grid; infer the latent; check by **pixel-exact re-render**. Sound oracle
-   preserved (re-render), no noise yet. KILL = the "tokens-smuggled-back" test (E8 grammar over the pixel string, or
-   any fixed-index lookup, must NOT match the perception path's accuracy). This is a project, not an afternoon.
-3. **Close k** — a live enumerator that RECOMPOSES the invented primitive from atoms inside the loop (limit #10),
-   so "invention" is synthesis, not menu-selection.
+2. **Perception rung 1 — the real step-change — STARTED, gap (a) CLOSED for single rects (audited).**
+   `percept_p1..p4.py` (+ `perception_p1_prereg.md`): sealed exact **rasterizer** (sub-pixel edge-coverage → gray,
+   painter's z-order) with **pixel-exact re-render** as the sound oracle; the engine infers latent + generative LAW
+   from a raw pixel grid (NOT a token). p4 = **law-discrimination** among **non-nested** coverage curves
+   {area/linear, gamma/convex, sqrt/concave} drawn per scene: 105/105 correct when distinguishable, **0/150
+   confab**, abstains exactly on audited coincidences; **AUDIT-1** coord-descent search == exhaustive brute oracle
+   (complete), **AUDIT-2** coincidences are the structurally-degenerate scenes. Fixed-index decode fails 0/60
+   (not tokenized). **NEXT hills (fable):** non-monotone law (outline/ring, attacks search soundness) → multi-rect
+   occlusion → ACTIVE(COLLECT) → the E8-over-pixel-string kill baseline; then rung 2 (noise, gated on E1's cliff).
+3. **Close k** — ~~a live enumerator that RECOMPOSES the invented primitive from atoms~~ **E9 ATTEMPTED → NULL**
+   (harness-confounded; see limit #10). Clean re-test = graft gradient ordering onto E8's efficient layered
+   generator so the size-only control reproduces ~109203.
 
 Files: `meta_forms.py`, `meta_reason.py`, `meta_param.py`, `meta_struct.py`, `meta_codeparam.py`,
 `meta_bench.py`, `meta_e1.py … meta_e8.py`, `meta_e7_prereg.md`, `meta_v2.py`, `meta_v2_prereg.md`,
