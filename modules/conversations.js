@@ -3091,7 +3091,8 @@ getSandpieWorker();
 function workerAgentStream(worker, id, signal) {
   const queue = [];
   let streamDone = false;
-  let notify = null;
+  let notify = null;      // resolve of the pull promise currently awaiting an event
+  let failPull = null;    // reject of that same promise — used to ABORT it (see onAbort)
   let cleaned = false;
 
   // Idempotent teardown. `sendAbort` posts {type:'abort', id} so the worker's
@@ -3112,7 +3113,16 @@ function workerAgentStream(worker, id, signal) {
   // So do the worker abort + listener teardown here, directly off the signal.
   const onAbort = () => {
     cleanup(true);
-    if (notify) { const n = notify; notify = null; n(); }
+    // REJECT the pending pull — do NOT resolve it. Resolving a pull that neither
+    // enqueues nor closes does NOT make the ReadableStream pull again (no read
+    // request arrives during the pull, so pullAgain is never set), so the stream
+    // silently stalls: readAgentEvents' await reader.read() hangs forever, the
+    // turn's finally never runs, and the UI stays stuck "generating" (Stop ■
+    // frozen, timer counting, content frozen — the long-standing stop-feedback
+    // bug). Rejecting errors the stream so read() rejects with AbortError, which
+    // unwinds to sendSingle's catch → finally → the UI reset.
+    const rej = failPull; notify = null; failPull = null;
+    if (rej) rej(new DOMException('aborted', 'AbortError'));
   };
 
   const messageHandler = (event) => {
@@ -3123,7 +3133,7 @@ function workerAgentStream(worker, id, signal) {
       streamDone = true;
       cleanup(false);   // natural end: detach listeners, worker already stopped
     }
-    if (notify) { const n = notify; notify = null; n(); }
+    if (notify) { const n = notify; notify = null; failPull = null; n(); }
   };
   worker.addEventListener('message', messageHandler);
   if (signal) {
@@ -3139,10 +3149,11 @@ function workerAgentStream(worker, id, signal) {
       // Block until next event or abort signal fires.
       await new Promise((resolve, reject) => {
         notify = resolve;
-        if (signal) {
-          if (signal.aborted) { reject(new DOMException('aborted', 'AbortError')); return; }
-          signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
-        }
+        failPull = reject;
+        // If the turn was already aborted between pulls, fail immediately.
+        // Otherwise onAbort (registered once on the signal) rejects THIS promise
+        // via failPull when the abort fires — that is what unwinds the stream.
+        if (signal && signal.aborted) { failPull = null; reject(new DOMException('aborted', 'AbortError')); }
       });
       while (queue.length > 0) controller.enqueue(enc.encode(queue.shift()));
       if (streamDone) controller.close();
