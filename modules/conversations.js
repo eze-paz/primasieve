@@ -2473,6 +2473,10 @@ function refreshSendButtonFor(which) {
 }
 function setStreamSending(stream, sending) {
   if (!stream) return;
+  // [stopdbg] TEMP diagnostic — trace every generating flip (esp. Stop→false then
+  // an unexpected →true auto-resume) with the caller stack. Remove once the
+  // stop-feedback bug is pinned.
+  try { console.log('[stopdbg] setStreamSending id=' + stream.id + ' sending=' + sending + ' generatingWas=' + stream.generating + '\n' + (new Error().stack || '')); } catch (_) {}
   if (sending) {
     stream.abort = new AbortController();
     stream.generating = true;
@@ -2799,6 +2803,11 @@ function handleButtonClick(which = 'main') {
   if (!btn) return;
   const convId = _composerConv(which);
   const s = convId ? convStreams.get(convId) : activeStream();
+  // [stopdbg] TEMP — which stop branch runs + what's actually generating.
+  try {
+    const gen = [...convStreams.values()].filter(x => x.generating).map(x => x.id);
+    console.log('[stopdbg] handleButtonClick which=' + which + ' composerConv=' + convId + ' resolvedStream=' + (s && s.id) + ' resolvedGenerating=' + (s && s.generating) + ' allGenerating=' + JSON.stringify(gen) + ' btnSending=' + btn.classList.contains('sending'));
+  } catch (_) {}
   // Stop decides on STREAM STATE, not the button's CSS class — the class can go
   // stale when a pane refresh is missed, and a stale ▶ click while generating
   // must never fall through to handleSubmit (whose empty-composer resume path
