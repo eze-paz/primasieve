@@ -33,7 +33,7 @@ def solve_handcoded(name, src, tests):
     return st.solved(), st.units, st.stratum_seen
 
 # ---------------- controller B: UCB bandit over forms (learned selection) ----------------------
-def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None, qfn=None, extra_forms=()):
+def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None, qfn=None, extra_forms=(), return_state=False):
     st = MetaState(name, src, tests, held_back=held_back)
     forms = list(extra_forms) + default_forms()   # discovered operators (extra_forms) get first pick
     warm = warm or {}                      # {form_name: pseudo_reward in ~[0,2]}
@@ -88,6 +88,7 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         ep_log.append({"form": f.name, "before": before, "after": st.best, "spent": spent,
                        "reward": round(r, 4), "solved": d["solved"], "improved": d["improved"]})
     true_solve = st.verify_full() if st.held else st.solved()
+    if return_state: return true_solve, st.units, st.stratum_seen, st   # for honest trace-diffing
     return true_solve, st.units, st.stratum_seen
 
 def solve_iterdeep(name, src, tests, held_back=0.0, b0=40):
