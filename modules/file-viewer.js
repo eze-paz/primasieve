@@ -185,12 +185,15 @@
     let savedHtml = initialHtml;   // last content written to OPFS — ↗ can use /files/ while it matches
     let active = null;       // { getHTML?, destroy? } of the current mode, if any
     let textSave = null;     // Text-mode Save button (removed on mode change)
+    // ⌖ element-pick state (Rendered mode): armed?, pending arm, live iframe, teardown fn
+    let pickOn = false, pendingPick = false, curFrame = null, pickArm = null;
 
     // latest content, capturing unsaved edits from the active mode (for the
     // dropdown carry-over AND the ↗/⬇ buttons).
     const currentHtml = () => { if (active && active.getHTML) { try { html = active.getHTML(); } catch (_) {} } return html; };
 
     const teardown = () => {
+      disarmPick();
       currentHtml();
       if (active && active.destroy) { try { active.destroy(); } catch (_) {} }
       active = null;
@@ -241,6 +244,9 @@
       iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;background:#fff;';
       body.appendChild(iframe);
       _renderedFrame = iframe;   // auto-reload target
+      curFrame = iframe;
+      // re-arm the pick (or a pending arm) after every (re)load — the doc is replaced
+      iframe.addEventListener('load', () => { if (pickOn || pendingPick) { pendingPick = false; armPick(iframe); } });
     }
 
     // single view-mode dropdown (Page / Text / Rendered) in the header
@@ -254,6 +260,70 @@
     // the clean /files/ URL whenever the doc on disk IS the live one.
     addOpenDownload(header, () => new Blob([currentHtml()], { type: 'text/html' }), () => name,
       fullKey, () => currentHtml() !== savedHtml);
+
+    /* ⌖ pick — hover-highlight an element in the Rendered preview and click to
+       copy its outerHTML (DevTools "Copy element" without opening DevTools).
+       Stays armed so several elements can be grabbed; exit: ⌖ again or Esc. */
+    const pickBtn = addHeaderButton(header, '⌖', 'Pick element — click in the preview to copy its HTML (Esc to exit)', () => {
+      if (pickOn) { disarmPick(); return; }
+      if (modeSel.value !== 'rendered') { modeSel.value = 'rendered'; showRendered(); pendingPick = true; return; }
+      if (curFrame && curFrame.contentDocument && curFrame.contentDocument.body) armPick(curFrame);
+      else pendingPick = true;
+    });
+
+    function armPick(frame) {
+      disarmPick();
+      const doc = frame && frame.contentDocument;
+      if (!doc || !doc.body) { pendingPick = true; return; }
+      // The iframe doc is a foreign document: theme vars don't resolve there, so
+      // take the resolved accent color from the app root and inject the literal.
+      const accent = (getComputedStyle(document.documentElement).getPropertyValue('--sp-accent') || '').trim() || '#2f81f7';
+      let last = null, saved = null;
+      const clearHl = () => { if (last && saved) { last.style.outline = saved[0]; last.style.outlineOffset = saved[1]; } last = null; saved = null; };
+      const onMove = (e) => {
+        const t = e.target;
+        if (!(t && t.nodeType === 1) || t === doc.documentElement || t === doc.body) { clearHl(); return; }
+        if (t !== last) { clearHl(); last = t; saved = [t.style.outline, t.style.outlineOffset]; t.style.outline = '2px solid ' + accent; t.style.outlineOffset = '-2px'; }
+      };
+      const onLeave = () => clearHl();
+      const onClick = (e) => {
+        e.preventDefault(); e.stopPropagation();   // never navigate while picking
+        const t = e.target;
+        if (!(t && t.nodeType === 1) || t === doc.documentElement || t === doc.body) return;
+        navigator.clipboard.writeText(t.outerHTML).then(() => {
+          pickBtn.textContent = '✓'; setTimeout(() => { if (pickOn) pickBtn.textContent = '⌖'; }, 1100);
+        }).catch((err) => {
+          console.error('[file-viewer] pick copy failed', err);
+          pickBtn.textContent = '✗'; setTimeout(() => { if (pickOn) pickBtn.textContent = '⌖'; }, 1100);
+        });
+      };
+      const onKey = (e) => { if (e.key === 'Escape') disarmPick(); };
+      const onWinKey = (e) => { if (e.key === 'Escape' && pickOn) disarmPick(); };
+      doc.addEventListener('mousemove', onMove, true);
+      doc.addEventListener('mouseleave', onLeave, true);
+      doc.addEventListener('click', onClick, true);
+      doc.addEventListener('keydown', onKey, true);
+      document.addEventListener('keydown', onWinKey, true);
+      const prevCursor = doc.body.style.cursor;
+      doc.body.style.cursor = 'crosshair';
+      pickOn = true;
+      pickBtn.style.background = 'var(--sp-accent)'; pickBtn.style.color = 'var(--sp-bg)';
+      pickBtn.title = 'Pick mode ON — click elements to copy their HTML (⌖ again or Esc to exit)';
+      pickArm = () => {
+        doc.removeEventListener('mousemove', onMove, true);
+        doc.removeEventListener('mouseleave', onLeave, true);
+        doc.removeEventListener('click', onClick, true);
+        doc.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('keydown', onWinKey, true);
+        doc.body.style.cursor = prevCursor;
+        clearHl();
+        pickOn = false;
+        pickBtn.style.background = ''; pickBtn.style.color = '';
+        pickBtn.textContent = '⌖';
+        pickBtn.title = 'Pick element — click in the preview to copy its HTML (Esc to exit)';
+      };
+    }
+    function disarmPick() { if (pickArm) { try { pickArm(); } catch (_) {} pickArm = null; } }
 
     showRendered();   // default (falls back to Editor/Text via the dropdown)
   }
