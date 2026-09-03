@@ -2500,7 +2500,12 @@ function setStreamSending(stream, sending) {
     for (const g of stream.host.querySelectorAll('.msg.tool-group')) tgUpdate(g);
     tgBreak(stream.host);
   }
-  if (stream === activeStream()) refreshSendButtonForActive();
+  // Repaint the composer buttons unconditionally. Gating this on
+  // `stream === activeStream()` meant a turn that ended while its conversation
+  // wasn't the active one left the Stop (■) button stuck; refreshSendButtonFor*
+  // re-resolves each pane's own conversation state, so an unconditional call is
+  // both correct and idempotent, and guarantees ■ → ▶ on every turn end.
+  refreshSendButtonForActive();
 
   refreshConversationList();
 }
@@ -3377,33 +3382,40 @@ async function sendSingle(text, stream, opts = {}) {
     // dropped while the tab was frozen) becomes an orphan the stop button can't
     // reach, because `generating` is already false.
     if (turnAgentId) { try { getSandpieWorker().postMessage({ type: 'abort', id: turnAgentId }); } catch (_) {} }
-    renderer.finalize();
-    // A surviving ask card (turn aborted mid-question): keep it ANSWERABLE.
-    // Answering appends the tool result and resumes the turn via resolveStoredAsk.
-    for (const card of (stream.host ? stream.host.querySelectorAll('.ask-card') : [])) {
-      if (!card._askState || card._askState.settled) continue;
-      const tcId = card.dataset.askTcId;
-      if (!tcId) continue;
-      card._askState.settled = true;   // guard: wire once
-      card._askState.onAnswer = (answers) => { resolveStoredAsk(convId, tcId, answers); };
-    }
-    // Reconcile any steer messages the loop never got to inject (turn aborted or
-    // the worker died before the next round boundary): keep them in the history
-    // so the user's input isn't lost — the next send will include them. Their
-    // provisional bubbles are already on screen.
-    if (stream._pendingSteer && stream._pendingSteer.length) {
-      for (const p of stream._pendingSteer) {
-        const already = stream.messages.includes(p.msg);
-        if (!already) { const m = { role: 'user', content: p.content }; bindBubble(p.el, m); stream.messages.push(m); }
+    // DOM/state reconciliation (finalize render, ask cards, steer replay) is wrapped
+    // so a throw here can NEVER skip the UI teardown below (endTotalTimer +
+    // setStreamSending). Without this, any error in finalize/reconcile stranded the
+    // turn in the generating state — Stop looked dead: button stuck on ■, timer
+    // still counting — even though the worker had aborted correctly.
+    try {
+      renderer.finalize();
+      // A surviving ask card (turn aborted mid-question): keep it ANSWERABLE.
+      // Answering appends the tool result and resumes the turn via resolveStoredAsk.
+      for (const card of (stream.host ? stream.host.querySelectorAll('.ask-card') : [])) {
+        if (!card._askState || card._askState.settled) continue;
+        const tcId = card.dataset.askTcId;
+        if (!tcId) continue;
+        card._askState.settled = true;   // guard: wire once
+        card._askState.onAnswer = (answers) => { resolveStoredAsk(convId, tcId, answers); };
       }
-      stream._pendingSteer = [];
-    }
-    // Any steer still buffered pre-post (agentId was already null) was just
-    // reconciled into history above — drop the buffer or the NEXT turn's drain
-    // would post it again on top of the history copy.
-    stream._earlySteer = [];
+      // Reconcile any steer messages the loop never got to inject (turn aborted or
+      // the worker died before the next round boundary): keep them in the history
+      // so the user's input isn't lost — the next send will include them. Their
+      // provisional bubbles are already on screen.
+      if (stream._pendingSteer && stream._pendingSteer.length) {
+        for (const p of stream._pendingSteer) {
+          const already = stream.messages.includes(p.msg);
+          if (!already) { const m = { role: 'user', content: p.content }; bindBubble(p.el, m); stream.messages.push(m); }
+        }
+        stream._pendingSteer = [];
+      }
+      // Any steer still buffered pre-post (agentId was already null) was just
+      // reconciled into history above — drop the buffer or the NEXT turn's drain
+      // would post it again on top of the history copy.
+      stream._earlySteer = [];
+      releaseWakeLock();
+    } catch (e) { console.error('[sandpie] turn teardown reconcile error (UI still reset below):', e); }
 
-    releaseWakeLock();
     endTotalTimer(stream, wasAborted ? 'stopped' : 'done');
     // Refresh the context readouts (sidebar week total + badge, and any open ctx
     // popup) now the provider has reported this turn's authoritative usage.
@@ -7326,10 +7338,16 @@ function startTotalTimer(stream) {
 }
 
 function endTotalTimer(stream, label) {
-  if (!stream || !stream.timerEl) return;
+  if (!stream) return;
+  // Stop the tick FIRST — BEFORE the timerEl guard below. If the live slot was
+  // never painted (timerEl still null, e.g. the bar wasn't on screen when the
+  // turn ended), an early return here would leave the interval running and the
+  // timer would keep counting after the turn is over. Seen on Stop mid-stream:
+  // the worker aborts correctly but the bar never settles.
   clearInterval(stream.timerInterval);
   stream.timerInterval = null;
   stream._tickTimer = null;
+  if (!stream.timerEl) return;
   const sec = (Date.now() - stream.timerStart) / 1000;
   const u = stream.lastUsage;
   const comp = u && typeof u.completion_tokens === 'number' ? u.completion_tokens : 0;
