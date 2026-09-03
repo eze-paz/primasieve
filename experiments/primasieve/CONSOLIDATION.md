@@ -108,6 +108,13 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     — E9 NULL and E10's invertible results unchanged. Net limit #10: *all four top-ops synthesize live; the ~10^3x
     win holds only where the target is deep enough that the witness pivot is selective — shallow targets match
     blind, and menu-selection is still cheaper.*
+    **E12 (prototype) + E13 (verdict-grade, meta_e13_prereg.md) probe the open-ended-invention frontier one level
+    above #10.** E13: with a PROVIDED library of recursion-scheme shapes, all fold parameters (g,law,combine,init)
+    are SYNTHESIZED from atoms (parity/mod10 emerge), inventing a primitive outside the object basis's expressive
+    closure (impasse-proved, ≥3x extrapolation, 0 confab); knockouts K1–K6 pass. K7 FAILS: a single fold scheme +
+    synthesized holes subsumes the others, so genuine multi-scheme selection is unshown, and a genuinely different
+    scheme needs a boolean primitive outside B. **Limit #10 is NOT closed at any level — it is re-instantiated at
+    whatever hypothesis language sits on top (the permanent regress).**
 11. **Sound rejection requires a COMPLETE search, and completeness has a tractability boundary (perception p5/p6).**
     "Sound rejection" is not a property of the framework alone: on a *trapping* landscape a heuristic search
     (coordinate descent) makes FALSE rejections (percept_p5: the folded/tent law → CD false-rejects 10/16 where
