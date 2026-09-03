@@ -42,13 +42,12 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
     if feat_log is not None or qfn is not None:
         import meta_features as mf
         err0 = mf.baseline_error(st)       # cache baseline error class once (used by features)
-    n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0
+    n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0; momentum = None
     while not st.solved() and st.units < GLOBAL:
-        # RESET is LAST-RESORT: only when no other form applies (else its unexplored bonus discards
-        # fresh progress before a productive form can be re-run -> stranded sqrt's 2-edit composition)
-        avail = [f for f in forms if f.applicable(st) and f.name != "RESET"]
-        if not avail: avail = [f for f in forms if f.applicable(st)]
+        avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
+        # MOMENTUM: if a form just improved, give it another turn before UCB (composes multi-edit
+        # fixes like sqrt's ENUM1 6->1->0 immediately, so RESET never discards the partial).
         def bonus(fn):                         # learned Q overrides warm prior when provided
             if qfn is not None:
                 import meta_features as mf
@@ -59,7 +58,8 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
             if n[f.name] == 0:                 # unexplored: cheap-first (Occam) biased by the prior
                 return 100.0 / ch + 55.0 * bonus(f.name)
             return q[f.name] + 1.5 * math.sqrt(math.log(total + 1) / n[f.name]) / ch
-        f = max(avail, key=ucb)
+        mom = next((f for f in avail if f.name == momentum), None) if momentum else None
+        f = mom if mom is not None else max(avail, key=ucb)
         row_before = None
         if feat_log is not None:
             import meta_features as mf
@@ -73,6 +73,7 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         gain = (before - st.best) / (len(tests) + 1)     # normalized score improvement
         r = gain / (spent / SLICE) + (5.0 if d["solved"] else 0.0)
         n[f.name] += 1; total += 1; q[f.name] += (r - q[f.name]) / n[f.name]
+        momentum = f.name if (d["improved"] and not d["solved"]) else None   # re-run a winning form
         ep_log.append({"form": f.name, "before": before, "after": st.best, "spent": spent,
                        "reward": round(r, 4), "solved": d["solved"], "improved": d["improved"]})
     true_solve = st.verify_full() if st.held else st.solved()

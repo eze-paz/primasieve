@@ -101,11 +101,10 @@ class Enumerate:
 def desc_of(ka, ln): return f"L{ln}:{ka[0]}"
 
 class Reset:
-    """Return to the pristine program (undo a stranding partial improvement). LOW priority
-    (cost_hint 10 -> unexplored value 10 < every ENUMERATE): tried only after other forms have had
-    a turn, so it never discards fresh progress (was cost 0.5 -> value 200 = fired first, stranding
-    sqrt's 2-edit composition by throwing away the first edit)."""
-    name = "RESET"; cost_hint = 10.0
+    """Return to the pristine program (undo a stranding partial). Fires early (cost 0.5) to escape a
+    DEAD-END partial (e.g. pascal); MOMENTUM (re-run a just-improved form) protects PRODUCTIVE
+    partials (e.g. sqrt's 2-edit compose) from being discarded, so early RESET is safe now."""
+    name = "RESET"; cost_hint = 0.5
     def applicable(self, st):
         # only useful to UNDO a partial improvement (return to pristine); not when already pristine
         return not st.solved() and st.tree is not st.orig
