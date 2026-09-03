@@ -16,6 +16,7 @@ from meta_reason import solve_ucb
 from meta_forms import MetaState, Negate
 import meta_struct as MS
 import meta_param as MP
+import meta_codeparam as MC
 
 # ================= generators (held-out) — each takes an rng so seeds are disjoint ==================
 def gen_struct(rng):                              # uniform structural: sum(c*x) -> sum(c*x**2)
@@ -35,6 +36,8 @@ def gen_negate(rng):                              # sign-flip one coeff: c -> -c
     p = _poly(rng); i = rng.randrange(len(p)); c, e = p[i]
     bad = list(p); bad[i] = (-c, e)
     return {"src": MP.poly_src(bad), "tests": MP.make_task(p, lambda ts: ts)["tests"], "flip": (c, e)}
+def gen_codeparam(rng):                           # NON-uniform code: a[i]*w -> a[i]*(w+i), k>=3
+    return MC.gen_weight_bug(rng, rng.randint(3, 8))
 
 # ================= per-class DISCOVERY (disjoint seeds) + the primitive used ========================
 SEEDS = [[(3, 2)], [(2, 3)], [(5, 4)], [(4, 2)], [(2, 5)]]   # single-term seeds for frame discovery
@@ -71,6 +74,9 @@ def discover_all():
     info["code"] = (cop, None, 0)
     # negate: first-class discovered op (from prior sign-flip sleep); primitive path = stuck->REPEAT
     info["negate"] = (Negate(), None, 0)
+    # codeparam: NON-uniform CODE bug; SAME math grammar discovers w'=w+i (cross-attribute), 0 changes
+    cop2, _, _ = MC.discover(random.Random(7))    # discovery seeds disjoint from graded instances
+    info["codeparam"] = (cop2, MC.CodeFitWeight(), 0)
     return info
 
 class CodeParam:
@@ -97,7 +103,7 @@ class CodeParam:
                 "improved": False, "solved": False, "exhausted": True, "fix": None}
 
 CLASSES = [("struct", gen_struct), ("diff", gen_diff), ("integ", gen_integ),
-           ("code", gen_code), ("negate", gen_negate)]
+           ("code", gen_code), ("negate", gen_negate), ("codeparam", gen_codeparam)]
 
 def grade(op, prim, task):
     extra_p = (prim,) if prim else ()
@@ -109,8 +115,8 @@ if __name__ == "__main__":
     N = int(os.environ.get("BENCH_N", "20"))
     t0 = time.time(); info = discover_all()
     print(f"discovered ops (vocab-added per class must be 0):")
-    for k in ("struct", "diff", "integ", "code", "negate"):
-        op = info[k][0]; print(f"  {k:7s}: {op.name if op else 'NONE':40s} vocab_added={info[k][2]}")
+    for k in ("struct", "diff", "integ", "code", "negate", "codeparam"):
+        op = info[k][0]; print(f"  {k:9s}: {op.name if op else 'NONE':40s} vocab_added={info[k][2]}")
     print(f"\n=== HELD-OUT MATRIX: {len(CLASSES)} classes x {N} instances = {len(CLASSES)*N} tests ===")
     print(f"{'class':8s} {'prim_solved':>11s} {'disc_solved':>11s} {'prim_med_E':>11s} {'disc_med_E':>11s}  headline")
     tot_p = tot_d = 0
