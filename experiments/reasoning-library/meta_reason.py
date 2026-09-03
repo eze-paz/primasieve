@@ -44,7 +44,10 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
         err0 = mf.baseline_error(st)       # cache baseline error class once (used by features)
     n = {f.name: 0 for f in forms}; q = {f.name: 0.0 for f in forms}; total = 0
     while not st.solved() and st.units < GLOBAL:
-        avail = [f for f in forms if f.applicable(st)]
+        # RESET is LAST-RESORT: only when no other form applies (else its unexplored bonus discards
+        # fresh progress before a productive form can be re-run -> stranded sqrt's 2-edit composition)
+        avail = [f for f in forms if f.applicable(st) and f.name != "RESET"]
+        if not avail: avail = [f for f in forms if f.applicable(st)]
         if not avail: break                    # all strata exhausted, nothing left to try
         def bonus(fn):                         # learned Q overrides warm prior when provided
             if qfn is not None:

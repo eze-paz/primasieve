@@ -63,15 +63,17 @@ class Enumerate:
     def applicable(self, st):
         return not st.solved() and not self._exhausted(st)
     def _edits(self, st):
-        th = st._th(); c = st._cache.get(self.k)
-        if c is None or c[0] != th:
+        # cursor keyed by (tree-content, stratum): committing a partial (new tree) does NOT overwrite
+        # the pristine stratum cursor, so RESET-to-pristine resumes where it left off (fixes sqrt).
+        key = (st._th(), self.k); c = st._cache.get(key)
+        if c is None:
             edits = [(ln, idx, ka) for (s, ln, desc, idx, ka) in _stratum_edits(st.tree, self.k, st.susp)
                      if not (st.susp and st.susp.get(ln, 0.0) == 0.0)]
-            st._cache[self.k] = [th, edits, 0]
-        return st._cache[self.k]
+            st._cache[key] = [st._th(), edits, 0]
+        return st._cache[key]
     def _exhausted(self, st):
-        c = st._cache.get(self.k)
-        return c is not None and c[0] == st._th() and c[2] >= len(c[1])
+        c = st._cache.get((st._th(), self.k))
+        return c is not None and c[2] >= len(c[1])
     def run(self, st, budget):
         # SOLVE-FIRST STEEPEST within this slice: evaluate up to `budget` candidates, take the BEST
         # (first-improvement strands the true fix behind a cheaper partial one).
@@ -99,9 +101,11 @@ class Enumerate:
 def desc_of(ka, ln): return f"L{ln}:{ka[0]}"
 
 class Reset:
-    """Return to the pristine program (undo a stranding partial improvement)."""
-    name = "RESET"; cost_hint = 0.5
-    def applicable(self, st): return not st.solved()
+    """Return to the pristine program (undo a stranding partial improvement). LOW priority
+    (cost_hint 10 -> unexplored value 10 < every ENUMERATE): tried only after other forms have had
+    a turn, so it never discards fresh progress (was cost 0.5 -> value 200 = fired first, stranding
+    sqrt's 2-edit composition by throwing away the first edit)."""
+    name = "RESET"; cost_hint = 10.0
     def applicable(self, st):
         # only useful to UNDO a partial improvement (return to pristine); not when already pristine
         return not st.solved() and st.tree is not st.orig
