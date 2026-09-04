@@ -1239,6 +1239,45 @@
   "wrong_lexicon_commitments": 0,
   "wrong_referent_commitments": 0
  },
+ "phase5c_clarifying_questions": {
+  "active_advantage": 3.276,
+  "active_questions": 1.05,
+  "active_resolved": 1.0,
+  "note": "questions are generic (slot x predicate [x object]); asking 'is it pair (i,j)?' is forbidden as that would be guessing dressed as a query.",
+  "random_questions": 3.44,
+  "random_resolved": 0.79,
+  "rows": [
+   {
+    "active_q": 1.0,
+    "active_resolved": 1.0,
+    "ambiguous": 16,
+    "objects": 3,
+    "random_q": 2.4375,
+    "random_resolved": 1.0,
+    "wrong": 0
+   },
+   {
+    "active_q": 1.0731707317073171,
+    "active_resolved": 1.0,
+    "ambiguous": 41,
+    "objects": 4,
+    "random_q": 3.3902439024390243,
+    "random_resolved": 0.7804878048780488,
+    "wrong": 0
+   },
+   {
+    "active_q": 1.0465116279069768,
+    "active_resolved": 1.0,
+    "ambiguous": 43,
+    "objects": 5,
+    "random_q": 3.86046511627907,
+    "random_resolved": 0.7209302325581395,
+    "wrong": 0
+   }
+  ],
+  "verdict": "LOOP CLOSED",
+  "wrong_referent_commitments": 0
+ },
  "phase6_noise_tolerance_sets": {
   "cliff_exact_match_under_noise": [
    {
