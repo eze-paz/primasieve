@@ -1010,6 +1010,316 @@
    "total_confabulations": 0
   }
  },
+ "phase6_noise_tolerance_sets": {
+  "cliff_exact_match_under_noise": [
+   {
+    "eps_px": 0,
+    "q": 0.06,
+    "truth_excluded": 0.9
+   },
+   {
+    "eps_px": 0,
+    "q": 0.12,
+    "truth_excluded": 0.975
+   }
+  ],
+  "collect": [
+   {
+    "confab": 0,
+    "k": 1,
+    "mean_set": 56.4,
+    "mode": "NAIVE intersect",
+    "singleton": 0.125,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 2,
+    "mean_set": 56.7,
+    "mode": "NAIVE intersect",
+    "singleton": 0.05,
+    "truth_in_set": 0.975
+   },
+   {
+    "confab": 0,
+    "k": 3,
+    "mean_set": 16.1,
+    "mode": "NAIVE intersect",
+    "singleton": 0.325,
+    "truth_in_set": 0.925
+   },
+   {
+    "confab": 0,
+    "k": 5,
+    "mean_set": 23.2,
+    "mode": "NAIVE intersect",
+    "singleton": 0.25,
+    "truth_in_set": 0.875
+   },
+   {
+    "confab": 0,
+    "k": 1,
+    "mean_set": 82.6,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.025,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 2,
+    "mean_set": 175.5,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.05,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 3,
+    "mean_set": 190.1,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 5,
+    "mean_set": 225.6,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   }
+  ],
+  "collect_eps_tracking": [
+   {
+    "confab": 0,
+    "eps": 5,
+    "k": 1,
+    "mean_agg_corruption": 1.87,
+    "mean_set": 53.3,
+    "singleton": 0.18333333333333332,
+    "truth_in_set": 0.9833333333333333
+   },
+   {
+    "confab": 0,
+    "eps": 7,
+    "k": 2,
+    "mean_agg_corruption": 0.77,
+    "mean_set": 354.6,
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 1,
+    "k": 3,
+    "mean_agg_corruption": 0.05,
+    "mean_set": 2.6,
+    "singleton": 0.48333333333333334,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 1,
+    "k": 5,
+    "mean_agg_corruption": 0.02,
+    "mean_set": 2.6,
+    "singleton": 0.5166666666666667,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 0,
+    "k": 7,
+    "mean_agg_corruption": 0,
+    "mean_set": 1,
+    "singleton": 1.0,
+    "truth_in_set": 1.0
+   }
+  ],
+  "collect_findings": {
+   "complete_mechanism": "aggregation lowers the EFFECTIVE corruption, so eps can shrink with k; only then does the survivor set actually shrink (a FIXED eps over a cleaner grid admits MORE latents, 82.6 -> 225.6). COLLECT therefore buys precision only when eps tracks the noise it removes.",
+   "corrected": "DENOISE FIRST by per-pixel majority vote, then apply ONE tolerance bound to the aggregate. Truth-in-set stays 1.000 at every k (0/4 exclusions).",
+   "naive_intersect": "UNSOUND -- intersecting per-observation eps-constraints is a CONJUNCTION, so P(truth survives k observations)=p^k and DECAYS: truth-in-set fell 1.000 -> 0.875 as k went 1 -> 5. More evidence made the engine reject the truth more often. Documented, not hidden.",
+   "precondition": "eps is a MODELLING INPUT (an assumed/measured bound on corruption), not an output. The OUTPUT is always a set, never a probability. Underestimate eps and the truth is rejected -- the E1 cliff."
+  },
+  "confabulations_at_honest_eps": 0,
+  "grid": "6x6",
+  "kill6": "PASSES",
+  "kill6_final": "PASSES on its stated criterion (0 confabulations anywhere). Sharper result: the mechanism is sound iff eps is a genuine bound; the OUTPUT stays a SET, never a probability; and COLLECT+aggregation reduces the noisy problem to the exact one (eps -> 0), which is the principled route across the E1 gate.",
+  "latents": 1323,
+  "mechanism": "acceptance within a SOUND tolerance bound eps, output = the eps-consistent SET (never a probability), shrunk by COLLECTing independent observations. Soundness is a theorem given eps >= corruption; the cost is abstention. Precondition: eps must bound the noise.",
+  "soundness_precision": {
+   "confabulation_committing_a_wrong_answer": "0 in EVERY cell of every arm -- the engine never lies",
+   "reading": "the two failure modes are distinct and must be scored separately. Committing a lie never happened. REJECTING THE TRUTH happens exactly when the tolerance precondition is violated -- by underestimating eps (the cliff: 90-98% exclusion at eps=0 under noise) or by estimating eps empirically (1.7%). So the rung-2 mechanism is sound ONLY with a genuine bound; empirical calibration reintroduces the E1 cliff in miniature.",
+   "truth_exclusion_rejecting_the_truth": "0 whenever eps is a GENUINE upper bound (240/240 theorem-qualifying trials). But 1.7% at k=1 when eps was ESTIMATED as the empirical max corruption of a separate sample and then applied to fresh trials: a finite-sample estimate is NOT a bound, and one fresh trial exceeded it.",
+   "why_it_still_works_at_scale": "majority-vote aggregation drives effective corruption to 0 (1.87 -> 0.00 px by k=7), at which point eps=0 is trivially a true bound: set size 1.0, singleton rate 1.00, truth always in. COLLECT converts the noise problem back into the exact rung-1 problem."
+  },
+  "sweep": [
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 1,
+    "q": 0.0,
+    "singleton": 1.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 2.7,
+    "q": 0.0,
+    "singleton": 0.55,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 49.4,
+    "q": 0.0,
+    "singleton": 0.1,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 227.6,
+    "q": 0.0,
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.325,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0.3,
+    "q": 0.03,
+    "singleton": 0.325,
+    "truth_in_set": 0.325
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.725,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 1.1,
+    "q": 0.03,
+    "singleton": 0.6,
+    "truth_in_set": 0.725
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 23.1,
+    "q": 0.03,
+    "singleton": 0.225,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 118.7,
+    "q": 0.03,
+    "singleton": 0.025,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.125,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0.1,
+    "q": 0.06,
+    "singleton": 0.125,
+    "truth_in_set": 0.125
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.375,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 0.8,
+    "q": 0.06,
+    "singleton": 0.225,
+    "truth_in_set": 0.375
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.9,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 8.6,
+    "q": 0.06,
+    "singleton": 0.375,
+    "truth_in_set": 0.9
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.95,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 119.8,
+    "q": 0.06,
+    "singleton": 0.0,
+    "truth_in_set": 0.95
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.0,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0,
+    "q": 0.12,
+    "singleton": 0.0,
+    "truth_in_set": 0.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.025,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 0.0,
+    "q": 0.12,
+    "singleton": 0.025,
+    "truth_in_set": 0.025
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.525,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 6.3,
+    "q": 0.12,
+    "singleton": 0.275,
+    "truth_in_set": 0.525
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.775,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 19.3,
+    "q": 0.12,
+    "singleton": 0.225,
+    "truth_in_set": 0.775
+   }
+  ],
+  "theorem_qualifying_trials": 240,
+  "theorem_violations": 0,
+  "trials_per_cell": 40
+ },
  "quixbugs": {
   "energy_ratio": 1.02,
   "hand_energy": 21839,
