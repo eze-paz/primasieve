@@ -34,11 +34,11 @@ class WN:
         self.use_gloss = use_gloss
         for pos, fn in (("n", "data.noun"), ("v", "data.verb"), ("a", "data.adj"), ("r", "data.adv")):
             self._load(pos, fn)
-        if shuffle_seed is not None:          # SHUFFLE control: permute glosses among synsets (same stats, wrong content)
-            import random
-            keys = list(self.gloss.keys()); vals = [self.gloss[k] for k in keys]
+        if shuffle_seed is not None:          # SHUFFLE control: permute the lemma->synset INDEX (what grounding
+            import random                      # actually enters the graph through) -> same graph + statistics,
+            keys = list(self.index.keys()); vals = [self.index[k] for k in keys]   # words point to WRONG meanings
             random.Random(shuffle_seed).shuffle(vals)
-            self.gloss = dict(zip(keys, vals))
+            self.index = dict(zip(keys, vals))
 
     def _load(self, pos, fn):
         path = os.path.join(_datadir(), fn)
