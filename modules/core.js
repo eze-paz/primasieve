@@ -309,11 +309,13 @@ const convStreams = new Map();
 const convLastViewed = new Map();
 let activeConvId = null; // always start on homescreen (was: localStorage read)
 
-/* --- API URL routing: remote proxy, local /proxy/, or direct --- */
+/* --- API URL routing: provider proxy, local /proxy/, or direct ---
+   The proxy is a PER-PROVIDER field now (no global provider): callers pass the
+   provider's proxyUrl; null/'' falls back to the local /proxy/ on localhost. */
 const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-function api(url) {
+function api(url, proxyUrl) {
   const stripped = url.replace(/^https?:\/\//, '');
-  const remote = ($('proxyUrl').value || '').trim().replace(/\/$/, '');
+  const remote = (proxyUrl || '').trim().replace(/\/$/, '');
   if (remote) return remote + '/proxy/' + stripped;
   if (isLocalhost) return '/proxy/' + stripped;
   return url;
