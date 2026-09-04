@@ -292,8 +292,11 @@ const SandpieImages = (function() {
   // can see, or a fallback exists (the send will reroute).
   function _warnVisionFallback(name) {
     try {
-      if (typeof SandpieProviders === 'undefined' || !SandpieProviders.getActive) return;
-      const act = SandpieProviders.getActive();
+      if (typeof SandpieProviders === 'undefined') return;
+      // Per-conversation provider: resolve the focused conversation's model
+      // (resolve(null) → active conv), falling back to the catalog default.
+      const act = SandpieProviders.resolve ? SandpieProviders.resolve(null)
+                : (SandpieProviders.getActive ? SandpieProviders.getActive() : null);
       if (!act) return;
       const canSee = SandpieProviders.providerCanSee ? SandpieProviders.providerCanSee(act) : true;
       const hasFb = !!(SandpieProviders.resolveVisionFallback && SandpieProviders.resolveVisionFallback(act));
