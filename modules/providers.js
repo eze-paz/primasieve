@@ -30,42 +30,7 @@ function selectableManaged() { return _managed.filter(p => !p.internal); }
 
 const AI_HTML = `
       <div id="providerChips"></div>
-      <div id="providerManagedNote" style="display:none; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); font-size:0.78rem; color:var(--sp-text-dim);">This provider is provided by your company sign-in — its settings are managed for you.</div>
-      <div id="providerForm" style="display:none; flex-direction:column; gap:0.4rem; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border);">
-        <div style="font-size:0.7rem; color:var(--sp-text-dim); text-transform:uppercase; letter-spacing:0.04em;">Selected provider</div>
-        <select id="spType">
-          <option value="openai">API (OpenAI-compatible)</option>
-          <option value="hermes">API (Hermes local llama.cpp)</option>
-        </select>
-
-        <input id="spName" autocomplete="off" placeholder="Name (e.g. Main, Backup)">
-        <input id="spEndpoint" autocomplete="off" placeholder="Base URL (e.g. https://api.openai.com/v1)">
-        <input id="spModel" autocomplete="off" placeholder="Model (e.g. gpt-4o)">
-        <input id="spApiKey" type="text" autocomplete="off" style="-webkit-text-security:disc; text-security:disc;" placeholder="API key">
-        <input id="spProxyUrl" autocomplete="off" placeholder="Proxy URL (optional)">
-        <input id="spContextWindow" type="number" min="1" autocomplete="off" placeholder="Context window (e.g. 128000)">
-        <input id="spMaxTokens" type="number" min="1" autocomplete="off" placeholder="Max output tokens (optional)">
-        <input id="spTemperature" type="number" min="0" max="2" step="0.1" autocomplete="off" placeholder="Temperature (optional, 0–2)">
-        <input id="spTopP" type="number" min="0" max="1" step="0.05" autocomplete="off" placeholder="top_p (optional, 0–1)">
-        <input id="spReasoningEffort" list="spReasoningEffortList" autocomplete="off" placeholder="Reasoning effort (reasoning models only: minimal/low/medium/high)">
-        <datalist id="spReasoningEffortList"><option value="minimal"></option><option value="low"></option><option value="medium"></option><option value="high"></option><option value="none"></option></datalist>
-        <input id="spProviderOrder" autocomplete="off" placeholder="Upstream routing (OpenRouter provider.order: e.g. deepseek — comma-separated, tried in order)">
-        <select id="spAllowFallbacks" style="display:none;">
-          <option value="yes">If preferred upstreams fail: fall back to others</option>
-          <option value="no">If preferred upstreams fail: error (no fallback)</option>
-        </select>
-        <select id="spVision">
-          <option value="yes">Vision: yes (this model accepts images)</option>
-          <option value="no">Vision: no (text only)</option>
-        </select>
-        <select id="spVisionFallback" style="display:none;">
-          <option value="">— no vision fallback —</option>
-        </select>
-        <div style="display:flex; gap:0.35rem;">
-          <button class="ghost" type="button" id="spDuplicate" style="flex:1;">Duplicate</button>
-          <button class="ghost" type="button" id="spDelete" style="flex:1;">Delete</button>
-        </div>
-      </div>
+      <div id="providerManagedNote" style="display:none; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--sp-border); font-size:0.78rem; color:var(--sp-text-dim);">Company models are provided by your sign-in and are managed for you.</div>
       <div id="routingHint" style="margin-top:0.5rem; font-size:0.7rem; color:var(--sp-text-dim);"></div>
 
     `;
@@ -337,13 +302,15 @@ function renderChips() {
   const row = document.getElementById('providerChips');
   if (!row) return;
   row.innerHTML = '';
+  // Plain NON-SELECTABLE list of models: chips are informational only (no active
+  // highlight, no click-to-activate). Which model a turn uses is picked in the
+  // composer's model picker; + Add / form still live below this list.
   const makeChip = (p) => {
     const chip = document.createElement('div');
-    chip.className = 'chip' + (p.id === _activeProviderId ? ' active' : '') + (p.managed ? ' managed' : '');
+    chip.className = 'chip plain' + (p.managed ? ' managed' : '');
     chip.textContent = p.name || p.model || 'Unnamed';
     chip.dataset.id = p.id;
     if (p.managed) chip.title = 'Provided by your company sign-in';
-    chip.onclick = () => selectProvider(p.id);
     return chip;
   };
   const groupOf = (chips) => {
@@ -619,7 +586,8 @@ function commitForm() {
 function addProvider() {
   const np = { id: 'provider_' + Date.now(), name: '', endpoint: '', model: '', apiKey: '', proxyUrl: '', type: 'openai' };
   _providers.push(np);
-  selectProvider(np.id);   // activate + show an empty form to fill in
+  saveProviders();
+  renderChips();   // the new (empty) model appears in the plain list
 }
 
 function duplicateSelected() {
