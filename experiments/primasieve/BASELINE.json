@@ -869,6 +869,147 @@
   "reading": "compression is safe as a REJECTOR (filter) but must never DECIDE; the acceptor half is quantified and large, which is why grounding/active probing keeps acceptance.",
   "true_boundaries": 23609
  },
+ "phase5_grounded_language": {
+  "T1_committed": 10,
+  "T1_lexicon_recovered": "10/10",
+  "T1_wrong_commitments": 0,
+  "T2_in_distribution": {
+   "acc": 1.0,
+   "confab": 0,
+   "coverage": 1.0,
+   "n": 120
+  },
+  "T3_novel_composition": {
+   "acc": 1.0,
+   "confab": 0,
+   "copy_fraction": 0.075,
+   "coverage": 1.0,
+   "n": 80,
+   "retrieval_baseline": 0.5625
+  },
+  "T4_unknown_word": {
+   "confab": 0,
+   "coverage": 0.0,
+   "n": 20
+  },
+  "held_out_pair": {
+   "preds": [
+    "C3",
+    "ABOVE"
+   ],
+   "words": [
+    "vorp",
+    "traz"
+   ]
+  },
+  "honest_limits": "The compositional generalisation (T3 = 100%) comes CHEAP because the semantics is compositional BY CONSTRUCTION: each word denotes an independent predicate, so holding out a word PAIR cannot block learning either word from other contexts. This is genuine systematic generalisation but it is the easy kind. Harder, untested: context-dependent or non-compositional meanings, gradable adjectives, quantifiers, and reference resolution with more than 2 objects -- the last being where the NL/SVAMP arc actually died. Syntax is SUPPLIED (5-slot schema); only semantics is learned. World is a 6x6 closed micro-world with 10 words.",
+  "kill5": "PASSES",
+  "knockout_shuffled_scenes": {
+   "acc": 0.0,
+   "committed": 0,
+   "coverage": 0.0,
+   "exact": 0
+  },
+  "learning_curve": [
+   {
+    "N": 2,
+    "committed": 3,
+    "confab": 0,
+    "exact": 3,
+    "mean_survivors": 1.57,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 3,
+    "committed": 4,
+    "confab": 0,
+    "exact": 4,
+    "mean_survivors": 1.5,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 5,
+    "committed": 7,
+    "confab": 0,
+    "exact": 7,
+    "mean_survivors": 1.12,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 8,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 12,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 35,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 120,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   }
+  ],
+  "n_train": 120,
+  "soundness_across_data_sizes": {
+   "full_lexicon_at_N": 8,
+   "max_wrong_commitments": 0,
+   "reading": "at every data size the learner either commits CORRECTLY or abstains with survivors>1 -- wrong commitment never occurs, which is the sound-rejection property carried into language",
+   "total_confabulations": 0
+  }
+ },
  "quixbugs": {
   "energy_ratio": 1.02,
   "hand_energy": 21839,
