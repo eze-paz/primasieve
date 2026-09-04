@@ -38,10 +38,17 @@ CLOSED for single rects (audited):**
   (bounded-visibility PROVEN complete, K-TRUTH 80/80, 0 confab; tent = unbounded → **abstain 24/24**), all-zero →
   abstain (infinitely ambiguous), and **uniqueness** → return the SET (the honest "not 100% sure"; fires on
   occlusion next). Twice caught my own w-shortcut re-introducing incompleteness — completeness is a claim to VERIFY.
-- **NEXT hills (fable order):** (1) ~~non-monotone law~~ **DONE** (p5/p6). (2) multi-rect **OCCLUSION**
-  (combinatorial, non-analytic search + version-space over scenes; where the latent-SET return actually fires and
-  the tractability boundary bites). (3) **ACTIVE(COLLECT)** scene selection. (4) the E8-over-pixel-string kill
-  baseline. Then rung 2 = noise/quantization (separate prereg, gated on E1's cliff).
+- **RUNG 1 CLOSED (conditionally):** (1) ~~non-monotone~~ **DONE** (p5/p6, limit #11); (2) multi-rect **OCCLUSION**
+  **DONE** (p7: survivor SET == brute, 0 confab, same-color decompositions 255-large); (3) **ACTIVE(COLLECT)**
+  **DONE** (p8: 3.5 vs 24.5 peels, unknown/UNKNOWABLE quotient); (4) **kill baseline** **DONE** (p9: flattened-string
+  knockout 0.20 vs 2D 1.00 at matched budget, positive control valid → not tokenized). All four end-conditions met.
+- **Scope of the close (limits #12/#13):** scene **recovery within a generator-matched hypothesis class**, NOT
+  open-world perception; the p9 kill is MDL-flavored at a matched layer budget. Honest headline: *search + exact 2D
+  re-render soundly recovers layered-rectangle scenes from a matched class, without tokens.*
+- **NEXT frontier (the real open question):** the **class-MISMATCH** case — a true generator OUTSIDE the engine's
+  hand-written hypothesis grammar (does it abstain honestly, or confabulate a matched-class fit?). Sharper p9: the
+  explains-rate-vs-k sweep (2D reaches 1.0 at k=2, 1D needs k≈2·rows). Then rung 2 = noise (separate prereg, gated
+  on E1's unsound-oracle cliff — may never cross).
 - Fable's hard gate holds: **exact renderer only** at rung 1; no noise until E1's unsound-oracle gap has a mechanism.
 - **Design note (probabilistic output):** the engine returns exact-consistent-or-abstain and, when unsure, the SET
   of all exactly-consistent latents — never an "X% sure" score. A confidence number needs a PRIOR = the

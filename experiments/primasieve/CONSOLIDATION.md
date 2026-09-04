@@ -33,6 +33,7 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
 | E8 | is the frame grammar authored vocabulary or reducible? | **REDUCIBLE** — all inventions are object-grammar expressions; but naive derivation costs **k≈10⁴–10⁵×**; the authored shortlist bought search efficiency, not expressive power |
 | v2 | does E7 replicate in a **second** real environment (a different implementer)? | **ACTIVE confabulation 0/2800** vs RANDOM 936/2800, against **decimal/libmpdec** (a genuinely separate C binary) rounding by the banker's-rounding convention (ROUND_HALF_EVEN — the trunc-toward-zero analog); coverage 14/14, honest abstain 4/4 OUT; invented `half_even` from real sparse (p=8%, pre-computed) residuals; K1/K3 pass. **PASS on all four kills' guarding intent, but the precise RANDOM curve was mis-predicted (see limit #9).** |
 | v3 | does it hold in a **different problem class** (not arithmetic)? | **ACTIVE confabulation 0/3000** vs RANDOM 824/3000, against **json/_json** (the C encoder) — **inverse-map inference**: string serialization/escaping + structural inversion; coverage 15/15, selected the astral→UTF-16 **surrogate-pair** rule, honest abstain 3/3 OUT, and **100% injectivity abstention** (abstains where ≥2 latents re-render identically: int-vs-str keys, list-vs-tuple). K1/K3 pass. Fable: **PASS — "same mechanism, new domain."** Two caveats (limits #9, #10): the RANDOM curve is descriptive not a test; the surrogate rule was a *pre-listed* deeper hypothesis (selection, not on-the-fly synthesis). |
+| perception rung 1 | does the loop work when the observation is NOT already a token (a raw pixel grid)? | **CLOSES (conditionally)** — `percept_p1..p9` under an exact sealed rasterizer + pixel-exact re-render oracle. Single-rect non-nested LAW discrimination (0/150 confab); **search-completeness is required and tractability-bounded** (limit #11); multi-rect OCCLUSION returns the exact survivor SET == brute (0 confab), same-color decompositions 255-large, refusing to pick; **ACTIVE peeling** reaches the observationally-irreducible class in **3.5 vs 24.5** peels (unknown vs UNKNOWABLE quotient); and the **kill baseline fails** — a flattened-string (row-adjacency-deleted) knockout at the matched layer budget explains occlusion 0.20 vs the 2D engine's 1.00 (both 1.0 on the positive control). Fable: CLOSES, with limits #12/#13. |
 
 ## Mapped limits (state these together, every time)
 
@@ -128,6 +129,20 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     latents (uniqueness check), never a probability — uncertainty is resolved by ACTIVE probing. (Twice caught a
     w-from-full-coverage-pixel shortcut silently re-introducing incompleteness — logged: completeness is a claim
     to VERIFY, not assert.)
+12. **Perception rung 1 is scene RECOVERY within a GENERATOR-MATCHED hypothesis class, not open-world perception.**
+    The observation is genuinely non-tokenized (a raw pixel grid, lossy, occluding), and the loop recovers the
+    latent scene soundly (0 confabulation), returns the exact survivor SET on the undecidable, and actively peels
+    to the observationally-irreducible class — but the hypothesis language (layered axis-aligned rectangles) was
+    authored by the **same hand as the scene generator**. So the honest headline is: *search + exact 2D re-render
+    soundly **recovers layered-rectangle scenes from a matched hypothesis class, without tokens**.* It does **not**
+    license real images, noise, learned latents, general reasoning, or the class-MISMATCH case (true generator
+    outside the engine's grammar) — that is the real open frontier, and rung 2 (noise) stays gated on E1's cliff.
+13. **The perception kill baseline (p9) is an MDL/compression result at a matched layer budget, not "1D cannot
+    perceive."** With *unbounded* intervals a flattened-string method explains any grid trivially (one run per row).
+    The result "2D engine 1.00 vs 1D-knockout 0.20 on occlusion" holds at the **fixed 2-layer budget both share**,
+    so it shows *2D adjacency buys compression/explanatory power at fixed complexity* — a real, narrower claim than
+    "the string method cannot perceive." (Sharper form, not yet run: explains-rate vs. k — 2D reaches 1.0 at k=2
+    while 1D needs k≈2·rows.)
 
 ## What it is / isn't
 
@@ -145,15 +160,16 @@ new domain,"** nothing broader.
 1. ~~v2 — second real symbolic environment~~ **DONE** (decimal/libmpdec). ~~v3 — third, different problem
    class~~ **DONE** (json/_json inverse-map). n = 3 implementers, n = 2 classes. Further symbolic environments
    have diminishing returns — the mechanism generalizes across domains (limit #4); stop adding same-shaped tests.
-2. **Perception rung 1 — the real step-change — STARTED, gap (a) CLOSED for single rects (audited).**
-   `percept_p1..p4.py` (+ `perception_p1_prereg.md`): sealed exact **rasterizer** (sub-pixel edge-coverage → gray,
-   painter's z-order) with **pixel-exact re-render** as the sound oracle; the engine infers latent + generative LAW
-   from a raw pixel grid (NOT a token). p4 = **law-discrimination** among **non-nested** coverage curves
-   {area/linear, gamma/convex, sqrt/concave} drawn per scene: 105/105 correct when distinguishable, **0/150
-   confab**, abstains exactly on audited coincidences; **AUDIT-1** coord-descent search == exhaustive brute oracle
-   (complete), **AUDIT-2** coincidences are the structurally-degenerate scenes. Fixed-index decode fails 0/60
-   (not tokenized). **NEXT hills (fable):** non-monotone law (outline/ring, attacks search soundness) → multi-rect
-   occlusion → ACTIVE(COLLECT) → the E8-over-pixel-string kill baseline; then rung 2 (noise, gated on E1's cliff).
+2. **Perception rung 1 — CLOSED (conditionally), `percept_p1..p9.py` + `perception_p1_prereg.md`.** The observation
+   is a raw pixel grid (NOT a token); a sealed exact **rasterizer** + **pixel-exact re-render** oracle keep it
+   sound. Closed against the owner-approved 4-part end condition: (1) 0 confabulation (law discrimination p4 0/150,
+   occlusion p7 0/40); (2) sound abstention returning the SET on the undecidable (tent p6, survivor-set p7,
+   irreducible-class p8); (3) ACTIVE peeling beats RANDOM 3.5 vs 24.5 peels (p8, the unknown/UNKNOWABLE quotient);
+   (4) the kill baseline fails (p9: flattened-string knockout 0.20 vs 2D 1.00 at matched budget, positive control
+   valid). Scope bounded by **limits #11–#13**: sound rejection needs a *complete* search with a tractability
+   boundary; the result is scene **recovery within a generator-matched hypothesis class**, not open-world
+   perception; the kill is MDL-flavored at a matched layer budget. **NEXT frontier:** the class-MISMATCH case (true
+   generator outside the engine's grammar) — the real open question — and rung 2 (noise), still gated on E1's cliff.
 3. **Close k** — ~~a live enumerator that RECOMPOSES the invented primitive from atoms~~ **E9 ATTEMPTED → NULL**
    (harness-confounded; see limit #10). Clean re-test = graft gradient ordering onto E8's efficient layered
    generator so the size-only control reproduces ~109203.
