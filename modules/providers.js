@@ -1,24 +1,23 @@
 /**
  * Providers Module for Sandpie
  *
- * "AI provider" settings: chips to pick the active provider, with the selected
- * provider's fields shown inline right below — no separate popup modal. The
- * panel lives in the gear Settings modal (SandpieSettings); falls back to the
- * sidebar (SandpieMenu) when settings.js isn't loaded (e.g. the stable page).
+ * Model catalog + per-conversation provider selection. There is NO global
+ * "active" provider: every conversation carries its own providerId (persisted
+ * in the conversation's .meta.json by conversations.js), and the composer's
+ * model picker (mp-trigger) sets it for THAT pane's conversation. The settings
+ * modal lists the available models (plain, non-selectable) and offers + Add.
  *
  * Storage stays in localStorage: a provider definition includes its API key (a
  * secret), so providers are NOT synced to the SandpieConfig blob.
  *
- * account.js may inject a "managed" provider at runtime (on company sign-in) via
- * setManaged(): it shows as a read-only chip, is never persisted, and is removed
- * on sign-out.
+ * account.js may inject "managed" providers at runtime (on company sign-in) via
+ * setManaged(): they show as read-only entries, are never persisted, and are
+ * removed on sign-out.
  */
 
 const PROVIDERS_KEY = 'sandpie-providers';
-const ACTIVE_PROVIDER_KEY = 'sandpie-active-provider';
 
 let _providers = [];
-let _activeProviderId = null;
 let _managed = [];              // company providers injected by account.js (one read-only chip per managed model); in-memory only, never persisted
 const MANAGED_ID = '__managed'; // id prefix — each managed provider's id is `__managed:<model>`
 function isManagedId(id) { return typeof id === 'string' && id.indexOf(MANAGED_ID + ':') === 0; }
@@ -55,22 +54,6 @@ function init() {
 
 function _wireProviderPanel() {
   loadProviders();
-  renderChips();
-  for (const id of ['spName','spEndpoint','spModel','spApiKey','spProxyUrl','spContextWindow','spMaxTokens','spTemperature','spTopP','spReasoningEffort','spProviderOrder','spAllowFallbacks','spVisionFallback']) {
-    const el = document.getElementById(id);
-    if (el && !el._spBound) { el.addEventListener('change', commitForm); el._spBound = true; }
-  }
-  const visionSel = document.getElementById('spVision');
-  if (visionSel && !visionSel._spBound) { visionSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); visionSel._spBound = true; }
-  const typeSel = document.getElementById('spType');
-  if (typeSel && !typeSel._spBound) { typeSel.addEventListener('change', () => { commitForm(); applyTypeUI(); }); typeSel._spBound = true; }
-  // spLiteRTLMModel wiring removed (local LLM engines removed)
-  // spWebGPUModel wiring removed (local LLM engines removed)
-  document.getElementById('spDuplicate')?.addEventListener('click', duplicateSelected);
-  document.getElementById('spDelete')?.addEventListener('click', deleteSelected);
-  // spClearModelCache wiring removed (local LLM engines removed)
-  if (_activeProviderId) loadFormFor(_activeProviderId);
-  applyTypeUI();
   updateRoutingHint();
   refreshAiDot();
 }
@@ -88,8 +71,6 @@ function loadProviders() {
     console.warn('loadProviders: corrupt provider list in localStorage, resetting:', e);
     _providers = [];
   }
-  _activeProviderId = localStorage.getItem(ACTIVE_PROVIDER_KEY);
-
   if (_providers.length === 0) {
     const old = JSON.parse(localStorage.getItem('opencode-config') || '{}');
     if (old.endpoint || old.model || old.apiKey) {
@@ -102,24 +83,15 @@ function loadProviders() {
         proxyUrl: old.proxyUrl || ''
       };
       _providers = [migrated];
-      _activeProviderId = migrated.id;
       saveProviders();
     }
   }
 
-  if (_activeProviderId && !getProviderById(_activeProviderId)) {
-    _activeProviderId = _providers.length ? _providers[0].id : null;
-  }
-  if (!_activeProviderId && _providers.length) {
-    _activeProviderId = _providers[0].id;
-  }
-
-  applyActiveProvider();
+  refreshProvidersUI();
 }
 
 function saveProviders() {
   localStorage.setItem(PROVIDERS_KEY, JSON.stringify(_providers));
-  localStorage.setItem(ACTIVE_PROVIDER_KEY, _activeProviderId || '');
 }
 
 // Resolve any id, including the in-memory managed provider.
@@ -127,9 +99,15 @@ function getProviderById(id) {
   return _managed.find(p => p.id === id) || _providers.find(p => p.id === id) || null;
 }
 
-function getActiveProvider() {
-  return getProviderById(_activeProviderId);
+// DEFAULT provider: what background utility calls (auto-title, compaction
+// summaries, memory agents) use when the caller doesn't pass a model. This is
+// NOT a chat default — conversations always use their own provider.
+function defaultProvider() {
+  return selectableManaged()[0] || _providers[0] || null;
 }
+// Legacy alias — external modules (auto-title, context, images, compactor log)
+// still call SandpieProviders.getActive(); it now means the default provider.
+const getActiveProvider = defaultProvider;
 
 // One-shot, NON-streaming completion — the shared utility path for background
 // summarization (native compactor + memory/note agents). Never touches the
@@ -139,14 +117,14 @@ function getActiveProvider() {
 // (OpenAI-spec default — the model's own cap). In-browser engines still need a
 // concrete generation budget, so the local paths below fall back to 1024.
 async function completeOnce({ system = '', user = '', model = '', maxTokens = null, signal, noReasoning = false, sessionId = null } = {}) {
-  const active = getActiveProvider();
+  const active = defaultProvider();
   const localMax = maxTokens != null ? maxTokens : 1024;
   // local-LM inference paths removed
-  const endpoint = (document.getElementById('endpoint')?.value || '').replace(/\/$/, '');
-  const apiKey = document.getElementById('apiKey')?.value || '';
-  const mdl = model || document.getElementById('model')?.value || '';
+  const endpoint = ((active && active.endpoint) || '').replace(/\/$/, '');
+  const apiKey = (active && active.apiKey) || '';
+  const mdl = model || (active && active.model) || '';
   if (!endpoint || !mdl) throw new Error('no provider configured');
-  const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions') : (endpoint + '/chat/completions');
+  const route = (typeof Sandpie !== 'undefined' && Sandpie.api) ? Sandpie.api(endpoint + '/chat/completions', active && active.proxyUrl) : (endpoint + '/chat/completions');
   const url = new URL(route, location.href).href;
   // STREAM the response: with stream:false the socket sits idle for the whole (often
   // multi-minute) generation and an intermediary proxy/CDN kills it with a 504 — the
@@ -257,40 +235,21 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
   throw lastErr || new Error('completion failed');
 }
 
-// Push the active provider's connection details into the hidden inputs that
-// conversations.js reads (endpoint/model/apiKey/proxyUrl).
-function applyActiveProvider() {
-  const p = getActiveProvider();
-  // local-LLM engine unload removed
-  const ep = document.getElementById('endpoint');
-  const mo = document.getElementById('model');
-  const ak = document.getElementById('apiKey');
-  const pu = document.getElementById('proxyUrl');
-  if (ep) ep.value = p ? p.endpoint : '';
-  if (mo) mo.value = p ? p.model : '';
-  if (ak) ak.value = p ? p.apiKey : '';
-  if (pu) pu.value = p ? p.proxyUrl : '';
-  updateRoutingHint();
+// Refresh every UI surface that mirrors the provider catalog (settings list,
+// composer pickers, status dot). Called after any catalog change.
+function refreshProvidersUI() {
+  renderChips();
+  renderModelPicker();
   refreshAiDot();
-  renderModelPicker();   // keep the composer model-picker label/selection in sync
 }
 
-// Ensure a model is selected before a send. If the hidden #model input is empty
-// but a configured provider has one, activate it instead of forcing the user to
-// pick (a better default than erroring). Returns true once a model is set.
-function ensureUsable() {
-  const modelSet = () => !!(document.getElementById('model')?.value || '').trim();
-  if (modelSet()) return true;
-  // The active provider may have a model that simply wasn't synced to the inputs.
-  const active = getActiveProvider();
-  if (active && (active.model || '').trim() && (active.endpoint || '').trim()) {
-    applyActiveProvider();
-    if (modelSet()) return true;
-  }
-  // Otherwise pick the first configured provider that actually has a model.
-  const candidate = [...selectableManaged(), ..._providers].find(p => (p.model || '').trim() && (p.endpoint || '').trim());
-  if (candidate) selectProvider(candidate.id);
-  return modelSet();
+// Ensure the conversation being sent into has a usable provider. With no global
+// active provider, this only VALIDATES: it resolves the conversation's provider
+// (via conversations.js) and reports whether it can actually serve a request.
+// Returns true when a turn can go out.
+function ensureUsable(convId) {
+  const p = resolveProvider(convId);
+  return !!(p && (p.model || '').trim() && (p.endpoint || '').trim());
 }
 
 // ============================================================
@@ -303,8 +262,8 @@ function renderChips() {
   if (!row) return;
   row.innerHTML = '';
   // Plain NON-SELECTABLE list of models: chips are informational only (no active
-  // highlight, no click-to-activate). Which model a turn uses is picked in the
-  // composer's model picker; + Add / form still live below this list.
+  // highlight, no click-to-activate). Which model a conversation uses is picked
+  // in that pane's composer model picker; + Add below extends the catalog.
   const makeChip = (p) => {
     const chip = document.createElement('div');
     chip.className = 'chip plain' + (p.managed ? ' managed' : '');
@@ -347,20 +306,23 @@ function renderChips() {
 // ARE company models, i.e. not anonymous). Lives in the input bar so the model is
 // switchable without opening Settings. Painted into EVERY .model-picker host
 // (main pane + side pane); no-op when none exist on the page.
+//
+// PER-CONVERSATION: each host carries data-conv-id (set by conversations.js when
+// the pane mounts a conversation). The chip shows THAT conversation's provider and
+// selecting an item sets it for that conversation only — there is no global model.
 function renderModelPicker() {
   // Paint the picker into EVERY composer host (main pane + side pane). Each host
   // gets its own trigger; the dropup panel is per-host too (moved to <body> only
   // while open, so position:fixed can escape overflow/backdrop-filter clipping).
   const hosts = Array.from(document.querySelectorAll('.model-picker'));
   if (!hosts.length) return;
-  const active = getActiveProvider();
   // Clean up any panel previously moved to <body> (per-host panels are wiped by innerHTML below).
   document.querySelectorAll('body > .mp-panel').forEach(p => p.remove());
   for (const host of hosts) {
     const wasOpen = host.classList.contains('open');
     host.innerHTML = '';
     host.classList.toggle('open', wasOpen);   // preserve open state across a re-render
-    buildModelPickerInto(host, active);
+    buildModelPickerInto(host, resolveProvider(host.dataset.convId || null));
   }
 }
 
@@ -389,10 +351,10 @@ function buildModelPickerInto(host, active) {
   const item = (p) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'mp-item' + (p.id === _activeProviderId ? ' active' : '');
+    b.className = 'mp-item' + (active && p.id === active.id ? ' active' : '');
     b.textContent = p.name || p.model || 'Unnamed';
     if (p.model) b.title = p.model;
-    b.addEventListener('click', () => { hideModelPickerPanel(host); selectProvider(p.id); });
+    b.addEventListener('click', () => { hideModelPickerPanel(host); setConvProvider(host.dataset.convId || null, p.id); });
     return b;
   };
   const hdr = (t) => { const d = document.createElement('div'); d.className = 'mp-hdr'; d.textContent = t; return d; };
@@ -450,89 +412,26 @@ function hideModelPickerPanel(host) {
 }
 
 // ============================================================
-// INLINE FORM  (settings of the selected/active provider)
+// PER-CONVERSATION PROVIDER RESOLUTION
 // ============================================================
 
-// Selecting a chip activates that provider AND loads it into the form below.
-function selectProvider(id) {
-  _activeProviderId = id;
-  saveProviders();
-  applyActiveProvider();
-  loadFormFor(id);
-  renderChips();
+// Resolve the provider a conversation will use. Reads the conversation's own
+// providerId via conversations.js (window.SandpieConv.getProviderId); falls back
+// to the default provider when the conv has none (or isn't known yet). Returns
+// null only when the catalog itself is empty.
+function resolveProvider(convId) {
+  let pid = null;
+  try { pid = (window.SandpieConv && SandpieConv.getProviderId) ? SandpieConv.getProviderId(convId) : null; } catch (_) {}
+  return getProviderById(pid) || defaultProvider();
 }
 
-function loadFormFor(id) {
-  const form = document.getElementById('providerForm');
-  const note = document.getElementById('providerManagedNote');
-  if (!form) return;
-  const p = getProviderById(id);
-  // Managed (company) providers are read-only: hide the editable form, show a note.
-  if (p && p.managed) { form.style.display = 'none'; if (note) note.style.display = 'block'; return; }
-  if (note) note.style.display = 'none';
-  if (!p) { form.style.display = 'none'; return; }
-  form.style.display = 'flex';
-  const set = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = (v != null ? v : ''); };
-  set('spName', p.name); set('spEndpoint', p.endpoint); set('spModel', p.model);
-  set('spApiKey', p.apiKey); set('spProxyUrl', p.proxyUrl);
-  set('spContextWindow', p.contextWindow); set('spMaxTokens', p.maxTokens); set('spTemperature', p.temperature);
-  set('spTopP', p.topP);
-  set('spReasoningEffort', p.reasoningEffort);
-  set('spProviderOrder', Array.isArray(p.providerOrder) ? p.providerOrder.join(', ') : '');
-  set('spAllowFallbacks', p.allowFallbacks === false ? 'no' : 'yes');
-  set('spVision', p.vision === 'no' ? 'no' : 'yes');
-  renderVisionFallbackOptions(p.id);
-  set('spVisionFallback', p.visionFallbackId || '');
-  set('spType', p.type || 'openai');
-  // spLiteRTLMModel/spWebGPUModel value setting removed (local LLM engines removed)
-  applyTypeUI();
-}
-
-// Show/hide provider fields based on the selected backend type.
-function applyTypeUI() {
-  const type = (document.getElementById('spType')?.value) || 'openai';
-  const hermes = type === 'hermes';
-  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  show('spApiKey', !hermes);
-  show('spProxyUrl', !hermes);
-  show('spReasoningEffort', !hermes);
-  show('spProviderOrder', !hermes);
-  // Fallback choice only matters once a preferred-provider order is set.
-  const hasOrder = !!(document.getElementById('spProviderOrder')?.value || '').trim();
-  show('spAllowFallbacks', !hermes && hasOrder);
-  // Vision capability (yes/no) + vision-fallback picker.
-  show('spVision', true);
-  const vision = (document.getElementById('spVision')?.value) || 'yes';
-  show('spVisionFallback', vision === 'no');
-  show('spContextWindow', true);
-  show('spTemperature', !hermes);
-  show('spTopP', !hermes);
-  const ep = document.getElementById('spEndpoint');
-  if (ep) ep.placeholder = 'Base URL (e.g. https://api.openai.com/v1)';
-  const cw = document.getElementById('spContextWindow');
-  if (cw) cw.placeholder = 'Context window (e.g. 128000)';
-}
-
-// Populate the vision-fallback dropdown with every vision-CAPABLE provider except
-// the one being edited (a model can't fall back to itself). Includes company-managed
-// providers — a company MiMo model is a valid vision fallback for a personal
-// text-only model. Rebuilt on every loadFormFor, so add/delete/duplicate stays in sync.
-function renderVisionFallbackOptions(activeId) {
-  const sel = document.getElementById('spVisionFallback');
-  if (!sel) return;
-  const prev = sel.value;
-  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  // Only vision-capable providers make sense as a fallback (a text-only model
-  // can't see the rerouted images either).
-  // Internal (picker-hidden) managed models are excluded from the user-facing
-  // fallback dropdown too — they're wired as fallbacks via models.json, not here.
-  const opts = [...selectableManaged(), ..._providers].filter(p => p.id !== activeId && providerCanSee(p));
-  sel.innerHTML = '<option value="">— no vision fallback —</option>'
-    + opts.map(p => {
-      const name = (p.name && p.name !== p.model) ? p.name + ' (' + p.model + ')' : (p.name || p.model || 'Unnamed');
-      return '<option value="' + esc(p.id) + '">' + esc(name) + '</option>';
-    }).join('');
-  sel.value = prev;
+// Set a conversation's provider (composer picker click). Delegates persistence to
+// conversations.js (stream + .meta.json); then repaints the pickers.
+function setConvProvider(convId, providerId) {
+  try {
+    if (window.SandpieConv && SandpieConv.setProviderId) SandpieConv.setProviderId(convId, providerId);
+  } catch (_) {}
+  renderModelPicker();
 }
 
 // Cloud providers can see images unless explicitly marked vision:no.
@@ -550,122 +449,33 @@ function resolveVisionFallback(p) {
   return (fb && providerCanSee(fb)) ? fb : null;
 }
 
-// Commit form edits to the active provider (auto-save on field change/blur).
-function commitForm() {
-  const p = getActiveProvider();
-  if (!p || p.managed) return;   // managed providers are read-only
-  const val = id => (document.getElementById(id)?.value || '').trim();
-  const num = id => { const n = parseFloat(document.getElementById(id)?.value); return Number.isFinite(n) ? n : null; };
-  p.type = (document.getElementById('spType')?.value) || 'openai';
-  p.endpoint = val('spEndpoint');
-  p.model = val('spModel');
-  p.apiKey = val('spApiKey');
-  p.proxyUrl = val('spProxyUrl');
-  p.name = val('spName') || p.model || 'Unnamed';
-  const cw = num('spContextWindow'); if (cw && cw > 0) p.contextWindow = cw; else delete p.contextWindow;
-  const mt = num('spMaxTokens');     if (mt && mt > 0) p.maxTokens = mt;     else delete p.maxTokens;
-  const tp = num('spTemperature');   if (tp != null && tp >= 0) p.temperature = tp; else delete p.temperature;
-  const pp = num('spTopP');          if (pp != null && pp >= 0) p.topP = pp;        else delete p.topP;
-  const re = val('spReasoningEffort').toLowerCase(); if (re) p.reasoningEffort = re; else delete p.reasoningEffort;
-  // OpenRouter upstream routing: providerOrder is stored as an ARRAY (maps to the
-  // request's provider.order), allowFallbacks as a bool (provider.allow_fallbacks).
-  const po = val('spProviderOrder').split(',').map(s => s.trim()).filter(Boolean);
-  if (po.length) p.providerOrder = po; else delete p.providerOrder;
-  const af = (document.getElementById('spAllowFallbacks')?.value) || 'yes';
-  if (po.length && af === 'no') p.allowFallbacks = false; else delete p.allowFallbacks;
-  p.vision = (val('spVision') === 'no') ? 'no' : 'yes';
-  const vf = val('spVisionFallback');
-  if (vf && vf !== p.id) p.visionFallbackId = vf; else delete p.visionFallbackId;
-  applyTypeUI();   // reflect fallback-select visibility as the order field changes
-  const rsn = (document.getElementById('spReasoning')?.value) || 'auto'; if (rsn !== 'auto') p.reasoning = rsn; else delete p.reasoning;
-  saveProviders();
-  applyActiveProvider();
-  renderChips();   // reflect a renamed chip / active highlight
-}
-
 function addProvider() {
   const np = { id: 'provider_' + Date.now(), name: '', endpoint: '', model: '', apiKey: '', proxyUrl: '', type: 'openai' };
   _providers.push(np);
   saveProviders();
-  renderChips();   // the new (empty) model appears in the plain list
-}
-
-function duplicateSelected() {
-  const p = getActiveProvider();
-  if (!p || p.managed) return;
-  const copy = { ...p, id: 'provider_' + Date.now(), name: (p.name || p.model || 'Provider') + ' (copy)' };
-  _providers.push(copy);
-  selectProvider(copy.id);
-}
-
-function deleteSelected() {
-  const p = getActiveProvider();
-  if (!p || p.managed) return;
-  if (!confirm('Delete "' + (p.name || p.model || 'this provider') + '"?')) return;
-  _providers = _providers.filter(x => x.id !== p.id);
-  _activeProviderId = _providers.length ? _providers[0].id : null;
-  saveProviders();
-  applyActiveProvider();
-  if (_activeProviderId) loadFormFor(_activeProviderId);
-  else { const f = document.getElementById('providerForm'); if (f) f.style.display = 'none'; }
-  renderChips();
+  refreshProvidersUI();   // the new (empty) model appears in the list + pickers
 }
 
 // ============================================================
 // MANAGED PROVIDER  (injected by account.js on company sign-in; in-memory only)
 // ============================================================
 
-// Resolve the catalog's default model to a managed provider. Match by model id
-// (the canonical case), else by model/name trimmed + case-insensitively; if
-// nothing matches (usually a defaultModel typo in models.json) warn and fall back
-// to the first chip.
-function managedDefault(defaultModel) {
-  if (defaultModel != null && String(defaultModel).trim() !== '') {
-    const want = String(defaultModel).trim();
-    const byId = getProviderById(MANAGED_ID + ':' + want);
-    if (byId) return byId;
-    const lc = want.toLowerCase();
-    const byField = _managed.find(p => String(p.model).toLowerCase() === lc || String(p.name).toLowerCase() === lc);
-    if (byField) return byField;
-    console.warn('[SandpieProviders] managed defaultModel ' + JSON.stringify(defaultModel) + ' matched no model — using the first. Available models:', _managed.map(p => p.model));
-  }
-  // Never default to an internal (picker-hidden) model; fall back to the first
-  // selectable one, and only to _managed[0] if every model is internal.
-  return selectableManaged()[0] || _managed[0];
-}
-
 // Surface read-only company providers as chips (one per managed model). NOT
-// persisted. On sign-in (the first time managed providers are injected) the
-// company *default* model is selected — even over a leftover personal/stale pick,
-// since a signed-in user should land on the company default. On later calls (e.g.
-// the 30-min token refresh) the active provider is left as-is so the user isn't
-// yanked mid-chat. Accepts a single def or a list; `defaultModel` = catalog id.
+// persisted. With no global active provider, conversations that point at a
+// managed id keep it while it exists; conversations.js falls back to the
+// default provider for ids that no longer resolve. Accepts a single def or a
+// list; `defaultModel` = catalog id (kept for API compat, unused here).
 function setManaged(defs, defaultModel) {
-  const firstInjection = _managed.length === 0;
   const list = Array.isArray(defs) ? defs : (defs ? [defs] : []);
   _managed = list.map(d => Object.assign({}, d, { id: MANAGED_ID + ':' + (d.model || d.name), managed: true }));
-  if (_managed.length) {
-    if (firstInjection || !getProviderById(_activeProviderId)) _activeProviderId = managedDefault(defaultModel).id;
-  } else if (!getProviderById(_activeProviderId)) {
-    _activeProviderId = _providers[0] ? _providers[0].id : null;
-  }
-  applyActiveProvider();
-  renderChips();
-  if (isManagedId(_activeProviderId)) loadFormFor(_activeProviderId);
+  refreshProvidersUI();
 }
 
-// Remove the managed provider (on sign-out); fall back to a real provider/none.
+// Remove the managed providers (on sign-out). Conversations pointing at a
+// managed id fall back to the default provider on their next send.
 function clearManaged() {
-  const wasActive = isManagedId(_activeProviderId);
   _managed = [];
-  if (wasActive) {
-    _activeProviderId = _providers.length ? _providers[0].id : null;
-    saveProviders();
-    applyActiveProvider();
-  }
-  renderChips();
-  if (_activeProviderId) loadFormFor(_activeProviderId);
-  else { const f = document.getElementById('providerForm'); if (f) f.style.display = 'none'; }
+  refreshProvidersUI();
 }
 
 // ============================================================
@@ -673,15 +483,9 @@ function clearManaged() {
 // ============================================================
 
 function updateRoutingHint() {
-  const active = getActiveProvider();
-  const remote = (document.getElementById('proxyUrl')?.value || '').trim();
   const hint = document.getElementById('routingHint');
   if (!hint) return;
-  if (active?.type === 'hermes') {
-    hint.textContent = 'Hermes local llama.cpp via ' + (active.endpoint || '(no endpoint set)');
-  } else if (remote) {
-    hint.textContent = 'Routing via ' + remote.replace(/^https?:\/\//, '');
-  } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     hint.textContent = 'Routing via local /proxy/';
   } else {
     hint.textContent = 'Direct calls (CORS required, e.g. OpenRouter)';
@@ -689,10 +493,7 @@ function updateRoutingHint() {
 }
 
 function refreshAiDot() {
-  const ep = document.getElementById('endpoint')?.value.trim();
-  const active = getActiveProvider();
-  const local = (active?.type === 'hermes');
-  const ok = ep && (local || document.getElementById('apiKey')?.value.trim());
+  const ok = [...selectableManaged(), ..._providers].some(p => (p.model || '').trim() && (p.endpoint || '').trim());
   const dot = document.getElementById('aiDot');
   if (dot) { dot.classList.remove('ok', 'warn', 'err'); if (ok) dot.classList.add('ok'); }
 }
@@ -702,13 +503,14 @@ function refreshAiDot() {
 // ============================================================
 
 window.SandpieProviders = {
-  getActive: getActiveProvider,
+  getActive: defaultProvider,          // legacy alias = DEFAULT provider (utility calls)
+  resolve: resolveProvider,            // per-conversation resolution
+  setConvProvider,
+  refreshPickers: renderModelPicker,   // repaint all composer pickers (conv switch)
   complete: completeOnce,
   load: loadProviders,
-  apply: applyActiveProvider,
   ensureUsable,
   list: () => _providers.slice(),
-  get activeId() { return _activeProviderId; },
   updateHint: updateRoutingHint,
   refreshDot: refreshAiDot,
   setManaged,
@@ -719,10 +521,8 @@ window.SandpieProviders = {
 
 function bootProviders() {
   init();
-  // Load personal providers + render the composer model-picker at app start, so it
-  // shows the user's models without first opening the gear panel (the panel's lazy
-  // render re-loads later — idempotent). loadProviders → applyActiveProvider →
-  // renderModelPicker does the initial paint.
+  // Load the provider catalog + render the composer model-pickers at app start
+  // (the panel's lazy render re-loads later — idempotent).
   try { loadProviders(); } catch (_) {}
   // If the user signed in before this module evaluated, the company catalog may
   // have been fetched before the picker existed — inject it now (no-op otherwise).
