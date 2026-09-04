@@ -19,6 +19,89 @@
    "system_py312"
   ]
  },
+ "l0_phase1": {
+  "audit": {
+   "CODE_PARAM": {
+    "authored": "CODE_PARAM[off'=(coeff+1)]",
+    "blind_energy": 23,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c+1)",
+     "e": "e"
+    }
+   },
+   "CODE_STRUCT_PARAM": {
+    "authored": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+    "blind_energy": 18,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c+e)",
+     "e": "e"
+    }
+   },
+   "NEGATE": {
+    "authored": "NEGATE (c -> -c)",
+    "blind_energy": 10,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "neg(c)",
+     "e": "e"
+    }
+   },
+   "STRUCT_GLOBAL": {
+    "authored": "STRUCT_GLOBAL[x->Pow2]",
+    "blind_energy": 5,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "c",
+     "e": "2"
+    }
+   },
+   "STRUCT_PARAM_diff": {
+    "authored": "STRUCT_PARAM[c'=coeff*exp,e'=exp-1]",
+    "blind_energy": 56,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c*e)",
+     "e": "(e-1)"
+    }
+   },
+   "STRUCT_PARAM_integ": {
+    "authored": "STRUCT_PARAM[c'=coeff/(exp+1),e'=exp+1]",
+    "blind_energy": 11915,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "neg((neg(c)/(e+1)))",
+     "e": "(e+1)"
+    }
+   }
+  },
+  "combinators": [
+   "AT_SITE",
+   "MAP_SITES",
+   "COMPOSE"
+  ],
+  "depth3": ">=400000 (cap-saturated lower bound)",
+  "frame_space_depth2": 125574436,
+  "globalapply": "MAP_SITES(discrete node-kind swap) -- combinator layer, not an arithmetic frame",
+  "kill1": "PASSES",
+  "primitive_growth": {
+   "/": "integ frame c'=c/(e+1) needs exact rational division; ast.Div IS an object-grammar node type"
+  },
+  "sizes_by_depth": {
+   "1": 73,
+   "2": 11206
+  },
+  "unreachable_on_e8_base": [
+   "STRUCT_PARAM_integ"
+  ]
+ },
  "ledger_recorded": {
   "e8_authored_vs_blind": {
    "comment": "authored shortlist buys ~1e4-1e5x search efficiency = the factor Phase 3's proposer must recover from L0",
