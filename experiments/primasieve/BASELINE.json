@@ -582,6 +582,45 @@
   "total": 60,
   "unsolved": []
  },
+ "phase2_reuse": {
+  "arm_A_cumulative": {
+   "compositions": {
+    "diff o diff": 12
+   },
+   "median_pair_evals": 5,
+   "n": 12,
+   "solved": 12
+  },
+  "arm_B_no_reuse_l0_direct": {
+   "candidates": 1863,
+   "frame": [
+    "((c*e)*(e-1))",
+    "(e-2)"
+   ],
+   "solved_once_discovered": 12
+  },
+  "arm_C_delete_diff": {
+   "library": [
+    "integ",
+    "double",
+    "raise"
+   ],
+   "n": 12,
+   "solved": 0
+  },
+  "arm_D_shuffled_tests": {
+   "n": 12,
+   "solved": 0
+  },
+  "library": {
+   "diff": "c'=(c*e),e'=(e-1)",
+   "double": "c'=(c+c),e'=e",
+   "integ": "c'=abs((neg(c)/(e+1))),e'=(e+1)",
+   "raise": "c'=c,e'=(e+1)"
+  },
+  "measure_d": "DEMONSTRATED",
+  "reuse_speedup_vs_rediscovery": 372.6
+ },
  "phase2_summary": {
   "bug_fixed": "sleep_l0._wrap -- L0 ev() works in Fraction for exactness but consumers write results into ast.Constant (CodeStructParam), where a Fraction is not a valid literal -> codeparam scored 0/10 until normalised to int/float.",
   "equivalence": "5/6 L0 frames authored-equivalent GENERALLY; integ equivalent on the evidence/graded regime (c>0) but WRONG for c<0 (L0 gives +5/2 where truth is -5/2)",
