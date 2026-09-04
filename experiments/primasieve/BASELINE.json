@@ -1,0 +1,547 @@
+{
+ "_updated": "2026-09-04T19:49:11",
+ "env": {
+  "interpreters": {
+   "default_python": {
+    "exe": "C:\\Users\\aezequiel\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe",
+    "numpy": null,
+    "torch": null,
+    "version": "3.11.15"
+   },
+   "system_py312": {
+    "exe": "C:/Users/aezequiel/AppData/Local/Programs/Python/Python312/python.exe",
+    "numpy": "2.5.1",
+    "torch": "2.13.0+cpu",
+    "version": "3.12.10"
+   }
+  },
+  "torch_capable": [
+   "system_py312"
+  ]
+ },
+ "ledger_recorded": {
+  "e8_authored_vs_blind": {
+   "comment": "authored shortlist buys ~1e4-1e5x search efficiency = the factor Phase 3's proposer must recover from L0",
+   "signmod": "unreachable at depth<=3",
+   "trunc": 36401
+  },
+  "matrix_disc_solved": 120,
+  "matrix_prim_solved": 25,
+  "matrix_total": 120,
+  "note": "numbers recorded in the project ledger BEFORE this plan; re-measured by the components above",
+  "quixbugs_energy_ratio": 0.83,
+  "quixbugs_ucb_solved": 26,
+  "seg_token_f": 0.741,
+  "zhikov_token_f": 0.7542
+ },
+ "matrix": {
+  "cells": {
+   "code": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "CODE_PARAM[off'=(coeff+1)]",
+    "prim_evals": [
+     591,
+     683,
+     531,
+     683,
+     591,
+     591,
+     1332,
+     531,
+     1359,
+     683,
+     531,
+     531,
+     531,
+     531,
+     1083,
+     1359,
+     591,
+     543,
+     1412,
+     1083
+    ],
+    "prim_med_evals": 591,
+    "prim_solved": 10
+   },
+   "codeparam": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+    "prim_evals": [
+     566,
+     566,
+     660,
+     752,
+     754,
+     911,
+     565,
+     754,
+     754,
+     565,
+     1486,
+     911,
+     939,
+     754,
+     660,
+     939,
+     1201,
+     939,
+     754,
+     754
+    ],
+    "prim_med_evals": 754,
+    "prim_solved": 0
+   },
+   "diff": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_PARAM[c'=coeff*exp,e'=(exp-1)]",
+    "prim_evals": [
+     967,
+     668,
+     876,
+     967,
+     876,
+     341,
+     668,
+     967,
+     667,
+     876,
+     340,
+     340,
+     967,
+     667,
+     331,
+     339,
+     876,
+     967,
+     331,
+     876
+    ],
+    "prim_med_evals": 772,
+    "prim_solved": 0
+   },
+   "integ": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_PARAM[c'=coeff/(exp+1),e'=(exp+1)]",
+    "prim_evals": [
+     967,
+     950,
+     876,
+     876,
+     668,
+     967,
+     876,
+     876,
+     876,
+     876,
+     668,
+     340,
+     967,
+     647,
+     967,
+     340,
+     341,
+     967,
+     876,
+     967
+    ],
+    "prim_med_evals": 876,
+    "prim_solved": 0
+   },
+   "negate": {
+    "disc_evals": [
+     29,
+     294,
+     59,
+     39,
+     29,
+     29,
+     127,
+     201,
+     59,
+     39,
+     39,
+     29,
+     92,
+     92,
+     164,
+     39,
+     90,
+     29,
+     59,
+     90
+    ],
+    "disc_med_evals": 59,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "NEGATE",
+    "prim_evals": [
+     29,
+     882,
+     59,
+     39,
+     29,
+     29,
+     201,
+     327,
+     59,
+     39,
+     39,
+     29,
+     92,
+     92,
+     264,
+     39,
+     138,
+     29,
+     59,
+     138
+    ],
+    "prim_med_evals": 59,
+    "prim_solved": 14
+   },
+   "struct": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_GLOBAL[x->Pow2]",
+    "prim_evals": [
+     420,
+     418,
+     615,
+     216,
+     420,
+     216,
+     148,
+     418,
+     812,
+     615,
+     284,
+     352,
+     1700,
+     352,
+     1754,
+     216,
+     420,
+     352,
+     216,
+     420
+    ],
+    "prim_med_evals": 418,
+    "prim_solved": 0
+   }
+  },
+  "disc_solved": 120,
+  "n_per_class": 20,
+  "ops": {
+   "code": "CODE_PARAM[off'=(coeff+1)]",
+   "codeparam": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+   "diff": "STRUCT_PARAM[c'=coeff*exp,e'=(exp-1)]",
+   "integ": "STRUCT_PARAM[c'=coeff/(exp+1),e'=(exp+1)]",
+   "negate": "NEGATE",
+   "struct": "STRUCT_GLOBAL[x->Pow2]"
+  },
+  "prim_solved": 24,
+  "secs": 201.8,
+  "total": 120,
+  "vocab_added": 0
+ },
+ "quixbugs": {
+  "energy_ratio": 1.02,
+  "hand_energy": 21839,
+  "hand_solved": 23,
+  "n": 26,
+  "per_bug": {
+   "bitcount": {
+    "hand_evals": 12,
+    "hand_solved": true,
+    "ucb_evals": 21,
+    "ucb_solved": true
+   },
+   "bucketsort": {
+    "hand_evals": 97,
+    "hand_solved": true,
+    "ucb_evals": 106,
+    "ucb_solved": true
+   },
+   "find_first_in_sorted": {
+    "hand_evals": 9,
+    "hand_solved": true,
+    "ucb_evals": 51,
+    "ucb_solved": true
+   },
+   "find_in_sorted": {
+    "hand_evals": 484,
+    "hand_solved": true,
+    "ucb_evals": 526,
+    "ucb_solved": true
+   },
+   "flatten": {
+    "hand_evals": 1,
+    "hand_solved": true,
+    "ucb_evals": 1,
+    "ucb_solved": true
+   },
+   "gcd": {
+    "hand_evals": 1,
+    "hand_solved": true,
+    "ucb_evals": 15,
+    "ucb_solved": true
+   },
+   "get_factors": {
+    "hand_evals": 25,
+    "hand_solved": true,
+    "ucb_evals": 33,
+    "ucb_solved": true
+   },
+   "hanoi": {
+    "hand_evals": 53,
+    "hand_solved": true,
+    "ucb_evals": 67,
+    "ucb_solved": true
+   },
+   "is_valid_parenthesization": {
+    "hand_evals": 23,
+    "hand_solved": true,
+    "ucb_evals": 33,
+    "ucb_solved": true
+   },
+   "kheapsort": {
+    "hand_evals": 366,
+    "hand_solved": true,
+    "ucb_evals": 616,
+    "ucb_solved": true
+   },
+   "kth": {
+    "hand_evals": 5190,
+    "hand_solved": false,
+    "ucb_evals": 5983,
+    "ucb_solved": true
+   },
+   "lcs_length": {
+    "hand_evals": 4502,
+    "hand_solved": false,
+    "ucb_evals": 10141,
+    "ucb_solved": true
+   },
+   "lis": {
+    "hand_evals": 5128,
+    "hand_solved": true,
+    "ucb_evals": 843,
+    "ucb_solved": true
+   },
+   "max_sublist_sum": {
+    "hand_evals": 756,
+    "hand_solved": true,
+    "ucb_evals": 343,
+    "ucb_solved": true
+   },
+   "mergesort": {
+    "hand_evals": 124,
+    "hand_solved": true,
+    "ucb_evals": 148,
+    "ucb_solved": true
+   },
+   "next_palindrome": {
+    "hand_evals": 174,
+    "hand_solved": true,
+    "ucb_evals": 230,
+    "ucb_solved": true
+   },
+   "next_permutation": {
+    "hand_evals": 102,
+    "hand_solved": true,
+    "ucb_evals": 125,
+    "ucb_solved": true
+   },
+   "pascal": {
+    "hand_evals": 670,
+    "hand_solved": true,
+    "ucb_evals": 957,
+    "ucb_solved": true
+   },
+   "powerset": {
+    "hand_evals": 585,
+    "hand_solved": false,
+    "ucb_evals": 306,
+    "ucb_solved": true
+   },
+   "quicksort": {
+    "hand_evals": 66,
+    "hand_solved": true,
+    "ucb_evals": 13,
+    "ucb_solved": true
+   },
+   "rpn_eval": {
+    "hand_evals": 9,
+    "hand_solved": true,
+    "ucb_evals": 45,
+    "ucb_solved": true
+   },
+   "shunting_yard": {
+    "hand_evals": 1496,
+    "hand_solved": true,
+    "ucb_evals": 451,
+    "ucb_solved": true
+   },
+   "sieve": {
+    "hand_evals": 2,
+    "hand_solved": true,
+    "ucb_evals": 25,
+    "ucb_solved": true
+   },
+   "sqrt": {
+    "hand_evals": 549,
+    "hand_solved": true,
+    "ucb_evals": 590,
+    "ucb_solved": true
+   },
+   "to_base": {
+    "hand_evals": 57,
+    "hand_solved": true,
+    "ucb_evals": 89,
+    "ucb_solved": true
+   },
+   "wrap": {
+    "hand_evals": 1358,
+    "hand_solved": true,
+    "ucb_evals": 507,
+    "ucb_solved": true
+   }
+  },
+  "secs": 50.0,
+  "ucb_energy": 22265,
+  "ucb_solved": 26
+ },
+ "segmentation": {
+  "boundary_f": 0.857,
+  "corpus": "br-phono",
+  "gap": 0.0131,
+  "lexicon_types": 925,
+  "secs": 30.6,
+  "token_f": 0.7411,
+  "token_p": 0.7048,
+  "token_r": 0.7814,
+  "tokens": 33399,
+  "utts": 9790,
+  "zhikov_token_f": 0.7542
+ }
+}
