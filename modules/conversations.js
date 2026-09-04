@@ -465,6 +465,10 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
     meta.projectRoot = projRoot;
     meta.projectNs = (s && s.projectNs) || (prevMeta && prevMeta.projectNs) || 'home';
   }
+  // PER-CONVERSATION provider: carried forward like projectRoot (meta is rebuilt
+  // from scratch on every save). null → the catalog default applies.
+  const provId = (s && s.providerId) || (prevMeta && prevMeta.providerId);
+  if (provId) meta.providerId = provId;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -1522,6 +1526,14 @@ function mountConv(convId, pane = null) {
   }
   refreshSendButtonForActive();
   if (typeof SandpieTokens !== 'undefined') SandpieTokens.notify();
+  // PER-CONVERSATION provider: tag the pane's model-picker host with the conv now
+  // mounted (providers.js reads data-conv-id to resolve + set that conv's model)
+  // and repaint both pickers so each shows its own conversation's model.
+  try {
+    const mpHost = document.getElementById(isSide ? 'modelPickerSide' : 'modelPicker');
+    if (mpHost) mpHost.dataset.convId = convId || '';
+    if (window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
+  } catch (_) {}
   // Active conversation changed → re-colour the memory bank immediately.
   if (convId) _recalcMemoryFor(convId);
   // BETA: the Files sidebar shows the ACTIVE conversation's project — refresh it
@@ -1804,6 +1816,7 @@ async function loadConv(id) {
       s.lastTurn = meta.lastTurn || null;
       s.projectRoot = meta.projectRoot || null;
       s.projectNs = meta.projectNs || null;
+      s.providerId = meta.providerId || null;
 
       if (!fileSize) {
         // Empty conversation (no messages yet)
@@ -2596,11 +2609,8 @@ async function handleSubmit(which = 'main') {
     // Empty submit resumes an interrupted turn instead of doing nothing — but only
     // when the conversation is resumable (last message didn't finish with 'stop').
     // No auto-resume on load; the user opts in by pressing Enter / send.
-    // Resumability is checked on THIS pane's own conversation, NOT isResumableActive()
-    // (which reads activeStream = the FOCUSED pane) — otherwise an empty Enter in one
-    // pane could resume based on the OTHER pane's state (cross-pane coupling).
-    const s = convId ? ensureStream(convId) : null;
-    if (s && isResumable(s.messages)) {
+    if (convId && isResumableActive()) {
+      const s = ensureStream(convId);
       if (s.generating) return;   // a turn is already running — never start a second loop
       if (s.host.parentNode !== pane) _mountInPane(s.host, pane);
       await sendSingle('', s, { resume: true });
@@ -2807,34 +2817,39 @@ function handleButtonClick(which = 'main') {
   const btn = which === 'side' ? $('sendBtnSide') : $('sendBtn');
   if (!btn) return;
   const convId = _composerConv(which);
-  // STRICTLY this pane's own conversation — never activeStream(). activeStream()
-  // follows the FOCUSED pane, so an empty pane's button (with convId null) used to
-  // act on the OTHER pane's turn. Each pane's button controls only its own pane.
-  const s = convId ? convStreams.get(convId) : null;
-  // Stop ONLY this pane's turn. sandpie runs an independent per-conversation loop
-  // per pane (single-flight is per-conv), so a turn generating in the OTHER pane
-  // is a separate, valid turn — this button must never cancel it. (The old global
-  // stop cancelled EVERY live turn on any click — the button "entanglement".)
+  const s = convId ? convStreams.get(convId) : activeStream();
+  // Stop decides on STREAM STATE, not the button's CSS class — the class can go
+  // stale when a pane refresh is missed, and a stale ▶ click while generating
+  // must never fall through to handleSubmit (whose empty-composer resume path
+  // would start a SECOND concurrent loop for this conversation).
   if (s && s.generating) {
-    // Abort this turn's page-side pre-send fetches too (the pool self-drains and
-    // pre-send work is brief), then stop this pane's stream. Other panes untouched.
-    for (const c of Array.from(_pageAbortPool)) { try { c.abort(); } catch (_) {} }
-    stopStream(s);
+    stopEverything(s);
+    return;
+  }
+  // GLOBAL STOP: this pane's conversation is idle, but some OTHER conversation
+  // (the other pane, or a background one whose host pane was unmounted) may
+  // still be generating. The click must reach it — a Stop press must never fall
+  // through to handleSubmit while ANY turn is live, because the empty-composer
+  // resume path would start a SECOND loop. Stop every live background turn.
+  let stoppedBackground = false;
+  for (const st of convStreams.values()) {
+    if (st !== s && st.generating) { stopStream(st); stoppedBackground = true; }
+  }
+  if (stoppedBackground) {
+    stopEverything(null);
     refreshSendButtonFor(which);
     return;
   }
-  // Stale ■ (button says sending but this pane's stream isn't live — an orphaned
-  // worker loop after a tab freeze). Best-effort abort THIS pane's last known
-  // agent id (idempotent on the worker), then resync the button. No other pane.
+  // Stale ■ with no live turn: usually just a missed UI resync — but it's also the
+  // signature of an ORPHANED worker loop (the page finalized the turn while the
+  // worker kept running, e.g. after a tab freeze). An explicit stop click must
+  // still reach it, so fire a best-effort abort at the last known agent id before
+  // resyncing the button. Idempotent on the worker.
   if (btn.classList.contains('sending')) {
-    const aid = s && (s.agentId || s._lastAgentId);
-    if (aid) { try { getSandpieWorker().postMessage({ type: 'abort', id: aid }); } catch (_) {} }
+    stopEverything(s);
     refreshSendButtonFor(which);
     return;
   }
-  // Idle → submit into THIS pane. A second loop on the same conversation is
-  // prevented by sendSingle's per-conversation single-flight, so no global stop is
-  // needed here.
   window.handleSubmit(which);
 }
 
@@ -3214,14 +3229,12 @@ async function sendSingle(text, stream, opts = {}) {
     maybeAutoTitle(convId).catch(() => {});
   }
 
-  // If no model is selected but a configured provider has one, use it rather than
-  // erroring; then validate. On failure the message above is preserved.
-  if (typeof SandpieProviders !== 'undefined' && SandpieProviders.ensureUsable) {
-    try { SandpieProviders.ensureUsable(); } catch (_) {}
-  }
-  const _active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
-  if (!$('endpoint').value || !$('model').value || !$('apiKey').value) {
-    addMsg('err', 'Add a provider (endpoint, model, and API key) in Settings before sending.', host);
+  // Validate THIS conversation's provider (per-conv model; no global default).
+  // On failure the message above is preserved.
+  let _prov = null;
+  try { _prov = SandpieProviders.resolve(convId); } catch (_) {}
+  if (!_prov || !(_prov.model || '').trim() || !(_prov.endpoint || '').trim()) {
+    addMsg('err', 'This conversation has no usable model — pick one in the composer model picker (or add one in Settings → AI provider).', host);
     return;
   }
   requestWakeLock();
@@ -3568,7 +3581,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   // images; text-only turns sent to it strip image_url parts from the history so
   // old image turns don't 400. An unset vision field keeps legacy behavior (can
   // see) — see SandpieProviders.providerCanSee.
-  const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+  // PER-CONVERSATION provider: this conversation's own model (composer picker),
+  // falling back to the catalog default when the conv has none set.
+  const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve)
+    ? SandpieProviders.resolve(convId) : null;
   const canSee = (active && typeof SandpieProviders.providerCanSee === 'function')
     ? SandpieProviders.providerCanSee(active) : true;
   // "Current" means the message being sent NOW: the last user message, whatever
@@ -3629,7 +3645,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
       resolvedMessages.push(msg);
     }
   }
-  const _ep = (effective && effective.endpoint) ? String(effective.endpoint).replace(/\/$/, '') : $('endpoint').value.replace(/\/$/, '');
+  const _ep = effective ? String(effective.endpoint || '').replace(/\/$/, '') : '';
   // BETA projects fork: resolve the conversation's project once (stream first, then
   // persisted meta) — reused for both the system-prompt block and the worker config.
   let _projRoot = null, _projNs = null;
@@ -3650,8 +3666,8 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
       : `\n\n## No project folder\nThis conversation has no project folder yet, so file writes will be refused. You can still read files anywhere in Dropbox by absolute path. Ask the user to start the conversation inside a project to enable writing.`;
   }
   return {
-    url: new URL(api(_ep + '/chat/completions'), location.href).href,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || $('apiKey').value) },
+    url: new URL(api(_ep + '/chat/completions', effective && effective.proxyUrl), location.href).href,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || '') },
     localize: null,   // display-side translation layer removed; language = system-prompt directive
     // Session reply language + the model's fluent set, for the worker's
     // per-call language rules (respond guard, subagent clause, deliverable
@@ -3664,7 +3680,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // there is a real bad-key error, not a refreshable session.
     authRefreshUrl: (effective && effective.managed) ? new URL('/auth/token', location.href).href : null,
     _hermesMode: !!(effective && effective.type === 'hermes'),
-    model: (effective && effective.model) || $('model').value,
+    model: (effective && effective.model) || '',
     systemPrompt: _sysPrompt,
     messages: resolvedMessages,
     tools: _todoV2() ? toolDefs() : _todoLabTools(toolDefs()),
@@ -3817,14 +3833,14 @@ function reportDegeneration(ev) {
 function reportTurnUsage(convId, usage, turnIndex) {
   try {
     if (!convId || !usage || typeof usage.prompt_tokens !== 'number') return;
-    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(convId) : null;
     const details = usage.completion_tokens_details || {};
     const reasoning = details.reasoning_tokens != null ? details.reasoning_tokens
                     : (usage.reasoning_tokens != null ? usage.reasoning_tokens : undefined);
     const body = {
       conversation_id: convId,
       turn_index: turnIndex | 0,
-      model: (typeof $ === 'function' && $('model')) ? $('model').value : (usage.model || null),
+      model: (active && active.model) || usage.model || null,
       provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
       usage: {
         prompt_tokens: usage.prompt_tokens || 0,
@@ -3856,8 +3872,8 @@ async function reportConversation(reason) {
     if (!cid) return;
     const session_id = await ensureSessionId(cid);
     if (!session_id) return;
-    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
-    const model = (typeof $ === 'function' && $('model')) ? $('model').value : (active && active.model) || null;
+    const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(cid) : null;
+    const model = (active && active.model) || null;
     const res = await fetch(new URL('/api/report/conversation', location.href).href, {
       method: 'POST',
       credentials: 'same-origin',
@@ -3882,12 +3898,12 @@ function reportTurnTiming(convId, timing, turnIndex) {
     // Stash the current session id so the always-on suspension monitor can label
     // its gaps with the conversation they happened in (best-effort — last known).
     if (timing.session_id) window.__sandpieActiveSessionId = timing.session_id;
-    const active = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+    const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(convId) : null;
     const body = {
       conversation_id: convId,
       session_id: timing.session_id || null,
       turn_index: turnIndex | 0,
-      model: (typeof $ === 'function' && $('model')) ? $('model').value : null,
+      model: (active && active.model) || null,
       provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
       timing: {
         completion_ms: timing.completion_ms | 0,
@@ -4121,6 +4137,9 @@ function ensureStream(id) {
       persistedCount: 0, _forceJsonlRewrite: false,
       // BETA projects fork: the conversation's project folder (null until picked).
       projectRoot: null, projectNs: null,
+      // PER-CONVERSATION provider: which catalog model this conversation uses
+      // (composer model picker). null → providers.js defaultProvider() applies.
+      providerId: null,
     };
     convStreams.set(id, s);
   }
@@ -4362,7 +4381,7 @@ function appendToolResult(tcId, result, scopeEl) {
 // default: everything non-English gets localized.
 function _modelFluent() {
   try {
-    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive && SandpieProviders.getActive()) || null;
+    const p = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(activeConvId) : null;
     if (!p || !Array.isArray(p.fluent) || !p.fluent.length) return null;
     return p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase());
   } catch (_) { return null; }
@@ -6270,7 +6289,7 @@ async function _performCompaction(convId, cfg, triggerReason = 'native compactio
   // every page-side compaction trigger, including the first send after resume.
   const cmpLog = async (event, extra = {}) => {
     try {
-      const provider = (typeof SandpieProviders !== 'undefined' && SandpieProviders.getActive) ? SandpieProviders.getActive() : null;
+      const provider = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(convId) : null;
       const sid = (typeof ensureSessionId === 'function') ? await ensureSessionId(convId) : null;
       const title = (typeof convTitle === 'function') ? await convTitle(convId) : null;
       console.log('[compaction] ' + event + ' ' + JSON.stringify({
@@ -7152,6 +7171,25 @@ window.saveActiveConv = saveActiveConv;
 window.saveConv = saveConv;
 // getTitle/autoTitle are read/write access to a conversation's name for modules
 // that only need that (notifications.js reads it for the toast body).
+// PER-CONVERSATION provider bridge — providers.js reads/sets the model through
+// this (the composer model picker is per conversation; there is no global model).
+// convId null means "the conversation the caller is focused on" (activeConvId).
+window.SandpieConv = {
+  getProviderId(convId) {
+    const id = convId || activeConvId;
+    if (!id) return null;
+    const s = convStreams.get(id);
+    return (s && s.providerId) || null;
+  },
+  setProviderId(convId, providerId) {
+    const id = convId || activeConvId;
+    if (!id) return;
+    const s = ensureStream(id);
+    s.providerId = providerId || null;
+    saveConv(id, { touchUpdated: false }).catch(() => {});
+  },
+};
+
 window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, getTitle: convTitle, autoTitle: maybeAutoTitle };
 window.renderHistoricalMessage = renderHistoricalMessage;
 window.clearActiveConvUI = clearActiveConvUI;
