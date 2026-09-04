@@ -260,6 +260,9 @@ self.addEventListener('message', async (event) => {
 
   if (data.type === 'agent') {
     const { id, config } = data;
+    // Python backend for this run. 'walios' routes run_python to the warm walios
+    // interpreter instead of the Pyodide pool; anything else keeps Pyodide.
+    _pyBackend = (config && config.pythonBackend === 'walios') ? 'walios' : 'pyodide';
     const abortCtl = new AbortController();
     _agentAborts.set(id, abortCtl);
     const ctx = {
@@ -963,7 +966,10 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
+let _pyBackend = 'pyodide';
+
 async function tool_run_python({ path, code, args, timeout }, ctx) {
+  if (_pyBackend === 'walios') return tool_run_python_walios({ path, code, args, timeout }, ctx);
   // REPL: `code` runs directly (no saved script) — enabled in BOTH modes now.
   // Falls back to `path` for a real saved script.
   const hasCode = typeof code === 'string' && code.trim() !== '';
@@ -3046,13 +3052,26 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
 // the WISP relay (wss://<host>/wisp): wget/nc/ssh/ping work.
 const WALIOS_BASE = '/walios/';
 const WALIOS_BB = 'busybox.wasm?v=net4';
+// Bumped together with any wali-worker.js deploy (dlopen7 = GOT back-fill before
+// the data relocs + the self-resolving import trampoline, ported from the node host).
+const WALIOS_WORKER_V = 'dlopen7';
+// Per-binary companion mounts, fetched+extracted on the FIRST exec of that binary
+// and cached for the worker's life. Shared by the shell tool and the warm
+// interpreter so both see the same package set.
+const WALIOS_LAZY_TARS = {
+  'python.wasm': [['pylib.tar.gz', '/py']],
+  'python_cxx.wasm?v=5': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
+                          ['walios-numpy.tar.gz?v=2', '/site-packages'],
+                          ['walios-docs.tar.gz?v=3', '/site-packages'],
+                          ['walios-mpl.tar.gz?v=1', '/site-packages']],
+};
 const WALIOS_MANIFEST = {
   busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
   // python → python_cxx: the dynamic-linking CPython that dlopen()s PIC-wasm
   // C-extension .so, so `import numpy/lxml/PIL/docx…` works seamlessly (the
   // packages are lazy-mounted into /site-packages when python_cxx first runs —
   // see the tool_walios run message). Plain python.wasm can't dlopen.
-  python: 'python_cxx.wasm?v=4', python3: 'python_cxx.wasm?v=4', pydl: 'python_cxx.wasm?v=4', lua: 'lua.wasm',
+  python: 'python_cxx.wasm?v=5', python3: 'python_cxx.wasm?v=5', pydl: 'python_cxx.wasm?v=5', lua: 'lua.wasm',
   ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
 };
@@ -3076,7 +3095,7 @@ async function _waliosPkgManifest() {
 }
 function _waliosEnsure() {
   if (_waliosWorker) return _waliosWorker;
-  const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=dlopen6');
+  const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
   try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
     const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
     const opfsWorker = new Worker(WALIOS_BASE + 'opfs-worker.js');
@@ -3137,14 +3156,194 @@ async function tool_walios({ script, timeout }, ctx) {
       // exec'd. python_cxx (which `python` now maps to) pulls the stdlib + the
       // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
       // `import` just works without the model running any install step.
-      lazyTars: {
-        'python.wasm':     [['pylib.tar.gz', '/py']],
-        'python_cxx.wasm?v=4': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'], ['walios-numpy.tar.gz?v=2', '/site-packages'], ['walios-docs.tar.gz?v=3', '/site-packages']],
-      },
+      lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
+             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1',
+             MPLBACKEND: 'Agg', MPLCONFIGDIR: '/tmp/mpl' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
+}
+
+
+// ── walios PERSISTENT Python — the warm interpreter ─────────────────────────
+// A fresh CPython per call costs ~0.3s of boot plus the imports on top (numpy
+// ~2s, pandas ~4s+) EVERY time, which is why the one-shot `walios` shell tool is
+// a poor Python backend. This keeps ONE python alive in its own walios worker and
+// feeds it framed requests, so imports and user globals are paid once per session
+// and later calls land in the tens of milliseconds. Guest half + wire format:
+// modules/walios-repl.py.
+const WPY_REPL_URL = './walios-repl.py?v=1';
+const WPY_GRACE_MS = 20000;      // JS deadline sits this far past the guest's own alarm
+let _wpy = null;                 // { worker, buf, waiters, seq, ready, booting, queue }
+
+// Frame scanning: the guest writes \x02<base64 json>\x03 on fd 1. Anything else on
+// fd 1 is stray guest output (a C extension writing to the fd directly) and is
+// skipped rather than allowed to corrupt the stream.
+function _wpyScan(st) {
+  for (;;) {
+    const a = st.buf.indexOf('\x02'), b = st.buf.indexOf('\x03', a + 1);
+    if (a < 0 || b < 0) { if (st.buf.length > 4 << 20) st.buf = st.buf.slice(-65536); return; }
+    const raw = st.buf.slice(a + 1, b);
+    st.buf = st.buf.slice(b + 1);
+    let f = null;
+    try { f = JSON.parse(_b64dec(raw)); } catch (_) { continue; }
+    if (f.t === 'call') { _wpyHostcall(st, f); continue; }
+    const i = st.waiters.findIndex(w => w.match(f));
+    if (i >= 0) st.waiters.splice(i, 1)[0].resolve(f);
+  }
+}
+function _b64enc(s) { return btoa(String.fromCharCode(...new TextEncoder().encode(s))); }
+function _b64dec(s) { return new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))); }
+function _wpySend(st, obj) { try { st.worker.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify(obj)) + '\n' }); } catch (_) {} }
+function _wpyWait(st, match, ms) {
+  return new Promise((resolve, reject) => {
+    const w = { match, resolve, reject };
+    st.waiters.push(w);
+    if (ms) setTimeout(() => { const i = st.waiters.indexOf(w); if (i >= 0) { st.waiters.splice(i, 1); reject(new Error('walios python: no response in ' + Math.round(ms / 1000) + 's')); } }, ms);
+  });
+}
+
+// Host RPC. The guest deliberately does NOT open its own sockets for these: the
+// page already has fetch() and the /proxy/ route, so pyodide.http.pyfetch and
+// micropip both come back out here. Same reachability as the Pyodide backend.
+async function _wpyFetch(url, init) {
+  try { return await fetch(url, init); }
+  catch (_) { return await fetch('/proxy/' + String(url).replace(/^https?:\/\//, ''), init); }
+}
+async function _wpyHostcall(st, f) {
+  const reply = (o) => _wpySend(st, { t: 'reply', id: f.id, ...o });
+  try {
+    const a = f.args || {};
+    if (f.op === 'fetch') {
+      const r = await _wpyFetch(a.url, {
+        method: a.method || 'GET', headers: a.headers || {},
+        body: a.body == null ? undefined : (a.body_is_b64 ? Uint8Array.from(atob(a.body), c => c.charCodeAt(0)) : a.body),
+      });
+      const buf = new Uint8Array(await r.arrayBuffer());
+      let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      const headers = {}; try { r.headers.forEach((v, k) => { headers[k] = v; }); } catch (_) {}
+      return reply({ ok_call: true, status: r.status, url: r.url || a.url, headers, body: btoa(bin) });
+    }
+    if (f.op === 'pip') {
+      const name = String(a.name || '').replace(/[^A-Za-z0-9._-]/g, '');
+      if (!name) return reply({ ok_call: false, error: 'empty package name' });
+      const meta = await (await _wpyFetch('https://pypi.org/pypi/' + name + '/json')).json();
+      const w = (meta.urls || []).find(u => u.packagetype === 'bdist_wheel' && /-(py3|py2\.py3)-none-any\.whl$/.test(u.filename));
+      if (!w) return reply({ ok_call: false, error: name + ' has no pure-Python wheel — it needs a compiled build, which must be cross-compiled to wasm ahead of time' });
+      const buf = new Uint8Array(await (await _wpyFetch(w.url)).arrayBuffer());
+      let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      return reply({ ok_call: true, name: meta.info.name, version: meta.info.version, body: btoa(bin) });
+    }
+    reply({ ok_call: false, error: 'unknown host op ' + f.op });
+  } catch (e) { reply({ ok_call: false, error: String((e && e.message) || e) }); }
+}
+
+function _wpyKill(reason) {
+  const st = _wpy; if (!st) return;
+  _wpy = null;
+  try { st.worker.terminate(); } catch (_) {}
+  for (const w of st.waiters.splice(0)) { try { w.reject(new Error(reason)); } catch (_) {} }
+}
+
+async function _wpyEnsure() {
+  if (_wpy && _wpy.ready) return _wpy;
+  if (_wpy && _wpy.booting) { await _wpy.booting; return _wpy; }
+  const src = await (await fetch(WPY_REPL_URL)).arrayBuffer();
+  const pkgM = await _waliosPkgManifest();
+  const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
+  const st = { worker: w, buf: '', waiters: [], seq: 0, ready: false, booting: null, queue: Promise.resolve(), diag: '' };
+  _wpy = st;
+  try {   // OPFS bridge: /root is the workspace (same namespace as /files)
+    const sab = new SharedArrayBuffer(32 + (1 << 20));
+    const ow = new Worker(WALIOS_BASE + 'opfs-worker.js');
+    ow.postMessage({ t: 'sab', sab }); w.postMessage({ t: 'opfs-sab', sab });
+  } catch (_) {}
+  try {   // WISP bridge: real sockets (ssl/urllib inside the guest)
+    const sab = new SharedArrayBuffer(32 + 65536);
+    const ww = new Worker(WALIOS_BASE + 'wisp-worker.js');
+    ww.postMessage({ t: 'sab', sab, url: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp' });
+    w.postMessage({ t: 'wisp-sab', sab });
+  } catch (_) {}
+  w.onmessage = (ev) => {
+    const m = ev.data;
+    if (m.t === 'out') {
+      if (m.fd === 2) { if (!/^\[host\]/.test(m.s)) st.diag = (st.diag + m.s).slice(-4000); return; }
+      st.buf += m.s; _wpyScan(st);
+    } else if (m.t === 'exit') {
+      _wpyKill('the walios Python interpreter exited (code ' + m.code + ')');
+    }
+  };
+  w.onerror = () => _wpyKill('the walios Python worker crashed');
+  st.booting = _wpyWait(st, f => f.t === 'ready', 180000).then((f) => { st.ready = true; st.python = f.python; return st; });
+  w.postMessage({
+    t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
+    tars: [['rootfs.tar.gz', '/']], opfs: '/root',
+    blobs: { '/sandpie/repl.py': src },
+    lazyTars: WALIOS_LAZY_TARS,
+    env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
+           PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
+           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/tmp/mpl' },
+    // busybox stays the root module so the manifest's lazyTars fire on the exec
+    // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
+    // means no extra process survives.
+    cwd: '/root', argv: ['busybox', 'sh', '-c', 'exec python -u /sandpie/repl.py'],
+    jspi: true, pty: false, cols: 120, rows: 40,
+  });
+  await st.booting;
+  return st;
+}
+
+// Run one chunk on the warm interpreter. Serialized: one run at a time, so a
+// hostcall reply can never be mistaken for another run's frame.
+function waliosPythonRun({ code, timeout, cwd, signal }) {
+  let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(600, Math.round(t));
+  const prev = _wpy ? _wpy.queue : Promise.resolve();
+  const job = prev.catch(() => {}).then(async () => {
+    if (signal && signal.aborted) return { ok: false, err: 'Error: aborted — the turn was stopped.' };
+    let st;
+    try { st = await _wpyEnsure(); }
+    catch (e) { _wpyKill('boot failed'); return { ok: false, err: 'Error: could not start the walios Python interpreter: ' + ((e && e.message) || e) }; }
+    const id = ++st.seq;
+    let onAbort = null;
+    try {
+      if (signal) { onAbort = () => _wpyKill('run aborted (turn stopped)'); signal.addEventListener('abort', onAbort, { once: true }); }
+      _wpySend(st, { t: 'run', id, code: String(code || ''), cwd: cwd || '/root', timeout: t });
+      const f = await _wpyWait(st, x => x.t === 'done' && x.id === id, t * 1000 + WPY_GRACE_MS);
+      return { ok: !!f.ok, out: f.out || '', err: f.err || '' };
+    } catch (e) {
+      // No frame came back in time (or the worker died): the interpreter is gone
+      // or wedged, so drop it — the next call boots a fresh one.
+      const diag = st.diag ? '\n' + st.diag.trim().split('\n').slice(-3).join('\n') : '';
+      _wpyKill('run overran its deadline');
+      return { ok: false, err: 'Error: ' + ((e && e.message) || e) + '. The interpreter was terminated; the next run starts a fresh one.' + diag };
+    } finally {
+      if (signal && onAbort) { try { signal.removeEventListener('abort', onAbort); } catch (_) {} }
+    }
+  });
+  if (_wpy) _wpy.queue = job.catch(() => {});
+  return job;
+}
+
+// run_python on the walios backend. Same contract as the Pyodide one: stdout +
+// stderr as text, `path` runs a saved script, `code` runs a snippet.
+async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
+  let src = code, cwd = '/root';
+  if (!src) {
+    if (!path) return { result: 'Error: pass "code" (a snippet) or "path" (a saved .py file).' };
+    const rel = String(path).replace(/^\/+/, '').replace(/^files\//, '');
+    try { src = new TextDecoder().decode(await opfsReadBytes(rel)); }
+    catch (e) { return { result: 'Error: cannot read ' + rel + ': ' + ((e && e.message) || e) }; }
+    const slash = rel.lastIndexOf('/');
+    if (slash > 0) cwd = '/root/' + rel.slice(0, slash);
+  }
+  if (Array.isArray(args) && args.length) {
+    src = 'import sys; sys.argv = ' + JSON.stringify(['<walios>', ...args.map(String)]) + '\n' + src;
+  }
+  const r = await waliosPythonRun({ code: src, timeout, cwd, signal: ctx && ctx.signal });
+  let text = (r.out || '') + (r.err ? (r.out ? '\n' : '') + r.err : '');
+  text = text.replace(/\n+$/, '');
+  if (!text) text = r.ok ? '[no output]' : '[failed with no output]';
+  return { result: text };
 }
 
 async function unknownTool(name) {

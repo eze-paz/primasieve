@@ -3696,6 +3696,12 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
     routedViaVision: !!routedViaVision,
+    // Python backend for run_python. Default (unset/anything else) = Pyodide.
+    // localStorage 'sandpie-python-backend' = 'walios' routes run_python at the
+    // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with
+    // imports paid once per session rather than once per call. Staged as a shadow
+    // backend so the default path is untouched.
+    pythonBackend: (() => { try { return (localStorage.getItem('sandpie-python-backend') || '').trim(); } catch (_) { return ''; } })(),
     // web_search primary backend: the first configured OpenRouter provider's
     // endpoint+key (active provider preferred), so the tool gets real Exa-backed
     // results even when the active model is NOT on OpenRouter. The worker calls
