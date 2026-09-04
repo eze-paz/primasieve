@@ -2458,12 +2458,13 @@ function refreshSendButtonFor(which) {
   const btn = which === 'side' ? $('sendBtnSide') : $('sendBtn');
   if (!btn) return;
   const convId = _composerConv(which);
-  // Resolve strictly to THIS pane's own conversation. The `activeStream()` fallback
-  // is only valid for the main composer (it always tracks the active conversation);
-  // for the side pane it would borrow the MAIN conversation's state, so an empty
-  // side pane opened while the main conv is generating flashed the Stop (■) button
-  // until the pane was focused and mounted its own (idle) conv — confusing jank.
-  const s = convId ? convStreams.get(convId) : (which === 'side' ? null : activeStream());
+  // Resolve STRICTLY to this pane's own mounted conversation — never fall back to
+  // activeStream(). activeStream() follows whichever pane is FOCUSED (focusPane
+  // sets activeConvId), so an empty pane would borrow the OTHER pane's state: e.g.
+  // an empty side pane (or the home-screen main pane) showing Stop (■) because the
+  // other pane's conversation is generating. A pane with no conversation is idle
+  // (▶); its composer starts/sends into that pane.
+  const s = convId ? convStreams.get(convId) : null;
   if (s && s.generating) {
     btn.textContent = '■';
     btn.title = 'Stop';
