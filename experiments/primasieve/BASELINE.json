@@ -1,5 +1,5 @@
 {
- "_updated": "2026-09-04T19:49:11",
+ "_updated": "2026-09-04T20:14:43",
  "env": {
   "interpreters": {
    "default_python": {
@@ -446,6 +446,162 @@
   "secs": 201.8,
   "total": 120,
   "vocab_added": 0
+ },
+ "phase2_equivalence": {
+  "code": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "codeparam": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "diff": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "integ": {
+   "c": {
+    "eq_general": false,
+    "eq_graded": true,
+    "note": "exact-Fraction equality; the earlier False was a float-coercion artifact of _wrap, not a frame difference"
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "negate": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "struct": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  }
+ },
+ "phase2_knockouts": {
+  "knockout_shuffled_frames": 0,
+  "spurious_without_verify": 0
+ },
+ "phase2_matrix": {
+  "cells": {
+   "code": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "CODE_PARAM[off'=(c+1)]",
+    "prim_med_evals": 531,
+    "prim_solved": 3
+   },
+   "codeparam": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "CODE_STRUCT_PARAM[w'=(c+e)]",
+    "prim_med_evals": 753,
+    "prim_solved": 0
+   },
+   "diff": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_PARAM[c'=(c*e),e'=(e-1)]",
+    "prim_med_evals": 772,
+    "prim_solved": 0
+   },
+   "integ": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_PARAM[c'=abs((neg(c)/(e+1))),e'=(e+1)]",
+    "prim_med_evals": 657,
+    "prim_solved": 0
+   },
+   "negate": {
+    "disc_med_evals": 90,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "NEGATE",
+    "prim_med_evals": 138,
+    "prim_solved": 4
+   },
+   "struct": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_GLOBAL[x->Pow2]",
+    "prim_med_evals": 417,
+    "prim_solved": 0
+   }
+  },
+  "disc_solved": 60,
+  "kill2": "PASSES",
+  "l0_calls": 6,
+  "l0_candidates_total": 8561,
+  "n_per_class": 10,
+  "ops": {
+   "code": "CODE_PARAM[off'=(c+1)]",
+   "codeparam": "CODE_STRUCT_PARAM[w'=(c+e)]",
+   "diff": "STRUCT_PARAM[c'=(c*e),e'=(e-1)]",
+   "integ": "STRUCT_PARAM[c'=abs((neg(c)/(e+1))),e'=(e+1)]",
+   "negate": "NEGATE",
+   "struct": "STRUCT_GLOBAL[x->Pow2]"
+  },
+  "prim_solved": 7,
+  "total": 60,
+  "unsolved": []
+ },
+ "phase2_summary": {
+  "bug_fixed": "sleep_l0._wrap -- L0 ev() works in Fraction for exactness but consumers write results into ast.Constant (CodeStructParam), where a Fraction is not a valid literal -> codeparam scored 0/10 until normalised to int/float.",
+  "equivalence": "5/6 L0 frames authored-equivalent GENERALLY; integ equivalent on the evidence/graded regime (c>0) but WRONG for c<0 (L0 gives +5/2 where truth is -5/2)",
+  "integ_caveat": "FitTemplate cannot solve negative-coefficient seeds, so no negative-c traces exist -> abs(neg(c)/(e+1)) is indistinguishable from c/(e+1) on the available evidence. This is an ACTIVE-PROBING (COLLECT) gap, not a grammar gap.",
+  "kill2": "PASSES (0 of 6 classes short)",
+  "knockout_i_shuffled_traces": "PASSES -- both components abstain after 200000 candidates; grounding is real",
+  "knockout_ii_heldout_verify": "NULL -- verification removed 0 spurious frames; the >=3-trace consistency + varying-attribute guards already reject shuffled data. Verify split is redundant on this evidence, NOT load-bearing. Reported, not tuned.",
+  "l0_discovery_cost": {
+   "calls": 6,
+   "candidates_total": 8561,
+   "comment": "trace-based signatures are coarser than Phase-1 sample-based ones, so cheaper",
+   "max": 8447,
+   "median": 25,
+   "phase1_blind_estimate": 12027
+  },
+  "measure_d_reuse": "NOT DEMONSTRATED -- each class crystallises its own frame from its own traces; no entry is reused by a later class. What IS shown is MACHINERY generality (one L0 + one discovery routine covers all 6 incl. 2 cross-domain code classes, zero authored vocab), which the ledger distinguishes from operator REUSE. Open.",
+  "phase0_authored_reference": "120/120 at N=20 (same 100% rate)",
+  "primitives_baseline": "7/60 at N=10",
+  "result": "60/60 held-out (6 classes x N=10) using ONLY L0-crystallised operators, authored 450-relation frame_grammar DELETED (never consulted)",
+  "wake_evidence_growth": "seeds 5 -> 12: L0 frame space (~1.3e8 at depth2) UNDERDETERMINES where the deleted 450-item menu did not (integ ABSTAINED at 5 seeds). Remedy = more evidence, NOT a smaller space. The authored menu was partly a REGULARISER, not only a search shortcut."
  },
  "quixbugs": {
   "energy_ratio": 1.02,
