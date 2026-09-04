@@ -692,6 +692,30 @@
   "result": "60/60 held-out (6 classes x N=10) using ONLY L0-crystallised operators, authored 450-relation frame_grammar DELETED (never consulted)",
   "wake_evidence_growth": "seeds 5 -> 12: L0 frame space (~1.3e8 at depth2) UNDERDETERMINES where the deleted 450-item menu did not (integ ABSTAINED at 5 seeds). Remedy = more evidence, NOT a smaller space. The authored menu was partly a REGULARISER, not only a search shortcut."
  },
+ "phase2e_active_probing": {
+  "active_correct_general": true,
+  "active_frame": "neg((neg(c)/(e+1)))",
+  "active_probes": [
+   [
+    -9,
+    1
+   ]
+  ],
+  "active_survivors": 1,
+  "active_vs_random_HONEST": "WEAK/NULL: active 1 probe vs random 1.4 probes = 1.4x, and random reached the correct frame 20/20. This is NOT the 7-12x E6 measured for active design. Reason: 6 of the 10 coefficient values in the probe pool are negative, so almost any random probe discriminates. The task is too easy to demonstrate active superiority. Reported, not spun -- the CLOSURE of the gap is the result here, not COLLECT beating random.",
+  "correct_in_general_before": 1,
+  "methodological_finding": "LOAD-BEARING and general: enum_trees dedupes candidates by SIGNATURE. If the signature is computed over the OBSERVED data only, every hypothesis that agrees on the evidence collapses to ONE representative -- the survivor set becomes a singleton BY CONSTRUCTION and the alternatives active probing needs are silently destroyed (first run: 1 survivor, gap looked unclosable). The hypothesis space must be INDIVIDUATED AT THE RESOLUTION YOU INTEND TO PROBE: dedup over traces + probe pool, consistency checked only on traces. Then 6 survivors appear and one probe settles it. Any survivor-set/abstention machinery built on signature dedup inherits this trap.",
+  "random_control": {
+   "mean_probes": 1.45,
+   "mean_survivors_left": 1.0,
+   "n": 20,
+   "solved": 20
+  },
+  "reading": "the underdetermination Phase 2 reported was an ACTIVE-PROBING gap, not a grammar gap, and the engine closes it itself: detect a non-singleton survivor set, choose the maximally splitting input, answer it with the execution oracle, reject the losers. COLLECT at the frame layer. A probe requires only TESTING, so FitTemplate's inability to SEARCH c<0 never blocks it.",
+  "survivor_set_before": 6,
+  "verdict": "GAP CLOSED",
+  "wake_traces": 10
+ },
  "phase3_proposer": {
   "bce": 0.3318,
   "bce_knockout": 0.3944,
