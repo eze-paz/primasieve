@@ -899,6 +899,23 @@
   "verdict": "HONEST NULL with real structure. The proposer learns genuine signal but does NOT deliver a net speedup, because BFS/Occam ordering over L0 is ALREADY near-optimal for the frames that matter.",
   "why_it_fails": "the 5 shallow targets sit at BFS ranks 2-52, so there is NO HEADROOM to win and reranking can only add noise; only the deep frames (d2 1896, integ 8580) have room, and they are rare in this task set"
  },
+ "phase3b_regime_test": {
+  "buckets": {
+   "EXPENSIVE (>500)": {
+    "median_bfs": 56966.0,
+    "median_ko_speedup": 0.957,
+    "median_prior": 41390.0,
+    "median_speedup": 1.27,
+    "n": 60
+   }
+  },
+  "honest_reading": "I ADVANCED an explanation for Phase 3's null ('the proposer pays only where blind search is expensive; the task set had no headroom'), pre-registered a test of it, and the test REFUTED me: on 60 held-out frames all of which land in the expensive bucket (median BFS rank 56966), the median speedup is 1.27x, well under the 2x bar. The learned signal is real but weak (1.27x vs knockout 0.96x). Phase 3 is simply a NULL; there is no regime that rescues it. Note also that these are RANDOM deep frames -- d2's 5.2x may be specific to STRUCTURED frames (d2 is a composition of a learned entry), but that is n=1 and is NOT claimed.",
+  "n_eval": 60,
+  "n_train": 600,
+  "prereg": "expensive bucket (BFS rank > 500) median speedup must be >= 2.0x for the regime explanation to stand; reported either way, no tuning after seeing buckets",
+  "verdict": "EXPLANATION REFUTED (expensive-bucket median 1.27x < 2x)",
+  "what_would_settle_it": "a set of STRUCTURED deep frames (compositions of library entries) large enough to test whether the proposer's advantage is structure-specific rather than depth-specific. Not run; stated as open."
+ },
  "phase4_compression_oracle": {
   "corpus": "br-phono",
   "correction_to_prereg": "I pre-registered that false-ACCEPTANCE (C) would be LARGE. MEASURED 0.42% -- it is NOT. Around gold the two-part DL is locally near-optimal (only 0.44% of all 86k single-gap moves improve it). The unsound-acceptance is therefore a GLOBAL/search phenomenon (other basins compress better), not a local one. Sharper than the prereg.",
