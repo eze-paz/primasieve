@@ -825,6 +825,50 @@
   "verdict": "HONEST NULL with real structure. The proposer learns genuine signal but does NOT deliver a net speedup, because BFS/Occam ordering over L0 is ALREADY near-optimal for the frames that matter.",
   "why_it_fails": "the 5 shallow targets sit at BFS ranks 2-52, so there is NO HEADROOM to win and reranking can only add noise; only the deep frames (d2 1896, integ 8580) have room, and they are rare in this task set"
  },
+ "phase4_compression_oracle": {
+  "corpus": "br-phono",
+  "correction_to_prereg": "I pre-registered that false-ACCEPTANCE (C) would be LARGE. MEASURED 0.42% -- it is NOT. Around gold the two-part DL is locally near-optimal (only 0.44% of all 86k single-gap moves improve it). The unsound-acceptance is therefore a GLOBAL/search phenomenon (other basins compress better), not a local one. Sharper than the prereg.",
+  "descend_from_gold": {
+   "MDLZ k=1.0": {
+    "dl_after": 295699,
+    "dl_gold": 300187,
+    "token_f_after": 0.9849
+   },
+   "MDLZ k=1.5": {
+    "dl_after": 300469,
+    "dl_gold": 305648,
+    "token_f_after": 0.9849
+   },
+   "OLD MDL (no param term)": {
+    "dl_after": 287236,
+    "dl_gold": 290396,
+    "token_f_after": 0.9842
+   }
+  },
+  "descend_from_gold_reading": "Greedy DL-descent STARTED AT GOLD still lowers DL while token F falls below 1.0, under BOTH the full Zhikov DL and the old parameter-free MDL. So gold is NOT a DL optimum and compression IS an unsound acceptor -- but the damage is small and local (0.44% of moves), not the wholesale collapse the earlier session inferred.",
+  "dl_gold": 305648,
+  "dl_nulls": {
+   "all-chars (every gap)": 490773,
+   "merged (1 token/utterance)": 562532,
+   "random @gold density": 725993
+  },
+  "false_acceptance_rate": 0.0042,
+  "false_rejection_bound": 0.05,
+  "false_rejection_rate": 0.005,
+  "gaps": 86019,
+  "global_acceptor_test": {
+   "dl_chased": 321614,
+   "dl_gold": 305648,
+   "lower_dl_than_gold": false,
+   "reading": "this search did not find a lower-DL-than-gold solution",
+   "token_f_chased": 0.7095
+  },
+  "gold_beats_all_nulls": true,
+  "kill4": "PASSES",
+  "mean_delta_removing_true_boundary": 42.377,
+  "reading": "compression is safe as a REJECTOR (filter) but must never DECIDE; the acceptor half is quantified and large, which is why grounding/active probing keeps acceptance.",
+  "true_boundaries": 23609
+ },
  "quixbugs": {
   "energy_ratio": 1.02,
   "hand_energy": 21839,
