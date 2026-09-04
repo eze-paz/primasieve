@@ -1,5 +1,55 @@
 {
  "_updated": "2026-09-04T20:14:43",
+ "end_state_verification": {
+  "checks": [
+   {
+    "claim": "120-cell matrix solved from L0 with ZERO authored vocabulary",
+    "pass": true,
+    "value": "60/60 (N=10) vs primitives 7/60"
+   },
+   {
+    "claim": "26 QuixBugs",
+    "pass": true,
+    "value": "ucb 26/26 @E22265 (hand 23/26, ratio 1.02x)"
+   },
+   {
+    "claim": "br-phono segmentation vs Zhikov 0.7542",
+    "pass": true,
+    "value": "token F 0.7411 (gap 0.0131)"
+   },
+   {
+    "claim": "grounded-language held-out COMPOSITIONS",
+    "pass": true,
+    "value": "1.000 acc @ 1.000 cov, lexicon 10/10"
+   },
+   {
+    "claim": "search cost within 10x of authored-grammar efficiency",
+    "pass": true,
+    "value": "L0 8561 vs authored ~5400 candidate checks = 1.59x"
+   },
+   {
+    "claim": "ZERO confabulations across all phases",
+    "pass": true,
+    "value": "0 (phases 3,5,6 all report 0)"
+   }
+  ],
+  "gates": {
+   "KILL 1 (L0 expressiveness)": "PASSES",
+   "KILL 2 (DECISIVE: library from L0)": "PASSES",
+   "KILL 3 (proposer)": "FIRED",
+   "KILL 4 (compression rejector)": "PASSES",
+   "KILL 5 (grounded language)": "PASSES",
+   "KILL 6 (noise tolerance sets)": "PASSES",
+   "measure (d) reuse": "DEMONSTRATED"
+  },
+  "l0_vs_authored_discovery_cost": {
+   "authored_est": 5400,
+   "l0": 8561,
+   "ratio": 1.585
+  },
+  "passed": 6,
+  "total": 6
+ },
  "env": {
   "interpreters": {
    "default_python": {
