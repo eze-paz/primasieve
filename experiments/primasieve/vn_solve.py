@@ -113,17 +113,31 @@ if __name__ == "__main__":
                 s = delta_sign(text, i, low, TOK.findall(text), members, cls_roles, lemmatize)
                 if s: return s
         return None
-    op_p = op_ok = 0
-    for d in inst:
-        g = VR.gold_op(d["Equation"]); s = dsign(d)
-        if s is None: continue
-        op_p += 1
-        if g == s or g == ("+" if s == "-" else "-"): op_ok += 1   # oracle picks the right forward/inverse mode
-    print(f"\n  ORACLE-SLOT ABLATION (fable): give the correct forward/inverse MODE, keep VerbNet delta-sign + solve:")
-    print(f"    {op_ok}/{op_p} ({100*op_ok//max(1,op_p)}%) -> GIVEN THE PARSE, the zero-LLM reasoning is CORRECT.")
-    print("  CONCLUSION (now SHOWN, not inferred): the maintain-unknowns solver + VerbNet delta-sign is complete;")
-    print("  the 40% overall is ENTIRELY the discourse PARSE (which slot the question queries), which crude cues")
-    print("  cannot resolve (32% trigger precision). The wall is PARSING (English->typed structure = reference")
-    print("  resolution), not the REASONING -- so the LLM's irreducible role here is PARSER/GROUNDER; the reasoning")
-    print("  stays symbolic + verifiable. HONEST caveats: 66/85 have a VerbNet delta-sign (19 uncovered verbs); the")
-    print("  oracle is 1-bit (forward/inverse), the dominant but not the only slot; 2-number non-money subset.")
+    # RETRACTION (fable): an "either forward or inverse matches" ablation is VACUOUS -- {forward,inverse} = {+,-}
+    # always, so it is 100% by construction even with SHUFFLED signs. Do not use it. The honest ablation supplies
+    # a mode from an ANSWER-INDEPENDENT question cue, applies VerbNet's sign, and checks REAL vs SHUFFLED sign.
+    QINV = {"originally", "original", "start", "starting", "begin", "beginning", "initially"}
+    def honest(shuf):
+        pp = ok = 0
+        for d in inst:
+            text = d["Body"] + " " + d["Question"]; low = [t.lower() for t in TOK.findall(text)]
+            s = None
+            for i, t in enumerate(low):
+                if NUM.match(t):
+                    s = delta_sign(text, i, low, TOK.findall(text), members, cls_roles, lemmatize)
+                    if s: break
+            if s is None: continue
+            if shuf: s = random.Random(hash((d["ID"], 1))).choice("+-")
+            inv = bool(set(TOK.findall(VT.sentences(text)[-1].lower())) & QINV)
+            pred = ("+" if s == "-" else "-") if inv else s
+            pp += 1; ok += (pred == VR.gold_op(d["Equation"]))
+        return ok, pp
+    hr, hp = honest(False); hs, _ = honest(True)
+    print(f"\n  HONEST MODE-ORACLE ABLATION (question-cue mode + VerbNet sign; either-or version RETRACTED as vacuous):")
+    print(f"    REAL VerbNet sign     {hr}/{hp} ({100*hr//max(1,hp)}%)")
+    print(f"    SHUFFLED VerbNet sign {hs}/{hp} ({100*hs//max(1,hp)}%)  -> VerbNet sign load-bearing iff REAL >> SHUF")
+    print("  HONEST CONCLUSION: VerbNet's per-verb direction IS load-bearing (REAL 69% vs SHUF 46%), and resolving")
+    print("  the forward/inverse MODE lifts raw 40%->69% -- but NOT to 100%. So 'given the parse the reasoning is")
+    print("  perfect' is FALSE; the wall is DISTRIBUTED across discourse mode-parse + verb coverage (66/85) + sign")
+    print("  quality, not one clean component. The arithmetic solve isn't the bottleneck, but no single fix clears it.")
+    print("  (Prior 'either-or 100% -> parsing is the sole wall' was a vacuous ablation, RETRACTED per fable.)")
