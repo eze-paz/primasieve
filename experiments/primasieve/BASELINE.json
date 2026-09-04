@@ -716,6 +716,7 @@
   "verdict": "GAP CLOSED",
   "wake_traces": 10
  },
+ "phase3_final_reading": "KILL 3 FIRED and STANDS for the general claim: the proposer does not recover E8's factor, and on random deep frames it gives 1.27x. My regime excuse was REFUTED by its own pre-registered test (Phase 3b). But the narrow home is real and now characterised with n=21 and a knockout at 1.00x: on DEEP frames that are COMPOSITIONS OF KNOWN OPERATORS the median speedup is 2.52x. So amortization pays for predicting RE-USE OF LEARNED STRUCTURE -- which is exactly what a recognition model is for -- and nowhere else here.",
  "phase3_proposer": {
   "bce": 0.3318,
   "bce_knockout": 0.3944,
@@ -915,6 +916,60 @@
   "prereg": "expensive bucket (BFS rank > 500) median speedup must be >= 2.0x for the regime explanation to stand; reported either way, no tuning after seeing buckets",
   "verdict": "EXPLANATION REFUTED (expensive-bucket median 1.27x < 2x)",
   "what_would_settle_it": "a set of STRUCTURED deep frames (compositions of library entries) large enough to test whether the proposer's advantage is structure-specific rather than depth-specific. Not run; stated as open."
+ },
+ "phase3c_structured": {
+  "median_knockout": 1.0,
+  "median_speedup": 1.23,
+  "median_speedup_deep": 2.519,
+  "n_deep": 21,
+  "n_structured": 46,
+  "pattern": "legible split: EVERY diff-composition wins big (diff o diff 5.21x, o code 5.76x, o codeparam 4.91x, o double 4.11x, o raise 6.38x) while EVERY integ-composition does not (0.40-1.21x). The recognition model learned to recognise the MULTIPLICATIVE structure (diff's c*e) and not the DIVISION structure (integ's c/(e+1)) -- consistent with integ being the single hardest frame throughout this project (blind cost 11915 in Phase 1, the only class to ABSTAIN in Phase 2, and the underdetermined one in Phase 2(e)).",
+  "random_deep_reference": 1.27,
+  "top": [
+   {
+    "bfs": 1345,
+    "comp": "codeparam o codeparam",
+    "ko": 294,
+    "prior": 184,
+    "speedup": 7.309782608695652
+   },
+   {
+    "bfs": 1774,
+    "comp": "diff o raise",
+    "ko": 719,
+    "prior": 278,
+    "speedup": 6.381294964028777
+   },
+   {
+    "bfs": 1809,
+    "comp": "diff o code",
+    "ko": 1056,
+    "prior": 314,
+    "speedup": 5.761146496815287
+   },
+   {
+    "bfs": 984,
+    "comp": "double o codeparam",
+    "ko": 273,
+    "prior": 183,
+    "speedup": 5.377049180327869
+   },
+   {
+    "bfs": 910,
+    "comp": "codeparam o double",
+    "ko": 208,
+    "prior": 170,
+    "speedup": 5.352941176470588
+   },
+   {
+    "bfs": 1896,
+    "comp": "diff o diff",
+    "ko": 31962,
+    "prior": 364,
+    "speedup": 5.208791208791209
+   }
+  ],
+  "verdict": "STRUCTURE-SPECIFIC (structured median 2.52x vs random-deep 1.27x)"
  },
  "phase4_compression_oracle": {
   "corpus": "br-phono",
