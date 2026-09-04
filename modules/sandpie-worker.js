@@ -3200,7 +3200,20 @@ function _wpyScan(st) {
     if (i >= 0) st.waiters.splice(i, 1)[0].resolve(f);
   }
 }
-function _b64enc(s) { return btoa(String.fromCharCode(...new TextEncoder().encode(s))); }
+// Chunked: String.fromCharCode(...bytes) blows the call stack once a frame gets
+// large (a micropip wheel reply is >100KB of base64), which surfaced as
+// "Maximum call stack size exceeded" instead of an install.
+function _b64enc(s) {
+  const b = new TextEncoder().encode(s);
+  let bin = '';
+  for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function _b64bytes(u8) {
+  let bin = '';
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
 function _b64dec(s) { return new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))); }
 function _wpySend(st, obj) { try { st.worker.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify(obj)) + '\n' }); } catch (_) {} }
 function _wpyWait(st, match, ms) {
@@ -3227,10 +3240,8 @@ async function _wpyHostcall(st, f) {
         method: a.method || 'GET', headers: a.headers || {},
         body: a.body == null ? undefined : (a.body_is_b64 ? Uint8Array.from(atob(a.body), c => c.charCodeAt(0)) : a.body),
       });
-      const buf = new Uint8Array(await r.arrayBuffer());
-      let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
       const headers = {}; try { r.headers.forEach((v, k) => { headers[k] = v; }); } catch (_) {}
-      return reply({ ok_call: true, status: r.status, url: r.url || a.url, headers, body: btoa(bin) });
+      return reply({ ok_call: true, status: r.status, url: r.url || a.url, headers, body: _b64bytes(new Uint8Array(await r.arrayBuffer())) });
     }
     if (f.op === 'pip') {
       const name = String(a.name || '').replace(/[^A-Za-z0-9._-]/g, '');
@@ -3238,9 +3249,8 @@ async function _wpyHostcall(st, f) {
       const meta = await (await _wpyFetch('https://pypi.org/pypi/' + name + '/json')).json();
       const w = (meta.urls || []).find(u => u.packagetype === 'bdist_wheel' && /-(py3|py2\.py3)-none-any\.whl$/.test(u.filename));
       if (!w) return reply({ ok_call: false, error: name + ' has no pure-Python wheel — it needs a compiled build, which must be cross-compiled to wasm ahead of time' });
-      const buf = new Uint8Array(await (await _wpyFetch(w.url)).arrayBuffer());
-      let bin = ''; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-      return reply({ ok_call: true, name: meta.info.name, version: meta.info.version, body: btoa(bin) });
+      return reply({ ok_call: true, name: meta.info.name, version: meta.info.version,
+                     body: _b64bytes(new Uint8Array(await (await _wpyFetch(w.url)).arrayBuffer())) });
     }
     reply({ ok_call: false, error: 'unknown host op ' + f.op });
   } catch (e) { reply({ ok_call: false, error: String((e && e.message) || e) }); }
