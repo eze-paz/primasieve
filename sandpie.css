@@ -1359,14 +1359,17 @@ ul.conv-list li.active {
     border-color: var(--sp-text-dim);
     color: var(--sp-text);
   }
-  .chip.active {
-    background: var(--sp-panel);
-    border: 2px solid var(--sp-accent);
-    color: var(--sp-text);
-    padding: calc(0.3rem - 1px) calc(0.7rem - 1px);
-  }
   .chip.add {
     border-style: dashed;
+  }
+  /* Settings-modal model list: informational chips — not selectable, no active state */
+  .chip.plain {
+    cursor: default;
+    user-select: text;
+  }
+  .chip.plain:hover {
+    border-color: var(--sp-border);
+    color: var(--sp-text-dim);
   }
   .modal {
     position: fixed;
