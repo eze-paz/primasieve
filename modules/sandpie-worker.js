@@ -3063,7 +3063,7 @@ const WALIOS_LAZY_TARS = {
   'python_cxx.wasm?v=5': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
                           ['walios-numpy.tar.gz?v=2', '/site-packages'],
                           ['walios-docs.tar.gz?v=3', '/site-packages'],
-                          ['walios-mpl.tar.gz?v=1', '/site-packages']],
+                          ['walios-mpl.tar.gz?v=2', '/site-packages']],   // ships _mplcache/fontlist-v390.json
 };
 const WALIOS_MANIFEST = {
   busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
@@ -3159,7 +3159,7 @@ async function tool_walios({ script, timeout }, ctx) {
       lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
              PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1',
-             MPLBACKEND: 'Agg', MPLCONFIGDIR: '/tmp/mpl' },
+             MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
@@ -3282,7 +3282,7 @@ async function _wpyEnsure() {
     lazyTars: WALIOS_LAZY_TARS,
     env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
            PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
-           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/tmp/mpl' },
+           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
     // means no extra process survives.
