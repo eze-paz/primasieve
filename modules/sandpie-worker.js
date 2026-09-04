@@ -3063,7 +3063,16 @@ const WALIOS_LAZY_TARS = {
   'python_cxx.wasm?v=5': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
                           ['walios-numpy.tar.gz?v=2', '/site-packages'],
                           ['walios-docs.tar.gz?v=3', '/site-packages'],
-                          ['walios-mpl.tar.gz?v=2', '/site-packages']],   // ships _mplcache/fontlist-v390.json
+                          ['walios-extras.tar.gz?v=1', '/site-packages']],
+// NOT matplotlib. It is built, packaged and its font cache is solved, but rendering
+// TRAPS in the browser: agg calls the main's `operator new[]`, which wasm-ld exported
+// as a `.command_export` wrapper that re-runs __wasm_call_ctors -> _mi_process_init
+// re-initialises mimalloc mid-render. The fix is relinking the main as a REACTOR
+// (-mexec-model=reactor) so exports are not ctor-wrapped; until then shipping it would
+// mean a multi-minute import ending in a dead interpreter, which is worse than a clean
+// ModuleNotFoundError. The ready bundle is parked on the box as
+// walios-mpl.tar.gz.staged-not-live. walios-extras ships the parts that DO work:
+// packaging, cycler, pyparsing and the _sqlite3 / _bz2 stdlib extensions.
 };
 const WALIOS_MANIFEST = {
   busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
@@ -3158,8 +3167,7 @@ async function tool_walios({ script, timeout }, ctx) {
       // `import` just works without the model running any install step.
       lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1',
-             MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
+             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
@@ -3282,7 +3290,7 @@ async function _wpyEnsure() {
     lazyTars: WALIOS_LAZY_TARS,
     env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
            PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
-           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
+           PYTHONDONTWRITEBYTECODE: '1' },
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
     // means no extra process survives.
