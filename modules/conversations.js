@@ -3232,6 +3232,9 @@ async function sendSingle(text, stream, opts = {}) {
   // On failure the message above is preserved.
   let _prov = null;
   try { _prov = SandpieProviders.resolve(convId); } catch (_) {}
+  // Track the last-used provider as the app default: new chats (and convs that
+  // never picked) follow whatever was actually used most recently.
+  try { if (_prov && _prov.id) localStorage.setItem('sandpie-default-provider', _prov.id); } catch (_) {}
   if (!_prov || !(_prov.model || '').trim() || !(_prov.endpoint || '').trim()) {
     addMsg('err', 'This conversation has no usable model — pick one in the composer model picker (or add one in Settings → AI provider).', host);
     return;
@@ -7182,7 +7185,13 @@ window.SandpieConv = {
   },
   setProviderId(convId, providerId) {
     const id = convId || activeConvId;
-    if (!id) return;
+    if (!id) {
+      // No conversation yet (home screen / brand-new chat): remember the choice
+      // as the app default — resolveProvider reads it so THIS picker updates
+      // immediately, and the conversation the next message creates uses it.
+      try { if (providerId) localStorage.setItem('sandpie-default-provider', providerId); } catch (_) {}
+      return;
+    }
     const s = ensureStream(id);
     s.providerId = providerId || null;
     saveConv(id, { touchUpdated: false }).catch(() => {});
