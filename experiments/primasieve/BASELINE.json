@@ -1084,6 +1084,161 @@
    "total_confabulations": 0
   }
  },
+ "phase5b_referential_uncertainty": {
+  "ambiguity_irreducible": "every abstention checked also has >1 assignment under the TRUE hidden lexicon, so the residual ambiguity is a property of the UTTERANCE+WORLD, not a learning failure. The engine reports exactly what is unknowable and commits everywhere else -- the UNKNOWN vs UNKNOWABLE split from p8, now at the reference layer. Resolving it needs more information (a follow-up utterance / active probe), not better inference.",
+  "grid": "8x8",
+  "learning_curve_3obj": [
+   {
+    "N": 3,
+    "committed": 0,
+    "exact": 0,
+    "wrong": 0
+   },
+   {
+    "N": 5,
+    "committed": 3,
+    "exact": 3,
+    "wrong": 0
+   },
+   {
+    "N": 8,
+    "committed": 7,
+    "exact": 7,
+    "wrong": 0
+   },
+   {
+    "N": 12,
+    "committed": 8,
+    "exact": 8,
+    "wrong": 0
+   },
+   {
+    "N": 16,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   },
+   {
+    "N": 30,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   }
+  ],
+  "method": "arc consistency to a fixpoint: a meaning survives for w iff for EVERY observation there EXISTS an object assignment under which all five words can hold with surviving meanings. The true lexicon is viable under the true assignment, so the true meaning is never removed -- soundness is a theorem. Ambiguity costs COVERAGE, never correctness.",
+  "min_N_full_lexicon": 16,
+  "phase5_reference_given_N": 8,
+  "rows": [
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   }
+  ],
+  "verdict": "SOUND",
+  "wrong_lexicon_commitments": 0,
+  "wrong_referent_commitments": 0
+ },
  "phase6_noise_tolerance_sets": {
   "cliff_exact_match_under_noise": [
    {
