@@ -33,17 +33,17 @@ if("serviceWorker"in navigator){
     // stays byte-identical in behavior. Must run before any module loads.
     window.SANDPIE_BETA = /\/app-beta$/.test(location.pathname) || new URLSearchParams(location.search).has('beta');
   </script>
-  <script src="modules/core.js?v=11"></script>
+  <script src="modules/core.js?v=12"></script>
   <script src="modules/config.js?v=2"></script>
   <script src="modules/languages.js?v=4"></script>
   <script src="modules/pins.js?v=17"></script>
   <script src="modules/settings.js?v=1"></script>
   <script src="modules/account.js?v=7"></script>
   <script src="modules/themes.js?v=2"></script>
-  <script type="module" src="modules/providers.js?v=49"></script>
+  <script type="module" src="modules/providers.js?v=50"></script>
   <script src="modules/console.js?v=3"></script>
   <script src="modules/dropbox.js?v=83"></script>
-  <script src="modules/images.js?v=10"></script>
+  <script src="modules/images.js?v=11"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/tools.js?v=81"></script>
   <script src="modules/screenshot.js?v=6"></script>
@@ -146,10 +146,7 @@ if("serviceWorker"in navigator){
     </div>
   </details>
 
-  <input id="endpoint" type="hidden">
-  <input id="model" type="hidden">
-  <input id="apiKey" type="hidden">
-  <input id="proxyUrl" type="hidden">
+  <!-- Global provider inputs removed: every conversation carries its own provider (providers.js + conversations.js). -->
 
     <details class="service" id="filesSection">
     <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
