@@ -164,4 +164,10 @@ if __name__ == "__main__":
         flips += (base != sw and base not in (None, "ABSTAIN") and sw not in (None, "ABSTAIN"))
     print(f"  (a) ROLE-SWAP: {len(dit)} ditransitive-with-Recipient problems; sign flips {flips} times "
           f"({100*flips//max(1,len(dit))}%, need >=90; was 0)")
-    print("  RESULT: see accuracy + role-swap. WIN=>=88% & flip>=90%; else honest boundary = beyond-a-chunker (not-syntax).")
+    # DECISIVE (fable): role-swap on PRONOUN-FREE queries (coref trivial). flips=0 there -> role-binding is DEAD WEIGHT.
+    print("  RETRACTED (fable): role-swap flips 0 even on the pronoun-FREE subset -> role-binding has ZERO measured")
+    print("  causal contribution; it never worked. The 85%-non-abstain is verb-sign + slot + ABSTENTION, not")
+    print("  role-binding. FAIR comparison: at full coverage 67%, and majority on the ANSWERED subset is ~75% -> the")
+    print("  chunker does NOT beat majority. HONEST ARC CONCLUSION: zero-LLM operator signal is REAL and cheap")
+    print("  (VerbNet beats shuffle) but NO committed parser beat the majority baseline at full coverage; the wall is")
+    print("  COREFERENCE/PRAGMATICS (which entity/quantity the question tracks), NOT the arithmetic reasoning.")
