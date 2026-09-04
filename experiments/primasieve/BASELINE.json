@@ -642,6 +642,189 @@
   "result": "60/60 held-out (6 classes x N=10) using ONLY L0-crystallised operators, authored 450-relation frame_grammar DELETED (never consulted)",
   "wake_evidence_growth": "seeds 5 -> 12: L0 frame space (~1.3e8 at depth2) UNDERDETERMINES where the deleted 450-item menu did not (integ ABSTAINED at 5 seeds). Remedy = more evidence, NOT a smaller space. The authored menu was partly a REGULARISER, not only a search shortcut."
  },
+ "phase3_proposer": {
+  "bce": 0.3318,
+  "bce_knockout": 0.3944,
+  "cap": 60000,
+  "depth": 3,
+  "kill3": "FIRED: median held-out speedup 0.8x < 2x",
+  "knockout_speedup": 0.2,
+  "median_speedup": 0.76,
+  "n_train": 600,
+  "per_target": {
+   "code": {
+    "c": {
+     "bfs": 19,
+     "frame_bfs": "(c+1)",
+     "frame_prior": "(c+1)",
+     "ko": 60,
+     "prior": 33,
+     "speedup": 0.58
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "codeparam": {
+    "c": {
+     "bfs": 14,
+     "frame_bfs": "(c+e)",
+     "frame_prior": "(c+e)",
+     "ko": 11,
+     "prior": 9,
+     "speedup": 1.56
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "d2": {
+    "c": {
+     "bfs": 1858,
+     "frame_bfs": "((c*e)*(e-1))",
+     "frame_prior": "((c*e)*(e-1))",
+     "ko": 31921,
+     "prior": 311,
+     "speedup": 5.97
+    },
+    "e": {
+     "bfs": 38,
+     "frame_bfs": "(e-2)",
+     "frame_prior": "(e-2)",
+     "ko": 41,
+     "prior": 53,
+     "speedup": 0.72
+    }
+   },
+   "diff": {
+    "c": {
+     "bfs": 16,
+     "frame_bfs": "(c*e)",
+     "frame_prior": "(c*e)",
+     "ko": 17,
+     "prior": 11,
+     "speedup": 1.45
+    },
+    "e": {
+     "bfs": 36,
+     "frame_bfs": "(e-1)",
+     "frame_prior": "(e-1)",
+     "ko": 201,
+     "prior": 57,
+     "speedup": 0.63
+    }
+   },
+   "integ": {
+    "c": {
+     "bfs": 8545,
+     "frame_bfs": "abs((neg(c)/(e+1)))",
+     "frame_prior": "abs((neg(c)/(e+1)))",
+     "ko": 21795,
+     "prior": 13614,
+     "speedup": 0.63
+    },
+    "e": {
+     "bfs": 35,
+     "frame_bfs": "(e+1)",
+     "frame_prior": "(e+1)",
+     "ko": 39,
+     "prior": 26,
+     "speedup": 1.35
+    }
+   },
+   "negate": {
+    "c": {
+     "bfs": 6,
+     "frame_bfs": "neg(c)",
+     "frame_prior": "neg(c)",
+     "ko": 4,
+     "prior": 4,
+     "speedup": 1.5
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "struct": {
+    "c": {
+     "bfs": 1,
+     "frame_bfs": "c",
+     "frame_prior": "c",
+     "ko": 1,
+     "prior": 1,
+     "speedup": 1.0
+    },
+    "e": {
+     "bfs": 4,
+     "frame_bfs": "2",
+     "frame_prior": "2",
+     "ko": 4,
+     "prior": 8,
+     "speedup": 0.5
+    }
+   }
+  },
+  "pool": 60000,
+  "regressions_over_3x": [],
+  "total_bfs_energy": 10578,
+  "total_knockout_energy": 54100,
+  "total_prior_energy": 14133,
+  "total_speedup": 0.75
+ },
+ "phase3_summary": {
+  "confabulation": "0 -- the prior only REORDERS; every accepted frame is the same correct frame BFS accepts (consistency + varying-attribute guards still decide). Soundness untouched by construction and verified in the run.",
+  "indicated_next": "amortization pays only on DEEP frame discovery. Either (a) raise the depth/complexity of the target families so blind cost dominates, or (b) drop the proposer and accept Occam-over-L0 as near-optimal here. Do NOT tune this model further.",
+  "kill3": "FIRED -- median held-out speedup 0.8x < 2x (pre-registered threshold)",
+  "plan_premise_not_met": "Phase 3 aimed to recover E8s 1e4-1e5x authored-vs-blind factor. NOT achieved: the L0 frames that actually matter are shallow enough that Occam finds them in <60 candidates, so there is no 1e4x to recover at this depth. The factor reappears only for deeper frames.",
+  "replicates": "the ledger meta_ledger A/B null and the S2 collateral-damage finding, re-instantiated at the L0 layer: learned ordering == default cost-ordering where the default is already near-optimal. The null is a COMPLIMENT to Occam enumeration, not a failure of the recognition model.",
+  "signal_is_real": "the trained model beats the shuffled-label knockout in nearly every cell (total 0.7x vs 0.2x; d2 5.2x vs 0.1x) -> it learns something, the knockout confirms it is not an artifact",
+  "variants_in_order_run": [
+   {
+    "desc": "JOINT multi-hot label over both c- and e-components (BUG)",
+    "median_speedup": 0.1,
+    "note": "reranking for e'=(e-1) under a prior carrying c'-components boosted * and c and buried the true frame; fixed, not tuned",
+    "v": 1
+   },
+   {
+    "best_cell": "d2 c-frame 1858 -> 50 = 37x",
+    "desc": "per-attribute conditioned label, pure component prior",
+    "median_speedup": 0.4,
+    "note": "helps a lot on DEEP frames, hurts trivial ones -- charges nothing for program STRUCTURE",
+    "regressions": [
+     "struct",
+     "diff",
+     "code"
+    ],
+    "v": 2
+   },
+   {
+    "best_cell": "d2 5.2x",
+    "desc": "two-part MDL: structural (Occam/BFS rank) bits + learned component bits, equal weight, no free parameter",
+    "knockout_total": "0.2x",
+    "median_speedup": 0.8,
+    "regressions": "none",
+    "total": "10578 -> 14133 (0.7x)",
+    "v": 3
+   }
+  ],
+  "verdict": "HONEST NULL with real structure. The proposer learns genuine signal but does NOT deliver a net speedup, because BFS/Occam ordering over L0 is ALREADY near-optimal for the frames that matter.",
+  "why_it_fails": "the 5 shallow targets sit at BFS ranks 2-52, so there is NO HEADROOM to win and reranking can only add noise; only the deep frames (d2 1896, integ 8580) have room, and they are rare in this task set"
+ },
  "quixbugs": {
   "energy_ratio": 1.02,
   "hand_energy": 21839,
