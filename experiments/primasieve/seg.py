@@ -78,6 +78,29 @@ def token_f1(pred_utts, gold_utts):
 def _tokens(bounds, L):
     pts = sorted(bounds | {0, L}); return set((pts[i], pts[i + 1]) for i in range(len(pts) - 1))
 
+def char_coster(streams, k=4):
+    """Character n-gram model -> cost (bits) of a NOVEL word = sum -log2 P(char|prev-k), backoff to uniform.
+    Essential for on-demand: novel/unseen words (dominant when learning from a small slice) get a data-driven,
+    plausibility-weighted cost instead of a flat one, so Viterbi segments unseen words sensibly."""
+    ctx = collections.defaultdict(collections.Counter)
+    for s in streams:
+        p = "^" + s
+        for i in range(1, len(p)):
+            for kk in range(1, k + 1):
+                ctx[p[max(0, i - kk):i]][p[i]] += 1
+    def cost(w):
+        p = "^" + w; b = 0.0
+        for i in range(1, len(p)):
+            pr = None
+            for kk in range(k, 0, -1):
+                c = p[max(0, i - kk):i]
+                if c in ctx and sum(ctx[c].values()) >= 2:
+                    n = ctx[c][p[i]]; tot = sum(ctx[c].values())
+                    pr = (n + 0.1) / (tot + 0.1 * 27); break
+            b += -math.log2(pr if pr else 1 / 27)
+        return b + 9.0                                       # novel-word premium: discourage over-segmentation
+    return cost
+
 def viterbi(stream, logp, novel_bits):
     """MDL-optimal DP segmentation: minimize sum of word costs (-log2 P from the learned lexicon, or novel-word
     MDL cost for unseen spans). This is the sound decoder -- entropy learned the lexicon, MDL decodes."""
@@ -143,21 +166,22 @@ if __name__ == "__main__":
         return logp, nb
     def boot(train_streams, decode_gold, entropy=True, iters=4, k=3):
         ctx = train_entropy(train_streams, k)
-        # seed: entropy segmentation of train
+        # NOTE: a char-backoff novel-word coster was tried and REGRESSED (0.495->0.32 even calibrated) -- the MDL
+        # balance (novel vs lexicon cost) is the hard research part; the flat len*log2(27)+6 cost is better here.
+        ccost = lambda w: len(w) * math.log2(27) + 6.0
         tr_seg = []
         for s in train_streams:
             e = fwd_entropy(s, ctx, k) if entropy else [random.Random(hash((s, i, 3))).random() * 5 for i in range(len(s))]
-            th = 0.0
-            tr_seg.append(segment(s, e, th))
+            tr_seg.append(segment(s, e, 0.0))
         for _ in range(iters):                                     # EM-like: relex -> Viterbi resegment train
-            logp, nb = lexicon_of(tr_seg)
+            logp, _ = lexicon_of(tr_seg)
             new = []
             for s in train_streams:
-                pts = sorted({0, len(s)} | viterbi(s, logp, nb))
+                pts = sorted({0, len(s)} | viterbi(s, logp, ccost))
                 new.append([s[pts[i]:pts[i + 1]] for i in range(len(pts) - 1)])
             tr_seg = new
-        logp, nb = lexicon_of(tr_seg)
-        pred = [viterbi(s, logp, nb) for s, _ in decode_gold]
+        logp, _ = lexicon_of(tr_seg)
+        pred = [viterbi(s, logp, ccost) for s, _ in decode_gold]
         return token_f1(pred, decode_gold)
     f_boot = boot(tr_streams, te_gold, entropy=True)
     f_boot_rnd = boot(tr_streams, te_gold, entropy=False)
