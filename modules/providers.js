@@ -422,6 +422,12 @@ function hideModelPickerPanel(host) {
 function resolveProvider(convId) {
   let pid = null;
   try { pid = (window.SandpieConv && SandpieConv.getProviderId) ? SandpieConv.getProviderId(convId) : null; } catch (_) {}
+  if (!pid) {
+    // No conversation-bound choice (home screen / brand-new chat, or a conv that
+    // never picked): fall back to the LAST-USED provider (the picker writes it
+    // here even before any conversation exists), then the catalog default.
+    try { pid = localStorage.getItem('sandpie-default-provider') || null; } catch (_) {}
+  }
   return getProviderById(pid) || defaultProvider();
 }
 
