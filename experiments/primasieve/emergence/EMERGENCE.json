@@ -498,6 +498,86 @@
    ]
   }
  ],
+ "chat_consistency": {
+  "by_specificity": {
+   "1": {
+    "ASK": 46,
+    "COMMIT": 74,
+    "NONE": 0,
+    "UNKNOWABLE": 0,
+    "n": 120
+   },
+   "2": {
+    "ASK": 16,
+    "COMMIT": 104,
+    "NONE": 0,
+    "UNKNOWABLE": 0,
+    "n": 120
+   },
+   "3": {
+    "ASK": 7,
+    "COMMIT": 113,
+    "NONE": 0,
+    "UNKNOWABLE": 0,
+    "n": 120
+   },
+   "4": {
+    "ASK": 2,
+    "COMMIT": 118,
+    "NONE": 0,
+    "UNKNOWABLE": 0,
+    "n": 120
+   }
+  },
+  "reading": "asking for more information is not a bolted-on behaviour -- it is what the commit rule forces when a description under-determines the referent",
+  "rule": "commit only on a unique referent; else ask, or report unknowable, or abstain on an unknown word",
+  "rule_violations": 0
+ },
+ "chat_open_endedness": {
+  "reading": "ask-rate rises monotonically with scene size. A 1-word description in a 2-object scene is usually already unique (so it COMMITS, correctly); the same description in a 20-object scene under-determines and it ASKS. \"Open-ended\" is relative to the world, not a property of the sentence.",
+  "rows": [
+   {
+    "ask": 14,
+    "ask_rate": 0.07,
+    "commit": 186,
+    "n": 200,
+    "objects": 2,
+    "unknowable": 0
+   },
+   {
+    "ask": 70,
+    "ask_rate": 0.35,
+    "commit": 130,
+    "n": 200,
+    "objects": 4,
+    "unknowable": 0
+   },
+   {
+    "ask": 123,
+    "ask_rate": 0.615,
+    "commit": 77,
+    "n": 200,
+    "objects": 8,
+    "unknowable": 0
+   },
+   {
+    "ask": 170,
+    "ask_rate": 0.85,
+    "commit": 30,
+    "n": 200,
+    "objects": 14,
+    "unknowable": 0
+   },
+   {
+    "ask": 186,
+    "ask_rate": 0.93,
+    "commit": 13,
+    "n": 200,
+    "objects": 20,
+    "unknowable": 1
+   }
+  ]
+ },
  "cost_blind": 212587,
  "cost_library": 18786,
  "library_arm": [
