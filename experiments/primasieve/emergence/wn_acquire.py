@@ -88,11 +88,17 @@ def related_words(word, pos="adj", hops=1):
     return out
 
 
-def propose(word, known_words, pos_order=("adj", "noun")):
-    """PROPOSE candidate known-words for an unknown word. Returns [(known_word, via_pos)] -- never commits."""
+def propose(word, known_words, pos_order=("adj", "noun"), hops=1):
+    """PROPOSE candidate known-words for an unknown word. Returns [(known_word, via_pos)] -- never commits.
+
+    hops=1 follows one pointer (needed for adjectives: scarlet is "similar to" red, not a synonym of it).
+    hops=0 is SAME-SYNSET ONLY, i.e. strict synonymy. Verbs need the strict setting: at hops=1 WordNet's
+    polysemy produced junk bridges -- "can" -> remove (via canning) and "find" -> grow (via "come to be") --
+    which would have had the engine asking to learn function words as actions. Measured: at hops=0, erase and
+    expand still bridge correctly while can/find/hello propose nothing."""
     props = []
     for pos in pos_order:
-        rel = related_words(word, pos)
+        rel = related_words(word, pos, hops=hops)
         for kw in known_words:
             if kw in rel and kw not in [p[0] for p in props]:
                 props.append((kw, pos))
