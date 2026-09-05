@@ -149,6 +149,10 @@ def parse(text, lexicon):
         if m and rel is None and cur is left and left:
             rel, i = m; cur = right; continue
         if w in QUANT: quant = True; i += 1; continue
+        # "everything" / "anyone" / "everybody" are a quantifier welded to a noun. Decompose by MORPHOLOGY
+        # rather than adding each compound to the word list -- the same rule that handles comparatives.
+        if any(w == q + suf for q in QUANT for suf in ("thing", "things", "one", "ones", "body")):
+            quant = True; plural = True; i += 1; continue
         if w in GOAL: goal_marker = True; i += 1; continue
         if w in NOUNS:
             if w.endswith("s"): plural = True

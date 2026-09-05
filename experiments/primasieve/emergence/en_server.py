@@ -13,6 +13,7 @@ import en_world as W
 import en_chat as C
 import wn_acquire as ACQ
 import en_actions as ACT
+import en_ops as OPS
 import random as _r
 
 PORT = int(os.environ.get("PORT", "8765"))
@@ -44,7 +45,9 @@ def say(text):
         if not text.strip().lower().startswith("y"):
             return {"kind": "ABSTAIN", "msg": f"understood - '{word}' stays unknown and I will keep "
                                               f"refusing it.", "highlight": []}
-        if isinstance(pred, tuple) and pred[0] == "ACTION":
+        if isinstance(pred, tuple) and pred[0] == "GOAL":
+            W.GOAL.add(word)                   # learned on the fly: this verb marks a target state
+        elif isinstance(pred, tuple) and pred[0] == "ACTION":
             STATE["alex"][word] = pred[1]
         else:
             lex[word] = pred
@@ -90,7 +93,15 @@ def say(text):
         qq2 = W.parse(rest, lex)
         setwise = qq2["quant"] or qq2["plural"]
         if not tgt:
-            return {"kind": "NONE", "msg": "I cannot tell which object you mean.", "highlight": []}
+            # EMPTY and AMBIGUOUS are different failures and were reported with the same sentence. If a
+            # description was given and matched nothing, say THAT -- "I cannot tell which you mean" is a
+            # false statement about an empty match, and it is what made the engine look evasive.
+            said = W.parse(rest, lex)["left"]
+            if said:
+                return {"kind": "NONE", "msg": f"there is nothing {' and '.join(said)} in this scene "
+                                               f"right now.", "highlight": []}
+            return {"kind": "ASK", "msg": f"'{act}' what? Name a description, or say 'all'.",
+                    "highlight": []}
         if len(tgt) != 1 and not setwise:
             p = C.best_question(sc, tgt)
             STATE["pending"] = (p, tgt)
@@ -114,37 +125,119 @@ def say(text):
     #      actions instead of referents: exactly one survivor -> do it; several -> say so; none -> say THAT,
     #      which is a far better answer than claiming not to understand the words.
     if q["kind"] == "goal" and not q["unknown"]:
+        if not q["left"] and not q["quant"]:
+            return {"kind": "ASK",
+                    "msg": f"'{q['goal']}' is the only thing you named, and it could be either the object "
+                           f"you mean or the state you want. Do you mean 'make everything {q['goal']}', or "
+                           f"did you mean to do something to the {q['goal']} ones? Say 'all', or name the "
+                           f"state you want.", "highlight": C.referents(sc, [q["goal"]])}
         tgt = C.referents(sc, q["left"]) if q["left"] else list(range(len(sc)))
+        # SET-WISE goals: "make everything wide" is one search per object, not an ambiguity to ask about.
+        # The command path already worked this way; the search path did not, and asked "which one?" for a
+        # sentence that names all of them.
+        if len(tgt) > 1 and (q["quant"] or q["plural"]):
+            cur, done, failed = list(sc), [], []
+            for i in tgt:
+                path = fin = None
+                for depth in (2, 4, 6, 8, 12, 20):
+                    path, fin = OPS.plan(cur[i], q["goal"], max_depth=depth)
+                    if path is not None: break
+                if path is None: failed.append(i)
+                else: cur[i] = fin; done.append(i)
+            if not done:
+                return {"kind": "OUT-OF-WORLD", "msg": f"none of {tgt} can be made {q['goal']} within "
+                                                       f"20 edits.", "highlight": tgt}
+            STATE["scene"] = cur; STATE["last_ref"] = None
+            extra = f" ({failed} could not be reached)" if failed else ""
+            return {"kind": "COMMIT", "msg": f"done - searched an edit path for each of {done} and made "
+                                             f"them {q['goal']}{extra}.",
+                    "highlight": done, "scene": scene_json()}
         if len(tgt) != 1:
             if not tgt:
-                return {"kind": "NONE", "msg": "nothing matches that description.", "highlight": []}
+                return {"kind": "NONE", "msg": f"there is nothing {' and '.join(q['left'])} in this scene, "
+                                               f"so there is nothing to make {q['goal']}.", "highlight": []}
             p = C.best_question(sc, tgt)
             STATE["pending"] = (p, tgt)
             return {"kind": "ASK", "msg": f"which one? {len(tgt)} match {tgt}. Is it {p}?", "highlight": tgt}
         i = tgt[0]
         goal = q["goal"]
-        held_before = W.unary_holds(goal, sc[i])
-        works = []
-        for word, op in alex.items():
-            after = ACT.OPS[op](sc, i)
-            if len(after) != len(sc): continue                  # removal cannot achieve a property
-            if W.unary_holds(goal, after[i]) and not held_before:
-                works.append((word, op))
-        uniq = {op for _, op in works}
-        if held_before:
+        if W.unary_holds(goal, sc[i]):
             return {"kind": "COMMIT", "msg": f"object #{i} is already {goal}.", "highlight": [i]}
-        if not uniq:
+        # SEARCH a GENERATIVE space of edits derived from the object representation, escalating depth,
+        # instead of scanning an authored menu of named operations. This is the Phase-1 move: the menu was
+        # the thing I kept extending whenever a test failed.
+        path = fin = None
+        for depth in (2, 4, 6, 8, 12, 20):
+            path, fin = OPS.plan(sc[i], goal, max_depth=depth)
+            if path is not None: break
+        if path is None:
             return {"kind": "OUT-OF-WORLD",
-                    "msg": f"I understand '{goal}', but none of my operations "
-                           f"({', '.join(sorted(alex))}) makes object #{i} {goal}.", "highlight": [i]}
-        if len(uniq) > 1:
-            return {"kind": "ASK", "msg": f"more than one of my operations would make it {goal}: "
-                                          f"{sorted(set(w for w, _ in works))}. Which?", "highlight": [i]}
-        word, op = works[0]
-        STATE["scene"] = ACT.OPS[op](sc, i)
+                    "msg": f"I understand '{goal}', but no sequence of my primitive edits "
+                           f"({', '.join(sorted(OPS.PRIMS))}) reaches it from object #{i} within 20 steps.",
+                    "highlight": [i]}
+        new = list(sc); new[i] = fin
+        STATE["scene"] = new
         STATE["last_ref"] = None
-        return {"kind": "COMMIT", "msg": f"done - I worked out that '{word}' makes object #{i} {goal}, "
-                                         f"and applied it.", "highlight": [i], "scene": scene_json()}
+        return {"kind": "COMMIT", "msg": f"done - worked out a {len(path)}-step edit that makes object #{i} "
+                                         f"{goal}: {OPS.describe_path(path)}.",
+                "highlight": [i], "scene": scene_json()}
+    # ---- UNKNOWN VERB. The refusals the owner hit were almost all LEXICAL, not semantic: "move the red one
+    #      rightmost" was refused while the IDENTICAL request under the known marker "make" succeeded. The
+    #      engine could already do the thing; it just did not know the word. So do not refuse -- HYPOTHESISE
+    #      that the unknown word marks a target state, and let the search decide:
+    #
+    #          verb + a stated target property -> search for a path; a path EXISTS means the hypothesis is
+    #                                             coherent, so ASK to confirm, then learn the word
+    #          verb + NO target property       -> the sentence has no truth conditions to verify against, so
+    #                                             ASK what should be true afterwards instead of refusing
+    #
+    #      No verb is named anywhere here. "move", "rotate", "transpose", "change" are all handled by the same
+    #      rule, and a verb whose target is unreachable is still refused -- the search is the judge.
+    if q["unknown"] and q["kind"] != "goal":
+        cand_verb = q["unknown"][0]
+        if len(q["left"]) >= 2:
+            target, desc = q["left"][-1], q["left"][:-1]
+            tgt = C.referents(sc, desc)
+            # each of these is a DIFFERENT failure and gets its own answer. Falling through to one generic
+            # message is what made every refusal look identical and unhelpful.
+            if not tgt:
+                return {"kind": "NONE", "msg": f"there is nothing {' and '.join(desc)} in this scene, so I "
+                                               f"cannot work out what '{cand_verb}' would do.", "highlight": []}
+            if len(tgt) > 1:
+                pq = C.best_question(sc, tgt)
+                STATE["pending"] = (pq, tgt)
+                return {"kind": "ASK", "msg": f"which one? {len(tgt)} match {tgt}. Is it {pq}?",
+                        "highlight": tgt}
+            path = None
+            for depth in (2, 4, 6, 8, 12, 20):
+                path, _fin = OPS.plan(sc[tgt[0]], target, max_depth=depth)
+                if path is not None: break
+            if path is None:
+                return {"kind": "OUT-OF-WORLD",
+                        "msg": f"I could learn '{cand_verb}' if I could reach '{target}', but no sequence "
+                               f"of my primitive edits reaches it from object #{tgt[0]} within 20 steps.",
+                        "highlight": tgt}
+            if not path:
+                # a ZERO-edit path is not evidence. The target is already true, so EVERY verb "succeeds"
+                # here and confirming would teach the word from a vacuous example. Ask for a real one.
+                return {"kind": "ASK",
+                        "msg": f"object #{tgt[0]} is already {target}, so doing nothing would satisfy that "
+                               f"sentence and I would learn nothing about '{cand_verb}'. Ask me to "
+                               f"'{cand_verb}' something that is NOT {target} yet.", "highlight": tgt}
+            STATE["acquire"] = (cand_verb, ("GOAL",), text)
+            return {"kind": "ACQUIRE",
+                    "msg": f"I have never learned '{cand_verb}', but I CAN reach '{target}' for "
+                           f"object #{tgt[0]} in {len(path)} edits. Does '{cand_verb}' mean "
+                           f"'make it {target}'?", "highlight": tgt}
+        if q["left"] and len(q["unknown"]) == 1:
+            tgt = C.referents(sc, q["left"])
+            props = ", ".join(sorted(set(lex.values()))[:8])
+            return {"kind": "ASK",
+                    "msg": f"I do not know '{cand_verb}', and nothing in the sentence says what should be "
+                           f"TRUE afterwards, so I have nothing to check a guess against. Tell me the state "
+                           f"you want and I will search for it -- e.g. '{cand_verb} the ... wide' or "
+                           f"'... tall'. I can aim at: {props} ...", "highlight": tgt}
+
     # ---- ACQUIRE: an unknown word is not a dead end. WordNet PROPOSES; the engine still has to ask. ----
     if q["unknown"]:
         return _diagnose(q["unknown"], text)
