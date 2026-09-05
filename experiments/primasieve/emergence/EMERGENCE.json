@@ -637,6 +637,18 @@
  },
  "cost_blind": 212587,
  "cost_library": 18786,
+ "english_lexicon_honesty": {
+  "SCRAMBLED truth": {
+   "of": 19,
+   "recovered": 18,
+   "wrong": 0
+  },
+  "normal English": {
+   "of": 19,
+   "recovered": 18,
+   "wrong": 0
+  }
+ },
  "library_arm": [
   {
    "cost": 3107,
