@@ -1,5 +1,110 @@
 {
  "_updated": "2026-09-04T20:14:43",
+ "dialog_s1_scaling": {
+  "n_obj": 3,
+  "rows": [
+   {
+    "binary": 12,
+    "concepts": 24,
+    "mean_survivors_at_full_coverage": 2.29,
+    "sentences": 200,
+    "unary": 12,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 33,
+    "mean_survivors_at_full_coverage": 1.18,
+    "sentences": null,
+    "unary": 21,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 45,
+    "mean_survivors_at_full_coverage": 1.22,
+    "sentences": null,
+    "unary": 33,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 65,
+    "mean_survivors_at_full_coverage": null,
+    "sentences": null,
+    "unary": 53,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 101,
+    "mean_survivors_at_full_coverage": null,
+    "sentences": null,
+    "unary": 89,
+    "wrong": 0
+   }
+  ],
+  "verdict": "partial/unsound",
+  "wrong_total": 0
+ },
+ "dialog_s2_subset_problem": {
+  "all_learned_after_asking": true,
+  "all_uncommitted_are_subset_cases": true,
+  "control": {
+   "active_questions": 2,
+   "active_words": 64,
+   "random_questions": 2,
+   "random_words": 64
+  },
+  "reading": "learning from POSITIVE examples alone cannot separate a predicate from any SUPERSET of it; this is the classic subset / no-negative-evidence problem. The engine abstains (correct), then obtains NEGATIVE evidence by asking about an object where its surviving meanings disagree. Sound throughout.",
+  "rows": [
+   {
+    "after_asking": 33,
+    "after_elimination": 32,
+    "concepts": 33,
+    "never_spoken": 0,
+    "questions": 1,
+    "spoken": 33,
+    "subset_cases": 1,
+    "uncommitted": 1,
+    "wrong": 0
+   },
+   {
+    "after_asking": 45,
+    "after_elimination": 43,
+    "concepts": 45,
+    "never_spoken": 0,
+    "questions": 2,
+    "spoken": 45,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   },
+   {
+    "after_asking": 64,
+    "after_elimination": 62,
+    "concepts": 65,
+    "never_spoken": 1,
+    "questions": 2,
+    "spoken": 64,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   },
+   {
+    "after_asking": 98,
+    "after_elimination": 96,
+    "concepts": 101,
+    "never_spoken": 3,
+    "questions": 2,
+    "spoken": 98,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   }
+  ],
+  "wrong_after_probing": 0
+ },
  "end_state_verification": {
   "checks": [
    {
