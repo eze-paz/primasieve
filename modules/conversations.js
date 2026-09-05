@@ -2922,7 +2922,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=206');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=207');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's

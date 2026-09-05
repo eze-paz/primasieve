@@ -3401,7 +3401,8 @@ async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
     if (!path) return { result: 'Error: pass "code" (a snippet) or "path" (a saved .py file).' };
     const rel = String(path).replace(/^\/+/, '').replace(/^files\//, '');
     try { src = new TextDecoder().decode(await opfsReadBytes(rel)); }
-    catch (e) { return { result: 'Error: cannot read ' + rel + ': ' + ((e && e.message) || e) }; }
+    catch (e) { return { result: 'Error: cannot read ' + rel + ': ' + ((e && e.message) || e)
+                                 + await _pyMissingHint(rel) }; }
     const slash = rel.lastIndexOf('/');
     if (slash > 0) cwd = '/root/' + rel.slice(0, slash);
     guestFile = '/root/' + rel;
@@ -3412,6 +3413,27 @@ async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
   text = text.replace(/\n+$/, '');
   if (!text) text = r.ok ? '[no output]' : '[failed with no output]';
   return { result: text };
+}
+
+// The commonest run_python failure in the A/B logs was calling it on a script that was
+// never written — the model emits run_python("…/verify.py") a turn BEFORE the write_file
+// that creates it (tool calls run in the order the model emits them, so this is the
+// model's mistake, not the backend's). "cannot read X" gives it nothing to correct with,
+// so it burns another turn guessing. Listing the folder makes the turn self-correcting.
+async function _pyMissingHint(rel) {
+  try {
+    const slash = rel.lastIndexOf('/');
+    const dir = slash > 0 ? rel.slice(0, slash) : '';
+    const items = await opfsCollect(dir, { includeDirs: true, max: 60 });
+    const names = (items || []).map(i => i.path.slice(dir ? dir.length + 1 : 0) + (i.kind === 'directory' ? '/' : ''));
+    if (!names.length) {
+      return dir ? ('\nThe folder ' + dir + '/ is empty. Write the script with write_file before running it.')
+                 : '\nWrite the script with write_file before running it.';
+    }
+    return '\n' + (dir ? dir + '/ contains: ' : 'Workspace root contains: ')
+         + names.slice(0, 20).join(', ') + (names.length > 20 ? ', …' : '')
+         + '\nIf the script is not listed, write it with write_file before running it.';
+  } catch (_) { return '\nWrite the script with write_file before running it.'; }
 }
 
 async function unknownTool(name) {
