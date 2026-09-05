@@ -381,6 +381,39 @@
    "verdict": "with_first 33.0x (REGRESSION), with_costed 1.0x -> ADOPT COST-ORDERED ONLY"
   }
  },
+ "E5_carrier_agnostic_derivation": {
+  "pair_carrier": {
+   "discovered": true,
+   "guard": true
+  },
+  "peer_ablation_reported_by_sandpie_91": {
+   "note": "their numbers, quoted as reported; not re-run here",
+   "scan_length_EM": "1.000 -> 0.000 (coverage 0.000)",
+   "scan_simple_EM": "1.000 -> 0.053 when REPEAT/PREPEND_EACH removed"
+  },
+  "seq_carrier": {
+   "PREPEND_EACH (= PREPEND_UNIT iterated)": {
+    "discovered": true,
+    "guard_rejects_corrupted": true,
+    "unseen_k": {
+     "7": 7,
+     "11": 11,
+     "23": 23
+    }
+   },
+   "REPEAT (= APPEND_UNIT iterated)": {
+    "discovered": true,
+    "guard_rejects_corrupted": true,
+    "unseen_k": {
+     "7": 7,
+     "11": 11,
+     "23": 23
+    }
+   }
+  },
+  "significance": "sandpie-91 hand-froze REPEAT/PREPEND_EACH before touching SCAN as an anti-rig guard and notes its genericity is argued not demonstrated. The same discovery routine that derived ITERATE over attribute frames derives those two over token sequences, so the hand-frozen inventory can in principle be replaced by a derived one.",
+  "verdict": "same routine derives both"
+ },
  "blind_arm": [
   {
    "cost": 3037,
