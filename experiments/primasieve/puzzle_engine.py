@@ -225,6 +225,116 @@ def induce(train, seg, lex):
     for f, e in train: T.add(make_template(f, e, seg, lex))
     return list(T)
 
+# ---------- compositional SVO generation (option 1) ----------
+PRON = {"i", "me", "you", "he", "she", "it", "we", "they", "him", "her", "us", "them"}
+def parse_foreign(f, seg, lex, catmap):
+    out = []
+    for w in toks(f):
+        pre, stem, suf = seg.get(w, ("", w, ""))
+        out.append(dict(word=w, stem=stem, lemma=lex.get(stem), pre=pre, suf=suf,
+                        noun=catmap.get(stem, False), known=stem in lex))
+    return out
+
+def parse_english(et, verb_lemmas):
+    """Return (subj, verb_idx, verb_surface, obj) where subj/obj are ('noun',lemma) | ('pron',surface) | None."""
+    vi = None
+    for i, t in enumerate(et):
+        if t.isalpha() and t not in PRON and lemma(t) in verb_lemmas: vi = i; break
+    if vi is None: return None
+    def parse_arg(region):
+        content = [t for t in region if t.isalpha() and t not in ENG_FUNC]
+        if content: return ("noun", lemma(content[0]))
+        pr = [t for t in region if t != ""]
+        if pr: return ("pron", " ".join(pr))
+        return None
+    return parse_arg(et[:vi]), vi, et[vi], parse_arg(et[vi + 1:])
+
+def learn_grammar(train, seg, lex, catmap, func):
+    verb_lemmas = {lex[s] for s in lex if not catmap.get(s, False)}
+    g = dict(role={}, person={}, infl={}, valence={}, det=None, dsubj=None, dobj=None, verb_lemmas=verb_lemmas)
+    detc = collections.Counter()
+    for f, e in train:
+        fw = parse_foreign(f, seg, lex, catmap)
+        et = toks(e)
+        pe = parse_english(et, verb_lemmas)
+        if pe is None: continue
+        subj, vi, vsurf, obj = pe
+        # determiner: token before a noun in english
+        for i, t in enumerate(et):
+            if t.isalpha() and t not in ENG_FUNC and i > 0 and et[i - 1] in ARTICLES: detc[et[i - 1]] += 1
+        fnouns = [x for x in fw if x["noun"] and x["known"]]
+        fverbs = [x for x in fw if x["known"] and not x["noun"]]
+        if not fverbs: continue
+        v = fverbs[0]
+        # valence
+        g["valence"][v["lemma"]] = "trans" if obj is not None else "intrans"
+        # subject person + inflection
+        subj_is_1sg = subj and subj[0] == "pron" and subj[1] == "i"
+        person = "1sg" if subj_is_1sg else "3"
+        suf = vsurf[len(v["lemma"]):] if vsurf.startswith(v["lemma"]) else ""
+        g["infl"][person] = suf
+        # case -> role via nominal args matched by lemma
+        for fn in fnouns:
+            if subj and subj[0] == "noun" and subj[1] == fn["lemma"]: g["role"][fn["suf"]] = "subj"
+            if obj and obj[0] == "noun" and obj[1] == fn["lemma"]: g["role"][fn["suf"]] = "obj"
+        # person affixes on the verb + default 3rd surfaces
+        vaff = [a for a in (v["pre"], v["suf"]) if a]
+        if not any(fn for fn in fnouns if subj and subj[0] == "noun" and subj[1] == fn["lemma"]):
+            # subject not a noun -> pronoun subject
+            if subj and subj[0] == "pron":
+                if subj[1] in PRON and vaff:                        # overt marked pronoun (e.g. 'i' <- li)
+                    for a in vaff: g["person"].setdefault(a, ("subj", subj[1]))
+                elif subj[1] not in PRON or subj[1] == "( he / she )" or "/" in subj[1]:
+                    g["dsubj"] = subj[1]                            # default 3rd-person subject surface
+                elif not vaff:
+                    g["dsubj"] = subj[1]
+        if obj is not None and not any(fn for fn in fnouns if obj and obj[0] == "noun" and obj[1] == fn["lemma"]):
+            if obj[0] == "pron":
+                if obj[1] in PRON and vaff:
+                    for a in vaff:
+                        if a not in g["person"]: g["person"][a] = ("obj", obj[1])
+                else:
+                    g["dobj"] = obj[1]
+    g["det"] = detc.most_common(1)[0][0] if detc else "the"
+    return g
+
+def generate_fe(f, M):
+    seg, lex, catmap, g = M["seg"], M["lex"], M["catmap"], M["grammar"]
+    fw = parse_foreign(f, seg, lex, catmap)
+    for x in fw:
+        if not x["known"]: return None                             # unknown morpheme -> abstain
+    verbs = [x for x in fw if not x["noun"]]
+    if len(verbs) != 1: return None                                # only single-clause SVO handled
+    v = verbs[0]; nouns = [x for x in fw if x["noun"]]
+    vaff = [a for a in (v["pre"], v["suf"]) if a]
+    subj = obj = None; person = "3"
+    # person affixes on verb
+    for a in vaff:
+        if a in g["person"]:
+            role, surf = g["person"][a]
+            if role == "subj": subj = ("pron", surf); person = "1sg" if surf == "i" else "3"
+            else: obj = ("pron", surf)
+        else:
+            return None                                            # unexplained affix -> abstain
+    # nominal args by case role
+    for n in nouns:
+        r = g["role"].get(n["suf"])
+        if r == "subj": subj = ("noun", n["lemma"])
+        elif r == "obj": obj = ("noun", n["lemma"])
+        else: return None                                          # unknown case -> abstain
+    valence = g["valence"].get(v["lemma"])
+    if valence is None: return None
+    if subj is None: subj = ("pron", g["dsubj"]) if g["dsubj"] else None
+    if valence == "trans" and obj is None: obj = ("pron", g["dobj"]) if g["dobj"] else None
+    if subj is None: return None
+    if valence == "trans" and obj is None: return None
+    def render_np(a):
+        return a[1] if a[0] == "pron" else f"{g['det']} {a[1]}"
+    vsurf = v["lemma"] + g["infl"].get(person, g["infl"].get("3", ""))
+    parts = [render_np(subj), vsurf]
+    if valence == "trans": parts.append(render_np(obj))
+    return " ".join(parts)
+
 # ---------- application ----------
 def match_fe(f, ff, seg, lex):
     fu = to_units(f, seg)
@@ -268,15 +378,29 @@ def engine(train, test_srcs=()):
     seg = build_seg(vocab, S, P)
     func, articles = analyze_english(train)
     lex, catmap, func = align(train, S, P, seg, func)
-    temps = induce(train, seg, lex)
-    return dict(S=S, P=P, seg=seg, lex=lex, temps=temps, func=func)
+    M = dict(S=S, P=P, seg=seg, lex=lex, catmap=catmap, func=func)
+    M["grammar"] = learn_grammar(train, seg, lex, catmap, func)
+    M["temps"] = induce(train, seg, lex)
+    # SOUND gate for the compositional grammar: every train pair it can generate (all words known) must be exact.
+    repro = gen_ok = 0
+    for f, e in train:
+        g = generate_fe(f, M)
+        if g is not None:
+            repro += 1; gen_ok += (g == _n(e))
+    M["gsound"] = (repro >= 1 and gen_ok == repro)
+    M["grepro"] = (gen_ok, repro)
+    return M
 
 def _n(s): return " ".join(toks(s))
-def reproduces(train, M):
+def reproduces(train, M):                              # template-level reproduction (diagnostic)
     return sum(1 for f, e in train if _n(e) in apply_fe(f, M["temps"], M["seg"], M["lex"]))
 
 def solve_fe(fsrc, M):
-    c = apply_fe(fsrc, M["temps"], M["seg"], M["lex"])
+    if M.get("gsound"):                                # compositional generation (generalizes across structures)
+        out = generate_fe(fsrc, M)
+        if out is not None: return ("commit", out)
+        return ("hard", None)
+    c = apply_fe(fsrc, M["temps"], M["seg"], M["lex"])  # fallback: whole-sentence templates
     if not c: return ("hard", None)
     if len(c) > 1: return ("soft", None)
     return ("commit", next(iter(c)))
