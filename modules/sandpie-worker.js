@@ -3308,6 +3308,19 @@ async function _wpyHostcall(st, f) {
       });
       return reply(done.ok ? { ok_call: true } : { ok_call: false, error: done.err || 'mount failed' });
     }
+    if (f.op === 'js') {
+      // Pyodide's `js` is its worker's global scope, so the faithful equivalent is
+      // evaluating in OUR worker. Only JSON-safe values cross back — there is no live
+      // object bridge, and the guest shim says so for anything else.
+      try {
+        const v = (0, eval)(String(a.code));
+        const resolved = (v && typeof v.then === 'function') ? await v : v;
+        let safe;
+        try { safe = JSON.parse(JSON.stringify(resolved === undefined ? null : resolved)); }
+        catch (_) { safe = String(resolved); }
+        return reply({ ok_call: true, value: safe });
+      } catch (e) { return reply({ ok_call: false, error: String((e && e.message) || e) }); }
+    }
     if (f.op === 'pip') {
       const name = String(a.name || '').replace(/[^A-Za-z0-9._-]/g, '');
       if (!name) return reply({ ok_call: false, error: 'empty package name' });

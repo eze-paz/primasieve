@@ -184,11 +184,51 @@ def _install_pyodide_shim():
     sys.modules["pyodide.ffi"] = ffi
 
 
+# --------------------------------------------------------------------- js shim
+# Third most common import in the real corpus after pyodide.http (147 uses), and the
+# actual API surface is small: js.eval, js.Function, js.XMLHttpRequest. Pyodide's `js` is
+# the worker's global scope — NOT the page DOM — so what is faithfully reproducible here is
+# evaluating JS in the host worker and returning a JSON-safe value. Anything needing a live
+# object reference says so instead of pretending.
+
+class _JsModule(types.ModuleType):
+    def __init__(self):
+        super().__init__("js")
+        self.__doc__ = "Evaluate JavaScript in the walios host worker (JSON-safe values only)."
+
+    def eval(self, code):
+        r = _hostcall("js", code=str(code))
+        if not r.get("ok_call"):
+            raise RuntimeError("js.eval failed: %s" % r.get("error", "unknown error"))
+        return r.get("value")
+
+    def __getattr__(self, name):
+        raise NotImplementedError(
+            "js.%s is not available: walios exposes JavaScript only through js.eval(code), "
+            "which returns JSON-safe values. There is no live object bridge, so DOM/global "
+            "handles cannot be passed into Python. For HTTP use pyodide.http.pyfetch." % name
+        )
+
+
+def _install_js_shim():
+    sys.modules["js"] = _JsModule()
+
+
 # --------------------------------------------------------------- micropip shim
 # Pure-Python wheels only. A C-extension wheel is x86 ELF or emscripten-ABI and
 # could never load here, so say so loudly instead of failing deep in an import.
 
 _PIP_DIR = "/tmp/sandpie-pip"
+
+# Packages that can never install at runtime here, and the shipped equivalent to reach for.
+# fitz/PyMuPDF is the one real gap in the corpus (20 uses, all fitz.open).
+_ALTERNATIVES = {
+    "pymupdf": "pypdf (text/page work) or pdfminer.six (layout)",
+    "fitz": "pypdf (text/page work) or pdfminer.six (layout)",
+    "opencv-python": "Pillow",
+    "scipy": "numpy",
+    "psycopg2": "sqlite3",
+}
 
 
 def _pip_dir():
@@ -334,16 +374,21 @@ def _micropip_install_now(requirements, **kw):
         r = _hostcall("pip", name=name, version=_pick_version(name, spec))
         if not r.get("ok_call"):
             if name in asked:
-                raise ValueError("micropip: %s" % r.get("error", "could not resolve " + raw))
+                alt = _ALTERNATIVES.get(name)
+                raise ValueError("micropip: %s%s" % (
+                    r.get("error", "could not resolve " + raw),
+                    (". Use %s instead — already installed." % alt) if alt else ""))
             continue       # a transitive dep with no pure-Python wheel: skip, let the import fail loudly
         data = base64.b64decode(r.get("body", ""))
         target = _pip_dir()
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             bad = [n for n in z.namelist() if n.endswith(".so") or n.endswith(".pyd")]
             if bad:
+                alt = _ALTERNATIVES.get(_canon(raw))
                 msg = ("micropip: %s ships compiled extensions (%s) — those cannot be loaded here. "
                        "walios C extensions must be cross-compiled to wasm ahead of time; only "
-                       "pure-Python wheels install at runtime." % (r.get("name", raw), bad[0]))
+                       "pure-Python wheels install at runtime.%s"
+                       % (r.get("name", raw), bad[0], (" Use %s instead — already installed." % alt) if alt else ""))
                 if name in asked:
                     raise ValueError(msg)
                 continue
@@ -545,6 +590,7 @@ def _run(msg):
 
 def main():
     _install_pyodide_shim()
+    _install_js_shim()
     _install_micropip_shim()
     _install_lazy_mounts()
     try:
