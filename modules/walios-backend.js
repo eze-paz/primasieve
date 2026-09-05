@@ -10,7 +10,10 @@
 
 (function (g) {
   // Bumped with every wali-worker.js deploy.
-  const WORKER_V = 'dlopen8';
+  // dlopen9: the host no longer silently answers 0 for unimplemented `wali.*` imports.
+  // __wasm_thread_spawn now returns EAGAIN so threading.Thread().start() raises
+  // RuntimeError instead of trapping the whole interpreter (exit 139).
+  const WORKER_V = 'dlopen9';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
