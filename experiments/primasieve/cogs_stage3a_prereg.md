@@ -405,3 +405,64 @@ tie-broken rows left open in 3c.
 Also unchanged from before: eps is chosen empirically, so it is an ESTIMATE and not the bound Phase 6's
 theorem requires -- Phase 6 already measured that a finite-sample estimate reintroduces the cliff in
 miniature, and nothing here removes that caveat.
+
+# STAGE 4 PRE-REGISTRATION -- towards English: constructions, vocabulary, reference, generation
+
+Written BEFORE any of it ran. Five sub-stages, each gated, each committed separately; a sub-stage that fails
+its gate is reported as a null and the next one still runs. The objective these are judged against (from
+ARCHITECTURE.md): one zero-LLM rejection-first engine that induces exact compositional structure from
+examples, generalizes by construction, and abstains rather than guesses.
+
+## 4a -- constructions DISCOVERED, not authored (SLOG as the kill gate)
+Testbed: SLOG (Li et al. 2023), a superset of COGS whose training data adds relative clauses, wh-questions,
+deeper PP/CP recursion and center-embedding. Its official generalization set is password-protected; its
+test.tsv carries the new construction categories (object_modifying_RC 636, wh_Q_simple_trans 290, pp_4 57,
+center_embed_2/4, cp_4) and is used as the gate. MEASURED starting point: the Stage 3 engine trained on SLOG
+train scores EM 0.000 with abstention 1.000 on EVERYTHING -- a single induction assumption (exactly one
+sentence terminator) fails when questions enter the corpus, and every parse dies with it.
+  A1  the terminator becomes a SET, induced by the same rule (sentence-final and nowhere else) -> COGS-shaped
+      SLOG categories recover to their COGS numbers.
+  A2  relative clauses are COMPOSED from existing combinators, not added: MODIFY(NP, CLAUSE-with-GAP) where
+      the gap filler is the modified NP's head -- the engine already has GAP (control) filled by an inherited
+      head. The gap's position (subject / object) is a SEARCHED dimension. Gate: object_modifying_RC EM >= 0.90.
+  A3  wh-questions: gate EM >= 0.90 on wh_Q_simple_trans, or an honest null naming the missing combinator.
+  A4  NO REGRESSION: COGS gen 0.9990 / structural 0.985,1.0,1.0; Stage 3b knockouts 11/11 and win gate 10/10;
+      Stage 3c 11/11 + 10/10. A new combinator that breaks the generator-family control is authored, not
+      generic, and is a FAIL regardless of its SLOG number.
+  A5  confabulation on every SLOG category <= 0.01. Coverage bought by guessing is a FAIL.
+
+## 4b -- open vocabulary as a TOLERANCE-SET verdict, never a commit
+Today an unseen word means abstain (COGS gen: 22 items, `monastery` / `gardner`). Two induced routes:
+morphology (surface -> lemma via affix rules induced from the lexicon, cross-checked against unimorph_eng.tsv
+as an oracle, never as an input) and class-from-context (a slot that admits exactly one class fixes the class).
+Both are guesses by construction, so the verdict is CONJECTURE-grade: commit only if the completed parse is
+UNIQUE and the guessed entry is used consistently; else abstain.
+  B1  the 22 COGS OOV abstains: >= 18 become correct, confabulation 0.
+  B2  held-out vocabulary: remove 10% of noun TYPES' lexicon evidence from train (keeping their sentences
+      out entirely), test on gen items containing them. Report EM / CONFAB / abstain in the two-mode form.
+      KILL: confabulation > 0.02 on held-out-vocabulary items.
+  B3  no regression on in-vocabulary items.
+
+## 4c -- reference: compose dialog_s3's LEARNED pronoun resolution with the COGS engine
+COGS and SLOG have no pronouns, so the testbed is the adversary grammar extended with a pronoun class whose
+referent is one of the preceding NPs, resolved by a discourse function learned by elimination exactly as
+dialog_s3 does (candidate functions survive iff they reproduce every training answer; the survivor set may go
+EMPTY). Synthetic, stated as such.
+  C1  pronoun sentences: EM >= 0.95, confabulation 0, and the learned discourse function is reported.
+  C2  the shuffled-answer knockout must EMPTY the survivor set (dialog_s3's own knockout, re-run here).
+  C3  no regression on pronoun-free items of the same grammar.
+
+## 4d -- generation: meaning -> English by inverting the synchronous grammar
+The grammar is synchronous, so the inverse derivation exists: from an LF, select the frame whose role tuple
+matches the event's conjuncts, realize slots recursively, and choose surface forms via the inverse lexicon
+(one lemma has several surface forms -- `eat` / `ate` / `eaten` -- so the choice is a searched function of the
+slot position, not a guess).
+  D1  round trip on COGS test: parse -> generate -> exact original sentence, EM >= 0.95.
+  D2  gen-side round trip: generate from the gold LF -> parse -> gold LF, EM >= 0.95 on the 3 structural
+      categories (depth beyond training).
+  D3  where several sentences realize one LF, the generator must return the SET or abstain -- never pick.
+
+## Order and honesty
+4a first (it is also the last consolidation item), then 4b, 4c, 4d. Each is committed with its numbers when
+its gate is decided either way. The one-line summary of what "fluent" means here: exact meaning for the
+English it has evidence for, ask or abstain otherwise. Nothing in this stage changes that contract.

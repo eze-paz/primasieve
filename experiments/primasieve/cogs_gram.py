@@ -82,7 +82,12 @@ class Lexicon:
         self.lemma = {}          # word -> lemma
         self.det = {}            # determiner word -> 'plain' | 'prefix' | ('inline', marker_predicate)
         self.det_pos = "pre"     # which side of its noun a determiner sits on
-        self.terminator = None
+        self.terminator = None      # kept for compatibility: the most frequent terminator
+        self.terminators = set()    # STAGE 4a: English has more than one (. and ?). A single-terminator rule
+                                    # returned None on SLOG (`.` ends 92.7% < 95%) and killed every parse.
+        self.rc_markers = set()     # functors introducing a RELATIVE CLAUSE on the preceding noun ('that')
+        self.rc_mid = ()            # the constant segments of the noun->clause modifier predicate ('nmod',)
+        self.wh = {}                # fronted question words -> the constant they denote ('Who' -> '?')
         self.rel_segs = {}       # relator word -> the observed full predicate segment lists
         self.vroles = {}         # verb lemma -> roles from its own LAMBDA lexicon row
         self.varity = {}
@@ -200,11 +205,62 @@ def induce_lexicon(train, eps=0.0):
         lex.rel_segs[w] = cc
     # likewise the terminator: `n == seen[w]` demands it occur NOWHERE but sentence-finally, so a single
     # corrupted row that moves it inside a sentence removes the terminator entirely
+    # terminators = tokens that end sentences and occur (almost) nowhere else. A SET, not a singleton, and
+    # decided BEFORE class: the question constant `?` in the logical form collides with the punctuation token
+    # `?`, which had been collecting NAME votes and so was neither a terminator nor "absent from the sentence".
     for w, n in lastvote.items():
-        if n >= (1 - max(eps, 0.05)) * max(nsent, 1) and seen[w] - n <= eps * max(seen[w], 1):
-            lex.terminator = w
+        if n >= 20 and seen[w] - n <= eps * max(seen[w], 1):
+            lex.terminators.add(w)
+            lex.cls[w] = FUNC
+    lex.terminator = max(lex.terminators, key=lambda w: lastvote[w]) if lex.terminators else None
     _induce_determiners(lex, train, eps)
+    _induce_gap_constructions(lex, train)
     return lex
+
+
+def _induce_gap_constructions(lex, train):
+    """STAGE 4a. Two constructions that COMPOSE from the existing GAP combinator (control already filled a
+    gap with an inherited head):
+      RELATIVE CLAUSE  noun . mid ( x_noun , x_event ): the noun's variable fills a gap in the clause that a
+                       functor right after the noun introduces -> lex.rc_markers, lex.rc_mid
+      WH-QUESTION      a constant argument (`?`) that is NO token of the sentence, co-occurring exactly with a
+                       fronted word (`Who`) -> lex.wh, by the same necessity+cover test as core.align
+    Neither adds a combinator type; both add an attachment site for one that exists."""
+    rcm, rcmid = collections.Counter(), collections.Counter()
+    whco = collections.defaultdict(collections.Counter)
+    tokn = collections.Counter()
+    for toks, defs, conj in _rows(train):
+        ts = set(toks)
+        for w in ts:
+            tokn[w] += 1
+        for pred, args in conj:
+            segs = [x.strip() for x in pred.split(" . ")]
+            if len(segs) >= 2 and len(args) == 2 and args[0][0] == "v" and args[1][0] == "v":
+                i, j = args[0][1], args[1][1]
+                if (i < len(toks) and j < len(toks) and lex.cls.get(toks[i]) == ENTITY
+                        and lex.cls.get(toks[j]) == EVENT and lex.lemma.get(toks[i]) == segs[0]
+                        and i + 1 < len(toks) and lex.cls.get(toks[i + 1]) == FUNC
+                        and toks[i + 1] not in lex.det):
+                    rcm[toks[i + 1]] += 1
+                    rcmid[tuple(segs[1:])] += 1
+            for a in args:
+                if a[0] == "c" and a[1] not in (ts - lex.terminators):
+                    for w in ts - lex.terminators:
+                        whco[a[1]][w] += 1
+    for w, n in rcm.items():
+        if n >= 10:
+            lex.rc_markers.add(w)
+    if rcmid:
+        lex.rc_mid = rcmid.most_common(1)[0][0]
+    first = collections.Counter()
+    for toks, defs, conj in _rows(train):
+        first[toks[0]] += 1
+    for c, cc in whco.items():
+        for w, n in cc.items():
+            # w occurs ONLY with this constant AND is FRONTED (sentence-initial): `did` co-occurs only with
+            # `?` too, but it is an auxiliary in second position, not the question word
+            if n == tokn[w] and lex.cls.get(w) == FUNC and n >= 10 and first[w] >= 0.9 * tokn[w]:
+                lex.wh[w] = c
 
 
 def _realization(toks, defs, conj, i):
@@ -269,18 +325,20 @@ def induce_relmid(lex, train, sch):
 
 # ================================================================ structural parse
 class NP:
-    __slots__ = ("det", "kind", "idx", "lemma", "rel", "inner")
+    __slots__ = ("det", "kind", "idx", "lemma", "rel", "inner", "rc")
 
     def __init__(self, det, kind, idx, lemma):
         self.det, self.kind, self.idx, self.lemma = det, kind, idx, lemma
         self.rel = self.inner = None
+        self.rc = None              # (marker, gapped CL) -- a relative clause modifying this NP's head
 
 
 class CL:
-    __slots__ = ("event", "lemma", "pre", "slots")
+    __slots__ = ("event", "lemma", "pre", "slots", "front")
 
-    def __init__(self, event, lemma, pre, slots):
+    def __init__(self, event, lemma, pre, slots, front=None):
         self.event, self.lemma, self.pre, self.slots = event, lemma, pre, slots
+        self.front = front          # (wh NP node, marker) for a fronted question, else None
 
 
 def parse_base(lex, sch, toks, i):
@@ -293,6 +351,8 @@ def parse_base(lex, sch, toks, i):
         return NP(toks[i], ENTITY, i + 1, lex.lemma.get(toks[i + 1], toks[i + 1])), i + 2
     if lex.det_pos == "post" and c == ENTITY and i + 1 < n and toks[i + 1] in lex.det:
         return NP(toks[i + 1], ENTITY, i, lex.lemma.get(toks[i], toks[i])), i + 2
+    if toks[i] in lex.wh:
+        return NP(None, NAME, i, lex.wh[toks[i]]), i + 1          # `Who` -> the constant `?`
     if c == NAME:
         return NP(None, NAME, i, toks[i]), i + 1
     if c == ENTITY:
@@ -300,9 +360,8 @@ def parse_base(lex, sch, toks, i):
     return None
 
 
-def parse_np(lex, sch, toks, i):
-    """NP -> base (RELATOR base)*, folded per np_branch: head-initial makes the FIRST base the outer head,
-    head-final makes the LAST one. Same token run, opposite nesting."""
+def _run(lex, sch, toks, i):
+    """The base run of an NP: base (RELATOR base)*. -> (bases, rels, j) or None."""
     b = parse_base(lex, sch, toks, i)
     if b is None:
         return None
@@ -315,17 +374,50 @@ def parse_np(lex, sch, toks, i):
         rels.append(toks[j])
         bases.append(b2[0])
         j = b2[1]
+    return bases, rels, j
+
+
+def _fold(sch, bases, rels):
+    """Fresh nodes each call (alternatives must not share mutable structure). -> (head, nearest noun)."""
+    bs = [NP(x.det, x.kind, x.idx, x.lemma) for x in bases]
     if sch.np_branch == "right":
-        cur = bases[0]
-        for r, nxt in zip(rels, bases[1:]):
-            cur.rel, cur.inner = r, nxt
-            cur = nxt
-        return bases[0], j
-    cur = bases[-1]
-    for r, nxt in zip(reversed(rels), reversed(bases[:-1])):
-        cur.rel, cur.inner = r, nxt
-        cur = nxt
-    return bases[-1], j
+        for k, r in enumerate(rels):
+            bs[k].rel, bs[k].inner = r, bs[k + 1]
+        return bs[0], bs[-1]
+    for k, r in enumerate(rels):
+        bs[k + 1].rel, bs[k + 1].inner = r, bs[k]
+    return bs[-1], bs[-1]
+
+
+def parses_np(lex, sch, toks, i, budget=None):
+    """NP -> base (RELATOR base)* [RELATIVE CLAUSE]. A GENERATOR, because a relative clause's extent is
+    genuinely ambiguous at the string level (`the rose that the cat studied to Jack`: is `to Jack` the
+    clause's or the matrix verb's?). Every reading is yielded; FRAME LICENSING + UNIQUENESS decide
+    downstream: a reading whose clauses use frames never seen in training produces no logical form, and if
+    more than one licensed reading survives the engine ABSTAINS. A fixed extent convention (min / max) was
+    tried first and is wrong both ways -- 0.563 and 0.858 exact match, with confabulation either way."""
+    r = _run(lex, sch, toks, i)
+    if r is None:
+        return
+    bases, rels, j = r
+    if j < len(toks) and toks[j] in lex.rc_markers:
+        n = 0
+        for sub, j2 in parses_cl(lex, sch, toks, j + 1, "auto", [PARSE_BUDGET]):
+            head, target = _fold(sch, bases, rels)
+            target.rc = (toks[j], sub)                 # attaches to the nearest noun
+            yield head, j2
+            n += 1
+            if n >= 6:
+                break
+    head, _ = _fold(sch, bases, rels)
+    yield head, j                                      # no-RC reading: the marker may open a matrix clause
+
+
+def parse_np(lex, sch, toks, i):
+    """First reading only -- for callers that need one node, never for deciding between readings."""
+    for out in parses_np(lex, sch, toks, i):
+        return out
+    return None
 
 
 def _is_verb_here(lex, toks, j):
@@ -362,41 +454,61 @@ def _slots_from(lex, sch, toks, j, budget):
                     continue
                 for rest, j3 in _slots_from(lex, sch, toks, j2, budget):
                     yield [(w if marked else None, kind, sub)] + rest, j3
-        p = parse_np(lex, sch, toks, base)
-        if p is not None and p[1] > j:
-            for rest, j3 in _slots_from(lex, sch, toks, p[1], budget):
-                yield [(w if marked else None, "NP", p[0])] + rest, j3
+        for npn, j2 in parses_np(lex, sch, toks, base, budget):
+            if j2 <= j:
+                continue
+            for rest, j3 in _slots_from(lex, sch, toks, j2, budget):
+                yield [(w if marked else None, "NP", npn)] + rest, j3
     yield [], j
 
 
 def parses_cl(lex, sch, toks, i, gapped, budget):
     """CLAUSE -> [subject] [marker] EVENT slot*   (verb_pos 'medial')
                 [subject] slot* [marker] EVENT    (verb_pos 'final')
+    gapped: False | True/'subj' (subject gap, as for control) | 'post' (an argument gap after the verb)
+    | 'auto' (by lookahead: a verb right here means the SUBJECT is the gap).
     The clause exports a head, which is what lets a clause be an ARGUMENT of another clause."""
+    if gapped == "auto":
+        gapped = "subj" if _is_verb_here(lex, toks, i) else "post"
+    if gapped is True:
+        gapped = "subj"
     if budget[0] <= 0:
         return
     budget[0] -= 1
-    if gapped:
-        head_slots, j = [(None, "GAP", None)], i
-    else:
-        p = parse_np(lex, sch, toks, i)
-        if p is None:
+    def with_gap(slots):
+        """A post-verbal GAP sits where the missing argument sits in the un-gapped frame -- the theme before a
+        `to`-phrase, the recipient before a theme. That position is part of the FRAME, so every position is
+        offered and the frame table decides which are attested. Fixing it canonically last produced 35
+        order-only confabulations on SLOG's relative clauses."""
+        if gapped != "post":
+            yield slots
             return
-        head_slots, j = [(None, "NP", p[0])], p[1]
-    if sch.verb_pos == "medial":
-        v = _is_verb_here(lex, toks, j)
-        if v is None:
-            return
-        e, pre = v
-        for slots, j2 in _slots_from(lex, sch, toks, e + 1, budget):
-            yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + slots), j2
-    else:
-        for slots, j2 in _slots_from(lex, sch, toks, j, budget):
-            v = _is_verb_here(lex, toks, j2)
+        for k in range(len(slots), -1, -1):
+            yield slots[:k] + [(None, "GAP", None)] + slots[k:]
+
+    def after_subject(head_slots, j):
+        if sch.verb_pos == "medial":
+            v = _is_verb_here(lex, toks, j)
             if v is None:
-                continue
+                return
             e, pre = v
-            yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + slots), e + 1
+            for slots, j2 in _slots_from(lex, sch, toks, e + 1, budget):
+                for sl in with_gap(slots):
+                    yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + sl), j2
+        else:
+            for slots, j2 in _slots_from(lex, sch, toks, j, budget):
+                v = _is_verb_here(lex, toks, j2)
+                if v is None:
+                    continue
+                e, pre = v
+                for sl in with_gap(slots):
+                    yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + sl), e + 1
+
+    if gapped == "subj":
+        yield from after_subject([(None, "GAP", None)], i)
+    else:
+        for npn, j in parses_np(lex, sch, toks, i, budget):
+            yield from after_subject([(None, "NP", npn)], j)
 
 
 def parse_sentence(lex, sch, toks, want=1):
@@ -408,21 +520,37 @@ def parse_sentence(lex, sch, toks, want=1):
             out.append(node)
             if len(out) >= want:
                 break
+    if not out and toks and toks[0] in lex.wh:
+        # FRONTED QUESTION: the wh phrase fills a GAP in the clause that follows, optionally after a functor
+        # (`Who did a bird love`). Same combinator as the relative clause, different attachment site.
+        wh = NP(None, NAME, 0, lex.wh[toks[0]])
+        k, mark = 1, None
+        if k < len(toks) and lex.cls.get(toks[k]) == FUNC and toks[k] not in lex.det and toks[k] not in lex.wh:
+            mark, k = toks[k], k + 1
+        for node, j in parses_cl(lex, sch, toks, k, "auto", [PARSE_BUDGET]):
+            if j == len(toks):
+                node.front = (wh, mark)
+                out.append(node)
+                break
     return out
 
 
 def strip_term(lex, s):
     toks = s.split()
-    while toks and toks[-1] == lex.terminator:
+    while toks and toks[-1] in lex.terminators:
         toks = toks[:-1]
     return toks
 
 
 def frame_key(cl):
-    return (cl.pre, tuple((m, k) for m, k, _ in cl.slots))
+    return (cl.pre, tuple((m, k) for m, k, _ in cl.slots), cl.front[1] if cl.front else None)
 
 
 # ================================================================ derivation -> logical form
+class _NoDerivation(Exception):
+    pass
+
+
 def ev_np(lex, sch, mid, node, defs, conj):
     """-> the head this NP exports. HEAD-select (np_head) decides whether that is the head noun's variable or
     the dependent's; the modifier predicate template (mod_pred) decides whose LEMMA is spliced into it."""
@@ -438,6 +566,14 @@ def ev_np(lex, sch, mid, node, defs, conj):
             own = [(node.lemma, (own_head,)), (r[1], (own_head,))]
         else:
             own = [(node.lemma, (own_head,))]
+    if node.rc is not None:
+        # noun . mid ( head , event ) then the clause's conjuncts, with the GAP filled by this head
+        marker, sub = node.rc
+        rc_conj = []
+        ev = ev_cl(lex, sch, mid, sub, ev_np.roles, defs, rc_conj, inherited=own_head)
+        if ev is None:
+            raise _NoDerivation()
+        own = own + [(" . ".join((node.lemma,) + tuple(lex.rc_mid)), (own_head, ev))] + rc_conj
     if node.rel is None:
         conj.extend(own)
         return own_head
@@ -463,6 +599,9 @@ def ev_np(lex, sch, mid, node, defs, conj):
 
 def ev_cl(lex, sch, mid, node, roles, defs, conj, inherited=None):
     ev = ("v", node.event)
+    ev_np.roles = roles
+    if node.front is not None:
+        inherited = ("c", node.front[0].lemma)            # the fronted wh phrase fills the gap
     heads, subconj = [], []
     for m, kind, sub in node.slots:
         c = []
@@ -503,7 +642,10 @@ def ev_cl(lex, sch, mid, node, roles, defs, conj, inherited=None):
 
 def lf_of(lex, sch, mid, roles, node):
     defs, conj = [], []
-    if ev_cl(lex, sch, mid, node, roles, defs, conj) is None:
+    try:
+        if ev_cl(lex, sch, mid, node, roles, defs, conj) is None:
+            return None
+    except _NoDerivation:
         return None
     return serialize(defs, conj)
 
@@ -512,12 +654,23 @@ def generate(model, s):
     """model = (lex, schema, mid, roles, varconv). -> the logical form, or None if no derivation exists.
     Derivations are always built over TOKEN POSITIONS; varconv only renames the variables on the way out."""
     lex, sch, mid, roles, varconv = model
-    ps = parse_sentence(lex, sch, strip_term(lex, s), want=1)
-    if not ps:
-        return None
-    lf = lf_of(lex, sch, mid, roles, ps[0])
-    if lf is None:
-        return None
+    readings = {}
+    for p in parse_sentence(lex, sch, strip_term(lex, s), want=12):
+        lf = lf_of(lex, sch, mid, roles, p)
+        if lf is not None:                             # a reading using an unseen FRAME is not licensed
+            readings.setdefault(lf, p)
+    if len(readings) > 1:
+        # SUBCATEGORIZATION as a tie-break only: among competing readings keep those whose every (frame, verb)
+        # pair was attested in training. A SINGLE novel reading is never rejected here -- that is how a verb
+        # seen only intransitively still parses transitively (the COGS lexical-generalization categories).
+        att = roles.get("__attested__", frozenset())
+        keep = {lf: p for lf, p in readings.items()
+                if all((frame_key(cl), cl.lemma) in att for cl, _ in clause_nodes(lex, sch, mid, p))}
+        if keep:
+            readings = keep
+    if len(readings) != 1:
+        return None                                    # none, or a GENUINE ambiguity: abstain, never pick
+    lf = next(iter(readings))
     return lf if varconv == "position" else renumber_first_appearance(lf)
 
 
@@ -530,25 +683,68 @@ def _cl_head(lex, sch, mid, node, inherited):
     if kind == "GAP":
         return inherited
     if kind == "NP":
-        return ev_np(lex, sch, mid, sub, [], [])
+        return _np_head_only(lex, sch, mid, sub)
     return _cl_head(lex, sch, mid, sub, inherited)
 
 
+def _walk_np(np):
+    while np is not None:
+        yield np
+        np = np.inner
+
+
+def _np_rcs(np):
+    """(relative-clause node, filler head) for every NP in a modifier chain."""
+    return [(n.rc[1], ("c", n.lemma) if n.kind == NAME else ("v", n.idx)) for n in _walk_np(np) if n.rc]
+
+
+def _np_head_only(lex, sch, mid, np):
+    """An NP's exported head WITHOUT evaluating its relative clauses (roles may not exist yet)."""
+    saved = [(n, n.rc) for n in _walk_np(np)]
+    for n, _ in saved:
+        n.rc = None
+    try:
+        return ev_np(lex, sch, mid, np, [], [])
+    finally:
+        for n, rc in saved:
+            n.rc = rc
+
+
 def clause_nodes(lex, sch, mid, node, inherited=None):
-    """Walk a derivation and yield (clause, slot heads) -- structure only, roles not needed yet."""
+    """Walk a derivation and yield (clause, slot heads) -- structure only, roles not needed yet.
+    Relative clauses inside NPs are walked too, their GAP filled by the NP they modify; a fronted wh phrase
+    fills the gap of the clause it fronts."""
+    if node.front is not None:
+        inherited = ("c", node.front[0].lemma)
     heads = []
     for m, kind, sub in node.slots:
         if kind == "GAP":
             heads.append(inherited)
         elif kind == "NP":
-            heads.append(ev_np(lex, sch, mid, sub, [], []))
+            heads.append(_np_head_only(lex, sch, mid, sub))
         else:
             heads.append(_cl_head(lex, sch, mid, sub, heads[0] if heads else inherited))
     out = [(node, heads)]
     for m, kind, sub in node.slots:
         if kind in ("CL", "VP"):
             out.extend(clause_nodes(lex, sch, mid, sub, inherited=(heads[0] if heads else inherited)))
+        elif kind == "NP":
+            for rc, filler in _np_rcs(sub):
+                out.extend(clause_nodes(lex, sch, mid, rc, inherited=filler))
     return out
+
+
+def gold_order(lf, skip_role=None):
+    """event -> its arguments in GOLD ORDER (2-segment binaries only, the RC modifier excluded)."""
+    p = parse_lf(lf)
+    if p is None or p[0] == "LAMBDA":
+        return None
+    m = collections.defaultdict(list)
+    for pred, args in p[1]:
+        segs = [x.strip() for x in pred.split(" . ")]
+        if len(segs) == 2 and len(args) == 2 and args[0][0] == "v" and segs[1] != skip_role:
+            m[args[0][1]].append(args[1])
+    return dict(m)
 
 
 def gold_roles(lf):
@@ -571,19 +767,48 @@ def induce_roles(lex, sch, mid, train, eps=0.0):
     plurality reading. That is Phase 6's rule: output the eps-consistent set, commit only on a singleton."""
     byframe = collections.defaultdict(collections.Counter)
     byverb = collections.defaultdict(collections.Counter)
+
+    def observe(node, g):
+        for cl, heads in clause_nodes(lex, sch, mid, node):
+            rs = tuple(g.get((cl.event, h)) for h in heads)
+            if not any(r is None for r in rs):
+                byframe[frame_key(cl)][rs] += 1
+                byverb[(frame_key(cl), cl.lemma)][rs] += 1
+
+    # Which reading of a training sentence to learn from is decided by STRUCTURAL CONSISTENCY WITH THE GOLD:
+    # a reading's set of (event, argument-head) pairs must equal the gold's binary-conjunct set. This needs no
+    # role table, so it works for the GAP frames that only ever occur in relative clauses. (A two-round scheme
+    # -- unique parses first, then gold-reproduction -- was tried and could never learn those frames, because
+    # every relative-clause sentence has >= 2 readings and its frames are absent from round 1.)
+    rc_role = lex.rc_mid[0] if lex.rc_mid else None
+
+    def consistent(node, lf):
+        # ORDER-AWARE: each clause's heads, in slot order, must equal the gold's arguments for that event in
+        # gold order. Order is what distinguishes gap positions; a set comparison could not. The RC modifier
+        # `noun . nmod ( noun , event )` is excluded -- it is a binary conjunct but not a clause argument.
+        go = gold_order(lf, skip_role=rc_role)
+        if go is None:
+            return False
+        seen = {}
+        for cl, heads in clause_nodes(lex, sch, mid, node):
+            seen[cl.event] = list(heads)
+        return seen == go
+
     for s, lf, cat in train:
         if cat == "primitive" or lf.startswith("LAMBDA"):
             continue
-        ps = parse_sentence(lex, sch, strip_term(lex, s), want=1)
         g = gold_roles(lf)
-        if not ps or g is None:
+        if g is None:
             continue
-        for cl, heads in clause_nodes(lex, sch, mid, ps[0]):
-            rs = tuple(g.get((cl.event, h)) for h in heads)
-            if any(r is None for r in rs):
-                continue
-            byframe[frame_key(cl)][rs] += 1
-            byverb[(frame_key(cl), cl.lemma)][rs] += 1
+        pick = [q for q in parse_sentence(lex, sch, strip_term(lex, s), want=12) if consistent(q, lf)]
+        if len(pick) == 1:                              # several consistent readings -> ambiguous -> skipped
+            observe(pick[0], g)
+    roles, ambiguous = _settle(byframe, byverb, eps)
+    roles["__attested__"] = frozenset(byverb)      # every (frame, verb) pair actually seen: subcategorization
+    return roles, ambiguous
+
+
+def _settle(byframe, byverb, eps):
     roles = {}
     ambiguous = []
 
