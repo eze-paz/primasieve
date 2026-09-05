@@ -263,6 +263,7 @@ self.addEventListener('message', async (event) => {
     // Python backend for this run. 'walios' routes run_python to the warm walios
     // interpreter instead of the Pyodide pool; anything else keeps Pyodide.
     _pyBackend = (config && config.pythonBackend === 'walios') ? 'walios' : 'pyodide';
+    if (_pyBackend === 'walios' && config && config.tools) config.tools = _waliosifyTools(config.tools);
     const abortCtl = new AbortController();
     _agentAborts.set(id, abortCtl);
     const ctx = {
@@ -967,6 +968,34 @@ function truncateToolResult(result) {
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
 let _pyBackend = 'pyodide';
+
+// The run_python description shipped in tools.js describes PYODIDE: ~100 prebuilt wheels,
+// micropip, and "no sockets, use pyfetch". On the walios backend three of those are wrong,
+// and in the A/B the model burned ~5 turns probing for requests / urllib / a system python
+// before falling back to pyfetch. Rewrite the paragraphs that differ, in place, so the
+// wording matches the backend actually executing the call.
+function _waliosifyTools(tools) {
+  if (!Array.isArray(tools)) return tools;
+  return tools.map((t) => {
+    const fn = t && t.function;
+    if (!fn || (fn.name !== 'run_python' && fn.name !== 'pyodide') || typeof fn.description !== 'string') return t;
+    let d = fn.description;
+    d = d.replace(/^PACKAGES:.*$/m,
+      'PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, sqlite3 and more are BUILT IN — just import. '
+      + 'Others: await micropip.install(\'name\') installs pure-Python wheels from PyPI (with their dependencies). '
+      + 'Packages with compiled C extensions cannot be installed at runtime — they must be cross-compiled ahead of time, and micropip says so explicitly if you try.');
+    d = d.replace(/^HTTP:.*$/m,
+      'HTTP: pyodide.http.pyfetch works (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()); check r.ok / r.status. '
+      + 'requests and urllib also work here — real sockets and TLS are available, and CA certificates are installed — but pyfetch is cheaper and is not subject to the guest network relay, so prefer it. '
+      + 'For non-CORS hosts: pyfetch(\'/proxy/host/path\').');
+    d = d.replace(/^Execute a Python script from OPFS via Pyodide\./m,
+      'Execute a Python script from OPFS via walios (a real CPython 3.14 compiled to wasm, kept WARM between calls — imports and globals persist, so a second call that reuses them is milliseconds).');
+    d = d.replace(/  pypi     → script runs: import micropip; await micropip\.install\('feedparser'\)/,
+      "  pypi     → script runs: import micropip; await micropip.install('feedparser')   # pure-Python wheels only");
+    return { ...t, function: { ...fn, description: d } };
+  });
+}
+
 
 async function tool_run_python({ path, code, args, timeout }, ctx) {
   if (_pyBackend === 'walios') return tool_run_python_walios({ path, code, args, timeout }, ctx);
@@ -3054,17 +3083,16 @@ const WALIOS_BASE = '/walios/';
 const WALIOS_BB = 'busybox.wasm?v=net4';
 // Bumped together with any wali-worker.js deploy (dlopen7 = GOT back-fill before
 // the data relocs + the self-resolving import trampoline, ported from the node host).
-const WALIOS_WORKER_V = 'dlopen7';
+const WALIOS_WORKER_V = 'dlopen8';
 // Per-binary companion mounts, fetched+extracted on the FIRST exec of that binary
 // and cached for the worker's life. Shared by the shell tool and the warm
 // interpreter so both see the same package set.
 const WALIOS_LAZY_TARS = {
   'python.wasm': [['pylib.tar.gz', '/py']],
+  // EAGER: the stdlib, plus the small extras bundle (certifi for TLS, packaging for
+  // micropip's resolver, and _shims/ctypes which MUST precede stdlib ctypes on the path).
   'python_cxx.wasm?v=7': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
-                          ['walios-numpy.tar.gz?v=2', '/site-packages'],
-                          ['walios-docs.tar.gz?v=4', '/site-packages'],
-                          ['walios-extras.tar.gz?v=2', '/site-packages'],
-                          ['walios-mpl.tar.gz?v=3', '/site-packages']],
+                          ['walios-extras.tar.gz?v=3', '/site-packages']],
 // walios-mpl carries matplotlib + contourpy + kiwisolver + mpl_toolkits and a PREBUILT
 // font cache (_mplcache/fontlist-v390.json): font_manager's first-import scan costs
 // >600s in-browser and 4.6s on the node host, so it is generated offline and shipped.
@@ -3075,6 +3103,20 @@ const WALIOS_LAZY_TARS = {
 // hit via operator new[] -> __wasm_call_ctors -> mimalloc init -> fputs). Hidden
 // visibility binds those symbols locally, so nothing round-trips through JS.
 };
+// LAZY: which bundle provides which top-level module. Unpacking all of these up front
+// cost ~2.3s and ~128MB of VFS on every boot, for packages most tasks never import.
+const WALIOS_LAZY_PKGS = (() => {
+  const NUMPY = ['walios-numpy.tar.gz?v=2', '/site-packages'];
+  const DOCS  = ['walios-docs.tar.gz?v=4', '/site-packages'];
+  const MPL   = ['walios-mpl.tar.gz?v=3', '/site-packages'];
+  const m = {};
+  for (const n of ['numpy', 'pandas', 'dateutil', 'pytz', 'tzdata', 'six', 'msgpack', 'simplejson', 'zlib']) m[n] = NUMPY;
+  for (const n of ['PIL', 'lxml', 'docx', 'openpyxl', 'pptx', 'reportlab', 'pypdf', 'PyPDF2', 'bs4', 'soupsieve',
+                   'fontTools', 'xlsxwriter', 'olefile', 'OleFileIO_PL', 'striprtf', 'chardet', 'charset_normalizer',
+                   'et_xmlfile', 'fpdf', 'pdfminer', 'typing_extensions', '_ssl']) m[n] = DOCS;
+  for (const n of ['matplotlib', 'mpl_toolkits', 'contourpy', 'kiwisolver']) m[n] = MPL;
+  return m;
+})();
 const WALIOS_MANIFEST = {
   busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
   // python → python_cxx: the dynamic-linking CPython that dlopen()s PIC-wasm
@@ -3169,7 +3211,7 @@ async function tool_walios({ script, timeout }, ctx) {
       lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
              PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1',
+             SANDPIE_ASYNCIO: '1', SANDPIE_LAZY_PKGS: JSON.stringify(WALIOS_LAZY_PKGS),
              SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
@@ -3246,10 +3288,38 @@ async function _wpyHostcall(st, f) {
       const headers = {}; try { r.headers.forEach((v, k) => { headers[k] = v; }); } catch (_) {}
       return reply({ ok_call: true, status: r.status, url: r.url || a.url, headers, body: _b64bytes(new Uint8Array(await r.arrayBuffer())) });
     }
+    if (f.op === 'mount') {
+      // the guest hit an import miss for a package that lives in a bundle we have not
+      // unpacked yet; ask the walios worker to mount it, then let the import retry
+      const st = _wpy;
+      if (!st) return reply({ ok_call: false, error: 'no interpreter' });
+      const done = await new Promise((res) => {
+        const prev = st.worker.onmessage;
+        const to = setTimeout(() => { st.worker.onmessage = prev; res({ ok: false, err: 'mount timed out' }); }, 120000);
+        st.worker.onmessage = (ev) => {
+          const m = ev.data;
+          if (m && m.t === 'tar-mounted' && m.url === a.url) {
+            clearTimeout(to); st.worker.onmessage = prev; res({ ok: !!m.ok, err: m.err });
+            return;
+          }
+          return prev(ev);
+        };
+        st.worker.postMessage({ t: 'mount-tar', url: WALIOS_BASE + a.url, prefix: a.prefix });
+      });
+      return reply(done.ok ? { ok_call: true } : { ok_call: false, error: done.err || 'mount failed' });
+    }
     if (f.op === 'pip') {
       const name = String(a.name || '').replace(/[^A-Za-z0-9._-]/g, '');
       if (!name) return reply({ ok_call: false, error: 'empty package name' });
-      const meta = await (await _wpyFetch('https://pypi.org/pypi/' + name + '/json')).json();
+      // `list` asks only for the published versions, so the guest can pick one that
+      // satisfies a specifier (urllib3<3) instead of always taking the newest.
+      if (a.list) {
+        const all = await (await _wpyFetch('https://pypi.org/pypi/' + name + '/json')).json();
+        return reply({ ok_call: true, versions: Object.keys(all.releases || {}) });
+      }
+      const relUrl = a.version ? ('https://pypi.org/pypi/' + name + '/' + encodeURIComponent(a.version) + '/json')
+                               : ('https://pypi.org/pypi/' + name + '/json');
+      const meta = await (await _wpyFetch(relUrl)).json();
       const w = (meta.urls || []).find(u => u.packagetype === 'bdist_wheel' && /-(py3|py2\.py3)-none-any\.whl$/.test(u.filename));
       if (!w) return reply({ ok_call: false, error: name + ' has no pure-Python wheel — it needs a compiled build, which must be cross-compiled to wasm ahead of time' });
       return reply({ ok_call: true, name: meta.info.name, version: meta.info.version,
@@ -3304,7 +3374,7 @@ async function _wpyEnsure() {
     env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
            PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
            PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1',
+             SANDPIE_ASYNCIO: '1', SANDPIE_LAZY_PKGS: JSON.stringify(WALIOS_LAZY_PKGS),
              SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`

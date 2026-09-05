@@ -437,7 +437,7 @@ uname -a
 Everything between the sentinels IS the script — no escaping needed. Either channel works; the blob form is just an escaping-free alternative. Optional per-call timeout on the blob opener: <|walios:90|> (seconds; default 120, max 300).
 ENVIRONMENT: busybox ash (full coreutils), persistent home at /root (files written there survive across calls), real TCP/UDP via the WISP relay (wget, nc, ssh, ping), python3 (stdlib lazy-loads on first use).
 ⚠️ /root IS the app's OPFS workspace root (same namespace the file tools see) — rm there deletes REAL files. Use it deliberately.
-USE FOR: quick POSIX shell computation, text processing, tar/gzip/zip work, sandboxed shell logic. NOT a substitute for run_python (no numpy/pandas there) or the shell tool (that runs on the user's real machine — walios is an isolated in-browser OS).`,
+USE FOR: quick POSIX shell computation, text processing, tar/gzip/zip work, sandboxed shell logic. Its python3 DOES have numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl and more — but prefer run_python for Python work (it keeps a warm interpreter, so imports and globals persist between calls). NOT the shell tool: that runs on the user's real machine, walios is an isolated in-browser OS.`,
       parameters: {
         type: 'object',
         properties: {

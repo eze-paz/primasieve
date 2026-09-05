@@ -225,6 +225,41 @@ def _already_have(name):
     return False
 
 
+def _pick_version(name, spec):
+    """Choose the newest release that satisfies `spec`.
+
+    Without this micropip always took the LATEST wheel, so a package pinned to
+    `urllib3<3` would happily get urllib3 4.x. Version ordering and specifier matching come
+    from `packaging` (shipped in walios-extras); if either the host or packaging cannot help
+    we fall back to latest, which is the old behaviour rather than a hard failure."""
+    if not spec:
+        return None
+    try:
+        from packaging.specifiers import SpecifierSet
+        from packaging.version import Version
+    except Exception:
+        return None
+    r = _hostcall("pip", name=name, list=True)
+    versions = r.get("versions") if r.get("ok_call") else None
+    if not versions:
+        return None          # old host, or nothing published: caller takes latest
+    try:
+        want = SpecifierSet(spec)
+    except Exception:
+        return None
+    best = None
+    for v in versions:
+        try:
+            pv = Version(v)
+        except Exception:
+            continue
+        if pv.is_prerelease or v not in want:
+            continue
+        if best is None or pv > best[0]:
+            best = (pv, v)
+    return best[1] if best else None
+
+
 def _wheel_requires(zf):
     """Runtime dependencies from the wheel's METADATA, minus the ones that do not apply.
 
@@ -261,7 +296,7 @@ def _wheel_requires(zf):
                     continue
             except Exception:
                 pass
-        out.append(req.name)
+        out.append((req.name, str(req.specifier or "")))
     return out
 
 
@@ -272,12 +307,21 @@ def _micropip_install_now(requirements, **kw):
     if isinstance(requirements, str):
         requirements = [requirements]
     deps = kw.get("deps", True)
-    queue = [str(r) for r in requirements]
-    asked = {_canon(r) for r in queue}
+    queue = []
+    for r in requirements:
+        spec = ""
+        try:
+            from packaging.requirements import Requirement
+            parsed = Requirement(str(r))
+            r, spec = parsed.name, str(parsed.specifier or "")
+        except Exception:
+            pass
+        queue.append((str(r), spec))
+    asked = {_canon(n) for n, _ in queue}
     seen, done = set(), []
 
     while queue:
-        raw = queue.pop(0)
+        raw, spec = queue.pop(0)
         name = _canon(raw)
         if name in seen:
             continue
@@ -287,7 +331,7 @@ def _micropip_install_now(requirements, **kw):
         if name not in asked and _already_have(name):
             continue
 
-        r = _hostcall("pip", name=name)
+        r = _hostcall("pip", name=name, version=_pick_version(name, spec))
         if not r.get("ok_call"):
             if name in asked:
                 raise ValueError("micropip: %s" % r.get("error", "could not resolve " + raw))
@@ -305,9 +349,9 @@ def _micropip_install_now(requirements, **kw):
                 continue
             z.extractall(target)
             if deps:
-                for d in _wheel_requires(z):
-                    if _canon(d) not in seen:
-                        queue.append(d)
+                for dn, dspec in _wheel_requires(z):
+                    if _canon(dn) not in seen:
+                        queue.append((dn, dspec))
         done.append("%s==%s" % (r.get("name", raw), r.get("version", "?")))
 
     importlib.invalidate_caches()
@@ -326,6 +370,50 @@ def _install_micropip_shim():
     m.list = _list
     m.add_mock_package = lambda *a, **k: None
     sys.modules["micropip"] = m
+
+
+# ------------------------------------------------------------ lazy package mounts
+# Boot used to unpack every bundle (numpy, docs, matplotlib) before the first line of
+# user code: ~2.3s and ~128MB for packages most tasks never touch. Instead the host lists
+# which bundle provides which top-level module, and we fetch one only when an import for
+# it actually misses.
+
+_LAZY = {}
+try:
+    _LAZY = json.loads(os.environ.get("SANDPIE_LAZY_PKGS") or "{}")
+except Exception:
+    _LAZY = {}
+
+
+class _MountOnMiss:
+    """A last-resort meta_path finder: normal resolution runs first, and we only act once
+    everything else has failed to find `fullname`."""
+
+    def __init__(self):
+        self._tried = set()
+
+    def find_spec(self, fullname, path=None, target=None):
+        top = fullname.split(".")[0]
+        bundle = _LAZY.get(top)
+        if not bundle or top in self._tried:
+            return None
+        self._tried.add(top)          # set BEFORE retrying: find_spec re-enters meta_path
+        r = _hostcall("mount", url=bundle[0], prefix=bundle[1])
+        if not r.get("ok_call"):
+            return None
+        import importlib
+        importlib.invalidate_caches()
+        try:
+            return importlib.util.find_spec(fullname)
+        except Exception:
+            return None
+
+
+def _install_lazy_mounts():
+    if not _LAZY:
+        return
+    import importlib.util  # noqa: F401  (find_spec lives here)
+    sys.meta_path.append(_MountOnMiss())
 
 
 # ------------------------------------------------------------------- execution
@@ -458,6 +546,7 @@ def _run(msg):
 def main():
     _install_pyodide_shim()
     _install_micropip_shim()
+    _install_lazy_mounts()
     try:
         os.makedirs("/root", exist_ok=True)
         os.chdir("/root")
