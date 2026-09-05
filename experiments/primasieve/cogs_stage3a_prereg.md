@@ -466,3 +466,29 @@ slot position, not a guess).
 4a first (it is also the last consolidation item), then 4b, 4c, 4d. Each is committed with its numbers when
 its gate is decided either way. The one-line summary of what "fluent" means here: exact meaning for the
 English it has evidence for, ask or abstain otherwise. Nothing in this stage changes that contract.
+
+## STAGE 4 MEASURED RESULTS (added after the runs; commits f97ef17, 6e2565c, c872d2a, and 4d)
+
+  4a  SLOG constructions      PASS  in_distribution 1.000; object_modifying_RC 0.964 (CONFAB 0.000, abstain
+                                    0.036); wh_Q_simple_trans 1.000; pp_4 / cp_4 / center_embed_2 / center_embed_4
+                                    all 1.000. Started from EM 0.000 on everything (single-terminator assumption).
+                                    A4 no-regression: COGS, Stage 3b (11/11 + win gate), Stage 3c (11/11 + win
+                                    gate, oracle 1.0000), core_selftest -- all PASS.
+  4b  open vocabulary         PASS  B1 22/22 (COGS gen now 1.0000 / 21000); B2 held-out 10% noun types (and, as
+                                    collateral, several rare verbs): 5179 items, CONFAB 0.0000, EM 1.0000; B3
+                                    unchanged. Morphology vs the unimorph oracle 0.370 on inflected verbs -- the
+                                    misses are irregulars no suffix rule can reach; an irregular UNSEEN verb is
+                                    where the next confabulation would come from.
+  4c  reference               PASS  400/400, CONFAB 0; pronoun class INDUCED (purity-tolerant), discourse function
+                                    LEARNED BY ELIMINATION ({LAST_OBJECT}); shuffled-referent knockout EMPTIES the
+                                    survivor set. SYNTHETIC testbed; the mechanism is the claim, not coverage.
+  4d  generation              PASS  D1 3000/3000 strict round trip, CONFAB 0; D2 pp / cp / obj_pp_to_subj_pp all
+                                    1.000 from the gold logical form; D3 0 multi-realization forms remain.
+
+What "fluent" now means here, exactly: for the English the engine has evidence for -- COGS + SLOG's
+constructions, a vocabulary open to unseen regular words -- it produces the exact meaning and the exact
+sentence back, with zero confabulation on every gate above, and asks or abstains otherwise. What it does NOT
+mean: coordination, adjectives, adverbs, negation, quantifiers, tense/aspect beyond the induced verb forms,
+real pronouns (gender / number / long-distance), irregular unseen verbs, or ambiguity that the meaning
+representation itself cannot resolve. Each of those is a further construction or fact to INDUCE, through the
+same gates.

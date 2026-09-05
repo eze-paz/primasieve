@@ -118,6 +118,14 @@ bookkeeping; a candidate for a third `core.verdict` state, recorded here as an i
 `meta_v3` (arc-1 commit mechanism; its live form is `core.verdict`). And the whole `archive/` of 106 files:
 git is the archive.
 
+### Stage 4 (on core from day one)
+`cogs_stage4a..d.py`, `cogs_gen.py`: constructions (SLOG), open vocabulary, reference, generation -- each with
+its claim in `core/registry.py`, each self-checking, each committed with its gate numbers. See the Stage 4
+section of `cogs_stage3a_prereg.md`. None added a combinator type: relative clauses and wh-questions compose
+the existing GAP; open vocabulary is the existing verdict discipline applied to a positional class guess and
+an induced suffix rule; reference is dialog_s3's elimination over the grammar's heads; generation is the same
+synchronous grammar read backwards.
+
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still
 frozen by hand** — the one authored thing Stage 3b's knockout ladder did not remove. It should be
