@@ -13,6 +13,10 @@ grammar, but a grammar that GROWS itself.
 Emergence = the hard task becomes solvable ONLY after learning from the easy ones. Agnostic =
 everything is generic expression terms; the same loop works for any domain with an oracle.
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 import ast, itertools, time, collections, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Shared with l0.py, which invented the same signature-dedupe independently: core.generate.SignatureBank.
@@ -83,6 +87,7 @@ def learn_unary(solution_asts):
     return name, (lambda x: op(x, x)), sym, cnt
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     print("=== EMERGENCE via library-learning (zero-LLM, agnostic terms) ===\n")
     def ex(f, argn, pts): return [({argn[i]: p[i] for i in range(len(argn))}, f(*p)) for p in pts]
     PTS2 = [(3, 1), (5, 2), (7, 4), (2, 2), (6, 3), (4, 1)]

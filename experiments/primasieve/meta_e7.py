@@ -8,6 +8,10 @@ Metric = coverage + abstention-correctness + CONFABULATION=0 (sound-rejection pr
 vs an ADVERSARIAL held-out (negatives, zero divisor, NULL). Arms ACTIVE (version-space disagreement, seeks
 edges) vs RANDOM-MATCHED. Control = in-grammar python +,-,* (tautology, ~100%). Knockouts K1 shuffle, K3
 ablate abs/sign (trunc-div must flip INVENTED->ABSTAINED)."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 import os, sys, random, sqlite3, statistics
 sys.path.insert(0, os.path.dirname(__file__))
 _C = sqlite3.connect(":memory:")
@@ -84,6 +88,7 @@ def score(op, model, world=sql):
     return cover, confab, abst_ok
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     B = 14; SEEDS = range(8)          # tight budget: random rarely samples the ~10% sparse edges
     OPS = ["+", "-", "*", "/", "%", "=", "<"]          # IN: +,-,*,=,<  EDGE: /,%  (OUT tested via OUT_ADV)
     print("REAL WORLD = SQLite; hypotheses in Python (different impl). vs adversarial held-out "

@@ -9,6 +9,11 @@ Why hidden state (Angluin): with a mode flag behind a d-op prefix, random sampli
 the dose d. Arms: ACTIVE vs RANDOM-SHORT (length-matched -- mandatory). Knockouts: shuffle-responses (-> no
 identification), stateless (no mode -> active~random), dose-response (gap grows with d). NULL: ACTIVE ~
 RANDOM-SHORT across all d = COLLECT vacuous. ZERO LLM, ZERO external oracle beyond the world's exact response."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.collect import best_split
+from core.registry import selfcheck
+
 import os, sys, random, itertools, statistics
 sys.path.insert(0, os.path.dirname(__file__))
 CLAMP = 100
@@ -65,7 +70,7 @@ def learn(true_run, dose, arm, budget, seed, pool, heldout):
     for step in range(budget):
         if identified(V, runs, heldout): break
         if arm == "active":
-            q = max(pool, key=lambda q: len({runs[(id(m), q)] for m in V}))
+            q = best_split(V, pool, lambda m, q: runs[(id(m), q)])          # core.collect (shared with p8, phase5c)
         elif arm == "random":
             q = rng.choice(pool)
         else:  # random-short: match ACTIVE's realized length distribution
@@ -84,6 +89,7 @@ def make_model_run(m, dose):
     return make_model(m, dose)
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     L = 3; B = 60; SEEDS = range(5); pool = prog_pool(L)
     print(f"hidden-state machine: 4 opcodes x {len(candidates(1))} candidate semantics = {len(candidates(1))**4} models; "
           f"r1 HIDDEN, mode gated by dose-d prefix; pool {len(pool)} programs, budget {B}\n")

@@ -7,7 +7,7 @@ file enforces, mechanically:
       components of the import graph before consolidation
   C2  every migrated thread still reproduces its PUBLISHED gate numbers -- consolidation that moves a number
       is a regression, not a refactor
-  C3  the island map is re-measured and printed, so fragmentation is a tracked quantity rather than a feeling
+  C3  ZERO ISLANDS: the live surface must be ONE connected component. No island is allowed -- merge or delete.
 
 Run it after any change to core/. Usage:  python core_selftest.py [--map-only]"""
 import os, re, sys, collections, subprocess
@@ -72,6 +72,11 @@ if __name__ == "__main__":
           f"{BASELINE_MAP['files']} files, {BASELINE_MAP['singletons']} single-file islands")
     print(f"  now:                  {len(comps)} components, {singles} single-file islands")
     print(f"  largest component:    {len(comps[0])} files")
+    ok3 = len(comps) == 1
+    print(f"  -> islands: {len(comps) - 1}   [gate == 0 -> {'PASS' if ok3 else 'FAIL'}]")
+    if not ok3:
+        for c in comps[1:]:
+            print(f"     ISLAND: {', '.join(c)}")
     print(f"\n  core/ is imported by {len(adopters)} modules: {', '.join(adopters)}")
 
     hit = check_adoption(adopters)
@@ -112,22 +117,20 @@ if __name__ == "__main__":
     checks.append(("SCAN simple train reproduction", r / t, 1.0000))
     checks.append(("SCAN simple test EM", scan_eval(G, ste)["EM"], 1.0000))
 
-    # l0 and emergence: their published results are STRINGS/counts, not fractions, so they are checked by
-    # re-running and matching the exact claim. This is what makes migration safe -- a number that moves is a
-    # regression, and these two are the threads whose enumeration hot loops were touched.
-    import io, contextlib
-    for mod, needles in (("l0", ["PASSES: all 6 parametric operators", "trunc     with abs/sign: E=109203"]),
-                         ("emergence", ["`x * x` (seen 6x)", "[7019 exprs", "[3008 exprs"])):
+    # Every other live result comes from ONE list: core/registry.py. Each module is re-run and its
+    # registered computed claims must still appear. Adding an experiment to the live surface = adding its
+    # claim there; this loop then protects it automatically.
+    import io, contextlib, runpy
+    from core.registry import PUBLISHED, verify_output
+    for mod in sorted(PUBLISHED):
         buf = io.StringIO()
         try:
             with contextlib.redirect_stdout(buf):
-                runpy = __import__("runpy")
                 runpy.run_module(mod, run_name="__main__")
         except SystemExit:
             pass
-        out = buf.getvalue()
-        for nd in needles:
-            checks.append((f"{mod}: {nd[:28]}", 1.0 if nd in out else 0.0, 1.0))
+        for claim, found in verify_output(mod, buf.getvalue()):
+            checks.append((f"{mod}: {claim[:26]}", 1.0 if found else 0.0, 1.0))
 
     allok = True
     for name, got, want in checks:

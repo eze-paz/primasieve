@@ -10,6 +10,10 @@ unification must find NOTHING -> no spurious primitive invented. (OUTSIDE) a rul
 space -> None (can't invent what's unreachable). GENERALIZE: recover on TRAIN gap artifacts, verify the new
 primitive explains HELD-OUT gap artifacts (different exps) -> not memorization. NULL: recovers on the decoy
 (invents structure that isn't there) or fails to generalize."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 import os, sys, random, statistics
 sys.path.insert(0, os.path.dirname(__file__))
 import meta_e4 as E4
@@ -49,6 +53,7 @@ def recover(pool):
     return (best[1], best[2]) if best else None
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     G = E4.grammar(); rng = random.Random(2)
     print("=== E5: invent a missing primitive from recurring GAP residuals (ZERO oracle) ===\n")
     for name, coef in HELDOUT.items():

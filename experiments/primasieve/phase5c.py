@@ -16,6 +16,11 @@ pool was dense with discriminators and random nearly tied), the referent questio
 a fair test of whether active design actually buys anything.
 KILL: any wrong referent commitment.
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.collect import best_split
+from core.registry import selfcheck
+
 import os, sys, json, random, time, itertools
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import world_english as W
@@ -63,7 +68,7 @@ def clarify(mode, cands, scene, truth, budget=6, rng=None):
         pool = [q for q in qs if q not in used]
         if not pool: break
         if mode == "active":
-            q = max(pool, key=lambda x: split(cands, x, scene))
+            q = best_split(cands, pool, lambda c, x: answer(x, scene, c))   # core.collect (shared with E6, p8)
             if split(cands, q, scene) < 2: break     # genuinely unknowable within this question language
         else:
             q = rng.choice(pool)
@@ -74,6 +79,7 @@ def clarify(mode, cands, scene, truth, budget=6, rng=None):
 
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     t0 = time.time()
     lex = W.Lexicon(seed=11)
     print("PHASE 5(c) -- the engine asks a clarifying question (COLLECT at the reference layer)\n")

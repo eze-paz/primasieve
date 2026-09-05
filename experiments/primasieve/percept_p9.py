@@ -13,6 +13,10 @@ Metric (pre-registered seeds fixed BELOW before any baseline code): a method 'ex
 language contains a scene that EXACTLY re-renders the observation (non-empty exact survivors). KILL FAILS (rung 1
 closes) iff every baseline explains <=0.5 of the occlusion scenes while the 2D engine explains 1.0 AND every
 baseline explains 1.0 of the positive-control scenes. Pure stdlib, exact, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 import os, sys, random
 sys.path.insert(0, os.path.dirname(__file__))
 from percept_p7 import G, NP, COLORS, render, survivors as survivors2d, all_rects, RMASK, bbox, rand_scene
@@ -84,6 +88,7 @@ def explains_fixed(grid):
     return render(guess) == grid
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     print("PERCEPTION rung 1 / p9 — KILL BASELINE: does scene recovery REQUIRE 2D structure? (parity knockout)\n")
     occ = [(sd, render(occ_scene(sd))) for sd in OCC_SEEDS]
     pos = [(sd, render(pos_scene(sd))) for sd in POS_SEEDS]

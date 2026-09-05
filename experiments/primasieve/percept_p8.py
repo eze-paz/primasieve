@@ -11,6 +11,11 @@ fable KILLS: ACTIVE reaches the irreducible class in FEWER peels than RANDOM; AC
 class (the true observational-equivalence class, containing the truth). Completeness of the bbox bound is a THEOREM
 (any layer pixel outside the nonzero bbox renders nonzero or is covered by one that does -> contradiction) GIVEN no
 rect uses the background color; asserted below. Pure stdlib, exact, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.collect import best_split
+from core.registry import selfcheck
+
 import os, sys, random, statistics
 sys.path.insert(0, os.path.dirname(__file__))
 from percept_p7 import G, NP, COLORS, render, survivors, all_rects, RMASK, to_scene, bbox, rand_scene
@@ -49,7 +54,7 @@ def refine(grid, arm, seed):
         if not splits:                                     # IRREDUCIBLE class reached -> halt
             return peels, surv, True
         if arm == "active":
-            i = max(splits, key=lambda k: splits[k])       # maximal split
+            i = best_split(surv, list(splits), lambda s, k: peel(s, k % G, k // G))   # core.collect (shared with E6, phase5c)
         else:
             i = rng.choice([k for k in range(NP) if k not in peeled])
             if i not in splits: wasted += 1                # RANDOM may spend a zero-split (vacuous) probe
@@ -61,6 +66,7 @@ def refine(grid, arm, seed):
             return peels, surv, "ACTIVE_WASTED"
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     print("PERCEPTION rung 1 / p8 — ACTIVE(COLLECT) peeling: drive the survivor set to its IRREDUCIBLE class\n")
     # focus on AMBIGUOUS scenes (large survivor sets), where active design matters
     scenes = []

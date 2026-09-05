@@ -4,6 +4,17 @@
 record; it is not an architecture. `README.md`, `NEXT.md`, `HANDOFF.md`, `METAPLAN.md`,
 `GENERAL_REASONER_PLAN.md` are per-arc plans. This file is the one that says what the code *is*.
 
+## The objective, stated so that keep/delete decisions can be made against it
+
+One zero-LLM, rejection-first engine that **induces exact compositional structure from examples, generalizes
+by construction, and abstains rather than guesses** — grown so that every gain compounds. Something is
+*useful* if it is a live mechanism of that engine or a gate protecting a live number. Everything else is a
+record, and records live in git history and in the docs, not on the live surface.
+
+Two hard rules follow. **No islands**: the live surface is one connected component, enforced by
+`core_selftest.py` C3, and anything that cannot be merged for a real reason is deleted. **No archive**: a
+file that is not live is deleted; git is the archive.
+
 ## The measured problem this fixes
 
 Before consolidation, primasieve was **193 python files in 94 connected components of the import graph, 76 of
@@ -53,10 +64,12 @@ Standing failure mode, from arc 1, printed by the harness: **a control that cann
 - **C2** every migrated thread still reproduces its **published** numbers; a moved number is a regression
 - **C3** the island map is re-measured and printed
 
-Current: **8 independent threads, 10 components over 87 live files (from 94 over 193), 76 of them in ONE
-component, C1/C2/C3 all pass.** 10 C2 rows are protected: COGS (analogy baseline, train, gen/21000), SCAN
-(train, test), l0 (KILL 1 claim + `trunc` at E=109203), emergence (`x*x` seen 6x, 7019 and 3008 expression
-counts).
+- **C3** is a HARD gate: **zero islands** — the live surface must be one connected component.
+
+Current: **1 component, 0 islands, 82 live files (from 94 components over 193), 8 independent threads,
+C1/C2/C3 all pass.** C2 reads every published claim from **one list**, `core/registry.py`; each live experiment
+also calls `selfcheck(__file__)` and verifies its own claims at exit, so a result that stops reproducing is
+caught by the file that owns it.
 
 ## Migration ledger
 
@@ -85,33 +98,44 @@ same structure:
 | `core/generate.py` | enumeration under **observational equivalence** (`SignatureBank`), plus the compression/SLEEP step | l0 and emergence both hand-rolled it. Simplest-first is load-bearing: adopting a learned operator in discovery order rather than **cost order** is a 33× regression. Compression buys depth (k=16 vs blind k=2), not breadth |
 | `core/select.py` | **cost-aware UCB** with momentum, for spaces too big to enumerate | the project's only measured win of learned selection over a hand-written strategy: 25/26 QuixBugs at **0.70×** the energy of hand-coded escalation. A prior must be lift-normalized or it merely relearns cheapest-first |
 
-### The residual, and why it is deliberately left alone
-10 components remain over 87 live files, with 76 in one. The stragglers are `percept_p7..p9`, `phase5b/c`,
-`dialog_s1/s2`, `meta_e4..e14`, `meta_v3`, `seg`. Each keeps a purely LOCAL tally, and adding an import to
-move the component count would be **gaming the metric, not compounding anything** — the exact failure this
-project rejects elsewhere. The honest way to fold them in is to give their published results a `C2` row in
-`core_selftest.py`, so the shared harness protects them; that is cheap and is the next step.
+### Pass 3 — merge or delete, judged against the objective
+The earlier note "the residual is deliberately left alone" was wrong and is withdrawn: every island gets
+merged for a real reason or deleted.
+
+**Merged**, each because it holds a live mechanism, with its published claim now in `core/registry.py`:
+`percept_p7..p9` (the rung-1 close; SET-returning abstention), `meta_e5` (anti-unify recurring residuals →
+new primitive = `core.generate`'s SLEEP step), `meta_e6` / `percept_p8` / `phase5c` (the same
+max-split line in three threads → **`core/collect.py`**, active observation: ACTIVE 6.0 vs RAND-SHORT 44.0
+probes, never a zero-split probe, halt on the irreducible set, correctness judged against the world not
+internal agreement), `meta_e7` (invention under a sound gate; the abs/sign ablation flips invent → abstain).
+`meta_e4` was deleted and then **restored**: it is imported by `meta_e5`, so it is a dependency of a live
+mechanism, and C2 caught the mistake within the same pass.
+
+**Deleted** (no live mechanism; conclusions already recorded in `CONSOLIDATION.md` and in git): `seg`
+(superseded by `seg_zhikov`, which holds the F 0.741 result), `meta_e12` (the regress/impasse note),
+`meta_e13` (multi-scheme selection NOT demonstrated — a null), `meta_e14` (defeasible conjecture
+bookkeeping; a candidate for a third `core.verdict` state, recorded here as an idea, not kept as code),
+`meta_v3` (arc-1 commit mechanism; its live form is `core.verdict`). And the whole `archive/` of 106 files:
+git is the archive.
 
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still
 frozen by hand** — the one authored thing Stage 3b's knockout ladder did not remove. It should be
 ENUMERATED over l0 terms with `SignatureBank` and selected by `core.search`, falling back to
 `core.select.cost_aware_ucb` when that space outgrows exhaustive. Every piece needed now exists in `core/`
-and sits in one component with COGS, which is precisely what was impossible before this pass.
+and sits in one component with COGS.
 
-### Archive — measured NULL or superseded, keep as record, do not extend
-**DONE — 106 files moved to `archive/`**, chosen safely: the live import closure was computed first and
-**no live file imports anything archived**. See `archive/README.md` for the per-category reasons. Summary:
-measured nulls kept as record (`infl_*` Stage 1 KILLED, `vn_*` Rosetta, `nl2eq*`, `puzzle_run/solve`,
-`platonic_*`, `moe_*`, the `llm_*` MDL probes, `kuhn_cfr`), the LLM-probe era superseded by the zero-LLM
-engine (`graft_*`, `stitch_*`, `measure_*`, `train_*`, and the rest), arc-1 bug-fixing superseded by the
-meta-reasoner result now living in `core/select.py` (`bugfix*`, `swebench_*`, `quixbugs_*`), and the one-off
-demos. `meta_e2/e3/e6/e7` were explicitly KEPT live: they are E-series results that sit outside the import
-closure only because nothing imports them, and archiving on graph position alone would have discarded them.
-
-The archive decision is **not** deletion and not a judgement on the work — a measured null is a result. It
-means: not on the live surface, not imported by new work, and not counted in the fragmentation number.
-`git mv archive/<file>.py .` brings one back, and then it goes through `core/` like anything else.
+### Proposed next cut — the arc-1 experimental surface (needs a go-ahead; ~45 files)
+The largest remaining block is arc-1: `meta_e1..e3, e8..e11, meta_v2, meta_param, meta_struct,
+meta_codeparam, meta_pool, meta_oracle, meta_learn, meta_transfer, meta_features, meta_discover,
+meta_emerge, meta_ledger, meta_bench, meta_iterdeep, bench_all, domain_math, reasoner_code, reasoner_core,
+hdp_*, seg_zhikov, beat_zhikov, phase2*, phase4, sleep_l0, proposer*, dialog_s1/s2/world, phase5/5b,
+world_english, puzzle_engine`. They are connected, so C3 does not force a decision — but by the objective,
+most are records whose mechanisms are already in `core/` (UCB → `select`, library → `generate`, tolerance,
+gates). Recommended: keep `meta_forms`, `meta_reason`, `meta_library`, `phase2*`/`sleep_l0` (library reuse),
+`seg_zhikov`, `dialog_*`, `phase5*`, `puzzle_engine`; delete the rest, registering each kept file's claim.
+This is the next "useful or not" decision and it is a ~45-file deletion of verified results, so it is
+proposed here rather than done unilaterally.
 
 ## The rule going forward
 

@@ -18,6 +18,10 @@ supposed to be L0 programs. Phase 1 tests exactly that (KILL 1) and prices blind
 GROWTH RULE (E8's, enforced): a primitive may be added ONLY if it is itself an object-grammar node type, and
 every addition is LOGGED with the target that forced it. See FORCED_BY below.
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 from fractions import Fraction as F
 import itertools, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -152,6 +156,7 @@ def audit(depth=3, ops=None, cap=400000, samples=None, label=""):
 
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     depth = int(os.environ.get("L0_DEPTH", "3"))
     print("PHASE 1 -- universal base language L0\n")
     print("combinators:")

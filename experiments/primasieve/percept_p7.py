@@ -15,6 +15,10 @@ Soundness+completeness check: the engine's survivor set (rects bounded to the no
 reference set enumerated over the bbox + a 2px MARGIN (proving nothing consistent escapes the bbox bound). Abstention
 must carry a WITNESS PAIR of distinct members that both re-render exactly. Bitmasks over a 6x6 field make the full
 double enumeration tractable. Pure stdlib, exact, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.registry import selfcheck
+
 import os, sys, random
 sys.path.insert(0, os.path.dirname(__file__))
 G = 6                                    # 6x6 pixel field (small enough for full brute double-enumeration)
@@ -121,6 +125,7 @@ def rand_scene(rng, same_color=None):
     return ((RMASK[a], ca), (RMASK[b], cb))              # a=back, b=front
 
 if __name__ == "__main__":
+    selfcheck(__file__)   # verifies this file\'s PUBLISHED claims (core/registry.py) at exit
     print("PERCEPTION rung 1 / p7 — MULTI-RECT OCCLUSION: return the exact survivor SET, commit only if singleton\n")
     N = 40
     kconf = ktruth = kcomplete = commit_ok = setret = wit_ok = 0
