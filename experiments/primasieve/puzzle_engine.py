@@ -273,10 +273,12 @@ def learn_grammar(train, seg, lex, catmap, func):
         person = "1sg" if subj_is_1sg else "3"
         suf = vsurf[len(v["lemma"]):] if vsurf.startswith(v["lemma"]) else ""
         g["infl"][person] = suf
-        # case -> role via nominal args matched by lemma
+        # case -> role via nominal args matched by lemma; TRANSITIVITY-CONDITIONED so it subsumes accusative AND
+        # ergative alignment (the engine discovers which from data): key = (suffix, clause-is-transitive).
+        trans = obj is not None
         for fn in fnouns:
-            if subj and subj[0] == "noun" and subj[1] == fn["lemma"]: g["role"][fn["suf"]] = "subj"
-            if obj and obj[0] == "noun" and obj[1] == fn["lemma"]: g["role"][fn["suf"]] = "obj"
+            if subj and subj[0] == "noun" and subj[1] == fn["lemma"]: g["role"][(fn["suf"], trans)] = "subj"
+            if obj and obj[0] == "noun" and obj[1] == fn["lemma"]: g["role"][(fn["suf"], trans)] = "obj"
         # person affixes on the verb + default 3rd surfaces
         vaff = [a for a in (v["pre"], v["suf"]) if a]
         if not any(fn for fn in fnouns if subj and subj[0] == "noun" and subj[1] == fn["lemma"]):
@@ -306,24 +308,23 @@ def generate_fe(f, M):
     verbs = [x for x in fw if not x["noun"]]
     if len(verbs) != 1: return None                                # only single-clause SVO handled
     v = verbs[0]; nouns = [x for x in fw if x["noun"]]
+    valence = g["valence"].get(v["lemma"])
+    if valence is None: return None
+    trans = (valence == "trans")
     vaff = [a for a in (v["pre"], v["suf"]) if a]
     subj = obj = None; person = "3"
-    # person affixes on verb
-    for a in vaff:
+    for a in vaff:                                                  # person affixes on verb
         if a in g["person"]:
             role, surf = g["person"][a]
             if role == "subj": subj = ("pron", surf); person = "1sg" if surf == "i" else "3"
             else: obj = ("pron", surf)
         else:
             return None                                            # unexplained affix -> abstain
-    # nominal args by case role
-    for n in nouns:
-        r = g["role"].get(n["suf"])
+    for n in nouns:                                                # nominal args by transitivity-conditioned case
+        r = g["role"].get((n["suf"], trans))
         if r == "subj": subj = ("noun", n["lemma"])
         elif r == "obj": obj = ("noun", n["lemma"])
-        else: return None                                          # unknown case -> abstain
-    valence = g["valence"].get(v["lemma"])
-    if valence is None: return None
+        else: return None                                          # unknown case-in-context -> abstain
     if subj is None: subj = ("pron", g["dsubj"]) if g["dsubj"] else None
     if valence == "trans" and obj is None: obj = ("pron", g["dobj"]) if g["dobj"] else None
     if subj is None: return None
