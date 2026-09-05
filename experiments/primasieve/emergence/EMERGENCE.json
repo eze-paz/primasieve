@@ -336,6 +336,63 @@
   "n_B": 12,
   "nmax": 64,
   "note": "adoption TESTED not assumed; the S2 ledger precedent is a form that helped deep cases and mis-steered easy ones, netting negative.",
+  "rederivation_after_peer_challenge": {
+   "challenger": "sandpie-86 (walios thread)",
+   "ratio_equals_formula_exactly": true,
+   "sweep": [
+    {
+     "nmax": 4,
+     "predicted": 3.0,
+     "ratio": 3.0,
+     "with_first": 72,
+     "without": 24
+    },
+    {
+     "nmax": 8,
+     "predicted": 5.0,
+     "ratio": 5.0,
+     "with_first": 120,
+     "without": 24
+    },
+    {
+     "nmax": 16,
+     "predicted": 9.0,
+     "ratio": 9.0,
+     "with_first": 216,
+     "without": 24
+    },
+    {
+     "nmax": 32,
+     "predicted": 17.0,
+     "ratio": 17.0,
+     "with_first": 408,
+     "without": 24
+    },
+    {
+     "nmax": 64,
+     "predicted": 33.0,
+     "ratio": 33.0,
+     "with_first": 792,
+     "without": 24
+    },
+    {
+     "nmax": 128,
+     "predicted": 65.0,
+     "ratio": 65.0,
+     "with_first": 1560,
+     "without": 24
+    },
+    {
+     "nmax": 256,
+     "predicted": 129.0,
+     "ratio": 129.0,
+     "with_first": 3096,
+     "without": 24
+    }
+   ],
+   "verdict": "the 33x is ARITHMETIC, not a measurement: ratio == (nmax + baseline)/baseline at every nmax, and nmax is my free parameter (64). At nmax=256 it is 129x; at nmax=4 it is 3x. The magnitude was wrongly quoted as an empirical result.",
+   "what_survives": "the SHAPE: first-position adoption imposes a CONSTANT per-miss overhead, so the penalty is unbounded as tasks get cheaper. Independently CONFIRMED on real problems where nothing is parameter-determined: on 26 QuixBugs, GlobalApply at cost_hint 1.0 (tried first) made gcd 1->15 evals (15x) and sieve 2->25 (12.5x), total +26% with zero extra solves."
+  },
   "workload_C_cheap": {
    "arms": {
     "with_costed": {
