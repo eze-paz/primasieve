@@ -24,39 +24,28 @@ def load(split):
     tr, te = SPLITS[split]
     return read(tr), read(te)
 
-# ---------- baselines ----------
+# ---------- baselines: now core.gates, shared with COGS and every future testbed ----------
+# These were duplicated here and in cogs_data.py. Analogy is the knockout that KILLED Stage 1 (0.951 on
+# inflection, at ceiling) and scores 0.000 on COGS gen -- the contrast that validated COGS as a testbed.
+from core.gates import Memorize as _Memorize, Analogy as _Analogy
+
+
 class Memorize:
-    """Exact lookup of the training command; abstains otherwise. Floor: measures how much of test is verbatim seen."""
-    def __init__(self, train): self.m = {tuple(c): a for c, a in train}
+    def __init__(self, train):
+        self.b = _Memorize([(tuple(c), a) for c, a in train], key=tuple)
+
     def predict(self, cmd):
-        a = self.m.get(tuple(cmd))
+        a = self.b.predict(tuple(cmd))
         return (a, "commit") if a is not None else (None, "hard")
 
+
 class Analogy:
-    """THE KNOCKOUT that killed Stage 1: copy the output of the most similar training command (token-overlap +
-    longest common prefix/suffix). Never abstains. If this scores well on the compositional splits, composition is
-    not actually required and Stage 2 is as hollow as Stage 1."""
     def __init__(self, train):
-        self.train = [(c, a) for c, a in train]
-        self.index = collections.defaultdict(list)
-        for i, (c, a) in enumerate(self.train):
-            for w in set(c): self.index[w].append(i)
+        self.b = _Analogy([(tuple(c), a) for c, a in train], tokenize=list)
+
     def predict(self, cmd):
-        cs = set(cmd); best = None; bs = -1
-        cand = collections.Counter()
-        for w in cs:
-            for i in self.index.get(w, ()): cand[i] += 1
-        for i, _ in cand.most_common(200):
-            c, a = self.train[i]
-            inter = len(cs & set(c)); union = len(cs | set(c))
-            jac = inter / union if union else 0
-            pre = 0
-            for x, y in zip(cmd, c):
-                if x != y: break
-                pre += 1
-            s = jac * 10 + pre + (1.0 if len(c) == len(cmd) else 0)
-            if s > bs: bs = s; best = a
-        return (best if best is not None else [], "commit")
+        return (self.b.predict(tuple(cmd)) or [], "commit")
+
 
 def evaluate(model, test):
     C = ok = wrong = hard = 0

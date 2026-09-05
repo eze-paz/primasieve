@@ -43,10 +43,13 @@ import os, sys, re, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cogs_lf import parse_lf, serialize, norm_lf
 from cogs_align import associate, to_positional, renumber_first_appearance
+from core.search import exhaustive
+from core.tolerance import induce_eps, LADDER as EPS_LADDER_CORE
+from core.vote import plurality, decisive_purity
 
 ENTITY, NAME, EVENT, REL, FUNC = "ENTITY", "NAME", "EVENT", "REL", "FUNC"
 PARSE_BUDGET = 20000
-EPS_LADDER = (0.0, 0.01, 0.02, 0.05, 0.10, 0.20)   # the induced tolerance ladder; ties go to the smallest
+EPS_LADDER = EPS_LADDER_CORE      # from core.tolerance: one ladder, shared with Phase 6's mechanism
 
 
 # ================================================================ the searched schema
@@ -677,28 +680,18 @@ def search_schema(lex, train, sample=350, verbose=False):
     tried first and is NOT sufficient -- on adversary grammar 2 it stranded at 248/350 because np_branch,
     np_head, mod_args and np_order have to move together, a mirror-image local optimum no single move escapes."""
     rows = [r for r in train if r[2] != "primitive"][:sample]
-    others = [d for d in Schema.DIMS if d not in PARSE_DIMS]
-    best = (-1, Schema())          # if NOTHING parses -- e.g. variables are not positions at all -- the
-                                   # default is returned and the caller's reproduction gate rejects it
-    evals = 0
-    combos = [{}]
-    for nb in Schema.SPACE["np_branch"]:
-        for vp in Schema.SPACE["verb_pos"]:
-            nodes = _parse_rows(lex, Schema(np_branch=nb, verb_pos=vp), rows)
-            if not any(n is not None for n in nodes):
-                continue
-            combos = [{}]
-            for d in others:
-                combos = [dict(c, **{d: v}) for c in combos for v in Schema.SPACE[d]]
-            for c in combos:
-                sch = Schema(np_branch=nb, verb_pos=vp, **c)
-                sc = _score_parsed(lex, sch, rows, nodes)
-                evals += 1
-                if sc > best[0]:
-                    best = (sc, sch)
-    if verbose:
-        print(f"  schema search: {evals} of {2*2*len(combos)} combinations on {len(rows)} rows, "
-              f"best reproduces {best[0]}/{len(rows)}\n  {best[1]}")
+    # via core.search.exhaustive, STAGED on the parse-relevant dimensions only: derivations are computed once
+    # per (np_branch, verb_pos) and reused across the 144 read-out combinations. core.search carries the
+    # measured reason this is exhaustive rather than coordinate descent.
+    space = {d: Schema.SPACE[d] for d in Schema.DIMS}
+    pt, sc = exhaustive(
+        space,
+        score=lambda p, nodes: _score_parsed(lex, Schema(**p), rows, nodes),
+        stage_key=lambda p: (p["np_branch"], p["verb_pos"]),
+        stage=lambda p: (lambda ns: ns if any(n is not None for n in ns) else None)(
+            _parse_rows(lex, Schema(np_branch=p["np_branch"], verb_pos=p["verb_pos"]), rows)),
+        verbose=verbose, label="schema search")
+    best = (sc if sc is not None else -1, Schema(**pt) if pt else Schema())
     return best[1], best[0], len(rows)
 
 
@@ -749,18 +742,14 @@ def induce(train, verbose=False, gate=0.99, force_eps=None):
             return _induce_positional(train, verbose=verbose, eps=force_eps) + ("position",)
         samp = [r for r in train if r[2] != "primitive"][:1500]
         lex0 = [r for r in train if r[2] == "primitive"]
-        best = None
-        for e in EPS_LADDER:
+
+        def fit_and_score(e):
             m = _induce_positional(lex0 + samp, verbose=False, eps=e) + ("position",)
             ok, wr, npar = reproduce(m, samp)
-            f = ok / max(ok + wr + npar, 1)
-            if best is None or f > best[0] + 1e-12:
-                best = (f, e)
-            if e == 0.0 and f >= gate:
-                break        # clean data pays NOTHING for the ladder; only noise makes it worth walking
-        if verbose:
-            print(f"  tolerance eps induced: {best[1]} (reproduces {best[0]:.4f} of a {len(samp)}-row sample)")
-        return _induce_positional(train, verbose=verbose, eps=best[1]) + ("position",)
+            return ok / max(ok + wr + npar, 1)
+
+        e, _sc, _walked = induce_eps(fit_and_score, EPS_LADDER, gate=gate, verbose=verbose)
+        return _induce_positional(train, verbose=verbose, eps=e) + ("position",)
 
     mpos = _pos()
     fpos = _frac(mpos)

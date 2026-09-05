@@ -26,6 +26,12 @@ S = 4                      # 4x4 supersample; edges land on a 1/4-pixel grid
 S2 = S * S                 # 16 subcells / pixel
 COLORS = (1, 2, 3)         # gray weights; interior pixel = w*S2 (<=48, fits a byte)
 
+# COMMIT/ABSTAIN and the confabulation-vs-abstention split counted here are core.verdict's, shared with
+# COGS Stage 3 and SCAN Stage 2. Perception's rung 2 (noisy observation) was explicitly GATED on a noise
+# mechanism existing; that mechanism is now core.tolerance, so the gate is open from this side.
+from core.verdict import score_two_mode, ABSTAIN, COMMIT
+
+
 def render(scene):
     """scene = list of (x0,y0,x1,y1,w,z) in SUBPIXEL coords. Returns a 24x24 grid of ints (0..48). SEALED."""
     sub = [[0] * (W * S) for _ in range(H * S)]                 # subcell gray weights

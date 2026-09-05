@@ -1,3 +1,7 @@
+**START HERE: [ARCHITECTURE.md](ARCHITECTURE.md)** — what the code is, the shared `core/`, the
+consolidation ledger, and the rule that keeps it from re-fragmenting. `python core_selftest.py`
+is the gate on the core itself. This README and the per-arc plans below are history.
+
 # Primasieve Engine
 
 A rejection-first reasoning engine. Zero LLM, pure-Python stdlib, deterministic verification.

@@ -25,6 +25,11 @@ KILL 6: any CONFABULATION (a committed singleton that is not the truth) at an ho
 """
 import os, sys, json, random, time, statistics
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The eps-consistency and tolerance-SET mechanism defined here is now core.tolerance, so that every thread
+# gets it: Stage 3d reused it for grammar induction, and perception's rung 2 was GATED on its existence.
+# This file keeps its own tiny hot-loop copies (ham/eps_set) for speed over 1323 enumerable latents, and
+# CHECKS them against the shared implementation instead of drifting from it.
+from core.tolerance import within as _core_within, survivors as _core_survivors
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get("BASELINE", os.path.join(HERE, "BASELINE.json"))
@@ -68,6 +73,15 @@ def corrupt(grid, q, rng):
             alts = [v for v in (0,) + COLORS if v != out[i]]
             out[i] = rng.choice(alts); nc += 1
     return out, nc
+
+
+def _core_agreement_check():
+    """The shared implementation must agree with the local hot loop, or one of them has drifted."""
+    for l in LATENTS[:40]:
+        obs = RENDERS[l]
+        assert _core_within(obs, RENDERS[l], 0), "core.tolerance.within disagrees at eps=0"
+        assert l in _core_survivors(LATENTS[:40], lambda h: RENDERS[h], obs, 0), "core survivors disagree"
+    return True
 
 
 def ham(a, b):
@@ -120,6 +134,7 @@ if __name__ == "__main__":
 
     # ---------------- (A) tolerance sweep + (B) the cliff ----------------
     print("(A/B) tolerance sweep -- eps is a BUDGET IN PIXELS; actual corruption count is known per trial")
+    assert _core_agreement_check()
     print(f"{'noise q':>8} {'eps(px)':>8} {'truth in set':>13} {'singleton':>10} {'mean|set|':>10} "
           f"{'confab':>7} {'eps>=noise':>11}")
     rows = []

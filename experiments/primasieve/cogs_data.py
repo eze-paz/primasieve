@@ -56,34 +56,29 @@ def evaluate(model, rows, by_category=True):
             agg["abstain"] += 1; per[cat]["abstain"] += 1
     return agg, (per if by_category else None)
 
-# ---------- baselines ----------
+# ---------- baselines: now core.gates, shared with SCAN and every future testbed ----------
+from core.gates import Memorize as _Memorize, Analogy as _Analogy
+
+
 class Memorize:
-    def __init__(self, train): self.m = {s: lf for s, lf, _ in train}
+    def __init__(self, train):
+        self.b = _Memorize([(s, lf) for s, lf, _ in train])
+
     def predict(self, s):
-        v = self.m.get(s)
+        v = self.b.predict(s)
         return (v, "commit") if v is not None else (None, "hard")
 
+
 class Analogy:
-    """The Stage-1 killer, ported: copy the logical form of the most token-similar training sentence.
-    Never abstains. On COGS it should fail structurally -- a copied LF cannot have the right arity or depth."""
+    """The Stage-1 killer, ported. On COGS it scores 0.000 EM on all 21000 gen items at coverage 1.000 --
+    copying an answer is structurally impossible here, which is exactly why COGS was the right testbed."""
+
     def __init__(self, train, cap=300):
-        self.train = [(s.split(), lf) for s, lf, _ in train]
-        self.idx = collections.defaultdict(list)
-        for i, (toks, lf) in enumerate(self.train):
-            for w in set(toks): self.idx[w].append(i)
-        self.cap = cap
+        self.b = _Analogy([(s, lf) for s, lf, _ in train], cap=cap)
+
     def predict(self, s):
-        toks = s.split(); ts = set(toks)
-        cand = collections.Counter()
-        for w in ts:
-            for i in self.idx.get(w, ())[:2000]: cand[i] += 1
-        best = None; bs = -1
-        for i, _ in cand.most_common(self.cap):
-            t2, lf = self.train[i]
-            inter = len(ts & set(t2)); union = len(ts | set(t2))
-            sc = (inter / union if union else 0) * 10 - abs(len(t2) - len(toks)) * 0.1
-            if sc > bs: bs = sc; best = lf
-        return (best, "commit")
+        return (self.b.predict(s), "commit")
+
 
 if __name__ == "__main__":
     tr, dev, test, gen = load()
