@@ -11,9 +11,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, HERE)
 import en_world as W
 import en_chat as C
+import wn_acquire as ACQ
 
 PORT = int(os.environ.get("PORT", "8765"))
-STATE = {"scene": None, "lex": None, "pending": None, "log": []}
+STATE = {"scene": None, "lex": None, "pending": None, "acquire": None, "log": []}
 
 
 def new_scene(n=5):
@@ -32,6 +33,18 @@ def scene_json():
 def say(text):
     sc, lex = STATE["scene"], STATE["lex"]
     pend = STATE["pending"]
+    acq = STATE["acquire"]
+    # ---- confirming (or rejecting) a WordNet PROPOSAL. Unconfirmed proposals are DISCARDED. ----
+    if acq and text.strip().lower() in ("yes", "no", "y", "n"):
+        word, pred, original = acq
+        STATE["acquire"] = None
+        if not text.strip().lower().startswith("y"):
+            return {"kind": "ABSTAIN", "msg": f"understood - '{word}' stays unknown and I will keep "
+                                              f"refusing it.", "highlight": []}
+        lex[word] = pred
+        r = say(original)                      # re-run the sentence now that the word is known
+        r["msg"] = f"learned: '{word}' = {pred}. " + r["msg"]
+        return r
     if pend and text.strip().lower() in ("yes", "no", "y", "n"):
         p, cands = pend
         want = text.strip().lower().startswith("y")
@@ -49,6 +62,16 @@ def say(text):
         STATE["pending"] = (q, cands)
         return {"kind": "ASK", "msg": f"narrowed to {cands}. Next: is it {q}?", "highlight": cands}
     q = W.parse(text, lex)
+    # ---- ACQUIRE: an unknown word is not a dead end. WordNet PROPOSES; the engine still has to ask. ----
+    if q["unknown"]:
+        for uw in q["unknown"]:
+            props = ACQ.propose(uw, list(lex))
+            if props:
+                pred = lex[props[0][0]]
+                STATE["acquire"] = (uw, pred, text)
+                return {"kind": "ACQUIRE",
+                        "msg": f"I have never learned '{uw}'. WordNet suggests it may mean "
+                               f"'{props[0][0]}' ({pred}). Is that right?", "highlight": []}
     kind, msg, cands = C.answer(sc, q, lex)
     STATE["pending"] = (C.best_question(sc, cands), cands) if kind == "ASK" else None
     return {"kind": kind, "msg": msg, "highlight": cands or [],
@@ -70,6 +93,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>primasieve</title>
  #log{height:300px;overflow:auto;background:#171a21;border:1px solid #262b36;border-radius:8px;padding:10px}
  .m{margin:6px 0} .you{color:#9ecbff} .k{font-weight:700;margin-right:6px}
  .COMMIT{color:#4ade80}.ASK{color:#fbbf24}.ABSTAIN{color:#f87171}.UNKNOWABLE{color:#c084fc}.NONE{color:#8b93a7}
+ .ACQUIRE{color:#38bdf8}
  input{width:100%;padding:9px;margin-top:8px;background:#171a21;color:#e6e6e6;
        border:1px solid #262b36;border-radius:6px;font:inherit}
  button{margin-top:8px;padding:7px 12px;background:#262b36;color:#e6e6e6;border:0;border-radius:6px;cursor:pointer}
