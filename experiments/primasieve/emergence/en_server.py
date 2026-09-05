@@ -113,6 +113,21 @@ def _diagnose(unknown, original):
           from not knowing the word at all.
     """
     lex, alex = STATE["lex"], STATE["alex"]
+    # 0. SPEECH ACT before anything else. A greeting is not a claim about the world, so there is nothing to
+    #    verify and nothing to be wrong about -- the commit rule does not apply and refusing was a mistake.
+    #    The act TYPE comes from WordNet's gloss, so any word glossed as a greeting works, not a listed set.
+    for uw in unknown:
+        act = ACQ.speech_act(uw)
+        if act:
+            kind, gloss = act
+            props = ", ".join(sorted(set(lex.values()))[:5])
+            acts = ", ".join(sorted(set(alex)))
+            reply = {"greeting": f"hello. I can describe things in this scene ({props} ...) and do these "
+                                 f"actions ({acts}). Ask me which object matches a description.",
+                     "farewell": "goodbye.",
+                     "thanks": "you are welcome.",
+                     "apology": "no need to apologise."}[kind]
+            return {"kind": "SPEECH-ACT", "msg": f"{reply}  [WordNet: '{uw}' = {gloss}]", "highlight": []}
     for uw in unknown:
         props = ACQ.propose(uw, list(lex))                       # describable?
         if props:
@@ -153,7 +168,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>primasieve</title>
  #log{height:300px;overflow:auto;background:#171a21;border:1px solid #262b36;border-radius:8px;padding:10px}
  .m{margin:6px 0} .you{color:#9ecbff} .k{font-weight:700;margin-right:6px}
  .COMMIT{color:#4ade80}.ASK{color:#fbbf24}.ABSTAIN{color:#f87171}.UNKNOWABLE{color:#c084fc}.NONE{color:#8b93a7}
- .ACQUIRE{color:#38bdf8}.OUT-OF-WORLD{color:#94a3b8}
+ .ACQUIRE{color:#38bdf8}.OUT-OF-WORLD{color:#94a3b8}.SPEECH-ACT{color:#e879f9}
  input{width:100%;padding:9px;margin-top:8px;background:#171a21;color:#e6e6e6;
        border:1px solid #262b36;border-radius:6px;font:inherit}
  button{margin-top:8px;padding:7px 12px;background:#262b36;color:#e6e6e6;border:0;border-radius:6px;cursor:pointer}

@@ -88,6 +88,66 @@ def related_words(word, pos="adj", hops=1):
     return out
 
 
+# ---------------------------------------------------------------- SPEECH ACTS
+# An earlier version of this engine refused "hello" as an unknown word. That was wrong, and the reason it was
+# wrong is worth stating: the soundness discipline exists to stop the engine COMMITTING TO FALSE CLAIMS ABOUT
+# THE WORLD. A greeting makes no claim -- there are no truth conditions to get wrong -- so the discipline
+# simply does not apply, and refusing was over-application, not rigour.
+#
+# WordNet already classifies these: "hello" is in noun.communication with the gloss "an expression of
+# greeting". So the act TYPE is looked up, not hardcoded per word. What IS supplied is the small map from a
+# gloss phrase to an act type below; that generalises to any word WordNet glosses the same way (howdy,
+# hiya, farewell, cheers all work without being listed), but it is my mapping and not induced.
+LEX_COMMUNICATION = 10
+# Patterns read OFF the actual glosses in this WordNet build, not invented:
+#   hello    "an expression of greeting"
+#   welcome  "a greeting or reception"
+#   goodbye  "a farewell remark"
+#   farewell "an acknowledgment or expression of goodwill at parting"
+#   thanks   "an acknowledgment of appreciation"
+#   sorry    "feeling or expressing regret or sorrow ..."   (an ADJECTIVE, so adjectives are checked too)
+ACT_PATTERNS = [
+    ("greeting", ["greeting"]),
+    ("farewell", ["farewell", "at parting", "leave-taking", "departing politely"]),
+    ("thanks", ["acknowledgment of appreciation", "gratitude"]),
+    ("apology", ["regret", "apology"]),
+]
+
+
+def _synsets_with_gloss(word, pos):
+    """(lex_filenum, gloss) for each synset of the word."""
+    idx = _index(pos)
+    offs = set(idx.get(word.lower(), []))
+    if not offs: return []
+    out = []
+    p = os.path.join(DICT, f"data.{pos}")
+    if not os.path.exists(p): return []
+    for line in open(p, encoding="latin-1"):
+        if line[:8] in offs:
+            head, _, gloss = line.partition("|")
+            f = head.split()
+            if len(f) > 1:
+                try: out.append((int(f[1]), gloss.strip()))
+                except ValueError: pass
+    return out
+
+
+def speech_act(word):
+    """Is this word a conversational move rather than a claim? -> (act_type, gloss) or None.
+
+    Looked up, not listed: any word WordNet glosses this way qualifies. Nouns are restricted to the
+    communication lexicographer file; adjectives are checked too because "sorry" is glossed as an adjective
+    ("feeling or expressing regret"), which the noun-only first version missed."""
+    for pos, restrict in (("noun", True), ("adj", False)):
+        for lex, gloss in _synsets_with_gloss(word, pos):
+            if restrict and lex != LEX_COMMUNICATION: continue
+            g = gloss.lower()
+            for act, pats in ACT_PATTERNS:
+                if any(pt in g for pt in pats):
+                    return act, gloss.split(";")[0].strip()
+    return None
+
+
 def propose(word, known_words, pos_order=("adj", "noun"), hops=1):
     """PROPOSE candidate known-words for an unknown word. Returns [(known_word, via_pos)] -- never commits.
 
