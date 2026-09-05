@@ -3063,7 +3063,7 @@ const WALIOS_LAZY_TARS = {
   'python_cxx.wasm?v=6': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
                           ['walios-numpy.tar.gz?v=2', '/site-packages'],
                           ['walios-docs.tar.gz?v=4', '/site-packages'],
-                          ['walios-extras.tar.gz?v=1', '/site-packages'],
+                          ['walios-extras.tar.gz?v=2', '/site-packages'],
                           ['walios-mpl.tar.gz?v=3', '/site-packages']],
 // walios-mpl carries matplotlib + contourpy + kiwisolver + mpl_toolkits and a PREBUILT
 // font cache (_mplcache/fontlist-v390.json): font_manager's first-import scan costs
@@ -3169,7 +3169,8 @@ async function tool_walios({ script, timeout }, ctx) {
       lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
              PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1' },
+             SANDPIE_ASYNCIO: '1',
+             SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
@@ -3303,7 +3304,8 @@ async function _wpyEnsure() {
     env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
            PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
            PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1' },
+             SANDPIE_ASYNCIO: '1',
+             SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
     // means no extra process survives.
