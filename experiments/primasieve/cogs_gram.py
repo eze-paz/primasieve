@@ -91,6 +91,23 @@ class Lexicon:
         self.rel_segs = {}       # relator word -> the observed full predicate segment lists
         self.vroles = {}         # verb lemma -> roles from its own LAMBDA lexicon row
         self.varity = {}
+        # STAGE 4b -- open vocabulary. Suffix rules (surface suffix -> lemma suffix) induced from the lexicon's
+        # own surface/lemma pairs, per class; unimorph is used only as an ORACLE to score them, never as input.
+        self.open_vocab = True
+        self.rules = {ENTITY: [], EVENT: []}
+
+    def unknown(self, w):
+        return self.open_vocab and w not in self.cls and w not in self.terminators
+
+    def lemma_of(self, w, cls=None):
+        """Known word -> its lemma. Unknown word -> the best-supported suffix rule of the guessed class, else
+        the surface form itself (which is exactly right for COGS nouns: `monastery` -> monastery)."""
+        if w in self.lemma:
+            return self.lemma[w]
+        for sfx, lsfx, n in self.rules.get(cls, []):
+            if sfx and w.endswith(sfx) and len(w) > len(sfx) + 1:
+                return w[:len(w) - len(sfx)] + lsfx
+        return w
 
 
 def _lambda_entry(word, lf, lex, votes, lemvote):
@@ -215,7 +232,28 @@ def induce_lexicon(train, eps=0.0):
     lex.terminator = max(lex.terminators, key=lambda w: lastvote[w]) if lex.terminators else None
     _induce_determiners(lex, train, eps)
     _induce_gap_constructions(lex, train)
+    _induce_suffix_rules(lex)
     return lex
+
+
+def _induce_suffix_rules(lex, min_support=3):
+    """(surface suffix -> lemma suffix) per class, from the lexicon's own pairs, ranked by support. `rolled` ->
+    roll gives ('ed', ''); `liked` -> like gives ('d', ''); an irregular pair (`ate` -> eat) yields a rule with
+    support 1 and is dropped. Identity is the implicit last rule."""
+    cnt = {ENTITY: collections.Counter(), EVENT: collections.Counter()}
+    for w, lem in lex.lemma.items():
+        c = lex.cls.get(w)
+        if c not in cnt or w == lem:
+            continue
+        k = 0
+        while k < min(len(w), len(lem)) and w[k] == lem[k]:
+            k += 1
+        if k >= 2:
+            cnt[c][(w[k:], lem[k:])] += 1
+    for c in cnt:
+        # LONGEST suffix first, support second: `liked` must meet ('d','') before ('ed','') or it becomes `lik`
+        lex.rules[c] = sorted([(a, b, n) for (a, b), n in cnt[c].most_common() if n >= min_support],
+                              key=lambda t: (-len(t[0]), -t[2]))
 
 
 def _induce_gap_constructions(lex, train):
@@ -347,13 +385,14 @@ def parse_base(lex, sch, toks, i):
     if i >= n:
         return None
     c = lex.cls.get(toks[i])
-    if lex.det_pos == "pre" and toks[i] in lex.det and i + 1 < n and lex.cls.get(toks[i + 1]) == ENTITY:
-        return NP(toks[i], ENTITY, i + 1, lex.lemma.get(toks[i + 1], toks[i + 1])), i + 2
+    if (lex.det_pos == "pre" and toks[i] in lex.det and i + 1 < n
+            and (lex.cls.get(toks[i + 1]) == ENTITY or lex.unknown(toks[i + 1]))):
+        return NP(toks[i], ENTITY, i + 1, lex.lemma_of(toks[i + 1], ENTITY)), i + 2
     if lex.det_pos == "post" and c == ENTITY and i + 1 < n and toks[i + 1] in lex.det:
         return NP(toks[i + 1], ENTITY, i, lex.lemma.get(toks[i], toks[i])), i + 2
     if toks[i] in lex.wh:
         return NP(None, NAME, i, lex.wh[toks[i]]), i + 1          # `Who` -> the constant `?`
-    if c == NAME:
+    if c == NAME or (lex.unknown(toks[i]) and toks[i][:1].isupper()):
         return NP(None, NAME, i, toks[i]), i + 1
     if c == ENTITY:
         return NP(None, ENTITY, i, lex.lemma.get(toks[i], toks[i])), i + 1
@@ -422,10 +461,14 @@ def parse_np(lex, sch, toks, i):
 
 def _is_verb_here(lex, toks, j):
     n = len(toks)
-    if j < n and lex.cls.get(toks[j]) == EVENT:
+
+    def verbish(k):
+        w = toks[k]
+        return lex.cls.get(w) == EVENT or (lex.unknown(w) and not w[:1].isupper())
+
+    if j < n and verbish(j):
         return j, None
-    if (j + 1 < n and lex.cls.get(toks[j]) == FUNC and toks[j] not in lex.det
-            and lex.cls.get(toks[j + 1]) == EVENT):
+    if (j + 1 < n and lex.cls.get(toks[j]) == FUNC and toks[j] not in lex.det and verbish(j + 1)):
         return j + 1, toks[j]
     return None
 
@@ -494,7 +537,7 @@ def parses_cl(lex, sch, toks, i, gapped, budget):
             e, pre = v
             for slots, j2 in _slots_from(lex, sch, toks, e + 1, budget):
                 for sl in with_gap(slots):
-                    yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + sl), j2
+                    yield CL(e, lex.lemma_of(toks[e], EVENT), pre, head_slots + sl), j2
         else:
             for slots, j2 in _slots_from(lex, sch, toks, j, budget):
                 v = _is_verb_here(lex, toks, j2)
@@ -502,7 +545,7 @@ def parses_cl(lex, sch, toks, i, gapped, budget):
                     continue
                 e, pre = v
                 for sl in with_gap(slots):
-                    yield CL(e, lex.lemma.get(toks[e], toks[e]), pre, head_slots + sl), e + 1
+                    yield CL(e, lex.lemma_of(toks[e], EVENT), pre, head_slots + sl), e + 1
 
     if gapped == "subj":
         yield from after_subject([(None, "GAP", None)], i)
@@ -628,8 +671,8 @@ def ev_cl(lex, sch, mid, node, roles, defs, conj, inherited=None):
         vr = lex.vroles.get(node.lemma)
         if vr and len(vr) == 1:
             rs = (next(iter(vr)),)
-    if rs is None:
-        rs = roles.get(("__fallback__", fk))
+    if rs is None and node.lemma in lex.lemma.values():
+        rs = roles.get(("__fallback__", fk))     # the plurality guess is allowed only for a KNOWN verb
     if rs is None or len(rs) != len(heads):
         return None
     block = [(node.lemma + " . " + r, (ev, h)) for r, h in zip(rs, heads)]

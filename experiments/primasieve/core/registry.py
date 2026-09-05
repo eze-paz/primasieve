@@ -33,6 +33,7 @@ PUBLISHED = {
     "phase5c": ["ASK the question that splits it"],
     # ---- Stage 4a: constructions on SLOG (relative clauses, wh-questions, center-embedding) --------------------
     "cogs_stage4a": ["4a SLOG CONSTRUCTIONS: PASS"],
+    "cogs_stage4b": ["4b OPEN VOCABULARY: PASS"],
 }
 
 
