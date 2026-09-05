@@ -241,6 +241,146 @@
   ],
   "verdict": "COMPOUNDING"
  },
+ "E3_recursion_and_cross_domain": {
+  "cross_domain": {
+   "CODE": {
+    "base_found_locally": true,
+    "base_search_evals": 16,
+    "gloss": "(weight, index) -- bump weight by its own index",
+    "n_tasks": 3,
+    "with_ITERATE": 3,
+    "without_ITERATE": 0
+   },
+   "GRID": {
+    "base_found_locally": true,
+    "base_search_evals": 18,
+    "gloss": "(cell value, scale) -- scale the value, keep the scale",
+    "n_tasks": 3,
+    "with_ITERATE": 3,
+    "without_ITERATE": 0
+   }
+  },
+  "discovery": {
+   "discovered": true,
+   "guard_rejects_corrupted": true
+  },
+  "extrapolation": [
+   {
+    "composition_evals": 16,
+    "composition_solved": true,
+    "iterate_evals": 7,
+    "iterate_n": 7,
+    "k": 7
+   },
+   {
+    "composition_evals": 20,
+    "composition_solved": false,
+    "iterate_evals": 11,
+    "iterate_n": 11,
+    "k": 11
+   },
+   {
+    "composition_evals": 20,
+    "composition_solved": false,
+    "iterate_evals": 23,
+    "iterate_n": 23,
+    "k": 23
+   },
+   {
+    "composition_evals": 20,
+    "composition_solved": false,
+    "iterate_evals": 37,
+    "iterate_n": 37,
+    "k": 37
+   }
+  ],
+  "verdict": "FORM TRANSFERS"
+ },
+ "E4_adoption_test": {
+  "arms": {
+   "with_costed": {
+    "A_evals": 98819,
+    "A_solved": 12,
+    "B_evals": 103621,
+    "B_solved": 12,
+    "total": 202440
+   },
+   "with_first": {
+    "A_evals": 147,
+    "A_solved": 12,
+    "B_evals": 104389,
+    "B_solved": 12,
+    "total": 104536
+   },
+   "without": {
+    "A_evals": 98672,
+    "A_solved": 0,
+    "B_evals": 103621,
+    "B_solved": 12,
+    "total": 202293
+   }
+  },
+  "conclusion": {
+   "with_costed": {
+    "B_eval_ratio": 1.0,
+    "solves_gained_on_A": 12,
+    "unconditional": true
+   },
+   "with_first": {
+    "B_eval_ratio": 1.01,
+    "solves_gained_on_A": 12,
+    "unconditional": true
+   }
+  },
+  "n_A": 12,
+  "n_B": 12,
+  "nmax": 64,
+  "note": "adoption TESTED not assumed; the S2 ledger precedent is a form that helped deep cases and mis-steered easy ones, netting negative.",
+  "workload_C_cheap": {
+   "arms": {
+    "with_costed": {
+     "evals": 12,
+     "ratio": 1.0,
+     "solved": 12
+    },
+    "with_first": {
+     "evals": 12,
+     "ratio": 1.0,
+     "solved": 12
+    },
+    "without": {
+     "evals": 12,
+     "ratio": 1.0,
+     "solved": 12
+    }
+   },
+   "finding": "on CHEAP tasks (already in library, ~1 eval -- the regime of the existing 6-class matrix where disc_medE=1) the naive with_first adoption pays a fixed nmax probe on every miss. E-4s original B workload hid this because blind search there costs ~8600 evals, making a 64-eval probe 0.7% noise.",
+   "n": 12,
+   "recommendation": "ADOPT ITERATE, but COST-ORDERED (tried only after the cheap routes fail), which is exactly the projects existing cost_hint discipline. Naive first-position adoption is NOT unconditional."
+  },
+  "workload_D_adversarial": {
+   "arms": {
+    "with_costed": {
+     "evals": 24,
+     "ratio": 1.0,
+     "solved": 12
+    },
+    "with_first": {
+     "evals": 792,
+     "ratio": 33.0,
+     "solved": 12
+    },
+    "without": {
+     "evals": 24,
+     "ratio": 1.0,
+     "solved": 12
+    }
+   },
+   "design": "task is a CHEAP library hit that is NOT an iteration of the base, so ITERATE must exhaust nmax before failing -- the real S2-style collateral-damage case. My first cheap workload was badly built: the task WAS the base frame, so ITERATE succeeded at n=1 and no cost appeared. Corrected here.",
+   "n": 12,
+   "verdict": "with_first 33.0x (REGRESSION), with_costed 1.0x -> ADOPT COST-ORDERED ONLY"
+  }
+ },
  "blind_arm": [
   {
    "cost": 3037,
