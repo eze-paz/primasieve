@@ -1936,6 +1936,36 @@ async function newConversation() {
 const _convRowCache = new Map();
 
 async function listConversations() {
+
+// --- Archived content search via the Dropbox API (archive-dehydration step 1) ---
+// When a sidebar query is active, archived conversations are matched by CLOUD
+// content search (files/search_v2 scoped to the archived folder) instead of
+// reading every archived .jsonl from OPFS. Titles still match locally from the
+// tiny meta files. Results are cached per query string (invalidated by any
+// file:changed/file:deleted under the archived dir, same as the row cache).
+// Returns a Set of conversation ids whose content matched the query.
+const _archSearchCache = { q: null, ids: null };
+function _archSearchInvalidate() { _archSearchCache.q = null; _archSearchCache.ids = null; }
+async function searchArchivedCloud() {
+  const q = ($('convSearch')?.value.trim() || '').toLowerCase();
+  if (!q) return new Set();
+  if (_archSearchCache.q === q && _archSearchCache.ids) return _archSearchCache.ids;
+  const ids = new Set();
+  try {
+    const sp = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
+    if (sp && sp.cloudConnected && sp.cloudConnected() && sp.cloudSearch && sp.workingRoot) {
+      const scope = sp.workingRoot() + '/' + ARCHIVED_DIR;
+      const r = await sp.cloudSearch(q, scope, { maxResults: 500 });
+      for (const p of r.paths || []) {
+        const name = (p.split('/').pop() || '');
+        const id = name.replace(/\.(?:jsonl|meta\.json|json)$/, '');
+        if (id) ids.add(id);
+      }
+    }
+  } catch (_) { /* cloud leg is best-effort: title matching still applies */ }
+  _archSearchCache.q = q; _archSearchCache.ids = ids;
+  return ids;
+}
   const searchActive = !!($('convSearch')?.value.trim());
 
   // Scan both dirs, collecting one entry per conversation id. A conv may have a new
@@ -1960,12 +1990,16 @@ async function listConversations() {
 
   // Steady-state refreshes reuse cached rows instead of re-reading every meta
   // (that was ~3.4s of the conversation-switch cost with many convs). Search
-  // bypasses the cache (it needs the jsonl content).
+  // bypasses the cache (it needs the jsonl content) — EXCEPT for archived
+  // conversations: their content search ran in the cloud (searchArchivedCloud),
+  // so they skip the local jsonl read entirely; cloudHit marks content matches.
+  const archIds = searchActive ? await searchArchivedCloud() : null;
   const rows = await Promise.all(
     [...found.entries()].map(async ([id, loc]) => {
       const key = (loc.archived ? 'a:' : 'n:') + id;
       if (!searchActive && _convRowCache.has(key)) return _convRowCache.get(key);
-      const row = await readConvMetaRow(id, loc.archived, loc.format, searchActive);
+      const row = await readConvMetaRow(id, loc.archived, loc.format, searchActive && !loc.archived);
+      if (row && searchActive && loc.archived) row.cloudHit = archIds.has(id);
       if (row && !searchActive) _convRowCache.set(key, row);
       return row;
     }),
@@ -2368,7 +2402,8 @@ async function refreshConversationList() {
     const query = searchInput.value.trim().toLowerCase();
     list = list.filter(c =>
       c.title.toLowerCase().includes(query) ||
-      (c.messageContent && c.messageContent.includes(query))
+      (c.messageContent && c.messageContent.includes(query)) ||
+      (c.archived && c.cloudHit)   // archived: matched by cloud content search
     );
   }
 
@@ -7052,7 +7087,13 @@ let sidePanel = null;
 
   const searchInput = $('convSearch');
   if (searchInput) {
-    searchInput.addEventListener('input', () => refreshConversationList());
+    // Debounced: each keystroke with a query triggers a Dropbox content search
+    // over the archive — coalesce to one request per 350ms pause.
+    let _searchTimer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => refreshConversationList(), 350);
+    });
   }
 })();
 
@@ -7926,6 +7967,7 @@ function bootConversations() {
       if (!id) return;
       _convRowCache.delete('a:' + id);
       _convRowCache.delete('n:' + id);
+      if (p.includes('/conversations/archived/')) _archSearchInvalidate();
     };
     Sandpie.events.on('file:changed', invalidateConvRow);
     Sandpie.events.on('file:deleted', invalidateConvRow);
