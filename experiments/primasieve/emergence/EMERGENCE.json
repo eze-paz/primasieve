@@ -1,0 +1,420 @@
+{
+ "E2a_void_note": "em_loop.py's tier curriculum was VOID as a depth test: tiers counted transforms APPLIED and the base set nearly closes under composition, so deep tier-6 frames were extensionally equal to shallow ones and blind depth-3 search correctly found the simpler equivalent. Its 11.3x cost figure is NOT an emergence result.",
+ "E2b_depth_curriculum": {
+  "blind": [
+   {
+    "cost": 481784,
+    "cycle": 1,
+    "how": {
+     "1": "blind",
+     "2": "blind"
+    },
+    "library": 0,
+    "max_k": 2,
+    "reached": [
+     1,
+     2
+    ]
+   },
+   {
+    "cost": 481784,
+    "cycle": 2,
+    "how": {
+     "1": "blind",
+     "2": "blind"
+    },
+    "library": 0,
+    "max_k": 2,
+    "reached": [
+     1,
+     2
+    ]
+   },
+   {
+    "cost": 481784,
+    "cycle": 3,
+    "how": {
+     "1": "blind",
+     "2": "blind"
+    },
+    "library": 0,
+    "max_k": 2,
+    "reached": [
+     1,
+     2
+    ]
+   },
+   {
+    "cost": 481784,
+    "cycle": 4,
+    "how": {
+     "1": "blind",
+     "2": "blind"
+    },
+    "library": 0,
+    "max_k": 2,
+    "reached": [
+     1,
+     2
+    ]
+   }
+  ],
+  "blind_max_k": 2,
+  "blind_reaches": [
+   1,
+   2
+  ],
+  "entries": [
+   "d1",
+   "d10",
+   "d12",
+   "d16",
+   "d2",
+   "d3",
+   "d4",
+   "d5",
+   "d6",
+   "d8"
+  ],
+  "heldout_verification": {
+   "all_exact": true,
+   "n_heldout_inputs": 20,
+   "note": "held-out (c,e) include NEGATIVE coefficients and exponents 29-40, disjoint from the 8 learning inputs (e 21..30, c>0). Every crystallised entry, including the composed d16, is exact -- so these are genuinely d^k, not 8-point signature coincidences."
+  },
+  "honest_scope": "the compounding mechanism is real and measured, but d^k is a FAVOURABLE family BY CONSTRUCTION: composition is exactly its structure (d_a o d_b = d_(a+b)). The claim is CONDITIONAL -- when a task family is compositional, crystallising composed frames buys exponential reach and blind search cannot follow. It is NOT a claim that arbitrary families compound; em_loop.py showed a family that does NOT (extensional collapse).",
+  "ks": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   8,
+   10,
+   12,
+   16
+  ],
+  "library": [
+   {
+    "cost": 189,
+    "cycle": 1,
+    "how": {
+     "1": "blind",
+     "10": "(d2 o d8)",
+     "12": "(d2 o d10)",
+     "16": "(d4 o d12)",
+     "2": "(d1 o d1)",
+     "3": "(d1 o d2)",
+     "4": "(d1 o d3)",
+     "5": "(d1 o d4)",
+     "6": "(d1 o d5)",
+     "8": "(d2 o d6)"
+    },
+    "library": 10,
+    "max_k": 16,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   {
+    "cost": 55,
+    "cycle": 2,
+    "how": {
+     "1": "d1",
+     "10": "d10",
+     "12": "d12",
+     "16": "d16",
+     "2": "d2",
+     "3": "d3",
+     "4": "d4",
+     "5": "d5",
+     "6": "d6",
+     "8": "d8"
+    },
+    "library": 10,
+    "max_k": 16,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   {
+    "cost": 55,
+    "cycle": 3,
+    "how": {
+     "1": "d1",
+     "10": "d10",
+     "12": "d12",
+     "16": "d16",
+     "2": "d2",
+     "3": "d3",
+     "4": "d4",
+     "5": "d5",
+     "6": "d6",
+     "8": "d8"
+    },
+    "library": 10,
+    "max_k": 16,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   {
+    "cost": 55,
+    "cycle": 4,
+    "how": {
+     "1": "d1",
+     "10": "d10",
+     "12": "d12",
+     "16": "d16",
+     "2": "d2",
+     "3": "d3",
+     "4": "d4",
+     "5": "d5",
+     "6": "d6",
+     "8": "d8"
+    },
+    "library": 10,
+    "max_k": 16,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   }
+  ],
+  "library_max_k": 16,
+  "library_only": [
+   3,
+   4,
+   5,
+   6,
+   8,
+   10,
+   12,
+   16
+  ],
+  "library_reaches": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   8,
+   10,
+   12,
+   16
+  ],
+  "verdict": "COMPOUNDING"
+ },
+ "blind_arm": [
+  {
+   "cost": 3037,
+   "cycle": 1,
+   "library": 0,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 12223,
+   "cycle": 2,
+   "library": 0,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 39110,
+   "cycle": 3,
+   "library": 0,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 120999,
+   "cycle": 4,
+   "library": 0,
+   "max_tier": 5,
+   "solved": [
+    1,
+    2,
+    3,
+    5
+   ]
+  },
+  {
+   "cost": 33372,
+   "cycle": 5,
+   "library": 0,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 3846,
+   "cycle": 6,
+   "library": 0,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  }
+ ],
+ "cost_blind": 212587,
+ "cost_library": 18786,
+ "library_arm": [
+  {
+   "cost": 3107,
+   "cycle": 1,
+   "library": 6,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 663,
+   "cycle": 2,
+   "library": 11,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 13528,
+   "cycle": 3,
+   "library": 17,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 644,
+   "cycle": 4,
+   "library": 22,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 387,
+   "cycle": 5,
+   "library": 27,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  {
+   "cost": 457,
+   "cycle": 6,
+   "library": 30,
+   "max_tier": 6,
+   "solved": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  }
+ ],
+ "library_size": 30,
+ "max_tier_blind": 6,
+ "max_tier_library": 6,
+ "secs": 26.0
+}
