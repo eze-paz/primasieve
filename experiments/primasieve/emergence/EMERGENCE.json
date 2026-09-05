@@ -396,18 +396,18 @@
     "discovered": true,
     "guard_rejects_corrupted": true,
     "unseen_k": {
-     "7": 7,
      "11": 11,
-     "23": 23
+     "23": 23,
+     "7": 7
     }
    },
    "REPEAT (= APPEND_UNIT iterated)": {
     "discovered": true,
     "guard_rejects_corrupted": true,
     "unseen_k": {
-     "7": 7,
      "11": 11,
-     "23": 23
+     "23": 23,
+     "7": 7
     }
    }
   },
@@ -589,5 +589,194 @@
  "library_size": 30,
  "max_tier_blind": 6,
  "max_tier_library": 6,
- "secs": 26.0
+ "secs": 26.0,
+ "transfer_vs_caching": {
+  "cold": {
+   "cost": 360000,
+   "reached": []
+  },
+  "entries_from_train": 6,
+  "eval_ks": [
+   8,
+   10,
+   12,
+   16,
+   20,
+   24
+  ],
+  "reachable_only_warm": [
+   8,
+   10,
+   12
+  ],
+  "reading": "the earlier 3.4x two-arm delta was CACHING (all warm entries had the eval tasks as provenance; the leakage guard dropped all 10 and warm fell back to cold exactly). THIS measures TRANSFER: store populated only from k<=6, evaluated on k>=8 with the guard on.",
+  "train_ks": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "transfer_delta_x": 2.0,
+  "warm": {
+   "cost": 180216,
+   "reached": [
+    8,
+    10,
+    12
+   ]
+  }
+ },
+ "two_arm_rule": "STANDING POLICY: every run reports COLD (empty library -- the scientific number) and WARM (library from disk -- the engineering number), plus the delta, which measures what the accumulated knowledge is worth. WARM stays honest via PROVENANCE on every entry: an eval can exclude entries crystallised from the eval task itself, so the library can never hold the answer to the question being asked. Wiping the library was a blunt substitute for that control.",
+ "two_arm_runs": [
+  {
+   "cold": {
+    "cost": 189,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   "delta_x": 1.0,
+   "guard": false,
+   "run_id": "142545",
+   "store_entries_before": 0,
+   "warm": {
+    "cost": 189,
+    "lib_in": 0,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   }
+  },
+  {
+   "cold": {
+    "cost": 189,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   "delta_x": 3.44,
+   "guard": false,
+   "run_id": "142608",
+   "store_entries_before": 10,
+   "warm": {
+    "cost": 55,
+    "lib_in": 10,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   }
+  },
+  {
+   "cold": {
+    "cost": 189,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   "delta_x": 3.44,
+   "guard": false,
+   "run_id": "142621",
+   "store_entries_before": 10,
+   "warm": {
+    "cost": 55,
+    "lib_in": 10,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   }
+  },
+  {
+   "cold": {
+    "cost": 189,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   },
+   "delta_x": 1.0,
+   "guard": true,
+   "run_id": "142640",
+   "store_entries_before": 10,
+   "warm": {
+    "cost": 189,
+    "lib_in": 0,
+    "reached": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     8,
+     10,
+     12,
+     16
+    ]
+   }
+  }
+ ]
 }
