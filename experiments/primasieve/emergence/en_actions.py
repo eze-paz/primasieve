@@ -50,12 +50,24 @@ def a_recolour(sc, i):
     return out
 
 
-OPS = {"OP_REMOVE": a_remove, "OP_GROW": a_grow, "OP_SHRINK": a_shrink, "OP_RECOLOUR": a_recolour}
+def a_widen(sc, i):
+    out = list(sc); (x0, y0, x1, y1), c = out[i]
+    out[i] = ((x0, y0, _clamp(x1 + 1, x0 + 1, W.G), y1), c); return out
+
+
+def a_heighten(sc, i):
+    out = list(sc); (x0, y0, x1, y1), c = out[i]
+    out[i] = ((x0, y0, x1, _clamp(y1 + 1, y0 + 1, W.G)), c); return out
+
+
+OPS = {"OP_REMOVE": a_remove, "OP_GROW": a_grow, "OP_SHRINK": a_shrink, "OP_RECOLOUR": a_recolour,
+       "OP_WIDEN": a_widen, "OP_HEIGHTEN": a_heighten}
 
 # English words the world actually uses when it narrates an action. The engine is NOT told which is which.
-ACTION_WORDS = ["remove", "delete", "grow", "enlarge", "shrink", "recolour"]
+ACTION_WORDS = ["remove", "delete", "grow", "enlarge", "shrink", "recolour", "widen", "heighten"]
 TRUE_MAP = {"remove": "OP_REMOVE", "delete": "OP_REMOVE", "grow": "OP_GROW",
-            "enlarge": "OP_GROW", "shrink": "OP_SHRINK", "recolour": "OP_RECOLOUR"}
+            "enlarge": "OP_GROW", "shrink": "OP_SHRINK", "recolour": "OP_RECOLOUR",
+            "widen": "OP_WIDEN", "heighten": "OP_HEIGHTEN"}
 
 
 def training(n, rng, true_map=None):

@@ -79,21 +79,72 @@ def say(text):
             qq = W.parse(rest, lex)
             if qq["unknown"]:
                 return _diagnose(qq["unknown"], text)
-            tgt = C.referents(sc, qq["left"]) if qq["left"] else []
+            # "enlarge all" has NO adjectives -- an empty description with a quantifier means EVERY object.
+            # The first version returned [] here and answered "I cannot tell which object you mean".
+            if qq["left"]:
+                tgt = C.referents(sc, qq["left"])
+            elif qq["quant"] or qq["plural"]:
+                tgt = list(range(len(sc)))
+            else:
+                tgt = []
+        qq2 = W.parse(rest, lex)
+        setwise = qq2["quant"] or qq2["plural"]
+        if not tgt:
+            return {"kind": "NONE", "msg": "I cannot tell which object you mean.", "highlight": []}
+        if len(tgt) != 1 and not setwise:
+            p = C.best_question(sc, tgt)
+            STATE["pending"] = (p, tgt)
+            return {"kind": "ASK", "msg": f"which one? {len(tgt)} match {tgt}. Is it {p}? "
+                                          f"(or say 'all' to do every one)", "highlight": tgt}
+        # SET-WISE: "remove the red ones" / "enlarge all" -- apply to every match, highest index first so
+        # removals do not invalidate the indices still to be processed.
+        before_n = len(sc)
+        cur = sc
+        for i in sorted(tgt, reverse=True):
+            cur = ACT.OPS[alex[act]](cur, i)
+        STATE["scene"] = cur
+        STATE["last_ref"] = None
+        which = f"objects {sorted(tgt)}" if len(tgt) > 1 else f"object #{tgt[0]}"
+        return {"kind": "COMMIT", "msg": f"done - {act} applied to {which}. "
+                                         f"{before_n} -> {len(cur)} objects.",
+                "highlight": [], "scene": scene_json()}
+    q = W.parse(text, lex)
+    # ---- GOAL: "make the green one wider". The property is known; the OPERATION is not stated. So search
+    #      the known operations and keep the ones that actually achieve it. Same commit rule, applied to
+    #      actions instead of referents: exactly one survivor -> do it; several -> say so; none -> say THAT,
+    #      which is a far better answer than claiming not to understand the words.
+    if q["kind"] == "goal" and not q["unknown"]:
+        tgt = C.referents(sc, q["left"]) if q["left"] else list(range(len(sc)))
         if len(tgt) != 1:
             if not tgt:
-                return {"kind": "NONE", "msg": "I cannot tell which object you mean.", "highlight": []}
+                return {"kind": "NONE", "msg": "nothing matches that description.", "highlight": []}
             p = C.best_question(sc, tgt)
             STATE["pending"] = (p, tgt)
             return {"kind": "ASK", "msg": f"which one? {len(tgt)} match {tgt}. Is it {p}?", "highlight": tgt}
         i = tgt[0]
-        before = sc
-        STATE["scene"] = ACT.OPS[alex[act]](sc, i)
+        goal = q["goal"]
+        held_before = W.unary_holds(goal, sc[i])
+        works = []
+        for word, op in alex.items():
+            after = ACT.OPS[op](sc, i)
+            if len(after) != len(sc): continue                  # removal cannot achieve a property
+            if W.unary_holds(goal, after[i]) and not held_before:
+                works.append((word, op))
+        uniq = {op for _, op in works}
+        if held_before:
+            return {"kind": "COMMIT", "msg": f"object #{i} is already {goal}.", "highlight": [i]}
+        if not uniq:
+            return {"kind": "OUT-OF-WORLD",
+                    "msg": f"I understand '{goal}', but none of my operations "
+                           f"({', '.join(sorted(alex))}) makes object #{i} {goal}.", "highlight": [i]}
+        if len(uniq) > 1:
+            return {"kind": "ASK", "msg": f"more than one of my operations would make it {goal}: "
+                                          f"{sorted(set(w for w, _ in works))}. Which?", "highlight": [i]}
+        word, op = works[0]
+        STATE["scene"] = ACT.OPS[op](sc, i)
         STATE["last_ref"] = None
-        return {"kind": "COMMIT", "msg": f"done - {act} applied to object #{i} "
-                                         f"({alex[act]}). {len(before)} -> {len(STATE['scene'])} objects.",
-                "highlight": [], "scene": scene_json()}
-    q = W.parse(text, lex)
+        return {"kind": "COMMIT", "msg": f"done - I worked out that '{word}' makes object #{i} {goal}, "
+                                         f"and applied it.", "highlight": [i], "scene": scene_json()}
     # ---- ACQUIRE: an unknown word is not a dead end. WordNet PROPOSES; the engine still has to ask. ----
     if q["unknown"]:
         return _diagnose(q["unknown"], text)

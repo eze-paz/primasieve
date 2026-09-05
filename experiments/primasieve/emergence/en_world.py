@@ -49,9 +49,28 @@ BINARY = {
     "the same colour as": lambda A, B: A[1] == B[1],
 }
 
-DETS = {"the", "a", "an", "that", "this"}
-NOUNS = {"one", "thing", "object", "block", "shape", "rectangle"}
-FILLER = {"is", "are", "which", "what", "where", "please", "me", "tell", "show", "?", "it"}
+DETS = {"the", "a", "an", "that", "this", "some"}
+NOUNS = {"one", "thing", "object", "block", "shape", "rectangle",
+         "ones", "things", "objects", "blocks", "shapes", "rectangles"}
+# FUNCTION WORDS are SYNTAX, not content. Leaking them into the unknown-word path produced nonsense like
+# refusing "how" and "can". The grammar is supplied anyway, so these belong here.
+FILLER = {"is", "are", "was", "which", "what", "where", "how", "please", "me", "my", "tell", "show", "?", "it",
+          "you", "your", "can", "could", "would", "will", "do", "does", "did", "of", "to", "and", "then",
+          "for", "with", "on", "in", "at", "be"}
+QUANT = {"all", "both", "every", "each", "any"}          # -> act on the WHOLE matching set
+GOAL = {"make", "turn", "render", "set"}                 # -> goal-directed: achieve a property
+
+
+def _base_adj(tok):
+    """comparatives: wider->wide, bigger->big, tinier->tiny, taller->tall. Morphology, not a word list."""
+    if tok in UNARY: return tok
+    if tok.endswith("er"):
+        for cand in (tok[:-2], tok[:-1], tok[:-3] + "y", tok[:-3]):
+            if cand in UNARY: return cand
+    if tok.endswith("est"):
+        for cand in (tok[:-3], tok[:-2], tok[:-4] + "y"):
+            if cand in UNARY: return cand
+    return None
 
 
 def _area(o): return (o[0][2] - o[0][0]) * (o[0][3] - o[0][1])
@@ -117,10 +136,11 @@ def _match_rel(toks, i):
 
 
 def parse(text, lexicon):
-    """-> dict(kind, left, rel, right, unknown). lexicon maps a KNOWN word -> predicate (LEARNED, not given)."""
+    """-> dict(kind, left, rel, right, unknown, quant, plural, goal). lexicon: KNOWN word -> predicate."""
     toks = tokenize(text)
     left, right, rel = [], [], None
     unknown = []
+    quant = False; plural = False; goal_marker = False
     cur = left
     i = 0
     while i < len(toks):
@@ -128,10 +148,23 @@ def parse(text, lexicon):
         m = _match_rel(toks, i)
         if m and rel is None and cur is left and left:
             rel, i = m; cur = right; continue
-        if w in DETS or w in NOUNS or w in FILLER:
+        if w in QUANT: quant = True; i += 1; continue
+        if w in GOAL: goal_marker = True; i += 1; continue
+        if w in NOUNS:
+            if w.endswith("s"): plural = True
+            i += 1; continue
+        if w in DETS or w in FILLER:
             i += 1; continue
         if w in lexicon:
             cur.append(lexicon[w]); i += 1; continue
+        b = _base_adj(w)                      # comparative/superlative morphology
+        if b is not None and b in lexicon:
+            cur.append(lexicon[b]); i += 1; continue
         unknown.append(w); i += 1
-    kind = "yesno" if (rel and left and right) else ("describe" if left else "empty")
-    return {"kind": kind, "left": left, "rel": rel, "right": right, "unknown": unknown, "tokens": toks}
+    # a goal request names the TARGET property last: "make the green one wider" -> describe green, achieve wide
+    goal = None
+    if goal_marker and left:
+        goal = left[-1]; left = left[:-1]
+    kind = "goal" if goal else ("yesno" if (rel and left and right) else ("describe" if left else "empty"))
+    return {"kind": kind, "left": left, "rel": rel, "right": right, "unknown": unknown,
+            "quant": quant, "plural": plural, "goal": goal, "tokens": toks}
