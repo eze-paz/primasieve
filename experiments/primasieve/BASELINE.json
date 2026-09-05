@@ -105,6 +105,30 @@
   ],
   "wrong_after_probing": 0
  },
+ "dialog_s3_conversation": {
+  "ambiguous_reference_test": {
+   "abstained": 300,
+   "answered": 0,
+   "n": 300,
+   "reading": "when the question describes MORE THAN ONE object the engine refuses to answer rather than picking one. The 100% coverage in the main test came from questions whose target description was unique; this exercises the abstention path that the main test did not."
+  },
+  "committed_discourse_fn": "LAST_SUBJECT",
+  "concepts": 45,
+  "dialogues_to_learn_rule": 5,
+  "heldout": {
+   "abstained": 0,
+   "accuracy": 1.0,
+   "answered": 400,
+   "confabulations": 0,
+   "correct": 400,
+   "coverage": 1.0,
+   "n": 400
+  },
+  "knockout_survivors": [],
+  "true_discourse_fn": "LAST_SUBJECT",
+  "verdict": "CONVERSATION WORKS",
+  "vocab_learned": 45
+ },
  "end_state_verification": {
   "checks": [
    {
