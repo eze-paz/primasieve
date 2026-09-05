@@ -3081,52 +3081,18 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
 // the WISP relay (wss://<host>/wisp): wget/nc/ssh/ping work.
 const WALIOS_BASE = '/walios/';
 const WALIOS_BB = 'busybox.wasm?v=net4';
-// Bumped together with any wali-worker.js deploy (dlopen7 = GOT back-fill before
-// the data relocs + the self-resolving import trampoline, ported from the node host).
-const WALIOS_WORKER_V = 'dlopen8';
-// Per-binary companion mounts, fetched+extracted on the FIRST exec of that binary
-// and cached for the worker's life. Shared by the shell tool and the warm
-// interpreter so both see the same package set.
-const WALIOS_LAZY_TARS = {
-  'python.wasm': [['pylib.tar.gz', '/py']],
-  // EAGER: the stdlib, plus the small extras bundle (certifi for TLS, packaging for
-  // micropip's resolver, and _shims/ctypes which MUST precede stdlib ctypes on the path).
-  'python_cxx.wasm?v=7': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
-                          ['walios-extras.tar.gz?v=3', '/site-packages']],
-// walios-mpl carries matplotlib + contourpy + kiwisolver + mpl_toolkits and a PREBUILT
-// font cache (_mplcache/fontlist-v390.json): font_manager's first-import scan costs
-// >600s in-browser and 4.6s on the node host, so it is generated offline and shipped.
-// The extensions are the HIDDEN-VISIBILITY build. That is not cosmetic: with default
-// visibility a side module imports symbols it also defines, so the loader has to route
-// them through a JS trampoline, and under JSPI a JS frame on the stack makes any
-// suspending syscall beneath it fail ("SuspendError: trying to suspend JS frames" —
-// hit via operator new[] -> __wasm_call_ctors -> mimalloc init -> fputs). Hidden
-// visibility binds those symbols locally, so nothing round-trips through JS.
-};
-// LAZY: which bundle provides which top-level module. Unpacking all of these up front
-// cost ~2.3s and ~128MB of VFS on every boot, for packages most tasks never import.
-const WALIOS_LAZY_PKGS = (() => {
-  const NUMPY = ['walios-numpy.tar.gz?v=2', '/site-packages'];
-  const DOCS  = ['walios-docs.tar.gz?v=4', '/site-packages'];
-  const MPL   = ['walios-mpl.tar.gz?v=3', '/site-packages'];
-  const m = {};
-  for (const n of ['numpy', 'pandas', 'dateutil', 'pytz', 'tzdata', 'six', 'msgpack', 'simplejson', 'zlib']) m[n] = NUMPY;
-  for (const n of ['PIL', 'lxml', 'docx', 'openpyxl', 'pptx', 'reportlab', 'pypdf', 'PyPDF2', 'bs4', 'soupsieve',
-                   'fontTools', 'xlsxwriter', 'olefile', 'OleFileIO_PL', 'striprtf', 'chardet', 'charset_normalizer',
-                   'et_xmlfile', 'fpdf', 'pdfminer', 'typing_extensions', '_ssl']) m[n] = DOCS;
-  for (const n of ['matplotlib', 'mpl_toolkits', 'contourpy', 'kiwisolver']) m[n] = MPL;
-  return m;
-})();
-const WALIOS_MANIFEST = {
-  busybox: WALIOS_BB, sh: WALIOS_BB, ash: WALIOS_BB, hush: WALIOS_BB,
-  // python → python_cxx: the dynamic-linking CPython that dlopen()s PIC-wasm
-  // C-extension .so, so `import numpy/lxml/PIL/docx…` works seamlessly (the
-  // packages are lazy-mounted into /site-packages when python_cxx first runs —
-  // see the tool_walios run message). Plain python.wasm can't dlopen.
-  python: 'python_cxx.wasm?v=7', python3: 'python_cxx.wasm?v=7', pydl: 'python_cxx.wasm?v=7', lua: 'lua.wasm',
-  ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
+// The backend definition is SHARED with /walios/terminal.html so the interactive terminal
+// always runs the same CPython, package bundles and env as run_python does. Classic script,
+// assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
+importScripts('/modules/walios-backend.js?v=1');
+const WB = self.WALIOS_BACKEND;
+const WALIOS_WORKER_V = WB.WORKER_V;
+const WALIOS_LAZY_TARS = WB.eagerTars('repl');
+const WALIOS_LAZY_PKGS = WB.LAZY_PKGS;
+const WALIOS_MANIFEST = Object.assign(WB.manifest(WALIOS_BB), {
+  lua: 'lua.wasm', ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
-};
+});
 let _waliosWorker = null, _waliosQueue = Promise.resolve();
 
 // pkgcache: binaries other users compiled in-tab (e.g. git) live on the server
@@ -3209,10 +3175,8 @@ async function tool_walios({ script, timeout }, ctx) {
       // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
       // `import` just works without the model running any install step.
       lazyTars: WALIOS_LAZY_TARS,
-      env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1', SANDPIE_LAZY_PKGS: JSON.stringify(WALIOS_LAZY_PKGS),
-             SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
+      env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
+                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
@@ -3384,11 +3348,8 @@ async function _wpyEnsure() {
     tars: [['rootfs.tar.gz', '/']], opfs: '/root',
     blobs: { '/sandpie/repl.py': src },
     lazyTars: WALIOS_LAZY_TARS,
-    env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-           PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
-           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
-             SANDPIE_ASYNCIO: '1', SANDPIE_LAZY_PKGS: JSON.stringify(WALIOS_LAZY_PKGS),
-             SSL_CERT_FILE: '/site-packages/certifi/cacert.pem' },
+    env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
+                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
     // means no extra process survives.
