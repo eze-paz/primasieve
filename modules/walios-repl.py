@@ -202,29 +202,114 @@ def _micropip_install(requirements, **kw):
     return _Immediate(lambda: _micropip_install_now(requirements, **kw))
 
 
+def _canon(name):
+    """PEP 503 normalisation: charset-normalizer, charset_normalizer, Charset.Normalizer
+    are all one project."""
+    out = []
+    for ch in str(name).strip().lower():
+        out.append("-" if ch in "._-" else ch)
+    res = "".join(out)
+    while "--" in res:
+        res = res.replace("--", "-")
+    return res
+
+
+def _already_have(name):
+    import importlib.util
+    for mod in (name.replace("-", "_"), name.replace("-", "")):
+        try:
+            if importlib.util.find_spec(mod) is not None:
+                return True
+        except (ImportError, ValueError):
+            pass
+    return False
+
+
+def _wheel_requires(zf):
+    """Runtime dependencies from the wheel's METADATA, minus the ones that do not apply.
+
+    Skips extras (Requires-Dist entries carrying `extra == ...`, which are opt-in) and
+    honours environment markers, so a package does not drag in Windows-only or
+    old-Python-only deps. `packaging` ships in walios-extras, so use the real parser
+    rather than guessing at the grammar."""
+    meta = None
+    for n in zf.namelist():
+        if n.endswith(".dist-info/METADATA"):
+            meta = zf.read(n).decode("utf-8", "replace")
+            break
+    if not meta:
+        return []
+    try:
+        from packaging.requirements import Requirement
+    except Exception:
+        return []          # no resolver available -> behave as before, single wheel
+    out = []
+    for line in meta.splitlines():
+        if not line.lower().startswith("requires-dist:"):
+            continue
+        spec = line.split(":", 1)[1].strip()
+        try:
+            req = Requirement(spec)
+        except Exception:
+            continue
+        if req.marker is not None:
+            text = str(req.marker)
+            if "extra" in text:
+                continue   # optional feature set, not a runtime dependency
+            try:
+                if not req.marker.evaluate():
+                    continue
+            except Exception:
+                pass
+        out.append(req.name)
+    return out
+
+
 def _micropip_install_now(requirements, **kw):
     import importlib
     import zipfile
 
     if isinstance(requirements, str):
         requirements = [requirements]
-    done = []
-    for req in requirements:
-        r = _hostcall("pip", name=str(req))
+    deps = kw.get("deps", True)
+    queue = [str(r) for r in requirements]
+    asked = {_canon(r) for r in queue}
+    seen, done = set(), []
+
+    while queue:
+        raw = queue.pop(0)
+        name = _canon(raw)
+        if name in seen:
+            continue
+        seen.add(name)
+        # A dependency already present (shipped or previously installed) is satisfied;
+        # the ones the caller ASKED for are always fetched.
+        if name not in asked and _already_have(name):
+            continue
+
+        r = _hostcall("pip", name=name)
         if not r.get("ok_call"):
-            raise ValueError("micropip: %s" % r.get("error", "could not resolve " + str(req)))
+            if name in asked:
+                raise ValueError("micropip: %s" % r.get("error", "could not resolve " + raw))
+            continue       # a transitive dep with no pure-Python wheel: skip, let the import fail loudly
         data = base64.b64decode(r.get("body", ""))
         target = _pip_dir()
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             bad = [n for n in z.namelist() if n.endswith(".so") or n.endswith(".pyd")]
             if bad:
-                raise ValueError(
-                    "micropip: %s ships compiled extensions (%s) — those cannot be loaded here. "
-                    "walios C extensions must be cross-compiled to wasm ahead of time; only "
-                    "pure-Python wheels install at runtime." % (r.get("name", req), bad[0])
-                )
+                msg = ("micropip: %s ships compiled extensions (%s) — those cannot be loaded here. "
+                       "walios C extensions must be cross-compiled to wasm ahead of time; only "
+                       "pure-Python wheels install at runtime." % (r.get("name", raw), bad[0]))
+                if name in asked:
+                    raise ValueError(msg)
+                continue
             z.extractall(target)
-        done.append("%s==%s" % (r.get("name", req), r.get("version", "?")))
+            if deps:
+                for d in _wheel_requires(z):
+                    if _canon(d) not in seen:
+                        queue.append(d)
+        done.append("%s==%s" % (r.get("name", raw), r.get("version", "?")))
+
     importlib.invalidate_caches()
     return done
 
