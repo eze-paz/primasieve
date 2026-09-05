@@ -46,6 +46,7 @@ from cogs_align import associate, to_positional, renumber_first_appearance
 
 ENTITY, NAME, EVENT, REL, FUNC = "ENTITY", "NAME", "EVENT", "REL", "FUNC"
 PARSE_BUDGET = 20000
+EPS_LADDER = (0.0, 0.01, 0.02, 0.05, 0.10, 0.20)   # the induced tolerance ladder; ties go to the smallest
 
 
 # ================================================================ the searched schema
@@ -119,7 +120,7 @@ def _rows(train):
         yield toks, p[0], p[1]
 
 
-def induce_lexicon(train):
+def induce_lexicon(train, eps=0.0):
     lex = Lexicon()
     votes = collections.defaultdict(collections.Counter)
     lemvote = collections.defaultdict(collections.Counter)
@@ -172,19 +173,34 @@ def induce_lexicon(train):
             for a in args:
                 if a[0] == "c":
                     votes[a[1]][NAME] += 1
+    # TOLERANCE (Phase 6). "A functor is a word that appears in NO logical form" is an EXACT test wearing the
+    # clothes of a vote: one corrupted row gives `d0` a single spurious ENTITY vote and it stops being a
+    # functor, which empties the determiner set and makes every sentence unparseable. The tolerant form asks
+    # whether its votes are NEGLIGIBLE against its occurrences.
     for w in seen:
-        if w not in votes:
+        if sum(votes[w].values()) <= eps * seen[w]:
             lex.cls[w] = FUNC
+    # PLURALITY, and Stage 3d measured what that costs. This is where the only confabulations in the whole
+    # noise experiment come from: a rare noun in a mispaired row gets `tomb` read as the lemma `like`, or
+    # `cobra` as `boy`, and the engine then commits a confidently wrong logical form. Two decisive-vote
+    # replacements were tried and BOTH are far worse -- purity (winner holds >= 1-eps of the votes) and a
+    # margin over the runner-up each drop so many words that exact match falls to 0.04-0.23 at 5% corruption,
+    # because dropping a word makes every sentence containing it abstain. So plurality stands, the
+    # confabulation onset it causes is MEASURED (~10% corruption on real COGS, reported in cogs_stage3d.py)
+    # instead of argued away, and closing it is the open item.
     for w, cc in votes.items():
-        lex.cls[w] = cc.most_common(1)[0][0]
+        if lex.cls.get(w) != FUNC:
+            lex.cls[w] = cc.most_common(1)[0][0]
     for w, cc in lemvote.items():
         lex.lemma[w] = cc.most_common(1)[0][0]
     for w, cc in relsegs.items():
         lex.rel_segs[w] = cc
+    # likewise the terminator: `n == seen[w]` demands it occur NOWHERE but sentence-finally, so a single
+    # corrupted row that moves it inside a sentence removes the terminator entirely
     for w, n in lastvote.items():
-        if n >= 0.95 * max(nsent, 1) and n == seen[w]:
+        if n >= (1 - max(eps, 0.05)) * max(nsent, 1) and seen[w] - n <= eps * max(seen[w], 1):
             lex.terminator = w
-    _induce_determiners(lex, train)
+    _induce_determiners(lex, train, eps)
     return lex
 
 
@@ -204,7 +220,7 @@ def _realization(toks, defs, conj, i):
     return ("inline", extra[0]) if extra else "plain"
 
 
-def _induce_determiners(lex, train):
+def _induce_determiners(lex, train, eps=0.0):
     """A determiner is a functor that sits on a CONSISTENT side of an entity token AND whose adjacent noun has
     a CONSISTENT conjunct realization. That second condition is what separates a determiner from an argument
     marker: a marker leaves the noun's realization untouched, so its realizations are mixed."""
@@ -228,7 +244,7 @@ def _induce_determiners(lex, train):
         n = 0
         for w, cc in side[d].items():
             r, c = cc.most_common(1)[0]
-            if cover[d][w] >= 10 and c >= 0.95 * cover[d][w]:
+            if cover[d][w] >= 10 and c >= (1 - max(eps, 0.05)) * cover[d][w]:
                 dets[w] = r
                 n += c
         if best is None or n > best[0]:
@@ -544,7 +560,12 @@ def gold_roles(lf):
     return m
 
 
-def induce_roles(lex, sch, mid, train):
+def induce_roles(lex, sch, mid, train, eps=0.0):
+    """TOLERANCE SETS (Phase 6). A frame's reading was taken as global only `if len(cc) == 1`, so a SINGLE
+    corrupted row made every frame contested. The tolerant test is whether one reading holds in at least
+    (1 - eps) of that frame's observations. Where nothing does -- at frame level, then at (frame, verb) level
+    -- the frame is CONTESTED and the engine ABSTAINS on any clause using it, rather than committing the
+    plurality reading. That is Phase 6's rule: output the eps-consistent set, commit only on a singleton."""
     byframe = collections.defaultdict(collections.Counter)
     byverb = collections.defaultdict(collections.Counter)
     for s, lf, cat in train:
@@ -562,15 +583,30 @@ def induce_roles(lex, sch, mid, train):
             byverb[(frame_key(cl), cl.lemma)][rs] += 1
     roles = {}
     ambiguous = []
+
+    def settled(cc):
+        tot = sum(cc.values())
+        top, n = cc.most_common(1)[0]
+        return top if tot and n >= (1 - eps) * tot else None
+
     for f, cc in byframe.items():
-        if len(cc) == 1:
-            roles[f] = cc.most_common(1)[0][0]
+        r = settled(cc)
+        if r is not None:
+            roles[f] = r
         else:
             ambiguous.append((f, dict(cc)))
     for key, cc in byverb.items():
         if key[0] not in roles:
-            roles[key] = cc.most_common(1)[0][0]
+            r = settled(cc)
+            if r is not None:
+                roles[key] = r
     for f, _ in ambiguous:
+        # A PLURALITY GUESS, kept deliberately. Gating it on eps (so a contested frame abstains instead) is
+        # more principled and was tried: it costs adversary grammar 0 its train reproduction, 1.000 -> 0.654,
+        # because cl_head = subject makes two clauses share a head and legitimately contests frames there.
+        # So it stays, and Stage 3d records it as one of the two identified confabulation sources -- the other
+        # being the plurality lexicon vote. Removing a guess that a passing gate depends on, with nothing to
+        # replace it, is a regression, not a fix.
         roles[("__fallback__", f)] = byframe[f].most_common(1)[0][0]
     return roles, ambiguous
 
@@ -666,12 +702,12 @@ def search_schema(lex, train, sample=350, verbose=False):
     return best[1], best[0], len(rows)
 
 
-def _induce_positional(train, verbose=False):
+def _induce_positional(train, verbose=False, eps=0.0):
     """Everything downstream of the alignment: variables are already token positions here."""
-    lex = induce_lexicon(train)
+    lex = induce_lexicon(train, eps)
     sch, sc, ns = search_schema(lex, train, verbose=verbose)
     mid = induce_relmid(lex, train, sch)
-    roles, ambiguous = induce_roles(lex, sch, mid, train)
+    roles, ambiguous = induce_roles(lex, sch, mid, train, eps)
     if verbose:
         print(f"  classes {dict(collections.Counter(lex.cls.values()))}   terminator {lex.terminator!r}")
         print(f"  determiners ({lex.det_pos}-nominal) {lex.det}   relators {mid}")
@@ -681,7 +717,7 @@ def _induce_positional(train, verbose=False):
     return lex, sch, mid, roles
 
 
-def induce(train, verbose=False, gate=0.99):
+def induce(train, verbose=False, gate=0.99, force_eps=None):
     """-> model = (lex, schema, mid, roles, varconv).
 
     The VARIABLE CONVENTION is the last thing that was an assumption rather than an induction. COGS numbers
@@ -691,16 +727,49 @@ def induce(train, verbose=False, gate=0.99):
     RECOVER the alignment from co-occurrence (cogs_align) and rewrite train into positional form first.
 
     Only rows whose alignment is UNAMBIGUOUS are used for induction -- learning from a row whose alignment was
-    settled by a tie-break would be learning from a guess, and the fraction dropped is reported."""
-    model = _induce_positional(train, verbose=verbose) + ("position",)
-    ok, wrong, nopar = reproduce(model, train)
-    frac = ok / max(ok + wrong + nopar, 1)
-    if frac >= gate:
+    settled by a tie-break would be learning from a guess, and the fraction dropped is reported.
+
+    The choice between the two conventions is COMPARATIVE, not a threshold. An absolute "positions must
+    reproduce >= 0.99, else align" test looks equivalent on clean data and is not: at 1% training corruption
+    it flipped a positional corpus onto the aligned path, whose output renumbering is then wrong for every
+    single prediction. Noise found that; clean data never could. So score both and keep the better."""
+    def _frac(m):
+        ok, wrong, nopar = reproduce(m, train)
+        return ok / max(ok + wrong + nopar, 1)
+
+    def _pos():
+        """The TOLERANCE eps is itself induced, over a ladder, by measured reproduction -- ties go to the
+        SMALLEST eps, so clean data keeps the exact eps = 0 engine and nothing regresses. Phase 6's warning
+        stands and is not papered over: an eps chosen empirically is an ESTIMATE, not a bound, so soundness
+        is no longer a theorem here -- which is exactly why cogs_stage3d.py reports both sides of the
+        precondition (eps >= noise, and eps < noise) instead of only the favourable one."""
+        if force_eps is not None:
+            # Phase 6's precondition has TWO sides and only a forced eps can show the unfavourable one:
+            # eps < the actual corruption must be demonstrated to reject the truth, not just asserted.
+            return _induce_positional(train, verbose=verbose, eps=force_eps) + ("position",)
+        samp = [r for r in train if r[2] != "primitive"][:1500]
+        lex0 = [r for r in train if r[2] == "primitive"]
+        best = None
+        for e in EPS_LADDER:
+            m = _induce_positional(lex0 + samp, verbose=False, eps=e) + ("position",)
+            ok, wr, npar = reproduce(m, samp)
+            f = ok / max(ok + wr + npar, 1)
+            if best is None or f > best[0] + 1e-12:
+                best = (f, e)
+            if e == 0.0 and f >= gate:
+                break        # clean data pays NOTHING for the ladder; only noise makes it worth walking
         if verbose:
-            print(f"  variable convention: POSITION (reproduces {frac:.4f} of train as-is)")
-        return model
+            print(f"  tolerance eps induced: {best[1]} (reproduces {best[0]:.4f} of a {len(samp)}-row sample)")
+        return _induce_positional(train, verbose=verbose, eps=best[1]) + ("position",)
+
+    mpos = _pos()
+    fpos = _frac(mpos)
+    if fpos >= gate:
+        if verbose:
+            print(f"  variable convention: POSITION (reproduces {fpos:.4f} of train as-is)")
+        return mpos
     if verbose:
-        print(f"  variable convention: positions reproduce only {frac:.4f} -> recovering the ALIGNMENT")
+        print(f"  variable convention: positions reproduce {fpos:.4f} -- also trying the recovered ALIGNMENT")
     anchor, astats = associate(train, verbose=verbose)
     rows, hows, st = to_positional(train, anchor, verbose=verbose, oracle=False)
     fit = [r for r, h in zip(rows, hows) if h in ("unique", "lexicon")]
@@ -709,7 +778,12 @@ def induce(train, verbose=False, gate=0.99):
         print(f"  inducing from the {st['unique']} unambiguously aligned rows of {n} "
               f"({st['unique']/max(n,1):.4f}); {st['tiebreak']} tie-broken rows and {st['failed']} failures"
               f" are DROPPED, not guessed")
-    return _induce_positional(fit, verbose=verbose) + ("first_appearance",)
+    mali = _induce_positional(fit, verbose=verbose, eps=mpos and 0.0) + ("first_appearance",)
+    fali = _frac(mali)
+    if verbose:
+        print(f"  variable convention: position {fpos:.4f} vs alignment {fali:.4f} -> "
+              f"{'POSITION' if fpos >= fali else 'FIRST_APPEARANCE'}")
+    return mpos if fpos >= fali else mali
 
 
 class Engine:

@@ -272,3 +272,136 @@ while aligning badly would be exploiting something else, and only G13 would have
   confounded vocabulary), and that case is untested.
 - Everything here still assumes the logical form is a flat set of conjuncts over definites, and that a
   training pair is exactly (one sentence, one logical form). Neither Stage 3b nor 3c varied that.
+
+# STAGE 3d PRE-REGISTRATION -- NOISE: does the abstain-not-guess property survive dirty training data?
+
+Written BEFORE the noise runs. This is the gate that decides whether the engine meets REAL data or only clean
+data, and it is deliberately built on Phase 6's mechanism (f3c09bb) rather than a new one.
+
+## What Phase 6 established, and what it predicts here
+
+Phase 6: acceptance = consistency WITHIN A TOLERANCE eps; the output is the SET of eps-consistent hypotheses,
+never a probability; soundness is a THEOREM given eps >= corruption, and the price is abstention, never a
+wrong answer. It also measured the cliff: at eps = 0 -- exact match -- under noise the truth is EXCLUDED in
+90-98% of trials. And it found that intersecting per-observation constraints is UNSOUND (a conjunction, so
+P(truth survives k) = p^k and DECAYS); the sound route is DENOISE FIRST, then ONE bound on the aggregate.
+
+The Stage 3 engine is an eps = 0 engine. Its induction is built on exact tests: a frame's role tuple is taken
+as global only `if len(cc) == 1`, so a SINGLE corrupted row makes every frame contested; and 3c's anchor test
+is exact set inclusion plus exact cover, so one mislabeled row can destroy a lexical anchor. Phase 6 therefore
+predicts a cliff. Where the engine already aggregates by MAJORITY over the corpus (word classes, lemma map,
+determiners, the schema search's argmax) Phase 6 predicts robustness, because that is denoise-first.
+
+## Design
+
+Corruption is applied to TRAINING pairs only; the test set stays CLEAN gold. That is the question that
+matters: did it learn the right grammar despite dirty supervision. Five corruption types, each swept
+SEPARATELY as well as mixed, because a mixed-only curve attributes nothing (the Stage 3b lesson):
+
+    drop_conjunct   remove one conjunct from the gold form
+    add_conjunct    insert a spurious conjunct over existing variables
+    swap_roles      exchange two role names within a clause
+    perturb_token   replace one sentence token (a typo / wrong-word analogue)
+    mispair         replace the whole logical form with another row's
+
+Rates p in {0, 0.01, 0.02, 0.05, 0.10, 0.20} of rows corrupted. Run on the adversary (ground truth known,
+fast) and on real COGS for the headline.
+
+## Gates
+
+N1 (THE CLIFF, expected). Report gen EM against p for the current eps = 0 engine. A collapse is the
+   pre-registered expectation, not a surprise; the number is the result.
+
+N2 (THE DECISIVE ONE -- soundness, scored as Phase 6 scored it, in TWO distinct modes).
+   CONFABULATION  = committed an answer and it was wrong, as a fraction of all items.
+   ABSTENTION     = declined to answer.
+   The engine's whole value proposition is that it abstains rather than guesses. So the gate is: as p rises,
+   degradation must go into ABSTENTION, not into CONFABULATION. KILL: confabulation rising materially with p
+   (concretely, exceeding 0.05 at p = 0.05) means the property does NOT survive noise and the component is
+   not deployable on dirty data. This is the number to report first, above any EM.
+
+N3 (THE MECHANISM). With tolerance-set induction -- every exact test replaced by an eps-tolerant one, and the
+   output the SET of eps-consistent readings with COMMIT only on unanimity -- gen EM must recover to >= 0.95
+   at p = 0.05 while confabulation stays <= 0.01.
+
+N4 (THE PRECONDITION, both sides, as Phase 6 insisted). eps >= actual noise must be sound and cost
+   abstention; eps < actual noise must be shown to exclude the truth. If only the favourable side is
+   reported, the result is void.
+
+N5 (NO REGRESSION). At p = 0, every Stage 3a/3b/3c number is unchanged: COGS train 1.0000, gen 0.9990,
+   structural 0.9850 / 1.0000 / 1.0000; Stage 3b 10/10 + 11/11; Stage 3c 11/11 + 10/10.
+
+## Pre-committed reading
+
+If N2 fails, say so plainly: the engine is a clean-data component, and the honest recommendation is that it
+needs a verified annotation pipeline rather than that it tolerates noise. Recovering EM by making the engine
+GUESS more confidently would be the worst possible outcome and is pre-committed as a FAIL, not a fix.
+
+## STAGE 3d MEASURED RESULT (added after the runs)
+
+Headline: the abstain-not-guess property SURVIVES noise up to a measurable point, and that point is now a
+number rather than a hope. There is a usable operating envelope and it must be stated with the envelope, not
+without it.
+
+ADVERSARY (COGS structure, clean test set, corruption in train only)
+  eps = 0 engine -- i.e. Stages 3a-3c as they stood:
+    exact match 1.000 at rate 0, then 0.000 from rate 0.01 onward. The cliff Phase 6 predicted.
+    CONFABULATION 0.0000 at every rate: it collapses entirely into ABSTENTION, never into wrong answers.
+  per corruption type at rate 0.05, eps = 0 -- the attribution that a mixed curve would have hidden:
+    drop_conjunct 1.000, add_conjunct 1.000, swap_roles 1.000   (logical-form side: survivable)
+    perturb_token 0.000, mispair 0.000                          (sentence side: fatal)
+    The logical-form decisions were already MAJORITY votes over the corpus -- Phase 6's denoise-first,
+    arrived at by accident. The sentence-side ones broke two EXACT tests wearing the clothes of votes: "a
+    functor is a word appearing in NO logical form" and "the terminator occurs NOWHERE else". One bad row
+    kills each, which is why 1% corruption was enough.
+  tolerance-set induction, eps induced by measured reproduction:
+    exact match 1.000 at every rate from 0.00 to 0.90, CONFABULATION 0.0000, precision 1.0000, and 1.000 for
+    every corruption type separately at rate 0.20.
+  N4, both sides of the precondition (forced eps x rate): eps >= corruption is 1.000 everywhere; eps below
+    it collapses (eps 0 at rate 0.02 -> 0.000; eps 0.02 at rate 0.20 -> 0.464). The cliff is real and shown.
+
+REAL COGS (all 21000 clean gen items, corruption in train only) -- and this is the number that matters,
+because the synthetic control OVER-STATED robustness badly:
+    rate    CONFAB    abstain      EM   precision
+    0.00    0.0000     0.0010  0.9990      1.0000
+    0.02    0.0000     0.0962  0.9038      1.0000
+    0.05    0.0016     0.0486  0.9498      0.9983
+    0.08    0.0004     0.0018  0.9979      0.9996
+    0.10    0.0955     0.0032  0.9013      0.9042
+    0.20    0.0967     0.1930  0.7102      0.8801
+
+So the OPERATING ENVELOPE is: safe to about 8% annotation noise (confabulation <= 0.2%), and NOT safe from
+about 10% (confabulation steps to ~9.6% and stays there). The onset is a STEP, not a slope.
+
+GATES. N1 met (the cliff is reported). N2 PASSES: confabulation at rate 0.05 is 0.0016 on COGS and 0.0000 on
+the adversary, far under the 0.05 kill threshold. N3 passes on the adversary (1.000 / 0.0000) and MARGINALLY
+MISSES on COGS: exact match 0.9498 against a 0.95 target, short by 0.0002, with confabulation 0.0016 inside
+its 0.01 bound. Reported as a miss, not rounded up. N4 met, both sides. N5 met: rate 0 reproduces every
+earlier number, and Stage 3b (10/10 + 11/11) and Stage 3c (11/11 + 10/10, oracle 1.0000, COGS renumbered
+0.9990) were rerun after the changes and are unchanged.
+
+THE METHODOLOGICAL FINDING, and it mirrors Stage 3b exactly. The synthetic adversary reports confabulation
+0.0000 even at 90% corruption; real COGS reports 9.6% from 10%. The synthetic grammars have no genuinely
+contested decisions, so nothing there can be resolved wrongly. A control built to vary STRUCTURE does not
+test ROBUSTNESS, and had only the adversary been run the conclusion would have been "noise-proof", which is
+false.
+
+## WHAT IS STILL NOT EARNED, after 3d
+
+The confabulation onset is traced to exactly two PLURALITY GUESSES, both identified, both with a fix
+attempted and MEASURED to be worse, so both are left open with their numbers rather than patched:
+  1. the lexicon vote. A rare noun in a mispaired row gets `tomb` read as the lemma `like`, or `cobra` as
+     `boy`, and the engine commits a confidently wrong form. Two decisive-vote replacements were tried --
+     purity (winner holds >= 1-eps of votes) and a margin over the runner-up -- and BOTH are far worse:
+     exact match falls to 0.04-0.23 at 5% corruption, because dropping a word makes every sentence
+     containing it abstain.
+  2. the contested-frame fallback. Gating the plurality reading on eps, so a contested frame abstains, costs
+     adversary grammar 0 its train reproduction (1.000 -> 0.654), because cl_head = subject makes two
+     clauses share a head and legitimately contests frames there.
+Getting both right needs a way to separate a NOISE-induced minority from a GENUINE ambiguity, which
+sentence-level counts alone do not provide. That is the next real problem, and it is the same shape as the
+tie-broken rows left open in 3c.
+
+Also unchanged from before: eps is chosen empirically, so it is an ESTIMATE and not the bound Phase 6's
+theorem requires -- Phase 6 already measured that a finite-sample estimate reintroduces the cliff in
+miniature, and nothing here removes that caveat.
