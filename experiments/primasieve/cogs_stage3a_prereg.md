@@ -77,3 +77,97 @@ must build COGS-LIKE grammars with DIFFERENT structure (left-branching modifiers
 predicates naming the DEPENDENT's lemma instead of the head's, other conjunct orders, other definiteness
 marking) and the same engine must run unchanged. Passing COGS but failing those would mean this engine
 re-derived COGS's own generator -- the same hollowness Stage 1 was killed for, one level up.
+
+# STAGE 3b PRE-REGISTRATION -- the generator-family control
+
+Written BEFORE the adversary ran. Mirrors Stage 2's part B, which is the test that made Stage 2 a result
+rather than a replication.
+
+## Design
+
+A seeded adversary builds 10 COGS-LIKE grammars that randomize the STRUCTURE Stage 3a wrote by hand, with a
+synthetic vocabulary so nothing leaks from COGS. Randomized dimensions, each recorded per grammar so that any
+failure is attributable to a named assumption:
+
+    np_branch   modifier attaches to the RIGHT of its head noun (COGS) | head-final, to the LEFT
+    np_head     a modified NP exports the HEAD noun's variable (COGS) | the DEPENDENT's
+    mod_pred    modifier predicate splices the HEAD's lemma (COGS) | the DEPENDENT's | no lemma at all
+    mod_args    modifier conjunct arguments (head, dep) (COGS) | (dep, head)
+    mid         the constant middle segments: ('nmod',) (COGS) | two segments | none
+    det_pos     determiner BEFORE the noun (COGS) | after it
+    verb_pos    verb before its post-arguments (COGS) | clause-final
+    cl_head     a clause exports the EVENT variable (COGS) | its SUBJECT's variable
+    def_style   definiteness as the `*` prefix list (COGS) | an inline marker predicate
+    roles / role order per frame, marker words, and the whole lexicon are randomized as well
+
+Train/test is a DEPTH split, as in Stage 2's length split: train has modifier and embedding depth <= 1 and
+never a modifier on the subject; test is (a) modifier depth 2-6, (b) embedding depth 2-6, (c) a modifier on the
+SUBJECT -- a configuration absent from train. That is the analogue of pp_recursion / cp_recursion /
+obj_pp_to_subj_pp. Test items are filtered to vocabulary seen in train, so no result is an OOV artefact.
+
+## Gates
+
+G7 (WIN gate, as Stage 2's): the UNCHANGED Stage 3a engine reaches EM >= 0.95 on the held-out depth split for
+   >= 9 of 10 grammars.
+
+G8 (SOUNDNESS, per grammar): the induced grammar reproduces >= 0.99 of that grammar's train rows.
+
+G9 (NO COGS REGRESSION): whatever is changed to satisfy G7 must leave the Stage 3a COGS numbers intact --
+   train reproduction 1.0000, gen EM 0.9990, and the three structural categories at 0.985 / 1.000 / 1.000.
+
+## Pre-committed reading of the outcome
+
+I expect the unchanged engine to FAIL G7, because Stage 3a's own limitation note says the constituent schemas
+are authored: `parse_np` requires a pre-nominal determiner and a right-attaching modifier, `parse_clause`
+requires the verb before its post-arguments, `ev_np` splices the HEAD's lemma and exports the HEAD's variable,
+and `ev_cl` exports the EVENT. Each of those is a dimension above. That failure is the RESULT, not a bug: it
+measures how much of Stage 3a's COGS score came from authored structure.
+
+The fix, if it is attempted, must be the mechanism Stage 3a ALREADY uses for the two conjunct-order policies --
+search a small generic space and keep what measurably reproduces train -- extended to the schema dimensions,
+NOT a per-dimension special case. Reaching G7 by adding COGS-specific or adversary-specific branches would be
+cheating and is pre-committed as a FAIL here. Both numbers get reported: before generalization and after.
+
+## STAGE 3b MEASURED RESULT (added after the runs)
+
+The pre-committed expectation was right: the UNCHANGED Stage 3a engine FAILED the control. Then the fix was
+made the pre-registered way -- extend the existing search-a-small-space-and-keep-what-reproduces mechanism to
+the structural dimensions -- and the control passes. Both numbers, as promised:
+
+                                        BEFORE (authored schemas)   AFTER (schemas searched)
+  part 0  sanity, COGS structure                  1.000                     1.000
+  part A  single-dimension knockouts survived      1/11                     11/11
+  part B  G7 win gate, 10 random grammars          0/10                     10/10
+          G8 per-grammar soundness >= 0.99         0/10                     10/10
+  G9      COGS unchanged                             --      train 1.0000, test 0.9997, gen 0.9990,
+                                                            pp/cp/obj_pp 0.985/1.000/1.000, 18-cat 0.9996
+
+Before generalization the knockout ladder named ten authored assumptions the COGS score had been resting on:
+cl_head=subject, def_style=inline, det_pos=post, mid=(), mod_args=dep_head, mod_pred=dep_lemma,
+mod_pred=bare, np_branch=left, np_head=dep, verb_pos=final. Only mid=('rel','of') survived, confirming that
+the relation-template segments really were induced in Stage 3a while the rest were written in.
+
+Two facts moved from AUTHORED to DIRECTLY OBSERVED rather than into the search, because the data determines
+them outright: the determiner set with its SIDE relative to the noun, and each determiner's DEFINITENESS
+REALIZATION (`*` prefix list / an inline marker predicate / none). The distinguishing signal is that a
+determiner controls its noun's conjunct realization CONSISTENTLY while an argument marker leaves it untouched.
+
+Three bugs the control found, none of which COGS alone could have exposed:
+  1. classifying a two-segment binary predicate as a verb frame BEFORE testing for a modifier misread a
+     lemma-less modifier predicate (`nmod . p1 ( x_10 , x_7 )`) as a verb. A modifier's predicate ends in a
+     token lying BETWEEN its two arguments; a role predicate never does. Test relator first.
+  2. COORDINATE DESCENT over the schema space is NOT sufficient: on random grammar 2 it stranded at 248/350
+     because np_branch, np_head, mod_args and np_order must move together (a mirror-image local optimum).
+     The space is only 576 wide and just np_branch/verb_pos affect the PARSE, so derivations are computed
+     once per parse-config and reused across the 144 read-outs -- exhaustive search, no local optima.
+  3. materializing slot alternatives into a list enumerated every parse of every embedded clause before
+     returning any, which is exponential in embedding depth; it cost 564/1000 cp_recursion items to a parse
+     budget wall. Lazy generators restored cp_recursion to 1.000.
+
+## WHAT IS STILL NOT EARNED (part C, measured)
+
+COGS numbers variables by TOKEN POSITION, which hands the induction its token<->predicate alignment for free.
+Renumbering the gold variables by ORDER OF FIRST APPEARANCE, changing nothing else, takes the same grammar
+from EM 1.000 to EM 0.000 (and EM_alpha 0.000 -- the induction breaks, not just the serializer). So
+positional variables are a load-bearing INPUT to this engine. Recovering the alignment under an order-based
+convention is the honest open item after Stage 3b.

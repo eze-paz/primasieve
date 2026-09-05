@@ -9,17 +9,17 @@ import os, sys, time, collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cogs_data import load, em, em_alpha, norm_lf
-from cogs_gram import Engine, induce, generate, reproduce, parse_sentence
+from cogs_gram import Engine, induce, generate, reproduce
 from cogs_lf import parse_lf, alpha_canon_bag
 
 STRUCTURAL = ("pp_recursion", "cp_recursion", "obj_pp_to_subj_pp")
 
 
-def score(lex, roles, order, rows):
+def score(model, rows):
     agg = collections.Counter()
     per = collections.defaultdict(collections.Counter)
     for s, gold, cat in rows:
-        pred = generate(lex, roles, order, s)
+        pred = generate(model, s)
         agg["n"] += 1
         per[cat]["n"] += 1
         if pred is None:
@@ -42,10 +42,10 @@ def line(name, agg):
             f"coverage {agg['C']/n:.4f}  abstain {agg['abstain']:5d}")
 
 
-def failures(lex, roles, order, rows, k=4):
+def failures(model, rows, k=4):
     out = []
     for s, gold, cat in rows:
-        pred = generate(lex, roles, order, s)
+        pred = generate(model, s)
         if pred is None or pred != norm_lf(gold):
             out.append((cat, s, gold, pred))
             if len(out) >= k:
@@ -59,20 +59,21 @@ if __name__ == "__main__":
     tr, dev, test, gen = load()
     fit = tr if mode == "full" else tr[:6000]
     print(f"STAGE 3a -- head-passing synchronous grammar. induce on {len(fit)} train rows ({mode})\n")
-    lex, roles, order = induce(fit, verbose=True)
+    model = induce(fit, verbose=True)
+    lex = model[0]
     print(f"  induction {time.time()-t0:.1f}s\n")
 
-    ok, wrong, nopar = reproduce(lex, roles, order, tr)
+    ok, wrong, nopar = reproduce(model, tr)
     tot = ok + wrong + nopar
     print(f"G1 SOUNDNESS  train reproduction {ok}/{tot} = {ok/tot:.4f}   wrong {wrong}  no-parse {nopar}"
           f"   [gate >= 0.99 -> {'PASS' if ok/tot >= 0.99 else 'FAIL'}]")
 
-    a, _ = score(lex, roles, order, test if mode == "full" else test[:2000])
+    a, _ = score(model, test if mode == "full" else test[:2000])
     print(f"G2 IN-DISTRIBUTION\n{line('test', a)}"
           f"   [gate EM >= 0.95 -> {'PASS' if a['em']/max(a['n'],1) >= 0.95 else 'FAIL'}]")
 
     rows = gen if mode == "full" else [r for r in gen if r[2] in STRUCTURAL]
-    agg, per = score(lex, roles, order, rows)
+    agg, per = score(model, rows)
     print(f"\nG3 STRUCTURAL (the real test -- substitution cannot solve these)")
     g3 = True
     for c in STRUCTURAL:
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     oov = collections.Counter()
     nz = 0
     for s_, gold, cat in rows:
-        if generate(lex, roles, order, s_) is None:
+        if generate(model, s_) is None:
             m = [w for w in s_.split() if w not in lex.cls]
             if m:
                 oov.update(m)
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     print(f"   abstains caused by UNSEEN VOCABULARY {dict(oov)}"
           f"   -- abstains with every word known: {nz}")
 
-    fs = [f for f in failures(lex, roles, order, rows, k=10 ** 9)
+    fs = [f for f in failures(model, rows, k=10 ** 9)
           if all(w in lex.cls for w in f[1].split())]
     print(f"\nnon-vocabulary failures: {len(fs)}")
     for cat, s_, gold, pred in fs[:3]:
