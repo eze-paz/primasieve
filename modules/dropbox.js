@@ -2124,6 +2124,18 @@
         try { return (await listFolder(absPath, { recursive, team, ns })).entries; }
         catch (e) { if (String((e && e.message) || e).includes('not_found')) return []; throw e; }
       },
+      // Content search over the cloud (files/search_v2), scoped to an absolute
+      // Dropbox path. filenameOnly=true matches names only. Returns {paths,
+      // hasMore} of path_display strings. Lets conversations.js search ARCHIVED
+      // conversation content without hydrating their .jsonl bodies (step 1 of
+      // the archive-dehydration plan).
+      async cloudSearch(query, absPath, { filenameOnly = false, maxResults = 500 } = {}) {
+        const opts = { path: absPath || '', max_results: Math.min(maxResults, 1000), file_status: 'active', filename_only: !!filenameOnly };
+        const data = await api('/2/files/search_v2', { query, options: opts });
+        const matches = Array.isArray(data.matches) ? data.matches : [];
+        const paths = matches.map(m => { const md = m.metadata?.metadata || m.metadata || {}; return md.path_display || md.path_lower || ''; }).filter(Boolean);
+        return { paths, hasMore: !!data.has_more };
+      },
       // Cursor-based delta listing for the TEAM hub — mirrors the workspace sync's
       // dbxfull-cursor: the cursor is a per-device localStorage variable, never a
       // file. Returns {entries, cursor}; callers store the cursor and pass it to
