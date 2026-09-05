@@ -36,6 +36,7 @@ PUBLISHED = {
     "cogs_stage4b": ["4b OPEN VOCABULARY: PASS"],
     "cogs_stage4c": ["4c REFERENCE: PASS"],
     "cogs_stage4d": ["4d GENERATION: PASS"],
+    "cogs_stage5": ["5 CONSTRUCTIONS: PASS", "marker-recall 1.0000", "IDENTICAL"],
 }
 
 

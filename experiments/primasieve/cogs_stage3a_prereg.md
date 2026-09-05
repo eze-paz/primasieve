@@ -492,3 +492,80 @@ mean: coordination, adjectives, adverbs, negation, quantifiers, tense/aspect bey
 real pronouns (gender / number / long-distance), irregular unseen verbs, or ambiguity that the meaning
 representation itself cannot resolve. Each of those is a further construction or fact to INDUCE, through the
 same gates.
+
+# STAGE 5 PRE-REGISTRATION -- coordination, adjectives, negation, quantifiers
+
+Written BEFORE it ran. These four are the top of Stage 4d's not-covered list. Testbed: cogs_english.py, a
+separate generator (the 3b adversary must not change) emitting COGS-LF-style pairs with synthetic vocabulary,
+one construction at a time plus a BASE control (no construction) and per-construction knockouts. Each is judged
+against the standing objective: induce it, generalize by construction, abstain rather than guess.
+
+What each is, in logical-form terms, and what it demands of the engine:
+  ADJECTIVE     a unary predicate SHARING THE HEAD noun's variable (`red ( x_head )`, red at an earlier token).
+                Breaks alignment-by-position: the predicate is anchored where the NOUN is, not where `red` is.
+                The engine must induce a class of pre-head modifiers that share the head's variable.
+  COORDINATION  a coordinator joins two same-type constituents and the outer role DISTRIBUTES over both heads
+                (`run.agent(e,x2) AND run.agent(e,x5)`). Needs an NP that exports TWO heads and a role applied
+                to each -- a genuinely new combinator shape (multi-head), not just a new attachment site.
+  NEGATION      a unary marker on the EVENT variable (`NOT ( x_e )`), introduced by a `did not` frame. Same
+                shape as the adjective's marker but on the event; a frame variant, inducible.
+  QUANTIFIER    `every cat` -> a marker `FORALL ( x )`. Pre-registered NULL EXPECTATION: a flat conjunct set
+                cannot represent SCOPE, so recovering the marker is the ceiling of this representation. If the
+                marker is recovered at 0 confabulation that is the honest result; a claim of "quantification"
+                would be false and is pre-committed as NOT supported.
+
+## Gates (each construction, on its own generated split, test set clean)
+  E5a  BASE control: the engine reproduces the no-construction split exactly (train 1.0000, test EM >= 0.98).
+       If BASE fails the generator or a Stage-4 change is broken and nothing below is evidence.
+  E5b  ADJECTIVE: test EM >= 0.95, CONFAB <= 0.01.
+  E5c  COORDINATION: test EM >= 0.95, CONFAB <= 0.01.
+  E5d  NEGATION: test EM >= 0.95, CONFAB <= 0.01.
+  E5e  QUANTIFIER (marker only): test EM >= 0.95, CONFAB <= 0.01, AND the commit message states plainly that
+       scope is not represented. Marker recovery is not a quantification claim.
+  E5f  NO REGRESSION: COGS gen 1.0000, SLOG 4a categories, Stage 3b/3c/3d, core_selftest -- all unchanged.
+  E5g  CONFABULATION is the headline for every construction. Coverage bought by guessing is a FAIL.
+
+## Pre-committed reading
+Each construction that composes from existing machinery (adjective = shared-variable unary; negation = event
+marker; coordination = multi-head role distribution) is a real extension. Quantifier scope is expected to be a
+representation NULL and will be reported as such, not tuned. Any construction that only passes by authoring a
+COGS-specific branch (rather than an induced fact + a generic combinator) is a FAIL regardless of its number.
+
+## STAGE 5 MEASURED RESULTS (added after the runs; fable review applied)
+
+Four constructions COGS/SLOG never had, one construction at a time, each with a DISCRIMINATING control that can
+fail. The clean whole-LF EM (all four 1.000) was NOT trusted; the controls are the result, and they exposed two
+soft spots a naive EM would have hidden.
+
+  BASE control                 EM 1.000, CONFAB 0
+  COORDINATION (arity 3)       EM 1.000, CONFAB 0, ABLATION drop 0.8125 -- induced, real, generalizes past 2-way
+  NEGATION                     EM 1.000, CONFAB 0, marker-recall 1.000 (241 gold), ABLATION drop 0.6025 -- real
+  ADJECTIVE (seen vocabulary)  EM 1.000, CONFAB 0, ABLATION drop 0.8775 -- real on the trained adjective class
+  QUANTIFIER                   EM 1.000, CONFAB 0, marker-recall 1.000 (292 gold) -- FORALL genuinely emitted
+  COGS no-regression           gen EM 1.000, CONFAB 0, marker tables EMPTY (mechanism inert, not just output)
+
+THE UNIFICATION: adjective, quantifier-marker and negation all reduced to ONE inducible shape -- a unary
+predicate that is no token's lemma, on an entity or event variable, triggered by a functor. Four hand-named
+features became one rule; the space of these constructions is itself compressible, which is the seed of an
+auto-derivation loop (residual -> anti-unify -> enumerate over l0 -> sound-gate -> adopt cost-ordered).
+
+TWO SOFT SPOTS THE CONTROLS EXPOSED (both predicted by the fable review, both reported not hidden):
+  1. QUANTIFIER passed the WRONG gate first. The marker-ablation did not move it (drop 0.000) because `every`
+     rides the pre-existing determiner inline-marker path (realization ('inline','FORALL')), not the Stage-5
+     marker table. The honest discriminator is marker-RECALL (1.000), which is non-vacuous. Re-gated on that.
+     And SCOPE is a DEMONSTRATED null: `every n0 v0 some n1` -- the every>some and some>every readings serialize
+     to a byte-IDENTICAL flat conjunct set, so the representation provably cannot distinguish them. Marker
+     recovery is the ceiling; "quantification" is not claimed.
+  2. ADJECTIVE does NOT generalize and has a fragility boundary:
+     - NOVEL adjective (train a0..a4, test unseen a5): EM 0.000, ABSTAIN 1.000. It is a memorized class, not a
+       construction -- but it fails CLOSED (abstains, never confabulates).
+     - HOMOGRAPH (a word that is a noun head in some sentences and an adjective in others): NON-TERMINATION.
+       "A marker is no token's lemma" is a negative definition; it cannot classify a word that IS a lemma
+       elsewhere, and the parse search explodes on the genuine ambiguity rather than abstaining. The fix (a
+       positive adjective signal + budget-threaded parse generators) is named and NOT attempted here.
+
+VERDICT: coordination and negation are genuinely induced with real ablation drops; the quantifier marker is
+recovered (scope a demonstrated representation null); the adjective is induced only over seen vocabulary, with
+a measured non-termination boundary on homographs. The discriminating controls are what make this a result
+rather than four clean numbers -- a control that only sees marker-present cases cannot discriminate and always
+passes.
