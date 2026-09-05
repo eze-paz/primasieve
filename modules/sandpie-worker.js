@@ -3060,7 +3060,7 @@ const WALIOS_WORKER_V = 'dlopen7';
 // interpreter so both see the same package set.
 const WALIOS_LAZY_TARS = {
   'python.wasm': [['pylib.tar.gz', '/py']],
-  'python_cxx.wasm?v=6': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
+  'python_cxx.wasm?v=7': [['pylib.tar.gz', '/py'], ['walios-ext.tar.gz', '/ext'],
                           ['walios-numpy.tar.gz?v=2', '/site-packages'],
                           ['walios-docs.tar.gz?v=4', '/site-packages'],
                           ['walios-extras.tar.gz?v=2', '/site-packages'],
@@ -3081,7 +3081,7 @@ const WALIOS_MANIFEST = {
   // C-extension .so, so `import numpy/lxml/PIL/docx…` works seamlessly (the
   // packages are lazy-mounted into /site-packages when python_cxx first runs —
   // see the tool_walios run message). Plain python.wasm can't dlopen.
-  python: 'python_cxx.wasm?v=6', python3: 'python_cxx.wasm?v=6', pydl: 'python_cxx.wasm?v=6', lua: 'lua.wasm',
+  python: 'python_cxx.wasm?v=7', python3: 'python_cxx.wasm?v=7', pydl: 'python_cxx.wasm?v=7', lua: 'lua.wasm',
   ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
 };
