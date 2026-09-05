@@ -27,6 +27,14 @@ class MetaState:
         self.stratum_seen = 0                # deepest stratum ever enumerated (for reporting)
         self.log = []                        # (form, units_before, score_before, score_after)
         self._cache = {}                     # stratum -> (tree_hash, ordered_edits, cursor)
+        # candidate constants come from the TASK'S OWN DATA (E8 rule: atoms from the object grammar, not a
+        # hand-written menu). Without this the edit space contains no non-numeric constants at all.
+        pool = set()
+        for inp, exp in (tests or []):
+            for v in (list(inp) if isinstance(inp, (list, tuple)) else [inp]) + [exp]:
+                if not isinstance(v, (int, float, bool, type(None))) and isinstance(v, (str, bytes)):
+                    pool.add(v)
+        self.const_pool = tuple(sorted(pool))
     def _th(self):                           # content hash: exhaustion is tied to the ACTUAL tree,
         return hash(ast.dump(self.tree))     # so RESET-to-pristine keeps pristine's exhausted state
     def _score(self, tree):
@@ -62,9 +70,9 @@ class MetaState:
         return all(rc.run_one(code, self.name, i, e)[0] for i, e in self.all_tests)
 
 # ---------- forms: each is applicable()/cost()/run(state, budget) -> EvidenceDelta ----------
-def _stratum_edits(tree, k, susp):
+def _stratum_edits(tree, k, susp, pool=()):
     """Edits INTRODUCED at exactly stratum k (so the controller genuinely chooses depth)."""
-    edits = [e for e in rc.enumerate_edits(tree, k) if e[0] == k]
+    edits = [e for e in rc.enumerate_edits(tree, k, pool) if e[0] == k]
     if k >= 2: edits += rc.enumerate_stmt_moves(tree, susp)
     def key(e):
         s, ln, desc, idx, ka = e
@@ -85,7 +93,8 @@ class Enumerate:
         # the pristine stratum cursor, so RESET-to-pristine resumes where it left off (fixes sqrt).
         key = (st._th(), self.k); c = st._cache.get(key)
         if c is None:
-            edits = [(ln, idx, ka) for (s, ln, desc, idx, ka) in _stratum_edits(st.tree, self.k, st.susp)
+            edits = [(ln, idx, ka) for (s, ln, desc, idx, ka) in _stratum_edits(st.tree, self.k, st.susp,
+                                                                             getattr(st, "const_pool", ()))
                      if not (st.susp and st.susp.get(ln, 0.0) == 0.0)]
             st._cache[key] = [st._th(), edits, 0]
         return st._cache[key]

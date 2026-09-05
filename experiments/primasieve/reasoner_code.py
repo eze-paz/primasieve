@@ -109,7 +109,7 @@ def called_methods(tree):
     ms={n.func.attr for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)}
     return sorted(ms)
 
-def enumerate_edits(tree, stratum):
+def enumerate_edits(tree, stratum, pool=()):
     """List of (stratum, lineno, desc, node_idx, (kind,arg)) up to the given stratum.
     Nodes addressed by walk-order index so an edit replays on any deepcopy."""
     idx=-1; edits=[]
@@ -134,6 +134,13 @@ def enumerate_edits(tree, stratum):
         if isinstance(node,ast.Constant) and isinstance(node.value,int) and not isinstance(node.value,bool):
             for d in (1,-1):
                 add(0,ln,f"L{ln}: const {node.value}->{node.value+d}",idx,("const",node.value+d))
+        # non-numeric constants had NO edit at all, so any task whose fix is a different string was
+        # unreachable -- the search space did not contain the answer. Candidates come from the task's own
+        # data (`pool`), the same way name edits already draw candidates from scope_names(tree).
+        if isinstance(node,ast.Constant) and isinstance(node.value,(str,bytes)):
+            for v in pool:
+                if type(v)==type(node.value) and v!=node.value:
+                    add(0,ln,f"L{ln}: const {node.value!r}->{v!r}",idx,("const",v))
         if isinstance(node,ast.Name) and isinstance(node.ctx,ast.Load):
             if node.id in CONFUSION_PAIRS:
                 add(0,ln,f"L{ln}: {node.id}->{CONFUSION_PAIRS[node.id]}",idx,("name",CONFUSION_PAIRS[node.id]))
