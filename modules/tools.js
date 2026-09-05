@@ -518,16 +518,26 @@ const RUN_PYTHON_WALIOS = (() => {
   const base = tools.run_python.description;
   const PACKAGES = "PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, requests, sqlite3 and more are BUILT IN as real compiled C extensions — just import. Others: await micropip.install('name') installs pure-Python wheels from PyPI with their dependencies; a package needing compiled C code cannot be installed at runtime and micropip tells you so, naming an installed alternative where one exists.";
   const HTTP = "HTTP: real sockets, TLS and CA certificates are present, so requests and urllib work normally (import requests; r = requests.get(url); r.json()). pyodide.http.pyfetch also works (async) and is cheaper for a simple GET: r = await pyfetch(url); data = await r.json(). pyfetch does NOT raise on HTTP 4xx/5xx — check r.ok / r.status before using the body.";
+  // Measured through the real warm-REPL path in a browser: asyncio.run() 4.2s on the
+  // first call then 69ms, run_until_complete 4ms, top-level await 16ms. Pyodide's
+  // "they raise event loop is already running" is simply untrue here. subprocess and
+  // os.popen, by contrast, HANG to the timeout because fork cannot start a child.
+  const ASYNC_WALIOS = "ASYNC: top-level await works, and so does the normal asyncio API — asyncio.run(main()), loop.run_until_complete() and asyncio.new_event_loop() all work here (unlike the Pyodide backend). Use whichever reads best. Do NOT use time.sleep() — it blocks this run's interpreter and burns the timeout; use await asyncio.sleep(n).";
+  const SHELL_WALIOS = "SHELL: there is no subprocess. subprocess.run(), subprocess.Popen and os.popen() HANG until the timeout (fork cannot start a child), and os.system() just returns -1. Never shell out from Python — use the walios tool for shell work, or do it in Python directly.";
   let out = base
     .replace('Execute a Python script from OPFS via Pyodide.',
              'Execute a Python script from OPFS via walios (wasm CPython 3.14 on a real Linux userland).')
     .replace(/^PACKAGES:.*$/m, PACKAGES)
-    .replace(/^HTTP:.*$/m, HTTP);
+    .replace(/^HTTP:.*$/m, HTTP)
+    .replace(/^ASYNC:.*$/m, ASYNC_WALIOS + '\n' + SHELL_WALIOS);
   const applied = out !== base
     && out.indexOf(PACKAGES) !== -1
     && out.indexOf(HTTP) !== -1
+    && out.indexOf(ASYNC_WALIOS) !== -1
+    && out.indexOf(SHELL_WALIOS) !== -1
     && out.indexOf('no sockets') === -1
-    && out.indexOf('No compiled C extensions') === -1;
+    && out.indexOf('No compiled C extensions') === -1
+    && out.indexOf('event loop is already running') === -1;
   if (!applied) {
     try { console.warn('[tools] walios run_python description did NOT build; using the Pyodide text'); } catch (_) {}
     return base;
