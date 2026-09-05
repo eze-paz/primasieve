@@ -18,6 +18,10 @@ else ABSTAIN. fable KILLs: (K-CONF) commit a law that doesn't re-render, OR comm
 was uniquely invertible = confabulation (must be 0). (K-TRUTH) the true law must ALWAYS be found (search complete).
 (K-ABST) abstain exactly on genuinely-indistinguishable scenes (>=2 laws co-invert) -- rate ~ the coincidence rate.
 Self-contained 16x16, exact integer, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, random, math
 sys.path.insert(0, os.path.dirname(__file__))
 W = H = 16
@@ -77,7 +81,7 @@ def discover(grid):
     surv = [(n, l) for n, l in surv if l is not None]
     if len(surv) == 1:
         return surv[0][0], surv[0][1], [n for n, _ in surv]        # unique law -> identify
-    return "abstain", None, [n for n, _ in surv]                   # 0 or >=2 -> abstain (can't tell the law)
+    return ABSTAIN, None, [n for n, _ in surv]                   # 0 or >=2 -> abstain (can't tell the law)
 
 def brute_survivors(grid):
     """COMPLETENESS ORACLE (fable audit): exhaustive JOINT search over the bbox+-S window (which provably contains
@@ -133,7 +137,7 @@ if __name__ == "__main__":
             else:
                 conf += 1                       # failed to commit the uniquely-correct law
         else:
-            if name == "abstain": abstain += 1
+            if name == ABSTAIN: abstain += 1
             elif name != true_law or _resid(LFN[name], got, grid) != 0:
                 conf += 1                       # committed a wrong/invalid law when it shouldn't
     coincidence = survcount[2] + survcount[3]

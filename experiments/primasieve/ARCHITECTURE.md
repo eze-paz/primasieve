@@ -53,7 +53,10 @@ Standing failure mode, from arc 1, printed by the harness: **a control that cann
 - **C2** every migrated thread still reproduces its **published** numbers; a moved number is a regression
 - **C3** the island map is re-measured and printed
 
-Current: **4 independent threads, 91 components (from 94), C1/C2/C3 all pass.**
+Current: **8 independent threads, 10 components over 87 live files (from 94 over 193), 76 of them in ONE
+component, C1/C2/C3 all pass.** 10 C2 rows are protected: COGS (analogy baseline, train, gen/21000), SCAN
+(train, test), l0 (KILL 1 claim + `trunc` at E=109203), emergence (`x*x` seen 6x, 7019 and 3008 expression
+counts).
 
 ## Migration ledger
 
@@ -65,29 +68,50 @@ going through `core/`.**
 |---|---|---|
 | COGS Stage 3a–3d | `cogs_*` | train 1.0000, gen 0.9990 / 21000, structural .985/1.000/1.000, 18-cat .9996 |
 | SCAN Stage 2 | `scan_*` | simple train 16728/16728, test EM 1.000; generator-family 6/6 |
-| Phase 6 tolerance sets | `phase6` | shared `within`/`survivors` asserted to agree with the local hot loop |
-| Perception rung 1 | `percept_p1` | imports `core.verdict`; **rung 2's noise gate is now open from this side** |
+| Phase 6 tolerance sets | `phase6` | shared `within`/`survivors` **asserted** to agree with the local hot loop |
+| Perception | `percept_p1..p6` | on `core.verdict`; **rung 2's noise gate is now open from this side** |
+| l0 universal base | `l0` | KILL 1 still passes; `trunc` still E=109203; ablation still UNREACHABLE |
+| Emergence | `emergence` | `x*x` seen 6x; hard task 7019 exprs primitives-only → 3008 with the learned op |
+| Meta-reasoner | `meta_reason` | UCB extracted to `core/select.py`; connects the 57-file component |
+| Grounded language | `phase5` | on the shared reporting contract, with a drift assertion |
+| Dialogue | `dialog_s3` | tally now goes through `core.verdict.summarize` |
+| Puzzles | `puzzle_engine` | on `core.verdict` (a measured null kept live as a comparison point) |
 
-### To migrate next, in this order (chosen by how much a gain would flow)
-1. `percept_p2..p9` — finish perception onto `core.verdict` + `core.tolerance`; rung 2 is the payoff.
-2. `l0`, `phase2*`, `sleep_l0` — the universal base and library reuse (KILL 2 passed, reuse 373×) onto
-   `core.search`. Highest compounding: it would let the COGS combinator inventory be *searched over l0*
-   rather than frozen by hand, which is the one authored thing Stage 3b did not remove.
-3. `emergence`, `meta_library` — the compounding library (ITERATE, depth k=16) as a combinator source.
-4. `dialog_*` — grounded language onto `core.verdict`.
-5. `meta_reason`, `meta_forms` — cost-aware UCB form selection onto `core.search`, so schema search can be
-   budgeted instead of exhaustive when a space grows past exhaustive size.
-6. `seg_zhikov`, `seg`, `hdp_*` — segmentation onto `core.gates`.
+Two modules were added to `core/` during this pass, both because two threads had independently invented the
+same structure:
+
+| module | mechanism | measurement it carries |
+|---|---|---|
+| `core/generate.py` | enumeration under **observational equivalence** (`SignatureBank`), plus the compression/SLEEP step | l0 and emergence both hand-rolled it. Simplest-first is load-bearing: adopting a learned operator in discovery order rather than **cost order** is a 33× regression. Compression buys depth (k=16 vs blind k=2), not breadth |
+| `core/select.py` | **cost-aware UCB** with momentum, for spaces too big to enumerate | the project's only measured win of learned selection over a hand-written strategy: 25/26 QuixBugs at **0.70×** the energy of hand-coded escalation. A prior must be lift-normalized or it merely relearns cheapest-first |
+
+### The residual, and why it is deliberately left alone
+10 components remain over 87 live files, with 76 in one. The stragglers are `percept_p7..p9`, `phase5b/c`,
+`dialog_s1/s2`, `meta_e4..e14`, `meta_v3`, `seg`. Each keeps a purely LOCAL tally, and adding an import to
+move the component count would be **gaming the metric, not compounding anything** — the exact failure this
+project rejects elsewhere. The honest way to fold them in is to give their published results a `C2` row in
+`core_selftest.py`, so the shared harness protects them; that is cheap and is the next step.
+
+### The one substantive migration still outstanding
+`core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still
+frozen by hand** — the one authored thing Stage 3b's knockout ladder did not remove. It should be
+ENUMERATED over l0 terms with `SignatureBank` and selected by `core.search`, falling back to
+`core.select.cost_aware_ucb` when that space outgrows exhaustive. Every piece needed now exists in `core/`
+and sits in one component with COGS, which is precisely what was impossible before this pass.
 
 ### Archive — measured NULL or superseded, keep as record, do not extend
-`infl_*` (Stage 1 KILLED on pre-registered gates), `vn_*` + `puzzle_*` (Rosetta/puzzle capability null),
-`nl2eq*` (wall = coreference), `platonic_*` (convergence strong, feature-richness weak), `moe_*` (negative),
-`reasoner_analog`, `stitch_*`, `graft_*`, `lora_*`, `measure_*`, `train_*` (the LLM-probe era, superseded by
-the zero-LLM engine), `swebench_*` + `bugfix_*` (arc-1 bug-fixing, superseded by the meta-reasoner result),
-`mockup_*`, `render_*`, `fin_*`, `eval_*` (one-off demos).
+**DONE — 106 files moved to `archive/`**, chosen safely: the live import closure was computed first and
+**no live file imports anything archived**. See `archive/README.md` for the per-category reasons. Summary:
+measured nulls kept as record (`infl_*` Stage 1 KILLED, `vn_*` Rosetta, `nl2eq*`, `puzzle_run/solve`,
+`platonic_*`, `moe_*`, the `llm_*` MDL probes, `kuhn_cfr`), the LLM-probe era superseded by the zero-LLM
+engine (`graft_*`, `stitch_*`, `measure_*`, `train_*`, and the rest), arc-1 bug-fixing superseded by the
+meta-reasoner result now living in `core/select.py` (`bugfix*`, `swebench_*`, `quixbugs_*`), and the one-off
+demos. `meta_e2/e3/e6/e7` were explicitly KEPT live: they are E-series results that sit outside the import
+closure only because nothing imports them, and archiving on graph position alone would have discarded them.
 
 The archive decision is **not** deletion and not a judgement on the work — a measured null is a result. It
 means: not on the live surface, not imported by new work, and not counted in the fragmentation number.
+`git mv archive/<file>.py .` brings one back, and then it goes through `core/` like anything else.
 
 ## The rule going forward
 

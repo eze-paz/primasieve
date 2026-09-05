@@ -11,6 +11,10 @@ Per-edge alignment is independent (p=0.5) so each flat is a NON-strawman rival (
 fable KILLs: K1 area committed while a gray flat also survives -> smuggled prior (must be 0). K2 area always survives
 (search complete for the truth). K3 each gray flat survives on >=10% of GRAY scenes (else strawman -> void). K4 the
 survivor set varies (>=2 distinct sets). Self-contained 16x16, exact integer, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, random
 sys.path.insert(0, os.path.dirname(__file__))
 W = H = 16
@@ -75,7 +79,7 @@ def search(rfn, grid):
 def discover(grid):
     surv = [(n, search(rfn, grid)) for n, rfn in LIB]
     surv = [(n, l) for n, l in surv if l is not None]
-    if not surv: return "abstain", None, []
+    if not surv: return ABSTAIN, None, []
     return surv[0][0], surv[0][1], [n for n, _ in surv]     # simplest survivor (Occam)
 
 def rand_rect(rng):
@@ -99,7 +103,7 @@ if __name__ == "__main__":
         has_gray = any(v not in (0, w * S2) for row in grid for v in row)
         name, lat, surv = discover(grid)
         sets[tuple(surv)] = sets.get(tuple(surv), 0) + 1
-        if name == "abstain": abst += 1
+        if name == ABSTAIN: abst += 1
         elif _resid(RFN[name], lat, grid) != 0: confab += 1
         if "area" in surv: area_survive += 1
         if name == "area" and any(d in surv for d in GRAY_RIVALS): area_with_rival += 1

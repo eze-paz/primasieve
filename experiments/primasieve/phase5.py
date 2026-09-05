@@ -21,6 +21,10 @@ KNOCKOUT: pair each training utterance with a RANDOM scene, so no consistent mea
 KILL 5: novel-composition accuracy under 80%, OR any confabulation (a committed judgement the checker says is
 wrong), OR the retrieval baseline matching the learner.
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import summarize   # the shared reporting contract: confabulation FIRST (core/verdict.py)
+
 import os, sys, json, random, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import world_english as W
@@ -167,6 +171,7 @@ if __name__ == "__main__":
     a2, c2, cf2, n2 = score(committed, tests, lex)
     print(f"\n=== T2 truth judgement, in-distribution ({n2} items) ===")
     print(f"  accuracy-on-committed {a2:.3f}   coverage {c2:.3f}   confabulations {cf2}")
+    assert f"CONFABULATION {cf2}/" in summarize(len(pairs), confab=cf2), "core.verdict contract drift"
 
     nb = items_with_pair(lex, 40, random.Random(99), hp)
     ntests = make_tests(lex, nb, random.Random(6))

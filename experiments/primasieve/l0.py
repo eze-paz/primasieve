@@ -20,6 +20,11 @@ every addition is LOGGED with the target that forced it. See FORCED_BY below.
 """
 from fractions import Fraction as F
 import itertools, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The signature-dedupe + cap bookkeeping below is core.generate.SignatureBank, shared with emergence.py,
+# which invented the same structure independently. The TRAVERSAL ORDER stays here, because it is
+# load-bearing for the published energies (trunc at E=109203).
+from core.generate import SignatureBank
 
 X = "X"                                                     # domain error / undefined
 
@@ -66,11 +71,11 @@ def enum_values(samples, depth=3, ops=None, consts=(1, 2, 3), cap=400000, target
     """Signature-deduped BFS over L0 value expressions, simplest-first. If target_sig is given, stop at the first
     match and return (label, energy). Otherwise enumerate to the depth cap and return the full list."""
     BIN = ops if ops is not None else BINARY_FULL
-    seen = {}; order = []
+    bank = SignatureBank(cap=cap)
+    order = bank.order
 
     def add(lab, sig):
-        if sig in seen or len(order) >= cap: return False
-        seen[sig] = lab; order.append((lab, sig))
+        if not bank.add(lab, sig): return False
         return target_sig is not None and sig == target_sig
 
     for lab, sig in leaves(samples, consts):

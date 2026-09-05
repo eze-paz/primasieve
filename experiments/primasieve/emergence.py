@@ -13,7 +13,12 @@ grammar, but a grammar that GROWS itself.
 Emergence = the hard task becomes solvable ONLY after learning from the easy ones. Agnostic =
 everything is generic expression terms; the same loop works for any domain with an oracle.
 """
-import ast, itertools, time, collections
+import ast, itertools, time, collections, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Shared with l0.py, which invented the same signature-dedupe independently: core.generate.SignatureBank.
+# The size-indexed traversal stays here -- it is load-bearing for the published expression counts
+# (819 easy / 7019 primitives-only on the hard task / 3008 with the learned operator).
+from core.generate import SignatureBank, compress_recurring
 
 BIN = {"+": lambda a, b: a + b, "-": lambda a, b: a - b, "*": lambda a, b: a * b}
 
@@ -29,11 +34,10 @@ def synth(examples, var_names, consts=(1, 2), unary=None, max_size=9, budget=300
                 v = fn(env); out.append(v if isinstance(v, int) else None)
             except Exception: out.append(None)
         return tuple(out)
-    seen = {}; banks = collections.defaultdict(list); tried = [0]
+    bank = SignatureBank(budget=budget); seen = bank.seen; banks = bank.by_size; tried = [0]
     def add(size, rep, fn):
         v = vec(fn)
-        if v in seen: return None
-        seen[v] = rep; banks[size].append((rep, fn, v))
+        if not bank.add(rep, v, size=size, payload=fn): return None
         return rep if v == target else None
     for nm in var_names:
         r = add(1, nm, lambda env, nm=nm: env[nm])
@@ -73,7 +77,7 @@ def learn_unary(solution_asts):
                 sym = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*"}.get(type(n.op))
                 if sym: counter[sym] += 1
     if not counter: return None
-    sym, cnt = counter.most_common(1)[0]
+    sym, cnt = compress_recurring([None], lambda _: counter.elements())   # core.vote.plurality, shared
     op = BIN[sym]
     name = {"*": "sq", "+": "dbl", "-": "zero"}.get(sym, "op")
     return name, (lambda x: op(x, x)), sym, cnt

@@ -9,6 +9,10 @@ solves the COUPLED deduction jointly:
   (5) synchronous TEMPLATE extraction with per-slot inflection suffixes (so 'the dog' + verb-3sg renders 'stinks');
   (6) SOUND gate = reproduce every train pair exactly; MDL-simplest survivors; COMMIT if survivors agree else ABSTAIN.
 Pilot=chickasaw (operators developed here only). See puzzle_prereg.md. foreign->English primary."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, json, io, re, collections
 
 D = os.path.join(os.path.dirname(__file__), "_nldata")
@@ -399,12 +403,12 @@ def reproduces(train, M):                              # template-level reproduc
 def solve_fe(fsrc, M):
     if M.get("gsound"):                                # compositional generation (generalizes across structures)
         out = generate_fe(fsrc, M)
-        if out is not None: return ("commit", out)
+        if out is not None: return (COMMIT, out)
         return ("hard", None)
     c = apply_fe(fsrc, M["temps"], M["seg"], M["lex"])  # fallback: whole-sentence templates
     if not c: return ("hard", None)
     if len(c) > 1: return ("soft", None)
-    return ("commit", next(iter(c)))
+    return (COMMIT, next(iter(c)))
 
 if __name__ == "__main__":
     name = sys.argv[1] if len(sys.argv) > 1 else "chickasaw"
@@ -418,7 +422,7 @@ if __name__ == "__main__":
     C = P = W = hard = soft = 0
     for it in items:
         gold = _n(it[1]); st, pred = solve_fe(it[0], M)
-        if st == "commit":
+        if st == COMMIT:
             C += 1; ok = (_n(pred) == gold); P += ok; W += (not ok)
             print(f"    {'OK ' if ok else 'WRONG'} pred={_n(pred)!r} gold={gold!r}")
         else:

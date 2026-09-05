@@ -50,3 +50,18 @@ def line(label, r, width=22):
     """One row of the standard report, confabulation before exact match -- deliberately."""
     return (f"  {label:<{width}} n {r['n']:6d}  CONFAB {r['confab']:.4f}  abstain {r['abstain']:.4f}  "
             f"EM {r['EM']:.4f}  precision {r['precision']:.4f}")
+
+
+def summarize(n, em=None, confab=0, abstain=0, label=""):
+    """The REPORTING CONTRACT, shared: confabulation first, exact match second.
+
+    Threads that tally their own counters (perception, the phase5 grounded-language arc, the E-series, the
+    dialogue arc) call this instead of formatting their own line, so the ordering stays uniform. Stage 3d is
+    why the ordering is fixed rather than a matter of taste: exact match fell 1.000 -> 0.000 at 1% training
+    corruption while confabulation stayed 0.0000, and a report that led with accuracy would have read as a
+    total failure rather than as an intact abstaining component."""
+    n = max(n, 1)
+    em = (n - confab - abstain) if em is None else em
+    return (f"{label + ': ' if label else ''}CONFABULATION {confab}/{n} = {confab/n:.4f}   "
+            f"abstain {abstain}/{n} = {abstain/n:.4f}   correct {em}/{n} = {em/n:.4f}   "
+            f"precision {(em/(em+confab)) if (em+confab) else 1.0:.4f}")

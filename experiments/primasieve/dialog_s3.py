@@ -22,6 +22,10 @@ structure to separate them -- which is the point.
 MEASURED: discourse-rule recovery, held-out answer accuracy, coverage, abstention on ambiguity, confabulations.
 KILL: any confabulation (a committed answer the world says is wrong).
 """
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import summarize   # the shared reporting contract: confabulation FIRST (core/verdict.py)
+
 import os, sys, json, random, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dialog_world as DW
@@ -164,7 +168,7 @@ if __name__ == "__main__":
         if a == d["ans"]: ok += 1
         else: confab += 1
     print(f"\nheld-out conversation ({len(test)} dialogues):")
-    print(f"  answered {com_}  abstained {ab}  correct {ok}  CONFABULATIONS {confab}")
+    print("  " + summarize(com_ + ab, em=ok, confab=confab, abstain=ab))
     print(f"  accuracy-on-answered {ok/max(1,com_):.3f}   coverage {com_/len(test):.3f}")
 
     # 4) knockout: shuffle which dialogue each answer belongs to -> the rule must not be learnable

@@ -12,6 +12,10 @@ Design: add r_ring (a frame = outer area-coverage minus inner-shrunk-by-1px area
 non-monotone). Two searches: search_cd (the p4 coordinate-descent heuristic) and search_exh (bounded EXHAUSTIVE
 over the bbox+-S window, which provably contains every exact inverse -> COMPLETE by construction = sound). Compare.
 Self-contained 16x16, exact integer, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, random, math
 sys.path.insert(0, os.path.dirname(__file__))
 W = H = 12
@@ -109,7 +113,7 @@ def discover(grid, search):
     surv = [(n, search(fn, grid)) for n, fn in LAWS]
     surv = [(n, l) for n, l in surv if l is not None]
     if len(surv) == 1: return surv[0][0], surv[0][1], [n for n, _ in surv]
-    return "abstain", None, [n for n, _ in surv]
+    return ABSTAIN, None, [n for n, _ in surv]
 
 def rand_ring_rect(rng):                                             # rects >=4px so the inner (shrunk 1px) is valid
     def redge(bp): return bp * S + (0 if rng.random() < 0.5 else rng.choice([1, 2, 3]))
@@ -165,11 +169,11 @@ if __name__ == "__main__":
             if name == true_law and _resid(LFN[name], got, grid) == 0: correct += 1
             else: conf += 1
         else:
-            if name == "abstain": abstain += 1
+            if name == ABSTAIN: abstain += 1
             elif name != true_law or _resid(LFN[name], got, grid) != 0: conf += 1
         # what the UNSOUND cd-search would have done (for contrast): commit when cd yields a lone survivor
         ncd, gcd, scd = discover(grid, search_cd)
-        if ncd != "abstain" and (ncd != true_law) and _resid(LFN[ncd], gcd, grid) == 0 and true_law not in scd:
+        if ncd != ABSTAIN and (ncd != true_law) and _resid(LFN[ncd], gcd, grid) == 0 and true_law not in scd:
             cd_conf += 1                                                # cd dropped the truth -> committed a wrong law that re-renders
 
     print("\n  PART B — law discrimination over {area,gamma,sqrt,ring} with the SOUND (exhaustive) search:")

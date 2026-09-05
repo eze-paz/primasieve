@@ -13,6 +13,10 @@ Fixes, all self-contained (the engine reasons about its OWN hypothesis renderers
 - UNIQUENESS: search returns ALL inverses in the window; >=2 distinct -> the LATENT is ambiguous -> report the SET
   and abstain on the exact latent (the honest 'not 100% sure' = enumerate every consistent answer, pick none).
 Self-contained 12x12, exact integer, ZERO LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, random, math
 sys.path.insert(0, os.path.dirname(__file__))
 W = H = 12
@@ -154,7 +158,7 @@ if __name__ == "__main__":
         elif v == f"identify:{true_law}": conf += 1                                  # committed but doesn't re-render
         elif v.startswith("identify:"): conf += 1                                    # committed the WRONG law
         elif v.startswith("identify-law") and surv == [true_law]: ident_set += 1     # right law, latent SET (honest)
-        elif v.startswith("abstain"): ab_law += 1
+        elif v.startswith(ABSTAIN): ab_law += 1
         else: conf += 1
     print(f"  DISCRIMINATION over {SOUND_LAWS} [{NB} scenes]:")
     print(f"    K-TRUTH true law in survivors: {tf}/{NB - ab_zero}")
@@ -168,7 +172,7 @@ if __name__ == "__main__":
         rng = random.Random(22000 + s)
         grid = L_tent(rand_rect(rng))
         v, got, surv = discover(grid)
-        if v.startswith("abstain"): tent_abstain += 1
+        if v.startswith(ABSTAIN): tent_abstain += 1
         elif got is not None and not _exact(LFN[surv[0]], got, grid): tent_conf += 1
     print(f"\n  TENT (unbounded-visibility) scenes: engine abstains {tent_abstain}/24, confabulates {tent_conf}/24")
 

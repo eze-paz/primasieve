@@ -1,6 +1,10 @@
 """P1 — meta-controller v0: UCB over reasoning FORMS, energy-accounted, with episode logging.
 KNOCKOUT: does a learned form-selection policy match the HAND-CODED escalation (strata 0->1->2
 + reset) at EQUAL energy on QuixBugs? (METAPLAN.md S1 / P1). Zero LLM."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.select import cost_aware_ucb as _core_ucb   # the shared selector this file's UCB is extracted into
+
 import os, json, math, time, ast, random
 import reasoner_code as rc
 from meta_forms import MetaState, Enumerate, Reset, Interpolate, default_forms
@@ -54,6 +58,8 @@ def solve_ucb(name, src, tests, ep_log, warm=None, held_back=0.0, feat_log=None,
                 import meta_features as mf
                 return qfn(st, fn, tried_forms, err0)
             return warm.get(fn, 0.0)
+        # the selector itself is now core.select.cost_aware_ucb, shared -- see that module for the three
+        # load-bearing details (cost-awareness, momentum, and lift-normalization of the prior)
         def ucb(f):                            # COST-AWARE UCB + (warm|learned) prior on exploration
             ch = getattr(f, "cost_hint", 1.0)
             if n[f.name] == 0:                 # unexplored: cheap-first (Occam) biased by the prior

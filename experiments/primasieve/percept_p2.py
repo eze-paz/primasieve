@@ -13,6 +13,10 @@ area render identically) -> a smuggled prior -> FAIL. Selection of area must be 
 by the gray edges), never by list order. That makes area a genuine DISCOVERY, not a hardcode.
 
 Pure stdlib, exact integer, ZERO LLM. Sealed renderer + oracle reused from percept_p1."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core.verdict import ABSTAIN, COMMIT   # shared COMMIT/ABSTAIN protocol (core/verdict.py)
+
 import os, sys, random, statistics
 sys.path.insert(0, os.path.dirname(__file__))
 from percept_p1 import W, H, S, S2, COLORS, render, oracle_equal, infer_single
@@ -72,7 +76,7 @@ def discover(grid):
         if lat is not None and oracle_equal(rfn(lat), grid):    # SOUND: survives iff it re-renders EXACTLY
             survivors.append((name, lat))
     if not survivors:
-        return "abstain", None, []
+        return ABSTAIN, None, []
     name, lat = survivors[0]                                    # LIB is Occam-ordered -> simplest survivor
     return name, lat, [s[0] for s in survivors]
 
@@ -103,7 +107,7 @@ if __name__ == "__main__":
         has_gray = any(v not in (0, w_true * S2) for row in grid for v in row)   # GENERATOR-INDEPENDENT label
         name, lat, surv = discover(grid)
         survset_hist[tuple(surv)] = survset_hist.get(tuple(surv), 0) + 1
-        if name == "abstain":
+        if name == ABSTAIN:
             abst += 1
         elif oracle_equal(RFN[name](lat), grid):
             cover += 1

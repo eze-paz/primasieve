@@ -112,6 +112,23 @@ if __name__ == "__main__":
     checks.append(("SCAN simple train reproduction", r / t, 1.0000))
     checks.append(("SCAN simple test EM", scan_eval(G, ste)["EM"], 1.0000))
 
+    # l0 and emergence: their published results are STRINGS/counts, not fractions, so they are checked by
+    # re-running and matching the exact claim. This is what makes migration safe -- a number that moves is a
+    # regression, and these two are the threads whose enumeration hot loops were touched.
+    import io, contextlib
+    for mod, needles in (("l0", ["PASSES: all 6 parametric operators", "trunc     with abs/sign: E=109203"]),
+                         ("emergence", ["`x * x` (seen 6x)", "[7019 exprs", "[3008 exprs"])):
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                runpy = __import__("runpy")
+                runpy.run_module(mod, run_name="__main__")
+        except SystemExit:
+            pass
+        out = buf.getvalue()
+        for nd in needles:
+            checks.append((f"{mod}: {nd[:28]}", 1.0 if nd in out else 0.0, 1.0))
+
     allok = True
     for name, got, want in checks:
         good = abs(got - want) < 5e-4
