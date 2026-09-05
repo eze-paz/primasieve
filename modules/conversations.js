@@ -1938,16 +1938,16 @@ const _convRowCache = new Map();
 async function listConversations() {
 
 // --- Archived content search via the Dropbox API (archive-dehydration step 1) ---
-// When a sidebar query is active, archived conversations are matched by CLOUD
-// content search (files/search_v2 scoped to the archived folder) instead of
-// reading every archived .jsonl from OPFS. Titles still match locally from the
-// tiny meta files. Results are cached per query string (invalidated by any
-// file:changed/file:deleted under the archived dir, same as the row cache).
-// Returns a Set of conversation ids whose content matched the query.
+// Archived conversations are matched by CLOUD content search (files/search_v2
+// scoped to the archived folder) instead of reading every archived .jsonl from
+// OPFS. Used by the Settings → Archive tab search (the sidebar never lists
+// archived rows). Results are cached per query string (invalidated by any
+// file:changed/file:deleted under the archived dir). Returns a Set of
+// conversation ids whose content matched the query.
 const _archSearchCache = { q: null, ids: null };
 function _archSearchInvalidate() { _archSearchCache.q = null; _archSearchCache.ids = null; }
-async function searchArchivedCloud() {
-  const q = ($('convSearch')?.value.trim() || '').toLowerCase();
+async function searchArchivedCloud(q) {
+  q = String(q || '').trim().toLowerCase();
   if (!q) return new Set();
   if (_archSearchCache.q === q && _archSearchCache.ids) return _archSearchCache.ids;
   const ids = new Set();
@@ -1968,15 +1968,17 @@ async function searchArchivedCloud() {
 }
   const searchActive = !!($('convSearch')?.value.trim());
 
-  // Scan both dirs, collecting one entry per conversation id. A conv may have a new
-  // meta file AND a legacy .json (kept as a backup); prefer the new format. Skip
-  // .jsonl (reached via its meta) and classify .meta.json BEFORE plain .json (since
-  // ".meta.json" also ends with ".json"). The list reads only the tiny meta files
-  // for migrated convs — no more parsing every conversation in full.
-  const found = new Map();   // id -> { archived, format }
-  for (const [dir, archived] of [[CONV_DIR, false], [ARCHIVED_DIR, true]]) {
+  // Scan the ACTIVE dir only. The sidebar never lists archived conversations
+  // (archive management lives in the Settings → Archive tab), so the archived
+  // dir is not scanned here at all — at 10k+ conversations re-reading archived
+  // metas on every keystroke would dominate the search path. listArchived()
+  // owns the archived listing. A conv may have a new meta file AND a legacy
+  // .json (kept as a backup); prefer the new format. Classify .meta.json BEFORE
+  // plain .json (since ".meta.json" also ends with ".json").
+  const found = new Map();   // id -> { archived: false, format }
+  {
     let entries = [];
-    try { entries = await opfs.listDir(dir); } catch { /* empty */ }
+    try { entries = await opfs.listDir(CONV_DIR); } catch { /* empty */ }
     for (const e of entries) {
       if (e.kind !== 'file') continue;
       let id = null, format = null;
@@ -1984,28 +1986,24 @@ async function searchArchivedCloud() {
       else if (e.name.endsWith('.json')) { id = e.name.slice(0, -5); format = 'old'; }
       else continue;
       const prev = found.get(id);
-      if (!prev || (prev.format === 'old' && format === 'new')) found.set(id, { archived, format });
+      if (!prev || (prev.format === 'old' && format === 'new')) found.set(id, { archived: false, format });
     }
   }
 
   // Steady-state refreshes reuse cached rows instead of re-reading every meta
   // (that was ~3.4s of the conversation-switch cost with many convs). Search
-  // bypasses the cache (it needs the jsonl content) — EXCEPT for archived
-  // conversations: their content search ran in the cloud (searchArchivedCloud),
-  // so they skip the local jsonl read entirely; cloudHit marks content matches.
-  const archIds = searchActive ? await searchArchivedCloud() : null;
+  // bypasses the cache (it needs the jsonl content) for active conversations.
   const rows = await Promise.all(
     [...found.entries()].map(async ([id, loc]) => {
-      const key = (loc.archived ? 'a:' : 'n:') + id;
+      const key = 'n:' + id;
       if (!searchActive && _convRowCache.has(key)) return _convRowCache.get(key);
-      const row = await readConvMetaRow(id, loc.archived, loc.format, searchActive && !loc.archived);
-      if (row && searchActive && loc.archived) row.cloudHit = archIds.has(id);
+      const row = await readConvMetaRow(id, false, loc.format, searchActive);
       if (row && !searchActive) _convRowCache.set(key, row);
       return row;
     }),
   );
   // Prune rows for conversations that no longer exist (deleted / moved archive).
-  const alive = new Set([...found.entries()].map(([id, loc]) => (loc.archived ? 'a:' : 'n:') + id));
+  const alive = new Set([...found.entries()].map(([id]) => 'n:' + id));
   for (const key of _convRowCache.keys()) if (!alive.has(key)) _convRowCache.delete(key);
   const out = rows.filter(Boolean);
 
@@ -2381,7 +2379,8 @@ async function autoArchiveStale() {
   try { list = await listConversations(); } catch { return; }
   const cutoff = Date.now() - AUTO_ARCHIVE_DAYS * 86_400_000;
   const stale = list.filter(c =>
-    !c.archived && !c.pinned && c.updated && new Date(c.updated).getTime() < cutoff
+    !c.archived && !c.pinned && c._format !== 'old' && c.updated &&
+    new Date(c.updated).getTime() < cutoff
   );
   if (!stale.length) return;
   for (const c of stale) {
@@ -2402,8 +2401,7 @@ async function refreshConversationList() {
     const query = searchInput.value.trim().toLowerCase();
     list = list.filter(c =>
       c.title.toLowerCase().includes(query) ||
-      (c.messageContent && c.messageContent.includes(query)) ||
-      (c.archived && c.cloudHit)   // archived: matched by cloud content search
+      (c.messageContent && c.messageContent.includes(query))
     );
   }
 
@@ -7735,27 +7733,135 @@ function hideBgProgress(convId, key) {
 // the shared row cache), with filter chips, sort, archive-scoped search, a
 // quiet pager and per-row actions (Unarchive / Open / Delete).
 // ---------------------------------------------------------------------------
-async function listArchived() {
-  const found = new Map();   // id -> { archived, format }
+// One-time backfill: give every archived legacy .json a tiny meta sidecar so no
+// listing path ever has to read the (potentially huge) body again. Runs chunked
+// after the initial sync; idempotent (skips ids that already have a sidecar) and
+// leaves the .json in place as a frozen backup (existing convention).
+let _archBackfillDone = false;
+async function backfillArchivedMetas() {
+  if (_archBackfillDone) return;
+  _archBackfillDone = true;
+  try {
+    const entries = await opfs.listDir(ARCHIVED_DIR).catch(() => []);
+    const legacy = entries.filter(e => e.kind === 'file' && e.name.endsWith('.json') && !e.name.endsWith(META_SUFFIX));
+    if (!legacy.length) return;
+    let done = 0;
+    for (const e of legacy) {
+      const id = e.name.slice(0, -5);
+      if (await opfs.exists(metaPath(id, true)).catch(() => false)) continue;
+      try {
+        const data = JSON.parse(await opfs.read(convPath(id, true)));
+        const meta = {
+          id,
+          title: data.title || '(no title)',
+          created: data.created || data.updated || '',
+          updated: data.updated || '',
+          msgCount: (data.messages || []).length,
+        };
+        if (data.pinned) meta.pinned = true;
+        const mp = metaPath(id, true);
+        await opfs.write(mp, JSON.stringify(meta));
+        Sandpie.events.emit('file:changed', mp);
+        done++;
+      } catch (_) { /* unreadable body: leave it; the lazy path still lists the id */ }
+      if (done % 10 === 0) await new Promise(r => setTimeout(r, 0));   // yield: never block a turn
+    }
+    if (done) console.info('[sandpie] Archived-meta backfill: ' + done + ' legacy conversation(s) sidecar-ed');
+  } catch (e) { console.warn('[sandpie] archived backfill failed:', e); }
+}
+
+// Lazy archived listing (archive-dehydration step 2). Phase 1 is a pure name
+// scan of ARCHIVED_DIR — zero file reads; ids are ISO timestamps, so sorting by
+// id IS sorting by date. Phase 2 reads metas ONLY for the ids a caller asks for
+// (one page at a time); a background fill then reads the rest in idle chunks so
+// counts / alpha sort / title search converge. Cloud-only rows (meta dehydrated
+// to Dropbox) merge in from the sync provider's cloud index with no marker and
+// hydrate on demand when opened.
+const _archScan = { ids: null, cloudIds: null };   // ordered newest-first id lists
+function _archScanInvalidate() { _archScan.ids = null; _archScan.cloudIds = null; }
+async function _archLocalIds() {
+  if (_archScan.ids) return _archScan.ids;
   let entries = [];
   try { entries = await opfs.listDir(ARCHIVED_DIR); } catch { /* empty */ }
+  const ids = [], seen = new Set();
   for (const e of entries) {
     if (e.kind !== 'file') continue;
-    let id = null, format = null;
-    if (e.name.endsWith(META_SUFFIX)) { id = e.name.slice(0, -META_SUFFIX.length); format = 'new'; }
-    else if (e.name.endsWith('.json')) { id = e.name.slice(0, -5); format = 'old'; }
-    else continue;
-    const prev = found.get(id);
-    if (!prev || (prev.format === 'old' && format === 'new')) found.set(id, { archived: true, format });
+    if (e.name.endsWith(META_SUFFIX)) { const id = e.name.slice(0, -META_SUFFIX.length); if (!seen.has(id)) { seen.add(id); ids.push(id); } }
+    else if (e.name.endsWith('.json')) {
+      const id = e.name.slice(0, -5);
+      if (!seen.has(id)) { seen.add(id); ids.push(id); }   // legacy .json (meta sidecar may come later)
+    }
   }
-  const rows = await Promise.all([...found.entries()].map(async ([id, loc]) => {
+  ids.sort((a, b) => b.localeCompare(a));   // id = ISO timestamp → newest first
+  _archScan.ids = ids;
+  return ids;
+}
+async function _archCloudIds() {
+  if (_archScan.cloudIds) return _archScan.cloudIds;
+  const ids = [];
+  try {
+    const sp = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
+    const idx = sp && sp.cloudIndex && sp.cloudIndex();
+    if (idx) {
+      const prefix = ARCHIVED_DIR + '/';
+      const seen = new Set();
+      for (const rel of Object.keys(idx)) {
+        if (!rel.startsWith(prefix)) continue;
+        const name = rel.slice(prefix.length);
+        const id = name.replace(/\.(?:jsonl|meta\.json|json)$/, '');
+        if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
+      }
+    }
+  } catch (_) { /* cloud merge is best-effort */ }
+  ids.sort((a, b) => b.localeCompare(a));
+  _archScan.cloudIds = ids;
+  return ids;
+}
+// Instant listing: every archived id as a skeleton row (title '(loading…)' until
+// its meta is read). Never blocks on file I/O beyond the single listDir.
+async function listArchived() {
+  const [local, cloud] = await Promise.all([_archLocalIds(), _archCloudIds()]);
+  const seen = new Set();
+  const out = [];
+  for (const id of [...local, ...cloud]) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const key = 'a:' + id;
+    const cached = _convRowCache.get(key);
+    out.push(cached || { id, title: '(loading…)', updated: id, pinned: false, archived: true, _format: null, _pending: true });
+  }
+  return out;
+}
+// Read the real rows for a set of ids (one page). Returns the rows found.
+async function readArchivedRows(ids) {
+  const rows = await Promise.all(ids.map(async (id) => {
     const key = 'a:' + id;
     if (_convRowCache.has(key)) return _convRowCache.get(key);
-    const row = await readConvMetaRow(id, true, loc.format, false);
-    if (row) _convRowCache.set(key, row);
-    return row;
+    let format = null;
+    if (await opfs.exists(metaPath(id, true)).catch(() => false)) format = 'new';
+    else if (await opfs.exists(convPath(id, true)).catch(() => false)) format = 'old';
+    const row = format ? await readConvMetaRow(id, true, format, false) : null;
+    if (row) { _convRowCache.set(key, row); return row; }
+    return null;   // cloud-only or unreadable: stays a skeleton row
   }));
-  return rows.filter(Boolean).sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+  return rows.filter(Boolean);
+}
+// Background fill: read remaining metas in small chunks so counts / alpha sort /
+// title search converge without ever blocking the interaction path.
+let _archFillRunning = false;
+async function fillArchivedRows(onProgress, onDone) {
+  if (_archFillRunning) return;
+  _archFillRunning = true;
+  try {
+    const ids = await _archLocalIds();
+    for (let i = 0; i < ids.length; i += 10) {
+      const chunk = ids.slice(i, i + 10).filter(id => !_convRowCache.has('a:' + id));
+      if (chunk.length) await readArchivedRows(chunk);
+      if (onProgress) onProgress();
+      await new Promise(r => setTimeout(r, 0));
+    }
+    if (onDone) onDone();
+  } finally { _archFillRunning = false; }
 }
 
 function registerArchiveSettingsTab() {
@@ -7787,12 +7893,21 @@ function registerArchiveSettingsTab() {
   function filtered(list) {
     const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
     let pool = list.filter(c => f.test(c));
-    if (state.query) pool = pool.filter(c => (c.title || '').toLowerCase().includes(state.query));
+    if (state.query) pool = pool.filter(c => c._cloudHit || (c.title || '').toLowerCase().includes(state.query));
     return pool.slice().sort(SORTERS[state.sort] || SORTERS['date-desc']);
   }
 
+  let _lastFillRefresh = 0;
   async function refresh() {
-    const list = await listArchived();
+    let list = await listArchived();
+    // Archive-scoped search: titles match locally (metas), CONTENT matches come
+    // from the cloud (files/search_v2 over the archived folder) — no jsonl reads.
+    // Cloud-matched rows are kept even while their title is still '(loading…)'.
+    if (state.query) {
+      const cloudIds = await searchArchivedCloud(state.query);
+      list = list.filter(c => (c.title || '').toLowerCase().includes(state.query) || cloudIds.has(c.id));
+      for (const c of list) if (cloudIds.has(c.id)) c._cloudHit = true;
+    }
     countEl.textContent = list.length + ' conversation' + (list.length === 1 ? '' : 's');
     // filter chips with live counts
     chipsEl.replaceChildren();
@@ -7805,8 +7920,26 @@ function registerArchiveSettingsTab() {
       b.onclick = () => { state.filter = f.id; state.shown = CHUNK; refresh(); };
       chipsEl.appendChild(b);
     }
-    const pool = filtered(list);
-    const shownNow = Math.min(state.shown, pool.length);
+    let pool = filtered(list);
+    let shownNow = Math.min(state.shown, pool.length);
+    // Hydrate the VISIBLE page's skeleton rows (one page of meta reads — never
+    // the whole archive), then re-filter so hydrated titles land in place. A
+    // throttled background fill converges counts / alpha sort / search meanwhile.
+    const pageIds = pool.slice(0, shownNow).filter(c => c._pending).map(c => c.id);
+    if (pageIds.length) {
+      await readArchivedRows(pageIds);
+      list = await listArchived();
+      if (state.query) {
+        const cloudIds = await searchArchivedCloud(state.query);
+        list = list.filter(c => (c.title || '').toLowerCase().includes(state.query) || cloudIds.has(c.id));
+        for (const c of list) if (cloudIds.has(c.id)) c._cloudHit = true;
+      }
+      pool = filtered(list);
+      shownNow = Math.min(state.shown, pool.length);
+      fillArchivedRows(() => {
+        if (listEl && Date.now() - _lastFillRefresh > 800) { _lastFillRefresh = Date.now(); refresh(); }
+      }, () => { if (listEl) refresh(); });
+    }
     const frag = document.createDocumentFragment();
     if (!pool.length) {
       const li = document.createElement('li');
@@ -7967,13 +8100,13 @@ function bootConversations() {
       if (!id) return;
       _convRowCache.delete('a:' + id);
       _convRowCache.delete('n:' + id);
-      if (p.includes('/conversations/archived/')) _archSearchInvalidate();
+      if (p.includes('/conversations/archived/')) { _archSearchInvalidate(); _archScanInvalidate(); }
     };
     Sandpie.events.on('file:changed', invalidateConvRow);
     Sandpie.events.on('file:deleted', invalidateConvRow);
     // Auto-archive stale conversations once, after the initial Dropbox sync
     // completes (splash still visible) — not on a timer.
-    Sandpie.events.on('sync:done', () => autoArchiveStale());
+    Sandpie.events.on('sync:done', () => { backfillArchivedMetas().then(() => autoArchiveStale()); });
     _installConvListGestures();
   }
   // Boot starts on a FRESH conversation (home screen, ctx 0). The last-open
