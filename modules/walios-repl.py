@@ -70,6 +70,29 @@ def _hostcall(op, **args):
 # Scripts written for the Pyodide backend use pyodide.http.pyfetch for HTTP (there
 # are no sockets there). Provide the same surface so those scripts run unchanged.
 
+class _Immediate:
+    """Awaitable that produces its value WITHOUT ever suspending.
+
+    Our shims block on a host round-trip inside `_hostcall`, so they never actually
+    yield to an event loop — modelling them as coroutines only forced one to exist.
+    That mattered: asyncio needs epoll, which needs JSPI, so `await pyfetch(...)` worked
+    in the browser but hung forever on the node host. With this, `await` on a shim works
+    under any driver, including the trivial one in `_maybe_await`."""
+
+    __slots__ = ("_fn",)
+
+    def __init__(self, fn):
+        self._fn = fn
+
+    def __await__(self):
+        return self._run()
+
+    def _run(self):
+        if False:      # makes this a generator without ever yielding
+            yield
+        return self._fn()
+
+
 class _FetchResponse:
     def __init__(self, r):
         self._r = r
@@ -84,26 +107,29 @@ class _FetchResponse:
     def _body(self):
         return base64.b64decode(self._r.get("body", "") or "")
 
-    async def bytes(self):
-        return self._body()
+    def bytes(self):
+        return _Immediate(lambda: self._body())
 
-    async def text(self):
-        return self._body().decode("utf-8", "replace")
+    def text(self):
+        return _Immediate(lambda: self._body().decode("utf-8", "replace"))
 
-    async def string(self):
-        return await self.text()
+    def string(self):
+        return _Immediate(lambda: self._body().decode("utf-8", "replace"))
 
-    async def json(self, **kw):
-        return json.loads(self._body().decode("utf-8", "replace"))
+    def json(self, **kw):
+        return _Immediate(lambda: json.loads(self._body().decode("utf-8", "replace")))
 
-    async def memoryview(self):
-        return memoryview(self._body())
+    def memoryview(self):
+        return _Immediate(lambda: memoryview(self._body()))
 
     def raise_for_status(self):
         if not self.ok:
             raise OSError("HTTP %s for %s" % (self.status, self.url))
 
-    async def unpack_archive(self, extract_dir=".", format=None):
+    def unpack_archive(self, extract_dir=".", format=None):
+        return _Immediate(lambda: self._unpack(extract_dir, format))
+
+    def _unpack(self, extract_dir, format):
         import shutil, tempfile
         suffix = ".zip" if (format in (None, "zip")) else "." + str(format)
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as fh:
@@ -113,8 +139,12 @@ class _FetchResponse:
         os.unlink(tmp)
 
 
-async def pyfetch(url, **kw):
+def pyfetch(url, **kw):
     """pyodide.http.pyfetch equivalent, served by the host's fetch()."""
+    return _Immediate(lambda: _pyfetch_now(url, **kw))
+
+
+def _pyfetch_now(url, **kw):
     body = kw.get("body")
     if isinstance(body, (bytes, bytearray)):
         body = base64.b64encode(bytes(body)).decode("ascii")
@@ -168,7 +198,11 @@ def _pip_dir():
     return _PIP_DIR
 
 
-async def _micropip_install(requirements, **kw):
+def _micropip_install(requirements, **kw):
+    return _Immediate(lambda: _micropip_install_now(requirements, **kw))
+
+
+def _micropip_install_now(requirements, **kw):
     import importlib
     import zipfile
 
@@ -199,10 +233,10 @@ def _install_micropip_shim():
     m = types.ModuleType("micropip")
     m.install = _micropip_install
 
-    async def _list():
-        return sorted(
+    def _list():
+        return _Immediate(lambda: sorted(
             n for n in os.listdir(_PIP_DIR) if not n.endswith(".dist-info")
-        ) if os.path.isdir(_PIP_DIR) else []
+        ) if os.path.isdir(_PIP_DIR) else [])
 
     m.list = _list
     m.add_mock_package = lambda *a, **k: None
@@ -251,12 +285,41 @@ def _get_loop():
     return loop
 
 
+def _loop_usable():
+    """Can asyncio actually run here? The HOST says so; the guest must not try to find out.
+
+    asyncio needs epoll, which needs JSPI. The browser worker has it, the node host does
+    not — and where it is missing the loop BLOCKS rather than failing, so a probe cannot
+    be bounded (SIGALRM does not interrupt it). So the host that knows its own capability
+    sets SANDPIE_ASYNCIO=1, and everything else falls back to driving coroutines directly.
+    """
+    return os.environ.get("SANDPIE_ASYNCIO") == "1"
+
+
+def _drive(coro):
+    """Run a coroutine that never suspends, without any event loop."""
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError(
+        "this code needs a running event loop, which is unavailable on this host "
+        "(await on our own shims — pyfetch, micropip — works everywhere)"
+    )
+
+
 def _maybe_await(value):
     import inspect
 
-    if inspect.iscoroutine(value):
+    if not inspect.iscoroutine(value):
+        return value
+    # Prefer real asyncio wherever it works, so user code keeps full async semantics.
+    # Where it does not, fall back to driving the coroutine directly: top-level code that
+    # only awaits our shims never suspends, so `await pyfetch(...)` still works there.
+    if _loop_usable():
         return _get_loop().run_until_complete(value)
-    return value
+    return _drive(value)
 
 
 def _execute(src):

@@ -3168,7 +3168,8 @@ async function tool_walios({ script, timeout }, ctx) {
       // `import` just works without the model running any install step.
       lazyTars: WALIOS_LAZY_TARS,
       env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
-             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
+             PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages', PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
+             SANDPIE_ASYNCIO: '1' },
       cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
@@ -3301,7 +3302,8 @@ async function _wpyEnsure() {
     lazyTars: WALIOS_LAZY_TARS,
     env: { HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8',
            PYTHONHOME: '/py', PYTHONPATH: '/site-packages/_shims:/py/Lib:/ext:/site-packages',
-           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache' },
+           PYTHONDONTWRITEBYTECODE: '1', MPLBACKEND: 'Agg', MPLCONFIGDIR: '/site-packages/_mplcache',
+             SANDPIE_ASYNCIO: '1' },
     // busybox stays the root module so the manifest's lazyTars fire on the exec
     // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
     // means no extra process survives.
