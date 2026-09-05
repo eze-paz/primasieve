@@ -3084,7 +3084,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=1');
+importScripts('/modules/walios-backend.js?v=2');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3189,7 +3189,7 @@ async function tool_walios({ script, timeout }, ctx) {
 // feeds it framed requests, so imports and user globals are paid once per session
 // and later calls land in the tens of milliseconds. Guest half + wire format:
 // modules/walios-repl.py.
-const WPY_REPL_URL = './walios-repl.py?v=1';
+const WPY_REPL_URL = './walios-repl.py?v=2';
 const WPY_GRACE_MS = 20000;      // JS deadline sits this far past the guest's own alarm
 let _wpy = null;                 // { worker, buf, waiters, seq, ready, booting, queue }
 
@@ -3362,7 +3362,7 @@ async function _wpyEnsure() {
 
 // Run one chunk on the warm interpreter. Serialized: one run at a time, so a
 // hostcall reply can never be mistaken for another run's frame.
-function waliosPythonRun({ code, timeout, cwd, signal }) {
+function waliosPythonRun({ code, timeout, cwd, signal, file, argv }) {
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(600, Math.round(t));
   const prev = _wpy ? _wpy.queue : Promise.resolve();
   const job = prev.catch(() => {}).then(async () => {
@@ -3374,7 +3374,8 @@ function waliosPythonRun({ code, timeout, cwd, signal }) {
     let onAbort = null;
     try {
       if (signal) { onAbort = () => _wpyKill('run aborted (turn stopped)'); signal.addEventListener('abort', onAbort, { once: true }); }
-      _wpySend(st, { t: 'run', id, code: String(code || ''), cwd: cwd || '/root', timeout: t });
+      _wpySend(st, { t: 'run', id, code: String(code || ''), cwd: cwd || '/root', timeout: t,
+                     file: file || null, argv: Array.isArray(argv) ? argv.map(String) : [] });
       const f = await _wpyWait(st, x => x.t === 'done' && x.id === id, t * 1000 + WPY_GRACE_MS);
       return { ok: !!f.ok, out: f.out || '', err: f.err || '' };
     } catch (e) {
@@ -3395,6 +3396,7 @@ function waliosPythonRun({ code, timeout, cwd, signal }) {
 // stderr as text, `path` runs a saved script, `code` runs a snippet.
 async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
   let src = code, cwd = '/root';
+  let guestFile = null;
   if (!src) {
     if (!path) return { result: 'Error: pass "code" (a snippet) or "path" (a saved .py file).' };
     const rel = String(path).replace(/^\/+/, '').replace(/^files\//, '');
@@ -3402,11 +3404,10 @@ async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
     catch (e) { return { result: 'Error: cannot read ' + rel + ': ' + ((e && e.message) || e) }; }
     const slash = rel.lastIndexOf('/');
     if (slash > 0) cwd = '/root/' + rel.slice(0, slash);
+    guestFile = '/root/' + rel;
   }
-  if (Array.isArray(args) && args.length) {
-    src = 'import sys; sys.argv = ' + JSON.stringify(['<walios>', ...args.map(String)]) + '\n' + src;
-  }
-  const r = await waliosPythonRun({ code: src, timeout, cwd, signal: ctx && ctx.signal });
+  const r = await waliosPythonRun({ code: src, timeout, cwd, signal: ctx && ctx.signal,
+                                   file: guestFile, argv: Array.isArray(args) ? args : [] });
   let text = (r.out || '') + (r.err ? (r.out ? '\n' : '') + r.err : '');
   text = text.replace(/\n+$/, '');
   if (!text) text = r.ok ? '[no output]' : '[failed with no output]';

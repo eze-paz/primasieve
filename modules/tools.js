@@ -501,10 +501,54 @@ function _toolAvailable(name) {
   return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// run_python has TWO backends and they do not have the same rules. The shipped
+// description above is Pyodide's, and it is FALSE for walios on the two points a
+// model acts on most: it says there are no sockets and no compiled C extensions,
+// when walios has real sockets + TLS and its numpy/pandas ARE C extensions. Handing
+// the model the wrong backend's rules is a measured cost -- in the A/B logs the
+// model burned turns probing for requests / urllib / a system python.
+//
+// Built by replacement, and then CHECKED. An identical construction in the A/B
+// harness silently produced a byte-identical copy for months (the anchors did not
+// match), so if any part of this fails to apply we keep the base text rather than
+// ship something subtly wrong.
+const RUN_PYTHON_WALIOS = (() => {
+  const base = tools.run_python.description;
+  const PACKAGES = "PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, requests, sqlite3 and more are BUILT IN as real compiled C extensions — just import. Others: await micropip.install('name') installs pure-Python wheels from PyPI with their dependencies; a package needing compiled C code cannot be installed at runtime and micropip tells you so, naming an installed alternative where one exists.";
+  const HTTP = "HTTP: real sockets, TLS and CA certificates are present, so requests and urllib work normally (import requests; r = requests.get(url); r.json()). pyodide.http.pyfetch also works (async) and is cheaper for a simple GET: r = await pyfetch(url); data = await r.json(). pyfetch does NOT raise on HTTP 4xx/5xx — check r.ok / r.status before using the body.";
+  let out = base
+    .replace('Execute a Python script from OPFS via Pyodide.',
+             'Execute a Python script from OPFS via walios (wasm CPython 3.14 on a real Linux userland).')
+    .replace(/^PACKAGES:.*$/m, PACKAGES)
+    .replace(/^HTTP:.*$/m, HTTP);
+  const applied = out !== base
+    && out.indexOf(PACKAGES) !== -1
+    && out.indexOf(HTTP) !== -1
+    && out.indexOf('no sockets') === -1
+    && out.indexOf('No compiled C extensions') === -1;
+  if (!applied) {
+    try { console.warn('[tools] walios run_python description did NOT build; using the Pyodide text'); } catch (_) {}
+    return base;
+  }
+  return out;
+})();
+
+function _waliosPython() {
+  try { return (localStorage.getItem('sandpie-python-backend') || '').trim() === 'walios'; }
+  catch (_) { return false; }
+}
+
 const SandpieTools = {
   names() { return Object.keys(tools); },
   defaultDescription(name) { return tools[name] ? tools[name].description : ''; },
-  description(name) { return SandpieTools.defaultDescription(name); },   // always the shipped description (editing removed 2026-08-07)
+  description(name) {
+    // the shipped description (editing removed 2026-08-07), except that run_python
+    // describes whichever backend is actually selected
+    if (name === 'run_python' && _waliosPython()) return RUN_PYTHON_WALIOS;
+    return SandpieTools.defaultDescription(name);
+  },
   isCustom(name) { return false; },                                          // custom-description storage is inert
   isEnabled(name) {
     // Hardcoded 2026-08-07: every tool is always ON. The disabled/enabled

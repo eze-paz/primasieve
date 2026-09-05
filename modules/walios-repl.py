@@ -540,7 +540,7 @@ def _maybe_await(value):
     return _drive(value)
 
 
-def _execute(src):
+def _execute(src, filename="<sandpie>"):
     """Run one chunk with Pyodide-ish semantics: top-level await allowed, and a
     trailing expression echoes its repr the way a REPL does."""
     tree = ast.parse(src)
@@ -551,15 +551,56 @@ def _execute(src):
         tree.body = tree.body[:-1]
     flags = ast.PyCF_ALLOW_TOP_LEVEL_AWAIT
     if tree.body:
-        _maybe_await(eval(compile(tree, "<sandpie>", "exec", flags=flags), _G))
+        _maybe_await(eval(compile(tree, filename, "exec", flags=flags), _G))
     if tail is not None:
-        value = _maybe_await(eval(compile(tail, "<sandpie>", "eval", flags=flags), _G))
+        value = _maybe_await(eval(compile(tail, filename, "eval", flags=flags), _G))
         if value is not None:
             print(repr(value))
 
 
+def _print_user_traceback(err, target):
+    """Report the SCRIPT's frames, not our driver's.
+
+    `python script.py` never shows the interpreter's own plumbing. We were printing
+    the full traceback, so every ordinary script error arrived topped by two frames
+    from walios-repl.py (_run and _execute, complete with their source lines). That
+    reads as "walios broke" rather than "your script raised", and it costs the model
+    turns chasing the wrong thing.
+
+    We drop leading frames until the script's own frame. If the exception never
+    reaches the script -- i.e. it really did originate inside walios -- nothing
+    matches and we print the WHOLE traceback, which is exactly what we want to see.
+    """
+    etype, exc, tb = sys.exc_info()
+    walk = tb
+    while walk is not None and walk.tb_frame.f_code.co_filename != target:
+        walk = walk.tb_next
+    err.write("".join(traceback.format_exception(etype, exc, walk if walk is not None else tb)))
+
+
 def _run(msg):
     cwd = msg.get("cwd") or "/root"
+    # `python script.py` ALWAYS defines __file__ and sets argv[0] to the script. We
+    # did neither, so any script touching __file__ died with NameError -- which reads
+    # as the model writing bad code when it is nothing of the sort. (This was the
+    # single largest failure class in the A/B logs.) argv[0] was "<walios>" and only
+    # set at all when args were passed, so sys.argv[0] was stale otherwise.
+    script = msg.get("file") or None
+    if script:
+        _G["__file__"] = script
+    else:
+        _G.pop("__file__", None)
+    sys.argv = [script or "<walios>"] + [str(a) for a in (msg.get("argv") or [])]
+    # The host hands us SOURCE, not a file the guest can open, so traceback frames had
+    # a filename and a line number but no CODE LINE -- `python script.py` always shows
+    # the offending line. Seed linecache under the script's name so it does too.
+    _src = msg.get("code") or ""
+    try:
+        import linecache
+        name = script or "<sandpie>"
+        linecache.cache[name] = (len(_src), None, _src.splitlines(True), name)
+    except Exception:
+        pass
     try:
         os.makedirs(cwd, exist_ok=True)
         os.chdir(cwd)
@@ -570,7 +611,7 @@ def _run(msg):
     ok = True
     armed = _set_timeout(msg.get("timeout") or 120)
     try:
-        _execute(msg.get("code") or "")
+        _execute(msg.get("code") or "", script or "<sandpie>")
     except SystemExit as e:
         if e.code not in (0, None):
             ok = False
@@ -580,7 +621,7 @@ def _run(msg):
         err.write("Timed out: %s\nThe interpreter is still warm — imports and globals survived.\n" % e)
     except BaseException:
         ok = False
-        traceback.print_exc(file=err)
+        _print_user_traceback(err, script or "<sandpie>")
     finally:
         if armed:
             _clear_timeout()

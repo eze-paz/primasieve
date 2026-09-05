@@ -30,8 +30,12 @@
     stdlib:  ['pylib.tar.gz', '/py'],
     ext:     ['walios-ext.tar.gz', '/ext'],
     // certifi (TLS), packaging (micropip's resolver) and _shims/ctypes, which MUST be on
-    // the path before stdlib ctypes or pandas fails to import. Always eager: it is ~64ms.
-    extras:  ['walios-extras.tar.gz?v=3', '/site-packages'],
+    // the path before stdlib ctypes or pandas fails to import. Also requests + urllib3 +
+    // idna + charset_normalizer, and the two C extensions they need: zlib (which lived in
+    // the 16MB numpy bundle) and _ssl (in the 11MB docs bundle). `import requests` used to
+    // fail outright or drag a whole heavy bundle in for one HTTP call. Eager, ~2.4MB gz,
+    // paid once per interpreter boot.
+    extras:  ['walios-extras.tar.gz?v=4', '/site-packages'],
     numpy:   ['walios-numpy.tar.gz?v=2', '/site-packages'],
     docs:    ['walios-docs.tar.gz?v=4', '/site-packages'],
     mpl:     ['walios-mpl.tar.gz?v=3', '/site-packages'],
@@ -40,10 +44,10 @@
   // Which bundle provides which top-level module, for mount-on-import-miss.
   const LAZY_PKGS = (() => {
     const m = {};
-    for (const n of ['numpy', 'pandas', 'dateutil', 'pytz', 'tzdata', 'six', 'msgpack', 'simplejson', 'zlib']) m[n] = BUNDLES.numpy;
+    for (const n of ['numpy', 'pandas', 'dateutil', 'pytz', 'tzdata', 'six', 'msgpack', 'simplejson']) m[n] = BUNDLES.numpy;
     for (const n of ['PIL', 'lxml', 'docx', 'openpyxl', 'pptx', 'reportlab', 'pypdf', 'PyPDF2', 'bs4', 'soupsieve',
                      'fontTools', 'xlsxwriter', 'olefile', 'OleFileIO_PL', 'striprtf', 'chardet', 'charset_normalizer',
-                     'et_xmlfile', 'fpdf', 'pdfminer', 'typing_extensions', '_ssl']) m[n] = BUNDLES.docs;
+                     'et_xmlfile', 'fpdf', 'pdfminer', 'typing_extensions']) m[n] = BUNDLES.docs;
     for (const n of ['matplotlib', 'mpl_toolkits', 'contourpy', 'kiwisolver']) m[n] = BUNDLES.mpl;
     return m;
   })();
