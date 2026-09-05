@@ -42,6 +42,7 @@ import os, sys, re, collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cogs_lf import parse_lf, serialize, norm_lf
+from cogs_align import associate, to_positional, renumber_first_appearance
 
 ENTITY, NAME, EVENT, REL, FUNC = "ENTITY", "NAME", "EVENT", "REL", "FUNC"
 PARSE_BUDGET = 20000
@@ -489,10 +490,16 @@ def lf_of(lex, sch, mid, roles, node):
 
 
 def generate(model, s):
-    """model = (lex, schema, mid, roles). -> the logical form, or None if no derivation exists."""
-    lex, sch, mid, roles = model
+    """model = (lex, schema, mid, roles, varconv). -> the logical form, or None if no derivation exists.
+    Derivations are always built over TOKEN POSITIONS; varconv only renames the variables on the way out."""
+    lex, sch, mid, roles, varconv = model
     ps = parse_sentence(lex, sch, strip_term(lex, s), want=1)
-    return lf_of(lex, sch, mid, roles, ps[0]) if ps else None
+    if not ps:
+        return None
+    lf = lf_of(lex, sch, mid, roles, ps[0])
+    if lf is None:
+        return None
+    return lf if varconv == "position" else renumber_first_appearance(lf)
 
 
 # ================================================================ frame -> role induction
@@ -635,8 +642,10 @@ def search_schema(lex, train, sample=350, verbose=False):
     np_head, mod_args and np_order have to move together, a mirror-image local optimum no single move escapes."""
     rows = [r for r in train if r[2] != "primitive"][:sample]
     others = [d for d in Schema.DIMS if d not in PARSE_DIMS]
-    best = (-1, None)
+    best = (-1, Schema())          # if NOTHING parses -- e.g. variables are not positions at all -- the
+                                   # default is returned and the caller's reproduction gate rejects it
     evals = 0
+    combos = [{}]
     for nb in Schema.SPACE["np_branch"]:
         for vp in Schema.SPACE["verb_pos"]:
             nodes = _parse_rows(lex, Schema(np_branch=nb, verb_pos=vp), rows)
@@ -657,19 +666,50 @@ def search_schema(lex, train, sample=350, verbose=False):
     return best[1], best[0], len(rows)
 
 
-def induce(train, verbose=False):
-    """-> model = (lex, schema, mid, roles)."""
+def _induce_positional(train, verbose=False):
+    """Everything downstream of the alignment: variables are already token positions here."""
     lex = induce_lexicon(train)
     sch, sc, ns = search_schema(lex, train, verbose=verbose)
     mid = induce_relmid(lex, train, sch)
     roles, ambiguous = induce_roles(lex, sch, mid, train)
     if verbose:
         print(f"  classes {dict(collections.Counter(lex.cls.values()))}   terminator {lex.terminator!r}")
-        print(f"  determiners ({lex.det_pos}-nominal) {lex.det}   relators {induce_relmid(lex, train, sch)}")
+        print(f"  determiners ({lex.det_pos}-nominal) {lex.det}   relators {mid}")
         print(f"  frames: {len(roles)} entries, frame-ambiguous {len(ambiguous)}")
         for f, cc in ambiguous[:3]:
             print(f"    AMBIGUOUS {f} -> {cc}")
     return lex, sch, mid, roles
+
+
+def induce(train, verbose=False, gate=0.99):
+    """-> model = (lex, schema, mid, roles, varconv).
+
+    The VARIABLE CONVENTION is the last thing that was an assumption rather than an induction. COGS numbers
+    variables by token position, which hands the induction its token<->predicate alignment; Stage 3b part C
+    measured what that was worth (EM 1.000 -> 0.000 under first-appearance numbering). So it is now chosen the
+    same way everything else is: try reading variables AS positions, and if that fails to reproduce train,
+    RECOVER the alignment from co-occurrence (cogs_align) and rewrite train into positional form first.
+
+    Only rows whose alignment is UNAMBIGUOUS are used for induction -- learning from a row whose alignment was
+    settled by a tie-break would be learning from a guess, and the fraction dropped is reported."""
+    model = _induce_positional(train, verbose=verbose) + ("position",)
+    ok, wrong, nopar = reproduce(model, train)
+    frac = ok / max(ok + wrong + nopar, 1)
+    if frac >= gate:
+        if verbose:
+            print(f"  variable convention: POSITION (reproduces {frac:.4f} of train as-is)")
+        return model
+    if verbose:
+        print(f"  variable convention: positions reproduce only {frac:.4f} -> recovering the ALIGNMENT")
+    anchor, astats = associate(train, verbose=verbose)
+    rows, hows, st = to_positional(train, anchor, verbose=verbose, oracle=False)
+    fit = [r for r, h in zip(rows, hows) if h in ("unique", "lexicon")]
+    if verbose:
+        n = st["unique"] + st["tiebreak"] + st["failed"]
+        print(f"  inducing from the {st['unique']} unambiguously aligned rows of {n} "
+              f"({st['unique']/max(n,1):.4f}); {st['tiebreak']} tie-broken rows and {st['failed']} failures"
+              f" are DROPPED, not guessed")
+    return _induce_positional(fit, verbose=verbose) + ("first_appearance",)
 
 
 class Engine:

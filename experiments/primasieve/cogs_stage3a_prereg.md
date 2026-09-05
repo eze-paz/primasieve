@@ -171,3 +171,104 @@ Renumbering the gold variables by ORDER OF FIRST APPEARANCE, changing nothing el
 from EM 1.000 to EM 0.000 (and EM_alpha 0.000 -- the induction breaks, not just the serializer). So
 positional variables are a load-bearing INPUT to this engine. Recovering the alignment under an order-based
 convention is the honest open item after Stage 3b.
+
+# STAGE 3c PRE-REGISTRATION -- earning the alignment instead of being handed it
+
+Written BEFORE the aligner ran. Stage 3b part C measured the one dependency left: COGS numbers logical-form
+variables by TOKEN POSITION, which hands the induction its token <-> predicate alignment for free. Renumber
+the gold variables by order of first appearance and the SAME grammar goes EM 1.000 -> 0.000, EM_alpha 0.000
+too, so the induction breaks and not merely the serializer.
+
+## The claim to test
+
+The alignment is RECOVERABLE from co-occurrence alone, with no positional crutch and no new hand-written
+structure. A predicate atom that names a word occurs in a sentence exactly when that word does; an atom that
+names a role or a template constant does not. That is a rejection-first test (exact set equality, not a
+similarity score), so it fits the engine's existing discipline:
+
+    anchor(atom) = { word : every occurrence of that word co-occurs with the atom }
+                   kept only if those words' sentences COVER every occurrence of the atom
+    a variable is then constrained to the positions of the words anchoring its own predicate, and the
+    per-sentence assignment must be INJECTIVE and consistent across all of that variable's conjuncts
+
+If that recovers positions, the entire Stage 3a/3b engine runs downstream UNCHANGED, and the variable
+convention becomes one more searched dimension (`position` | `first_appearance`) rather than an assumption.
+
+## Gates
+
+G10 (the frontier gate). On the COGS-structure adversary grammar with variables renumbered by first
+    appearance -- the exact configuration that scored EM 0.000 in Stage 3b part C -- EM >= 0.95.
+
+G11 (it must generalize, not patch one case). Under first-appearance numbering, the whole Stage 3b suite:
+    single-dimension knockouts >= 10/11 and the 10-random-grammar win gate >= 9/10.
+
+G12 (NO REGRESSION, both earlier stages). COGS itself, positional, unchanged: train reproduction 1.0000,
+    test 0.9997, gen 0.9990, structural 0.985 / 1.000 / 1.000, 18-category mean 0.9996. And Stage 3b
+    positional still 10/10 with 11/11 knockouts.
+
+G13 (report the alignment itself, not just the downstream score). Measure and print, separately:
+    (a) the fraction of training rows whose variables were aligned to a unique consistent position,
+    (b) the fraction aligned CORRECTLY against the oracle -- available because the adversary generated the
+        true positions, and the identity for COGS,
+    (c) how many predicate atoms were classified lexical vs constant, and any ties.
+    An engine that scores well downstream while aligning badly would be exploiting something else, and G13
+    is what would expose that.
+
+## Pre-committed reading
+
+If G10 passes but G11 fails, the aligner is a COGS-shaped patch and the honest verdict is a null: report it
+as such. If the co-occurrence test cannot separate lexical atoms from role names at all, that is a clean
+negative about this signal being insufficient, and it gets reported rather than rescued with positions.
+The aligner may NOT consult token positions to decide what a variable means -- it may only use positions as
+the candidate SET a variable is assigned from. Using order-of-appearance as a tie-break is allowed and must
+be reported as a tie-break, with the count of rows it decided.
+
+## STAGE 3c MEASURED RESULT (added after the runs)
+
+The frontier is closed. The alignment IS recoverable from co-occurrence, with no positional crutch.
+
+  G10  the exact configuration that scored EM 0.000 in Stage 3b part C          EM 1.000   PASS
+  G10  strongest form -- REAL COGS, all gold variables renumbered by first
+       appearance: train reproduction 1.0000, gen EM 0.9990 / EM_alpha 0.9990,
+       structural 0.9850 / 1.0000 / 1.0000, 18-category mean 0.9996
+       -- IDENTICAL to positional COGS                                                     PASS
+  G11  single-dimension knockouts, all renumbered                                   11/11  PASS
+  G11  win gate, 10 random grammars, all renumbered                                 10/10  PASS
+  G12  no regression: COGS positional unchanged (train 1.0000, test 0.9997, gen 0.9990,
+       structural 0.9850/1.0000/1.0000, 18-cat 0.9996); Stage 3b positional 10/10 + 11/11  PASS
+  G13  alignment report over 22 grammars: rows aligned unambiguously mean 0.8544 (min 0.8423);
+       ORACLE accuracy of those mean 1.0000, min 1.0000; alignment failures 0;
+       12628 tie-broken rows DROPPED rather than guessed; 866 lexical atoms / 66 constants  PASS
+
+On real COGS the aligner reaches 0.9971 unambiguous with 0 failures and discovers the multi-surface lemmas by
+itself (`eat` <- ate / eat / eaten, `freeze` <- froze / frozen, `give` <- gave / given), which is the part no
+adversary grammar tested -- the synthetic lexicons are one-to-one.
+
+TWO GENERIC REJECTION RULES carry the association, and both were forced by measurement, not chosen a priori:
+  PARSIMONY. Necessity alone is far too weak: on an 8000-row COGS slice the atom `nmod` is "necessary" for
+    ~170 location nouns, because each of them happens to occur only inside a modifier, and their union does
+    cover every `nmod` occurrence. Requiring the MINIMAL necessary set that exactly accounts for the atom
+    (at most 3 surface forms) collapses `dog` from {bicycle, dog, notebook, plaque} to {dog}.
+  NON-DECOMPOSABILITY. `nmod`'s minimal cover can still come out as {in, on, beside} -- exactly the union of
+    three OTHER atoms' covers. A lemma's cover is not built out of other atoms' covers, so an atom whose
+    cover decomposes that way is demoted to a constant. After both rules: roll -> {rolled}, agent -> {},
+    nmod -> {}, dog -> {dog}.
+
+DISCIPLINE POINTS worth keeping. (a) Induction uses ONLY the unambiguously aligned rows; a row whose
+alignment was settled by a tie-break is dropped, because learning from it would be learning from a guess --
+and 85% of rows suffice on the adversary, 99.7% on COGS. (b) The variable convention is chosen the same way
+every other fact is: try reading variables as positions, keep it if it reproduces train, otherwise recover
+the alignment -- so COGS still takes the direct path and there is no branch on dataset identity. (c) The
+oracle accuracy is reported SEPARATELY from the downstream score, because an engine scoring well downstream
+while aligning badly would be exploiting something else, and only G13 would have caught that.
+
+## WHAT IS STILL NOT EARNED, after 3c
+
+- Tie-broken rows are dropped, not resolved. A word repeated inside one sentence leaves its variable
+  ambiguous; ~14% of adversary rows and 0.3% of COGS rows are discarded. Enough survive that nothing is lost
+  here, but the engine cannot yet learn from a sentence it cannot align uniquely.
+- The alignment signal is sentence-level CO-OCCURRENCE, which needs a corpus where a lemma and its surface
+  forms co-vary cleanly. It says nothing about a lemma whose token never appears without another (perfectly
+  confounded vocabulary), and that case is untested.
+- Everything here still assumes the logical form is a flat set of conjuncts over definites, and that a
+  training pair is exactly (one sentence, one logical form). Neither Stage 3b nor 3c varied that.

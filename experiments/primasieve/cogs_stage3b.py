@@ -122,8 +122,9 @@ if __name__ == "__main__":
           f"{sum(x is not None for x, _ in predsC)/len(teC):>6.3f}")
     print(f"   EM {emC:.3f}  EM_alpha {emaC:.3f}   vs part 0 on the SAME grammar with positional "
           f"variables: EM {s0['EM']:.3f}")
-    print("   -> positional variables are a LOAD-BEARING INPUT, not an incidental detail: they hand the")
-    print("      induction its token<->predicate alignment for free. Recovering that alignment under an")
-    print("      order-based convention is NOT solved here, and is the honest open item after Stage 3b.")
+    print("   -> WAS the open item after Stage 3b, where this line read EM 0.000: positional variables handed")
+    print("      the induction its token<->predicate alignment for free. Stage 3c (cogs_align.py) recovers")
+    print("      that alignment from co-occurrence, so the convention is now induced, not assumed. See")
+    print("      cogs_stage3c.py for the full suite and the oracle accuracy of the recovered alignment.")
 
     print(f"\ntotal {time.time()-t0:.1f}s")
