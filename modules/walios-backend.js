@@ -13,7 +13,12 @@
   // dlopen9: the host no longer silently answers 0 for unimplemented `wali.*` imports.
   // __wasm_thread_spawn now returns EAGAIN so threading.Thread().start() raises
   // RuntimeError instead of trapping the whole interpreter (exit 139).
-  const WORKER_V = 'dlopen9';
+  // dlopen10: one armed itimer had TWO delivery sources (a polled deadline and a real
+  // setTimeout) and neither cancelled the other, so a ONE-SHOT setitimer/alarm fired
+  // SIGALRM twice -- measured 2 handler entries where 1 was expected. In Python the
+  // second delivery re-entered the handler inside the except clause of the first and
+  // went uncaught, which is exactly the _set_timeout pattern.
+  const WORKER_V = 'dlopen10';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
