@@ -34,6 +34,7 @@ PUBLISHED = {
     # ---- Stage 4a: constructions on SLOG (relative clauses, wh-questions, center-embedding) --------------------
     "cogs_stage4a": ["4a SLOG CONSTRUCTIONS: PASS"],
     "cogs_stage4b": ["4b OPEN VOCABULARY: PASS"],
+    "cogs_stage4c": ["4c REFERENCE: PASS"],
 }
 
 
