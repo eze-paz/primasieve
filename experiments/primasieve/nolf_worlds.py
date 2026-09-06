@@ -35,6 +35,7 @@ class Records:
     REL = ("above", "below", "equals")
 
     def __init__(self, seed=11):
+        self.lex_seed = seed
         concepts = list(self.FIELDS) + list(self.ORD) + list(self.REL) + ["not", "and", "every", "some"] + [f"n{i}" for i in range(10)]
         self.lex = _Lex(concepts, seed)
 
@@ -81,6 +82,7 @@ class Strings:
     ALPHA = ("p", "q", "r", "s")
 
     def __init__(self, seed=23):
+        self.lex_seed = seed
         concepts = list(self.ALPHA) + ["contains", "starts", "ends", "before", "count", "not", "and", "every", "followed"] + [f"n{i}" for i in range(9)]
         self.lex = _Lex(concepts, seed)
 

@@ -51,6 +51,9 @@ import tokenize
 # Only int / rat / rec currently carry primitives -- the rest are here because the discipline must be able to
 # refuse a value of any shape, not because anything was authored for them.
 INT, RAT, FLT, STR, SET, TUP, REC = "int", "rat", "float", "str", "set", "tuple", "rec"
+# Phase 3 (nolf_prereg.md) adds three STRUCTURAL shapes, none of them content: a truth value, a sequence (a
+# string or a tuple -- a situation, a record, a list of positions are all sequences), and a scalar element.
+BOOL, SEQ, ELEM = "bool", "seq", "elem"
 
 
 def _c_int(v): return isinstance(v, int) and not isinstance(v, bool)
@@ -60,9 +63,13 @@ def _c_str(v): return isinstance(v, str)
 def _c_set(v): return isinstance(v, (set, frozenset))
 def _c_tup(v): return isinstance(v, tuple)
 def _c_rec(v): return isinstance(v, tuple) and len(v) > 0 and all(_c_int(f) for f in v)   # flat record of fields
+def _c_bool(v): return isinstance(v, bool)
+def _c_seq(v): return isinstance(v, (tuple, str))
+def _c_elem(v): return (isinstance(v, int) and not isinstance(v, bool)) or (isinstance(v, str) and len(v) == 1)
 
 
-CHECK = {INT: _c_int, RAT: _c_rat, FLT: _c_flt, STR: _c_str, SET: _c_set, TUP: _c_tup, REC: _c_rec}
+CHECK = {INT: _c_int, RAT: _c_rat, FLT: _c_flt, STR: _c_str, SET: _c_set, TUP: _c_tup, REC: _c_rec,
+         BOOL: _c_bool, SEQ: _c_seq, ELEM: _c_elem}
 
 # Canonical probes, per type, used ONLY to fingerprint behaviour so that identity is behavioural. They are
 # content-free values, and the fingerprint is order-independent given the signature.
@@ -74,6 +81,9 @@ PROBES = {
     SET: (frozenset(), frozenset({0}), frozenset({0, 1})),
     TUP: ((), (0,), (0, 1)),
     REC: ((0,), (1, 2, 3), (4, -1)),
+    BOOL: (False, True),
+    SEQ: ((), (1, 2), (2, 1, 2), "ab", "bab", ((1, 2), (3, 4))),
+    ELEM: (0, 1, 2, "a", "b"),
 }
 _PARTIAL = "!"          # the probe was outside the primitive's domain -- part of its behaviour, not an error
 
@@ -167,6 +177,53 @@ P_INT = tuple(sorted({
 P_REC = (register(lambda r, i, d: r[:i] + (r[i] + d,) + r[i + 1:], (REC, INT, INT), REC,
                   _ENOPS + "the representation ((x0,y0,x1,y1), colour) HAS those fields; one edit per field is "
                            "forced by the representation itself. widen/move/rotate are compositions, not entries"),)
+
+_NOLF = ("nolf_prereg.md (Phase 3, language from situations only): a sentence's meaning must be an executable "
+         "truth condition over an OPAQUE structured situation, so the base needs the structural accessors of a "
+         "sequence and the two-valued connectives -- nothing that names any world's content. ")
+
+
+def _at(s, i):
+    if not -len(s) <= i < len(s): raise IndexError(i)
+    return s[i]
+
+
+def _positions(s, e): return tuple(i for i, x in enumerate(s) if x == e)
+
+
+def _first_pos(s, e):
+    p = _positions(s, e)
+    if not p: raise KeyError(e)          # ABSENT element (a false presupposition), distinct from an impossible position
+    return p[0]
+
+
+def _last_pos(s, e):
+    p = _positions(s, e)
+    if not p: raise KeyError(e)
+    return p[-1]
+
+
+P_SEQ = tuple(sorted({
+    register(lambda s, i: _at(s, i), (SEQ, INT), ELEM, _NOLF + "the element at a position (a character; a field of a record)"),
+    register(lambda s, i: _at(s, i), (SEQ, INT), SEQ, _NOLF + "the sub-sequence at a position (a record of a situation)"),
+    register(lambda s, i: _at(s, i), (SEQ, INT), INT, _NOLF + "the integer at a position (a numeric field of a record)"),
+    register(lambda s: len(s), (SEQ,), INT, _NOLF + "how many elements"),
+    register(lambda s, e: e in s, (SEQ, ELEM), BOOL, _NOLF + "membership"),
+    register(lambda s, e: sum(1 for x in s if x == e), (SEQ, ELEM), INT, _NOLF + "how many times an element occurs"),
+    register(_positions, (SEQ, ELEM), SEQ, _NOLF + "where an element occurs (its positions, as a sequence)"),
+    register(_first_pos, (SEQ, ELEM), INT, _NOLF + "the first position of an element (partial when absent)"),
+    register(_last_pos, (SEQ, ELEM), INT, _NOLF + "the last position of an element (partial when absent)"),
+    register(lambda s: min(s), (SEQ,), INT, _NOLF + "the least of a sequence of integers (partial on empty)"),
+    register(lambda s: max(s), (SEQ,), INT, _NOLF + "the greatest of a sequence of integers (partial on empty)"),
+    register(lambda a, b: a < b, (INT, INT), BOOL, _NOLF + "order between integers"),
+    register(lambda a, b: a > b, (INT, INT), BOOL, _NOLF + "order between integers, the other way"),
+    register(lambda a, b: a == b, (INT, INT), BOOL, _NOLF + "equality of integers"),
+    register(lambda a, b: a == b, (ELEM, ELEM), BOOL, _NOLF + "equality of elements"),
+    register(lambda a: a + 1, (INT,), INT, _NOLF + "the next position"),
+    register(lambda a: not a, (BOOL,), BOOL, _NOLF + "negation"),
+    register(lambda a, b: a and b, (BOOL, BOOL), BOOL, _NOLF + "conjunction"),
+    register(lambda a, b: a or b, (BOOL, BOOL), BOOL, _NOLF + "disjunction"),
+}))
 
 # ---------------------------------------------------------------------------------------------------------------
 # THE INTERFACE. Four calls, and none of them chooses.

@@ -253,6 +253,54 @@ from situations only -- **pre-registered** (`nolf_prereg.md`); sealed worlds and
 **pre-registered** (`introspect_prereg.md`), not built. 5 learned priors, 6 worlds plural -- not started; both
 depend on 3.
 
+### Phase 3 -- LANGUAGE FROM SITUATIONS ONLY: the learner (nolf_learn.py; nolf_prereg.md)
+Built after the prereg, on the two sealed non-rect worlds (`nolf_worlds.py`: integer records, strings). Input is
+(situation, sentence, truth) and nothing else: no logical form, no word classes, no combinator names. What the
+learner does, each piece a mechanism the engine already had or a declared bias:
+- **classes** by distributional substitutability (Jaccard of left/right-neighbour context sets, numbered);
+- **skeletons** = class sequences; a multi-member class is a SLOT, a singleton is part of the construction; when no
+  term fits, slots are demoted one at a time (searched, not authored);
+- **terms** = the smallest executable truth condition over `core/primitives`' structural atoms (16 added to the
+  ledger, each with its forcing record: sequence access, membership, count, positions, order, equality, the
+  connectives) with typed HOLES (INT / ELEM / RELATION / SELECTOR / BOOL), enumerated by atom count under
+  observational-equivalence dedupe (SignatureBank) -- the hole KINDS are part of the signature, or not(_b) and 0<_i
+  merge and negation is lost (measured);
+- **denotations** solved as ONE constraint problem across every sentence a word occurs in, per (word, kind):
+  arc consistency, then depth-first assignment with propagation, then verification on every row, then an
+  EVIDENCE gate: fitted on four fifths of a skeleton's rows, the construction must predict the other fifth exactly
+  (memorising constructions from a handful of rows produced the only confabulation seen; the gate removed it);
+- **composition**: a span whose class sequence is a learned construction reduces to a BOOL slot; negation and
+  conjunction are then one-atom constructions over BOOL slots; a word learned around (demoted) is re-absorbed
+  into the general construction once that exists (conjunctions containing 'n3' evaluated to nothing until then);
+- **verdict**: predict only when every word is known, the skeleton is learned, and every surviving denotation and
+  analysis agree; otherwise ABSTAIN.
+Declared biases, none English- or world-specific: simplest term first; a word keeps a kind it already has unless
+nothing else fits; mutual exclusivity as an ORDER (a class with more members than a kind has values is tried in
+that kind last); a false presupposition (an absent element) makes a sentence false. The learner imports core/
+only (C4) and its source shares no LF vocabulary (G7).
+
+**Measured (2026-09-06, 240 s learning budget per world, `nolf_run.py --world W`, `--report`): NOT PASSED, and the
+numbers are the bar.** Every construction the learner adopts is CORRECT against the hidden lexicon (numerals, fields,
+relations, ordinals, quantifiers, characters, positions) and CONFABULATION IS 0 on every split of every run.
+- **strings**: 6 constructions (contains/starts/ends as one SELECT construction with the word as selector, count,
+  before, negation, conjunction); compositional EM **0.748**, iid 0.815, confab 0; analogy baseline 0.422 at 58%
+  confab (G3 met); shuffled lexicon **identical, 0.748** (G5 met). Unsolved: 'every x followed by y' (5 atoms).
+- **records**: coverage depends on which constructions fit the budget -- **0.31 to 0.61** compositional across
+  runs of the same code (0.61 when 'some', 'every', the atom and negation all landed; 0.31 with two). The 4-slot
+  atom takes 30-75 s with nothing pinned; field-vs-field (4 atoms, ordinal as selector) has never fit. G2 (0.80)
+  and G3 not met on records. This variance is the honest headline: the search is correct and too slow, and its
+  time-to-first-analysis depends on enumeration order.
+- **records G5 (shuffled lexicon) FAILS for the budget reason, not a spelling leak:** with re-permuted word forms
+  the same code learned 0 constructions in 240 s (main run: 2). Different forms change class numbering and so the
+  order skeletons are attempted; under a budget that only fits some of them, which ones land changes. The claim
+  "spelling carries nothing" needs a run that converges on both permutations; with 240 s it cannot be made for
+  records and is NOT made. Strings, where everything reachable converges, is identical under the permutation.
+- G6 not testable on these worlds (no scope interaction) -- a worlds/prereg mismatch, stated.
+Lessons paid for, in the code: hole kinds belong in the dedupe signature; arc consistency without a global
+assignment accepts spurious lexicons; a 150-row subsample under-determines numerals; alternative analyses must
+not be merged by intersection; memorised constructions from 1-5 rows are where confabulation enters; greedy
+reduction needs an unreduced fallback; a demoted word must be absorbed when the general construction appears.
+Not registered in `core/registry.py` (no PASS to protect); `nolf_results.json` holds the last fits.
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
