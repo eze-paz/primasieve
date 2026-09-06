@@ -3197,7 +3197,7 @@ async function tool_walios({ script, timeout }, ctx) {
 // feeds it framed requests, so imports and user globals are paid once per session
 // and later calls land in the tens of milliseconds. Guest half + wire format:
 // modules/walios-repl.py.
-const WPY_REPL_URL = './walios-repl.py?v=2';
+const WPY_REPL_URL = './walios-repl.py?v=3';
 const WPY_GRACE_MS = 20000;      // JS deadline sits this far past the guest's own alarm
 let _wpy = null;                 // { worker, buf, waiters, seq, ready, booting, queue }
 
@@ -3212,7 +3212,12 @@ function _wpyScan(st) {
     st.buf = st.buf.slice(b + 1);
     let f = null;
     try { f = JSON.parse(_b64dec(raw)); } catch (_) { continue; }
-    if (f.t === 'call') { _wpyHostcall(st, f); continue; }
+    // Time spent servicing a host call is credited back to whatever run is waiting.
+    // The guest pauses its own SIGALRM across the round trip for the same reason; if
+    // only the guest paused, a slow first `import pandas` would sail past the guest
+    // alarm and get killed out here instead -- which is worse, because that tears down
+    // the whole interpreter rather than raising a catchable timeout inside it.
+    if (f.t === 'call') { const t0 = Date.now(); _wpyHostcall(st, f).finally(() => _wpyCredit(st, Date.now() - t0)); continue; }
     const i = st.waiters.findIndex(w => w.match(f));
     if (i >= 0) st.waiters.splice(i, 1)[0].resolve(f);
   }
@@ -3237,8 +3242,27 @@ function _wpyWait(st, match, ms) {
   return new Promise((resolve, reject) => {
     const w = { match, resolve, reject };
     st.waiters.push(w);
-    if (ms) setTimeout(() => { const i = st.waiters.indexOf(w); if (i >= 0) { st.waiters.splice(i, 1); reject(new Error('walios python: no response in ' + Math.round(ms / 1000) + 's')); } }, ms);
+    if (!ms) return;
+    // A movable deadline rather than a one-shot timer, so _wpyCredit can push it out
+    // by however long the host spent on the guest's behalf (downloads, tar extraction).
+    w.deadline = Date.now() + ms;
+    w.budgetMs = ms;
+    const tick = () => {
+      const i = st.waiters.indexOf(w);
+      if (i < 0) return;                                   // already settled
+      const left = w.deadline - Date.now();
+      if (left > 0) { w.timer = setTimeout(tick, left); return; }
+      st.waiters.splice(i, 1);
+      reject(new Error('walios python: no response in ' + Math.round(w.budgetMs / 1000) + 's'));
+    };
+    w.timer = setTimeout(tick, ms);
   });
+}
+
+// Push every pending deadline out by `spent` ms of host-side work.
+function _wpyCredit(st, spent) {
+  if (!(spent > 0)) return;
+  for (const w of st.waiters) if (w.deadline) w.deadline += spent;
 }
 
 // Host RPC. The guest deliberately does NOT open its own sockets for these: the

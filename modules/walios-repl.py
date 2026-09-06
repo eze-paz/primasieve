@@ -55,15 +55,26 @@ _call_seq = 0
 
 
 def _hostcall(op, **args):
-    """Ask the browser host to do something (network, mostly) and wait for its reply."""
+    """Ask the browser host to do something (network, mostly) and wait for its reply.
+
+    The run deadline is PAUSED across the round trip. It exists to catch a runaway
+    loop in the user's code, and host time is not the user's code: a first `import
+    pandas` has to download and extract a bundle, and charging that to the deadline
+    made the very first pandas/matplotlib import blow through even a 120s timeout --
+    which then left the half-built module in sys.modules and poisoned every later
+    import of it. Measure guest compute, not the host's download."""
     global _call_seq
     _call_seq += 1
     cid = _call_seq
-    _send({"t": "call", "id": cid, "op": op, "args": args})
-    while True:
-        m = _recv()
-        if m.get("t") == "reply" and m.get("id") == cid:
-            return m
+    rem = _pause_timeout()
+    try:
+        _send({"t": "call", "id": cid, "op": op, "args": args})
+        while True:
+            m = _recv()
+            if m.get("t") == "reply" and m.get("id") == cid:
+                return m
+    finally:
+        _resume_timeout(rem)
 
 
 # ---------------------------------------------------------------- pyodide shim
@@ -492,6 +503,61 @@ def _clear_timeout():
         pass
 
 
+def _pause_timeout():
+    """Stop the deadline and hand back what was left of it (0 when unarmed)."""
+    try:
+        import signal
+
+        rem = signal.getitimer(signal.ITIMER_REAL)[0]
+        if rem > 0:
+            signal.setitimer(signal.ITIMER_REAL, 0.0)
+        return rem
+    except Exception:
+        return 0.0
+
+
+def _resume_timeout(rem):
+    try:
+        if rem and rem > 0:
+            import signal
+
+            signal.setitimer(signal.ITIMER_REAL, float(rem))
+    except Exception:
+        pass
+
+
+def _purge_partial_imports():
+    """Drop modules whose import was cut short, and say which ones.
+
+    A timeout (or any abort) can land in the middle of an import. CPython puts the
+    module into sys.modules BEFORE running its body, so what survives is a shell:
+    `import pandas` then fails forever with "partially initialized module 'pandas'
+    ... has no attribute '_pandas_datetime_CAPI'", in an interpreter we advertise as
+    still warm. The spec's _initializing flag marks exactly these, so evict them and
+    let the next import start clean."""
+    dead = []
+    for name, mod in list(sys.modules.items()):
+        try:
+            spec = getattr(mod, "__spec__", None)
+            if spec is not None and getattr(spec, "_initializing", False):
+                dead.append(name)
+        except Exception:
+            continue
+    for name in dead:
+        sys.modules.pop(name, None)
+    return sorted(dead)
+
+
+def _note_purge(err, dead):
+    """Tell the model what was evicted, so a retry is an obvious next move."""
+    if not dead:
+        return
+    tops = sorted({n.split(".")[0] for n in dead})
+    err.write("Interrupted mid-import; dropped %d partially initialised module(s) (%s) "
+              "so they import cleanly on retry. Just run the import again.\n"
+              % (len(dead), ", ".join(tops[:6])))
+
+
 def _get_loop():
     import asyncio
 
@@ -619,9 +685,11 @@ def _run(msg):
     except KeyboardInterrupt as e:
         ok = False
         err.write("Timed out: %s\nThe interpreter is still warm — imports and globals survived.\n" % e)
+        _note_purge(err, _purge_partial_imports())
     except BaseException:
         ok = False
         _print_user_traceback(err, script or "<sandpie>")
+        _note_purge(err, _purge_partial_imports())
     finally:
         if armed:
             _clear_timeout()
