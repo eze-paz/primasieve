@@ -4951,6 +4951,17 @@ async function runAgent(config, ctx) {
   // bare-prose round's own content is delivered as the reply (localized to the
   // session Reply language) — never a blank turn.
   const MAX_RESPOND_RETRIES = 2;
+  // THINKING OVERRUN: a round cut at the provider's output cap (finish_reason=length)
+  // with NO tool call and NO content — the whole budget went to reasoning. Seen live
+  // 2026-09-06 (GLM-5.3-Flash-Thinking, maxOutput 16000, session ...12-16-48): three
+  // 16000-token reasoning-only rounds in a row; the first two were misdiagnosed by the
+  // force-respond branch as "plain text without respond()", the third silently ended
+  // the turn with todos open because the no-tool-call branch never read finish_reason,
+  // and the 63k chars of reasoning were dropped from history. Now: classify it first,
+  // keep the truncated round, nudge the model to ACT (not re-think), and after this
+  // many overruns end the turn VISIBLY.
+  const MAX_THINK_OVERRUNS = 2;
+  ctx._thinkOverruns = 0;
   const MAX_RESPOND_DELIVERIES = 5;   // hard cap on respond() deliveries per turn
   const MAX_FINAL_RESPOND_FORCES = 3; // times we re-prompt for a closing respond() before giving up and ending anyway
   // This turn forces respond() when the tool is present: the visible reply comes
@@ -5274,6 +5285,14 @@ async function runAgent(config, ctx) {
     const respondCall = round.tool_calls.find(tc => tc && tc.function && tc.function.name === 'respond');
     let respondText = null;
     let _forceRespondRetry = false;
+    // Classified BEFORE the bare-prose triage below so an overrun never reaches the
+    // force-respond branches (there is no prose to force into respond()).
+    const _thinkOverrun = round.finish_reason === 'length' && !round.tool_calls.length && !(round.content || '').trim();
+    let _thinkOverrunFinal = false;
+    if (_thinkOverrun) {
+      ctx._thinkOverruns++;
+      _thinkOverrunFinal = ctx._thinkOverruns > MAX_THINK_OVERRUNS;
+    }
     // Content the model writes outside respond() is never the visible reply — but
     // it is NOT nuked: fold it into the reasoning channel so it shows in the
     // collapsed thinking box and persists there (asstMsg.reasoning), like CoT.
@@ -5304,6 +5323,18 @@ async function runAgent(config, ctx) {
         ctx._respondCount++;
         ctx._respondLangs.add(respondLocaleOverride.code);
       }
+    } else if (_thinkOverrun) {
+      if (_thinkOverrunFinal && _respondForced && !ctx._responded && !ctx.signal?.aborted) {
+        const _capTok0 = round.usage && round.usage.completion_tokens ? round.usage.completion_tokens : null;
+        round.content = 'The model hit its output-token cap' + (_capTok0 ? ' (' + _capTok0 + ' tokens)' : '') + ' '
+          + ctx._thinkOverruns + ' times in a row while reasoning and never produced an action. The turn was ended; the work is unfinished.';
+        respondLocaleOverride = ctx._localize || null;
+        ctx._responded = true;
+        ctx._respondIsLatest = true;
+        ctx._respondCount++;
+        if (respondLocaleOverride && respondLocaleOverride.code) ctx._respondLangs.add(respondLocaleOverride.code);
+      }
+      // otherwise: nothing to hide (no content); the retry/nudge lives in the no-tool-call block below
     } else if (_respondForced && round.tool_calls.length) {
       _stashAside(round.content);                        // working-tool round: keep leaked prose as thinking
       round.content = '';
@@ -5339,6 +5370,36 @@ async function runAgent(config, ctx) {
       ctx.emit({ type: 'rate', completion_tokens: round.usage.completion_tokens, decode_ms: Math.round(round.decode_ms), bench: /bench/i.test(String(config.model || '')) });
     }
     if (!round.tool_calls.length) {
+      // The model tried to answer in plain text without respond().    if (!round.tool_calls.length) {
+      if (_thinkOverrun) {
+        const _capTok = round.usage && round.usage.completion_tokens ? round.usage.completion_tokens : null;
+        // NEVER drop the round: the truncated reasoning stays in history and in the
+        // thinking box, flagged, so the transcript shows what actually happened.
+        const tm = { role: 'assistant',
+          content: '[reasoning cut at the output cap' + (_capTok ? ' (' + _capTok + ' tokens)' : '') + ' before any action was emitted]',
+          finish_reason: 'length' };
+        if (round.reasoning_content) tm.reasoning = round.reasoning_content;
+        messages.push(tm);
+        await emitAdded(tm);
+        if (!_thinkOverrunFinal && !ctx.signal?.aborted) {
+          setReminder('think-overrun',
+            '<system-reminder>OUTPUT CAP HIT WHILE REASONING (finish_reason=length' + (_capTok ? ', ' + _capTok + ' completion tokens' : '') + '): '
+            + 'your entire output budget was spent thinking and NO tool call and NO reply was emitted. Nothing you reasoned reached the user or the tools. '
+            + 'Do NOT resume or redo that reasoning; it will hit the same cap. Act now: emit the single next tool call (or respond()) immediately, '
+            + 'with at most a few sentences of reasoning. If the step is large, split it into smaller tool calls. '
+            + '(overrun ' + ctx._thinkOverruns + '/' + MAX_THINK_OVERRUNS + ')</system-reminder>',
+            { attempt: ctx._thinkOverruns, completion_tokens: _capTok });
+          continue;
+        }
+        // Retries exhausted (or aborted): end the turn VISIBLY, never silently.
+        ctx.emit({ type: 'error', message: 'Output-token cap hit ' + ctx._thinkOverruns + ' times in a row while reasoning; no action was produced. Turn ended with unfinished work.' });
+        if (round.content) {
+          const fm = { role: 'assistant', content: round.content, finish_reason: 'length' };
+          messages.push(fm);
+          await emitAdded(fm);
+        }
+        break;
+      }
       // The model tried to answer in plain text without respond(). It was hidden
       // (round.content blanked above); reject it and force a respond() call so the
       // reply reaches the user through the one visible channel. Capped — on the cap
