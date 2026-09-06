@@ -3197,7 +3197,7 @@ async function tool_walios({ script, timeout }, ctx) {
 // feeds it framed requests, so imports and user globals are paid once per session
 // and later calls land in the tens of milliseconds. Guest half + wire format:
 // modules/walios-repl.py.
-const WPY_REPL_URL = './walios-repl.py?v=3';
+const WPY_REPL_URL = './walios-repl.py?v=4';
 const WPY_GRACE_MS = 20000;      // JS deadline sits this far past the guest's own alarm
 let _wpy = null;                 // { worker, buf, waiters, seq, ready, booting, queue }
 

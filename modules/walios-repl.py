@@ -447,6 +447,17 @@ class _MountOnMiss:
 
     def __init__(self):
         self._tried = set()
+        self._mounted = set()
+
+    @staticmethod
+    def _resolve(fullname):
+        import importlib
+
+        importlib.invalidate_caches()
+        try:
+            return importlib.util.find_spec(fullname)
+        except Exception:
+            return None
 
     def find_spec(self, fullname, path=None, target=None):
         top = fullname.split(".")[0]
@@ -454,15 +465,20 @@ class _MountOnMiss:
         if not bundle or top in self._tried:
             return None
         self._tried.add(top)          # set BEFORE retrying: find_spec re-enters meta_path
-        r = _hostcall("mount", url=bundle[0], prefix=bundle[1])
+        url = bundle[0]
+        # Several packages share one bundle (openpyxl and et_xmlfile are both in
+        # walios-docs.tar.gz), and _tried keys on the MODULE, so importing openpyxl
+        # downloaded and extracted the same 12 MB tar twice -- measured at 4987ms for
+        # openpyxl against 1916ms for reportlab, which needs the same bundle once.
+        # Key the mount on the BUNDLE; a second module out of it just needs resolution
+        # retried, not another mount.
+        if url in self._mounted:
+            return self._resolve(fullname)
+        r = _hostcall("mount", url=url, prefix=bundle[1])
         if not r.get("ok_call"):
             return None
-        import importlib
-        importlib.invalidate_caches()
-        try:
-            return importlib.util.find_spec(fullname)
-        except Exception:
-            return None
+        self._mounted.add(url)
+        return self._resolve(fullname)
 
 
 def _install_lazy_mounts():
