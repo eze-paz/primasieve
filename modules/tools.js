@@ -523,7 +523,7 @@ const RUN_PYTHON_WALIOS = (() => {
   // "they raise event loop is already running" is simply untrue here. subprocess and
   // os.popen, by contrast, HANG to the timeout because fork cannot start a child.
   const ASYNC_WALIOS = "ASYNC: top-level await works, and so does the normal asyncio API — asyncio.run(main()), loop.run_until_complete() and asyncio.new_event_loop() all work here (unlike the Pyodide backend). Use whichever reads best. Do NOT use time.sleep() — it blocks this run's interpreter and burns the timeout; use await asyncio.sleep(n).";
-  const SHELL_WALIOS = "SHELL: there is no subprocess. subprocess.run(), subprocess.Popen and os.popen() HANG until the timeout (fork cannot start a child), and os.system() just returns -1. Never shell out from Python — use the walios tool for shell work, or do it in Python directly.";
+  const SHELL_WALIOS = "SHELL: there is no subprocess. subprocess.run(), subprocess.Popen and os.popen() raise OSError [Errno 38] Function not implemented immediately (this platform cannot fork), and os.system() returns -1. Do not shell out from Python — use the walios tool for shell work, or do the job in Python directly.";
   let out = base
     .replace('Execute a Python script from OPFS via Pyodide.',
              'Execute a Python script from OPFS via walios (wasm CPython 3.14 on a real Linux userland).')

@@ -18,7 +18,10 @@
   // SIGALRM twice -- measured 2 handler entries where 1 was expected. In Python the
   // second delivery re-entered the handler inside the except clause of the first and
   // went uncaught, which is exactly the _set_timeout pattern.
-  const WORKER_V = 'dlopen10';
+  // dlopen11: fork returns ENOSYS on a binary without Asyncify (CPython). It used to
+  // hand back a pid and never run the child, so subprocess/os.popen waited out the
+  // whole timeout; now they raise OSError immediately.
+  const WORKER_V = 'dlopen11';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
