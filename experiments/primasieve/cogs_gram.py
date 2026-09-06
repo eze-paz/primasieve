@@ -720,20 +720,21 @@ def parses_cl(lex, sch, toks, i, gapped, budget):
             yield from after_subject([(None, "NP", npn)], j)
 
 
-def parse_sentence(lex, sch, toks, want=1):
+def parse_sentence(lex, sch, toks, want=1, cap=None):
     """Complete parses only: every token consumed. `want` caps how many are collected (2 to detect ambiguity).
 
     A hard iteration cap makes the parser FAIL CLOSED: the coordination/marker generators are not all
     budget-threaded, so a genuinely ambiguous input (a homograph -- a word that is a noun in one place and an
     adjective in another -- is the case that hits this) can explode the search tree. Capping the yielded
     partial parses turns that into an ABSTENTION, never a hang."""
-    budget = [PARSE_BUDGET]
+    lim = cap if cap is not None else PARSE_BUDGET
+    budget = [lim]
     out = []
     seen_parts = 0
     for node, j in parses_cl(lex, sch, toks, 0, False, budget):
         seen_parts += 1
-        if seen_parts > 12000:              # fail closed on a genuine search explosion (a homograph); high
-            return []                       # enough not to touch deep COGS recursion (verified 1.0000)
+        if seen_parts > min(12000, lim):    # fail closed on a search explosion (a homograph); the SCHEMA
+            return []                       # SEARCH passes a small cap so ambiguity is cut off cheaply
         if j == len(toks):
             out.append(node)
             if len(out) >= want:
@@ -1095,8 +1096,14 @@ PARSE_DIMS = ("np_branch", "verb_pos")          # the only dimensions that chang
                                                 # change how a fixed derivation is read out as a logical form
 
 
+SEARCH_CAP = 1500   # per-parse budget DURING the exhaustive schema search: enough to reproduce ordinary
+                    # sentences, small enough that adversarial noun/adjective ambiguity is cut off cheaply.
+                    # The final fit (induce_roles, reproduce) uses the full PARSE_BUDGET.
+
+
 def _parse_rows(lex, sch, rows):
-    return [(parse_sentence(lex, sch, strip_term(lex, s), want=1) or [None])[0] for s, _, _ in rows]
+    return [(parse_sentence(lex, sch, strip_term(lex, s), want=1, cap=SEARCH_CAP) or [None])[0]
+            for s, _, _ in rows]
 
 
 def _score_parsed(lex, sch, rows, nodes):
