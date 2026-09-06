@@ -109,7 +109,7 @@ if __name__ == "__main__":
         p = cogs_generate(m, s)
         n += 1
         em += cem(p, gold)
-    checks.append(("COGS gen EM (21000 items)", em / n, 0.9990))
+    checks.append(("COGS gen EM (21000 items)", em / n, 1.0000))   # 4b open-vocab took the 22 OOV abstains to correct
 
     strn, ste = scan_load("simple")
     G = scan_induce(strn)

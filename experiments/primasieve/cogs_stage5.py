@@ -67,6 +67,8 @@ def induce_ablated(tr):
     m = induce(tr)
     lex = m[0]
     lex.emark, lex.emark_det, lex.vmark, lex.coord = {}, set(), {}, set()
+    lex.adj = {}          # track 1 moved adjectives to lex.adj; the ablation must blank it too, else the
+                          # adjective machinery is not actually disabled and its drop is spuriously 0
     return m
 
 
