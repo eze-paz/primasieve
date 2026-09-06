@@ -1935,8 +1935,6 @@ async function newConversation() {
 // filtered out — they fire constantly during a turn but never change a row.
 const _convRowCache = new Map();
 
-async function listConversations() {
-
 // --- Archived content search via the Dropbox API (archive-dehydration step 1) ---
 // Archived conversations are matched by CLOUD content search (files/search_v2
 // scoped to the archived folder) instead of reading every archived .jsonl from
@@ -1966,6 +1964,11 @@ async function searchArchivedCloud(q) {
   _archSearchCache.q = q; _archSearchCache.ids = ids;
   return ids;
 }
+
+// MODULE SCOPE (not nested in listConversations): the bootConversations
+// file:changed/file:deleted listener and the Archive tab both call
+// _archSearchInvalidate()/searchArchivedCloud() outside that function.
+async function listConversations() {
   const searchActive = !!($('convSearch')?.value.trim());
 
   // Scan the ACTIVE dir only. The sidebar never lists archived conversations
