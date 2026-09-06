@@ -26,24 +26,42 @@ the commit rule is untouched: exactly one shortest path -> do it; nothing within
 import os, sys
 from collections import deque
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import en_world as W
+from core import primitives as P
+
+# THE EDITS THEMSELVES NOW LIVE IN core/primitives.py, unnamed and with the forcing record that says the
+# representation -- not a failing test -- put them there. l0.py had independently written the same growth
+# rule over an expression grammar; one inventory now serves both. What stays HERE is what is genuinely this
+# world's: the record's field ORDER, the degeneracy/bounds validity check, and the colour field's extent.
+# The binding from this file's labels to the shared primitives is by SEARCH UNDER VERIFICATION -- exactly one
+# primitive of the right shape must reproduce the witness -- so core/ still holds no name -> primitive table.
+def _bind(sig, witness):
+    hits = [q for q in P.candidates(sig) if all(P.apply(q, *a) == v for a, v in witness)]
+    if len(hits) != 1:
+        raise AssertionError(f"en_ops binding is not unique: {len(hits)} primitives reproduce {witness}")
+    return P.unchecked(hits[0])
+
+
+_FIELD_STEP = _bind(((P.REC, P.INT, P.INT), P.REC), [(((0, 0, 0, 0), 0, 1), (1, 0, 0, 0))])
+_STEP = _bind(((P.INT, P.INT), P.INT), [((3, 4), 7)])
+_WRAP = _bind(((P.INT, P.INT), P.INT), [((5, 3), 2)])
 
 
 def _mk(field, delta):
     def op(o):
-        (x0, y0, x1, y1), c = o
-        v = [x0, y0, x1, y1]
-        v[field] += delta
+        r, c = o
+        v = _FIELD_STEP(r, field, delta)
         if v[2] <= v[0] or v[3] <= v[1]: return None          # degenerate
         if not (0 <= v[0] and 0 <= v[1] and v[2] <= W.G and v[3] <= W.G): return None
-        return ((v[0], v[1], v[2], v[3]), c)
+        return (v, c)
     return op
 
 
 def _cycle(o):
     (r, c) = o
-    return (r, (c + 1) % len(W.COLOURS))
+    return (r, _WRAP(_STEP(c, 1), len(W.COLOURS)))            # a finite-extent field: step then wrap
 
 
 # PRIMITIVES: one edit per field of the representation. Nothing here was added for a test.

@@ -20,6 +20,8 @@ import sys
 PUBLISHED = {
     # ---- current frontier -------------------------------------------------------------------------------------
     "l0": ["PASSES: all 6 parametric operators", "trunc     with abs/sign: E=109203"],
+    # ---- the unnamed executable inventory (given #4): a ledger claim, not a capability claim ---------------------
+    "primitives": ["PRIMITIVE INVENTORY: SOUND"],
     "emergence": ["`x * x` (seen 6x)", "[7019 exprs", "[3008 exprs"],
     # ---- perception rung 1 (p1-p9; the rung CLOSES at p9) -----------------------------------------------------
     "percept_p7": ["0 confabulation, never"],

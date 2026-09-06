@@ -29,26 +29,52 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # which invented the same structure independently. The TRAVERSAL ORDER stays here, because it is
 # load-bearing for the published energies (trunc at E=109203).
 from core.generate import SignatureBank
+from core import primitives as P
 
 X = "X"                                                     # domain error / undefined
 
+# THE EXECUTABLE BASE IS NOT HELD HERE. It lives once in core/primitives.py -- unnamed, typed, with the
+# FORCED_BY ledger this file's growth rule invented -- shared with emergence/en_ops.py, which had built the
+# same "derive the primitives from the representation" rule over a record instead of an expression grammar.
+# l0 keeps ITS OWN legacy labels and binds each to a primitive by SEARCH UNDER VERIFICATION over
+# candidates(): exactly one primitive of the right shape must reproduce l0's witnesses, or the bind raises.
+# So the glyphs are l0's, the executables are shared, and core/ still holds no name -> primitive table.
+_R2, _R1 = ((P.RAT, P.RAT), P.RAT), ((P.RAT,), P.RAT)
 
-def _sign(x): return (x > 0) - (x < 0)
-UNARY = {"abs": lambda v: X if v is X else abs(v),
-         "sign": lambda v: X if v is X else _sign(v),
-         "neg": lambda v: X if v is X else -v}
+
+def _bind(sig, witness):
+    hits = [q for q in P.candidates(sig) if all(P.apply(q, *a) == v for a, v in witness)]
+    if len(hits) != 1:
+        raise AssertionError(f"l0 binding is not unique: {len(hits)} primitives reproduce the witness {witness}")
+    return P.unchecked(hits[0])
 
 
-def _add(x, y): return X if X in (x, y) else x + y
-def _sub(x, y): return X if X in (x, y) else x - y
-def _mul(x, y): return X if X in (x, y) else x * y
-def _fdiv(x, y): return X if (X in (x, y) or y == 0) else x // y
-def _tdiv(x, y): return X if (X in (x, y) or y == 0) else F(x) / F(y)   # true division (ast.Div node type)
+_B_ADD = _bind(_R2, [((F(3), F(4)), 7), ((F(-2), F(5)), 3)])
+_B_SUB = _bind(_R2, [((F(3), F(4)), -1)])
+_B_MUL = _bind(_R2, [((F(3), F(4)), 12)])
+_B_FDV = _bind(_R2, [((F(7), F(2)), 3)])
+_B_TDV = _bind(_R2, [((F(7), F(2)), F(7, 2))])
+_B_ABS = _bind(_R1, [((F(-3),), 3), ((F(3),), 3)])
+_B_SGN = _bind(_R1, [((F(-3),), -1)])
+_B_NEG = _bind(_R1, [((F(3),), -3)])
+
+UNARY = {"abs": lambda v: X if v is X else _B_ABS(v),
+         "sign": lambda v: X if v is X else _B_SGN(v),
+         "neg": lambda v: X if v is X else _B_NEG(v)}
+
+
+def _add(x, y): return X if X in (x, y) else _B_ADD(x, y)
+def _sub(x, y): return X if X in (x, y) else _B_SUB(x, y)
+def _mul(x, y): return X if X in (x, y) else _B_MUL(x, y)
+def _fdiv(x, y): return X if (X in (x, y) or y == 0) else _B_FDV(x, y)
+def _tdiv(x, y): return X if (X in (x, y) or y == 0) else _B_TDV(x, y)   # exact division (ast.Div node type)
 
 BINARY_BASE = {"+": _add, "-": _sub, "*": _mul, "//": _fdiv}
 BINARY_FULL = dict(BINARY_BASE, **{"/": _tdiv})
 
 # Primitive-growth ledger: which target FORCED each primitive beyond the E8 base set. Filled by the audit.
+# The ledger for the whole executable base now lives with the base, in core.primitives.ledger(); this entry
+# is kept because 1.2's growth-rule print quotes it verbatim, and core/primitives.py quotes it back.
 FORCED_BY = {"/": "integ frame c'=c/(e+1) needs exact rational division; ast.Div IS an object-grammar node type"}
 
 COMBINATORS = {
