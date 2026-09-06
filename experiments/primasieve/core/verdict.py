@@ -12,6 +12,96 @@ exact match fell 1.000 -> 0.000 at 1% training corruption while confabulation st
 collapsed into abstention and remained deployable in a way an accuracy column alone would have hidden."""
 COMMIT, ABSTAIN = "commit", "hard"
 
+# ---------------------------------------------------------------------------------------------------------------
+# THE THIRD STATE -- ATTRIBUTED (E-7, emergence/em_attributed.py, em_attributed_prereg.md; owner's proposal).
+#
+# Two buckets, proven or silent, cap the engine's reach at what its oracles can verify. ATTRIBUTED lets it HOLD
+# and USE a premise it cannot verify, on one condition: a CERTIFICATE -- (source, span) where the span is a
+# verbatim substring of the source and the engine's own reading of the span yields exactly the claim. That check
+# is exact, so a new fatal column appears next to confabulation: MISATTRIBUTION. And a third: LAUNDERING -- a
+# COMMIT whose provenance is non-empty and was never upgraded by world evidence. All three must sit at zero.
+#
+#   taint      anything derived from an attributed premise is attributed, provenance = union
+#   one-way    world evidence contradicting it RETRACTS it and every dependent (source struck); world evidence
+#              uniquely confirming it UPGRADES it to COMMIT; nothing ever moves COMMIT -> ATTRIBUTED
+#   no weights the only per-source number is a COUNT of confirmations/strikes, reported, never used to decide
+#
+# E14 pre-registered a CONJECTURED state and was deleted for want of a certificate; the reference IS the
+# certificate. "The core is as wide as its oracles" gets a companion: attributed reach is as wide as its
+# SOURCES, and the guarantee shifts from correctness to fidelity. Measurements: see the E-7 row in ARCHITECTURE.
+# ---------------------------------------------------------------------------------------------------------------
+ATTRIBUTED, RETRACTED = "attributed", "retracted"
+
+
+def attribute(claim, source_id, source_text, span, reads):
+    """Admit `claim` on the word of `source_id` iff the certificate checks: `span` is verbatim in the source
+    text and `reads(span) == claim`. -> (claim, ATTRIBUTED, {(source_id, span)}) or (None, ABSTAIN, set()).
+    A failed check is a MISATTRIBUTION attempt: it is refused at the door and never held."""
+    if span and span in source_text and reads(span) == claim:
+        return claim, ATTRIBUTED, {(source_id, span)}
+    return None, ABSTAIN, set()
+
+
+def combine(*states):
+    """The taint lattice: any ABSTAIN/RETRACTED -> ABSTAIN; any ATTRIBUTED -> ATTRIBUTED; else COMMIT."""
+    if any(s in (ABSTAIN, RETRACTED) for s in states): return ABSTAIN
+    if any(s == ATTRIBUTED for s in states): return ATTRIBUTED
+    return COMMIT
+
+
+class Beliefs:
+    """Provenance-carrying store. Each key -> dict(value, state, prov: set[(source, span)], deps: set[key],
+    upgraded: bool). Derived claims inherit the union of provenance and the lattice state."""
+
+    def __init__(self):
+        self.b = {}; self.strikes = {}; self.confirms = {}
+
+    def hold(self, key, value, state, prov=()):
+        self.b[key] = dict(value=value, state=state, prov=set(prov), deps=set(), upgraded=False, from_=set())
+        for s, _ in prov: self.strikes.setdefault(s, 0); self.confirms.setdefault(s, 0)
+
+    def derive(self, key, value, from_keys):
+        prem = [self.b[k] for k in from_keys]
+        state = combine(*[p["state"] for p in prem])
+        prov = set().union(*[p["prov"] for p in prem]) if prem else set()
+        self.b[key] = dict(value=value, state=state, prov=prov, deps=set(), upgraded=False, from_=set(from_keys))
+        for k in from_keys: self.b[k]["deps"].add(key)
+        return state
+
+    def upgrade(self, key):
+        """world evidence uniquely confirms an ATTRIBUTED claim -> COMMIT (provenance kept as history)."""
+        e = self.b[key]
+        if e["state"] == ATTRIBUTED:
+            e["state"] = COMMIT; e["upgraded"] = True
+            for s, _ in e["prov"]: self.confirms[s] = self.confirms.get(s, 0) + 1
+
+    def retract(self, key):
+        """world evidence contradicts an ATTRIBUTED claim -> RETRACTED, cascading to every dependent."""
+        e = self.b[key]
+        if e["state"] == COMMIT and not e["prov"]:
+            raise AssertionError("a world-verified COMMIT is never retracted")
+        out = []
+        stack = [key]
+        while stack:
+            k = stack.pop()
+            if self.b[k]["state"] == RETRACTED: continue
+            self.b[k]["state"] = RETRACTED; out.append(k)
+            stack.extend(self.b[k]["deps"])
+        for s, _ in e["prov"]: self.strikes[s] = self.strikes.get(s, 0) + 1
+        return out
+
+    def laundered(self):
+        """COMMITs carrying provenance that were never upgraded by the world -- must be empty."""
+        return [k for k, e in self.b.items() if e["state"] == COMMIT and e["prov"] and not e["upgraded"]]
+
+
+def summarize3(n, confab, misattrib, laundered, attributed_wrong, attributed, abstain, label=""):
+    """The reporting contract with the third state: the three FATAL columns first."""
+    n = max(n, 1)
+    return (f"{label + ': ' if label else ''}CONFABULATION {confab}/{n}   MISATTRIBUTION {misattrib}   "
+            f"LAUNDERING {laundered}   |   attributed {attributed}/{n} (source-wrong {attributed_wrong})   "
+            f"abstain {abstain}/{n}")
+
 
 def commit(x):
     return (x, COMMIT) if x is not None else (None, ABSTAIN)

@@ -1826,7 +1826,131 @@
     "waste": 0.967
    }
   ],
-  "secs": 118.0
+  "secs": 89.7
+ },
+ "E7_attributed_state": {
+  "cascaded": 13,
+  "confirms": {
+   "DICT-A": 5,
+   "DICT-B": 3,
+   "FORUM": 2,
+   "WORDNET": 3
+  },
+  "decoy": {
+   "big": "attributed",
+   "small": "hard"
+  },
+  "passed": false,
+  "pre_evidence": {
+   "abstain": 135,
+   "attributed": 65,
+   "attributed_wrong": 13,
+   "confab": 0,
+   "n": 200,
+   "wrong_by_source": {
+    "DICT-B": 5,
+    "FORUM": 8
+   }
+  },
+  "prereg": "em_attributed_prereg.md",
+  "read": {
+   "admitted": 15,
+   "contested": [
+    "teal",
+    "minuscule"
+   ],
+   "distractor_admits": 0,
+   "refused": 3
+  },
+  "retracted": [
+   "central",
+   "lofty"
+  ],
+  "secs": 3.3,
+  "shuffle_admitted": 0,
+  "strikes": {
+   "DICT-A": 0,
+   "DICT-B": 1,
+   "FORUM": 2,
+   "WORDNET": 1
+  },
+  "upgraded": [
+   "azure",
+   "boxy",
+   "broad",
+   "crimson",
+   "emerald",
+   "minuscule(resolved)",
+   "scarlet",
+   "teal(resolved)",
+   "topmost"
+  ]
+ },
+ "E8_corpus_acquisition": {
+  "attributed": 38,
+  "by_pred": {
+   "big": 1,
+   "blue": 2,
+   "green": 3,
+   "middle": 2,
+   "orange": 1,
+   "purple": 2,
+   "red": 17,
+   "small": 1,
+   "tiny": 6,
+   "wide": 1,
+   "yellow": 2
+  },
+  "prereg": "em_corpus_prereg.md",
+  "secs": 1.3,
+  "single_token": 32,
+  "sound": true,
+  "stats": {
+   "contested_synsets": 0,
+   "contested_words": 0,
+   "passes": [
+    {
+     "admitted": 32,
+     "depth": 1
+    },
+    {
+     "admitted": 3,
+     "depth": 2
+    },
+    {
+     "admitted": 3,
+     "depth": 3
+    }
+   ],
+   "refused": 0,
+   "rule": "first-sense",
+   "synsets": 18185
+  },
+  "v1_record": {
+   "attributed": 1001,
+   "author_audit": "~7/40 correct; sense drift (blue->sad, big->bad, square->drunk)",
+   "stats": {
+    "contested_synsets": 18,
+    "contested_words": 21,
+    "passes": [
+     {
+      "admitted": 159,
+      "depth": 1
+     },
+     {
+      "admitted": 274,
+      "depth": 2
+     },
+     {
+      "admitted": 568,
+      "depth": 3
+     }
+    ],
+    "refused": 3,
+    "rule": "any-sense",
+    "synsets": 18185
+   }
+  }
  },
  "blind_arm": [
   {

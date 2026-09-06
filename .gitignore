@@ -30,3 +30,7 @@ _hf/
 _cpukern/target/
 test/lang-harness/.env
 
+
+# primasieve regenerable network cache + transient logs
+experiments/primasieve/emergence/kb_cache.json
+experiments/primasieve/selftest.err

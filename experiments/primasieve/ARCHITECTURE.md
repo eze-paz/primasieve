@@ -141,6 +141,23 @@ frontier was deceptive, not the signal. Two recorded limits: distractor ops (`%`
 almost-right-primitive-plus-correction targets, the residual-repair shape, not generically. Not in C2 (a 6-minute
 run); the claim lives in `CONSOLIDATION.md` limit #10.
 
+### Emergence E-7 — the third verdict state (core/verdict.py: ATTRIBUTED)
+Owner's proposal: the engine had two buckets, proven or silent. `core/verdict.py` now has **ATTRIBUTED** — a
+premise held on a **checkable certificate** `(source, span)`: the span verbatim in the source and the engine's
+own reading of it equal to the claim — with a taint lattice (derived-from-attributed is attributed, provenance
+union), one-way defeasibility (world contradiction RETRACTS with cascade and strikes the source; unique
+confirmation UPGRADES to COMMIT; nothing moves the other way), and two new fatal columns beside confabulation:
+**MISATTRIBUTION** (certificate fails — refused at the door) and **LAUNDERING** (a COMMIT carrying provenance never
+upgraded by the world). `emergence/em_attributed.py` + prereg on the rect world, 12 new words, 4 sources (3
+planted texts incl. 3 lies + the real WordNet): **confab 0, misattribution 0, laundering 0; all 3 lies retracted or
+struck with 100% of dependent answers cascaded (13); 9 truths upgraded incl. two contested words resolved by the
+world; distractor mentions admit 0; span-rotation knockout admits 0; today's antonym-bridge decoy (large→small)
+is blocked by the certificate while large→big passes.** Two honest notes: **utility 65/200 pre-evidence
+attributed answers vs a pre-registered bar of 100 — NOT MET** (contested words and a word whose meaning the base
+lexicon never learned abstain; a unique referent is required), so the registered claim is SOUND, not PASS; and a
+prediction miss — WordNet genuinely contests `minuscule` (small vs tiny), so two words were contested, not one.
+Chat wiring: user-taught and WordNet-confirmed words carry provenance and answers that rely on them say so.
+
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still
 frozen by hand** — the one authored thing Stage 3b's knockout ladder did not remove. It should be

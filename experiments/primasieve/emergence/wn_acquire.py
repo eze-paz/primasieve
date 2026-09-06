@@ -156,12 +156,19 @@ def propose(word, known_words, pos_order=("adj", "noun"), hops=1):
     polysemy produced junk bridges -- "can" -> remove (via canning) and "find" -> grow (via "come to be") --
     which would have had the engine asking to learn function words as actions. Measured: at hops=0, erase and
     expand still bridge correctly while can/find/hello propose nothing."""
+    # RANKED BY HOP DISTANCE, strict synonyms first. Measured failure (chat, 2026-09-06): "large" proposed
+    # 'small' -- the antonym pointer is one hop away, 'big' is in the SAME synset, and the old loop returned
+    # candidates in lexicon order, so whichever known word happened to be listed first won. A same-synset
+    # candidate must outrank a one-hop one; among equals, lexicon order stands.
     props = []
     for pos in pos_order:
-        rel = related_words(word, pos, hops=hops)
-        for kw in known_words:
-            if kw in rel and kw not in [p[0] for p in props]:
-                props.append((kw, pos))
+        rings = [related_words(word, pos, hops=0)]
+        for h in range(1, hops + 1):
+            rings.append(related_words(word, pos, hops=h) - set().union(*rings))
+        for rel in rings:
+            for kw in known_words:
+                if kw in rel and kw not in [p[0] for p in props]:
+                    props.append((kw, pos))
     return props
 
 
