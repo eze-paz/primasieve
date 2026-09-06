@@ -19,6 +19,9 @@ Only the LibreOffice command-line shape people actually type is supported:
 
   soffice [--headless] --convert-to pdf [--outdir DIR] FILE...
 
+Without --outdir the PDF is written to the CURRENT directory, which is what real
+soffice does -- not next to the source file.
+
 Conversion targets other than pdf are refused honestly: the page engine only carries
 the *_pdf_Export filters.
 """
