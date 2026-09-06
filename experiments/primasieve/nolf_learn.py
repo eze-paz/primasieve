@@ -35,7 +35,7 @@ from core.generate import SignatureBank
 INT, BOOL, SEQ, ELEM = P.INT, P.BOOL, P.SEQ, P.ELEM
 HI, HE, HR, HS, HB = "hi", "he", "hr", "hs", "hb"                  # hole kinds
 HOLE_TYPE = {HI: INT, HE: ELEM, HB: BOOL}
-MAX_OPS, MAX_HOLES, JACCARD, BANK_CAP, MIN_ROWS, GRACE = 4, 5, 0.5, 6000, 15, 10
+MAX_OPS, MAX_HOLES, JACCARD, BANK_CAP, MIN_ROWS, GRACE = 4, 5, 0.5, 6000, 40, 10
 
 
 # ------------------------------------------------------------------------------------------ terms and their closures
@@ -164,7 +164,7 @@ class Enumerator:
         self.atoms = _atoms_by_sig()
         self.probes = probes; self.elems = sorted(elems, key=repr); self.rels = rels; self.sels = sels
         rng = random.Random(0)
-        self.envs = {HI: [0, 1, -1, 3, 5, 2], HE: (self.elems * 3)[:4], HR: (rels * 2)[:4], HS: (sels * 2)[:4], HB: [True, True, False, False]}
+        self.envs = {HI: [0, 1, 3, 2, 5, 4], HE: (self.elems * 3)[:6], HR: (rels * 2)[:6], HS: (sels * 2)[:6], HB: [True, True, False, False, True, False]}
         self.vars = []
         for s in probes[:2]:
             for x in list(s)[:3]: self.vars.append(x)
@@ -175,7 +175,7 @@ class Enumerator:
         and are different terms -- the first version merged them and lost negation."""
         f = compile_term(term); hs = holes(term)
         out = [tuple(hs)]
-        for j in range(4):
+        for j in range(6):
             env = tuple(self.envs[h][(j + q) % len(self.envs[h])] for q, h in enumerate(hs))   # distinct per hole
             for s in self.probes:
                 vs = self.vars if lam else [None]
@@ -374,7 +374,30 @@ class Learner:
             if seen_tv.setdefault(k, tv) != tv: collide = True; break
         words = [w for w in rows[0][1] if isinstance(w, str)]
         first_hit = None
-        for term in enum.candidates(self.max_ops):
+        typed = {}                                                # word -> kinds it already has
+        for (w, h) in self.dom: typed.setdefault(w, set()).add(h)
+        def min_novelty(term):
+            hs_ = holes(term)
+            if len(hs_) != nslots: return 99
+            best = 99
+            for perm in itertools.permutations(range(nslots)):
+                n = sum(1 for j, h in enumerate(hs_) if isinstance(rows[0][1][perm[j]], str)
+                        and rows[0][1][perm[j]] in typed and h not in typed[rows[0][1][perm[j]]])
+                best = min(best, n)
+                if best == 0: break
+            return best
+        def ordered():
+            """size level by size level; inside a level, terms whose holes can be filled without giving any word a
+            new kind come first -- on a world where every word is an integer or a relation, terms with element
+            holes otherwise consume the level's budget (measured: 1694 candidate pairs, none of them the truth)"""
+            level, buf = None, []
+            for t in enum.candidates(self.max_ops):
+                if ops(t) != level:
+                    for x in sorted(buf, key=min_novelty): yield x
+                    level, buf = ops(t), []
+                buf.append(t)
+            for x in sorted(buf, key=min_novelty): yield x
+        for term in ordered():
             if time.time() > self.deadline: break
             # after the first accepted analysis, alternatives at the same size get a short grace period; the
             # held-out fifth (evidence gate) is what protects against a wrong first analysis, not exhaustion
@@ -382,7 +405,9 @@ class Learner:
             hs = holes(term)
             if len(hs) != nslots: continue
             if best_ops is not None and ops(term) > best_ops: break
-            if collide and not uses_sit(term) and HB not in hs: continue
+            # a sentence's truth depends on the situation: a term over word slots that never reads it can only be right
+            # by memorising (measured: 'b12a(_i, 0)' on 23-34 rows passed the evidence gate by luck and confabulated)
+            if not uses_sit(term) and HB not in hs: continue
             f = compile_term(term)
             # a word keeps the kind it already has unless nothing else fits: mappings that give a typed word a NEW
             # kind are tried after those that do not, and once a level succeeds the noisier levels are skipped
@@ -545,7 +570,13 @@ class Learner:
         rels = [p for p in P.pids() if P.signature(p) == ((INT, INT), BOOL)]
         sels = [("all",), ("any",)] + [("idx", k) for k in range(-1, 4)]
         self.universe = {HI: sorted(ints), HE: sorted(elems, key=repr), HR: rels, HS: sels}
-        probes = [sit for sit, _, _ in train[:3]]
+        # dedupe probes: 8 situations of DIFFERENT sizes -- with 3, 'all records satisfy' and 'record 0 satisfies'
+        # agreed on every probe and the quantifier construction was merged away (measured)
+        by_size = {}
+        for sit, _, _ in train:
+            by_size.setdefault(len(sit), []).append(sit)
+        probes = [x for k in sorted(by_size) for x in by_size[k][:3]][:8]
+        if len(probes) < 8: probes += [sit for sit, _, _ in train[:8 - len(probes)]]
         enum = Enumerator(probes, elems, rels, sels)
         enum.table(False); self.table_seconds = time.time() - t0; self.t0 = t0; self.enum = enum
         self.demoted = set()
@@ -553,42 +584,43 @@ class Learner:
         for row in train: by_len[len(row[1])].append(row)
         self.log = []
         final = t0 + self.budget
-        for pass_ in (1, 2):
-            for L in sorted(by_len):
-                groups = collections.defaultdict(list); raw = collections.defaultdict(list)
-                for sit, toks, tv in by_len[L]:
-                    items = self._reduce(toks)
-                    key, fill = self._key(items)
-                    groups[key].append((sit, fill, tv))
-                    rkey, rfill = self._key([("c", self.cls[w], w) for w in toks])
-                    raw[key].append((rkey, (sit, rfill, tv)))
-                # composites over learned pieces first (no word slot: one atom away, near-free), then by EVIDENCE --
-                # the construction with the most rows pins the most words, and every later skeleton gets cheaper
-                # measured (records): fewest slots first learns the 3-slot quantifier constructions in ~50 s each and
-                # then the 4-slot construction in ~30 s with three classes already pinned; evidence-first spent the
-                # whole budget on the 4-slot construction with nothing pinned. Composites (no word slot) go first.
-                todo = [(k, r) for k, r in sorted(groups.items(), key=lambda kv: (sum(1 for x in kv[0] if x != "B" and x[0] == "C"), -len(kv[1])))
-                        if k not in self.grammar]
-                for i, (key, rows) in enumerate(todo):
-                    if time.time() > final: break
-                    left = final - time.time()
-                    # pass 1 shares what is left evenly, with a floor; pass 2 gives a skeleton everything remaining
-                    # pass 1: a fair share of what is left, floored at 45 s and CEILED at 90 s so one expensive skeleton
-                    # cannot starve the cheap composites (negation, conjunction) that only exist once it is grouped
-                    self.deadline = min(final, time.time() + min(75, max(30, left / (len(todo) - i)))) if pass_ == 1 else final
-                    self._learn_key(key, rows, enum)
-                    if key not in self.grammar and any(k == "B" for k in key):
-                        # the greedy reduction may have swallowed a span that is not a constituent here ("count x"
-                        # read as a positional construction): try the sentence unreduced
-                        by_raw = collections.defaultdict(list)
-                        for rkey, row in raw[key]: by_raw[rkey].append(row)
-                        for rkey, rrows in by_raw.items():
-                            if rkey not in self.grammar and time.time() < final:
-                                self.deadline = min(final, time.time() + (30 if pass_ == 1 else final - time.time()))
-                                self._learn_key(rkey, rrows, enum)
-            self.deadline = final
+        # SELF-GENERATED CURRICULUM (the E-6 closure lesson applied to constructions): no authored order. After every
+        # construction lands, everything is re-grouped (new constructions reduce more spans) and re-ranked by how much
+        # of it is already PINNED -- the fraction of its slot words that have a denotation -- then by how many slot
+        # classes are still unknown, then by evidence. The foundation (nothing pinned yet) gets the largest cap,
+        # because every later skeleton is cheaper once it lands; a skeleton is retried whenever new pins arrive.
+        tried = {}                                                # key -> number of pins when last attempted
+        while time.time() < final:
+            groups = collections.defaultdict(list); raw = collections.defaultdict(list)
+            for sit, toks, tv in train:
+                items = self._reduce(toks); key, fill = self._key(items)
+                groups[key].append((sit, fill, tv))
+                rkey, rfill = self._key([("c", self.cls[w], w) for w in toks]); raw[key].append((rkey, (sit, rfill, tv)))
+            npins = len(self.dom)
+            pinned_words = {k[0] for k in self.dom}
+            def pinned_frac(key, rows):
+                slots = {w for _, fill, _ in rows for w in fill if isinstance(w, str)}
+                return sum(1 for w in slots if w in pinned_words) / len(slots) if slots else 1.0
+            def unknown_classes(key):
+                return sum(1 for k in key if k != "B" and k[0] == "C" and not any(self.cls.get(w) == k[1] for (w, _) in self.dom))
+            todo = [(k, r) for k, r in groups.items() if k not in self.grammar and len(r) >= MIN_ROWS
+                    and any(x != "B" and x[0] == "C" or x == "B" for x in k) and tried.get(k, -1) < npins]
+            if not todo: break
+            key, rows = max(todo, key=lambda kr: (pinned_frac(*kr), -unknown_classes(kr[0]), len(kr[1])))
+            tried[key] = npins
+            left = final - time.time()
+            cap = 120 if npins == 0 else 60
+            self.deadline = min(final, time.time() + min(cap, left))
+            self._learn_key(key, rows, enum)
+            if key not in self.grammar and any(k == "B" for k in key):
+                by_raw = collections.defaultdict(list)                # the greedy reduction may have swallowed a
+                for rkey, row in raw[key]: by_raw[rkey].append(row)   # non-constituent: try the sentence unreduced
+                for rkey, rrows in by_raw.items():
+                    if rkey not in self.grammar and len(rrows) >= MIN_ROWS and time.time() < final:
+                        self.deadline = min(final, time.time() + 30); self._learn_key(rkey, rrows, enum)
+        self.deadline = final
         self.log = [e for i, e in enumerate(self.log) if not (e[0] == "unsolved" and any(
-            f[0] == "learned" and f[1] == e[1] for f in self.log[i + 1:]))]   # an unsolved that pass 2 solved is not a record
+            f[0] == "learned" and f[1] == e[1] for f in self.log[i + 1:]))]
         self.seconds = time.time() - t0
         return self
 

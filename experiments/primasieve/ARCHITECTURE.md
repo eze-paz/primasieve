@@ -301,6 +301,26 @@ assignment accepts spurious lexicons; a 150-row subsample under-determines numer
 not be merged by intersection; memorised constructions from 1-5 rows are where confabulation enters; greedy
 reduction needs an unreduced fallback; a demoted word must be absorbed when the general construction appears.
 Not registered in `core/registry.py` (no PASS to protect); `nolf_results.json` holds the last fits.
+
+**The self-generated curriculum (owner's go-ahead, same day).** No authored order: after every construction lands,
+everything is re-grouped (new constructions reduce more spans) and re-ranked by the fraction of its slot words
+already pinned, then by unknown slot classes, then by evidence; the foundation (nothing pinned) gets the largest
+cap; a skeleton is retried whenever new pins arrive; candidate terms inside a size level are ordered by how many
+new word typings their best mapping needs. Two more lessons paid for on the way: the dedupe probes must span
+situation SIZES (with three probes 'all records satisfy' and 'record 0 satisfies' agreed everywhere and the
+quantifier construction was merged away), and a term over word slots must READ the situation unconditionally
+(situation-blind terms on 20-30 rows passed the evidence gate by luck and produced the only confabulations seen).
+**Measured after the curriculum (240 s per world, all four fits on one code state, `nolf_results.json`):
+CONFABULATION 0 on every split of every fit.**
+- **records**: 5 constructions -- 'some', 'every', the 4-slot atom, negation, conjunction -- compositional EM
+  **0.715** (was 0.31-0.61), iid 0.614; G2 (0.80) and G3 (1.5x the analogy's 0.513) NOT met; field-vs-field
+  (4 atoms) still never fits. Shuffled lexicon: **0.418** with 3 constructions -- the same code, fewer
+  constructions inside the budget; G5 fails for the budget reason, as before.
+- **strings**: 6 constructions, compositional EM **0.748**, iid 0.815; G3 met; shuffled **identical, 0.748**
+  (G5 met). 'every x followed by y' (5 atoms) unsolved.
+NOT PASSED: the G2 bar is 0.80 on both worlds. The learner is correct; the budget and the 4-atom ceiling are what it
+misses. The next lever is the enumeration itself: the 4-atom level holds 4,663 boolean terms and the true one is
+found by order, not by guidance.
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
