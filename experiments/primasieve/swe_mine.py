@@ -163,24 +163,27 @@ def stmt_diff(before_src, after_src):
 LEAF_FIELDS = {"id", "attr", "arg", "name", "value", "asname", "module"}
 
 
-def skeleton(nodes):
+def skeleton(nodes, depth=None):
     """canonical skeleton of a list of statements: node types and structure, leaves (names, attributes, constants)
-    replaced by holes numbered by first occurrence -- the anti-unification of every edit that shares the shape."""
+    replaced by holes numbered by first occurrence -- the anti-unification of every edit that shares the shape.
+    `depth`: subtrees below this depth are replaced by their node TYPE alone (depth-2 measurement, post hoc and
+    labelled as such: the pre-registered level is the full skeleton)."""
     holes = {}
     def h(v):
         k = repr(v)
         if k not in holes: holes[k] = f"_{len(holes)}"
         return holes[k]
-    def walk(n):
+    def walk(n, d=0):
         if isinstance(n, ast.AST):
+            if depth is not None and d >= depth: return f"<{type(n).__name__}>"
             parts = []
             for f, v in ast.iter_fields(n):
                 if f in ("ctx", "type_comment", "kind"): continue
                 if f in LEAF_FIELDS and not isinstance(v, (ast.AST, list)):
                     parts.append(f"{f}={h(v)}"); continue
-                parts.append(f"{f}={walk(v)}")
+                parts.append(f"{f}={walk(v, d + 1)}")
             return f"{type(n).__name__}({','.join(parts)})"
-        if isinstance(n, list): return "[" + ",".join(walk(x) for x in n) + "]"
+        if isinstance(n, list): return "[" + ",".join(walk(x, d) for x in n) + "]"
         if n is None: return "None"
         return h(n)
     return walk(nodes)
@@ -244,7 +247,10 @@ def mine(repo, max_commits=None, rebuild=False, verbose=True):
         sb, sa = skeleton(rem), skeleton(add)
         if sb == sa: fam = "relabel (skeleton unchanged)"          # a docstring or constant change dressed as a rewrite
         edits.append(dict(sha=sha, ts=ts, path=path, family=fam, owner=owner,
-                          skel=skeleton(rem) + " -> " + skeleton(add), shape=shape(rem) + " -> " + shape(add),
+                          skel=sb + " -> " + sa, shape=shape(rem) + " -> " + shape(add),
+                          d1=skeleton(rem, 1) + " -> " + skeleton(add, 1), d2=skeleton(rem, 2) + " -> " + skeleton(add, 2),
+                          d3=skeleton(rem, 3) + " -> " + skeleton(add, 3),
+                          dump_rem=[dump_stmt(x) for x in rem], dump_add=[dump_stmt(x) for x in add],
                           path_len=prim_edits(rem, add), n_rem=len(rem), n_add=len(add)))
         if verbose and n % 500 == 0: print(f"  ... {n}/{len(cand)} candidates, {len(edits)} statement-level edits, {time.time()-t0:.0f}s", flush=True)
     json.dump(edits, open(CACHE, "w", encoding="utf-8"))
@@ -284,10 +290,18 @@ if __name__ == "__main__":
     cutoff = head_ts - 365 * 86400
     train = [e for e in struct if e["ts"] < cutoff]; held = [e for e in struct if e["ts"] >= cutoff]
     print(f"train (before {datetime.datetime.utcfromtimestamp(cutoff).date()}): {len(train)}   held-out year: {len(held)}")
-    for key in ("skel", "shape"):
+    for key in ("skel", "d3", "d2", "d1", "shape"):
+        if key not in train[0]: continue
         curve, ops, ndeg = coverage_curve(train, held, key)
-        print(f"\n{key.upper()}-level operators: {len(set(e[key] for e in train))} distinct in train, {ndeg} degenerate excluded")
+        rep = sum(1 for op, c in collections.Counter(e[key] for e in train).items() if c >= 2)
+        print(f"\n{key.upper()}-level operators: {len(set(e[key] for e in train))} distinct in train ({rep} recurring), {ndeg} degenerate excluded"
+              + ("   [post hoc abstraction level, not the pre-registered one]" if key in ("d1", "d2", "d3") else ""))
         print("  k -> held-out structural coverage: " + "  ".join(f"{k}:{c:.3f}" for k, c in curve))
+        if key in ("d2", "d1"):
+            freq = collections.Counter(e[key] for e in train)
+            for op in ops[:5]:
+                ex = next(e for e in train if e[key] == op)
+                print(f"    x{freq[op]:<4d} {ex['family']:24s} {op[:130]}")
         if key == "skel":
             skel_cov200 = curve[-1][1]
             print("  top operators (frequency, path length, example family):")

@@ -346,6 +346,20 @@ SCRIPT rather than the result) is untested and is the one cheap follow-up before
 relabel family (996 edits whose skeleton is unchanged: docstrings, constants, renames) was separated out and is
 where a token-level engine already reaches. Not registered (no PASS); the negative stands as measured.
 
+**Follow-ups run the same night (post hoc, labelled).** (1) Coarser abstraction levels: held-out skeleton coverage
+at k=200 is 0.037 (pre-registered level), depth-3 0.044, depth-2 0.066, depth-1 0.272 -- and depth-1 approaches the
+bar only by degenerating into shapes (`Return(<Call>) -> Return(<Call>)`). (2) `swe_ops.py`, the test the owner
+asked for -- can a recurring pattern be HELD AS A PRIMITIVE AND APPLIED, i.e. does pattern + before-state determine
+the gold after-state? **0 of 136 held-out structural fixes at depth 1 or depth 2**; even on their own training
+instances only 5-7% of recurring-pattern edits are determined by pattern + before-state. History-derived operators
+are descriptions, not moves, in this repository. (3) `swe_reach.py`, the owner's escalation idea -- restart from a
+PLAUSIBLE PREMISE in the same file and explore a few edits: on 386 sampled structural fixes the closest same-file
+block is within 5 structural edits of the gold added block for **26.2%** (the buggy code itself: 18.7%), within 10
+for 41.5% (29.5%); 8% of gold blocks already exist verbatim elsewhere in the file; median distance 16 vs 22, gold
+blocks median 70 AST tokens. Additions of definitions are the reachable family (39/96 within 5), large rewrites the
+least (31/177). **Reading:** a same-file premise is closer than the original code, by a third, not by an order of
+magnitude; it widens what a short local search can reach, it does not make restructure a one-step primitive.
+
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
