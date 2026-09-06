@@ -318,7 +318,14 @@ CONFABULATION 0 on every split of every fit.**
   constructions inside the budget; G5 fails for the budget reason, as before.
 - **strings**: 6 constructions, compositional EM **0.748**, iid 0.815; G3 met; shuffled **identical, 0.748**
   (G5 met). 'every x followed by y' (5 atoms) unsolved.
-NOT PASSED: the G2 bar is 0.80 on both worlds. The learner is correct; the budget and the 4-atom ceiling are what it
+**THE LIBRARY LEVER (owner's go-ahead): records 0.715 -> 1.000 / 1.000 (iid / compositional) at CONFAB 0, six
+constructions in 183 s.** Sub-terms of adopted constructions are FRAGMENTS; candidates that reuse fragments are tried
+first, and when the plain search is exhausted (or 45% of the budget remains with a failure) a second enumeration
+takes fragments as LEAVES, so field-vs-field -- 4 atoms, never reached before -- is 2 applications over the atom's
+body and lands in 29 s. Skeletons containing a failed skeleton's pattern are deferred. Strings stays 0.748 (its two
+unsolved constructions need positions/successor fragments no adopted construction supplies). Records PASSES G1-G3
+and G5 is untested on this code state; strings misses G2.
+Earlier note, kept: the G2 bar is 0.80 on both worlds. The learner is correct; the budget and the 4-atom ceiling are what it
 misses. The next lever is the enumeration itself: the 4-atom level holds 4,663 boolean terms and the true one is
 found by order, not by guidance.
 ## How to test / validate (the interface)

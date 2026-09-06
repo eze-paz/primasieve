@@ -75,6 +75,44 @@ def ops(term):
     return 1 + ops(term[1]) + ops(term[2])
 
 
+def result_type(term):
+    tag = term[0]
+    if tag == "SIT": return SEQ
+    if tag == "K": return INT
+    if tag == "H": return HOLE_TYPE.get(term[1])
+    if tag == "VAR": return None
+    if tag == "A": return P.signature(term[1])[1]
+    return BOOL
+
+
+def has_var(term):
+    tag = term[0]
+    if tag == "VAR": return True
+    if tag in ("SIT", "K", "H"): return False
+    return any(has_var(a) for a in (term[2:] if tag in ("A", "SK") else term[1:]))
+
+
+def subterms(term):
+    yield term
+    tag = term[0]
+    if tag in ("SIT", "K", "H", "VAR"): return
+    for a in (term[2:] if tag in ("A", "SK") else term[1:]):
+        yield from subterms(a)
+
+
+def fragments(grammar):
+    """THE LIBRARY: every sub-term with at least one atom application inside an adopted construction, with its
+    result type and whether it mentions the bound variable. The emergence thread's lesson applied to language:
+    a construction learned once is a piece of the next one (field-vs-field is the atom's body applied twice)."""
+    out = {}
+    for alts in grammar.values():
+        for term, _ in alts:
+            for sub in subterms(term):
+                if ops(sub) >= 1 and result_type(sub) is not None:
+                    out[sub] = (result_type(sub), has_var(sub))
+    return out
+
+
 def compile_term(term):
     """-> f(sit, env, var) where env is the tuple of hole values in `holes` order; raises on a partial application."""
     counter = [0]
@@ -160,7 +198,9 @@ class Enumerator:
     """BOOL terms with typed holes, by number of atom applications, deduped by observational signature on probe
     situations. `lam=True` tables also contain the bound variable (bodies for SELECT)."""
 
-    def __init__(self, probes, elems, rels, sels):
+    def __init__(self, probes, elems, rels, sels, library=None, max_ops=None):
+        self.library = library or {}                      # fragment term -> (type, has_var): extra LEAVES
+        self.max_ops = max_ops if max_ops is not None else MAX_OPS
         self.atoms = _atoms_by_sig()
         self.probes = probes; self.elems = sorted(elems, key=repr); self.rels = rels; self.sels = sels
         rng = random.Random(0)
@@ -175,7 +215,7 @@ class Enumerator:
         and are different terms -- the first version merged them and lost negation."""
         f = compile_term(term); hs = holes(term)
         out = [tuple(hs)]
-        for j in range(6):
+        for j in range(5):
             env = tuple(self.envs[h][(j + q) % len(self.envs[h])] for q, h in enumerate(hs))   # distinct per hole
             for s in self.probes:
                 vs = self.vars if lam else [None]
@@ -188,13 +228,20 @@ class Enumerator:
         if lam in self.tables: return self.tables[lam]
         banks = collections.defaultdict(lambda: SignatureBank(cap=BANK_CAP))
         T = collections.defaultdict(lambda: collections.defaultdict(list))
-        leaves = [("SIT",), ("H", HI), ("H", HE), ("K", 0), ("K", -1)] + ([("VAR",)] if lam else [("H", HB)])
+        # an ELEM hole is a distinct kind only when the situations hold elements that are not integers; where every
+        # element is an integer (records) it duplicates the INT hole and doubles the table for nothing -- data decides
+        elem_hole = [("H", HE)] if any(not P.CHECK[INT](e) for e in self.elems) else []
+        leaves = [("SIT",), ("H", HI), ("K", 0), ("K", -1)] + elem_hole + ([("VAR",)] if lam else [("H", HB)])
         types_of = {"SIT": [SEQ], "K": [INT], "VAR": [SEQ, ELEM]}
         for lf in leaves:
             ts = [HOLE_TYPE[lf[1]]] if lf[0] == "H" else types_of[lf[0]]
             for ty in ts:
                 if banks[ty].add(lf, ("leaf", lf, ty)): T[0][ty].append(lf)
-        for k in range(1, MAX_OPS + 1):
+        for frag, (ty, hv) in self.library.items():                  # library fragments are leaves: depth for free
+            if hv and not lam: continue
+            if len(holes(frag)) > MAX_HOLES: continue
+            if banks[ty].add(frag, self._sig(frag, lam)): T[0][ty].append(frag)
+        for k in range(1, self.max_ops + 1):
             new = []
             for (args, res), pids in self.atoms.items():
                 for split in _splits(k - 1, len(args)):
@@ -206,7 +253,7 @@ class Enumerator:
                 for a in T[split[0]][INT]:
                     for b in T[split[1]][INT]:
                         new.append((BOOL, ("R", a, b)))
-            if lam and k == MAX_OPS: break                                                 # a body sits under SELECT
+            if lam and k == self.max_ops: break                                            # a body sits under SELECT
             if not lam:                                                                    # SELECT (no nesting)
                 L = self.table(True)
                 for split in _splits(k - 1, 2):
@@ -221,9 +268,9 @@ class Enumerator:
         self.tables[lam] = T
         return T
 
-    def candidates(self, max_ops=MAX_OPS):
+    def candidates(self, max_ops=None):
         T = self.table(False)
-        for k in range(0, max_ops + 1):
+        for k in range(0, (max_ops if max_ops is not None else self.max_ops) + 1):
             for t in T[k][BOOL]: yield t
 
 
@@ -386,17 +433,20 @@ class Learner:
                 best = min(best, n)
                 if best == 0: break
             return best
+        lib = fragments(self.grammar)
+        def reuse(term):
+            return -sum(1 for sub in subterms(term) if sub in lib)
         def ordered():
             """size level by size level; inside a level, terms whose holes can be filled without giving any word a
-            new kind come first -- on a world where every word is an integer or a relation, terms with element
-            holes otherwise consume the level's budget (measured: 1694 candidate pairs, none of them the truth)"""
+            new kind come first (measured: element-holed terms consumed a level's budget), and among those, terms
+            that REUSE fragments of adopted constructions (the library) come before terms that reuse nothing"""
             level, buf = None, []
-            for t in enum.candidates(self.max_ops):
+            for t in enum.candidates(enum.max_ops):
                 if ops(t) != level:
-                    for x in sorted(buf, key=min_novelty): yield x
+                    for x in sorted(buf, key=lambda x: (min_novelty(x), reuse(x))): yield x
                     level, buf = ops(t), []
                 buf.append(t)
-            for x in sorted(buf, key=min_novelty): yield x
+            for x in sorted(buf, key=lambda x: (min_novelty(x), reuse(x))): yield x
         for term in ordered():
             if time.time() > self.deadline: break
             # after the first accepted analysis, alternatives at the same size get a short grace period; the
@@ -590,6 +640,7 @@ class Learner:
         # classes are still unknown, then by evidence. The foundation (nothing pinned yet) gets the largest cap,
         # because every later skeleton is cheaper once it lands; a skeleton is retried whenever new pins arrive.
         tried = {}                                                # key -> number of pins when last attempted
+        library_pass = False
         while time.time() < final:
             groups = collections.defaultdict(list); raw = collections.defaultdict(list)
             for sit, toks, tv in train:
@@ -603,13 +654,33 @@ class Learner:
                 return sum(1 for w in slots if w in pinned_words) / len(slots) if slots else 1.0
             def unknown_classes(key):
                 return sum(1 for k in key if k != "B" and k[0] == "C" and not any(self.cls.get(w) == k[1] for (w, _) in self.dom))
-            todo = [(k, r) for k, r in groups.items() if k not in self.grammar and len(r) >= MIN_ROWS
-                    and any(x != "B" and x[0] == "C" or x == "B" for x in k) and tried.get(k, -1) < npins]
-            if not todo: break
+            pending = [(k, r) for k, r in groups.items() if k not in self.grammar and len(r) >= MIN_ROWS
+                       and any(x != "B" and x[0] == "C" or x == "B" for x in k)]
+            # a skeleton that CONTAINS an unsolved skeleton's pattern ("... and <field-vs-field>") cannot be solved before
+            # that one is: defer it instead of spending a cap on it (measured: two such keys burned 120 s)
+            failed = [k for k in tried if k not in self.grammar and "B" not in k]
+            def contains_failed(key):
+                return any(len(u) < len(key) and any(key[i:i + len(u)] == u for i in range(len(key) - len(u) + 1)) for u in failed)
+            todo = [(k, r) for k, r in pending if tried.get(k, -1) < npins and not contains_failed(k)]
+            # the plain search is done when every remaining skeleton has been tried once since the last pin, or when
+            # less than 45% of the budget is left with something failed: the library is what widens reach from here
+            plain_done = pending and all(k in tried for k, _ in pending)
+            late = failed and (final - time.time()) < 0.45 * self.budget
+            if pending and not library_pass and (plain_done or late) and fragments(self.grammar) and final - time.time() > 45:
+                todo = []
+            if not todo:
+                # THE LIBRARY PASS: the plain search has nothing left it can reach. Re-enumerate with the fragments
+                # of every adopted construction as LEAVES -- a 5-atom truth condition is then 2 applications over
+                # fragments -- and give the unsolved skeletons one more round. Once.
+                if library_pass or not fragments(self.grammar): break
+                library_pass = True
+                enum = Enumerator(probes, elems, rels, sels, library=fragments(self.grammar), max_ops=2)
+                enum.table(False); self.library_seconds = time.time() - t0
+                tried = {}; continue
             key, rows = max(todo, key=lambda kr: (pinned_frac(*kr), -unknown_classes(kr[0]), len(kr[1])))
             tried[key] = npins
             left = final - time.time()
-            cap = 120 if npins == 0 else 60
+            cap = 120 if npins == 0 else (90 if library_pass else 60)
             self.deadline = min(final, time.time() + min(cap, left))
             self._learn_key(key, rows, enum)
             if key not in self.grammar and any(k == "B" for k in key):
