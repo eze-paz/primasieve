@@ -19,6 +19,9 @@ The four mechanisms below are the ones that recur, extracted from the implementa
     collect     active observation: the probe that splits the surviving hypotheses
     closure     the SELF-MODEL: what the library reaches by composition, exact and charged -- the graded,
                 sound signal a curriculum needs (E-5 null -> E-6 pass), plus the E-6 schedule and honest HALT
+    grow        ONE loop over both growth triggers: a representational COLLISION (extend the type, degree 4)
+                resolved BEFORE a closure STALL (invent a combinator, degree 3), each fired only on its own
+                signal, halting honestly when neither is present (Stage 7)
 
 Each carries the MEASURED lesson that produced it, in comments, so the knowledge travels with the code
 instead of living in a commit message no other thread will read. A core adopted by only one thread is not a

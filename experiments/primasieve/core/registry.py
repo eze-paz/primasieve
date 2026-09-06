@@ -41,6 +41,7 @@ PUBLISHED = {
     "cogs_stage5": ["5 CONSTRUCTIONS: PASS", "marker-recall 1.0000", "IDENTICAL"],
     "cogs_stage6": ["DEGREE 4 (representation extension by collision-driven selection): PASS",
                     "collision under ablation: none", "held-out truth accuracy WITH the extension: 1.000"],
+    "cogs_stage7": ["STAGE 7 COMPOSED GROWTH LOOP: PASS", "first-growth collision"],
 }
 
 
