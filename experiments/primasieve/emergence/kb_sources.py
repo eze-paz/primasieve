@@ -297,22 +297,10 @@ def deep_research(word, anchors, depth=2, budget=None, trace=None, tried=None):
     return r
 
 
-def query_word(q):
-    """Pull the word being asked about out of a natural question -- 'what is a dog?', 'define justice',
-    'what does photosynthesis mean' -> dog / justice / photosynthesis. General phrasing, no per-word logic; a
-    single token is returned as-is. Multi-word content is returned joined (the lookup misses and the caller
-    abstains)."""
-    import re as _re
-    t = q.strip().lower().rstrip("?.! ")
-    t = _re.sub(r"^(what\s+is|what\s+are|what\s+was|whats|what's|what\s+does|what\s+do|who\s+is|define|meaning\s+of|tell\s+me\s+about)", "", t).strip()
-    t = _re.sub(r"^(a|an|the)", "", t).strip()
-    t = _re.sub(r"\s*(mean|means|meaning)$", "", t).strip()
-    return t or q.strip()
-
-
-def define(word, online=True):
-    """WIDE definitional answer: the researched meaning of `word`, returned VERBATIM with its SOURCE, and NOT
-    reduced to any world's predicates. This is the widening the shapes-reader blocked: the answer is whatever a
+def research_gloss(word, online=True):
+    """RESEARCH PRIMITIVE (reading kind iii in no_paradigm_prereg.md): the researched meaning of `word`, returned
+    VERBATIM with its SOURCE, NOT reduced to any world's predicates. This is not a mode and has no flag -- it is
+    what the single answer loop calls for any symbol it cannot bind. This is the widening the shapes-reader blocked: the answer is whatever a
     source actually says, so it is as wide as the sources (all of WordNet, plus online lexica). Abstention is
     INTERNAL -- every source is consulted cheapest-first; None comes back only if NO source defines the word, at
     which point the caller may refuse honestly. The citation is the source text itself: the answer is sound
@@ -344,18 +332,6 @@ def define(word, online=True):
 
 
 if __name__ == "__main__":
-    if "--define" in sys.argv:
-        rest = [a for a in sys.argv[1:] if a != "--define"]
-        q = " ".join(rest)
-        words = [query_word(q)] if q else []
-        for w in words:
-            d = define(w)
-            if d is None:
-                print(f"{w}: [abstain] no source I can reach defines this word.")
-            else:
-                print(f"{w} = {d['gloss']}")
-                print(f"    [source: {d['source']}]")
-        sys.exit(0)
     import en_chat as C
     _, lex, _ = C.build(n=9000, seed=7)
     anchors = dict(lex)

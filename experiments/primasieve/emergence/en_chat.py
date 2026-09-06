@@ -76,7 +76,22 @@ def best_question(scene, cands):
 
 def answer(scene, q, lex):
     if q["unknown"]:
-        return "ABSTAIN", f"I do not know the word(s) {q['unknown']}. I will not guess.", None
+        # no "unknown word" exit before RESEARCH (no_paradigm_prereg.md step 6): an unbound symbol is an INTERNAL
+        # signal, not an answer. Resolve each one against the declared sources; quote what a source says, cited.
+        # Refuse only after the source set is exhausted, naming what was consulted.
+        import kb_sources as KB
+        found, missing = [], []
+        for w in q["unknown"]:
+            r = KB.research_gloss(w)
+            (found if r else missing).append((w, r))
+        if found and not missing:
+            msg = "  ".join(f"{w}: {r['gloss']} [{r['source']}]" for w, r in found)
+            return "ATTRIBUTED", msg, None
+        if found:
+            msg = "  ".join(f"{w}: {r['gloss']} [{r['source']}]" for w, r in found)
+            return "ATTRIBUTED", msg + f"  -- no source I can reach defines {[w for w, _ in missing]}.", None
+        srcs = [sid for sid, _, _ in KB.SOURCES]
+        return "REFUSE", f"no source I can reach defines {[w for w, _ in missing]}; consulted {srcs}.", None
     if q["kind"] == "empty":
         return "NONE", "I did not find anything to identify in that.", None
     if q["kind"] == "yesno":
