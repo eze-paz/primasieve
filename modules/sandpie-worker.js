@@ -5002,7 +5002,15 @@ async function runAgent(config, ctx) {
       }
     }, HB_MS);
   }
-  const _profTool = (name, ms, isErr) => {
+  // The python tool is called `pyodide` on BOTH backends, so tool_timing could not
+  // tell walios apart from Pyodide — asking "what is walios' error rate?" had no
+  // answer in the data, only a blended one. Bucket it per backend instead. The
+  // server stores whatever string arrives, so this needs no schema change; the rows
+  // simply become pyodide:walios / pyodide:pyodide from here on.
+  const _profToolName = (name) => (name === 'run_python' || name === 'pyodide')
+    ? name + ':' + _pyBackend : name;
+  const _profTool = (rawName, ms, isErr) => {
+    const name = _profToolName(rawName);
     const t = _prof.tools[name] || (_prof.tools[name] = { ms: 0, calls: 0, errors: 0 });
     t.ms += ms; t.calls++; if (isErr) t.errors++;
     _prof.toolMs += ms; _prof.toolCalls++;
