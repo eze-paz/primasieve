@@ -124,6 +124,15 @@ g. a type-check that secretly encodes the answer -> ablating it must change HOW 
 h. demo-set tuning -> sealed 50-item holdout written by the USER after code freeze
 i. width by quoting -> report COMPUTED vs QUOTED split; a "wide" engine that computes 0 is a dictionary
 
+## 6b. MEASURED (2026-09-06): FILLER cannot be honestly replaced by an INDUCED skip list -- delete it by COMPOSITION
+
+Probe: seed-free function-word induction (frequency x right-context entropy, no list) on _nldata/alice.txt (27,439
+tokens). Recovers only 18/38 of the authored FILLER+DETS words, MISSES the interrogatives/modals the chat lives on
+(which, how, please, can, would -- rare in narrative), and ADMITS content words: `little` (a SIZE predicate), `one`,
+`down`, `out`, `said`. Shipping it would regress "the little one" and remain a membership list that changes behavior
+(watch a). NEGATIVE. Decision: FILLER is not replaced by a better list; it is deleted when core/resolve.py resolves
+EVERY symbol and COMPOSE ignores readings that bind to nothing -- function words fall out of composition, not a list.
+
 ## 7. KILL GATES (register each in core/registry.py; C3 stays at zero islands)
 
 NP-1 static/grep: every string literal reachable from answer() is a source id, a verdict name, or a message
