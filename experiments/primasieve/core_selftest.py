@@ -8,6 +8,12 @@ file enforces, mechanically:
   C2  every migrated thread still reproduces its PUBLISHED gate numbers -- consolidation that moves a number
       is a regression, not a refactor
   C3  ZERO ISLANDS: the live surface must be ONE connected component. No island is allowed -- merge or delete.
+  C4  NO WORLD IN A MECHANISM: a world module (a sealed test oracle: en_world, world_english, dialog_world ...)
+      may be imported by the experiments that test against it, never by core/ or by the knowledge-acquisition
+      modules (kb_*, wn_*). Owner's objection (2026-09-06): the rect world had leaked into the research loop
+      (kb_sources built its definition-kind table from en_world's colour/size/shape lists), biasing a general
+      engine toward shapes. The wider count -- every non-world module that imports a world -- is PRINTED as a
+      tracked number, the way the island map was before it reached zero.
 
 Run it after any change to core/. Usage:  python core_selftest.py [--map-only]"""
 import os, re, sys, collections, subprocess
@@ -50,6 +56,37 @@ def island_map(root=HERE):
     return comps, sorted(adj["core"])
 
 
+WORLD_RE = re.compile(r"world")
+
+
+def world_imports(root=HERE):
+    """-> (hard: [(module, world)] for core/ and kb_*/wn_* modules, wide: [(module, world)] for every non-world
+    module). A 'world' is any live module whose name contains 'world'. Import statements are read from source."""
+    files = {}
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if not d.startswith((".", "_")) and d != "__pycache__"]
+        for fn in fns:
+            if fn.endswith(".py"):
+                files[os.path.join(dp, fn)] = fn[:-3]
+    worlds = {m for m in files.values() if WORLD_RE.search(m)}
+    hard, wide = [], []
+    for path, mod in files.items():
+        if mod in worlds:
+            continue
+        src = open(path, encoding="utf-8", errors="replace").read()
+        imported = set()
+        for m in re.finditer(r"^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))", src, re.M):
+            name = (m.group(1) or m.group(2)).split(".")[-1]
+            if name in worlds:
+                imported.add(name)
+        rel = os.path.relpath(path, root).replace("\\", "/")
+        for w in sorted(imported):
+            wide.append((rel, w))
+            if rel.startswith("core/") or mod.startswith(("kb_", "wn_")):
+                hard.append((rel, w))
+    return hard, wide
+
+
 def check_adoption(adopters):
     """C1 -- independence measured by pre-consolidation component, not by counting files."""
     THREADS = {"cogs": "COGS Stage 3 (component 2)", "scan": "SCAN Stage 2 (component 11)",
@@ -85,6 +122,14 @@ if __name__ == "__main__":
         print(f"  {name:<40} {', '.join(sorted(mods))}")
     ok1 = len(hit) >= 2
     print(f"  -> {len(hit)} independent threads on core   [gate >= 2 -> {'PASS' if ok1 else 'FAIL'}]")
+
+    hard, wide = world_imports()
+    print("\nC4 -- NO WORLD IN A MECHANISM")
+    print(f"  non-world modules importing a world: {len(wide)}   (tracked; the next number to drive down)")
+    for rel, w in wide:
+        print(f"    {rel:<36} imports {w}{'   <- MECHANISM' if (rel, w) in hard else ''}")
+    ok4 = not hard
+    print(f"  -> world imports in core/ or kb_*/wn_*: {len(hard)}   [gate == 0 -> {'PASS' if ok4 else 'FAIL'}]")
 
     if "--map-only" in sys.argv:
         sys.exit(0)

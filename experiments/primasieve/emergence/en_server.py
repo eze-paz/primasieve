@@ -13,6 +13,7 @@ import en_world as W
 import en_chat as C
 import wn_acquire as ACQ
 import kb_sources as KB
+import core.resolve as RES
 import en_actions as ACT
 from core.verdict import Beliefs, ATTRIBUTED, COMMIT, RETRACTED
 import en_ops as OPS
@@ -156,6 +157,7 @@ def say(text):
     the world, the reply says so. This is core.verdict's ATTRIBUTED taint made visible (E-7): an answer that
     depends on an attributed premise is attributed, and is never presented as if the world had verified it."""
     r = _say(text)
+    if r.get("kind") not in ("DEFINED", "RETRACTED", "TAUGHT"): STATE["last_resolve"] = None
     used = [w for w in W.tokenize(text) if w in STATE["provenance"]]
     if "attributed" in r:                                    # already tagged by an inner say() (research/teach re-run)
         return r
@@ -193,6 +195,20 @@ def _say(text):
             return {"kind": "NONE", "msg": f"I do not hold '{w}'.", "highlight": []}
         return {"kind": "RETRACTED", "msg": f"retracted '{w}' and {len(deps)} answer(s) that relied on it"
                                              + (": " + " | ".join(deps[:4]) if deps else "") + ". Its source was struck.", "highlight": []}
+    if low in ("wrong", "that's wrong", "thats wrong", "no that's wrong", "that is wrong", "incorrect") and STATE.get("last_resolve"):
+        rz = STATE["last_resolve"]; STATE["last_resolve"] = None
+        topic = rz["symbols"][rz["topic"]].lower()
+        if rz["via_frame"]: RES.reject(STATE["frames"], rz["via_frame"])
+        key = ("gloss", topic)
+        deps = STATE["beliefs"].retract(key) if key in STATE["beliefs"].b else []
+        return {"kind": "RETRACTED", "msg": f"understood: looking up '{topic}' was not what you wanted. "
+                                             + ("The question frame I had learned is retracted. " if rz["via_frame"] else "")
+                                             + f"Dropped the definition I was holding ({len(deps)} item(s)). Tell me what you meant.", "highlight": []}
+    if low in ("correct", "right", "that's right", "thats right", "yes that's right") and STATE.get("last_resolve"):
+        rz = STATE["last_resolve"]; STATE["last_resolve"] = None
+        fr = RES.accept(STATE["frames"], rz["symbols"], rz["topic"], rz["kind"], STATE.setdefault("resolve_history", []))
+        return {"kind": "TAUGHT", "msg": "noted: that was the right thing to do with it."
+                                         + (f" I now hold a question frame {[s or '_' for s in fr['skeleton']]} -> look up the blank (a conjecture; 'wrong' retracts it)." if fr else ""), "highlight": []}
     if low in ("wrong", "that's wrong", "thats wrong", "no that's wrong", "that is wrong", "incorrect"):
         used = [w for w in STATE["last_used"] if ("word", w) in STATE["beliefs"].b]
         if not used:
@@ -529,6 +545,22 @@ def _diagnose(unknown, original):
             return {"kind": "ACQUIRE", "msg": f"I have never learned '{uw}'. WordNet relates it to "
                                               f"'{aprops[0][0]}', which I know as an action. Is that right?",
                     "highlight": []}
+    # ---- RESOLVE (E-10, core/resolve.py): before giving up, research EVERY symbol of the whole utterance, find the
+    #      topic by the sources' own specificity, derive the intent from what the engine CAN do with it, and answer
+    #      with the certificate itself. Offline sources only, so the reply is deterministic. "what is a dog" lands
+    #      here because no shape is a dog; the answer is the dictionary, cited, held on its word.
+    rz = RES.resolve(original, KB.Lexica(online=False, world=dict(lex)), beliefs=STATE["beliefs"], frames=STATE.setdefault("frames", []))
+    if rz["kind"] == RES.GLOSS and rz["answer"]:
+        topic = rz["symbols"][rz["topic"]]; senses = rz["answer"]; src = senses[0][1]
+        listed = "  |  ".join(f"({i+1}) {g[:110]}" for i, (g, _) in enumerate(senses[:4])) + (f"  | ... {len(senses)} senses" if len(senses) > 4 else "")
+        why = ("a frame learned from your earlier accepted questions" if rz["via_frame"] else
+               "the only thing I can do with it" if not rz["alternatives"] else "the cheapest of what I can do with it")
+        STATE["last_resolve"] = rz
+        STATE["research_log"].append(_jsonable({"word": topic, "status": "defined", "source": src, "senses": len(senses),
+                                                "consulted": rz["consulted"], "unavailable": []}))
+        return {"kind": "DEFINED", "msg": f"'{topic}' per {src}: {listed}. Held on {src}'s word, not verified; nothing in my "
+                                          f"world is '{topic}'. [intent = look it up, {why}; say 'wrong' if you meant something else]"
+                                          + (f" (consulted {', '.join(rz['consulted'])})"), "highlight": [], "research": {"word": topic, "source": src}}
     known_any = [uw for uw in unknown
                  if ACQ.related_words(uw, "noun") or ACQ.related_words(uw, "verb")
                  or ACQ.related_words(uw, "adj")]
@@ -557,7 +589,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>primasieve</title>
  #log{height:300px;overflow:auto;background:#171a21;border:1px solid #262b36;border-radius:8px;padding:10px}
  .m{margin:6px 0} .you{color:#9ecbff} .k{font-weight:700;margin-right:6px}
  .COMMIT{color:#4ade80}.ASK{color:#fbbf24}.ABSTAIN{color:#f87171}.UNKNOWABLE{color:#c084fc}.NONE{color:#8b93a7}
- .ACQUIRE{color:#38bdf8}.OUT-OF-WORLD{color:#94a3b8}.SPEECH-ACT{color:#e879f9}
+ .ACQUIRE{color:#38bdf8}.DEFINED{color:#fbbf24}.OUT-OF-WORLD{color:#94a3b8}.SPEECH-ACT{color:#e879f9}
  .ATTRIBUTED{color:#38bdf8}.TAUGHT{color:#a3e635}.RETRACTED{color:#fb7185}
  #kb{margin-top:18px;background:#171a21;border:1px solid #262b36;border-radius:8px;padding:12px;font-size:12px}
  #kb h2{font-size:13px;margin:0 0 6px;color:#c9d1e3} #kb table{border-collapse:collapse;width:100%}

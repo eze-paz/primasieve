@@ -60,45 +60,69 @@ def tokens(text):
     return re.findall(r"[a-z]+", text.lower())
 
 
-import en_world as _W
+# ------------------------------------------------ KIND AGREEMENT, DERIVED FROM THE SOURCES (replaces FAMILY/CUES)
+# History, kept because it was paid for: an untyped reading ('the anchor word occurs in the definition') put 322 of
+# 381 corroborated words on 'small' through 'of small importance' and 'little'. V3 fixed that with FAMILY/CUES --
+# hand-written lists of colour/size/shape/zone cue words built from en_world's predicate lists. That was the rect
+# world leaking into a mechanism (owner's objection, 2026-09-06; core_selftest C4 now forbids it), and the cue
+# lists had been written AFTER seeing the failure (no_paradigm_prereg overclaim-watch f).
+#
+# The replacement asks the SOURCES what kind of thing an anchor is: an anchor's KIND CUES are the tokens of its
+# own dictionary definitions (WordNet, every part of speech; KAIKKI when downloaded), minus the tokens that occur
+# in the definitions of more than half of the anchors (those describe nothing in particular: 'a', 'of', 'having'),
+# minus the anchor itself. A candidate definition vouches for anchor p only if, besides naming p, it shares a
+# cue with p's own definition -- 'having a deep red colour' shares 'colour' with red's gloss ('the chromatic
+# color resembling the hue of blood' via colour/color spelling both being read), 'of small importance' shares
+# nothing with small's gloss ('limited or below average in number or quantity or magnitude or extent'). No word
+# of any world appears here; permute the anchor set and the cues follow the sources.
+_CUE_CACHE = {}
 
-# ------------------------------------------------ the SHAPES-WORLD VERIFIER (DEMOTED -- no_paradigm_prereg.md)
-# read()/FAMILY/CUES below map a definition onto a predicate of ONE attached world (en_world). They used to be THE
-# meaning space: every researched meaning had to reduce to a colour/size/position or come back "none", which is why
-# the attributed lexicon is 435 colour/size words and nothing else. That paradigm is retired: meaning is now the set
-# of cited READINGS a source returns (wikt_readings / research_gloss / src_wordnet, all senses). This block is only an
-# OPTIONAL VERIFIER, applied when a candidate reading happens to name a predicate of the attached world, to eliminate
-# against that world. HONESTY: the CUES lists were written AFTER seeing 322/381 words wrongly land on 'small' (fitted
-# to the outcome; prereg overclaim-watch f). They remain only because the grounded thread (em_preempt/em_attributed,
-# a peer session) still consumes them; an ablation gate (remove the cues, re-derive the published numbers) is OWED.
-# TYPE CUES (V3 rule, after the corroborated bulk pass put 322 of 381 words on 'small' through 'little' and 'of
-# small importance'): a definition vouches for a predicate only if it also names WHAT KIND of property it is.
-# 'small in size' reads; 'of small importance' does not. The cue lists are about property KINDS, not about any
-# target word, and are the same for every source. Recorded in em_preempt.py's log as V2 -> V3.
-FAMILY = {}
-for _p in _W.COLOURS: FAMILY[_p] = "colour"
-for _p in _W.SIZES: FAMILY[_p] = "size"
-for _p in _W.SHAPES: FAMILY[_p] = "shape"
-for _p in _W.HZONES + _W.VZONES: FAMILY[_p] = "zone"
-CUES = {"colour": {"colour", "color", "coloured", "colored", "hue", "shade", "tint", "tinge", "tinged", "dye", "pigment", "ish"},
-        "size": {"size", "sized", "dimension", "dimensions", "extent", "stature", "bulk", "magnitude", "height", "width",
-                 "breadth", "length", "tall", "wide", "large", "big", "small", "little", "tiny", "huge", "thin", "narrow", "broad"},
-        "shape": {"shape", "shaped", "form", "sides", "angles", "square", "rectangular", "wide", "tall", "broad", "thin", "narrow"},
-        "zone": {"position", "positioned", "located", "situated", "placed", "top", "bottom", "side", "left", "right",
-                 "upper", "lower", "middle", "centre", "center", "edge", "end", "part", "highest", "lowest", "nearest"}}
+
+def _gloss_tokens(word):
+    """tokens of every dictionary definition of `word` across the offline sources (examples in quotes dropped)."""
+    toks = set()
+    for pos in ("adj", "noun", "verb", "adv"):
+        try:
+            for _, g in ACQ._synsets_with_gloss(word, pos):
+                toks |= set(tokens(g.split('"')[0]))
+        except Exception:
+            pass
+    try:
+        import kb_offline as _OFF
+        e = _OFF.kaikki_entry(word)
+        if e:
+            for d in e.get("defs", [])[:8]: toks |= set(tokens(d))
+    except Exception:
+        pass
+    return toks
+
+
+def cues_for(anchors):
+    """predicate -> its kind cues, derived from the glosses of the anchor words that carry that predicate."""
+    key = frozenset(anchors.items())
+    if key in _CUE_CACHE: return _CUE_CACHE[key]
+    by_pred = {}
+    for w, p in anchors.items():
+        by_pred.setdefault(p, set()).update(_gloss_tokens(w))
+    n = len(by_pred)
+    common = {t for t in set().union(*by_pred.values()) if sum(t in g for g in by_pred.values()) > n / 2} if n else set()
+    words_of = {}
+    for w, p in anchors.items(): words_of.setdefault(p, set()).add(w)
+    cues = {p: (g - common - words_of[p]) for p, g in by_pred.items()}
+    _CUE_CACHE[key] = cues
+    return cues
 
 
 def read(span, anchors, typed=True):
-    """-> set of predicates the span vouches for (negation guard; with typed=True the span must also carry a cue
-    for the predicate's property KIND). Empty = says nothing we can use."""
+    """-> set of predicates the span vouches for (negation guard; with typed=True the span must also share a
+    SOURCE-DERIVED kind cue with the predicate's own definition). Empty = says nothing we can use."""
     toks = tokens(span); preds = set(); tokset = set(toks)
+    cues = cues_for(anchors) if typed else None
     for i, t in enumerate(toks):
         if t in anchors and not (set(toks[max(0, i - 2):i]) & NEG):
             p = anchors[t]
-            if typed and p in FAMILY:
-                cues = CUES[FAMILY[p]] - {t}                   # the anchor itself is not its own cue
-                if not (tokset & cues) and not any(x.endswith("ish") for x in tokset if FAMILY[p] == "colour"):
-                    continue
+            if typed and not ((tokset - {t}) & cues.get(p, set())):
+                continue
             preds.add(p)
     return preds
 
@@ -360,6 +384,11 @@ def research_gloss(word, online=True):
             senses = [g for _, g in sg]
             gloss = "  |  ".join(f"({i+1}) {g}" for i, g in enumerate(senses)) if len(senses) > 1 else senses[0]
             return dict(word=word, gloss=gloss, readings=senses, source="WORDNET-" + pos, cite=gloss, kind="lexical")
+    e = OFF.kaikki_entry(w)                                     # offline Wiktionary, every POS once the full index exists
+    if e and e.get("defs"):
+        senses = e["defs"]
+        gloss = "  |  ".join(f"({i+1}) {g}" for i, g in enumerate(senses)) if len(senses) > 1 else senses[0]
+        return dict(word=word, gloss=gloss, readings=senses, source="KAIKKI", cite=" | ".join(senses), kind="lexical")
     if online:
         for sid, fn in (("WIKTIONARY", src_wiktionary), ("WIKIDATA", src_wikidata), ("CONCEPTNET", src_conceptnet)):
             try:
@@ -371,6 +400,49 @@ def research_gloss(word, online=True):
                 text = "  |  ".join(f"({i+1}) {d}" for i, d in enumerate(senses)) if len(senses) > 1 else senses[0]
                 return dict(word=word, gloss=text, readings=senses, source=sid, cite=r[0][1], kind="lexical")
     return None
+
+
+# ---------------------------------------------------------------- the RESOLVER's view of the sources (core/resolve.py)
+# core/ imports no source module and no world; it is handed this object. Reading kinds are core.resolve's integers.
+_DF = None
+
+
+def gloss_df(token):
+    """how many dictionary definitions (offline WordNet, every POS; examples in quotes excluded) mention `token`.
+    The specificity key the resolver ranks symbols by -- the sources' own base rate, not a list."""
+    global _DF
+    if _DF is None:
+        import collections
+        _DF = collections.Counter()
+        for pos in ("adj", "noun", "verb", "adv"):
+            p = os.path.join(ACQ.DICT, f"data.{pos}")
+            if not os.path.exists(p): continue
+            for line in open(p, encoding="latin-1"):
+                if line.startswith(" ") or "|" not in line: continue
+                for t in set(tokens(line.split("|", 1)[1].split('"')[0])): _DF[t] += 1
+    return _DF.get(token.lower(), 0) + OFF.kaikki_df(token)
+
+
+class Lexica:
+    """readings(symbol) -> {WORLD: [pred], EXEC: [], GLOSS: [(gloss, source, certificate text)]}; df(symbol).
+    `world` is an attached world's lexicon (symbol -> predicate) or empty; executable bindings are not offered by
+    this adapter (the loop invents none; a verified ledger binding would be added here by its owner)."""
+    def __init__(self, online=False, world=None):
+        from core.resolve import WORLD, EXEC, GLOSS
+        self.K = (WORLD, EXEC, GLOSS); self.online = online; self.world = dict(world or {})
+        self.consulted = ["WORDNET-noun", "WORDNET-verb", "WORDNET-adj"] + (["KAIKKI"] if OFF.kaikki_index(verbose=False) is not None else [])                          + (["WIKTIONARY", "WIKIDATA", "CONCEPTNET"] if online else [])
+
+    def readings(self, sym):
+        W_, E_, G_ = self.K
+        r = {W_: [], E_: [], G_: []}
+        low = sym.lower()
+        if low in self.world: r[W_] = [self.world[low]]
+        if low.isalpha():
+            g = research_gloss(low, online=self.online)
+            if g: r[G_] = [(s, g["source"], g["cite"]) for s in g["readings"]]
+        return r
+
+    def df(self, sym): return gloss_df(sym)
 
 
 if __name__ == "__main__":

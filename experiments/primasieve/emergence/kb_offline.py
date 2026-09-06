@@ -14,15 +14,101 @@ import os, sys, json, re, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 NLDATA = os.path.join(ROOT, "_nldata")
-KAIKKI_RAW = os.path.join(NLDATA, "kaikki-English-adj.jsonl")
+KAIKKI_RAW = os.path.join(NLDATA, "kaikki-English-adj.jsonl")          # the old adjective-only snapshot (rect-world artifact)
 KAIKKI_IDX = os.path.join(NLDATA, "kaikki_adj_index.json")
+KAIKKI_ALL_RAW = os.path.join(NLDATA, "kaikki-English-all.jsonl")      # ALL of English Wiktionary (every POS), 3.2 GB
+KAIKKI_ALL_DB = os.path.join(NLDATA, "kaikki_all.sqlite")              # indexed once into sqlite: O(1) lookup, no load time
 MOBY_RAW = os.path.join(NLDATA, "files", "mthesaur.txt")
 _CACHE = {}
 
 
+class _SqliteIndex:
+    """dict-like view over the sqlite index: get / in / iter / len, so every caller of kaikki_index() works
+    unchanged whether the index is the old JSON dict or the full-dictionary database."""
+    def __init__(self, path):
+        import sqlite3
+        self.c = sqlite3.connect(path, check_same_thread=False)
+    def get(self, w, default=None):
+        r = self.c.execute("select v from e where w=?", (w,)).fetchone()
+        return json.loads(r[0]) if r else default
+    def __contains__(self, w): return self.c.execute("select 1 from e where w=?", (w,)).fetchone() is not None
+    def __iter__(self):
+        for (w,) in self.c.execute("select w from e"): yield w
+    def __len__(self): return self.c.execute("select count(*) from e").fetchone()[0]
+    def df(self, t):
+        try:
+            r = self.c.execute("select n from df where t=?", (t.lower(),)).fetchone()
+        except Exception:
+            return 0
+        return r[0] if r else 0
+
+
+def kaikki_build_all(verbose=True):
+    """Stream the full English Wiktionary JSONL once into sqlite. Per word: defs (every sense, every POS, with the
+    POS kept per sense), syn, ex, pos list. Nothing is filtered by part of speech: the adjective-only snapshot was
+    the rect world baked into data (no_paradigm_prereg audit), and 'what is a dog' needs the nouns."""
+    import sqlite3
+    if not os.path.exists(KAIKKI_ALL_RAW): return None
+    t0 = time.time(); n = 0; acc = {}
+    with open(KAIKKI_ALL_RAW, encoding="utf-8") as f:
+        for line in f:
+            n += 1
+            try: e = json.loads(line)
+            except Exception: continue
+            w = e.get("word", "").lower(); pos = e.get("pos", "")
+            if not w or not re.fullmatch(r"[a-z][a-z\-' ]*", w): continue
+            d = acc.setdefault(w, {"defs": [], "senses": [], "syn": [], "ex": [], "pos": []})
+            if pos and pos not in d["pos"]: d["pos"].append(pos)
+            for s_ in e.get("senses", [])[:8]:
+                g = s_.get("glosses") or s_.get("raw_glosses") or []
+                if not g: continue
+                gl = re.sub(r"\s+", " ", g[-1]).strip()
+                if len(d["defs"]) < 12: d["defs"].append(gl); d["senses"].append({"pos": pos, "gloss": gl})
+                for x in s_.get("examples", [])[:2]:
+                    if x.get("text") and len(d["ex"]) < 4: d["ex"].append(x["text"].strip())
+                d["syn"] += [y["word"].lower() for y in s_.get("synonyms", []) if y.get("word")]
+            d["syn"] += [y["word"].lower() for y in e.get("synonyms", []) if y.get("word")]
+            d["syn"] = list(dict.fromkeys(d["syn"]))[:16]
+            if verbose and n % 200000 == 0: print(f"  kaikki-all: {n} lines, {len(acc)} words, {time.time()-t0:.0f}s", flush=True)
+    # document frequency of every token over every definition: the resolver's specificity key, widened from
+    # WordNet's 118k glosses to Wiktionary's -- computed once here, stored beside the entries.
+    df = {}
+    for d in acc.values():
+        for gl in d["defs"]:
+            for t in set(re.findall(r"[a-z]+", gl.lower())): df[t] = df.get(t, 0) + 1
+    tmp = KAIKKI_ALL_DB + ".tmp"
+    if os.path.exists(tmp): os.remove(tmp)
+    c = sqlite3.connect(tmp); c.execute("create table e (w text primary key, v text)"); c.execute("create table df (t text primary key, n integer)")
+    c.executemany("insert into e values (?,?)", ((w, json.dumps(d, ensure_ascii=False)) for w, d in acc.items() if d["defs"]))
+    c.executemany("insert into df values (?,?)", df.items())
+    c.commit(); c.close()
+    if os.path.exists(KAIKKI_ALL_DB): os.remove(KAIKKI_ALL_DB)
+    os.replace(tmp, KAIKKI_ALL_DB)
+    if verbose: print(f"  kaikki-all index: {sum(1 for d in acc.values() if d['defs'])} words from {n} lines in {time.time()-t0:.0f}s -> {os.path.basename(KAIKKI_ALL_DB)}", flush=True)
+    return _SqliteIndex(KAIKKI_ALL_DB)
+
+
+def kaikki_df(token):
+    """definitions in the full Wiktionary index mentioning `token` (0 when only the adjective snapshot exists)."""
+    idx = kaikki_index(verbose=False)
+    return idx.df(token) if isinstance(idx, _SqliteIndex) else 0
+
+
+def kaikki_entry(word):
+    """the full entry for `word` (defs, senses with POS, syn, ex, pos) or None -- the lookup the kind-cue reader
+    and the resolver use."""
+    idx = kaikki_index(verbose=False)
+    return idx.get(word.lower()) if idx is not None else None
+
+
 def kaikki_index(rebuild=False, verbose=True):
-    """word -> {defs:[str], syn:[str], ex:[str]}; built once from the raw JSONL (a few minutes), then loaded."""
+    """word -> {defs:[str], syn:[str], ex:[str], ...}. Prefers the FULL dictionary (sqlite, every POS); falls back
+    to the old adjective-only JSON index when the full file has not been downloaded."""
     if "kaikki" in _CACHE: return _CACHE["kaikki"]
+    if os.path.exists(KAIKKI_ALL_DB) and not rebuild:
+        _CACHE["kaikki"] = _SqliteIndex(KAIKKI_ALL_DB); return _CACHE["kaikki"]
+    if os.path.exists(KAIKKI_ALL_RAW):
+        _CACHE["kaikki"] = kaikki_build_all(verbose=verbose); return _CACHE["kaikki"]
     if os.path.exists(KAIKKI_IDX) and not rebuild:
         _CACHE["kaikki"] = json.load(open(KAIKKI_IDX, encoding="utf-8")); return _CACHE["kaikki"]
     if not os.path.exists(KAIKKI_RAW): _CACHE["kaikki"] = None; return None
@@ -113,7 +199,7 @@ if __name__ == "__main__":
     print("building offline indexes ...")
     k = kaikki_index(rebuild="--rebuild" in sys.argv)
     m = moby_index()
-    print(f"kaikki: {len(k) if k else 'NOT DOWNLOADED'} adjectives   moby: {len(m) if m else 'NOT DOWNLOADED'} headwords")
+    print(f"kaikki: {len(k) if k else 'NOT DOWNLOADED'} words ({'full dictionary' if isinstance(k, _SqliteIndex) else 'adjectives only'})   moby: {len(m) if m else 'NOT DOWNLOADED'} headwords")
     for w in sys.argv[1:] or ["slender", "enormous", "teal", "topmost"]:
         if w.startswith("--"): continue
         print(f"\n{w}: kaikki {src_kaikki(w)[:2] if src_kaikki(w) else None}")

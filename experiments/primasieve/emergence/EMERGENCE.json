@@ -1,4 +1,53 @@
 {
+ "E10_resolve_loop": {
+  "cold_start": {
+   "What is a dog?": {
+    "senses": 7,
+    "source": "WORDNET-noun",
+    "topic": "dog"
+   },
+   "define dog": {
+    "senses": 5,
+    "source": "WORDNET-verb",
+    "topic": "define"
+   },
+   "dog?": {
+    "senses": 7,
+    "source": "WORDNET-noun",
+    "topic": "dog"
+   },
+   "what does lofty mean": {
+    "senses": 3,
+    "source": "WORDNET-adj",
+    "topic": "lofty"
+   }
+  },
+  "gates": {
+   "R1": true,
+   "R2": true,
+   "R3": true,
+   "R4": true,
+   "R5": true,
+   "R6": true,
+   "R7": false,
+   "R8": true
+  },
+  "kaikki_full": true,
+  "literals": [
+   "",
+   "Z",
+   "answer",
+   "consulted",
+   "gloss",
+   "kind",
+   "skeleton",
+   "state",
+   "tie",
+   "topic"
+  ],
+  "passed": false,
+  "prereg": "em_resolve_prereg.md"
+ },
  "E2a_void_note": "em_loop.py's tier curriculum was VOID as a depth test: tiers counted transforms APPLIED and the base set nearly closes under composition, so deep tier-6 frames were extensionally equal to shallow ones and blind depth-3 search correctly found the simpler equivalent. Its 11.3x cost figure is NOT an emergence result.",
  "E2b_depth_curriculum": {
   "blind": [
@@ -1826,7 +1875,7 @@
     "waste": 0.967
    }
   ],
-  "secs": 148.8
+  "secs": 94.0
  },
  "E7_attributed_state": {
   "cascaded": 13,
@@ -1866,7 +1915,7 @@
    "central",
    "lofty"
   ],
-  "secs": 2.7,
+  "secs": 1.8,
   "shuffle_admitted": 0,
   "strikes": {
    "DICT-A": 0,
@@ -1902,7 +1951,7 @@
    "yellow": 2
   },
   "prereg": "em_corpus_prereg.md",
-  "secs": 1.3,
+  "secs": 0.6,
   "single_token": 32,
   "sound": true,
   "stats": {
@@ -1951,6 +2000,159 @@
     "synsets": 18185
    }
   }
+ },
+ "E9_conjectured_state": {
+  "agnostic": true,
+  "fatal": {
+   "confab": 0,
+   "laundering": 0,
+   "stale": 0
+  },
+  "inertness": {
+   "abstain": 0,
+   "conjecture": 47,
+   "factor": Infinity,
+   "n": 10
+  },
+  "invariance": true,
+  "per_budget": [
+   {
+    "abstain_arm": {
+     "abstain": 200
+    },
+    "cascaded_dependents": 7,
+    "conjecture_arm": {
+     "abstain": 149,
+     "conj_ok": 47,
+     "conj_wrong": 4
+    },
+    "conjectures": 7,
+    "n": 10,
+    "retracted": 3,
+    "still_open": 0,
+    "ties": 0,
+    "upgraded": 4,
+    "words_seen": 7
+   },
+   {
+    "abstain_arm": {
+     "abstain": 159,
+     "commit_ok": 41
+    },
+    "cascaded_dependents": 4,
+    "conjecture_arm": {
+     "abstain": 96,
+     "commit_ok": 36,
+     "conj_ok": 66,
+     "conj_wrong": 2
+    },
+    "conjectures": 7,
+    "n": 20,
+    "retracted": 1,
+    "still_open": 0,
+    "ties": 0,
+    "upgraded": 6,
+    "words_seen": 10
+   },
+   {
+    "abstain_arm": {
+     "abstain": 154,
+     "commit_ok": 46
+    },
+    "cascaded_dependents": 6,
+    "conjecture_arm": {
+     "abstain": 36,
+     "commit_ok": 59,
+     "conj_ok": 102,
+     "conj_wrong": 3
+    },
+    "conjectures": 12,
+    "n": 40,
+    "retracted": 2,
+    "still_open": 0,
+    "ties": 0,
+    "upgraded": 10,
+    "words_seen": 16
+   },
+   {
+    "abstain_arm": {
+     "abstain": 44,
+     "commit_ok": 156
+    },
+    "cascaded_dependents": 0,
+    "conjecture_arm": {
+     "abstain": 3,
+     "commit_ok": 142,
+     "conj_ok": 55
+    },
+    "conjectures": 6,
+    "n": 80,
+    "retracted": 0,
+    "still_open": 0,
+    "ties": 0,
+    "upgraded": 6,
+    "words_seen": 18
+   },
+   {
+    "abstain_arm": {
+     "abstain": 21,
+     "commit_ok": 179
+    },
+    "cascaded_dependents": 0,
+    "conjecture_arm": {
+     "commit_ok": 180,
+     "conj_ok": 20
+    },
+    "conjectures": 3,
+    "n": 160,
+    "retracted": 0,
+    "still_open": 1,
+    "ties": 0,
+    "upgraded": 2,
+    "words_seen": 19
+   },
+   {
+    "abstain_arm": {
+     "abstain": 2,
+     "commit_ok": 198
+    },
+    "cascaded_dependents": 0,
+    "conjecture_arm": {
+     "commit_ok": 197,
+     "conj_ok": 3
+    },
+    "conjectures": 1,
+    "n": 320,
+    "retracted": 0,
+    "still_open": 1,
+    "ties": 0,
+    "upgraded": 0,
+    "words_seen": 19
+   },
+   {
+    "abstain_arm": {
+     "abstain": 3,
+     "commit_ok": 197
+    },
+    "cascaded_dependents": 0,
+    "conjecture_arm": {
+     "commit_ok": 196,
+     "conj_ok": 4
+    },
+    "conjectures": 1,
+    "n": 640,
+    "retracted": 0,
+    "still_open": 1,
+    "ties": 0,
+    "upgraded": 0,
+    "words_seen": 19
+   }
+  ],
+  "prereg": "em_conjecture_prereg.md",
+  "revision": true,
+  "shuffled_identical": true,
+  "sound": true,
+  "ties": 0
  },
  "blind_arm": [
   {

@@ -173,9 +173,89 @@ demand with the caveat stated to the user; contested words (91) are asked about.
 researched or taught word is tagged and recorded as a dependent; `wrong` retracts with cascade and strikes the
 source; world-learned words cannot be retracted by telling.
 
+### Emergence E-9 -- the fourth verdict state (core/verdict.py: CONJECTURED), E14 brought back agnostic
+Owner's request: bring E14's defeasible state back without its provided certificate language or hand-listed
+program family. `core/verdict.py` now has **CONJECTURED** -- a provisional guess admitted ONLY from a **survivor
+set** (what the caller's sound elimination has not ruled out): one survivor -> COMMIT, several -> the unique
+simplest under a CALLER-SUPPLIED key is held with its rivals recorded, a tie or an empty set -> ABSTAIN. The core
+imposes no notion of simplicity and names nothing about any world (checked by the experiment reading the module's
+AST). Lattice: ABSTAIN/RETRACTED > CONJECTURED > ATTRIBUTED > COMMIT; derived-from-conjectured is conjectured with
+ancestry union. `Beliefs.revise(key, survivors)` is the one-way channel: value ruled out -> RETRACTED with cascade,
+set reaches one -> COMMIT, otherwise value kept and rivals narrowed. LAUNDERING now also names a COMMIT with
+un-upgraded conjecture ancestry; STALE (a held conjecture the evidence already rules out) is the experiment's fatal
+column. `emergence/em_conjecture.py` + prereg, rect world, 19 words, two arms on one stream at seven budgets:
+**confab 0/1400, laundering 0, stale 0; evidence-count invariance holds (10 vs 10,000 observations, identical
+value/state/rivals); every wrong guess retracted with 100% of dependents cascaded, every right guess upgraded on
+a singleton, no COMMIT ever retracted; inertness: at n=10 the abstain-only engine answers 0/200 and the conjecture
+arm 47/200 correct (4 later refuted and retracted); shuffled lexicon identical per budget.** The honest price is
+printed, not hidden: 306 conjecture-backed answers over all budgets, 9 later refuted, all retracted. One word stays
+CONJECTURED after 4000 observations and is reported as open: `huge`, survivors {huge, square} -- every huge rect in
+this world is 4x4 and therefore square, so positive-only evidence can never eliminate the superset meaning (the subset
+problem of learning from positive examples). The specificity key guesses right and cannot prove it; only negative
+evidence or an exclusivity constraint would close it. Recorded as a limit of the evidence, not of the state.
+Why it matters for language-from-examples-only: a child commits to the most specific consistent meaning at once,
+overgeneralizes, is corrected, revises; abstain-only learns like a proof checker. This is that behaviour with the
+fatal columns kept at zero. The specificity key here (observed base rate) is one caller-chosen bias among
+possible ones -- stated as such, not claimed as the right one.
+
+### Phase 0 (2026-09-06) -- the rect world out of every mechanism; full Wiktionary offline
+Owner's objection: the rect world "presumes and hardcodes bullshit about rectangles", biasing a general engine toward
+shapes. Measured, not assumed: `core/` was clean, but the research loop was not -- `kb_sources` built its
+definition-kind table (FAMILY/CUES) from `en_world`'s colour/size/shape/zone lists, the offline Wiktionary snapshot
+held ADJECTIVES ONLY because rect-world words are adjectives, and WordNet was searched adjectives-first for the same
+reason. Three changes, each gated:
+- **C4 in `core_selftest.py`**: a world module (name contains `world`) may be imported by the experiments that test
+  against it, never by `core/` or by `kb_*`/`wn_*`. Demonstrated to FAIL on HEAD (kb_sources imported en_world),
+  passes now. The wider count (every non-world module importing a world: **14**, all experiment/chat files) is
+  printed as the next number to drive down, the way the island map was.
+- **Source-derived kind cues** replace FAMILY/CUES: an anchor's cues are the tokens of its OWN dictionary
+  definitions minus those common to more than half of the anchors. 'having a deep red colour' reads red; 'of small
+  importance' reads nothing. `validate_chat` 19/19 unchanged; E-7 unchanged. Honest limits: 'a bluish green colour'
+  no longer reads green (WordNet spells 'color'; the full Wiktionary index adds the British glosses), and an anchor
+  with no dictionary entry ('centred') has no cues until one exists.
+- **Full English Wiktionary offline**: kaikki.org's complete JSONL (3.2 GB, 2026-08-28 snapshot, CC BY-SA) under
+  `_nldata/`, indexed once into sqlite (`kb_offline.kaikki_build_all`: every POS, senses with POS, examples,
+  synonyms, and a document-frequency table over every definition). Registered as the offline KAIKKI source for
+  every part of speech; the adjective-only index remains only as the fallback when the full file is absent.
+
+### Emergence E-10 -- the unified answer loop (core/resolve.py): "what is a dog" from an empty lexicon
+`emergence/em_resolve_prereg.md` (implements no_paradigm_prereg section 5 for the owner's acceptance case). The
+loop holds no word: SEGMENT by Unicode category runs; RESOLVE every symbol through an injected source object
+(core imports no source module and no world); TOPIC = the unique most specific symbol by the sources' own
+definition count (the one declared bias; tie -> ASK); INTENT by AFFORDANCE = the reading kinds the topic actually
+has (world binding / executable / gloss), cheapest reversible first, never above CONJECTURED until the user
+confirms; ANSWER = the certificate shown as itself (gloss verbatim with source, held ATTRIBUTED); LEARN = accepted
+(symbols, topic, kind) anti-unified into FRAMES held CONJECTURED, retracted on `wrong`. Gates: **R1 cold start
+'What is a dog?' / 'dog?' / 'what does lofty mean' -> the right topic's gloss, 7 senses per WordNet, ATTRIBUTED;
+R2 'which one is red' -> WORLD with GLOSS named when a world is attached, GLOSS alone when not (the affordances
+changed, not the words); R3 all sources removed -> refuses, invents nothing; R4 the loop's string literals share
+no token with any test utterance and contain no glyph; R5 glosses permuted across headwords -> topic and citation
+follow the permutation; R6 two accepted 'what is a X' -> frame ('what','is','a',_) fires on 'what is a tree',
+retracted on 'wrong'; R8 COMMITs 0, LAUNDERING 0, MISATTRIBUTION 0.** Registered as SOUND. **R7 prediction MISS,
+recorded:** 'I hate my dog' does not resolve to dog -- with WordNet alone 'hate' and 'my' tie as rarer than 'dog'
+and the loop ASKS; with the full Wiktionary counts (hate 147, my 394, dog 2130) it picks 'hate'; and 'define dog'
+picks 'define' (125 definitions mention it vs 2130 for dog). Both are the
+declared bias behaving as declared, not patched with a list; frames correct them after feedback. Chat wiring:
+`en_server._diagnose` consults the resolver before OUT-OF-WORLD/ABSTAIN, so the chat now answers "what is a dog"
+with a cited definition (kind DEFINED), `correct` may form a frame, `wrong` drops the gloss and the frame;
+`validate_chat` extended to 21 checks.
+
+### The plan the owner asked to execute (2026-09-06), and where each phase stands
+0 hygiene (C4, world-free reader, full Wiktionary) -- **done**. 1 general knowledge acquisition (every POS, cited)
+-- **done for definitions** via research_gloss + KAIKKI-all. The pre-emptive bulk pass (`em_preempt --offline`) was
+re-run with the derived cues over the full dictionary -- the ablation the peer prereg said was owed: **963,478 lemmas,
+10 corroborated (2+ sources), 8,243 single-source (held on demand with the caveat), 695 contested**; the corroborated
+lexicon stays at 32 words. Against the authored cues' 32/454/91 that is far fewer bulk admissions and far more words
+the chat will research live -- `validate_chat` 21/21 still passes (gargantuan resolved live, teal contested live).
+Restated, not tuned: fewer silent pre-loads is the honest direction. 2 intent by affordance (E-10) -- **SOUND, R7 miss recorded**. 3 language
+from situations only -- **pre-registered** (`nolf_prereg.md`); sealed worlds and the gate harness built
+(`nolf_worlds.py`, `nolf_run.py`); the learner is the open slot and is NOT claimed. 4 introspection world --
+**pre-registered** (`introspect_prereg.md`), not built. 5 learned priors, 6 worlds plural -- not started; both
+depend on 3.
+
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
-   still reproduces, incl. `em_closure`, `em_attributed`, `em_corpus`, `validate_chat`), C3 (zero islands).
+   still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
    `--map-only` for the island map alone.
 2. **The chat acceptance test:** `python emergence/validate_chat.py` — a scripted conversation, offline sources
    only, deterministic scene; one line per check; ends with `CHAT VALIDATION: PASS` and exit code 0. It asserts
@@ -191,7 +271,8 @@ source; world-learned words cannot be retracted by telling.
 4. **Rebuild the pre-emptive lexicon:** `python emergence/em_corpus.py` then `python emergence/em_preempt.py
    --offline` (seconds; needs `_nldata/kaikki-English-adj.jsonl` and `_nldata/files/mthesaur.txt`, see
    `kb_offline.py` for the sources), optionally `--online N` for the N best candidates the offline sources
-   cannot settle (paced, resumable; the server reloads the file live).
+   cannot settle (paced, resumable; the server reloads the file live). The full Wiktionary index is built by
+   `python emergence/kb_offline.py --rebuild` once `_nldata/kaikki-English-all.jsonl` is present (minutes; sqlite).
 
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still

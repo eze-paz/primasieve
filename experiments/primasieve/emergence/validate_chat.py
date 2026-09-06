@@ -66,7 +66,10 @@ if __name__ == "__main__":
     k, m = say("which one is mustard"); check("single-source word held WITH the caveat", "no second source" in m.lower(), f"{k}: {m}")
     k, m = say("which one is teal"); check("contested word -> ASK with both readings", k == "ASK" and "blue" in m and "green" in m, f"{k}: {m}")
     k, m = say("none"); check("'none' leaves a contested word unknown", k == "ABSTAIN", f"{k}: {m}")
-    k, m = say("which one is sex"); check("no source -> OUT-OF-WORLD naming sources consulted", k in ("OUT-OF-WORLD", "ABSTAIN") and "consulted" in m, f"{k}: {m}")
+    k, m = say("which one is sex"); check("a word no shape can be -> DEFINED from the sources (cited) or OUT-OF-WORLD naming sources consulted",
+                                          k in ("DEFINED", "OUT-OF-WORLD", "ABSTAIN") and "consulted" in m, f"{k}: {m}")
+    k, m = say("what is a dog"); check("'what is a dog' -> DEFINED, cited, held on the source's word (E-10)", k == "DEFINED" and "WORDNET" in m.upper() or "KAIKKI" in m, f"{k}: {m}")
+    k, m = say("wrong"); check("'wrong' on a definition drops it and asks what was meant", k == "RETRACTED", f"{k}: {m}")
 
     print("4. retraction cascades; sources are struck", flush=True)
     S.STATE["last_used"] = ["gargantuan"]

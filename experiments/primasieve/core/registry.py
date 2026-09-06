@@ -31,6 +31,10 @@ PUBLISHED = {
     "em_closure": ["E6 CLOSURE CURRICULUM: PASS"],
     # ---- emergence E-7: the third verdict state (core/verdict.py ATTRIBUTED); utility bar reported, not claimed --
     "em_attributed": ["E7 ATTRIBUTED STATE: SOUND"],
+    # ---- emergence E-9: the fourth verdict state (core/verdict.py CONJECTURED) -- a guess with a correction channel
+    "em_conjecture": ["E9 CONJECTURED STATE: SOUND"],
+    # ---- emergence E-10: the unified answer loop (core/resolve.py) -- "what is a dog" from an empty lexicon; R7 reported
+    "em_resolve": ["E10 RESOLVE LOOP: SOUND"],
     # ---- emergence E-8: corpus acquisition (WordNet first-sense, both directions) + the chat acceptance test ------
     "em_corpus": ["WORDNET CORPUS ACQUISITION: SOUND"],
     "validate_chat": ["CHAT VALIDATION: PASS"],

@@ -116,14 +116,16 @@ def _synsets_with_gloss(word, pos):
     out = []
     p = os.path.join(DICT, f"data.{pos}")
     if not os.path.exists(p): return []
+    order = {o: i for i, o in enumerate(idx.get(word.lower(), []))}     # the SOURCE's own listing order, kept as
+    found = []                                                           # data (NP-3: it carries no authority)
     for line in open(p, encoding="latin-1"):
         if line[:8] in offs:
             head, _, gloss = line.partition("|")
             f = head.split()
             if len(f) > 1:
-                try: out.append((int(f[1]), gloss.strip()))
+                try: found.append((order.get(line[:8], 1 << 30), (int(f[1]), gloss.strip())))
                 except ValueError: pass
-    return out
+    return [g for _, g in sorted(found, key=lambda x: x[0])]
 
 
 def speech_act(word):
