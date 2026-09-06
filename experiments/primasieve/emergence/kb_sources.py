@@ -60,12 +60,37 @@ def tokens(text):
     return re.findall(r"[a-z]+", text.lower())
 
 
-def read(span, anchors):
-    """-> set of predicates the span vouches for (after the negation guard). Empty = says nothing we can use."""
-    toks = tokens(span); preds = set()
+import en_world as _W
+
+# TYPE CUES (V3 rule, after the corroborated bulk pass put 322 of 381 words on 'small' through 'little' and 'of
+# small importance'): a definition vouches for a predicate only if it also names WHAT KIND of property it is.
+# 'small in size' reads; 'of small importance' does not. The cue lists are about property KINDS, not about any
+# target word, and are the same for every source. Recorded in em_preempt.py's log as V2 -> V3.
+FAMILY = {}
+for _p in _W.COLOURS: FAMILY[_p] = "colour"
+for _p in _W.SIZES: FAMILY[_p] = "size"
+for _p in _W.SHAPES: FAMILY[_p] = "shape"
+for _p in _W.HZONES + _W.VZONES: FAMILY[_p] = "zone"
+CUES = {"colour": {"colour", "color", "coloured", "colored", "hue", "shade", "tint", "tinge", "tinged", "dye", "pigment", "ish"},
+        "size": {"size", "sized", "dimension", "dimensions", "extent", "stature", "bulk", "magnitude", "height", "width",
+                 "breadth", "length", "tall", "wide", "large", "big", "small", "little", "tiny", "huge", "thin", "narrow", "broad"},
+        "shape": {"shape", "shaped", "form", "sides", "angles", "square", "rectangular", "wide", "tall", "broad", "thin", "narrow"},
+        "zone": {"position", "positioned", "located", "situated", "placed", "top", "bottom", "side", "left", "right",
+                 "upper", "lower", "middle", "centre", "center", "edge", "end", "part", "highest", "lowest", "nearest"}}
+
+
+def read(span, anchors, typed=True):
+    """-> set of predicates the span vouches for (negation guard; with typed=True the span must also carry a cue
+    for the predicate's property KIND). Empty = says nothing we can use."""
+    toks = tokens(span); preds = set(); tokset = set(toks)
     for i, t in enumerate(toks):
         if t in anchors and not (set(toks[max(0, i - 2):i]) & NEG):
-            preds.add(anchors[t])
+            p = anchors[t]
+            if typed and p in FAMILY:
+                cues = CUES[FAMILY[p]] - {t}                   # the anchor itself is not its own cue
+                if not (tokset & cues) and not any(x.endswith("ish") for x in tokset if FAMILY[p] == "colour"):
+                    continue
+            preds.add(p)
     return preds
 
 
@@ -141,8 +166,19 @@ def src_conceptnet(word):
     return [(s, text) for s in out]
 
 
-SOURCES = [("WORDNET-adj", lambda w: src_wordnet(w, "adj")), ("WORDNET-noun", lambda w: src_wordnet(w, "noun")),
-           ("WIKTIONARY", src_wiktionary), ("WIKIDATA", src_wikidata), ("CONCEPTNET", src_conceptnet)]
+import kb_offline as OFF
+
+# (source id, fetch, reader). OFFLINE sources first -- exact, instant, no rate limit; the online ones are the
+# fallback for words the downloaded resources do not settle. MOBY reads by lemma equality (its lists are broad).
+SOURCES = [("WORDNET-adj", lambda w: src_wordnet(w, "adj"), None), ("WORDNET-noun", lambda w: src_wordnet(w, "noun"), None),
+           ("KAIKKI", OFF.src_kaikki, None), ("MOBY", OFF.src_moby, OFF.moby_read),
+           ("WIKTIONARY", src_wiktionary, None), ("WIKIDATA", src_wikidata, None), ("CONCEPTNET", src_conceptnet, None)]
+OFFLINE = {"WORDNET-adj", "WORDNET-noun", "KAIKKI", "MOBY"}
+
+
+def family(sid):
+    """independence for corroboration: KAIKKI is a snapshot of WIKTIONARY, so they count once."""
+    return "WIKTIONARY" if sid in ("KAIKKI", "WIKTIONARY") else sid
 
 
 def research(word, anchors, stop_when_unique=True):
@@ -152,22 +188,23 @@ def research(word, anchors, stop_when_unique=True):
     search early (cheapest-first). A contest is never settled by vote: if two sources disagree the word is
     reported CONTESTED with both citations, and the chat asks. Only the world (or the user) settles it."""
     cites = {}; consulted = []; unavailable = []; refused = 0
-    for sid, fn in SOURCES:
-        cands = fn(word)
+    for sid, fn, reader in SOURCES:
+        rd = reader or read
+        cands = fn(word, anchors) if sid == "MOBY" else fn(word)
         if cands is None: unavailable.append(sid); continue
         consulted.append(sid)
         for span, text in cands:
-            preds = read(span, anchors)
+            preds = rd(span, anchors)
             if len(preds) != 1:
                 if len(preds) > 1: cites.setdefault(frozenset(preds), []).append((sid, span[:120]))
                 continue
             p = next(iter(preds))
-            claim, state, prov = attribute((word, p), sid, text, span, lambda s, w=word: (w, next(iter(read(s, anchors)))) if len(read(s, anchors)) == 1 else None)
+            claim, state, prov = attribute((word, p), sid, text, span, lambda s, w=word: (w, next(iter(rd(s, anchors)))) if len(rd(s, anchors)) == 1 else None)
             if state == ATTRIBUTED: cites.setdefault(frozenset([p]), []).append((sid, span[:120]))
             else: refused += 1
         distinct = {p for k in cites for p in k}
-        if stop_when_unique and len(distinct) == 1 and sid.startswith("WORDNET"):
-            break
+        if stop_when_unique and len(distinct) == 1 and sid in OFFLINE and sid == "MOBY":
+            break                                              # all offline sources seen and they agree: no remote call
     distinct = {p for k in cites for p in k}
     base = dict(consulted=consulted, unavailable=unavailable, refused=refused)
     if not distinct: return dict(status="none", preds=set(), cites={}, **base)
@@ -221,20 +258,27 @@ def deep_research(word, anchors, depth=2, budget=None, trace=None, tried=None):
     tried.add(word)
     r = research(word, anchors)
     r["trace"] = trace; r["chain"] = {}; r["examples"] = []
-    det = wikt_detail(word)
+    det = OFF.kaikki_detail(word) or (wikt_detail(word) if r["status"] == "none" else None)   # offline first
     if det: r["examples"] = det["examples"][:3]
     if r["status"] != "none" or depth <= 0 or not det: return r
     children = []
     for links in det["links"][:3]:
-        children += [w for w in links if w not in anchors and w not in tried and w not in STOP and w.isalpha()]
+        children += [w for w in links if w not in anchors and w not in tried and w not in STOP and w.isalpha() and len(w) > 2]
     children += [s for s in det["synonyms"] if s not in anchors and s not in tried and s.isalpha()]
-    children = list(dict.fromkeys(children))[:5]
+    children = list(dict.fromkeys(children))[:8]
     temp = dict(anchors)
     for child in children:
         if budget[0] <= 0: trace.append(f"budget exhausted before '{child}'"); break
         budget[0] -= 1
         cr = deep_research(child, temp, depth - 1, budget, trace, tried)
+        # a CHASED child becomes an anchor only if CORROBORATED (2+ sources) or vouched by WordNet's strict
+        # first-sense synonymy: one loose definition deep in a chain is how 'nearest' -> small reached 'topmost'.
         if cr["status"] == "attributed":
+            c_cites = next(iter(cr["cites"].values()))
+            c_srcs = {family(s) for s, _ in c_cites}          # KAIKKI *is* Wiktionary: one family, not two sources
+            if len(c_srcs) < 2 and "WORDNET-adj" not in c_srcs:
+                trace.append(f"'{word}' -> chased '{child}' -> {next(iter(cr['preds']))} but single-source; not used as an anchor")
+                continue
             p = next(iter(cr["preds"])); temp[child] = p
             r["chain"][child] = dict(pred=p, cites=next(iter(cr["cites"].values()))[:2], chain=cr.get("chain", {}))
             trace.append(f"'{word}' -> chased '{child}' -> {p}")
@@ -253,7 +297,65 @@ def deep_research(word, anchors, depth=2, budget=None, trace=None, tried=None):
     return r
 
 
+def query_word(q):
+    """Pull the word being asked about out of a natural question -- 'what is a dog?', 'define justice',
+    'what does photosynthesis mean' -> dog / justice / photosynthesis. General phrasing, no per-word logic; a
+    single token is returned as-is. Multi-word content is returned joined (the lookup misses and the caller
+    abstains)."""
+    import re as _re
+    t = q.strip().lower().rstrip("?.! ")
+    t = _re.sub(r"^(what\s+is|what\s+are|what\s+was|whats|what's|what\s+does|what\s+do|who\s+is|define|meaning\s+of|tell\s+me\s+about)", "", t).strip()
+    t = _re.sub(r"^(a|an|the)", "", t).strip()
+    t = _re.sub(r"\s*(mean|means|meaning)$", "", t).strip()
+    return t or q.strip()
+
+
+def define(word, online=True):
+    """WIDE definitional answer: the researched meaning of `word`, returned VERBATIM with its SOURCE, and NOT
+    reduced to any world's predicates. This is the widening the shapes-reader blocked: the answer is whatever a
+    source actually says, so it is as wide as the sources (all of WordNet, plus online lexica). Abstention is
+    INTERNAL -- every source is consulted cheapest-first; None comes back only if NO source defines the word, at
+    which point the caller may refuse honestly. The citation is the source text itself: the answer is sound
+    (never confabulated) and retractable to exactly the source it came from."""
+    w = word.lower().strip()
+    for pos in ("noun", "verb", "adj"):
+        try:
+            sg = ACQ._synsets_with_gloss(w, pos)          # the actual DEFINITION gloss, not just synset words
+        except Exception:
+            sg = None
+        if sg:
+            gloss = sg[0][1]
+            try:
+                words = src_wordnet(w, pos)               # synset lemmas, shown as "also: ..." context
+                syn = words[0][1] if words else ""
+            except Exception:
+                syn = ""
+            return dict(word=word, gloss=gloss, source="WORDNET-" + pos, cite=gloss, synset=syn, kind="lexical")
+    if online:
+        for sid, fn in (("WIKTIONARY", src_wiktionary), ("WIKIDATA", src_wikidata), ("CONCEPTNET", src_conceptnet)):
+            try:
+                r = fn(w)
+            except Exception:
+                r = None
+            if r:
+                text = r[0][1]
+                return dict(word=word, gloss=text, source=sid, cite=text, kind="lexical")
+    return None
+
+
 if __name__ == "__main__":
+    if "--define" in sys.argv:
+        rest = [a for a in sys.argv[1:] if a != "--define"]
+        q = " ".join(rest)
+        words = [query_word(q)] if q else []
+        for w in words:
+            d = define(w)
+            if d is None:
+                print(f"{w}: [abstain] no source I can reach defines this word.")
+            else:
+                print(f"{w} = {d['gloss']}")
+                print(f"    [source: {d['source']}]")
+        sys.exit(0)
     import en_chat as C
     _, lex, _ = C.build(n=9000, seed=7)
     anchors = dict(lex)
