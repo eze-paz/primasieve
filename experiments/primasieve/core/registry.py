@@ -29,6 +29,9 @@ PUBLISHED = {
     "em_closure": ["E6 CLOSURE CURRICULUM: PASS"],
     # ---- emergence E-7: the third verdict state (core/verdict.py ATTRIBUTED); utility bar reported, not claimed --
     "em_attributed": ["E7 ATTRIBUTED STATE: SOUND"],
+    # ---- emergence E-8: corpus acquisition (WordNet first-sense, both directions) + the chat acceptance test ------
+    "em_corpus": ["WORDNET CORPUS ACQUISITION: SOUND"],
+    "validate_chat": ["CHAT VALIDATION: PASS"],
     # ---- the E-series mechanisms kept live because core/ now holds them ----------------------------------------
     "meta_e5": ["CLOSED: recurring residual -> anti-unify -> NEW PRIMITIVE crystallized + generalizes"],
     "meta_e6": ["K2 stateless: ACTIVE 6.0 vs RAND-SHORT 44.0"],

@@ -47,8 +47,10 @@ def load_attributed():
         STATE["provenance"][w] = f"{v.get('how', 'research')}: {v.get('source', 'WORDNET')} via {chain}, unverified"
         _hold(w, v["pred"], [(c[0], c[1]) for c in v.get("cites", [(v.get("source", "WORDNET-adj"), v.get("span", ""))])])
     STATE["contested"] = {w: c for w, c in d.get("contested", {}).items() if w not in lex}
+    STATE["single"] = {w: v for w, v in d.get("single", {}).items() if w not in lex}   # one source only: on demand
     total = sum(1 for w in lex if w in STATE["provenance"])
-    return f"loaded {n} new attributed words ({total} total; {len(STATE['contested'])} known-contested) from attributed_lexicon.json"
+    return (f"loaded {n} new attributed words ({total} total; {len(STATE['contested'])} known-contested; "
+            f"{len(STATE['single'])} single-source available on demand) from attributed_lexicon.json")
 
 
 def _retract_word(word, why):
@@ -155,6 +157,8 @@ def say(text):
     depends on an attributed premise is attributed, and is never presented as if the world had verified it."""
     r = _say(text)
     used = [w for w in W.tokenize(text) if w in STATE["provenance"]]
+    if "attributed" in r:                                    # already tagged by an inner say() (research/teach re-run)
+        return r
     if used and r.get("kind") in ("COMMIT", "ASK", "NONE", "UNKNOWABLE"):
         tags = "; ".join(f"'{w}' = {STATE['lex'].get(w, STATE['alex'].get(w))} ({STATE['provenance'][w]})" for w in used)
         r["kind"] = "ATTRIBUTED" if r["kind"] == "COMMIT" else r["kind"]
@@ -472,11 +476,9 @@ def _diagnose(unknown, original):
         #      Sources disagree -> ASK with both readings. Nothing anywhere -> only THEN say so, naming the
         #      sources consulted and any that were unreachable.
         anchors = dict(lex)
-        if uw in STATE.get("contested", {}):                 # pre-emptive research already found the sources disagree
-            STATE["teach"] = (uw, original)
-            sides = "; ".join(f"{k} per {', '.join(sorted({s for s, _ in v}))}" for k, v in STATE["contested"][uw].items())
-            return {"kind": "ASK", "msg": f"'{uw}' was researched already and the sources disagree: {sides}. Which do you "
-                                          f"mean? (say the word, or 'none')", "highlight": []}
+        # a word the BULK pass found contested is not short-circuited: live research reads with the full anchor set
+        # (attributed synonyms included) and may settle it; the bulk verdict is appended only if live also contests.
+        bulk_contest = STATE.get("contested", {}).get(uw)
         r = KB.deep_research(uw, anchors)                    # chases the unknowns a definition leads to (budgeted)
         hits = [t for t in r.get("trace", []) if not t.endswith(("-> none", "-> contested")) and "budget" not in t]
         dead = len(r.get("trace", [])) - len(hits)
@@ -487,14 +489,16 @@ def _diagnose(unknown, original):
             pred = next(iter(r["preds"])); cites = next(iter(r["cites"].values()))
             lex[uw] = pred
             srcs = sorted({s for s, _ in cites})
-            STATE["provenance"][uw] = f"research: {', '.join(srcs)} -> {pred}, unverified"
+            single = len({KB.family(s) for s in srcs}) < 2                 # one source family only: say so
+            STATE["provenance"][uw] = f"research: {', '.join(srcs)} -> {pred}, {'single source, ' if single else 'corroborated, '}unverified"
             rr = say(original)
             via = (" via " + " > ".join(f"{c}={v['pred']}" for c, v in r["chain"].items())) if r.get("chain") else ""
             STATE["provenance"][uw] += via
             _hold(uw, pred, cites)
             STATE["research_log"].append(_jsonable({"word": uw, "status": "attributed", "pred": pred, "cites": cites,
                                                     "trace": r.get("trace", []), "consulted": r["consulted"], "unavailable": r["unavailable"]}))
-            rr["msg"] = (f"researched '{uw}': {chase}{', '.join(srcs)} read it as '{pred}'{via} "
+            rr["msg"] = (f"researched '{uw}': {chase}{'only ' if single else ''}{', '.join(srcs)} read it as '{pred}'{via}"
+                         f"{'; no second source corroborates' if single else ''} "
                          f"(e.g. {cites[0][0]}: \"{cites[0][1][:80]}\").{ex} Holding that on their word. " + rr["msg"])
             rr["research"] = {"word": uw, "pred": pred, "cites": cites, "consulted": r["consulted"], "unavailable": r["unavailable"]}
             return rr
@@ -503,8 +507,19 @@ def _diagnose(unknown, original):
             STATE["research_log"].append(_jsonable({"word": uw, "status": "contested", "preds": r["preds"], "cites": r["cites"],
                                                     "trace": r.get("trace", []), "consulted": r["consulted"], "unavailable": r["unavailable"]}))
             sides = "; ".join(f"{'/'.join(sorted(k))} per {', '.join(sorted({s for s, _ in v}))}" for k, v in r["cites"].items())
+            if bulk_contest:
+                sides += "; earlier bulk pass: " + "; ".join(f"{k} per {', '.join(sorted({s for s, _ in v}))}" for k, v in bulk_contest.items())
             return {"kind": "ASK", "msg": f"researched '{uw}' and the sources disagree: {sides}. Which do you mean? "
                                           f"(say the word, or 'none')", "highlight": [], "research": {"word": uw, "cites": {"/".join(sorted(k)): v for k, v in r["cites"].items()}}}
+        if uw in STATE.get("single", {}):                    # live research found nothing; ONE pre-computed source vouches: hold it, cite it, say so
+            v = STATE["single"].pop(uw); pred = v["pred"]
+            lex[uw] = pred
+            STATE["provenance"][uw] = f"{v['how']}: {v['source']}, unverified"
+            _hold(uw, pred, [(c[0], c[1]) for c in v.get("cites", [])] or [(v["source"], v["span"])])
+            rr = say(original)
+            rr["msg"] = (f"'{uw}': only {v['source']} defines it in my terms, as '{pred}' (\"{v['span'][:80]}\"). "
+                         f"No second source corroborates. Holding it on that one word. " + rr["msg"])
+            return rr
         consulted_note = f" (consulted {', '.join(r['consulted'])}" + (f"; unreachable: {', '.join(r['unavailable'])}" if r["unavailable"] else "") + ")"
         STATE["research_log"].append(_jsonable({"word": uw, "status": "none", "trace": r.get("trace", []),
                                                 "consulted": r["consulted"], "unavailable": r["unavailable"]}))

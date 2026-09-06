@@ -158,6 +158,41 @@ lexicon never learned abstain; a unique referent is required), so the registered
 prediction miss — WordNet genuinely contests `minuscule` (small vs tiny), so two words were contested, not one.
 Chat wiring: user-taught and WordNet-confirmed words carry provenance and answers that rely on them say so.
 
+### Emergence E-8 + the research loop: knowledge bases behind the chat
+`emergence/kb_sources.py` (research: every designated source, cheapest first, before an abstention may reach the
+chat; deep chasing of the unknowns a definition leads to, budgeted; chased children anchor only if corroborated
+or WordNet-strict), `emergence/kb_offline.py` (downloaded resources, indexed once: kaikki.org Wiktionary
+adjectives 175,811 entries; Moby Thesaurus 30,195 headwords — both under `_nldata/`, git-ignored),
+`emergence/em_preempt.py` (the pre-emptive pass over every lemma of every dictionary), `emergence/em_corpus.py`
+(E-8, registered). **Reading rules, with their history in the code:** WordNet first sense in BOTH directions
+(one direction: downhearted→blue); a definition must carry a cue for the property KIND it describes ('small in
+size' reads, 'of small importance' does not — untyped reading put 322 of 381 corroborated words on 'small');
+Moby only by MUTUAL synonymy and only when internally coherent; KAIKKI and WIKTIONARY are one source family for
+corroboration. Bulk admission needs two independent sources (32 words); single-source words (454) are held on
+demand with the caveat stated to the user; contested words (91) are asked about. Every reply that relies on a
+researched or taught word is tagged and recorded as a dependent; `wrong` retracts with cascade and strikes the
+source; world-learned words cannot be retracted by telling.
+
+## How to test / validate (the interface)
+1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
+   still reproduces, incl. `em_closure`, `em_attributed`, `em_corpus`, `validate_chat`), C3 (zero islands).
+   `--map-only` for the island map alone.
+2. **The chat acceptance test:** `python emergence/validate_chat.py` — a scripted conversation, offline sources
+   only, deterministic scene; one line per check; ends with `CHAT VALIDATION: PASS` and exit code 0. It asserts
+   COMMIT/ASK behaviour, teaching, protection of world-learned words, research through the offline sources,
+   the single-source caveat, contested→ASK, honest OUT-OF-WORLD naming the sources consulted, retraction with
+   cascade and strikes, and the three fatal columns at zero (confabulation, misattribution, laundering).
+3. **The live surface:** `python emergence/en_server.py` → http://localhost:8765 . The page shows the scene,
+   the chat, and a knowledge panel (attributed words with state/sources/dependents, per-source confirm/strike
+   counts, a "probe a word" deep-research box that learns nothing, the research log, the world-learned words).
+   Feedback commands: `wrong`, `correct`, `forget <word>`, `<word> means <known word>`. Endpoints for scripts:
+   `GET /api/state`, `POST /api/say {"text"}`, `POST /api/research {"word"}`, `POST /api/forget {"word"}`,
+   `POST /api/reload`, `POST /api/new`.
+4. **Rebuild the pre-emptive lexicon:** `python emergence/em_corpus.py` then `python emergence/em_preempt.py
+   --offline` (seconds; needs `_nldata/kaikki-English-adj.jsonl` and `_nldata/files/mthesaur.txt`, see
+   `kb_offline.py` for the sources), optionally `--online N` for the N best candidates the offline sources
+   cannot settle (paced, resumable; the server reloads the file live).
+
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still
 frozen by hand** — the one authored thing Stage 3b's knockout ladder did not remove. It should be

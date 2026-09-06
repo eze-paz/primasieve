@@ -330,111 +330,6 @@
 "florid"
 ],
 "source": "WORDNET-adj"
-},
-"blueness": {
-"pred": "blue",
-"source": "WORDNET-noun",
-"span": "blue blueness",
-"chain": [],
-"cites": [
-[
-"WORDNET-noun",
-"blue blueness"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"purpleness": {
-"pred": "purple",
-"source": "WORDNET-noun",
-"span": "purple purpleness",
-"chain": [],
-"cites": [
-[
-"WORDNET-noun",
-"purple purpleness"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"sanguinary": {
-"pred": "red",
-"source": "WORDNET-adj",
-"span": "gory sanguinary sanguineous slaughterous butcherly",
-"chain": [],
-"cites": [
-[
-"WORDNET-adj",
-"gory sanguinary sanguineous slaughterous butcherly"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"showy": {
-"pred": "red",
-"source": "WORDNET-adj",
-"span": "flamboyant showy splashy",
-"chain": [],
-"cites": [
-[
-"WORDNET-adj",
-"flamboyant showy splashy"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"slaughterous": {
-"pred": "red",
-"source": "WORDNET-adj",
-"span": "gory sanguinary sanguineous slaughterous butcherly",
-"chain": [],
-"cites": [
-[
-"WORDNET-adj",
-"gory sanguinary sanguineous slaughterous butcherly"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"viridity": {
-"pred": "green",
-"source": "WORDNET-noun",
-"span": "green greenness viridity",
-"chain": [],
-"cites": [
-[
-"WORDNET-noun",
-"green greenness viridity"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
-},
-"yellowness": {
-"pred": "yellow",
-"source": "WORDNET-noun",
-"span": "yellow yellowness",
-"chain": [],
-"cites": [
-[
-"WORDNET-noun",
-"yellow yellowness"
-]
-],
-"depth": 1,
-"how": "offline first-sense",
-"examples": []
 }
 },
 "n_all": 38,
@@ -458,14 +353,5 @@
 "contested_words": 0,
 "synsets": 18185,
 "rule": "first-sense"
-},
-"contested": {},
-"unresolved": {},
-"runs": [
-{
-"kind": "offline",
-"at": "2026-09-06 11:26",
-"words": 39
 }
-]
 }

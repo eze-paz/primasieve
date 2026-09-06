@@ -123,18 +123,39 @@ def _first_sense_span(w, pos, anchors):
 
 
 def offline_pass(lex, d):
-    """every adjective and noun lemma through the ON-DISK source only (WordNet first sense; see _first_sense_span)."""
-    anchors = anchors_from(lex, d)
-    lemmas = sorted(set(ACQ._index("adj")) | set(ACQ._index("noun")))
-    lemmas = [w for w in lemmas if w.isalpha() and w not in anchors]
-    t0 = time.time(); n_new = n_con = 0
+    """every lemma of every downloaded dictionary through the ON-DISK sources: WordNet (first sense, both ways),
+    KAIKKI (Wiktionary definitions, token reading), MOBY (synonym lists, lemma equality).
+
+    CORROBORATION RULE for bulk admission (no human is watching): a word enters the pre-emptive lexicon only when
+    TWO independent sources agree on the predicate and none disagrees. A word one source alone vouches for goes to
+    d["single"]: the chat may still hold it ATTRIBUTED on demand -- with its single citation visible to the user --
+    but it is not pre-loaded silently. Disagreement -> d["contested"]."""
+    import kb_offline as OFF
+    # V3: bulk reading anchors ONLY on world-learned words. V2 chained through attributed words ('little',
+    # 'slight') and, with one-directional Moby and untyped definitions, put 322 of 381 corroborated words on
+    # 'small' (punctual, horrible, versatile ...). Recorded here; V2 output was discarded.
+    anchors = dict(lex)
+    kai = OFF.kaikki_index(verbose=True) or {}
+    mob = OFF.moby_index() or {}
+    lemmas = set(ACQ._index("adj")) | set(ACQ._index("noun")) | set(kai) | set(mob)
+    lemmas = sorted(w for w in lemmas if w.isalpha() and w not in anchors)
+    d.setdefault("single", {})
+    t0 = time.time(); n_new = n_con = n_single = 0
     for i, w in enumerate(lemmas):
         cites = {}
-        for sid, pos in (("WORDNET-adj", "adj"), ("WORDNET-noun", "noun")):
-            span = _first_sense_span(w, pos, anchors)
-            for span, text in ([(span, span)] if span else []):
-                idx_ = ACQ._index(pos); off0 = idx_[w][0]
-                preds = {anchors[l] for l in span.split() if l in anchors and (idx_.get(l) or [None])[0] == off0}
+        readers = [("WORDNET-adj", "adj", None), ("WORDNET-noun", "noun", None), ("KAIKKI", None, None), ("MOBY", None, OFF.moby_read)]
+        for sid, pos, rd in readers:
+            if pos:
+                span = _first_sense_span(w, pos, anchors)
+                cands = [(span, span)] if span else []
+            else:
+                cands = (OFF.src_kaikki(w) if sid == "KAIKKI" else OFF.src_moby(w, anchors)) or []
+            for span, text in cands:
+                if pos:
+                    idx_ = ACQ._index(pos); off0 = idx_[w][0]
+                    preds = {anchors[l] for l in span.split() if l in anchors and (idx_.get(l) or [None])[0] == off0}
+                else:
+                    preds = (rd or KB.read)(span, anchors)
                 if len(preds) == 1:
                     p = next(iter(preds))
                     _, st, _ = attribute((w, p), sid, text, span, lambda s: (w, next(iter(KB.read(s, anchors)))) if len(KB.read(s, anchors)) == 1 else None)
@@ -143,14 +164,19 @@ def offline_pass(lex, d):
                     cites.setdefault("/".join(sorted(preds)), []).append((sid, span[:120]))
         single = {k: v for k, v in cites.items() if "/" not in k}
         if len(single) == 1 and len(cites) == 1:
-            p = next(iter(single))
-            d["words"][w] = dict(pred=p, source="+".join(sorted({s for s, _ in single[p]})), span=single[p][0][1],
-                                 chain=[], cites=single[p][:3], depth=1, how="offline first-sense", examples=[])
-            anchors[w] = p; n_new += 1
+            p = next(iter(single)); srcs = sorted({s for s, _ in single[p]})
+            entry = dict(pred=p, source="+".join(srcs), span=single[p][0][1], chain=[], cites=single[p][:3], depth=1,
+                         how="offline, corroborated" if len(srcs) >= 2 else "offline, single source",
+                         examples=(kai.get(w, {}).get("ex", [])[:2] if kai else []))
+            if len(srcs) >= 2:
+                d["words"][w] = entry; n_new += 1                 # NOT added to anchors: no chaining in bulk (V3)
+            else:
+                d["single"][w] = entry; n_single += 1
         elif cites:
             d["contested"][w] = {k: v[:2] for k, v in cites.items()}; n_con += 1
-    log(f"offline pass: {len(lemmas)} lemmas scanned in {time.time()-t0:.1f}s -> {n_new} attributed, {n_con} contested; "
-        f"lexicon now {len(d['words'])} words")
+        if i and i % 20000 == 0: log(f"  ... {i}/{len(lemmas)} ({time.time()-t0:.0f}s)")
+    log(f"offline pass: {len(lemmas)} lemmas scanned in {time.time()-t0:.1f}s -> {n_new} corroborated (2+ sources), "
+        f"{n_single} single-source (on demand only), {n_con} contested; lexicon now {len(d['words'])} words")
     return d
 
 
