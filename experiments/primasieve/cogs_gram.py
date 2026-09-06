@@ -101,6 +101,10 @@ class Lexicon:
         self.emark_det = set()   # markers that also stand in for a determiner (a quantifier: no det, no def)
         self.vmark = {}          # functor token -> marker predicate contributed on the EVENT's var
         self.coord = set()       # coordinator tokens joining two same-type constituents
+        self.adj = {}            # ADJECTIVE token -> the predicate it contributes on the FOLLOWING head noun
+                                 # (positive signal: an EXTRA unary on a head's variable, not "no token's
+                                 # lemma"). Allows a HOMOGRAPH -- a word that is a noun head in one place and an
+                                 # adjective in another -- because the predicate may be the word's own lemma.
 
     def unknown(self, w):
         return self.open_vocab and w not in self.cls and w not in self.terminators
@@ -250,6 +254,8 @@ def _induce_markers(lex, train):
     therefore not a coordinator."""
     lemmas = set(lex.lemma.values())
     seen = collections.Counter()
+    adjcand = collections.defaultdict(collections.Counter)   # token -> contributed adjective predicate counts
+    adjtok = collections.Counter()                           # token -> times it acted as a pre-nominal modifier
     coa = collections.defaultdict(collections.Counter)
     target = collections.defaultdict(collections.Counter)
     det_like = collections.defaultdict(lambda: [0, 0])
@@ -260,18 +266,38 @@ def _induce_markers(lex, train):
             seen[w] += 1
         markers_here = set()
         role_args = collections.defaultdict(list)     # (event, role predicate) -> [arg token positions]
+        unary_on = collections.defaultdict(list)      # variable position -> [predicates] (for EXTRA detection)
         for pred, args in conj:
             segs = [x.strip() for x in pred.split(" . ")]
-            if len(segs) == 1 and len(args) == 1 and args[0][0] == "v" and segs[0] not in lemmas:
-                j = args[0][1]
-                if j >= len(toks):
-                    continue
-                markers_here.add(segs[0])
-                target[segs[0]][lex.cls.get(toks[j])] += 1
-                left2 = (j >= 1 and toks[j - 1] in lex.det) or (j >= 2 and toks[j - 2] in lex.det)
-                det_like[segs[0]][0 if left2 else 1] += 1
+            if len(segs) == 1 and len(args) == 1 and args[0][0] == "v":
+                unary_on[args[0][1]].append(segs[0])
+                if segs[0] not in lemmas:
+                    j = args[0][1]
+                    if j < len(toks):
+                        markers_here.add(segs[0])
+                        target[segs[0]][lex.cls.get(toks[j])] += 1
+                        left2 = (j >= 1 and toks[j - 1] in lex.det) or (j >= 2 and toks[j - 2] in lex.det)
+                        det_like[segs[0]][0 if left2 else 1] += 1
             elif len(segs) == 2 and len(args) == 2 and args[0][0] == "v" and args[1][0] == "v":
                 role_args[(args[0][1], pred)].append(args[1][1])
+        # ADJECTIVE: a head noun at j whose variable carries a unary predicate that is NOT its own lemma. That
+        # extra predicate is contributed by the pre-nominal token(s) before j (skipping a determiner). This is
+        # a POSITIVE signal keyed on position, so it survives a homograph (predicate == the word's noun lemma).
+        for j, preds in unary_on.items():
+            if j >= len(toks):
+                continue
+            selfl = lex.lemma.get(toks[j])
+            if selfl is None or selfl not in preds:
+                continue                              # j is not acting as a head noun here
+            k = j - 1
+            if k >= 0 and toks[k] in lex.det:
+                k -= 1
+            for P in preds:
+                if P == selfl:
+                    continue
+                if 0 <= k < len(toks):
+                    adjcand[toks[k]][P] += 1
+                    adjtok[toks[k]] += 1
         for m in markers_here:
             for w in ts:                              # co-occurrence, ONCE per row
                 coa[m][w] += 1
@@ -296,8 +322,16 @@ def _induce_markers(lex, train):
             lex.emark[w] = m
             if det_like[m][1] > det_like[m][0]:
                 lex.emark_det.add(w)
+    for w, cc in adjcand.items():
+        P, c = cc.most_common(1)[0]
+        # a modifier token is an ADJECTIVE if one predicate dominates its pre-nominal contributions; a
+        # determiner (whose realization already adds an inline marker like DEFMARK) is excluded -- that marker
+        # is not an adjective, it is the determiner's own definiteness realization.
+        if c >= 10 and c >= 0.9 * adjtok[w] and w not in lex.det and w not in lex.emark_det:
+            lex.adj[w] = P
     for w, n in coordv.items():
-        if n >= 10 and lex.cls.get(w) == FUNC and w not in lex.det and w not in lex.emark and w not in lex.vmark:
+        if (n >= 10 and lex.cls.get(w) == FUNC and w not in lex.det and w not in lex.emark
+                and w not in lex.vmark and w not in lex.adj):
             lex.coord.add(w)
 
 
@@ -428,13 +462,14 @@ def induce_relmid(lex, train, sch):
 
 # ================================================================ structural parse
 class NP:
-    __slots__ = ("det", "kind", "idx", "lemma", "rel", "inner", "rc", "marks", "conj_heads")
+    __slots__ = ("det", "kind", "idx", "lemma", "rel", "inner", "rc", "marks", "conj_heads", "amarks")
 
     def __init__(self, det, kind, idx, lemma):
         self.det, self.kind, self.idx, self.lemma = det, kind, idx, lemma
         self.rel = self.inner = None
         self.rc = None              # (marker, gapped CL) -- a relative clause modifying this NP's head
         self.marks = ()             # marker predicates contributed on this head (adjective / quantifier)
+        self.amarks = ()            # adjective predicates contributed on this head
         self.conj_heads = None      # for a coordinated NP: the list of member NP nodes
 
 
@@ -462,11 +497,19 @@ def parse_base(lex, sch, toks, i):
         elif k < n and toks[k] in lex.det and not (k + 1 < n and toks[k + 1] in lex.coord):
             det = toks[k]; k += 1
         while k < n and toks[k] in lex.emark and toks[k] not in lex.emark_det:
-            marks.append(lex.emark[toks[k]]); k += 1        # adjectives between determiner and noun
+            marks.append(lex.emark[toks[k]]); k += 1        # quantifier-style entity markers
+        # ADJECTIVES: consume pre-nominal adjective tokens, but ONLY while a head noun still follows -- this is
+        # what disambiguates a homograph (n0 as adjective before another noun vs n0 as the head itself).
+        amarks = []
+        while (k < n and toks[k] in lex.adj and k + 1 < n
+               and (lex.cls.get(toks[k + 1]) == ENTITY or toks[k + 1] in lex.adj
+                    or (lex.unknown(toks[k + 1]) and not toks[k + 1][:1].isupper()))):
+            amarks.append(lex.adj[toks[k]]); k += 1
         if k < n and (lex.cls.get(toks[k]) == ENTITY or (lex.unknown(toks[k]) and not toks[k][:1].isupper())):
-            if det is not None or marks:
+            if det is not None or marks or amarks:
                 node = NP(det, ENTITY, k, lex.lemma_of(toks[k], ENTITY))
                 node.marks = tuple(marks)
+                node.amarks = tuple(amarks)
                 return node, k + 1
     else:
         c = lex.cls.get(toks[i])
@@ -482,8 +525,11 @@ def parse_base(lex, sch, toks, i):
     return None
 
 
-def _coord_np(lex, sch, toks, i):
+def _coord_np(lex, sch, toks, i, budget):
     """[base] (coord [base])+ as ONE NP exporting every member's head, so a role distributes over all."""
+    if budget[0] <= 0:
+        return None
+    budget[0] -= 1
     b = parse_base(lex, sch, toks, i)
     if b is None:
         return None
@@ -523,6 +569,7 @@ def _fold(sch, bases, rels):
     bs = [NP(x.det, x.kind, x.idx, x.lemma) for x in bases]
     for a, b in zip(bs, bases):
         a.marks = b.marks
+        a.amarks = b.amarks
     if sch.np_branch == "right":
         for k, r in enumerate(rels):
             bs[k].rel, bs[k].inner = r, bs[k + 1]
@@ -533,7 +580,12 @@ def _fold(sch, bases, rels):
 
 
 def parses_np(lex, sch, toks, i, budget=None):
-    c = _coord_np(lex, sch, toks, i)
+    if budget is None:
+        budget = [PARSE_BUDGET]
+    if budget[0] <= 0:
+        return
+    budget[0] -= 1
+    c = _coord_np(lex, sch, toks, i, budget)
     if c is not None:
         yield c
         return
@@ -549,7 +601,7 @@ def parses_np(lex, sch, toks, i, budget=None):
     bases, rels, j = r
     if j < len(toks) and toks[j] in lex.rc_markers:
         n = 0
-        for sub, j2 in parses_cl(lex, sch, toks, j + 1, "auto", [PARSE_BUDGET]):
+        for sub, j2 in parses_cl(lex, sch, toks, j + 1, "auto", budget):
             head, target = _fold(sch, bases, rels)
             target.rc = (toks[j], sub)                 # attaches to the nearest noun
             yield head, j2
@@ -740,7 +792,8 @@ def ev_np(lex, sch, mid, node, defs, conj):
             own = [(node.lemma, (own_head,)), (r[1], (own_head,))]
         else:
             own = [(node.lemma, (own_head,))]
-    own = own + [(m, (own_head,)) for m in node.marks]          # adjective / quantifier markers
+    own = own + [(m, (own_head,)) for m in node.marks]          # quantifier / inline markers
+    own = own + [(m, (own_head,)) for m in node.amarks]         # adjective predicates on the head
     if node.rc is not None:
         # noun . mid ( head , event ) then the clause's conjuncts, with the GAP filled by this head
         marker, sub = node.rc

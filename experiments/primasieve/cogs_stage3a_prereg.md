@@ -569,3 +569,30 @@ recovered (scope a demonstrated representation null); the adjective is induced o
 a measured non-termination boundary on homographs. The discriminating controls are what make this a result
 rather than four clean numbers -- a control that only sees marker-present cases cannot discriminate and always
 passes.
+
+## STAGE 5 TRACK 1 (adjective mechanism made POSITIVE; homograph classification fixed)
+
+Two corrections to the Stage 5 adjective handling, applied after the fable review:
+
+CORRECTION OF FRAMING: the novel-adjective ABSTENTION is CORRECT, not a "memorized class" failure. An unseen
+adjective's surface->predicate mapping is genuinely unknown (its predicate A5 cannot be derived from `a5`),
+exactly as an unseen noun's is. Abstaining rather than guessing is the right behaviour under the standing
+objective; it was over-criticised. So the only real defect was the homograph.
+
+POSITIVE ADJECTIVE SIGNAL (replaces the fragile "a marker is no token's lemma" negative definition): an
+adjective is now detected as a token that contributes an EXTRA unary predicate on a FOLLOWING head noun's
+variable -- positive and position-keyed. This SURVIVES A HOMOGRAPH, a word that is a noun head in some
+sentences and an adjective in others, because the adjective predicate may legitimately BE the word's own
+lemma. Measured: on the homograph corpus the detector now correctly recovers adj = {n0: N0}; all four Stage-5
+constructions stay EM 1.000 CONFAB 0; COGS stays 1.000 with the adjective table EMPTY (inert). Parse-time is
+disambiguated by "a head noun follows" (n0 before another noun = adjective; n0 as the last noun = head).
+
+FAIL-CLOSED: the coordination / marker parse GENERATORS are now budget-threaded (parses_np, _coord_np,
+_slots_from all decrement the shared parse budget), so every individual parse terminates in <= PARSE_BUDGET
+steps -- the earlier unbounded parse hang is gone. Adversary sanity after the change: repro 1.000, test 1.000.
+
+REMAINING LIMIT, stated plainly: INDUCING a full grammar on a heavily-homographic corpus is SLOW, because the
+576-configuration exhaustive schema search re-parses the genuine noun/adjective ambiguity in every config and
+burns the parse budget doing so. Classification is correct and every parse is bounded, but the exhaustive
+search over adversarial ambiguity is a performance limit -- explicitly NOT claimed solved. A cheaper schema
+search (a small budget during the search phase, full budget only for the final fit) is the fix; not attempted.
