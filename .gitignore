@@ -34,3 +34,4 @@ test/lang-harness/.env
 # primasieve regenerable network cache + transient logs
 experiments/primasieve/emergence/kb_cache.json
 experiments/primasieve/selftest.err
+experiments/primasieve/emergence/*.out
