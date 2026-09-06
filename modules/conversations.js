@@ -2952,7 +2952,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=211');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=212');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3094,6 +3094,29 @@ function getSandpieWorker() {
             }
             const out = await s.capture(pr.args && pr.args.path, (pr.args && pr.args.opts) || {});
             reply({ ok: true, dataUrl: out.dataUrl, width: out.width, height: out.height, warnings: out.warnings || [], mode: out.mode || 'fresh-render' });
+          } catch (e) {
+            reply({ ok: false, error: (e && e.message) || String(e) });
+          }
+        })();
+        return;
+      }
+      // walios office→PDF: the worker posts an office-convert-request on behalf of a
+      // guest (`import soffice` in run_python, or `soffice --convert-to pdf` in the
+      // walios shell). Convert with the same ZetaOffice engine the file viewer uses
+      // (opfs._officeEngine) and hand the PDF bytes back; the worker writes them into
+      // OPFS, where the guest's /root sees them.
+      if (msg.payload && msg.payload.type === 'office-convert-request') {
+        const pr = msg.payload;
+        (async () => {
+          const reply = (payload) => { try { _sandpieWorker.postMessage({ type: 'office-convert-result', id: pr.id, payload }); } catch (_) {} };
+          try {
+            const o = window.opfs;
+            if (!o || typeof o._officeEngine !== 'function') { reply({ ok: false, error: 'opfs.js on this page has no office engine (outdated assets — hard-reload the page)' }); return; }
+            if (!self.crossOriginIsolated) { reply({ ok: false, error: 'this page is not cross-origin isolated, so LibreOffice-WASM cannot run here (it needs the COOP/COEP headers prod and coiserver.py send)' }); return; }
+            const engine = await o._officeEngine();
+            if (!engine) { reply({ ok: false, error: 'the office engine is unavailable on this page' }); return; }
+            const pdf = await engine.convert(pr.args.bytes, pr.args.ext);
+            reply({ ok: true, pdf });
           } catch (e) {
             reply({ ok: false, error: (e && e.message) || String(e) });
           }

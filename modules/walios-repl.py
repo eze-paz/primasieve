@@ -488,6 +488,81 @@ def _install_lazy_mounts():
     sys.meta_path.append(_MountOnMiss())
 
 
+
+# ------------------------------------------------------------------ soffice shim
+# There is no soffice binary in walios (LibreOffice needs pthreads this kernel does not
+# give guests), and subprocess cannot fork anyway -- so `subprocess.run(["soffice",
+# "--convert-to", "pdf", ...])` can never work here. What the page DOES have is ZetaOffice
+# (LibreOffice-WASM) booted for the office-file viewer. `import soffice` reaches it through
+# the host: the document is read out of OPFS (= /root), converted on the page, and the PDF
+# is written back next to it. Same engine, same fonts (sandpie/fonts/), same fidelity as
+# opening the file in the app.
+
+_SOFFICE_EXTS = ("docx", "doc", "odt", "rtf", "txt", "xlsx", "xls", "ods", "csv",
+                 "pptx", "ppt", "odp", "odg")
+
+
+class _SofficeModule(types.ModuleType):
+    def __init__(self):
+        super().__init__("soffice")
+        self.__doc__ = (
+            "Convert office documents to PDF with the in-browser LibreOffice.\n\n"
+            "  import soffice\n"
+            "  pdf = soffice.convert('/root/report.docx')            # -> '/root/report.pdf'\n"
+            "  pdf = soffice.convert('deck.pptx', outdir='/root/out')\n\n"
+            "Input: docx doc odt rtf txt xlsx xls ods csv pptx ppt odp odg. Output: PDF only.\n"
+            "Files outside /root are staged into /root/.soffice-tmp for the conversion."
+        )
+        self.EXTS = _SOFFICE_EXTS
+
+    @staticmethod
+    def _under_root(p):
+        return p == "/root" or p.startswith("/root/")
+
+    def convert(self, src, to="pdf", outdir=None):
+        """Convert `src` to PDF. Returns the absolute path of the PDF written."""
+        import shutil
+
+        fmt = str(to or "pdf").split(":", 1)[0].lower()
+        if fmt != "pdf":
+            raise ValueError("soffice.convert: only 'pdf' is available here (the page engine carries the PDF export filters only, not %r)" % to)
+        src = os.path.abspath(str(src))
+        if not os.path.isfile(src):
+            raise FileNotFoundError(src)
+        ext = os.path.splitext(src)[1].lstrip(".").lower()
+        if ext not in _SOFFICE_EXTS:
+            raise ValueError("soffice.convert: .%s is not a document type the PDF export handles (%s)" % (ext or "?", ", ".join(_SOFFICE_EXTS)))
+        if outdir is None:
+            outdir = os.path.dirname(src) if self._under_root(src) else (os.getcwd() if self._under_root(os.getcwd()) else "/root")
+        outdir = os.path.abspath(str(outdir))
+        if not self._under_root(outdir):
+            raise ValueError("soffice.convert: outdir must be under /root (the workspace) -- %s is RAM-only and the host cannot write there" % outdir)
+        os.makedirs(outdir, exist_ok=True)
+        staged = None
+        if not self._under_root(src):
+            os.makedirs("/root/.soffice-tmp", exist_ok=True)
+            staged = "/root/.soffice-tmp/in-%d-%s" % (os.getpid(), os.path.basename(src))
+            shutil.copyfile(src, staged)
+        out = os.path.join(outdir, os.path.splitext(os.path.basename(src))[0] + ".pdf")
+        try:
+            r = _hostcall("office", src=staged or src, out=out)
+        finally:
+            if staged:
+                try:
+                    os.remove(staged)
+                except Exception:
+                    pass
+        if not r.get("ok_call"):
+            raise RuntimeError("soffice.convert failed: %s" % (r.get("error") or "unknown error"))
+        return r.get("out") or out
+
+    to_pdf = convert
+
+
+def _install_soffice_shim():
+    sys.modules["soffice"] = _SofficeModule()
+
+
 # ------------------------------------------------------------------- execution
 
 _G = {"__name__": "__main__", "__builtins__": builtins}
@@ -718,6 +793,7 @@ def main():
     _install_js_shim()
     _install_micropip_shim()
     _install_lazy_mounts()
+    _install_soffice_shim()
     try:
         os.makedirs("/root", exist_ok=True)
         os.chdir("/root")

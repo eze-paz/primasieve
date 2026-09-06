@@ -317,6 +317,14 @@ self.addEventListener('message', async (event) => {
     return;
   }
 
+  // Page → worker reply to an office→PDF conversion the worker asked for on behalf of a
+  // walios guest (see _officeConvertGuest below). Carries the PDF bytes or an error.
+  if (data.type === 'office-convert-result') {
+    const d = _officeReqs.get(data.id);
+    if (d) { _officeReqs.delete(data.id); d.resolve(data.payload || { ok: false, error: 'empty reply' }); }
+    return;
+  }
+
   // Page → worker reply to a screenshot request (see tool_screenshot below).
   // Carries the whole payload — data URL, dimensions and fidelity caveats.
   if (data.type === 'screenshot-result') {
@@ -991,7 +999,8 @@ function _waliosifyTools(tools) {
     d = d.replace(/^PACKAGES:.*$/m,
       'PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, sqlite3 and more are BUILT IN — just import. '
       + 'Others: await micropip.install(\'name\') installs pure-Python wheels from PyPI (with their dependencies). '
-      + 'Packages with compiled C extensions cannot be installed at runtime — they must be cross-compiled ahead of time, and micropip says so explicitly if you try.');
+      + 'Packages with compiled C extensions cannot be installed at runtime — they must be cross-compiled ahead of time, and micropip says so explicitly if you try. '
+      + 'OFFICE→PDF: import soffice; soffice.convert(\'/root/report.docx\') writes /root/report.pdf with the app\'s in-browser LibreOffice (docx/xlsx/pptx/odt and more; PDF is the only target). Do not shell out to soffice from Python.');
     d = d.replace(/^HTTP:.*$/m,
       'HTTP: pyodide.http.pyfetch works (async): r = await pyfetch(url); data = await r.json() (also await r.bytes() / await r.string()); check r.ok / r.status. '
       + 'requests and urllib also work here — real sockets and TLS are available, and CA certificates are installed — but pyfetch is cheaper and is not subject to the guest network relay, so prefer it. '
@@ -2162,6 +2171,71 @@ async function tool_html_console({ path }, ctx) {
 const SHOT_TIMEOUT = 45000;
 const _shotReqs = new Map();
 
+// ── office → PDF for walios guests ──────────────────────────────────────────
+// There is no soffice binary in walios (LibreOffice needs pthreads the kernel does not
+// give guests, and the page already carries one LibreOffice). Both guest entry points —
+// `import soffice` in the warm REPL and the `soffice` command in the shell tool — issue an
+// `office` hostcall that lands here. The guest's /root IS the OPFS workspace, so the input
+// is read straight out of OPFS, converted by the page's ZetaOffice engine
+// (opfs._officeEngine — the same LibreOffice-WASM and the same sandpie/fonts/ the file
+// viewer uses), and the PDF is written back into OPFS at the path the guest asked for.
+const OFFICE_TIMEOUT = 240000;   // a cold engine boot alone is 30-90s on a slow machine
+const OFFICE_FILTER = {
+  docx: 'writer_pdf_Export', doc: 'writer_pdf_Export', odt: 'writer_pdf_Export', rtf: 'writer_pdf_Export', txt: 'writer_pdf_Export',
+  xlsx: 'calc_pdf_Export', xls: 'calc_pdf_Export', ods: 'calc_pdf_Export', csv: 'calc_pdf_Export',
+  pptx: 'impress_pdf_Export', ppt: 'impress_pdf_Export', odp: 'impress_pdf_Export', odg: 'draw_pdf_Export',
+};
+const _officeReqs = new Map();
+let _officeSeq = 0;
+// '/root/a/b.docx' → 'a/b.docx'. null when the path is not a file under /root.
+function _guestToOpfs(p) {
+  const s = String(p || '').replace(/\/+/g, '/');
+  if (!s.startsWith('/root/')) return null;
+  const rel = s.slice('/root/'.length).replace(/^\/+|\/+$/g, '');
+  if (!rel || rel.split('/').some(seg => seg === '.' || seg === '..')) return null;
+  return rel;
+}
+async function _officeConvertGuest(a) {
+  a = a || {};
+  const srcRel = _guestToOpfs(a.src);
+  if (!srcRel) return { ok_call: false, error: 'the source must be a file under /root (the workspace) — got ' + JSON.stringify(a.src || '') };
+  const name = srcRel.split('/').pop();
+  const ext = (name.includes('.') ? name.split('.').pop() : '').toLowerCase();
+  const filter = OFFICE_FILTER[ext];
+  if (!filter) return { ok_call: false, error: '.' + (ext || '?') + ' is not a document type the PDF export handles (' + Object.keys(OFFICE_FILTER).join(', ') + ')' };
+  const outRel = a.out ? _guestToOpfs(a.out) : srcRel.replace(/\.[^./]+$/, '') + '.pdf';
+  if (!outRel) return { ok_call: false, error: 'the output must be under /root (the workspace) — got ' + JSON.stringify(a.out) };
+  let bytes;
+  try { bytes = await opfsReadBytes(srcRel); }
+  catch (e) { return { ok_call: false, error: 'could not read /root/' + srcRel + ' from the workspace: ' + ((e && e.message) || e) }; }
+  const res = await new Promise((resolve) => {
+    const id = 'office' + (++_officeSeq);
+    const timer = setTimeout(() => { _officeReqs.delete(id); resolve({ ok: false, error: 'the page did not finish the conversion within ' + (OFFICE_TIMEOUT / 1000) + 's. '
+      + 'Total silence (rather than an error) usually means sandpie.html is running cached assets older than this worker — ask the user to hard-reload the page.' }); }, OFFICE_TIMEOUT);
+    _officeReqs.set(id, { resolve: (d) => { clearTimeout(timer); resolve(d); } });
+    try {
+      self.postMessage({ type: 'forward-to-page', payload: { type: 'office-convert-request', replyType: 'office-convert-result', id, args: { bytes: bytes.buffer, ext, name } } });
+    } catch (e) {
+      clearTimeout(timer); _officeReqs.delete(id);
+      resolve({ ok: false, error: 'could not reach the page (' + ((e && e.message) || e) + ')' });
+    }
+  });
+  if (!res || !res.ok || !res.pdf) return { ok_call: false, error: (res && res.error) || 'conversion failed' };
+  const pdf = new Uint8Array(res.pdf);
+  try { await opfsWriteBytes(outRel, pdf); }
+  catch (e) { return { ok_call: false, error: 'converted, but could not write /root/' + outRel + ': ' + ((e && e.message) || e) }; }
+  try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: [outRel] } }); } catch (_) {}
+  return { ok_call: true, out: '/root/' + outRel, size: pdf.length, filter };
+}
+// Host RPC from a guest that is NOT the warm REPL (the shell tool's `soffice`). Same
+// frame shape as _wpyHostcall's; only the ops a one-shot shell program needs.
+async function _waliosGuestCall(f) {
+  try {
+    if (f.op === 'office') return await _officeConvertGuest(f.args);
+    return { ok_call: false, error: 'unknown host op ' + f.op };
+  } catch (e) { return { ok_call: false, error: String((e && e.message) || e) }; }
+}
+
 // Ask the configured vision fallback to describe an image, for models that cannot
 // see. Mirrors the captioning path in tool_load_image.
 async function _captionImage(dataUrl, ctx, what) {
@@ -3138,6 +3212,55 @@ function _waliosEnsure() {
   _waliosWorker = w;
   return w;
 }
+// `soffice` inside the shell. LibreOffice is not a guest program here — it is the page's
+// ZetaOffice engine, reached through the `office` hostcall (see _officeConvertGuest). The
+// command is a shebang wrapper plus the Python CLI in modules/walios-soffice.py, seeded
+// into the VFS as run-message blobs. Blobs land 0644 and busybox will not exec a script
+// without +x, so the user's script is prefixed — on the SAME line, so `sh: line N` error
+// numbers are unchanged — with a chmod. The CLI speaks \x02…\x03 frames on stdout, which
+// are stripped from the visible output and answered on stdin (the wali worker delivers a
+// chunk pushed after stdin-eof ahead of the EOF, so the boot-time stdin-eof stays).
+const WALIOS_SOFFICE_URL = './walios-soffice.py?v=1';
+const WALIOS_PRELUDE = 'chmod +x /usr/bin/soffice 2>/dev/null; ';
+let _waliosSofficeSrc = null;
+async function _waliosBlobs() {
+  if (_waliosSofficeSrc === null) {
+    try { _waliosSofficeSrc = await (await fetch(WALIOS_SOFFICE_URL)).arrayBuffer(); }
+    catch (_) { _waliosSofficeSrc = false; }
+  }
+  if (!_waliosSofficeSrc) return {};
+  return {
+    '/usr/lib/sandpie/soffice.py': _waliosSofficeSrc.slice(0),
+    '/usr/bin/soffice': new TextEncoder().encode('#!/bin/sh\nexec python3 /usr/lib/sandpie/soffice.py "$@"\n').buffer,
+  };
+}
+// Splits a guest's fd-1 stream into visible text and \x02<base64 json>\x03 host-call
+// frames. `push` gets the text, `onCall` gets each decoded {t:'call'} frame. A frame cut
+// across two `out` messages is held until its \x03 arrives; whatever is still held at
+// exit (a lone \x02 in ordinary output) is released by flush(). A \x02…\x03 span that is
+// not one of our frames is passed through untouched.
+function _waliosFrameScanner(push, onCall) {
+  let pend = '';
+  return {
+    feed(s) {
+      pend += s;
+      for (;;) {
+        const a = pend.indexOf('\x02');
+        if (a < 0) { if (pend) push(pend); pend = ''; return; }
+        if (a > 0) push(pend.slice(0, a));
+        const b = pend.indexOf('\x03', a + 1);
+        if (b < 0) { pend = pend.slice(a); return; }
+        const raw = pend.slice(a + 1, b);
+        pend = pend.slice(b + 1);
+        let f = null;
+        try { f = JSON.parse(_b64dec(raw)); } catch (_) { push('\x02' + raw + '\x03'); continue; }
+        if (pend.startsWith('\n')) pend = pend.slice(1);   // the frame's own line ending
+        if (f && f.t === 'call') onCall(f);
+      }
+    },
+    flush() { if (pend) push(pend); pend = ''; },
+  };
+}
 async function tool_walios({ script, timeout }, ctx) {
   if (!script || !String(script).trim())
     return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
@@ -3145,8 +3268,20 @@ async function tool_walios({ script, timeout }, ctx) {
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
   const pkgM = await _waliosPkgManifest();
+  const blobs = await _waliosBlobs();
   return await new Promise((resolve) => {
     const chunks = []; let outLen = 0, truncated = false, done = false;
+    const push = (s) => { if (!truncated) { chunks.push(s); outLen += s.length; if (outLen > 65536) truncated = true; } };
+    // Movable deadline, not a one-shot timer: time the host spends converting a document
+    // on the guest's behalf is credited back, so a 60s LibreOffice boot cannot eat a 120s
+    // budget meant for the guest's own work (same rule as the warm REPL's _wpyCredit).
+    let deadline = Date.now() + t * 1000, timer = null;
+    const tick = () => {
+      if (done) return;
+      const left = deadline - Date.now();
+      if (left > 0) { timer = setTimeout(tick, left); return; }
+      kill('Error: walios run exceeded ' + t + 's and was terminated (worker killed; the next call starts a fresh one).');
+    };
     const finish = (result) => { if (done) return; done = true; clearTimeout(timer); resolve({ result }); };
     const kill = (why) => {
       try { w.terminate(); } catch (_) {}
@@ -3154,20 +3289,31 @@ async function tool_walios({ script, timeout }, ctx) {
       let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
       finish(why + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : ''));
     };
-    const timer = setTimeout(() => kill('Error: walios run exceeded ' + t + 's and was terminated (worker killed; the next call starts a fresh one).'), t * 1000);
+    timer = setTimeout(tick, t * 1000);
     if (ctx && ctx.signal) {
       if (ctx.signal.aborted) return kill('Error: walios run aborted (turn stopped).');
       ctx.signal.addEventListener('abort', () => kill('Error: walios run aborted (turn stopped).'), { once: true });
     }
+    // Frame channel on fd 1: a host call from a guest program (soffice) is serviced here,
+    // answered on stdin, and never shown. The host's time is credited to the deadline.
+    const frames = _waliosFrameScanner(push, (f) => {
+      const t0 = Date.now();
+      _waliosGuestCall(f).then((o) => {
+        deadline += Date.now() - t0;
+        if (done) return;
+        try { w.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify({ t: 'reply', id: f.id, ...o })) + '\n' }); } catch (_) {}
+      });
+    });
     w.onmessage = (ev) => {
       if (done) return;
       const m = ev.data;
       if (m.t === 'out') {
         if (m.fd === 2 && /^\[host\]/.test(m.s)) return;   // host diagnostics
-        if (!truncated) { chunks.push(m.s); outLen += m.s.length; if (outLen > 65536) truncated = true; }
+        if (m.fd === 1) frames.feed(m.s); else push(m.s);
       } else if (m.t === 'boot') {
         try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF
       } else if (m.t === 'exit') {
+        frames.flush();
         let text = chunks.join('');
         if (truncated) text = text.slice(0, 65536) + '\n…[output truncated at 64KB]';
         text = text.replace(/\n+$/, '');
@@ -3178,6 +3324,7 @@ async function tool_walios({ script, timeout }, ctx) {
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
     w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
       tars: [['rootfs.tar.gz', '/']], opfs: '/root',
+      blobs,
       // Lazy per-binary mounts: only fetched/extracted when that wasm is first
       // exec'd. python_cxx (which `python` now maps to) pulls the stdlib + the
       // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
@@ -3185,7 +3332,7 @@ async function tool_walios({ script, timeout }, ctx) {
       lazyTars: WALIOS_LAZY_TARS,
       env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
                          HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
-      cwd: '/root', argv: ['busybox', 'sh', '-c', String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
+      cwd: '/root', argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
 
@@ -3197,7 +3344,7 @@ async function tool_walios({ script, timeout }, ctx) {
 // feeds it framed requests, so imports and user globals are paid once per session
 // and later calls land in the tens of milliseconds. Guest half + wire format:
 // modules/walios-repl.py.
-const WPY_REPL_URL = './walios-repl.py?v=4';
+const WPY_REPL_URL = './walios-repl.py?v=5';
 const WPY_GRACE_MS = 20000;      // JS deadline sits this far past the guest's own alarm
 let _wpy = null;                 // { worker, buf, waiters, seq, ready, booting, queue }
 
@@ -3334,6 +3481,7 @@ async function _wpyHostcall(st, f) {
       return reply({ ok_call: true, name: meta.info.name, version: meta.info.version,
                      body: _b64bytes(new Uint8Array(await (await _wpyFetch(w.url)).arrayBuffer())) });
     }
+    if (f.op === 'office') return reply(await _officeConvertGuest(a));
     reply({ ok_call: false, error: 'unknown host op ' + f.op });
   } catch (e) { reply({ ok_call: false, error: String((e && e.message) || e) }); }
 }
