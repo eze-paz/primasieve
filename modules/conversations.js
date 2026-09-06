@@ -226,6 +226,7 @@ async function convTitle(id) { const m = await readConvMeta(id); return (m && m.
 // usage, messages, _format } or null. Callers don't care about on-disk format.
 async function readConvData(id) {
   const loc = await convLocation(id);
+  await ensureLocalConvFile(loc.format === 'new' ? jsonlPath(id, loc.archived) : convPath(id, loc.archived));
   if (loc.format === 'new') {
     let meta = {}; try { meta = JSON.parse(await opfs.read(metaPath(id, loc.archived))); } catch {}
     let messages = []; try { messages = await readConvJsonl(jsonlPath(id, loc.archived)); } catch {}
@@ -281,6 +282,23 @@ async function readConvMetaRow(id, archived, format, wantSearch) {
     if (wantSearch) row.messageContent = (data.messages || []).map(m => _convText(m.content)).join(' ').toLowerCase();
     return row;
   } catch { return null; }
+}
+
+// Hydrate-then-read support (archive-dehydration step 3): conversation files may
+// exist only in Dropbox (body purged locally). Fetch one into OPFS; false when
+// it isn't local AND isn't in the cloud index (or the cloud is unreachable) —
+// callers degrade to today's behavior, never lose data.
+async function ensureLocalConvFile(p) {
+  try { if (await opfs.exists(p)) return true; } catch {}
+  try {
+    const sp = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
+    if (!sp || !sp.cloudConnected || !sp.cloudConnected() || !sp.cloudDownload) return false;
+    const e = (sp.cloudIndex && sp.cloudIndex()) ? sp.cloudIndex()[p] : null;
+    if (!e || e.kind !== 'file') return false;   // not in the cloud either
+    const bytes = await sp.cloudDownload(e.path || ((sp.workingRoot() || '') + '/' + p), { team: false });
+    await opfs.write(p, bytes);
+    return true;
+  } catch (_) { return false; }
 }
 
 async function rewriteConvJsonl(id, archived, messages) {
@@ -1785,6 +1803,9 @@ async function loadConv(id) {
         if (prevId) mountConv(prevId);
         return;
       }
+      // Dehydrated archive: fetch the body from the cloud before the size probe
+      // (getFileSize returns 0 for a missing file → would render as empty).
+      await ensureLocalConvFile(loc.format === 'new' ? jsonlPath(id, loc.archived) : convPath(id, loc.archived));
 
       // Read the tiny meta file first (title, compaction, msgCount, etc.)
       let meta = {};
@@ -2066,6 +2087,11 @@ async function toggleArchiveConv(id, currentlyArchived) {
     [jsonlPath(id, from), jsonlPath(id, to)],
     [convPath(id, from), convPath(id, to)],
   ];
+  // Dehydrated archive: fetch cloud-only source files first — the move below
+  // skips unreadable files, which would leave the body behind in the archive.
+  for (const p of [metaPath(id, from), jsonlPath(id, from), convPath(id, from)]) {
+    await ensureLocalConvFile(p);
+  }
   for (const [src, dst] of pairs) {
     let content; try { content = await opfs.read(src); } catch { continue; }
     if (src.endsWith(META_SUFFIX) || src.endsWith('.json')) {
@@ -2117,7 +2143,8 @@ async function _deleteConvFiles(id) {
   // removed; migration never does.)
   for (const archived of [false, true]) {
     for (const p of [metaPath(id, archived), jsonlPath(id, archived), convPath(id, archived)]) {
-      try { if (await opfs.exists(p)) { await opfs.remove(p); Sandpie.events.emit('file:deleted', p); } } catch {}
+      try { await opfs.remove(p); } catch {}   // NotFound is fine (cloud-only file)
+      Sandpie.events.emit('file:deleted', p);   // unconditional: deletes the Dropbox copy too
     }
   }
 
