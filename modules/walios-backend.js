@@ -78,25 +78,111 @@
                python: MAIN, python3: MAIN, pydl: MAIN };
     },
 
-    // Mount strategy differs by host, and only because of capability:
-    //  - 'repl'     : the warm interpreter installs a meta_path finder that can call OUT to
-    //                 the host to mount a bundle on an import miss, so heavy bundles wait.
-    //  - 'terminal' : an interactive `python` has no host RPC channel, so nothing could
-    //                 service a lazy mount; everything is unpacked up front instead.
-    // Same binary, same packages, same env either way.
-    eagerTars(mode) {
-      const base = [BUNDLES.stdlib, BUNDLES.ext, BUNDLES.extras];
-      if (mode === 'terminal') base.push(BUNDLES.numpy, BUNDLES.docs, BUNDLES.mpl);
-      return { 'python.wasm': [BUNDLES.stdlib], [MAIN]: base };
+    // ONE mount strategy for every host. It used to fork: 'terminal' unpacked all six
+    // bundles on the first `python` because an interactive shell had nothing to service
+    // a lazy mount, while 'repl'/'tool' unpacked three. That fork is what let the walios()
+    // tool ship with the lazy list and NO mount channel, so numpy/pandas/PIL/docx simply
+    // did not exist there. Every host now carries hostChannel() below, so every host can
+    // mount on demand and the mode argument is kept only so old callers keep working.
+    eagerTars(_mode) {
+      return { 'python.wasm': [BUNDLES.stdlib], [MAIN]: [BUNDLES.stdlib, BUNDLES.ext, BUNDLES.extras] };
     },
 
-    env(mode) {
+    env(_mode) {
       const e = Object.assign({}, PY_ENV);
-      if (mode === 'repl') {
-        e.SANDPIE_ASYNCIO = '1';                          // the browser worker has JSPI, so asyncio works
-        e.SANDPIE_LAZY_PKGS = JSON.stringify(LAZY_PKGS);
-      }
+      e.SANDPIE_ASYNCIO = '1';                            // the browser worker has JSPI, so asyncio works
+      e.SANDPIE_LAZY_PKGS = JSON.stringify(LAZY_PKGS);
       return e;
+    },
+
+    // The guest->host frame channel, shared by the walios() tool and terminal.html so
+    // there is one implementation to debug rather than two that drift.
+    //
+    // Frames ride fd 1 as \x02<base64 json>\x03. Under a pty that is also the user's
+    // screen, which is workable in both directions but for one wrinkle measured here:
+    // the pty ECHOES the reply we write to stdin straight back into the output, so the
+    // base64 line lands on screen. We know the exact bytes we sent, so we drop the first
+    // occurrence of each. Without that a terminal user sees a line of base64 every time
+    // a package is mounted.
+    //
+    //   worker    the Worker running wali-worker.js
+    //   onScreen  called with everything that is NOT a frame (write it to the terminal)
+    //   onCall    optional, for ops other than 'mount'; returns a promise of the reply
+    //   onMountMs optional, told how long a mount took so a caller can extend a deadline
+    hostChannel({ worker, onScreen, onCall, onMountMs }) {
+      const STX = String.fromCharCode(2), ETX = String.fromCharCode(3);
+      const enc = (str) => {
+        const b = new TextEncoder().encode(str);
+        let out = '';
+        for (let i = 0; i < b.length; i += 0x8000) out += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+        return btoa(out);
+      };
+      const dec = (x) => new TextDecoder().decode(Uint8Array.from(atob(x), (c) => c.charCodeAt(0)));
+      let pend = '';
+      const echoes = [];                 // reply payloads we expect the pty to echo back
+      const mounts = [];                 // in-flight mounts, awaiting 'tar-mounted'
+      const reply = (f, o) => {
+        const payload = enc(JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o)));
+        echoes.push(payload);
+        try { worker.postMessage({ t: 'stdin', data: payload + '\n' }); } catch (_) {}
+      };
+      // Strip our own echoed replies before anything reaches the screen.
+      const emit = (text) => {
+        if (!text) return;
+        for (let i = 0; i < echoes.length; i++) {
+          const at = text.indexOf(echoes[i]);
+          if (at < 0) continue;
+          let end = at + echoes[i].length;
+          if (text[end] === '\r') end++;
+          if (text[end] === '\n') end++;
+          text = text.slice(0, at) + text.slice(end);
+          echoes.splice(i, 1);
+          i--;
+        }
+        if (text) onScreen(text);
+      };
+      const serve = (f) => {
+        if (f.op === 'mount') {
+          const a = f.args || {};
+          if (!a.url) return reply(f, { ok_call: false, error: 'mount without url' });
+          mounts.push({ url: a.url, f, t0: Date.now() });
+          try { worker.postMessage({ t: 'mount-tar', url: a.url, prefix: a.prefix }); }
+          catch (e) { reply(f, { ok_call: false, error: String((e && e.message) || e) }); }
+          return;
+        }
+        if (onCall) { Promise.resolve(onCall(f)).then((o) => reply(f, o)); return; }
+        reply(f, { ok_call: false, error: 'unknown host op ' + f.op });
+      };
+      return {
+        // Feed it fd-1 output. Returns nothing; screen text goes to onScreen.
+        feed(strIn) {
+          pend += strIn;
+          for (;;) {
+            const a = pend.indexOf(STX);
+            if (a < 0) { emit(pend); pend = ''; return; }
+            if (a > 0) emit(pend.slice(0, a));
+            const b = pend.indexOf(ETX, a + 1);
+            if (b < 0) { pend = pend.slice(a); return; }
+            const raw = pend.slice(a + 1, b);
+            pend = pend.slice(b + 1);
+            if (pend.startsWith('\r')) pend = pend.slice(1);
+            if (pend.startsWith('\n')) pend = pend.slice(1);
+            let f = null;
+            try { f = JSON.parse(dec(raw)); } catch (_) { emit(STX + raw + ETX); continue; }
+            if (f && f.t === 'call') serve(f);
+          }
+        },
+        // Call from the worker's onmessage for {t:'tar-mounted'}. True if it was ours.
+        mounted(m) {
+          const i = mounts.findIndex((x) => x.url === m.url);
+          if (i < 0) return false;
+          const wt = mounts.splice(i, 1)[0];
+          if (onMountMs) onMountMs(Date.now() - wt.t0);
+          reply(wt.f, m.ok ? { ok_call: true } : { ok_call: false, error: m.err || 'mount failed' });
+          return true;
+        },
+        flush() { if (pend) { emit(pend); pend = ''; } },
+      };
     },
   };
 })(typeof self !== 'undefined' ? self : globalThis);

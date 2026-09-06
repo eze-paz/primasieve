@@ -3166,7 +3166,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=2');
+importScripts('/modules/walios-backend.js?v=3');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3247,33 +3247,6 @@ async function _waliosBlobs() {
   }
   return b;
 }
-// Splits a guest's fd-1 stream into visible text and \x02<base64 json>\x03 host-call
-// frames. `push` gets the text, `onCall` gets each decoded {t:'call'} frame. A frame cut
-// across two `out` messages is held until its \x03 arrives; whatever is still held at
-// exit (a lone \x02 in ordinary output) is released by flush(). A \x02…\x03 span that is
-// not one of our frames is passed through untouched.
-function _waliosFrameScanner(push, onCall) {
-  let pend = '';
-  return {
-    feed(s) {
-      pend += s;
-      for (;;) {
-        const a = pend.indexOf('\x02');
-        if (a < 0) { if (pend) push(pend); pend = ''; return; }
-        if (a > 0) push(pend.slice(0, a));
-        const b = pend.indexOf('\x03', a + 1);
-        if (b < 0) { pend = pend.slice(a); return; }
-        const raw = pend.slice(a + 1, b);
-        pend = pend.slice(b + 1);
-        let f = null;
-        try { f = JSON.parse(_b64dec(raw)); } catch (_) { push('\x02' + raw + '\x03'); continue; }
-        if (pend.startsWith('\n')) pend = pend.slice(1);   // the frame's own line ending
-        if (f && f.t === 'call') onCall(f);
-      }
-    },
-    flush() { if (pend) push(pend); pend = ''; },
-  };
-}
 async function tool_walios({ script, timeout }, ctx) {
   if (!script || !String(script).trim())
     return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
@@ -3309,40 +3282,22 @@ async function tool_walios({ script, timeout }, ctx) {
     }
     // Frame channel on fd 1: a host call from a guest program (soffice) is serviced here,
     // answered on stdin, and never shown. The host's time is credited to the deadline.
-    const mountWaiters = [];
-    const answer = (f, o) => {
-      if (done) return;
-      try { w.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify({ t: 'reply', id: f.id, ...o })) + '\n' }); } catch (_) {}
-    };
-    const frames = _waliosFrameScanner(push, (f) => {
-      const t0 = Date.now();
-      // `mount` is answered here rather than in _waliosGuestCall because it needs THIS
-      // worker: the bundle is extracted into this guest's filesystem.
-      if (f.op === 'mount') {
-        const url = (f.args || {}).url;
-        if (!url) return answer(f, { ok_call: false, error: 'mount without url' });
-        mountWaiters.push({ url, t0, f });
-        try { w.postMessage({ t: 'mount-tar', url, prefix: (f.args || {}).prefix }); }
-        catch (e) { answer(f, { ok_call: false, error: String((e && e.message) || e) }); }
-        return;
-      }
-      _waliosGuestCall(f).then((o) => {
-        deadline += Date.now() - t0;
-        answer(f, o);
-      });
+    // The SAME channel terminal.html uses — one implementation, in walios-backend.js.
+    // `mount` is serviced inside it because it needs THIS worker: the bundle is extracted
+    // into this guest's filesystem, so it cannot go through _waliosGuestCall.
+    const frames = WB.hostChannel({
+      worker: w,
+      onScreen: push,
+      onMountMs: (ms) => { deadline += ms; },        // host time is not the guest's budget
+      onCall: (f) => {
+        const t0 = Date.now();
+        return _waliosGuestCall(f).then((o) => { deadline += Date.now() - t0; return o; });
+      },
     });
     w.onmessage = (ev) => {
       if (done) return;
       const m = ev.data;
-      if (m.t === 'tar-mounted') {
-        const i = mountWaiters.findIndex((x) => x.url === m.url);
-        if (i >= 0) {
-          const wt = mountWaiters.splice(i, 1)[0];
-          deadline += Date.now() - wt.t0;      // host time is not the guest's budget
-          answer(wt.f, m.ok ? { ok_call: true } : { ok_call: false, error: m.err || 'mount failed' });
-        }
-        return;
-      }
+      if (m.t === 'tar-mounted') { frames.mounted(m); return; }
       if (m.t === 'out') {
         if (m.fd === 2 && /^\[host\]/.test(m.s)) return;   // host diagnostics
         if (m.fd === 1) frames.feed(m.s); else push(m.s);
