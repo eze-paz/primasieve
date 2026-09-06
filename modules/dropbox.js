@@ -540,13 +540,21 @@
   const isBetaIgnored = (rel) => BETA && !isExemptRel(rel);
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
+    const ARCHIVED_META_RE = /^sandpie\/conversations\/archived\/[^/]+\.meta\.json$/;
     return EXEMPT_PREFIXES.some(p => {
       const pl = p.toLowerCase();
       if (pl === 'sandpie/skills') {
         // Only SKILL.md files, not scripts/templates/etc under skills folders
         return r.startsWith(pl + '/') && r.split('/').pop() === 'skill.md';
       }
-      return r === pl || r.startsWith(pl + '/');
+      if (r === pl || r.startsWith(pl + '/')) {
+        // Dehydration step 4: archived conversation BODIES (.jsonl/.json) are
+        // dehydratable - only their tiny meta sidecars stay eager (metas are
+        // the Archive tab's index; bodies re-hydrate on open/unarchive/delete).
+        if (r.startsWith('sandpie/conversations/archived/')) return ARCHIVED_META_RE.test(r);
+        return true;
+      }
+      return false;
     });
   }
   // Convert an already-synced workspace to on-demand: remove LOCAL copies of clean

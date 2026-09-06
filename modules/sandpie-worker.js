@@ -474,7 +474,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=14', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=15', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -668,12 +668,20 @@ function _reportHydrated(rel) {
 
 function _relExempt(rel) {
   const r = String(rel).replace(/^\/+/, '').toLowerCase();
-  return _dbxExempt.some(p => {
+  const ARCHIVED_META_RE = /^sandpie\/conversations\/archived\/[^/]+\.meta\.json$/;
+    return _dbxExempt.some(p => {
       const pl = String(p).toLowerCase();
       if (pl === 'sandpie/skills') {
         return r.startsWith(pl + '/') && r.split('/').pop() === 'skill.md';
       }
-      return r === pl || r.startsWith(pl + '/');
+      if (r === pl || r.startsWith(pl + '/')) {
+        // Dehydration step 4: archived conversation BODIES (.jsonl/.json) are
+        // dehydratable - only their tiny meta sidecars stay eager (metas are
+        // the Archive tab's index; bodies re-hydrate on open/unarchive/delete).
+        if (r.startsWith('sandpie/conversations/archived/')) return ARCHIVED_META_RE.test(r);
+        return true;
+      }
+      return false;
     });
 }
 function _indexEntry(rel) {
