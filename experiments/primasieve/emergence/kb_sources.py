@@ -62,6 +62,15 @@ def tokens(text):
 
 import en_world as _W
 
+# ------------------------------------------------ the SHAPES-WORLD VERIFIER (DEMOTED -- no_paradigm_prereg.md)
+# read()/FAMILY/CUES below map a definition onto a predicate of ONE attached world (en_world). They used to be THE
+# meaning space: every researched meaning had to reduce to a colour/size/position or come back "none", which is why
+# the attributed lexicon is 435 colour/size words and nothing else. That paradigm is retired: meaning is now the set
+# of cited READINGS a source returns (wikt_readings / research_gloss / src_wordnet, all senses). This block is only an
+# OPTIONAL VERIFIER, applied when a candidate reading happens to name a predicate of the attached world, to eliminate
+# against that world. HONESTY: the CUES lists were written AFTER seeing 322/381 words wrongly land on 'small' (fitted
+# to the outcome; prereg overclaim-watch f). They remain only because the grounded thread (em_preempt/em_attributed,
+# a peer session) still consumes them; an ablation gate (remove the cues, re-derive the published numbers) is OWED.
 # TYPE CUES (V3 rule, after the corroborated bulk pass put 322 of 381 words on 'small' through 'little' and 'of
 # small importance'): a definition vouches for a predicate only if it also names WHAT KIND of property it is.
 # 'small in size' reads; 'of small importance' does not. The cue lists are about property KINDS, not about any
@@ -97,46 +106,83 @@ def read(span, anchors, typed=True):
 # ---------------------------------------------------------------- sources: each -> [(span, text)] candidates
 def src_wordnet(word, pos):
     idx, dat = ACQ._index(pos), ACQ._data(pos)
-    offs = idx.get(word.lower(), [])
-    if not offs or offs[0] not in dat: return []
-    span = " ".join(l.lower() for l in dat[offs[0]][0])
-    return [(span, span)]
+    offs = [o for o in idx.get(word.lower(), []) if o in dat]
+    if not offs: return []
+    # EVERY synset. The file's order carries no authority (prereg NP-3: sense #1 is not disambiguation); callers
+    # receive the whole set and must not privilege the first.
+    return [(" ".join(l.lower() for l in dat[o][0]),) * 2 for o in offs]
 
 
 def _strip_wiki(s):
-    s = re.sub(r"\{\{[^{}]*\}\}", " ", s)                      # templates ({{lb|en|obsolete}} etc.)
+    """Plain text of a wikitext line WITH the template data kept as text, not deleted. Templates are typed
+    relational edges, not noise: {{alternative spelling of|mul|x}} is the ALIAS edge that makes x -> x-times
+    reachable, {{lb|mul|arithmetic}} is a DOMAIN tag. The old reader stripped every {{...}} before the chase could
+    see them -- the paradigm that made the multiplication sense of 'x' unreachable (prereg audit #3)."""
+    s = re.sub(r"\{\{(?:alternative spelling of|alt sp|alt form|alternative form of|altform)\s*\|[^|}]*\|([^|}]+)[^}]*\}\}",
+               r"alternative spelling of \1", s)
+    s = re.sub(r"\{\{(?:lb|label|lbl)\|[^|}]*\|([^}]*)\}\}", lambda m: "[" + m.group(1).replace("|", ", ") + "]", s)
+    s = re.sub(r"\{\{(?:ng|n-g|non-gloss definition|non-gloss)\|([^}]*)\}\}", r"\1", s)
+    s = re.sub(r"\{\{(?:ux|uxi)\|[^|}]*\|([^|}]*)[^}]*\}\}", r"e.g. \1", s)
+    s = re.sub(r"\{\{[^{}]*\}\}", " ", s)                      # anything else: drop the markup only
     s = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", s)     # [[link|text]] -> text
-    return re.sub(r"\s+", " ", s.replace("'''", "").replace("''", "")).strip()
+    return re.sub(r"\s+", " ", s.replace("'" * 3, "").replace("'" * 2, "")).strip()
 
 
-def src_wiktionary(word):
-    """RAW WIKITEXT, not the extracts API: extracts truncate at ~1200 chars, which for 'enormous' cut the page
-    after one obsolete sense and a quotation. Definition lines in wikitext start with '# '."""
+def wikt_edges(line):
+    """The TYPED EDGES on one definition line -> dict(alias=[targets], domain=[tags], usage=[examples]).
+    An ALIAS edge is what deep_research follows to its target page (x -> the times sign)."""
+    return dict(
+        alias=[t.strip() for t in re.findall(r"\{\{(?:alternative spelling of|alt sp|alt form|alternative form of|altform)\s*\|[^|}]*\|([^|}]+)", line)],
+        domain=[t.strip() for m in re.findall(r"\{\{(?:lb|label|lbl)\|[^|}]*\|([^}]*)\}\}", line) for t in m.split("|")],
+        usage=[_strip_wiki(u) for u in re.findall(r"\{\{(?:ux|uxi)\|[^|}]*\|([^|}]*)", line)])
+
+
+WIKT_POS = (r"(?:Adjective|Noun|Verb|Symbol|Letter|Numeral|Conjunction|Particle|Adverb|Preposition|Pronoun|"
+            r"Interjection|Determiner|Prefix|Suffix|Proper noun|Phrase|Number|Abbreviation)")
+
+
+def _wikitext(word):
     url = ("https://en.wiktionary.org/w/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json"
            "&formatversion=2&titles=" + urllib.parse.quote(word))
     txt = _fetch("wiktw:" + word, url)
     if txt is None: return None
     try:
-        page = json.loads(txt)["query"]["pages"][0]
-        wt = page["revisions"][0]["slots"]["main"]["content"]
+        return json.loads(txt)["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"]
     except Exception:
-        return []
-    # the English section ends at the next LEVEL-2 header ("\n==Xxx==", not "\n===Etymology===")
-    eng = re.split(r"\n==[^=]", wt.split("==English==")[1])[0] if "==English==" in wt else wt
-    # the world's predicates are all adjectival, so ADJECTIVE senses are read first; noun/verb only if there is
-    # no adjective section (the duck sense of 'teal' otherwise adds 'small').
-    # The SOURCE TEXT for the certificate is the cleaned definition list, i.e. exactly what was read: the raw
-    # wikitext contains templates, so a cleaned line is not verbatim in it and the certificate (rightly) refused
-    # every Wiktionary reading in the first run.
-    for headers in (("Adjective",), ("Noun", "Verb")):
-        defs = []
-        for header in headers:
-            for m in re.finditer(rf"===+{header}===+\n(.*?)(?=\n===|\Z)", eng, re.S):
-                defs += [d for d in (_strip_wiki(l[2:]) for l in m.group(1).split("\n") if l.startswith("# ")) if d][:5]
-        if defs:
-            text = "\n".join(defs)
-            return [(d, text) for d in defs]
-    return []
+        return ""
+
+
+def wikt_readings(word):
+    """EVERY definition line on the page as a structured READING: dict(def, lang, pos, alias, domain, usage).
+    No language section is privileged and no POS block is whitelisted -- the two authored filters that made the
+    Translingual `Symbol` sense of 'x' (multiplication, via an ALIAS edge) unreachable are gone. Sense ORDER is the
+    page's editorial order and carries no authority: callers get the whole set (prereg NP-3)."""
+    wt = _wikitext(word)
+    if wt is None: return None
+    out = []
+    for lm in re.finditer(r"(?:^|\n)==([^=\n]+)==\n(.*?)(?=\n==[^=]|\Z)", wt, re.S):
+        lang, body = lm.group(1).strip(), lm.group(2)
+        for pm in re.finditer(r"===+(" + WIKT_POS + r")===+\n(.*?)(?=\n===+[^=]|\Z)", body, re.S):
+            pos, block = pm.group(1), pm.group(2)
+            for l in block.split("\n"):
+                if l.startswith("# "):
+                    d = _strip_wiki(l[2:])
+                    if d:
+                        e = wikt_edges(l)
+                        out.append({"def": d, "lang": lang, "pos": pos, "alias": e["alias"], "domain": e["domain"], "usage": []})
+                elif l.startswith("#:") and out and out[-1]["lang"] == lang:
+                    out[-1]["usage"] += wikt_edges(l)["usage"]
+    return out
+
+
+def src_wiktionary(word):
+    """-> [(span, text)] over EVERY reading on the page (all languages, all POS). The certificate text is the
+    cleaned definition list, i.e. exactly what was read."""
+    rs = wikt_readings(word)
+    if rs is None: return None
+    defs = [r["def"] for r in rs]
+    text = "\n".join(defs)
+    return [(d, text) for d in defs]
 
 
 def src_wikidata(word):
@@ -173,7 +219,14 @@ import kb_offline as OFF
 SOURCES = [("WORDNET-adj", lambda w: src_wordnet(w, "adj"), None), ("WORDNET-noun", lambda w: src_wordnet(w, "noun"), None),
            ("KAIKKI", OFF.src_kaikki, None), ("MOBY", OFF.src_moby, OFF.moby_read),
            ("WIKTIONARY", src_wiktionary, None), ("WIKIDATA", src_wikidata, None), ("CONCEPTNET", src_conceptnet, None)]
-OFFLINE = {"WORDNET-adj", "WORDNET-noun", "KAIKKI", "MOBY"}
+# DECLARED per-source metadata (prereg audit #13): the loop reads these flags, never a source's NAME.
+#   offline   -- no network; consulted first (cost order is a measured lesson, cost-ordered adoption)
+#   anchored  -- the source's lookup takes the anchor set (a mutual-synonymy source needs it); others take the word
+SOURCE_META = {"WORDNET-adj": dict(offline=True, anchored=False), "WORDNET-noun": dict(offline=True, anchored=False),
+               "KAIKKI": dict(offline=True, anchored=False), "MOBY": dict(offline=True, anchored=True),
+               "WIKTIONARY": dict(offline=False, anchored=False), "WIKIDATA": dict(offline=False, anchored=False),
+               "CONCEPTNET": dict(offline=False, anchored=False)}
+OFFLINE = {sid for sid, m in SOURCE_META.items() if m["offline"]}
 
 
 def family(sid):
@@ -190,7 +243,7 @@ def research(word, anchors, stop_when_unique=True):
     cites = {}; consulted = []; unavailable = []; refused = 0
     for sid, fn, reader in SOURCES:
         rd = reader or read
-        cands = fn(word, anchors) if sid == "MOBY" else fn(word)
+        cands = fn(word, anchors) if SOURCE_META[sid]["anchored"] else fn(word)
         if cands is None: unavailable.append(sid); continue
         consulted.append(sid)
         for span, text in cands:
@@ -203,8 +256,8 @@ def research(word, anchors, stop_when_unique=True):
             if state == ATTRIBUTED: cites.setdefault(frozenset([p]), []).append((sid, span[:120]))
             else: refused += 1
         distinct = {p for k in cites for p in k}
-        if stop_when_unique and len(distinct) == 1 and sid in OFFLINE and sid == "MOBY":
-            break                                              # all offline sources seen and they agree: no remote call
+        if stop_when_unique and len(distinct) == 1 and OFFLINE <= set(consulted) | set(unavailable):
+            break                                              # every declared OFFLINE source seen and they agree: no remote call
     distinct = {p for k in cites for p in k}
     base = dict(consulted=consulted, unavailable=unavailable, refused=refused)
     if not distinct: return dict(status="none", preds=set(), cites={}, **base)
@@ -218,33 +271,24 @@ STOP = set("a an the of or and to in on at by for with from as is are be being b
 
 
 def wikt_detail(word):
-    """-> dict(defs=[str], links=[[w..] per def], synonyms=[w], examples=[str]) from the cached wikitext, or None."""
-    if src_wiktionary(word) is None: return None
-    txt = _CACHE.get("wiktw:" + word)
-    if not txt: return None
-    try:
-        wt = json.loads(txt)["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"]
-    except Exception:
-        return None
-    eng = re.split(r"\n==[^=]", wt.split("==English==")[1])[0] if "==English==" in wt else wt
+    """-> dict(defs=[str], links=[[w..] per def], synonyms=[w], examples=[str]) for the chase, over EVERY reading
+    (all languages, all POS). ALIAS edge targets are added to each definition's links so deep_research follows
+    x -> its alias page the same way it follows any linked word. None if the page is unreachable."""
+    rs = wikt_readings(word)
+    if rs is None: return None
     out = dict(defs=[], links=[], synonyms=[], examples=[])
-    for headers in (("Adjective",), ("Noun", "Verb")):
-        for header in headers:
-            for m in re.finditer(rf"===+{header}===+\n(.*?)(?=\n===[^=]|\Z)", eng, re.S):
-                block = m.group(1)
-                for l in block.split("\n"):
-                    if l.startswith("# "):
-                        out["defs"].append(_strip_wiki(l[2:]))
-                        out["links"].append([t.split("|")[0].lower() for t in re.findall(r"\[\[([^\]]+)\]\]", l)])
-                    elif l.startswith("#:"):
-                        for ux in re.findall(r"\{\{ux\|en\|([^}]*)\}\}", l):
-                            out["examples"].append(_strip_wiki(ux.split("|")[0]))
-                for sm in re.finditer(r"====+Synonyms====+\n(.*?)(?=\n===|\Z)", block + "\n" + eng[m.end():m.end() + 1500], re.S):
-                    out["synonyms"] += re.findall(r"\{\{(?:syn|l)\|en\|([a-z\- ]+)", sm.group(1))
-                    break
-        if out["defs"]: break
-    out["synonyms"] = list(dict.fromkeys(s.strip() for s in out["synonyms"]))[:6]
+    for r in rs:
+        out["defs"].append(r["def"])
+        out["links"].append([t for t in re.findall(r"[a-z]+", r["def"].lower())] + r["alias"])
+        out["examples"] += r["usage"]
+    wt = _wikitext(word) or ""
+    out["synonyms"] = re.findall(r"\{\{(?:syn|l)\|[a-z]+\|([a-z\- ]+)", wt)[:20]
     return out
+
+
+# ---------------------------------------------------------------- DEEP research: chase the unknowns a definition leads to
+STOP = set("a an the of or and to in on at by for with from as is are be being been very more most quite rather "
+           "somewhat having has have that which who whose one ones thing things someone something not no".split())
 
 
 def deep_research(word, anchors, depth=2, budget=None, trace=None, tried=None):
@@ -312,13 +356,10 @@ def research_gloss(word, online=True):
         except Exception:
             sg = None
         if sg:
-            gloss = sg[0][1]
-            try:
-                words = src_wordnet(w, pos)               # synset lemmas, shown as "also: ..." context
-                syn = words[0][1] if words else ""
-            except Exception:
-                syn = ""
-            return dict(word=word, gloss=gloss, source="WORDNET-" + pos, cite=gloss, synset=syn, kind="lexical")
+            # EVERY sense, none privileged (NP-3). A caller that needs one must ask or verify, never take the first.
+            senses = [g for _, g in sg]
+            gloss = "  |  ".join(f"({i+1}) {g}" for i, g in enumerate(senses)) if len(senses) > 1 else senses[0]
+            return dict(word=word, gloss=gloss, readings=senses, source="WORDNET-" + pos, cite=gloss, kind="lexical")
     if online:
         for sid, fn in (("WIKTIONARY", src_wiktionary), ("WIKIDATA", src_wikidata), ("CONCEPTNET", src_conceptnet)):
             try:
@@ -326,8 +367,9 @@ def research_gloss(word, online=True):
             except Exception:
                 r = None
             if r:
-                text = r[0][1]
-                return dict(word=word, gloss=text, source=sid, cite=text, kind="lexical")
+                senses = [d for d, _ in r]
+                text = "  |  ".join(f"({i+1}) {d}" for i, d in enumerate(senses)) if len(senses) > 1 else senses[0]
+                return dict(word=word, gloss=text, readings=senses, source=sid, cite=r[0][1], kind="lexical")
     return None
 
 

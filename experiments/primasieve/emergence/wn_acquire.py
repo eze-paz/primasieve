@@ -106,12 +106,6 @@ LEX_COMMUNICATION = 10
 #   farewell "an acknowledgment or expression of goodwill at parting"
 #   thanks   "an acknowledgment of appreciation"
 #   sorry    "feeling or expressing regret or sorrow ..."   (an ADJECTIVE, so adjectives are checked too)
-ACT_PATTERNS = [
-    ("greeting", ["greeting"]),
-    ("farewell", ["farewell", "at parting", "leave-taking", "departing politely"]),
-    ("thanks", ["acknowledgment of appreciation", "gratitude"]),
-    ("apology", ["regret", "apology"]),
-]
 
 
 def _synsets_with_gloss(word, pos):
@@ -133,18 +127,21 @@ def _synsets_with_gloss(word, pos):
 
 
 def speech_act(word):
-    """Is this word a conversational move rather than a claim? -> (act_type, gloss) or None.
+    """Is this word a conversational move rather than a claim? -> (act_label, gloss) or None.
 
-    Looked up, not listed: any word WordNet glosses this way qualifies. Nouns are restricted to the
-    communication lexicographer file; adjectives are checked too because "sorry" is glossed as an adjective
-    ("feeling or expressing regret"), which the noun-only first version missed."""
+    LOOKED UP, NOT LISTED -- for real this time (prereg audit #14). The old version carried ACT_PATTERNS, a list of
+    four acts (greeting/farewell/thanks/apology) with hand-written cue phrases, and matched glosses against it: a
+    congratulation or a request was silently misrouted. Now the ONLY criterion is WordNet's own classification --
+    a noun sense filed under the communication lexicographer file -- and the act label is the gloss head itself
+    (the text before the first ';'), so any act WordNet glosses this way is recognised and named by its source.
+    Adjectives are checked too because "sorry" is glossed as an adjective. A caller that needs a fixed reply must
+    key on the returned label as data, not on a listed set."""
     for pos, restrict in (("noun", True), ("adj", False)):
         for lex, gloss in _synsets_with_gloss(word, pos):
             if restrict and lex != LEX_COMMUNICATION: continue
-            g = gloss.lower()
-            for act, pats in ACT_PATTERNS:
-                if any(pt in g for pt in pats):
-                    return act, gloss.split(";")[0].strip()
+            if not restrict and "expressing" not in gloss.lower() and "acknowledg" not in gloss.lower(): continue
+            head = gloss.split(";")[0].strip()
+            return head, head
     return None
 
 
