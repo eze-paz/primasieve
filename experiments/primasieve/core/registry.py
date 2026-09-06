@@ -27,6 +27,8 @@ PUBLISHED = {
     "percept_p9": ["RUNG 1 END CONDITION MET"],
     # ---- emergence E-6: the closure self-model (core/closure.py); E-5's null is the docstring's first lesson ---
     "em_closure": ["E6 CLOSURE CURRICULUM: PASS"],
+    # ---- emergence E-7: the third verdict state (core/verdict.py ATTRIBUTED); utility bar reported, not claimed --
+    "em_attributed": ["E7 ATTRIBUTED STATE: SOUND"],
     # ---- the E-series mechanisms kept live because core/ now holds them ----------------------------------------
     "meta_e5": ["CLOSED: recurring residual -> anti-unify -> NEW PRIMITIVE crystallized + generalizes"],
     "meta_e6": ["K2 stateless: ACTIVE 6.0 vs RAND-SHORT 44.0"],
@@ -42,6 +44,7 @@ PUBLISHED = {
     "cogs_stage6": ["DEGREE 4 (representation extension by collision-driven selection): PASS",
                     "collision under ablation: none", "held-out truth accuracy WITH the extension: 1.000"],
     "cogs_stage7": ["STAGE 7 COMPOSED GROWTH LOOP: PASS", "first-growth collision"],
+    "cogs_stage8": ["STAGE 8 MEANING-FIRST FLUENT REALIZATION: PASS", "CONFABULATION 0/1800"],
 }
 
 
