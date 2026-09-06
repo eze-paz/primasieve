@@ -101,6 +101,7 @@ class Lexicon:
         self.emark_det = set()   # markers that also stand in for a determiner (a quantifier: no det, no def)
         self.vmark = {}          # functor token -> marker predicate contributed on the EVENT's var
         self.coord = set()       # coordinator tokens joining two same-type constituents
+        self.senses = {}         # word -> set of classes it is indexed under (a homograph has >1)
         self.adj = {}            # ADJECTIVE token -> the predicate it contributes on the FOLLOWING head noun
                                  # (positive signal: an EXTRA unary on a head's variable, not "no token's
                                  # lemma"). Allows a HOMOGRAPH -- a word that is a noun head in one place and an
@@ -108,6 +109,10 @@ class Lexicon:
 
     def unknown(self, w):
         return self.open_vocab and w not in self.cls and w not in self.terminators
+
+    def has_sense(self, w, cls):
+        """A homograph (duck = noun AND verb) is indexed under EACH of its senses; position disambiguates."""
+        return cls in self.senses.get(w, {self.cls.get(w)})
 
     def lemma_of(self, w, cls=None):
         """Known word -> its lemma. Unknown word -> the best-supported suffix rule of the guessed class, else
@@ -226,6 +231,12 @@ def induce_lexicon(train, eps=0.0):
     for w, cc in votes.items():
         if lex.cls.get(w) != FUNC:
             lex.cls[w] = cc.most_common(1)[0][0]
+        # MULTIPLE SENSES per surface form (duck = noun AND verb). Keep every class whose support is a real
+        # share of the word's occurrences, not just the majority -- a homograph is INDEXED under each of its
+        # senses, and the parser picks the sense by POSITION (after a determiner -> the entity sense; in the
+        # verb slot -> the event sense), the same way the noun/adjective homograph is disambiguated.
+        tot = sum(cc.values())
+        lex.senses[w] = {c for c, k in cc.items() if k >= max(3, 0.15 * tot)} or {lex.cls.get(w)}
     for w, cc in lemvote.items():
         lex.lemma[w] = cc.most_common(1)[0][0]
     for w, cc in relsegs.items():
@@ -502,10 +513,10 @@ def parse_base(lex, sch, toks, i):
         # what disambiguates a homograph (n0 as adjective before another noun vs n0 as the head itself).
         amarks = []
         while (k < n and toks[k] in lex.adj and k + 1 < n
-               and (lex.cls.get(toks[k + 1]) == ENTITY or toks[k + 1] in lex.adj
+               and (lex.has_sense(toks[k + 1], ENTITY) or toks[k + 1] in lex.adj
                     or (lex.unknown(toks[k + 1]) and not toks[k + 1][:1].isupper()))):
             amarks.append(lex.adj[toks[k]]); k += 1
-        if k < n and (lex.cls.get(toks[k]) == ENTITY or (lex.unknown(toks[k]) and not toks[k][:1].isupper())):
+        if k < n and (lex.has_sense(toks[k], ENTITY) or (lex.unknown(toks[k]) and not toks[k][:1].isupper())):
             if det is not None or marks or amarks:
                 node = NP(det, ENTITY, k, lex.lemma_of(toks[k], ENTITY))
                 node.marks = tuple(marks)
@@ -520,7 +531,7 @@ def parse_base(lex, sch, toks, i):
     c = lex.cls.get(toks[i])
     if c == NAME or (lex.unknown(toks[i]) and toks[i][:1].isupper()):
         return NP(None, NAME, i, toks[i]), i + 1
-    if c == ENTITY:
+    if lex.has_sense(toks[i], ENTITY):
         return NP(None, ENTITY, i, lex.lemma.get(toks[i], toks[i])), i + 1
     return None
 
@@ -624,7 +635,7 @@ def _is_verb_here(lex, toks, j):
 
     def verbish(k):
         w = toks[k]
-        return lex.cls.get(w) == EVENT or (lex.unknown(w) and not w[:1].isupper())
+        return lex.has_sense(w, EVENT) or (lex.unknown(w) and not w[:1].isupper())
 
     if j < n and verbish(j):
         return j, None
