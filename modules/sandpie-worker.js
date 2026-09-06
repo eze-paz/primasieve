@@ -3221,18 +3221,31 @@ function _waliosEnsure() {
 // are stripped from the visible output and answered on stdin (the wali worker delivers a
 // chunk pushed after stdin-eof ahead of the EOF, so the boot-time stdin-eof stays).
 const WALIOS_SOFFICE_URL = './walios-soffice.py?v=1';
+const WALIOS_SITECUSTOMIZE_URL = './walios-sitecustomize.py?v=1';
 const WALIOS_PRELUDE = 'chmod +x /usr/bin/soffice 2>/dev/null; ';
 let _waliosSofficeSrc = null;
+let _waliosSiteSrc = null;
 async function _waliosBlobs() {
   if (_waliosSofficeSrc === null) {
     try { _waliosSofficeSrc = await (await fetch(WALIOS_SOFFICE_URL)).arrayBuffer(); }
     catch (_) { _waliosSofficeSrc = false; }
   }
-  if (!_waliosSofficeSrc) return {};
-  return {
-    '/usr/lib/sandpie/soffice.py': _waliosSofficeSrc.slice(0),
-    '/usr/bin/soffice': new TextEncoder().encode('#!/bin/sh\nexec python3 /usr/lib/sandpie/soffice.py "$@"\n').buffer,
-  };
+  if (_waliosSiteSrc === null) {
+    try { _waliosSiteSrc = await (await fetch(WALIOS_SITECUSTOMIZE_URL)).arrayBuffer(); }
+    catch (_) { _waliosSiteSrc = false; }
+  }
+  const b = {};
+  // On the default path for every python in this worker, so `python3 -c "import numpy"`
+  // in a walios() script reaches the same packages the warm REPL does. Without it the
+  // shell tool had the lazy bundle list but no way to ask for a mount, so numpy/pandas/
+  // PIL/docx simply did not exist there while terminal.html had them — measured, 4 of 7
+  // capability checks diverged.
+  if (_waliosSiteSrc) b['/site-packages/_shims/sitecustomize.py'] = _waliosSiteSrc.slice(0);
+  if (_waliosSofficeSrc) {
+    b['/usr/lib/sandpie/soffice.py'] = _waliosSofficeSrc.slice(0);
+    b['/usr/bin/soffice'] = new TextEncoder().encode('#!/bin/sh\nexec python3 /usr/lib/sandpie/soffice.py "$@"\n').buffer;
+  }
+  return b;
 }
 // Splits a guest's fd-1 stream into visible text and \x02<base64 json>\x03 host-call
 // frames. `push` gets the text, `onCall` gets each decoded {t:'call'} frame. A frame cut
@@ -3296,17 +3309,40 @@ async function tool_walios({ script, timeout }, ctx) {
     }
     // Frame channel on fd 1: a host call from a guest program (soffice) is serviced here,
     // answered on stdin, and never shown. The host's time is credited to the deadline.
+    const mountWaiters = [];
+    const answer = (f, o) => {
+      if (done) return;
+      try { w.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify({ t: 'reply', id: f.id, ...o })) + '\n' }); } catch (_) {}
+    };
     const frames = _waliosFrameScanner(push, (f) => {
       const t0 = Date.now();
+      // `mount` is answered here rather than in _waliosGuestCall because it needs THIS
+      // worker: the bundle is extracted into this guest's filesystem.
+      if (f.op === 'mount') {
+        const url = (f.args || {}).url;
+        if (!url) return answer(f, { ok_call: false, error: 'mount without url' });
+        mountWaiters.push({ url, t0, f });
+        try { w.postMessage({ t: 'mount-tar', url, prefix: (f.args || {}).prefix }); }
+        catch (e) { answer(f, { ok_call: false, error: String((e && e.message) || e) }); }
+        return;
+      }
       _waliosGuestCall(f).then((o) => {
         deadline += Date.now() - t0;
-        if (done) return;
-        try { w.postMessage({ t: 'stdin', data: _b64enc(JSON.stringify({ t: 'reply', id: f.id, ...o })) + '\n' }); } catch (_) {}
+        answer(f, o);
       });
     });
     w.onmessage = (ev) => {
       if (done) return;
       const m = ev.data;
+      if (m.t === 'tar-mounted') {
+        const i = mountWaiters.findIndex((x) => x.url === m.url);
+        if (i >= 0) {
+          const wt = mountWaiters.splice(i, 1)[0];
+          deadline += Date.now() - wt.t0;      // host time is not the guest's budget
+          answer(wt.f, m.ok ? { ok_call: true } : { ok_call: false, error: m.err || 'mount failed' });
+        }
+        return;
+      }
       if (m.t === 'out') {
         if (m.fd === 2 && /^\[host\]/.test(m.s)) return;   // host diagnostics
         if (m.fd === 1) frames.feed(m.s); else push(m.s);
@@ -3330,8 +3366,11 @@ async function tool_walios({ script, timeout }, ctx) {
       // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
       // `import` just works without the model running any install step.
       lazyTars: WALIOS_LAZY_TARS,
+      // SANDPIE_HOST_RPC tells the in-guest sitecustomize that someone is listening on
+      // fd 1, so an import miss can ask for a bundle. The terminal deliberately does not
+      // set it: there the bundles are already mounted and a frame would land in the pty.
       env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
-                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
+                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8', SANDPIE_HOST_RPC: '1' }, WB.env('repl')),
       cwd: '/root', argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
