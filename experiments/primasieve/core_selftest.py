@@ -122,11 +122,27 @@ if __name__ == "__main__":
     # claim there; this loop then protects it automatically.
     import io, contextlib, runpy
     from core.registry import PUBLISHED, verify_output
+    def _locate(mod):
+        """a registered module normally sits at the top level; thread subdirectories (emergence/) are searched
+        so a registered claim there is protected by the same loop (em_closure)."""
+        top = os.path.join(HERE, mod + ".py")
+        if os.path.exists(top):
+            return None                                    # run by module name, as before
+        for root, dirs, files in os.walk(HERE):
+            dirs[:] = [d for d in dirs if not d.startswith((".", "_")) and d != "__pycache__"]
+            if mod + ".py" in files:
+                return os.path.join(root, mod + ".py")
+        return None
+
     for mod in sorted(PUBLISHED):
         buf = io.StringIO()
+        path = _locate(mod)
         try:
             with contextlib.redirect_stdout(buf):
-                runpy.run_module(mod, run_name="__main__")
+                if path:
+                    runpy.run_path(path, run_name="__main__")
+                else:
+                    runpy.run_module(mod, run_name="__main__")
         except SystemExit:
             pass
         for claim, found in verify_output(mod, buf.getvalue()):

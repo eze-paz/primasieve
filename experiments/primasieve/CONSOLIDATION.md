@@ -110,6 +110,21 @@ hidden vocabulary); or the loop failing to build operators on operators. None oc
     — E9 NULL and E10's invertible results unchanged. Net limit #10: *all four top-ops synthesize live; the ~10^3x
     win holds only where the target is deep enough that the witness pivot is selective — shallow targets match
     blind, and menu-selection is still cheaper.*
+    **E15 (meta_e15.py, meta_e15_prereg.md) closes E9's open SUSPECT — by refuting it.** E9 left "match-count is
+    deceptive for compositional targets" as a suspect because its best-first harness was less efficient than E8's
+    BFS. E15 grafts orderings onto E8's layered generator, with the identity ordering reproducing trunc at exactly
+    109203 (the calibration E9 lacked). Result: the match-count gradient reaches a VERIFIED trunc on every seed
+    (a new correct form, `(abs(a)//abs(b))*sign(a//b)`) at 7401–8575 vs uncensored blind 138682–154739 =
+    **17.7–18.7×**, within 3% of the cheating ceiling (known sub-trees first). The signal was never deceptive;
+    the FRONTIER was — best-first starves sub-parts, a layered generator materializes them all first (the same
+    fix E10 reached via the witness). Three TARGET-BLIND diversity orderings (novelty/QD, the brainstorm's bet)
+    were NULL (cap-hit on every seed; 0.84–0.90× on decoys). Limits, from labelled post-hoc checks: distractor
+    ops `%`/min/max degrade MATCH **10.8×** (past E10's 3× bound — remainder-like candidates crowd the high-match
+    ranks), and MATCH gives NO speedup on random decoys (median 0.77×; trunc is 23× more favoured) — it works
+    exactly when the target is an almost-right primitive plus a correction, i.e. the residual-repair shape. 0
+    confab; shuffle/ablation ABSTAIN; signmod via trunc-reuse. Limit #10's synthesis story is unchanged (E10/E11
+    are target-aware witnesses at ~31×); what changes is the E9 entry: SUSPECT → REFUTED, harness confound
+    CONFIRMED as the cause.
     **E12 (prototype) + E13 (verdict-grade, meta_e13_prereg.md) probe the open-ended-invention frontier one level
     above #10.** E13: with a PROVIDED library of recursion-scheme shapes, all fold parameters (g,law,combine,init)
     are SYNTHESIZED from atoms (parity/mod10 emerge), inventing a primitive outside the object basis's expressive

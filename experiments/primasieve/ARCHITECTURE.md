@@ -66,7 +66,8 @@ Standing failure mode, from arc 1, printed by the harness: **a control that cann
 
 - **C3** is a HARD gate: **zero islands** — the live surface must be one connected component.
 
-Current: **1 component, 0 islands, 82 live files (from 94 components over 193), 8 independent threads,
+Current: **1 component, 0 islands, 91 live files (from 94 components over 193; 82 at consolidation, +Stage 4/5,
+E15), 8 independent threads,
 C1/C2/C3 all pass.** C2 reads every published claim from **one list**, `core/registry.py`; each live experiment
 also calls `selfcheck(__file__)` and verifies its own claims at exit, so a result that stops reproducing is
 caught by the file that owns it.
@@ -97,6 +98,7 @@ same structure:
 |---|---|---|
 | `core/generate.py` | enumeration under **observational equivalence** (`SignatureBank`), plus the compression/SLEEP step | l0 and emergence both hand-rolled it. Simplest-first is load-bearing: adopting a learned operator in discovery order rather than **cost order** is a 33× regression. Compression buys depth (k=16 vs blind k=2), not breadth |
 | `core/select.py` | **cost-aware UCB** with momentum, for spaces too big to enumerate | the project's only measured win of learned selection over a hand-written strategy: 25/26 QuixBugs at **0.70×** the energy of hand-coded escalation. A prior must be lift-normalized or it merely relearns cheapest-first |
+| `core/closure.py` | the **self-model**: signatures the library reaches by one composition, exact, incrementally maintained and **charged to energy**; the E-6 schedule (distance-1 first, blind ONCE per task ever, honest HALT) | E-5 (`emergence/em_curriculum.py`): learning-progress bandits — plain UCB and `core.select`'s cost-aware form — did **not** beat a shuffled sweep on a 26-task pool with 6 dead ends: a sound binary verdict is a flat landscape, and the cost-aware form fell into the cheap-mastered-task trap (54k–107k zero-progress re-probes). E-6 (`emergence/em_closure.py`): with the closure, **all 20 reached on every seed with no authored order** (shuffled sweep missed 2), **each dead end probed exactly once** (authored 38, memory-only knockout 293–357), **halts** at 76k–101k of 320k with exactly the dead ends unsolved, 0 unsound distance-1 calls. Recorded limits: authored order is still 75–98× cheaper to *first* reach (it knows the base task is first); the cascade does **not** solve in ascending order (ρ≈0.1, a prediction miss) |
 
 ### Pass 3 — merge or delete, judged against the objective
 The earlier note "the residual is deliberately left alone" was wrong and is withdrawn: every island gets
@@ -125,6 +127,19 @@ section of `cogs_stage3a_prereg.md`. None added a combinator type: relative clau
 the existing GAP; open vocabulary is the existing verdict discipline applied to a positional class guess and
 an induced suffix rule; reference is dialog_s3's elimination over the grammar's heads; generation is the same
 synchronous grammar read backwards.
+
+### Emergence E-5 / E-6 and the E15 record (on core from day one)
+`emergence/em_curriculum.py` + prereg (E-5, a measured NULL kept live as the comparison point and as the first
+lesson in `core/closure.py`'s docstring), `emergence/em_closure.py` + prereg (E-6, PASS; its claim is in
+`core/registry.py`, and `core_selftest.py` C2 now locates registered modules in thread subdirectories). Both
+import `core/`. **E15** (`meta_e15.py` + prereg) is a *record*, not a mechanism: on E8's layered generator
+calibrated to reproduce 109203 exactly, three target-blind diversity orderings (cell-rarity, value-rarity, QD
+round-robin) were NULL, and E9's match-count gradient — pre-registered as "deceptive" — reached a verified `trunc`
+on every seed at 17.7–18.7× below blind, within 3% of the cheating ceiling. E9's suspect is **refuted**: the
+frontier was deceptive, not the signal. Two recorded limits: distractor ops (`%`,min,max) degrade it 10.8×
+(past E10's 3× bound) and it gives no speedup on random decoys (median 0.77×) — it works for
+almost-right-primitive-plus-correction targets, the residual-repair shape, not generically. Not in C2 (a 6-minute
+run); the claim lives in `CONSOLIDATION.md` limit #10.
 
 ### The one substantive migration still outstanding
 `core/generate.py` names it: **the COGS combinator inventory (PRIM / EMIT / UNION / HEAD-select) is still

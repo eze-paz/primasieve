@@ -14,6 +14,11 @@ The four mechanisms below are the ones that recur, extracted from the implementa
     search      induce-by-search-then-verify: a small space, a scorer, keep what reproduces; ties to simplest
     tolerance   eps-consistency and tolerance SETS (Phase 6), including the eps ladder and its precondition
     gates       the pre-registered gate harness: knockout ladders, sanity controls, the standard baselines
+    generate    enumeration under observational equivalence (SignatureBank) and the SLEEP/compress step
+    select      cost-aware UCB with momentum, for spaces too big to enumerate
+    collect     active observation: the probe that splits the surviving hypotheses
+    closure     the SELF-MODEL: what the library reaches by composition, exact and charged -- the graded,
+                sound signal a curriculum needs (E-5 null -> E-6 pass), plus the E-6 schedule and honest HALT
 
 Each carries the MEASURED lesson that produced it, in comments, so the knowledge travels with the code
 instead of living in a commit message no other thread will read. A core adopted by only one thread is not a
