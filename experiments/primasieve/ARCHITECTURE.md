@@ -328,6 +328,24 @@ and G5 is untested on this code state; strings misses G2.
 Earlier note, kept: the G2 bar is 0.80 on both worlds. The learner is correct; the budget and the 4-atom ceiling are what it
 misses. The next lever is the enumeration itself: the 4-atom level holds 4,663 boolean terms and the true one is
 found by order, not by guidance.
+### SWE-MINE (2026-09-07) -- do structural rewrites repeat? A clean NEGATIVE
+`swe_mine_prereg.md`, `swe_mine.py`, `swe_mine_result.txt`. Owner's hypothesis: structural fixes in a mature
+repository repeat, so edit operators anti-unified from its history give the engine a coarser move set where a
+structural rewrite is one step. Measured on sympy's full history (50,437 non-merge commits, 10,432 candidate
+commits touching a test and exactly one source file, 7,148 statement-level edits, census families recovered
+verbatim): **4,275 structural edits produce 4,112 distinct skeletons. Only 90 skeletons recur at all, covering 253
+edits (6%). Skeleton-level coverage of the held-out year: 0.037 at k=200 (K1 bar 0.30) -> FAIL.** Shape-level
+coverage is 0.79 and, as pre-registered (K4), says nothing: `[] -> [Assign]` is not an operator. 3,184 of 4,275
+structural edits are 30+ primitive AST edits long -- the darkness a token-level search faces is not a few steps, it
+is dozens. The time-respecting SWE-bench test reached one structural sympy instance (path length 335, not covered);
+the other twelve are non-structural by the census or multi-file, so that gate is n=1 and is not claimed.
+**Reading:** in this repository, structural repair is not a vocabulary problem at the statement-skeleton level.
+"Having seen it before" is not available either: the fixes are each their own species. Two honest caveats: (a)
+the skeleton is one abstraction level; a coarser one (subtrees truncated at depth 2, or operators over the edit
+SCRIPT rather than the result) is untested and is the one cheap follow-up before closing the question; (b) the
+relabel family (996 edits whose skeleton is unchanged: docstrings, constants, renames) was separated out and is
+where a token-level engine already reaches. Not registered (no PASS); the negative stands as measured.
+
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
