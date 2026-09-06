@@ -665,6 +665,15 @@ const BETA_DESC = { ...SHORT_DESC,
   copy_to_workspace: 'Copy a file or folder from anywhere in the user\'s Dropbox INTO this conversation\'s project folder so you can edit or run it. The source is never modified.',
   shell: 'Run a command on the REMOTE relay host (stdout/stderr/exit code). The relay is a SEPARATE machine — NOT your project files: verify project files with list_files, never `ls`/`cat` here. Use it only for the relay itself (builds, ssh/scp to other hosts). Write a relay file by piping content through stdin. Long jobs (>~120s) are killed — launch detached (nohup … & echo $!) and poll a log.',
 };
+
+// The WIRE path is _effectiveTool(), and it prefers SHORT_DESC/BETA_DESC over
+// SandpieTools.description() — so the backend-aware text on the accessor never reached
+// the model. Caught only by dumping the tools array the app actually POSTed: while
+// running WALIOS the model was being told "never asyncio.run()", "No sockets — use
+// pyodide.http.pyfetch" and "~100 packages prebuilt", every one of which is false here.
+// Same content as RUN_PYTHON_WALIOS, in the short form these maps use.
+const SHORT_DESC_WALIOS = "Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py file. Runs on walios (wasm CPython 3.14 on a real Linux userland), NOT Pyodide. Async: top-level `await` works, and asyncio.run(main()) / loop.run_until_complete() work too. Do not use time.sleep() — use await asyncio.sleep(n). REAL SOCKETS: requests and urllib work normally (import requests; r = requests.get(url)); pyodide.http.pyfetch also works and is cheaper for a simple GET — check r.ok / r.status. PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, requests, sqlite3 and more are BUILT IN as real compiled C extensions — just import; others via `await micropip.install(...)` (pure-Python wheels only). NO subprocess: subprocess.run/Popen and os.popen raise OSError [Errno 38] immediately (no fork) — use the walios tool for shell work. A relative save lands next to the script.";
+
 // BOTH modes: run_python is renamed pyodide() and takes `code` directly (REPL).
 const NAME = { run_python: 'pyodide' };
 const PARAMS = {
@@ -692,6 +701,8 @@ function _effectiveTool(name) {
   const beta = !!window.SANDPIE_BETA;
   const descMap = beta ? BETA_DESC : SHORT_DESC;
   let description = (descMap[name] != null) ? descMap[name] : SandpieTools.description(name);
+  // run_python describes whichever backend is actually selected, on the wire path too.
+  if (name === 'run_python' && _waliosPython()) description = SHORT_DESC_WALIOS;
   const outName = (beta && BETA_NAME[name]) || NAME[name] || name;
   const params = (beta && BETA_PARAMS[name]) || PARAMS[name] || tools[name].parameters;
   // /app search: append WHERE the workspace + team shared area sit in Dropbox, so
