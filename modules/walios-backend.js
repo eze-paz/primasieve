@@ -104,6 +104,26 @@
           && typeof WebAssembly.promising === 'function';
     },
 
+    // Yield to the event loop WITHOUT setTimeout.
+    //
+    // Both SAB bridges below hand the guest one chunk at a time and then spin until it
+    // has drained: the host cannot Atomics.wait (it may be the main thread, where that
+    // is illegal), so it has to yield. setTimeout was the obvious way, and it is wrong --
+    // Chrome clamps timers to >=1s in a HIDDEN tab, so every chunk handshake cost a
+    // second the moment the user switched tabs. Measured: an 8-chunk stdlib mount blew
+    // through syncRequest's 60s budget and the guest reported the bundle "did not
+    // arrive", which surfaces as `ModuleNotFoundError: No module named 'encodings'` --
+    // a background tab silently broke python. MessagePort delivery is not throttled.
+    tick() {
+      if (!this._tickCh) {
+        this._tickCh = new MessageChannel();
+        this._tickQ = [];
+        this._tickCh.port1.onmessage = () => { const f = this._tickQ.shift(); if (f) f(); };
+        this._tickCh.port1.start();
+      }
+      return new Promise((r) => { this._tickQ.push(r); this._tickCh.port2.postMessage(0); });
+    },
+
     // Blocking stdin for the SYNCHRONOUS path.
     //
     // Without JSPI the guest cannot await a postMessage, so `{t:'stdin'}` is useless to
@@ -130,7 +150,7 @@
         async write(str) {
           const b = enc.encode(str);
           for (let off = 0; off < b.length;) {
-            while (Atomics.load(ctl, 0) !== 0) await new Promise((r) => setTimeout(r, 0));
+            while (Atomics.load(ctl, 0) !== 0) await g.WALIOS_BACKEND.tick();
             const n = Math.min(b.length - off, data.length);
             data.set(b.subarray(off, off + n), 0);
             Atomics.store(ctl, 1, n);
@@ -172,7 +192,7 @@
       catch (_) { return null; }                       // no cross-origin isolation
       const ctl = new Int32Array(sab, 0, 8), data = new Uint8Array(sab, 32);
       try { worker.postMessage({ t: 'mount-sab', sab }); } catch (_) { return null; }
-      const idle = async () => { while (Atomics.load(ctl, 0) !== 0) await new Promise((r) => setTimeout(r, 1)); };
+      const idle = async () => { while (Atomics.load(ctl, 0) !== 0) await g.WALIOS_BACKEND.tick(); };
       return {
         ctl,                                             // exposed so a probe can watch the handshake
         state() { return [Atomics.load(ctl, 0), Atomics.load(ctl, 1)]; },
