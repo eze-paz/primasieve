@@ -39,8 +39,8 @@
     // fail outright or drag a whole heavy bundle in for one HTTP call. Eager, ~2.4MB gz,
     // paid once per interpreter boot.
     extras:  ['walios-extras.tar.gz?v=4', '/site-packages'],
-    numpy:   ['walios-numpy.tar.gz?v=2', '/site-packages'],
-    docs:    ['walios-docs.tar.gz?v=4', '/site-packages'],
+    numpy:   ['walios-numpy.tar.gz?v=3', '/site-packages'],
+    docs:    ['walios-docs.tar.gz?v=5', '/site-packages'],
     mpl:     ['walios-mpl.tar.gz?v=3', '/site-packages'],
   };
 

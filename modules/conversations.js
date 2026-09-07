@@ -2952,7 +2952,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=214');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=215');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3787,7 +3787,13 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with
     // imports paid once per session rather than once per call. Staged as a shadow
     // backend so the default path is untouched.
-    pythonBackend: (() => { try { return (localStorage.getItem('sandpie-python-backend') || '').trim(); } catch (_) { return ''; } })(),
+    // Asks SandpieTools rather than reading the preference directly: walios needs JSPI
+    // (Chromium-only) and traps without it, so the answer is preference AND capability —
+    // and it must be the SAME answer that picked the tool description.
+    pythonBackend: (() => {
+      try { if (window.SandpieTools && window.SandpieTools.waliosPython) return window.SandpieTools.waliosPython() ? 'walios' : ''; } catch (_) {}
+      try { return (localStorage.getItem('sandpie-python-backend') || '').trim(); } catch (_) { return ''; }
+    })(),
     // web_search primary backend: the first configured OpenRouter provider's
     // endpoint+key (active provider preferred), so the tool gets real Exa-backed
     // results even when the active model is NOT on OpenRouter. The worker calls

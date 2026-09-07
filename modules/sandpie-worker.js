@@ -3251,6 +3251,12 @@ async function tool_walios({ script, timeout }, ctx) {
   if (!script || !String(script).trim())
     return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
+  // Unlike run_python there is no second implementation to fall back to, so say why.
+  // Without JSPI every blocking syscall traps instead of suspending: measured, a bare
+  // `echo ok` exits 139 and python cannot start.
+  if (typeof WebAssembly.Suspending !== 'function' || typeof WebAssembly.promising !== 'function')
+    return { result: 'Error: the walios shell needs WebAssembly JSPI, which this browser does not have '
+                     + '(Chromium-only today). Use run_python for computation, or the shell tool for the relay host.' };
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
   const pkgM = await _waliosPkgManifest();

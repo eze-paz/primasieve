@@ -547,12 +547,40 @@ const RUN_PYTHON_WALIOS = (() => {
   return out;
 })();
 
+// walios is a real Linux userland: every blocking syscall suspends through JSPI, so
+// without it the guest does not degrade, it TRAPS — measured, a bare `echo ok` exits 139
+// and python cannot start at all. JSPI is Chromium-only, so on Safari/Firefox a user with
+// the walios preference set would get a dead Python tool. Fall back to Pyodide instead.
+//
+// THE SAME predicate must decide the tool DESCRIPTION and the tool's actual BACKEND, or
+// the model is told walios's rules while running on Pyodide — that exact mismatch was a
+// real bug once already. conversations.js calls SandpieTools.waliosPython() for the
+// worker's config so there is one answer, not two.
+function _waliosCapable() {
+  return typeof WebAssembly !== 'undefined'
+      && typeof WebAssembly.Suspending === 'function'
+      && typeof WebAssembly.promising === 'function';
+}
+let _waliosWarned = false;
 function _waliosPython() {
-  try { return (localStorage.getItem('sandpie-python-backend') || '').trim() === 'walios'; }
+  let want = false;
+  try { want = (localStorage.getItem('sandpie-python-backend') || '').trim() === 'walios'; }
   catch (_) { return false; }
+  if (!want) return false;
+  if (_waliosCapable()) return true;
+  if (!_waliosWarned) {
+    _waliosWarned = true;
+    console.warn('[sandpie] python backend "walios" requested but this browser has no JSPI '
+                 + '(WebAssembly.Suspending/promising) — falling back to Pyodide.');
+  }
+  return false;
 }
 
 const SandpieTools = {
+  // The single answer to "is run_python actually running on walios right now?" —
+  // the preference AND the browser capability. conversations.js feeds the worker from
+  // this so the backend and the tool description can never disagree.
+  waliosPython() { return _waliosPython(); },
   names() { return Object.keys(tools); },
   defaultDescription(name) { return tools[name] ? tools[name].description : ''; },
   description(name) {
