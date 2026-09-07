@@ -1796,6 +1796,11 @@ ul.conv-list li.active {
     line-height: 1.5;
   }
   .ask-free-input:focus { border-color: var(--sp-accent); }
+  .ask-free-input.selected {
+    border-color: var(--sp-accent);
+    background: var(--sp-accent-dim);
+    color: var(--sp-accent);
+  }
   .ask-free-input::placeholder { color: var(--sp-text-dim); opacity: 0.8; }
   .ask-dots {
     display: flex;

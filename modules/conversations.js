@@ -4700,6 +4700,9 @@ function buildQuestionsView(questions, onAnswer) {
         });
         chip.classList.add('selected');
         const r = chip.querySelector('.chip-radio'); if (r) r.textContent = '\u25cf';
+        // Free text and chips are mutually exclusive: picking a chip clears the text
+        const fi = body.querySelector('.ask-free-input');
+        if (fi) { fi.value = ''; fi.classList.remove('selected'); }
         saveAnswer(i);
       };
     });
@@ -4711,8 +4714,17 @@ function buildQuestionsView(questions, onAnswer) {
         freeInput.style.height = 'auto';
         freeInput.style.height = (freeInput.scrollHeight + 2) + 'px';
       };
+      if (prevFree) freeInput.classList.add('selected');
       grow();
-      freeInput.addEventListener('input', () => { saveAnswer(i); grow(); });
+      freeInput.addEventListener('input', () => {
+        // Typing selects the free-text option: deselect chips, highlight the input
+        body.querySelectorAll('.ask-chip').forEach(c => {
+          c.classList.remove('selected');
+          const r = c.querySelector('.chip-radio'); if (r) r.textContent = '\u25cb';
+        });
+        freeInput.classList.toggle('selected', !!freeInput.value.trim());
+        saveAnswer(i); grow();
+      });
 
       // Enter submits the current answer (Shift+Enter = newline). Mirrors the
       // next/check button: on the last question this responds and closes the card.
