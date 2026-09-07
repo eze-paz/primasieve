@@ -1,0 +1,135 @@
+{
+ "n": 843,
+ "verbatim": 156,
+ "para_em": 0.0,
+ "para_confab": 0.0,
+ "formal_em": 0.44333333333333336,
+ "formal_confab": 0.0,
+ "constructions_para": 1,
+ "constructions_formal": 4,
+ "proposals": 40,
+ "accepted": 4,
+ "misreport": 0,
+ "samples": [
+  [
+   "the second record's beta is equal to 7",
+   "the second record's beta is 7"
+  ],
+  [
+   "the third record's beta is equal to its alpha and the fourth record's beta is equal to its alpha",
+   "the third record's beta is equal to the fourth record's beta and the fourth"
+  ],
+  [
+   "the second record's gamma is below 6",
+   "the second record's gamma is below 6"
+  ],
+  [
+   "the third record's alpha is equal to its gamma",
+   "the third record's alpha is equal to its gamma"
+  ],
+  [
+   "the first record's alpha is equal to its beta and the fourth record's gamma is equal to 4",
+   "the first record's alpha is equal to the second record's beta and the fourth"
+  ],
+  [
+   "some record has gamma below 2",
+   "some record has a gamma value below 2"
+  ],
+  [
+   "the fourth record's gamma is equal to its alpha",
+   "the gamma of the fourth record is equal to the alpha of the record"
+  ],
+  [
+   "the first record's beta is equal to 4 and the first record's beta is above its gamma",
+   "the first record's beta is equal to 4 and the first record's beta"
+  ],
+  [
+   "some record has beta above 1",
+   "some record has a beta value greater than 1"
+  ],
+  [
+   "some record has gamma equal to 3",
+   "the record has a gamma value of 3"
+  ],
+  [
+   "the first record's alpha is above its beta",
+   "the first record's alpha is above the second record's beta"
+  ],
+  [
+   "the first record's beta is above 8",
+   "the first record's beta is above 8"
+  ],
+  [
+   "it is not the case that the fourth record's alpha is below 9",
+   "the fourth record's alpha is not below 9"
+  ],
+  [
+   "every record has gamma equal to 7",
+   "every record has a gamma value of 7"
+  ],
+  [
+   "the second record's gamma is above its beta",
+   "the second record's gamma is above the second record's beta"
+  ],
+  [
+   "the first record's beta is equal to its gamma and the second record's gamma is above its beta",
+   "the first record's beta is equal to the second record's gamma and the second"
+  ],
+  [
+   "the third record's gamma is equal to its beta",
+   "the gamma of the third record is equal to its beta"
+  ],
+  [
+   "the third record's alpha is equal to its gamma",
+   "the third record's alpha is equal to its gamma"
+  ],
+  [
+   "the third record's gamma is equal to 2",
+   "the gamma of the third record is 2"
+  ],
+  [
+   "the second record's gamma is above 4",
+   "the second record's gamma is above 4"
+  ],
+  [
+   "the second record's alpha is above 8",
+   "the second record's alpha is above 8"
+  ],
+  [
+   "the first record's gamma is above 1",
+   "the gamma of the first record is above 1"
+  ],
+  [
+   "the third record's gamma is above 3 and the second record's beta is below 7",
+   "the third record's gamma is above 3 and the second record's beta is"
+  ],
+  [
+   "the first record's alpha is equal to 2 and the fourth record's alpha is above its beta",
+   "the first record's alpha is equal to 2 and the fourth record's alpha"
+  ],
+  [
+   "it is not the case that the first record's alpha is below its beta",
+   "the first record's alpha is not below its beta"
+  ],
+  [
+   "every record has alpha above 6",
+   "every record has an alpha value greater than 6"
+  ],
+  [
+   "it is not the case that the third record's alpha is equal to its beta",
+   "the alpha of the third record is not equal to the beta of the third record"
+  ],
+  [
+   "the third record's gamma is below 0",
+   "the gamma of the third record is below zero"
+  ],
+  [
+   "the second record's gamma is above its alpha",
+   "the second record's gamma is above the alpha"
+  ],
+  [
+   "the first record's gamma is equal to 6",
+   "the gamma of the first record is 6"
+  ]
+ ]
+}

@@ -412,7 +412,14 @@ only if the parse agrees with the intended meaning on all 20; MISREPORT (accepte
 First run at 240 sentences was UNINFORMATIVE (0 constructions on both narrators: the evidence gate needs 40 rows per
 construction; recorded so it is not repeated). **CONTROL at 2,605 formal sentences: 4 constructions (the atom, its
 negation, the quantified atom), compositional EM 0.443, CONFAB 0** -- the rendering, with its function words ("the",
-"record", "'s", "is"), is learnable. Paraphrase run at 1,000 sentences: RESULTS_E13
+"record", "'s", "is"), is learnable. Paraphrase run at 1,000 sentences: **843 narrated in 50 min (19% verbatim copies, 48-word vocabulary, 29 word classes); the learner adopted ONE construction
+(the atom, 66 rows) -- the narrator spreads the same meaning over many surface forms, so no skeleton but one reaches 40
+rows; the held-out scoring line reported n=0 (a split bookkeeping bug, unfixed, so no coverage number is claimed).
+ROUND TRIP: 40 proposals, **4 accepted, MISREPORT 0**; the four accepted sentences are the narrator's verbatim copies of
+the formal rendering. Reading: the guarantee holds (nothing wrong was ever accepted), the mechanism runs end to end, and
+the reward is bounded by the narrator: a 0.5B base model is too inconsistent for the engine to learn fluent forms from
+at this scale. The lever is a stronger narrator (an instruct model) or an order of magnitude more sentences; both are
+hours, and the acceptance bar stays exactly where it is.
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
