@@ -174,6 +174,8 @@
       try { worker.postMessage({ t: 'mount-sab', sab }); } catch (_) { return null; }
       const idle = async () => { while (Atomics.load(ctl, 0) !== 0) await new Promise((r) => setTimeout(r, 1)); };
       return {
+        ctl,                                             // exposed so a probe can watch the handshake
+        state() { return [Atomics.load(ctl, 0), Atomics.load(ctl, 1)]; },
         async mount(url, prefix) {
           let bytes;
           try {
