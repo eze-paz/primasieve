@@ -401,6 +401,18 @@ translation at all (irregulars, and "-ed" doubling as participle), which is why 
 engine's discipline and usable by it. It is not fluency: the table is the model's lexicon; whatever makes it fluent
 lives in what the 24 layers do with these vectors, and the causal probe is the first instrument that can ask them.
 
+### Emergence E-13 (2026-09-07) -- the describer: a model narrates, the world judges, the engine learns; fluency by round trip
+`emergence/em_describer.py` (+ a KV-cached greedy decoder in `qwen_fwd.py`: 10 s -> 2.9 s per sentence). Owner's ask:
+make the model fluent. The honest architecture: fluency at the EDGE, zero confabulation in the CORE. (1) Qwen2.5-0.5B
+paraphrases a fixed plain-word rendering of records-world meanings ("the second record's beta is above 5"); the world
+labels the MEANING's truth, so a paraphrase that changed the meaning is noise the learner must reject. (2) The Phase 3
+learner learns from (situation, paraphrase, truth). (3) REALIZATION BY ROUND TRIP: for a held-out meaning the model
+proposes a sentence; the engine parses it with the learned grammar and evaluates it on 20 fresh situations; ACCEPT
+only if the parse agrees with the intended meaning on all 20; MISREPORT (accepted sentence wrong on a 21st) must be 0.
+First run at 240 sentences was UNINFORMATIVE (0 constructions on both narrators: the evidence gate needs 40 rows per
+construction; recorded so it is not repeated). **CONTROL at 2,605 formal sentences: 4 constructions (the atom, its
+negation, the quantified atom), compositional EM 0.443, CONFAB 0** -- the rendering, with its function words ("the",
+"record", "'s", "is"), is learnable. Paraphrase run at 1,000 sentences: RESULTS_E13
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).

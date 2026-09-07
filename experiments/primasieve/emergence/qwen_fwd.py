@@ -64,6 +64,42 @@ class Qwen:
         W = self.w["model.embed_tokens.weight"] if self.tied or "lm_head.weight" not in self.w else self.w["lm_head.weight"]
         return h[-1] @ W.T
 
+    @torch.no_grad()
+    def generate(self, ids, max_new=16, stop=("\n",)):
+        """greedy decoding with a KEY-VALUE CACHE: the prompt is encoded once, each new token attends to cached
+        keys/values (without this, every token re-ran the whole 160-token few-shot prompt: ~10 s per sentence)."""
+        w = self.w; T0 = len(ids); pos_all = torch.arange(T0)
+        K = [None] * self.L; V = [None] * self.L
+        def step(x_tokens, pos, first):
+            x = w["model.embed_tokens.weight"][torch.tensor(x_tokens)]; T = x.shape[0]
+            for l in range(self.L):
+                p = f"model.layers.{l}."
+                h = self.rms(x, w[p + "input_layernorm.weight"])
+                q = (h @ w[p + "self_attn.q_proj.weight"].T + w[p + "self_attn.q_proj.bias"]).view(T, self.H, self.hd)
+                k = (h @ w[p + "self_attn.k_proj.weight"].T + w[p + "self_attn.k_proj.bias"]).view(T, self.KV, self.hd)
+                v = (h @ w[p + "self_attn.v_proj.weight"].T + w[p + "self_attn.v_proj.bias"]).view(T, self.KV, self.hd)
+                q, k = self.rope(q, pos), self.rope(k, pos)
+                K[l] = k if first else torch.cat([K[l], k], 0); V[l] = v if first else torch.cat([V[l], v], 0)
+                rep = self.H // self.KV
+                kk = K[l].repeat_interleave(rep, 1); vv = V[l].repeat_interleave(rep, 1)
+                att = torch.einsum("thd,shd->hts", q, kk) / math.sqrt(self.hd)
+                if first: att = att + torch.full((T, T), float("-inf")).triu(1)
+                att = torch.softmax(att, -1)
+                o = torch.einsum("hts,shd->thd", att, vv).reshape(T, self.D)
+                x = x + o @ w[p + "self_attn.o_proj.weight"].T
+                h = self.rms(x, w[p + "post_attention_layernorm.weight"])
+                x = x + (torch.nn.functional.silu(h @ w[p + "mlp.gate_proj.weight"].T) * (h @ w[p + "mlp.up_proj.weight"].T)) @ w[p + "mlp.down_proj.weight"].T
+            hN = self.rms(x[-1], w["model.norm.weight"])
+            Wo = self.w["model.embed_tokens.weight"] if self.tied or "lm_head.weight" not in self.w else self.w["lm_head.weight"]
+            return int(torch.argmax(hN @ Wo.T))
+        t = step(ids, pos_all, True); out = []
+        for i in range(max_new):
+            s = self.decode([t])
+            if any(x in s for x in stop) or t == self.tok.token_to_id("<|endoftext|>"): break
+            out.append(t)
+            t = step([t], torch.tensor([T0 + i]), False)
+        return out
+
     def encode(self, text): return self.tok.encode(text).ids
     def decode(self, ids): return self.tok.decode(ids)
 
