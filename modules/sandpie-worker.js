@@ -3166,7 +3166,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=4');
+importScripts('/modules/walios-backend.js?v=5');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3193,12 +3193,24 @@ async function _waliosPkgManifest() {
     return (_waliosPkgM = m);
   } catch (_) { return (_waliosPkgM = {}); }
 }
+// Wire an OPFS bridge worker for dehydrated (cloud-only) files: it lists them
+// from the cloud index and downloads on first open, so the shell sees the same
+// files the app's sidebar shows instead of an empty directory. Report each
+// hydration so the page records a clean sync-state entry (as the file tools do).
+function _waliosWireOpfs(ow) {
+  try { ow.postMessage({ t: 'dbx', token: (_dbxCtx && _dbxCtx.token) || null, beta: !!(_dbxCtx && _dbxCtx.beta) }); } catch (_) {}
+  ow.addEventListener('message', (ev) => {
+    const d = ev.data; if (!d || d.t !== 'hydrated' || !d.rel) return;
+    _hydratedSet.add(d.rel); _reportHydrated(d.rel);
+  });
+  return ow;
+}
 function _waliosEnsure() {
   if (_waliosWorker) return _waliosWorker;
   const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
   try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
     const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
-    const opfsWorker = new Worker(WALIOS_BASE + 'opfs-worker.js');
+    const opfsWorker = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
     opfsWorker.postMessage({ t: 'sab', sab: opfsSab });
     w.postMessage({ t: 'opfs-sab', sab: opfsSab });
   } catch (_) { /* no cross-origin isolation → RAM-only VFS */ }
@@ -3503,7 +3515,7 @@ async function _wpyEnsure() {
   _wpy = st;
   try {   // OPFS bridge: /root is the workspace (same namespace as /files)
     const sab = new SharedArrayBuffer(32 + (1 << 20));
-    const ow = new Worker(WALIOS_BASE + 'opfs-worker.js');
+    const ow = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
     ow.postMessage({ t: 'sab', sab }); w.postMessage({ t: 'opfs-sab', sab });
   } catch (_) {}
   try {   // WISP bridge: real sockets (ssl/urllib inside the guest)
