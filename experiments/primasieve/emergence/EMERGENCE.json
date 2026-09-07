@@ -1875,7 +1875,7 @@
     "waste": 0.967
    }
   ],
-  "secs": 89.6
+  "secs": 133.7
  },
  "E7_attributed_state": {
   "cascaded": 13,
@@ -1915,7 +1915,7 @@
    "central",
    "lofty"
   ],
-  "secs": 1.8,
+  "secs": 2.7,
   "shuffle_admitted": 0,
   "strikes": {
    "DICT-A": 0,
@@ -1951,7 +1951,7 @@
    "yellow": 2
   },
   "prereg": "em_corpus_prereg.md",
-  "secs": 0.6,
+  "secs": 0.8,
   "single_token": 32,
   "sound": true,
   "stats": {

@@ -240,14 +240,18 @@ import kb_offline as OFF
 
 # (source id, fetch, reader). OFFLINE sources first -- exact, instant, no rate limit; the online ones are the
 # fallback for words the downloaded resources do not settle. MOBY reads by lemma equality (its lists are broad).
+import kb_geometry as GEO
+
 SOURCES = [("WORDNET-adj", lambda w: src_wordnet(w, "adj"), None), ("WORDNET-noun", lambda w: src_wordnet(w, "noun"), None),
            ("KAIKKI", OFF.src_kaikki, None), ("MOBY", OFF.src_moby, OFF.moby_read),
+           (GEO.SOURCE_ID, GEO.src_geometry, GEO.geometry_read),            # E-11: a model's weights, read as a lexicon
            ("WIKTIONARY", src_wiktionary, None), ("WIKIDATA", src_wikidata, None), ("CONCEPTNET", src_conceptnet, None)]
 # DECLARED per-source metadata (prereg audit #13): the loop reads these flags, never a source's NAME.
 #   offline   -- no network; consulted first (cost order is a measured lesson, cost-ordered adoption)
 #   anchored  -- the source's lookup takes the anchor set (a mutual-synonymy source needs it); others take the word
 SOURCE_META = {"WORDNET-adj": dict(offline=True, anchored=False), "WORDNET-noun": dict(offline=True, anchored=False),
                "KAIKKI": dict(offline=True, anchored=False), "MOBY": dict(offline=True, anchored=True),
+               GEO.SOURCE_ID: dict(offline=True, anchored=True),
                "WIKTIONARY": dict(offline=False, anchored=False), "WIKIDATA": dict(offline=False, anchored=False),
                "CONCEPTNET": dict(offline=False, anchored=False)}
 OFFLINE = {sid for sid, m in SOURCE_META.items() if m["offline"]}

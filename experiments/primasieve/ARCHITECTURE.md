@@ -360,6 +360,35 @@ blocks median 70 AST tokens. Additions of definitions are the reachable family (
 least (31/177). **Reading:** a same-file premise is closer than the original code, by a third, not by an order of
 magnitude; it widens what a short local search can reach, it does not make restructure a one-step primitive.
 
+### Emergence E-11 (2026-09-07) -- a language model's WEIGHTS as a world, and then as a source
+`emergence/em_weights.py`, `em_weights2.py`, `em_weights3.py`, `qwen_fwd.py` (a 120-line Qwen2 forward pass from
+safetensors, so the model can be the oracle), `kb_geometry.py`. Owner's ask: point the engine at LLM weights and see
+whether it extracts a high-dimensional pattern. The engine's way: the embedding table is a WORLD, the engine's sound
+knowledge (the morphology table, WordNet, the numerals) supplies hypotheses, every claim carries a shuffled knockout.
+Qwen2.5-0.5B, 24,944 whole-word tokens, predictions committed in the docstring before running:
+- **Morphology is a translation.** One constant vector: singular -> plural nearest-neighbour accuracy **0.920**,
+  3rd-person **0.943**, present participle 0.472, past 0.292; the shuffled-pair knockout is **0.000** on all four.
+  Tolerance set (Phase 6): 98% of plural pairs lie within an eps that admits 5% of random pairs -- exact up to eps.
+- **Synonymy is proximity.** WordNet first-synset noun pairs: cosine 0.271 vs 0.084 random; synonym in the top-10
+  neighbours 35% vs 0% for a random word. **Number words lie on a line** in value order (better than all 200 shuffles).
+- **Meaning in the raw weights, no hypothesis:** the principal axes of the word subspace decode as function words vs
+  content words, then language identity, then plurality (two axes), then adverbs (-ly). The lexicon is organised
+  along dimensions a grammarian would name.
+- **CAUSAL, the model as oracle:** the plural operator read off the table, added to the residual stream at the last
+  position (scaled to the residual's own norm; at |d| = 0.099 unscaled nothing moved -- a calibration error, fixed and
+  recorded), steers the next word to a plural on **14/20 prompts at layer 18; a random direction of the same size 0/20;
+  the negated operator 0/20.** "a problem with the server" -> servers; "buy a new laptop" -> computers, batteries, cars.
+  A pattern extracted from weights that changes the model's behaviour as predicted.
+- **Added to the architecture:** `kb_geometry.py` -- the weights as a designated OFFLINE source in `kb_sources`
+  (`WEIGHTS-qwen2.5-0.5b`, anchored, MOBY's lemma-equality reading, ATTRIBUTED with the neighbour list as the
+  certificate). Built once by `em_weights3.py` in the numpy environment into `_nldata/qwen_geometry.sqlite` (24,944
+  words x 12 neighbours + 99,776 operator applications); read by the stdlib engine like the Wiktionary index. Utility
+  on E-7's twelve hard words, alone: 2 unique-and-right, 1 contested with the truth present, 0 wrong, 9 nothing;
+  shuffle knockout 0/12. Regressions unchanged: validate_chat 21/21, E-7, E-10.
+**What this is and is not.** It is verified lexical structure and one behavioural operator, extracted with the
+engine's discipline and usable by it. It is not fluency: the table is the model's lexicon; whatever makes it fluent
+lives in what the 24 layers do with these vectors, and the causal probe is the first instrument that can ask them.
+
 ## How to test / validate (the interface)
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
