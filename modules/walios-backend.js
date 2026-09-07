@@ -176,13 +176,19 @@
       return {
         ctl,                                             // exposed so a probe can watch the handshake
         state() { return [Atomics.load(ctl, 0), Atomics.load(ctl, 1)]; },
+        // prefix 'module:<key>' streams a RAW wasm binary for sync exec to compile;
+        // anything else is a gzipped package tarball to unpack. Same buffer, same
+        // handshake -- a blocked guest can only be handed one channel.
         async mount(url, prefix) {
           let bytes;
+          const raw = String(prefix || '').startsWith('module:');
           try {
             const abs = new URL(url, new URL(base, self.location ? self.location.href : undefined)).href;
             const resp = await fetch(abs);
             if (!resp.ok) throw new Error('HTTP ' + resp.status + ' for ' + abs);
-            bytes = new Uint8Array(await new Response(resp.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+            bytes = raw
+              ? new Uint8Array(await resp.arrayBuffer())
+              : new Uint8Array(await new Response(resp.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
           } catch (e) {
             await idle(); Atomics.store(ctl, 0, 3); Atomics.notify(ctl, 0);
             return { ok: false, error: String((e && e.message) || e) };
