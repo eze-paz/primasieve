@@ -3941,6 +3941,41 @@ function parseWaliosBlobCalls(text) {
 
 function scrubFramingTokens(s) { return typeof s === 'string' ? s.replace(/<\|[\s\S]*?\|>/g, '').replace(/<｜[\s\S]*?｜>/g, '') : s; }
 
+// FRAMING LEAK in a STRING ARGUMENT. GLM-family models emit tool calls as text
+// (`<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value>...</tool_call>`) and
+// occasionally RESTART the opener mid-value: seen live 2026-09-07 (GLM-5.3-Flash,
+// transcript turn 27605) -- `<tool_call>respond<arg_key>text</arg_key><arg_value>` was
+// emitted twice inside one call, the provider's non-nesting parser took the whole
+// span up to the single closer as the value, and the user saw the reply twice with
+// the raw marker between the copies. 7 such turns in the week before this fix.
+// Rule: everything up to and including the LAST opener is a discarded false start;
+// the final segment is the one the model actually closed. Trailing closers and any
+// dangling `<arg_key>` tail are stripped. -> { text, leaked }
+function scrubArgFraming(text) {
+  if (typeof text !== 'string' || text.indexOf('<') < 0) return { text, leaked: false };
+  const hasMarker = /<tool_call>|<\/tool_call>|<arg_value>|<\/arg_value>|<arg_key>/.test(text);
+  if (!hasMarker) return { text, leaked: false };
+  let t = text;
+  const lastCall = t.lastIndexOf('<tool_call>');
+  if (lastCall >= 0) {
+    // RESTARTED OPENER: the value is whatever follows the last opener's <arg_value> (or its
+    // <arg_key>..</arg_key> block, or the bare opener) -- the earlier copy is the false start.
+    const val = t.indexOf('<arg_value>', lastCall);
+    const key = t.indexOf('</arg_key>', lastCall);
+    if (val >= 0) t = t.slice(val + '<arg_value>'.length);
+    else if (key >= 0) t = t.slice(key + '</arg_key>'.length);
+    else t = t.slice(lastCall + '<tool_call>'.length);
+  } else if (t.startsWith('<arg_value>')) {
+    t = t.slice('<arg_value>'.length);
+  }
+  // NO opener: the value ENDS at the first closer -- what follows is a dangling second argument
+  // the parser failed to split off (`...</arg_value><arg_key>language</arg_key><arg_value>en`).
+  const tail = t.indexOf('</arg_value>');
+  if (tail >= 0) t = t.slice(0, tail);
+  t = t.replace(/<\/?tool_call>/g, '').replace(/<arg_key>[\s\S]*$/, '');
+  return { text: t.trim(), leaked: true };
+}
+
 function firstBalancedObject(s) {
   const start = s.indexOf('{'); if (start < 0) return null;
   let depth = 0, inStr = false, esc = false;
@@ -5096,6 +5131,7 @@ async function runAgent(config, ctx) {
   ctx._respondRetries = 0;    // bare-prose attempts rejected this turn while forcing respond()
   ctx._responded = false;      // at least one respond() delivered this turn (multi-respond support)
   ctx._langRejectCount = 0;    // respond() calls rejected for missing language this turn
+  ctx._framingLeaks = 0;       // respond() texts that carried leaked tool-call markup (scrubArgFraming)
   ctx._respondLangs = new Set(); // language codes already delivered this turn (dedup)
   ctx._respondCount = 0;        // successful respond() deliveries this turn (hard cap)
   ctx._forceRespondNext = false; // one-shot: the NEXT request must compel respond() BY NAME (armed after a bare-prose round)
@@ -5465,7 +5501,13 @@ async function runAgent(config, ctx) {
     let _rejectRespondLang = false;
     let _rejectReason = '';
     if (respondCall) {
-      try { const _a = JSON.parse(respondCall.function.arguments || '{}'); respondText = String(_a.text ?? ''); respondLocaleOverride = _locFromOverride(_a.language); if (!respondLocaleOverride) { _rejectRespondLang = true; _rejectReason = 'missing'; } }
+      try {
+        const _a = JSON.parse(respondCall.function.arguments || '{}');
+        const _sf = scrubArgFraming(String(_a.text ?? ''));
+        respondText = _sf.text;
+        if (_sf.leaked) { ctx._framingLeaks++; try { console.warn('[respond] leaked tool-call framing scrubbed from text (last-opener rule)'); } catch (_) {} }
+        respondLocaleOverride = _locFromOverride(_a.language); if (!respondLocaleOverride) { _rejectRespondLang = true; _rejectReason = 'missing'; }
+      }
       catch (_) { respondText = ''; _rejectRespondLang = true; _rejectReason = 'missing'; }
       _stashAside(round.content);                        // keep any non-respond prose as thinking
       if (_rejectRespondLang) {
@@ -5716,7 +5758,9 @@ async function runAgent(config, ctx) {
         } else {
           try {
             const _a2 = JSON.parse(tc.function.arguments || '{}');
-            _tcText = String(_a2.text ?? '');
+            const _sf2 = scrubArgFraming(String(_a2.text ?? ''));
+            _tcText = _sf2.text;
+            if (_sf2.leaked) { ctx._framingLeaks++; try { console.warn('[respond] leaked tool-call framing scrubbed from text (last-opener rule)'); } catch (_) {} }
             _tcLocale = _locFromOverride(_a2.language);
             if (!_tcLocale) { _tcReject = true; _tcReason = 'missing'; }
             else if (ctx._respondCount >= MAX_RESPOND_DELIVERIES) { _tcReject = true; _tcReason = 'cap'; }
