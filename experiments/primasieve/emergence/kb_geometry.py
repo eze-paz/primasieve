@@ -44,6 +44,17 @@ def apply_operator(word, op):
     return r[0] if r else None
 
 
+def verified_operators():
+    """the morphology operators E-12 verified on this table: feature -> (accuracy, knockout, tolerance core, pairs).
+    An operator is held with its numbers, the way a Phase 6 tolerance set is held with its eps."""
+    c = _con()
+    if c is None: return {}
+    try:
+        return {f: (a, k, core, n) for f, a, k, core, n in c.execute("select * from verified_op")}
+    except sqlite3.OperationalError:
+        return {}
+
+
 def src_geometry(word, anchors=None):
     """kb_sources' source shape -> [(span, text)] | None. The TEXT is the neighbour list (what was read); a SPAN is
     one neighbour that is an anchor word (lemma equality, MOBY's rule), so the certificate check is exact."""

@@ -385,7 +385,19 @@ Qwen2.5-0.5B, 24,944 whole-word tokens, predictions committed in the docstring b
   words x 12 neighbours + 99,776 operator applications); read by the stdlib engine like the Wiktionary index. Utility
   on E-7's twelve hard words, alone: 2 unique-and-right, 1 contested with the truth present, 0 wrong, 9 nothing;
   shuffle knockout 0/12. Regressions unchanged: validate_chat 21/21, E-7, E-10.
-**What this is and is not.** It is verified lexical structure and one behavioural operator, extracted with the
+**E-12 (same night): the morphology sweep and the causal map** (`em_weights4.py`, result json beside it). Every
+inflectional feature with >= 40 single-token pairs, same test: **VERIFIED** plural 0.915, 3rd-person singular 0.945,
+comparative 0.707 (75 pairs), superlative 0.829 (41 pairs); below the bar: present participle 0.435, past tense
+0.237, past participle 0.263 -- knockout 0.000 on every one of the seven. The four survivors are written into the
+geometry source as verified operators with their numbers (`kb_geometry.verified_operators()`), the engine's first
+open-vocabulary morphology module, read off a model and checked against the morphology table. **Causal map:** every
+survivor steers the model's next word, random direction 0/20 and negated 0/20 at every layer: comparative **20/20 at
+layer 20**, superlative 16/20 at 20, plural 15/20 at 16, 3rd-person 9/20 at 20; all late, as predicted. **The
+finding:** plural and 3rd-person are one direction (cosine **0.941**; the other pairs 0.26-0.42). The table encodes
+the "-s" suffix once, and the layers decide from context what it is -- nouns flip at layer 16, verbs at layer 20,
+with the same vector. Morphology in the lexicon is orthographic; syntax is in the stack. Past tense is not a
+translation at all (irregulars, and "-ed" doubling as participle), which is why it fails as geometry.
+**What this is and is not.** It is verified lexical structure and four behavioural operators, extracted with the
 engine's discipline and usable by it. It is not fluency: the table is the model's lexicon; whatever makes it fluent
 lives in what the 24 layers do with these vectors, and the causal probe is the first instrument that can ask them.
 
