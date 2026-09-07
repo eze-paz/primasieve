@@ -14,9 +14,9 @@ to the gold after-state (ast.dump equality). Reports: recurring patterns, held-o
 of those are REPRODUCED -- the number that says whether restructure is a primitive here."""
 import os, sys, ast, json, collections, datetime
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "_nldata", "swe_mine_edits.json")
-STRUCTURAL = {"small-mixed-rewrite", "large-rewrite", "add-def/class", "insert:large", "insert:else/elif-branch"}
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
+from swe_mine import CACHE, STRUCTURAL          # one thread, one definition of the families (no island: C3)
+from core.registry import selfcheck
 LEAF_FIELDS = {"id", "attr", "arg", "name", "value", "asname", "module"}
 
 

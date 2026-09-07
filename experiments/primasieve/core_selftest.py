@@ -199,4 +199,4 @@ if __name__ == "__main__":
         allok &= good
         print(f"  {name:<34} {got:.4f}  published {want:.4f}  {'OK' if good else 'MOVED'}")
     print(f"  -> {'PASS' if allok else 'FAIL'}")
-    print(f"\nCONSOLIDATION SELF-TEST: {'PASS' if (ok1 and allok) else 'FAIL'}")
+    print(f"\nCONSOLIDATION SELF-TEST: {'PASS' if (ok1 and ok3 and ok4 and allok) else 'FAIL'}")   # every gate, not two
