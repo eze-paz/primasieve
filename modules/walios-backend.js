@@ -95,6 +95,118 @@
       return e;
     },
 
+    // Is JSPI here? walios' blocking syscalls are WebAssembly.Suspending imports, so
+    // without it the guest traps rather than degrading. Callers pass `jspi: WB.jspi()`
+    // so a browser without it takes the synchronous path instead of dying.
+    jspi() {
+      return typeof WebAssembly !== 'undefined'
+          && typeof WebAssembly.Suspending === 'function'
+          && typeof WebAssembly.promising === 'function';
+    },
+
+    // Blocking stdin for the SYNCHRONOUS path.
+    //
+    // Without JSPI the guest cannot await a postMessage, so `{t:'stdin'}` is useless to
+    // it: a read on fd 0 returns EOF immediately and the warm REPL exits the instant it
+    // starts (measured — "guest exited 0" in 5s). wali-worker.js has always had the
+    // receiving half of the fix — readStdin() parks on Atomics.wait against a
+    // SharedArrayBuffer installed by a 'stdin-sab' message — but NO host ever sent that
+    // message, so the whole mechanism was dead code. This is the writing half.
+    //
+    // Protocol (ctl = Int32Array(sab,0,4), data = Uint8Array(sab,16)):
+    //   ctl[0]  0 = empty / host may write, 1 = data ready, 2 = EOF
+    //   ctl[1]  byte count in data
+    // The guest drains, sets ctl[0] back to 0 and notifies; we wait for that before the
+    // next chunk. Never Atomics.wait here — a host may be on the main thread, where it
+    // is disallowed — so yield to the event loop instead.
+    stdinBridge(worker, capacity) {
+      let sab;
+      try { sab = new SharedArrayBuffer(16 + (capacity || (1 << 20))); }
+      catch (_) { return null; }                       // no cross-origin isolation
+      const ctl = new Int32Array(sab, 0, 4), data = new Uint8Array(sab, 16);
+      try { worker.postMessage({ t: 'stdin-sab', sab }); } catch (_) { return null; }
+      const enc = new TextEncoder();
+      return {
+        async write(str) {
+          const b = enc.encode(str);
+          for (let off = 0; off < b.length;) {
+            while (Atomics.load(ctl, 0) !== 0) await new Promise((r) => setTimeout(r, 0));
+            const n = Math.min(b.length - off, data.length);
+            data.set(b.subarray(off, off + n), 0);
+            Atomics.store(ctl, 1, n);
+            Atomics.store(ctl, 0, 1);
+            Atomics.notify(ctl, 0);
+            off += n;
+          }
+        },
+        eof() { Atomics.store(ctl, 0, 2); Atomics.notify(ctl, 0); },
+      };
+    },
+
+    // Lazy bundle mounting for the SYNCHRONOUS path.
+    //
+    // With JSPI the wali worker fetches and extracts a bundle itself. Without it the guest
+    // is parked in Atomics.wait ON THAT THREAD, so the worker can never run its own
+    // 'mount-tar' handler: the mount frame went out and nothing came back. Measured --
+    // `import numpy` hung to the 90s test timeout while the stdlib worked fine.
+    //
+    // So the host does the half that needs an event loop (fetch + gunzip) on ITS thread
+    // and streams the plain tar bytes through a SAB the guest drains from inside its wait
+    // loop; the guest parses them with the same installTar() the async path uses. One
+    // buffer, installed at boot -- a blocked guest can never be handed a new one.
+    //
+    //   ctl[0]  0 = host may write, 1 = chunk ready, 2 = last chunk, 3 = host error
+    //   ctl[1]  bytes in this chunk        data[0..256) = NUL-padded mount prefix
+    // `base` matters: bundle URLs are RELATIVE ('walios-numpy.tar.gz?v=3') and the wali
+    // worker resolves them against its own script at /walios/. Fetching from the host
+    // instead resolves them against the HOST's document, which 404s and looks exactly
+    // like a missing package -- the finder gets ok_call:false and raises
+    // ModuleNotFoundError in milliseconds. Resolve explicitly.
+    mountBridge(worker, opts) {
+      const o = (typeof opts === 'number') ? { chunkBytes: opts } : (opts || {});
+      const base = o.base || '/walios/';
+      const chunkBytes = o.chunkBytes;
+      const PREFIX = 256, cap = chunkBytes || (4 << 20);
+      let sab;
+      try { sab = new SharedArrayBuffer(32 + PREFIX + cap); }
+      catch (_) { return null; }                       // no cross-origin isolation
+      const ctl = new Int32Array(sab, 0, 8), data = new Uint8Array(sab, 32);
+      try { worker.postMessage({ t: 'mount-sab', sab }); } catch (_) { return null; }
+      const idle = async () => { while (Atomics.load(ctl, 0) !== 0) await new Promise((r) => setTimeout(r, 1)); };
+      return {
+        ctl,                                             // exposed so a probe can watch the handshake
+        state() { return [Atomics.load(ctl, 0), Atomics.load(ctl, 1)]; },
+        async mount(url, prefix) {
+          let bytes;
+          try {
+            const abs = new URL(url, new URL(base, self.location ? self.location.href : undefined)).href;
+            const resp = await fetch(abs);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' for ' + abs);
+            bytes = new Uint8Array(await new Response(resp.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+          } catch (e) {
+            await idle(); Atomics.store(ctl, 0, 3); Atomics.notify(ctl, 0);
+            return { ok: false, error: String((e && e.message) || e) };
+          }
+          const pb = new TextEncoder().encode(prefix || '/');
+          for (let off = 0;;) {
+            await idle();
+            data.fill(0, 0, PREFIX);
+            data.set(pb.subarray(0, PREFIX), 0);        // the prefix rides with every chunk
+            const n = Math.min(bytes.length - off, cap);
+            data.set(bytes.subarray(off, off + n), PREFIX);
+            off += n;
+            const last = off >= bytes.length;
+            Atomics.store(ctl, 1, n);
+            Atomics.store(ctl, 0, last ? 2 : 1);
+            Atomics.notify(ctl, 0);
+            if (last) break;
+          }
+          await idle();                                  // guest has installed it
+          return { ok: true };
+        },
+      };
+    },
+
     // The guest->host frame channel, shared by the walios() tool and terminal.html so
     // there is one implementation to debug rather than two that drift.
     //
@@ -109,7 +221,11 @@
     //   onScreen  called with everything that is NOT a frame (write it to the terminal)
     //   onCall    optional, for ops other than 'mount'; returns a promise of the reply
     //   onMountMs optional, told how long a mount took so a caller can extend a deadline
-    hostChannel({ worker, onScreen, onCall, onMountMs }) {
+    //   stdin     optional stdinBridge(); when given, replies go through the SAB as well
+    //             as postMessage, so the same channel works with and without JSPI
+    //   mount     optional mountBridge(); when given, bundles are fetched HERE and
+    //             streamed in, because a synchronous guest cannot mount its own
+    hostChannel({ worker, onScreen, onCall, onMountMs, stdin, mount }) {
       const STX = String.fromCharCode(2), ETX = String.fromCharCode(3);
       const enc = (str) => {
         const b = new TextEncoder().encode(str);
@@ -124,7 +240,11 @@
       const reply = (f, o) => {
         const payload = enc(JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o)));
         echoes.push(payload);
+        // The JSPI guest reads postMessage'd chunks; the synchronous guest is parked in
+        // Atomics.wait and only ever sees the SAB. Feed both — whichever path this guest
+        // is on, exactly one of them is listening.
         try { worker.postMessage({ t: 'stdin', data: payload + '\n' }); } catch (_) {}
+        if (stdin) { try { stdin.write(payload + '\n'); } catch (_) {} }
       };
       // Strip our own echoed replies before anything reaches the screen.
       const emit = (text) => {
@@ -145,6 +265,16 @@
         if (f.op === 'mount') {
           const a = f.args || {};
           if (!a.url) return reply(f, { ok_call: false, error: 'mount without url' });
+          // A synchronous guest cannot service its own 'mount-tar', so fetch here and
+          // stream the bytes in. Under JSPI the worker still does it itself.
+          if (mount) {
+            const t0 = Date.now();
+            mount.mount(a.url, a.prefix).then((r) => {
+              if (onMountMs) onMountMs(Date.now() - t0);
+              reply(f, r.ok ? { ok_call: true } : { ok_call: false, error: r.error || 'mount failed' });
+            });
+            return;
+          }
           mounts.push({ url: a.url, f, t0: Date.now() });
           try { worker.postMessage({ t: 'mount-tar', url: a.url, prefix: a.prefix }); }
           catch (e) { reply(f, { ok_call: false, error: String((e && e.message) || e) }); }
