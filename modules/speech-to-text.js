@@ -21,7 +21,7 @@ const SandpieSpeech = (function () {
 
   const NS = 'speech';
   const LS_KEY = 'sandpie-speech';
-  const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto' };
+  const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto', engine: 'webspeech' };
 
   const MODELS = [
     { id: 'onnx-community/whisper-tiny',  label: 'Whisper Tiny — fastest (~80 MB)' },
@@ -63,6 +63,7 @@ const SandpieSpeech = (function () {
   }
   const cfgModel = () => cfgAll().model;
   const cfgLang  = () => cfgAll().lang;
+  const cfgEngine = () => cfgAll().engine;
 
   // ── State machine: idle | recording | busy ──
   let _state = 'idle';
@@ -138,7 +139,56 @@ const SandpieSpeech = (function () {
     try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
   }
 
-  // ── Capture + VAD loop ──
+  // ── Engine: Web Speech API (default) — native recognizer, live text ──
+  // Chrome/Edge: excellent quality + instant live results. Desktop Chrome routes
+  // audio through Google's recognizer service (not fully on-device); Android is
+  // on-device. Unavailable on Firefox/Safari -> falls back to Whisper on-device.
+  let _recog = null, _recogActive = false;
+  function webspeechSupported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+  function wsStart() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return false;
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    const lang = cfgLang();
+    r.lang = lang === 'auto' ? (navigator.language || 'es-ES') : lang;
+    r.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        if (res.isFinal) {
+          appendToComposer(res[0].transcript);
+        } else interim += res[0].transcript;
+      }
+      setState('recording');
+      if (interim) _btn.title = interim.slice(-60);
+    };
+    r.onerror = (e) => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;   // benign
+      console.warn('[stt] webspeech error:', e.error);
+      flashTitle('Voice input error: ' + e.error);
+    };
+    r.onend = () => {
+      // Chrome auto-stops after silence; restart while the user is still recording.
+      if (_recogActive && !_stopping) { try { r.start(); return; } catch (_) {} }
+      if (!_recogActive) window.SandpieSpeech.engineDone(true);
+    };
+    _recog = r;
+    _recogActive = true;
+    try { r.start(); } catch (e) { _recogActive = false; return false; }
+    return true;
+  }
+  function wsStop() {
+    _recogActive = false;
+    try { _recog && _recog.stop(); } catch (_) {}
+    // onend fires engineDone; settle shortly after in case it never fires.
+    setTimeout(() => { if (_state === 'busy') window.SandpieSpeech.engineDone(true); }, 800);
+  }
+
+  // ── Capture + VAD loop (Whisper on-device engine) ──
   let _stream = null, _ctx = null, _node = null, _src = null;
   let _buf = [];            // Float32 chunks at 16 kHz (current segment)
   let _bufSec = 0;
@@ -214,6 +264,10 @@ const SandpieSpeech = (function () {
   }
 
   async function engineStart() {
+    if (cfgEngine() === 'webspeech' && webspeechSupported()) {
+      if (wsStart()) return;   // native engine took over
+      flashTitle('Web Speech unavailable — using on-device Whisper');
+    }
     try {
       _stopping = false;
       _stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -244,6 +298,7 @@ const SandpieSpeech = (function () {
   }
 
   function engineStop() {
+    if (_recogActive) { wsStop(); return; }
     _stopping = true;
     teardownCapture();
     flushSegment(true);   // trailing buffer → final segment; engineDone fires on drain
@@ -297,6 +352,12 @@ const SandpieSpeech = (function () {
       Transcription runs <strong>fully on-device</strong> with Whisper: your microphone audio
       never leaves this tab. The first use downloads the model (cached after).
     </p>
+    <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Engine</label>
+    <select id="sttEngine" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;">
+      <option value="webspeech">Browser native (Web Speech) — fast, live text</option>
+      <option value="whisper">Whisper on-device — private, audio never leaves the tab</option>
+    </select>
+    <p id="sttEngineNote" style="font-size:0.68rem; color:var(--sp-text-dim); margin:0 0 0.6rem;"></p>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Model</label>
     <select id="sttModel" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;"></select>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Spoken language</label>
@@ -314,8 +375,22 @@ const SandpieSpeech = (function () {
 
     for (const m of MODELS) { const o = document.createElement('option'); o.value = m.id; o.textContent = m.label; modelSel.appendChild(o); }
     for (const pair of LANGS) { const o = document.createElement('option'); o.value = pair[0]; o.textContent = pair[1]; langSel.appendChild(o); }
+    const engineSel = panel.querySelector('#sttEngine');
+    const engineNote = panel.querySelector('#sttEngineNote');
+    engineSel.value = cfgEngine();
     modelSel.value = cfgModel();
     langSel.value  = cfgLang();
+    function noteFor() {
+      if (cfgEngine() === 'webspeech') {
+        return webspeechSupported()
+          ? "Desktop Chrome/Edge route the audio through the browser's speech service; Android runs it on-device."
+          : 'This browser has no Web Speech API — Whisper on-device will be used instead.';
+      }
+      return 'Whisper runs fully in this tab; the first use downloads the model.';
+    }
+    engineNote.textContent = noteFor();
+
+    engineSel.addEventListener('change', () => { setCfg({ engine: engineSel.value }); engineNote.textContent = noteFor(); });
 
     modelSel.addEventListener('change', () => { setCfg({ model: modelSel.value }); _workerReady = false; status.textContent = ''; });
     langSel.addEventListener('change', () => setCfg({ lang: langSel.value }));
