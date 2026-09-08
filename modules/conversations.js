@@ -3085,7 +3085,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=216');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=217');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3912,6 +3912,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // open-todos stop guard. window.__todoV2 = 1 (console) restores the
     // guarded v2 tool for comparison/rollback.
     todoMode: _todoV2() ? '' : 'claude',
+    // LITE2 fast-path flags (worker-side round cap + empty-search guard + scraper fail-fast).
+    lite2: _lite2Only(convId || activeConvId),
+    lite2Rounds: 3,
     // Rerouted to the vision fallback for this turn (user attached an image to a
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
@@ -3936,6 +3939,20 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // uses only the /proxy/ multi-engine scrape fallback.
     webSearch: (() => {
       try {
+        // LITE2-ONLY primary backend (2026-09-08): route the search helper through
+        // the managed company proxy (the server holds a VALID upstream key) instead
+        // of the client's stored openrouter.ai key, which can be stale/invalid
+        // (session y5xo6tis: every search 401'd "User not found"). Gated on lite2
+        // so the standard mode's webSearch backend is untouched.
+        if (_lite2Only(convId || activeConvId)) {
+          const mg = [effective, active, ...((typeof SandpieProviders !== 'undefined' && SandpieProviders.list) ? SandpieProviders.list() : [])].filter(Boolean)
+            .find(p => p.managed && String(p.apiKey || '').trim() && String(p.endpoint || '').trim());
+          if (mg) return {
+            url: String(mg.endpoint).trim().replace(/\/$/, '') + '/chat/completions',
+            apiKey: String(mg.apiKey).trim(),
+            model: (effective && effective.model) || '',
+          };
+        }
         const cands = [effective, active,
                        ...((typeof SandpieProviders !== 'undefined' && SandpieProviders.list) ? SandpieProviders.list() : [])].filter(Boolean);
         const or = cands.find(p => /(^https?:\/\/|\.)openrouter\.ai(\/|$)/i.test(String(p.endpoint || '').trim() + '/')
@@ -6300,7 +6317,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     // The reply-language directive below still applies (it is appended after this).
     content = 'You are sandpie, a fast assistant in ' + (_lite2Only(_liteCid) ? 'LITE2' : 'LITE') + ' mode. Answer directly, concisely and completely. '
       + (_lite2Only(_liteCid)
-        ? 'You have exactly ONE tool: web_search (keyword web search returning a ranked list of {title, url, snippet}). Use it whenever the request needs current/recent info or a lookup, then answer from the results. '
+        ? 'You have exactly ONE tool: web_search (keyword web search returning a ranked list of {title, url, snippet}). SPEED is the priority: answer from your own knowledge by default; call web_search ONLY when the answer depends on current/recent facts you are unsure of. When you do search, batch independent lookups as SEVERAL web_search calls in the SAME turn, then answer. If searches return no results, do NOT keep retrying reworded queries - answer from what you know and say live search is unavailable. '
         : 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. ')
       + 'No other tools exist in this mode (no files, no code execution, no page fetching): if the request needs them, say so in one short line and ask the user to run >>> ' + (_lite2Only(_liteCid) ? 'lite2' : 'lite') + ' off. '
       + 'Do not invent tool results.';
