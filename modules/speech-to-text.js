@@ -108,7 +108,11 @@ const SandpieSpeech = (function () {
         return;
       }
     };
-    _worker.onerror = (e) => console.warn('[stt] worker error:', e.message || e);
+    _worker.onerror = (e) => {
+      console.warn('[stt] worker error:', e.message || e);
+      flashTitle('STT engine error: ' + (e.message || 'worker failed'));
+      window.SandpieSpeech.engineDone(false, (e && e.message) || 'worker failed');
+    };
     return _worker;
   }
   const _pending = new Map();
@@ -166,6 +170,7 @@ const SandpieSpeech = (function () {
     _queue = _queue.then(async () => {
       try {
         const txt = await transcribeSegment(f32);
+        console.info('[stt] segment ->', JSON.stringify(txt));
         if (txt) appendToComposer(txt);
       } catch (e) {
         console.warn('[stt] segment failed:', e && e.message);
@@ -175,9 +180,13 @@ const SandpieSpeech = (function () {
     });
   }
 
+  let _dbgT = 0;
   function onAudioChunk(chunk, rate) {
     const f32 = resampleTo16k(chunk, rate);
-    const loud = rms(f32) > RMS_THRESH;
+    const level = rms(f32);
+    const now = Date.now();
+    if (now - _dbgT > 2000) { _dbgT = now; console.info('[stt] mic level rms=' + level.toFixed(4) + ' (thresh ' + RMS_THRESH + ')'); }
+    const loud = level > RMS_THRESH;
     if (loud) {
       _speechSeen = true;
       _silenceMs = 0;
@@ -195,7 +204,9 @@ const SandpieSpeech = (function () {
 
   function flushSegment(final) {
     if (!_buf.length) { if (final) window.SandpieSpeech.engineDone(true); return; }
-    const total = new Float32Array(Math.floor(_bufSec * TARGET_SR));
+    let n = 0;
+    for (const c of _buf) n += c.length;
+    const total = new Float32Array(n);
     let off = 0;
     for (const c of _buf) { total.set(c, off); off += c.length; }
     _buf = []; _bufSec = 0; _silenceMs = 0; _speechSeen = false;
@@ -207,11 +218,13 @@ const SandpieSpeech = (function () {
       _stopping = false;
       _stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (_ctx.state === 'suspended') await _ctx.resume();
       _src = _ctx.createMediaStreamSource(_stream);
       _node = _ctx.createScriptProcessor(4096, 1, 1);   // deprecated but universal; capture-only
       _node.onaudioprocess = (e) => { if (_state === 'recording') onAudioChunk(e.inputBuffer.getChannelData(0), _ctx.sampleRate); };
       _src.connect(_node);
-      _node.connect(_ctx.destination);   // ScriptProcessor needs a destination; gain 0 path
+      const sink = _ctx.createGain(); sink.gain.value = 0;   // ScriptProcessor needs a destination; keep it silent
+      _node.connect(sink); sink.connect(_ctx.destination);
       // Preload the model in the background so the first segment isn't slow.
       try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); } catch (_) {}
     } catch (e) {
