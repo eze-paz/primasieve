@@ -6298,11 +6298,11 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   if (_liteCid && (_liteOn(_liteCid) || _lite2On(_liteCid))) {
     // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
     // The reply-language directive below still applies (it is appended after this).
-    content = 'You are sandpie, a fast assistant in LITE mode. Answer directly, concisely and completely. '
-      + (_lite2On(_liteCid)
+    content = 'You are sandpie, a fast assistant in ' + (_lite2Only(_liteCid) ? 'LITE2' : 'LITE') + ' mode. Answer directly, concisely and completely. '
+      + (_lite2Only(_liteCid)
         ? 'You have exactly ONE tool: web_search (keyword web search returning a ranked list of {title, url, snippet}). Use it whenever the request needs current/recent info or a lookup, then answer from the results. '
         : 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. ')
-      + 'No other tools exist in this mode (no files, no code execution, no page fetching): if the request needs them, say so in one short line and ask the user to run >>> ' + (_lite2On(_liteCid) ? 'lite2' : 'lite') + ' off. '
+      + 'No other tools exist in this mode (no files, no code execution, no page fetching): if the request needs them, say so in one short line and ask the user to run >>> ' + (_lite2Only(_liteCid) ? 'lite2' : 'lite') + ' off. '
       + 'Do not invent tool results.';
   } else {
     content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
