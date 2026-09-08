@@ -357,7 +357,7 @@
           const name = 'picked/' + fname;
           await opfs.write(name, bytes);
           opfs.notifyUpload(name);
-          const pane = (host && host.id === 'messagesSide' && !opfs._isMobile()) ? 'side' : 'main';
+          const pane = (document.querySelector('#messagesSide .file-viewer') && !opfs._isMobile()) ? 'side' : 'main';
           if (window.SandpieImages && SandpieImages.setState) {
             SandpieImages.setState({ kind: 'image', opfsPath: name, name: fname, mime: 'image/jpeg',
               size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, pane);
